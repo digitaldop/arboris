@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -34,6 +35,8 @@ from .models import (
     SistemaOperazioneCronologia,
     SistemaUtentePermessi,
 )
+from anagrafica.dati_base_import import default_gi_file_path, run_import_dati_base
+
 from .permissions import operational_admin_required
 
 
@@ -134,14 +137,51 @@ def impostazioni_generali_sistema(request):
     else:
         form = SistemaImpostazioniGeneraliForm(instance=impostazioni)
 
+    p = default_gi_file_path()
     return render(
         request,
         "sistema/impostazioni_generali_form.html",
         {
             "form": form,
             "impostazioni": impostazioni_display,
+            "dati_base_file_ready": p.is_file(),
+            "dati_base_file_path": str(p),
         },
     )
+
+
+def importa_dati_base_anagrafica(request):
+    """
+    Avvia l'import di regioni, province, città e CAP da import/gi_comuni_cap.xlsx (stesso meccanismo di `import_dati_base`).
+    Protetto a livello Sistema: solo chi ha permesso di gestione sul modulo.
+    """
+    if request.method != "POST":
+        return redirect("impostazioni_generali_sistema")
+    p = default_gi_file_path()
+    if not p.is_file():
+        messages.error(
+            request,
+            f"File assente sul server: {p}. Carica o committa il file nella cartella import del progetto e ridistribuisci.",
+        )
+        return redirect("impostazioni_generali_sistema")
+    try:
+        stats = run_import_dati_base(file_path=p)
+    except ValidationError as e:
+        messages.error(request, " ".join(e.messages) if e.messages else str(e))
+        return redirect("impostazioni_generali_sistema")
+    except Exception as e:  # noqa: BLE001 — logica operativa: mostra errore generico
+        messages.error(request, f"Errore durante l'import: {e}")
+        return redirect("impostazioni_generali_sistema")
+    messages.success(
+        request,
+        (
+            f"Import dati base eseguito. File: {stats.get('file', p)}. "
+            f"Nuove regioni: {stats['regioni_creati']}, nuove province: {stats['province_creati']}, "
+            f"elaborazione città (righe): {stats['citta_righe']}, CAP creati: {stats['cap_creati']}, "
+            f"CAP non importati (città mancante): {stats['cap_saltati']}."
+        ),
+    )
+    return redirect("impostazioni_generali_sistema")
 
 
 def get_pending_restore_metadata(request):

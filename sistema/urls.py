@@ -19,6 +19,11 @@ urlpatterns = [
         name="impostazioni_generali_sistema",
     ),
     path(
+        "sistema/impostazioni-generali/importa-dati-base/",
+        sistema_manage(views.importa_dati_base_anagrafica),
+        name="importa_dati_base_anagrafica",
+    ),
+    path(
         "sistema/backup-database/",
         sistema_manage(views.backup_database_sistema),
         name="backup_database_sistema",

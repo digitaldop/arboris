@@ -58,6 +58,46 @@
                     </div>
 
                     <div class="admin-section">
+                        <div class="admin-section-title">Dati anagrafici di base</div>
+                        <div class="panel">
+                            <div class="panel-body" data-terminology-skip="true">
+                                <p class="help-text" style="margin-top:0;">
+                                    Regione, province, città (con codice ISTAT e codice Belfiore/catastale) e collegamento CAP
+                                    vengono letti dal file
+                                    <code>import/gi_comuni_cap.xlsx</code> nella cartella del progetto (sul server).
+                                    L'import unisce o aggiorna i record; non cancella dati esistenti (né indirizzi collegati).
+                                </p>
+                                {% if can_manage_sistema %}
+                                    <form
+                                        method="post"
+                                        action="{% url 'importa_dati_base_anagrafica' %}"
+                                        style="margin-top:0.75rem;"
+                                        onsubmit="return confirm('Avviare l\'import da gi_comuni_cap.xlsx? L\'operazione pu\u00f2 richiedere qualche minuto.');"
+                                    >
+                                        {% csrf_token %}
+                                        <button
+                                            type="submit"
+                                            class="btn btn-secondary"
+                                            {% if not dati_base_file_ready %}disabled title="File non presente nel deploy"{% endif %}
+                                        >
+                                            Importa dati base (comuni, CAP, …)
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                {% if not dati_base_file_ready %}
+                                    <p class="help-text" style="color: var(--color-warning-text, #8a4b00); margin-top:0.5rem;">
+                                        File assente: <code>{{ dati_base_file_path }}</code>. Aggiungilo in repository o sul server e rideploya.
+                                    </p>
+                                {% else %}
+                                    <p class="help-text" style="margin-top:0.5rem;">
+                                        File utilizzato: <code>{{ dati_base_file_path }}</code>
+                                    </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-section">
                         <div class="admin-section-title">Aspetto del software</div>
                         <div class="panel">
                             <div class="panel-body" data-terminology-skip="true">
