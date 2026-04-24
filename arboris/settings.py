@@ -13,10 +13,18 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 import dj_database_url
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_bool(name, default=False):
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 # Quick-start development settings - unsuitable for production
@@ -55,6 +63,10 @@ INSTALLED_APPS = [
     'gestione_finanziaria',
     'gestione_amministrativa.apps.GestioneAmministrativaConfig',
 ]
+
+USE_S3_MEDIA = env_bool("USE_S3_MEDIA") or bool(os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip())
+if USE_S3_MEDIA:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -166,6 +178,15 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -179,6 +200,41 @@ LOGOUT_REDIRECT_URL = "login"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+if USE_S3_MEDIA:
+    aws_storage_bucket_name = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
+    if not aws_storage_bucket_name:
+        raise ImproperlyConfigured(
+            "USE_S3_MEDIA e' attivo ma AWS_STORAGE_BUCKET_NAME non e' configurato."
+        )
+
+    aws_s3_region_name = os.environ.get("AWS_S3_REGION_NAME", "").strip() or None
+    aws_s3_endpoint_url = os.environ.get("AWS_S3_ENDPOINT_URL", "").strip() or None
+    aws_s3_custom_domain = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "").strip() or None
+    aws_media_location = os.environ.get("AWS_MEDIA_LOCATION", "").strip()
+
+    s3_default_storage_options = {
+        "bucket_name": aws_storage_bucket_name,
+        "region_name": aws_s3_region_name,
+        "access_key": os.environ.get("AWS_ACCESS_KEY_ID", "").strip() or None,
+        "secret_key": os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip() or None,
+        "default_acl": None,
+        "file_overwrite": env_bool("AWS_S3_FILE_OVERWRITE", default=False),
+        "querystring_auth": env_bool("AWS_QUERYSTRING_AUTH", default=True),
+        "signature_version": os.environ.get("AWS_S3_SIGNATURE_VERSION", "s3v4").strip() or "s3v4",
+    }
+
+    if aws_s3_endpoint_url:
+        s3_default_storage_options["endpoint_url"] = aws_s3_endpoint_url
+    if aws_s3_custom_domain:
+        s3_default_storage_options["custom_domain"] = aws_s3_custom_domain
+    if aws_media_location:
+        s3_default_storage_options["location"] = aws_media_location
+
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": s3_default_storage_options,
+    }
 
 # Celery (ripristino database in background). Se CELERY_BROKER_URL è vuoto, si usa un thread worker-side.
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "").strip()
