@@ -23,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-sg+t9@_ej5r58z(c@aji3-ddce#zr6_nh5uderw6xsm)k63ln)'
+#SECRET_KEY = 'django-insecure-sg+t9@_ej5r58z(c@aji3-ddce#zr6_nh5uderw6xsm)k63ln)'
+SECRET_KEY = '1+f0hexzqb_3t%ps51)re9wc7%0&&(pe!)=#*2v2yjyh^%9!-v'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "False") == "True"
@@ -69,7 +70,7 @@ MIDDLEWARE = [
     'gestione_finanziaria.middleware.SincronizzazionePsd2ScheduleMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = 'arboris.urls'
 
 TEMPLATES = [
     {
@@ -89,18 +90,31 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = 'arboris.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Stringa di collegamento al database arboris_dev, database per lo sviluppo
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL")
-    )
-}
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "arboris_dev",
+            "USER": "postgres",
+            "PASSWORD": "postgres",
+            "HOST": "localhost",
+            "PORT": "5432",
+        }
+    }
 
 
 # Password validation
