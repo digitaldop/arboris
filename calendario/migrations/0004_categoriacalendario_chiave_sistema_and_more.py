@@ -93,5 +93,5 @@ class Migration(migrations.Migration):
             name='ripetizione_numero_occorrenze',
             field=models.PositiveSmallIntegerField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(260)]),
         ),
-        migrations.RunPython(ensure_system_categories, noop_reverse),
+        
     ]
