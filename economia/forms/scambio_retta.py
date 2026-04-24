@@ -5,6 +5,7 @@ from django import forms
 from anagrafica.models import Famiglia, Familiare, Studente
 from anagrafica.forms import make_searchable_select
 from scuola.models import AnnoScolastico
+from scuola.utils import resolve_default_anno_scolastico
 
 from economia.models import PrestazioneScambioRetta, ScambioRetta, TariffaScambioRetta
 
@@ -145,9 +146,9 @@ class ScambioRettaForm(forms.ModelForm):
 
         if not self.instance.pk and not self.is_bound:
             if not self.initial.get("anno_scolastico"):
-                primo_anno = self.fields["anno_scolastico"].queryset.first()
-                if primo_anno:
-                    self.initial["anno_scolastico"] = primo_anno.pk
+                anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+                if anno_predefinito:
+                    self.initial["anno_scolastico"] = anno_predefinito.pk
 
             if not self.initial.get("tariffa_scambio_retta"):
                 prima_tariffa = self.fields["tariffa_scambio_retta"].queryset.first()

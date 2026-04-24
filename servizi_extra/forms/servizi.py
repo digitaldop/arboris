@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
+from scuola.utils import resolve_default_anno_scolastico
 
 from servizi_extra.models import (
     ServizioExtra,
@@ -42,9 +43,9 @@ class ServizioExtraForm(forms.ModelForm):
         self.fields["anno_scolastico"].empty_label = None
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
-            primo_anno = self.fields["anno_scolastico"].queryset.first()
-            if primo_anno:
-                self.initial["anno_scolastico"] = primo_anno.pk
+            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+            if anno_predefinito:
+                self.initial["anno_scolastico"] = anno_predefinito.pk
 
 
 class TariffaServizioExtraForm(forms.ModelForm):
@@ -254,4 +255,3 @@ class RataServizioExtraPagamentoForm(forms.ModelForm):
                 cleaned_data["metodo_pagamento"] = ""
 
         return cleaned_data
-

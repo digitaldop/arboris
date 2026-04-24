@@ -519,7 +519,7 @@
                                         <td class="document-file-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
                                                 {% if f.instance.pk and f.instance.file %}
-                                                    <a href="{{ f.instance.file.url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.filename }}</a>
+                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.filename }}</a>
                                                 {% else %}
                                                     <span class="table-muted">Nessun file</span>
                                                 {% endif %}
@@ -528,7 +528,7 @@
                                                 {{ f.file }}
                                                 {% if f.instance.pk and f.instance.file %}
                                                     <div class="help-text">
-                                                        <a href="{{ f.instance.file.url }}" target="_blank" rel="noopener noreferrer">File attuale: {{ f.instance.filename }}</a>
+                                                        <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale: {{ f.instance.filename }}</a>
                                                     </div>
                                                 {% endif %}
                                             </div>
@@ -922,7 +922,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=14"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=15"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

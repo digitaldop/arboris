@@ -3,12 +3,33 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from anagrafica.dati_base_import import run_import_dati_base
-from anagrafica.forms import FamiliareForm, FamiliareInlineForm, StudenteForm, StudenteInlineForm
-from anagrafica.models import CAP, Citta, Famiglia, Familiare, Indirizzo, Provincia, Regione, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
+from anagrafica.forms import (
+    FamiliareForm,
+    FamiliareInlineForm,
+    IscrizioneStudenteInlineForm,
+    StudenteForm,
+    StudenteInlineForm,
+    StudenteStandaloneForm,
+)
+from anagrafica.models import (
+    CAP,
+    Citta,
+    Documento,
+    Famiglia,
+    Familiare,
+    Indirizzo,
+    Provincia,
+    Regione,
+    RelazioneFamiliare,
+    StatoRelazioneFamiglia,
+    Studente,
+    TipoDocumento,
+)
 
 
 class ImportDatiBaseTests(TestCase):
@@ -311,3 +332,123 @@ class FamigliaInlineDefaultsTests(TestCase):
         )
         self.assertTrue(studente_form.is_valid(), studente_form.errors)
         self.assertIsNone(studente_form.cleaned_data["indirizzo"])
+
+    def test_studente_standalone_form_prefills_family_address_and_cf_binding(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            indirizzo_principale=indirizzo,
+            attiva=True,
+        )
+
+        form = StudenteStandaloneForm(initial={"famiglia": famiglia.pk})
+
+        self.assertEqual(str(form["indirizzo"].value()), str(indirizzo.pk))
+        self.assertEqual(form.initial["indirizzo_search"], indirizzo.label_select())
+        self.assertIn('data-inherited-address="1"', str(form["indirizzo"]))
+        self.assertIn('data-cf-luogo-id="1"', str(form["luogo_nascita"]))
+
+    def test_studente_standalone_form_normalizes_family_address_back_to_inherited(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            indirizzo_principale=indirizzo,
+            attiva=True,
+        )
+
+        form = StudenteStandaloneForm(
+            data={
+                "famiglia": famiglia.pk,
+                "cognome": "Verdi",
+                "nome": "Marco",
+                "sesso": "M",
+                "data_nascita": "2015-05-20",
+                "luogo_nascita": roma.pk,
+                "luogo_nascita_search": "Roma (RM)",
+                "codice_fiscale": "",
+                "indirizzo": indirizzo.pk,
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data["indirizzo"])
+
+    def test_iscrizione_inline_prefers_current_school_year(self):
+        from datetime import date
+        from scuola.models import AnnoScolastico
+
+        AnnoScolastico.objects.create(
+            nome_anno_scolastico="2024/2025",
+            data_inizio=date(2024, 9, 1),
+            data_fine=date(2025, 8, 31),
+            corrente=False,
+        )
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            corrente=True,
+        )
+
+        form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
+
+        self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
+
+
+class DocumentoStorageTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="documenti@example.com",
+            email="documenti@example.com",
+            password="Password123!",
+        )
+        self.regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Roma", provincia=self.provincia, codice_catastale="H501", ordine=1, attiva=True)
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(cognome_famiglia="Neri", stato_relazione_famiglia=self.stato, attiva=True)
+        self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+
+    def test_document_download_view_streams_uploaded_file(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                self.client.force_login(self.user)
+                documento = Documento.objects.create(
+                    famiglia=self.famiglia,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("documento-test.pdf", b"contenuto-pdf", content_type="application/pdf"),
+                )
+
+                response = self.client.get(reverse("apri_documento", kwargs={"pk": documento.pk}))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('filename="documento-test.pdf"', response["Content-Disposition"])
+                self.assertEqual(b"".join(response.streaming_content), b"contenuto-pdf")
+
+    def test_deleting_document_removes_file_from_storage(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                documento = Documento.objects.create(
+                    famiglia=self.famiglia,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("documento-delete.pdf", b"da-eliminare", content_type="application/pdf"),
+                )
+                file_path = Path(tmpdir) / documento.file.name
+                self.assertTrue(file_path.exists())
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    documento.delete()
+
+                self.assertFalse(file_path.exists())

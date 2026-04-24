@@ -177,7 +177,8 @@ LOGOUT_REDIRECT_URL = "login"
 
 #Aggiungo la regola per i file da caricare nella cartella media
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Celery (ripristino database in background). Se CELERY_BROKER_URL è vuoto, si usa un thread worker-side.
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "").strip()

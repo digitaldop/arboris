@@ -1,6 +1,7 @@
 from django import forms
 
 from .models import AnnoScolastico, Classe
+from .utils import resolve_default_anno_scolastico
 
 
 class DateInput(forms.DateInput):
@@ -47,6 +48,6 @@ class ClasseForm(forms.ModelForm):
         self.fields["anno_scolastico"].empty_label = None
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
-            primo_anno = self.fields["anno_scolastico"].queryset.first()
-            if primo_anno:
-                self.initial["anno_scolastico"] = primo_anno.pk
+            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+            if anno_predefinito:
+                self.initial["anno_scolastico"] = anno_predefinito.pk

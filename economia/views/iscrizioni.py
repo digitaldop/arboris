@@ -27,6 +27,7 @@ from economia.models import (
     RataIscrizione,
 )
 from scuola.models import AnnoScolastico
+from scuola.utils import resolve_default_anno_scolastico
 
 
 def is_popup_request(request):
@@ -846,9 +847,7 @@ def verifica_situazione_rette(request):
     - click sulla cella -> form di gestione della rata.
     """
 
-    anni_scolastici = list(
-        AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio")
-    )
+    anni_scolastici = list(AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id"))
 
     selected_id = request.GET.get("anno_scolastico") or ""
     anno_scolastico = None
@@ -858,12 +857,7 @@ def verifica_situazione_rette(request):
             None,
         )
     if anno_scolastico is None:
-        anno_scolastico = next(
-            (a for a in anni_scolastici if a.corrente),
-            None,
-        )
-    if anno_scolastico is None and anni_scolastici:
-        anno_scolastico = anni_scolastici[0]
+        anno_scolastico = resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
 
     colonne = []
     righe_per_classe = []

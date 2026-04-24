@@ -4,6 +4,7 @@ from django import forms
 from django.forms import HiddenInput
 from django.db import DatabaseError
 from django.utils import timezone
+from scuola.utils import resolve_default_anno_scolastico
 
 from economia.models import (
     MetodoPagamento,
@@ -62,9 +63,9 @@ class CondizioneIscrizioneForm(forms.ModelForm):
         self.fields["anno_scolastico"].empty_label = None
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
-            primo_anno = self.fields["anno_scolastico"].queryset.first()
-            if primo_anno:
-                self.initial["anno_scolastico"] = primo_anno.pk
+            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+            if anno_predefinito:
+                self.initial["anno_scolastico"] = anno_predefinito.pk
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("mese_prima_retta"):
             self.initial["mese_prima_retta"] = CondizioneIscrizione.DEFAULT_MESE_PRIMA_RETTA
@@ -192,12 +193,12 @@ class IscrizioneForm(forms.ModelForm):
         self.fields["condizione_iscrizione"].queryset = condizioni_queryset
 
         if not self.instance.pk and not self.is_bound:
-            primo_anno = self.fields["anno_scolastico"].queryset.first()
+            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
 
             if not self.initial.get("anno_scolastico"):
-                if primo_anno:
-                    self.initial["anno_scolastico"] = primo_anno.pk
-                    anno_scolastico_id = primo_anno.pk
+                if anno_predefinito:
+                    self.initial["anno_scolastico"] = anno_predefinito.pk
+                    anno_scolastico_id = anno_predefinito.pk
                     self.fields["classe"].queryset = self.fields["classe"].queryset.model.objects.filter(
                         anno_scolastico_id=anno_scolastico_id
                     ).order_by("ordine_classe", "nome_classe", "sezione_classe")

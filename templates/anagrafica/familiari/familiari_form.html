@@ -400,7 +400,7 @@
                                             {{ f.file }}
                                             {% if f.instance.pk and f.instance.file %}
                                                 <div class="help-text">
-                                                    <a href="{{ f.instance.file.url }}" target="_blank">File attuale</a>
+                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale</a>
                                                 </div>
                                             {% endif %}
                                         </td>

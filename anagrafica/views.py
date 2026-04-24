@@ -1,5 +1,7 @@
+import mimetypes
+
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -37,6 +39,7 @@ from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_
 from calendario.data import build_dashboard_calendar_data
 from sistema.models import Scuola, SistemaImpostazioniGenerali
 from scuola.models import AnnoScolastico, Classe
+from scuola.utils import resolve_default_anno_scolastico
 from django.forms import modelform_factory
 
 from django.db import transaction
@@ -59,23 +62,35 @@ MONTH_LABELS = {
 
 
 def resolve_current_school_year():
+    anno_corrente = resolve_default_anno_scolastico()
+    if anno_corrente:
+        return anno_corrente, anno_corrente.nome_anno_scolastico
+
     oggi = timezone.localdate()
-
-    anno_corrente = AnnoScolastico.objects.filter(corrente=True).order_by("-data_inizio").first()
-    if anno_corrente:
-        return anno_corrente, anno_corrente.nome_anno_scolastico
-
-    anno_corrente = (
-        AnnoScolastico.objects.filter(data_inizio__lte=oggi, data_fine__gte=oggi)
-        .order_by("-data_inizio")
-        .first()
-    )
-    if anno_corrente:
-        return anno_corrente, anno_corrente.nome_anno_scolastico
-
     anno_inizio = oggi.year if oggi.month >= 9 else oggi.year - 1
     anno_fine = anno_inizio + 1
     return None, f"{anno_inizio}/{anno_fine}"
+
+
+def apri_documento(request, pk):
+    documento = get_object_or_404(
+        Documento.objects.select_related("tipo_documento", "famiglia", "familiare", "studente"),
+        pk=pk,
+    )
+
+    if not documento.file:
+        raise Http404("Il documento non ha alcun file associato.")
+
+    try:
+        file_handle = documento.file.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("Il file del documento non e disponibile sul server.") from exc
+
+    filename = documento.filename or f"documento-{documento.pk}"
+    content_type, _encoding = mimetypes.guess_type(filename)
+    response = FileResponse(file_handle, content_type=content_type or "application/octet-stream")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
 
 
 def resolve_next_school_year(anno_corrente):

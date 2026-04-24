@@ -14,7 +14,7 @@
             --font-headings: {{ site_fonts.heading_css_stack|safe }};
         }
     </style>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=41">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=43">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
 </head>
@@ -146,28 +146,58 @@
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-panel">
                                 <nav class="sidebar-nav sidebar-subnav">
-                                    <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' %}active{% endif %}">
-                                        Iscrizioni
-                                    </a>
-                                    <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' %}active{% endif %}">
-                                        Stati iscrizione
-                                    </a>
-                                    <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' %}active{% endif %}">
-                                        Rate iscrizione
-                                    </a>
                                     <a href="{% url 'verifica_situazione_rette' %}" class="{% if request.resolver_match.url_name == 'verifica_situazione_rette' %}active{% endif %}">
                                         Verifica situazione rette
                                     </a>
                                     <a href="{% url 'fondo_piano_lista' %}" class="{% if request.resolver_match and request.resolver_match.url_name|slice:':6' == 'fondo_' %}active{% endif %}">
                                         Fondo accantonamento
                                     </a>
-                                    <a href="{% url 'lista_scambi_retta' %}" class="{% if request.resolver_match.url_name == 'lista_scambi_retta' or request.resolver_match.url_name == 'crea_scambio_retta' or request.resolver_match.url_name == 'modifica_scambio_retta' %}active{% endif %}">
-                                        Scambio retta
-                                    </a>
-                                    <a href="{% url 'lista_tariffe_scambio_retta' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_scambio_retta' or request.resolver_match.url_name == 'crea_tariffa_scambio_retta' or request.resolver_match.url_name == 'modifica_tariffa_scambio_retta' %}active{% endif %}">
-                                        Tariffe scambio retta
-                                    </a>
                                 </nav>
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-economia-scambi-panel"
+                                        data-storage-key="arboris-sidebar-economia-scambi"
+                                        data-default-open="true"
+                                    >
+                                        <span>Scambi retta</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-scambi-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            <a href="{% url 'lista_scambi_retta' %}" class="{% if request.resolver_match.url_name == 'lista_scambi_retta' or request.resolver_match.url_name == 'crea_scambio_retta' or request.resolver_match.url_name == 'modifica_scambio_retta' or request.resolver_match.url_name == 'elimina_scambio_retta' or request.resolver_match.url_name == 'contabilizza_scambio_retta' %}active{% endif %}">
+                                                Scambio retta
+                                            </a>
+                                            <a href="{% url 'lista_tariffe_scambio_retta' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_scambio_retta' or request.resolver_match.url_name == 'crea_tariffa_scambio_retta' or request.resolver_match.url_name == 'modifica_tariffa_scambio_retta' or request.resolver_match.url_name == 'elimina_tariffa_scambio_retta' %}active{% endif %}">
+                                                Tariffe scambio retta
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-economia-iscrizioni-panel"
+                                        data-storage-key="arboris-sidebar-economia-iscrizioni"
+                                        data-default-open="true"
+                                    >
+                                        <span>Iscrizioni</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-iscrizioni-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' or request.resolver_match.url_name == 'crea_iscrizione' or request.resolver_match.url_name == 'modifica_iscrizione' or request.resolver_match.url_name == 'elimina_iscrizione' or request.resolver_match.url_name == 'ritiro_anticipato_iscrizione' or request.resolver_match.url_name == 'ricalcola_rate_iscrizione' %}active{% endif %}">
+                                                Iscrizioni
+                                            </a>
+                                            <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' or request.resolver_match.url_name == 'crea_stato_iscrizione' or request.resolver_match.url_name == 'modifica_stato_iscrizione' or request.resolver_match.url_name == 'elimina_stato_iscrizione' %}active{% endif %}">
+                                                Stati iscrizione
+                                            </a>
+                                            <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' or request.resolver_match.url_name == 'pagamento_rapido_rata_iscrizione' %}active{% endif %}">
+                                                Rate iscrizione
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
                                 <div class="sidebar-subsection">
                                     <button
                                         type="button"
@@ -176,17 +206,17 @@
                                         data-storage-key="arboris-sidebar-economia-impostazioni"
                                         data-default-open="true"
                                     >
-                                        <span>Impostazioni economiche</span>
+                                        <span>Impostazioni rette</span>
                                     </button>
                                     <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-impostazioni-panel">
                                         <nav class="sidebar-nav sidebar-subnav">
-                                            <a href="{% url 'lista_condizioni_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_condizioni_iscrizione' %}active{% endif %}">
+                                            <a href="{% url 'lista_condizioni_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_condizioni_iscrizione' or request.resolver_match.url_name == 'crea_condizione_iscrizione' or request.resolver_match.url_name == 'modifica_condizione_iscrizione' or request.resolver_match.url_name == 'elimina_condizione_iscrizione' %}active{% endif %}">
                                                 Condizioni economiche
                                             </a>
-                                            <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_condizione_iscrizione' %}active{% endif %}">
+                                            <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_condizione_iscrizione' or request.resolver_match.url_name == 'crea_tariffa_condizione_iscrizione' or request.resolver_match.url_name == 'modifica_tariffa_condizione_iscrizione' or request.resolver_match.url_name == 'elimina_tariffa_condizione_iscrizione' %}active{% endif %}">
                                                 Tariffe
                                             </a>
-                                            <a href="{% url 'lista_agevolazioni' %}" class="{% if request.resolver_match.url_name == 'lista_agevolazioni' %}active{% endif %}">
+                                            <a href="{% url 'lista_agevolazioni' %}" class="{% if request.resolver_match.url_name == 'lista_agevolazioni' or request.resolver_match.url_name == 'crea_agevolazione' or request.resolver_match.url_name == 'modifica_agevolazione' or request.resolver_match.url_name == 'elimina_agevolazione' %}active{% endif %}">
                                                 Agevolazioni
                                             </a>
                                         </nav>
@@ -480,6 +510,7 @@
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=2"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=8"></script>
     <script src="{% static 'js/core/codice-fiscale.js' %}?v=4"></script>
+    <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>

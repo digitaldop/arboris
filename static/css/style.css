@@ -397,6 +397,7 @@ a:hover {
 
 .sidebar-nav a {
     display: block;
+    position: relative;
     padding: 10px 16px;
     color: var(--sidebar-link);
     text-decoration: none;
@@ -458,31 +459,53 @@ a:hover {
 }
 
 .sidebar-subsection {
-    border-top: 1px solid rgba(65, 118, 144, 0.14);
-    margin-top: 6px;
-    padding-top: 6px;
+    margin: 10px 10px 0;
+    border: 1px solid rgba(65, 118, 144, 0.18);
+    border-left: 3px solid rgba(65, 118, 144, 0.34);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.18);
+    overflow: hidden;
 }
 
 .sidebar-subsection .sidebar-collapsible {
-    padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.25);
-    color: #325264;
-    font-size: 12px;
-    border-top: 1px solid rgba(65, 118, 144, 0.12);
-    border-bottom: 1px solid rgba(65, 118, 144, 0.12);
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.42);
+    color: #2d4b5b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.7px;
+    border-top: none;
+    border-bottom: 1px solid rgba(65, 118, 144, 0.14);
 }
 
 .sidebar-subsection .sidebar-collapsible:hover {
-    background: rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.56);
 }
 
 .sidebar-subsection .sidebar-module-panel {
-    background: rgba(255, 255, 255, 0.22);
-    border-bottom: 1px solid rgba(65, 118, 144, 0.12);
+    background: rgba(255, 255, 255, 0.24);
+    border-bottom: none;
 }
 
 .sidebar-subsection .sidebar-subnav a {
-    padding-left: 42px;
+    padding-left: 52px;
+    font-size: 12px;
+}
+
+.sidebar-subsection .sidebar-subnav a::before {
+    content: "";
+    position: absolute;
+    left: 34px;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(62, 100, 120, 0.66);
+    transform: translateY(-50%);
+}
+
+.sidebar-subsection .sidebar-subnav a.active::before {
+    background: rgba(255, 255, 255, 0.92);
 }
 
 .sidebar-subnav a {
@@ -1406,7 +1429,7 @@ select:focus {
     max-height: 240px;
     overflow-y: auto;
     display: none;
-    z-index: 1000;
+    z-index: 4002;
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 
@@ -2076,9 +2099,13 @@ select:focus {
     table-layout: auto;
 }
 
+.inline-lock-container .panel {
+    overflow: visible;
+}
+
 .inline-lock-container .panel-body {
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
 }
 
 .inline-table th,
@@ -2455,6 +2482,21 @@ select:focus {
     height: 22px;
     font-size: 11px;
     border-radius: 3px;
+}
+
+.form-table tr:has(input[type="checkbox"][name="attivo"]),
+.form-table tr:has(input[type="checkbox"][name$="-attivo"]),
+.form-table tr:has(input[type="checkbox"][name="attiva"]),
+.form-table tr:has(input[type="checkbox"][name$="-attiva"]),
+.inline-table td:has(input[type="checkbox"][name="attivo"]),
+.inline-table td:has(input[type="checkbox"][name$="-attivo"]),
+.inline-table td:has(input[type="checkbox"][name="attiva"]),
+.inline-table td:has(input[type="checkbox"][name$="-attiva"]),
+.inline-subform-grid .inline-details-field:has(input[type="checkbox"][name="attivo"]),
+.inline-subform-grid .inline-details-field:has(input[type="checkbox"][name$="-attivo"]),
+.inline-subform-grid .inline-details-field:has(input[type="checkbox"][name="attiva"]),
+.inline-subform-grid .inline-details-field:has(input[type="checkbox"][name$="-attiva"]) {
+    display: none;
 }
 
 .family-attiva-row {

@@ -7,6 +7,7 @@ import re
 from .utils import citta_choice_label, validate_and_normalize_phone_number
 from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
+from scuola.utils import resolve_default_anno_scolastico
 
 from django.forms import inlineformset_factory
 from .models import (
@@ -955,15 +956,64 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
         make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
+
+        famiglia_id = None
+        if self.is_bound:
+            famiglia_id = self.data.get(self.add_prefix("famiglia")) or self.data.get("famiglia")
+        elif getattr(self.instance, "famiglia_id", None):
+            famiglia_id = self.instance.famiglia_id
+        else:
+            famiglia_id = self.initial.get("famiglia")
+
+        if (
+            not self.is_bound
+            and not self.initial.get("indirizzo")
+            and not getattr(self.instance, "indirizzo_id", None)
+            and famiglia_id
+        ):
+            try:
+                famiglia = Famiglia.objects.select_related("indirizzo_principale").get(pk=famiglia_id)
+            except (Famiglia.DoesNotExist, TypeError, ValueError):
+                famiglia = None
+
+            if famiglia and famiglia.indirizzo_principale_id:
+                self.initial["indirizzo"] = famiglia.indirizzo_principale_id
+                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
+
         self.setup_famiglia_search()
         self.setup_indirizzo_search()
+        self.setup_luogo_nascita_autocomplete_fk()
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
         self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
-        self.setup_luogo_nascita_autocomplete_fk()
+
+        if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
+            self.initial["attivo"] = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        indirizzo = cleaned_data.get("indirizzo")
+        famiglia = cleaned_data.get("famiglia") or getattr(self.instance, "famiglia", None)
+
+        if famiglia is None and getattr(self.instance, "famiglia_id", None):
+            famiglia = (
+                Famiglia.objects.select_related("indirizzo_principale")
+                .filter(pk=self.instance.famiglia_id)
+                .first()
+            )
+
+        if (
+            famiglia
+            and indirizzo
+            and getattr(famiglia, "indirizzo_principale_id", None)
+            and indirizzo.pk == famiglia.indirizzo_principale_id
+        ):
+            cleaned_data["indirizzo"] = None
+
+        return cleaned_data
 
 #FINE FORM PER GLI STUDENTI
 
@@ -1097,7 +1147,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio")
+        self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
         self.fields["classe"].queryset = self.fields["classe"].queryset.select_related("anno_scolastico").order_by(
             "-anno_scolastico__data_inizio",
             "ordine_classe",
@@ -1124,6 +1174,11 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             self.fields["agevolazione"].queryset = Agevolazione.objects.filter(attiva=True).order_by("nome_agevolazione")
         except DatabaseError:
             self.fields["agevolazione"].queryset = Agevolazione.objects.none()
+
+        if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
+            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+            if anno_predefinito:
+                self.initial["anno_scolastico"] = anno_predefinito.pk
 
         if not getattr(self.instance, "pk", None):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()

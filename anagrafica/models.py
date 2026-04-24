@@ -3,6 +3,7 @@ import os
 
 from django.db import models
 from django.db.models import Max
+from django.urls import reverse
 from .utils import format_phone_number, whatsapp_url_from_phone
 
 
@@ -467,6 +468,12 @@ class Documento(models.Model):
         if not self.file:
             return ""
         return os.path.basename(self.file.name)
+
+    @property
+    def download_url(self):
+        if not self.file or not self.pk:
+            return ""
+        return reverse("apri_documento", kwargs={"pk": self.pk})
 
     def clean(self):
         owners = [self.famiglia_id, self.familiare_id, self.studente_id]

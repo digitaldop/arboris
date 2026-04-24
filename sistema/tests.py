@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import SistemaUtentePermessi
+from .models import LivelloPermesso, SistemaUtentePermessi
 
 
 class AuthenticationInterfaceTests(TestCase):
@@ -80,3 +80,46 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, reverse("lista_famiglie"))
         self.assertNotContains(response, reverse("lista_iscrizioni"))
         self.assertNotContains(response, reverse("lista_dipendenti"))
+
+
+class SidebarEconomiaTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="economia@example.com",
+            email="economia@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_economia=LivelloPermesso.VISUALIZZAZIONE,
+        )
+
+    def test_home_renders_economia_sidebar_in_requested_order(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        start = content.index('id="sidebar-economia-panel"')
+        end = content.index('data-sidebar-section-key="scuola"')
+        economia_section = content[start:end]
+
+        labels_in_order = [
+            "Verifica situazione rette",
+            "Fondo accantonamento",
+            "<span>Scambi retta</span>",
+            "Scambio retta",
+            "Tariffe scambio retta",
+            "<span>Iscrizioni</span>",
+            "Iscrizioni",
+            "Stati iscrizione",
+            "Rate iscrizione",
+            "<span>Impostazioni rette</span>",
+        ]
+
+        previous_index = -1
+        for label in labels_in_order:
+            current_index = economia_section.index(label)
+            self.assertGreater(current_index, previous_index)
+            previous_index = current_index

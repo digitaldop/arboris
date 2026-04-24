@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from economia.models import PrestazioneScambioRetta
 from scuola.models import AnnoScolastico
+from scuola.utils import resolve_default_anno_scolastico
 
 
 MONTH_LABELS = {
@@ -38,12 +39,7 @@ WEEKDAY_FULL_LABELS = [
 
 
 def resolve_current_school_year():
-    today = timezone.localdate()
-
-    return (
-        AnnoScolastico.objects.filter(corrente=True).order_by("-data_inizio", "-id").first()
-        or AnnoScolastico.objects.filter(data_inizio__lte=today, data_fine__gte=today).order_by("-data_inizio", "-id").first()
-    )
+    return resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
 
 
 def normalize_scambio_view(value):

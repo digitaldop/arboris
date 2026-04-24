@@ -731,7 +731,7 @@
                                             {{ f.file }}
                                             {% if f.instance.pk and f.instance.file %}
                                                 <div class="help-text">
-                                                    <a href="{{ f.instance.file.url }}" target="_blank">File attuale</a>
+                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale</a>
                                                 </div>
                                             {% endif %}
                                         </td>
@@ -792,7 +792,7 @@
                                                     <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
-                                                            <a href="{{ doc.file.url }}" target="_blank">Apri</a>
+                                                            <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
                                                             <span class="table-muted">—</span>
                                                         {% endif %}
@@ -833,7 +833,7 @@
                                                     <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
-                                                            <a href="{{ doc.file.url }}" target="_blank">Apri</a>
+                                                            <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
                                                             <span class="table-muted">—</span>
                                                         {% endif %}

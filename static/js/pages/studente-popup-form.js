@@ -17,6 +17,11 @@ window.ArborisStudentePopupForm = (function () {
             return famigliaSelect.options[famigliaSelect.selectedIndex] || null;
         }
 
+        function getSelectedFamigliaAddressId() {
+            const selectedOption = getSelectedFamigliaOption();
+            return selectedOption ? (selectedOption.dataset.indirizzoFamigliaId || "") : "";
+        }
+
         function updateInheritedAddressPlaceholder() {
             const indirizzoSelect = document.getElementById("id_indirizzo");
             if (!indirizzoSelect || !indirizzoSelect.options.length) return;
@@ -39,15 +44,24 @@ window.ArborisStudentePopupForm = (function () {
             const help = document.getElementById("popup-studente-address-help");
             if (!indirizzoSelect || !help) return;
 
+            const familyAddressId = getSelectedFamigliaAddressId();
+            const selectedFamily = getSelectedFamigliaOption();
+
+            if (indirizzoSelect.value && familyAddressId && indirizzoSelect.value === familyAddressId) {
+                const familyAddress = selectedFamily ? selectedFamily.dataset.indirizzoFamiglia || "" : "";
+                help.textContent = familyAddress
+                    ? `Indirizzo famiglia: ${familyAddress}`
+                    : "Indirizzo famiglia";
+                return;
+            }
+
             if (indirizzoSelect.value) {
                 help.textContent = "Indirizzo specifico";
                 return;
             }
 
-            const famigliaSelect = document.getElementById("id_famiglia");
-            if (famigliaSelect) {
-                const selectedOption = famigliaSelect.options[famigliaSelect.selectedIndex];
-                const familyAddress = selectedOption ? selectedOption.dataset.indirizzoFamiglia : "";
+            if (selectedFamily) {
+                const familyAddress = selectedFamily.dataset.indirizzoFamiglia || "";
                 if (familyAddress) {
                     help.textContent = `Usa indirizzo famiglia: ${familyAddress}`;
                     return;
@@ -83,12 +97,31 @@ window.ArborisStudentePopupForm = (function () {
             if (deleteIndirizzoBtn && indirizzoSelect) deleteIndirizzoBtn.disabled = !indirizzoSelect.value;
         }
 
+        function markInheritedAddress(indirizzoSelect, enabled) {
+            if (!indirizzoSelect) {
+                return;
+            }
+
+            if (enabled) {
+                indirizzoSelect.dataset.inheritedAddress = "1";
+            } else {
+                delete indirizzoSelect.dataset.inheritedAddress;
+            }
+        }
+
         function syncFamigliaDefaults() {
             const cognomeInput = document.getElementById("id_cognome");
             const indirizzoSelect = document.getElementById("id_indirizzo");
             const selectedOption = getSelectedFamigliaOption();
+            const familyAddressId = selectedOption ? (selectedOption.dataset.indirizzoFamigliaId || "") : "";
+            const previousValue = indirizzoSelect ? (indirizzoSelect.value || "") : "";
 
             if (!selectedOption || !selectedOption.value) {
+                if (indirizzoSelect && indirizzoSelect.dataset.inheritedAddress === "1" && previousValue) {
+                    indirizzoSelect.value = "";
+                    markInheritedAddress(indirizzoSelect, false);
+                    indirizzoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+                }
                 updateInheritedAddressPlaceholder();
                 refreshAddressHelp();
                 updateButtons();
@@ -100,7 +133,18 @@ window.ArborisStudentePopupForm = (function () {
             }
 
             if (indirizzoSelect) {
-                indirizzoSelect.value = "";
+                const isInherited = indirizzoSelect.dataset.inheritedAddress === "1";
+                if ((!indirizzoSelect.value || isInherited) && familyAddressId) {
+                    indirizzoSelect.value = familyAddressId;
+                    markInheritedAddress(indirizzoSelect, true);
+                } else if (!familyAddressId && isInherited) {
+                    indirizzoSelect.value = "";
+                    markInheritedAddress(indirizzoSelect, false);
+                }
+
+                if ((indirizzoSelect.value || "") !== previousValue) {
+                    indirizzoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+                }
             }
 
             updateInheritedAddressPlaceholder();
@@ -169,12 +213,15 @@ window.ArborisStudentePopupForm = (function () {
 
         if (indirizzoSelect) {
             indirizzoSelect.addEventListener("change", function () {
+                const familyAddressId = getSelectedFamigliaAddressId();
+                markInheritedAddress(indirizzoSelect, Boolean(familyAddressId && indirizzoSelect.value === familyAddressId));
                 refreshAddressHelp();
                 updateButtons();
             });
         }
 
         bindPopupActions();
+        syncFamigliaDefaults();
         updateInheritedAddressPlaceholder();
         refreshAddressHelp();
         updateButtons();
