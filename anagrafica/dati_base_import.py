@@ -27,6 +27,8 @@ def default_gi_file_path() -> Path:
 def normalizza_nome_colonna(nome: str) -> str:
     nome = str(nome).strip().lower()
     nome = nome.replace("\n", " ")
+    # Header Excel/CSV con underscore (es. denominazione_regione) allineati a "Denominazione Regione"
+    nome = nome.replace("_", " ")
     nome = re.sub(r"\s+", " ", nome)
     return nome
 
@@ -45,6 +47,7 @@ def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
     return {
         "regione": [
             "Denominazione Regione",
+            "denominazione_regione",
             "Regione",
             "Nome Regione",
             "Nome regione",
@@ -52,18 +55,22 @@ def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
         "provincia": [
             "Denominazione dell'Unità territoriale sovracomunale (valida a fini statistici)",
             "Denominazione Provincia",
+            "denominazione_provincia",
             "Provincia",
             "Nome Provincia",
             "Nome provincia",
         ],
         "sigla": [
             "Sigla automobilistica",
+            "sigla_provincia",
             "Sigla",
             "Sigla provincia",
             "Sig.",
         ],
         "comune": [
             "Denominazione in italiano",
+            "denominazione_ita",
+            "Denominazione ITA",
             "Denominazione Comune",
             "Comune",
             "Città",
@@ -76,6 +83,7 @@ def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
             "Cap.",
         ],
         "codice_istat": [
+            "codice_istat",
             "Codice Comune formato numerico",
             "Codice comune formato numerico",
             "Codice ISTAT del Comune",
@@ -89,6 +97,7 @@ def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
             "Codice istat",
         ],
         "codice_catastale": [
+            "codice_belfiore",
             "Codice Catastale del comune",
             "Codice catastale del comune",
             "Codice catastale",
