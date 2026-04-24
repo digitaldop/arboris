@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina indirizzo - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'lista_indirizzi' %}">Indirizzi</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina indirizzo</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            <p>Sei sicuro di voler eliminare questo indirizzo?</p>
+
+            <p><strong>{{ indirizzo }}</strong></p>
+
+            {% if usage.totale %}
+                <div class="message message-warning">
+                    Questo indirizzo è attualmente collegato a {{ usage.totale }} record.
+                    Se lo elimini, quei collegamenti verranno rimossi.
+                </div>
+
+                {% if usage.famiglie %}
+                    <p><strong>Famiglie:</strong> {{ usage.famiglie|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.studenti %}
+                    <p><strong>Studenti:</strong> {{ usage.studenti|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.familiari %}
+                    <p><strong>Familiari:</strong> {{ usage.familiari|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.scuole %}
+                    <p><strong>Scuole:</strong> {{ usage.scuole|join:", " }}</p>
+                {% endif %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        Sì, elimina
+                    </button>
+
+                    <a href="{% url 'lista_indirizzi' %}" class="btn btn-secondary">
+                        Annulla
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

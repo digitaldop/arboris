@@ -1,0 +1,36 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+
+{% block title %}Elimina classe - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+{% if not popup %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_classi' %}">Classi</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina classe</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare la classe <strong>{{ classe }}</strong>.</p>
+        </div>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            {% else %}
+                <a href="{% url 'lista_classi' %}" class="btn btn-secondary">Annulla</a>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

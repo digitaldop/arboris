@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Calendario agenda - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Calendario</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Calendario</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Elenco eventi</a>
+            {% if can_manage_calendario %}
+                <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary">Categorie</a>
+                <a href="{% url 'crea_evento_calendario' %}" class="btn btn-primary">Nuovo evento</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="calendar-workspace">
+        <aside class="calendar-sidebar">
+            <div class="admin-section compact">
+                <div class="admin-section-title">Panoramica</div>
+                <div class="panel">
+                    <div class="panel-body summary-panel-body">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_eventi_locali }}</div>
+                                <div class="summary-label">Eventi e scadenze</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_categorie }}</div>
+                                <div class="summary-label">Categorie</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_intera_giornata }}</div>
+                                <div class="summary-label">Intera giornata</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_con_orario }}</div>
+                                <div class="summary-label">Con orario</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section compact">
+                <div class="admin-section-title">Categorie</div>
+                <div class="panel">
+                    <div class="panel-body calendar-side-panel-body">
+                        {% if calendar_categories %}
+                            <div class="calendar-legend">
+                                {% for categoria in calendar_categories %}
+                                    <div class="calendar-legend-item">
+                                        <span class="calendar-legend-dot" style="background: {{ categoria.colore }};"></span>
+                                        <span>{{ categoria.nome }}</span>
+                                        <span class="calendar-legend-count">{{ categoria.count_eventi }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="calendar-selected-day-empty">Ancora nessuna categoria configurata.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section compact">
+                <div class="admin-section-title">{% if can_manage_calendario %}Creazione rapida{% else %}Navigazione{% endif %}</div>
+                <div class="panel">
+                    <div class="panel-body calendar-side-panel-body">
+                        <div class="calendar-quick-help">
+                            <div class="calendar-quick-help-title">{% if can_manage_calendario %}Come funziona{% else %}Come consultare il calendario{% endif %}</div>
+                            <div class="calendar-quick-help-text">
+                                {% if can_manage_calendario %}
+                                    In vista mensile o annuale fai doppio click su un giorno per aprire la giornata completa.
+                                    In vista giornaliera o settimanale clicca direttamente su una fascia oraria o sulla riga "Intera giornata" per creare un evento.
+                                    Per serie settimanali o ripetizioni apri poi la scheda completa dell'evento.
+                                {% else %}
+                                    Usa le viste giorno, mese, settimana e anno per consultare gli eventi.
+                                    Con un doppio click su un giorno apri la vista giornaliera completa e il dettaglio resta sempre disponibile nella sidebar.
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section compact">
+                <div class="admin-section-title">Giorno selezionato</div>
+                <div class="panel">
+                    <div class="panel-body calendar-side-panel-body">
+                        <div id="calendar-selected-day-panel" class="calendar-selected-day-panel">
+                            <div class="calendar-selected-day-empty">Seleziona un giorno per vedere gli eventi programmati.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <section class="calendar-main-panel">
+            <div class="calendar-toolbar">
+                <div class="calendar-toolbar-left">
+                    <button type="button" class="btn btn-secondary btn-sm calendar-nav-btn" data-calendar-nav="prev" aria-label="Periodo precedente" title="Periodo precedente">&larr;</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-calendar-nav="today">Oggi</button>
+                    <button type="button" class="btn btn-secondary btn-sm calendar-nav-btn" data-calendar-nav="next" aria-label="Periodo successivo" title="Periodo successivo">&rarr;</button>
+                </div>
+                <div class="calendar-toolbar-title" id="calendar-toolbar-title"></div>
+                <div class="calendar-view-switch">
+                    <button type="button" class="calendar-view-btn" data-calendar-view="day">Giorno</button>
+                    <button type="button" class="calendar-view-btn" data-calendar-view="month">Mensile</button>
+                    <button type="button" class="calendar-view-btn" data-calendar-view="week">Settimanale</button>
+                    <button type="button" class="calendar-view-btn" data-calendar-view="year">Annuale</button>
+                </div>
+            </div>
+
+            <div
+                id="calendar-agenda-app"
+                class="calendar-agenda-app"
+                data-initial-view="{{ calendar_initial_view }}"
+                data-initial-date="{{ calendar_initial_date|date:'Y-m-d' }}"
+                data-can-manage="{% if can_manage_calendario %}true{% else %}false{% endif %}"
+                data-create-url="{% url 'crea_evento_calendario_rapido' %}"
+                data-full-create-url="{% url 'crea_evento_calendario' %}"
+                data-csrf-token="{{ csrf_token }}"
+            >
+                <div id="calendar-agenda-render"></div>
+            </div>
+        </section>
+    </div>
+
+    {{ calendar_entries|json_script:"calendar-agenda-data" }}
+    {{ calendar_categories_payload|json_script:"calendar-categories-data" }}
+    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=4"></script>
+{% endblock %}

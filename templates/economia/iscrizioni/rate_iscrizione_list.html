@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Rate iscrizione - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Rate iscrizione</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">
+            {% if iscrizione_filtro %}
+                Rate iscrizione {{ iscrizione_filtro }}
+            {% else %}
+                Rate iscrizione
+            {% endif %}
+        </h1>
+        <div class="page-head-actions">
+            {% if iscrizione_filtro %}
+                <a href="{% url 'modifica_iscrizione' iscrizione_filtro.pk %}" class="btn btn-secondary">Apri iscrizione</a>
+            {% endif %}
+            <a href="{% url 'lista_iscrizioni' %}" class="btn btn-secondary">Torna alle iscrizioni</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Studente</th>
+                    <th>Anno scolastico</th>
+                    <th>Voce piano</th>
+                    <th>Scadenza</th>
+                    <th>Importo dovuto</th>
+                    <th>Importo finale</th>
+                    <th>Pagata</th>
+                    <th>Importo pagato</th>
+                    <th>Metodo pagamento</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rata in rate %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_rata_iscrizione' rata.pk %}">
+                        <td>{{ rata.iscrizione.studente }}</td>
+                        <td>{{ rata.iscrizione.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ rata.display_label }}</td>
+                        <td>{{ rata.data_scadenza|it_date|default:"-" }}</td>
+                        <td>EUR {{ rata.importo_dovuto|euro }}</td>
+                        <td>EUR {{ rata.importo_finale|euro }}</td>
+                        <td>{% if rata.pagata %}Si{% else %}No{% endif %}</td>
+                        <td>EUR {{ rata.importo_pagato|euro }}</td>
+                        <td>{{ rata.metodo_pagamento|default:"-" }}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_rata_iscrizione' rata.pk %}" class="table-link">Gestisci pagamento</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="10"><div class="empty-state">Nessuna rata disponibile.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

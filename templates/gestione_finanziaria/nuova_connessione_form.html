@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Nuova connessione {{ provider.nome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Nuova connessione ({{ provider.nome }})</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Nuova connessione PSD2 - {{ provider.nome }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Seleziona l'istituto bancario e compila i parametri del consenso.
+            Al salvataggio verrai reindirizzato sulla pagina del provider per autorizzare
+            l'accesso in lettura. Al ritorno, i conti collegati verranno creati automaticamente.
+        </p>
+    </div>
+
+    {% if errore_lista %}
+        <div class="content-card">
+            <div class="empty-state">Errore nel recupero degli istituti: {{ errore_lista }}</div>
+        </div>
+    {% endif %}
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.etichetta.label_tag }}</th><td>{{ form.etichetta }} {{ form.etichetta.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.institution_id.label_tag }}</th>
+                    <td>
+                        {% if is_truelayer %}
+                            {{ form.institution_id }} {{ form.institution_id.errors }}
+                            <br><small>{{ form.institution_id.help_text }}</small>
+                        {% elif istituti %}
+                            <select name="institution_id" id="id_institution_id" class="form-control" required>
+                                <option value="" {% if not form.institution_id.value %}selected{% endif %}>-- Seleziona un istituto --</option>
+                                {% for i in istituti %}
+                                    <option value="{{ i.id|escape }}"{% if form.institution_id.value == i.id %} selected{% endif %}>{{ i.name }} — {{ i.id }}</option>
+                                {% endfor %}
+                            </select>
+                            {{ form.institution_id.errors }}
+                            <br><small>{{ form.institution_id.help_text }}</small>
+                        {% else %}
+                            {{ form.institution_id }} {{ form.institution_id.errors }}
+                            <br><small>{{ form.institution_id.help_text }}</small>
+                            <p class="table-muted" style="margin:0.5rem 0 0 0;">Lista istituti non disponibile. Inserisci l&rsquo;id nel formato mostrato in tabella sotto (es. <code>NomeBanca|IT</code> per Enable Banking).</p>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr><th>{{ form.access_valid_for_days.label_tag }}</th><td>{{ form.access_valid_for_days }} {{ form.access_valid_for_days.errors }}</td></tr>
+                <tr><th>{{ form.max_historical_days.label_tag }}</th><td>{{ form.max_historical_days }} {{ form.max_historical_days.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Avvia autorizzazione</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="content-card">
+        <h2 class="section-title">Istituti disponibili ({{ country }})</h2>
+        <p class="table-muted">
+            {% if is_truelayer %}
+                Con TrueLayer puoi lasciare vuoto l&rsquo;istituto e scegliere la banca nel portale.
+            {% else %}
+                Con il menu a tendina non serve copiare a mano: scegli la riga corrispondente. Gli id sono quelli forniti dall&rsquo;API del provider.
+            {% endif %}
+        </p>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Nome</th>
+                    <th>BIC</th>
+                    <th>Paesi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for istituto in istituti %}
+                    <tr>
+                        <td><code>{{ istituto.id }}</code></td>
+                        <td>{{ istituto.name }}</td>
+                        <td>{{ istituto.bic|default:"-" }}</td>
+                        <td>{{ istituto.countries|join:", " }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">Nessun istituto disponibile o lista non recuperabile.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

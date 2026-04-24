@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titolo }} - {{ piano.nome }}{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fondo_piano_dettaglio' piano.pk %}">{{ piano.nome }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ titolo }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{{ titolo }} — {{ piano.nome }}</h1>
+    </div>
+    {% if saldo is not None %}
+        <div class="content-card">
+            <p>Saldo disponibile: <strong>{{ saldo }} €</strong></p>
+        </div>
+    {% endif %}
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                {% for field in form %}
+                    <tr>
+                        <th>{{ field.label_tag }}</th>
+                        <td>{{ field }} {{ field.errors }}<br><small class="table-muted">{{ field.help_text }}</small></td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Registra</button>
+                <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

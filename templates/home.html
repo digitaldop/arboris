@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Home - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Anno Scolastico {{ anno_scolastico_corrente }}</h1>
+    </div>
+
+    <div id="dashboard-sections" class="dashboard-sections" data-dashboard-order-key="arboris-dashboard-section-order">
+        <div class="admin-section dashboard-section" data-dashboard-section-id="statistiche-generali">
+            <button
+                type="button"
+                class="admin-section-title collapsible-title is-open dashboard-section-title"
+                data-target="dashboard-statistiche-generali"
+                data-storage-key="arboris-dashboard-statistiche-generali"
+                data-default-open="true"
+            >
+                <span class="dashboard-section-label">STATISTICHE GENERALI DELL'ANNO SCOLASTICO {{ anno_scolastico_corrente }}</span>
+                <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+            </button>
+            <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali">
+                <div class="panel-body dashboard-panel-body">
+                    <div class="dashboard-stats-grid">
+                        <div class="dashboard-stat-card dashboard-stat-card-full">
+                            <div class="dashboard-stat-label">Composizione delle classi</div>
+                            {% if composizione_classi %}
+                                <div class="dashboard-class-grid">
+                                    {% for classe in composizione_classi %}
+                                        <div class="dashboard-class-item">
+                                            <div class="dashboard-class-name">{{ classe.nome_classe }}</div>
+                                            <div class="dashboard-class-count">{{ classe.studenti_label }}</div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="dashboard-stat-note">Nessuna classe configurata per l'anno scolastico corrente.</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-label">{{ student_terminology.selected_plural }} iscritti</div>
+                            <div class="dashboard-stat-value">{{ count_studenti_iscritti }}</div>
+                            <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti all'anno scolastico corrente.</div>
+                        </div>
+
+                        <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-label">Famiglie iscritte</div>
+                            <div class="dashboard-stat-value">{{ count_famiglie_iscritte }}</div>
+                            <div class="dashboard-stat-note">Totale famiglie con figli iscritti all'anno scolastico corrente.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if can_view_economia %}
+            <div class="admin-section dashboard-section" data-dashboard-section-id="economia">
+                <button
+                    type="button"
+                    class="admin-section-title collapsible-title is-open dashboard-section-title"
+                    data-target="dashboard-riepilogo-economia"
+                    data-storage-key="arboris-dashboard-riepilogo-economia"
+                    data-default-open="true"
+                >
+                    <span class="dashboard-section-label">RIEPILOGO ECONOMICO DELL'ANNO SCOLASTICO {{ anno_scolastico_corrente }}</span>
+                    <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+                </button>
+                <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-economia">
+                    <div class="panel-body dashboard-panel-body">
+                        {% if economia_dashboard.configured_year %}
+                            <div class="dashboard-stats-grid">
+                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-label">Totale {{ student_terminology.selected_plural }} iscritti</div>
+                                    <div class="dashboard-class-grid dashboard-economy-highlights-grid">
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
+                                            <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_iscritti }}</div>
+                                            <div class="dashboard-economy-card-meta">Iscritti attivi nell'anno scolastico corrente.</div>
+                                        </div>
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} paganti</div>
+                                            <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_paganti }}</div>
+                                            <div class="dashboard-economy-card-meta">Tutti gli iscritti che pagano una retta.</div>
+                                        </div>
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} non paganti</div>
+                                            <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_non_paganti }}</div>
+                                            <div class="dashboard-economy-card-meta">Iscritti senza quota retta da versare.</div>
+                                        </div>
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} con riduzione speciale</div>
+                                            <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_riduzione_speciale }}</div>
+                                            <div class="dashboard-economy-card-meta">Iscritti con riduzione speciale applicata.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-label">Agevolazioni collegate</div>
+                                    {% if economia_dashboard.agevolazioni %}
+                                        <div class="dashboard-economy-list">
+                                            {% for agevolazione in economia_dashboard.agevolazioni %}
+                                                <div class="dashboard-economy-list-item">
+                                                    <div class="dashboard-economy-card-title">{{ agevolazione.nome_agevolazione }}</div>
+                                                    <div class="dashboard-economy-card-value dashboard-economy-card-value-sm">{{ agevolazione.count_studenti }}</div>
+                                                    <div class="dashboard-economy-card-meta">{{ agevolazione.studenti_label }}</div>
+                                                    <div class="dashboard-stat-note dashboard-stat-note-compact">{{ agevolazione.studenti_names }}</div>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <div class="dashboard-stat-note">Nessuna agevolazione collegata a {{ student_terminology.selected_plural_lower }} iscritti nell'anno corrente.</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-label">Riepilogo rette</div>
+
+                                    <div class="economia-summary-grid dashboard-economia-summary-grid">
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Totale annuo rette</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_rette_annuo|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Incassato finora</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_rette_incassato|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Rette ancora da incassare</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_rette_rimanenti|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Retta media mensile</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.media_mensile_rette|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Totale Preiscrizioni</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_preiscrizioni|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Totale riduzioni speciali</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_riduzioni_speciali|euro }}</div>
+                                        </div>
+                                        <div class="economia-summary-item">
+                                            <div class="economia-summary-label">Totale scambi retta</div>
+                                            <div class="economia-summary-value">EUR {{ economia_dashboard.totale_scambi_retta|euro }}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="dashboard-economy-section-title">Totali agevolazioni applicate</div>
+                                    {% if economia_dashboard.agevolazioni %}
+                                        <table class="list-table dashboard-mini-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Agevolazione</th>
+                                                    <th>{{ student_terminology.selected_plural }}</th>
+                                                    <th>Totale scalato</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for agevolazione in economia_dashboard.agevolazioni %}
+                                                    <tr>
+                                                        <td>{{ agevolazione.nome_agevolazione }}</td>
+                                                        <td>{{ agevolazione.studenti_label }}</td>
+                                                        <td>EUR {{ agevolazione.totale_importo|euro }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    {% else %}
+                                        <div class="dashboard-stat-note">Nessuna agevolazione con {{ student_terminology.selected_plural_lower }} collegati nell'anno scolastico corrente.</div>
+                                    {% endif %}
+
+                                    <div class="dashboard-economy-section-title">Riepilogo mensile rette</div>
+                                    {% if economia_dashboard.riepilogo_mensile %}
+                                        <div class="dashboard-matrix-table-wrapper">
+                                            <table class="list-table dashboard-mini-table dashboard-matrix-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Voce</th>
+                                                        <th>{{ economia_dashboard.riepilogo_preiscrizioni.label }}</th>
+                                                        {% for month in economia_dashboard.riepilogo_mensile %}
+                                                            <th>{{ month.label }}</th>
+                                                        {% endfor %}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <th>Totale rette</th>
+                                                        <td class="{% if economia_dashboard.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard.riepilogo_preiscrizioni.importo_totale|euro }}</td>
+                                                        {% for month in economia_dashboard.riepilogo_mensile %}
+                                                            <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_totale|euro }}</td>
+                                                        {% endfor %}
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Incassato</th>
+                                                        <td class="{% if economia_dashboard.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard.riepilogo_preiscrizioni.importo_incassato|euro }}</td>
+                                                        {% for month in economia_dashboard.riepilogo_mensile %}
+                                                            <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_incassato|euro }}</td>
+                                                        {% endfor %}
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Rimanente</th>
+                                                        <td class="{% if economia_dashboard.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard.riepilogo_preiscrizioni.importo_rimanente|euro }}</td>
+                                                        {% for month in economia_dashboard.riepilogo_mensile %}
+                                                            <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_rimanente|euro }}</td>
+                                                        {% endfor %}
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="dashboard-stat-note">Nessun mese disponibile per il riepilogo rette dell'anno scolastico corrente.</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="dashboard-stat-note">Configura un anno scolastico corrente per visualizzare il riepilogo economico.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if mostra_dashboard_prossimo_anno %}
+            <div class="admin-section dashboard-section" data-dashboard-section-id="statistiche-generali-prossimo-anno">
+                <button
+                    type="button"
+                    class="admin-section-title collapsible-title is-open dashboard-section-title"
+                    data-target="dashboard-statistiche-generali-prossimo-anno"
+                    data-storage-key="arboris-dashboard-statistiche-generali-prossimo-anno"
+                    data-default-open="true"
+                >
+                    <span class="dashboard-section-label">STATISTICHE GENERALI DELL'ANNO SCOLASTICO {{ dashboard_prossimo_anno.anno_label }}</span>
+                    <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+                </button>
+                <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali-prossimo-anno">
+                    <div class="panel-body dashboard-panel-body">
+                        <div class="dashboard-stats-grid">
+                            <div class="dashboard-stat-card dashboard-stat-card-full">
+                                <div class="dashboard-stat-label">Composizione delle classi</div>
+                                {% if dashboard_prossimo_anno.composizione_classi %}
+                                    <div class="dashboard-class-grid">
+                                        {% for classe in dashboard_prossimo_anno.composizione_classi %}
+                                            <div class="dashboard-class-item">
+                                                <div class="dashboard-class-name">{{ classe.nome_classe }}</div>
+                                                <div class="dashboard-class-count">{{ classe.studenti_label }}</div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessuna classe configurata per il prossimo anno scolastico.</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="dashboard-stat-card">
+                                <div class="dashboard-stat-label">{{ student_terminology.selected_plural }} iscritti</div>
+                                <div class="dashboard-stat-value">{{ dashboard_prossimo_anno.count_studenti_iscritti }}</div>
+                                <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti al prossimo anno scolastico.</div>
+                            </div>
+
+                            <div class="dashboard-stat-card">
+                                <div class="dashboard-stat-label">Famiglie iscritte</div>
+                                <div class="dashboard-stat-value">{{ dashboard_prossimo_anno.count_famiglie_iscritte }}</div>
+                                <div class="dashboard-stat-note">Totale famiglie con figli iscritti al prossimo anno scolastico.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if can_view_economia %}
+                <div class="admin-section dashboard-section" data-dashboard-section-id="economia-prossimo-anno">
+                    <button
+                        type="button"
+                        class="admin-section-title collapsible-title is-open dashboard-section-title"
+                        data-target="dashboard-riepilogo-economia-prossimo-anno"
+                        data-storage-key="arboris-dashboard-riepilogo-economia-prossimo-anno"
+                        data-default-open="true"
+                    >
+                        <span class="dashboard-section-label">RIEPILOGO ECONOMICO DELL'ANNO SCOLASTICO {{ dashboard_prossimo_anno.anno_label }}</span>
+                        <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+                    </button>
+                    <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-economia-prossimo-anno">
+                        <div class="panel-body dashboard-panel-body">
+                            {% if economia_dashboard_prossimo_anno.configured_year %}
+                                <div class="dashboard-stats-grid">
+                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                        <div class="dashboard-stat-label">Totale {{ student_terminology.selected_plural }} iscritti</div>
+                                        <div class="dashboard-class-grid dashboard-economy-highlights-grid">
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                                <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
+                                                <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_iscritti }}</div>
+                                                <div class="dashboard-economy-card-meta">Iscritti attivi nel prossimo anno scolastico.</div>
+                                            </div>
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                                <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} paganti</div>
+                                                <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_paganti }}</div>
+                                                <div class="dashboard-economy-card-meta">Tutti gli iscritti che pagano una retta.</div>
+                                            </div>
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                                <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} non paganti</div>
+                                                <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_non_paganti }}</div>
+                                                <div class="dashboard-economy-card-meta">Iscritti senza quota retta da versare.</div>
+                                            </div>
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                                <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} con riduzione speciale</div>
+                                                <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_riduzione_speciale }}</div>
+                                                <div class="dashboard-economy-card-meta">Iscritti con riduzione speciale applicata.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                        <div class="dashboard-stat-label">Agevolazioni collegate</div>
+                                        {% if economia_dashboard_prossimo_anno.agevolazioni %}
+                                            <div class="dashboard-economy-list">
+                                                {% for agevolazione in economia_dashboard_prossimo_anno.agevolazioni %}
+                                                    <div class="dashboard-economy-list-item">
+                                                        <div class="dashboard-economy-card-title">{{ agevolazione.nome_agevolazione }}</div>
+                                                        <div class="dashboard-economy-card-value dashboard-economy-card-value-sm">{{ agevolazione.count_studenti }}</div>
+                                                        <div class="dashboard-economy-card-meta">{{ agevolazione.studenti_label }}</div>
+                                                        <div class="dashboard-stat-note dashboard-stat-note-compact">{{ agevolazione.studenti_names }}</div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="dashboard-stat-note">Nessuna agevolazione collegata a {{ student_terminology.selected_plural_lower }} iscritti nel prossimo anno.</div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                        <div class="dashboard-stat-label">Riepilogo rette</div>
+
+                                        <div class="economia-summary-grid dashboard-economia-summary-grid">
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Totale annuo rette</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_rette_annuo|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Incassato finora</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_rette_incassato|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Rette ancora da incassare</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_rette_rimanenti|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Retta media mensile</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.media_mensile_rette|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Totale Preiscrizioni</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_preiscrizioni|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Totale riduzioni speciali</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_riduzioni_speciali|euro }}</div>
+                                            </div>
+                                            <div class="economia-summary-item">
+                                                <div class="economia-summary-label">Totale scambi retta</div>
+                                                <div class="economia-summary-value">EUR {{ economia_dashboard_prossimo_anno.totale_scambi_retta|euro }}</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="dashboard-economy-section-title">Totali agevolazioni applicate</div>
+                                        {% if economia_dashboard_prossimo_anno.agevolazioni %}
+                                            <table class="list-table dashboard-mini-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Agevolazione</th>
+                                                        <th>{{ student_terminology.selected_plural }}</th>
+                                                        <th>Totale scalato</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for agevolazione in economia_dashboard_prossimo_anno.agevolazioni %}
+                                                        <tr>
+                                                            <td>{{ agevolazione.nome_agevolazione }}</td>
+                                                            <td>{{ agevolazione.studenti_label }}</td>
+                                                            <td>EUR {{ agevolazione.totale_importo|euro }}</td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        {% else %}
+                                            <div class="dashboard-stat-note">Nessuna agevolazione con {{ student_terminology.selected_plural_lower }} collegati nel prossimo anno scolastico.</div>
+                                        {% endif %}
+
+                                        <div class="dashboard-economy-section-title">Riepilogo mensile rette</div>
+                                        {% if economia_dashboard_prossimo_anno.riepilogo_mensile %}
+                                            <div class="dashboard-matrix-table-wrapper">
+                                                <table class="list-table dashboard-mini-table dashboard-matrix-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Voce</th>
+                                                            <th>{{ economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.label }}</th>
+                                                            {% for month in economia_dashboard_prossimo_anno.riepilogo_mensile %}
+                                                                <th>{{ month.label }}</th>
+                                                            {% endfor %}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
+                                                            <th>Totale rette</th>
+                                                            <td class="{% if economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_totale|euro }}</td>
+                                                            {% for month in economia_dashboard_prossimo_anno.riepilogo_mensile %}
+                                                                <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_totale|euro }}</td>
+                                                            {% endfor %}
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Incassato</th>
+                                                            <td class="{% if economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_incassato|euro }}</td>
+                                                            {% for month in economia_dashboard_prossimo_anno.riepilogo_mensile %}
+                                                                <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_incassato|euro }}</td>
+                                                            {% endfor %}
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Rimanente</th>
+                                                            <td class="{% if economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ economia_dashboard_prossimo_anno.riepilogo_preiscrizioni.importo_rimanente|euro }}</td>
+                                                            {% for month in economia_dashboard_prossimo_anno.riepilogo_mensile %}
+                                                                <td class="{% if month.importo_rimanente > 0 %}dashboard-matrix-col-open{% else %}dashboard-matrix-col-closed{% endif %}">EUR {{ month.importo_rimanente|euro }}</td>
+                                                            {% endfor %}
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% else %}
+                                            <div class="dashboard-stat-note">Nessun mese disponibile per il riepilogo rette del prossimo anno scolastico.</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        {% if can_view_calendario %}
+            <div class="admin-section dashboard-section" data-dashboard-section-id="calendario">
+                <button
+                    type="button"
+                    class="admin-section-title collapsible-title is-open dashboard-section-title"
+                    data-target="dashboard-riepilogo-calendario"
+                    data-storage-key="arboris-dashboard-riepilogo-calendario"
+                    data-default-open="true"
+                >
+                    <span class="dashboard-section-label">CALENDARIO</span>
+                    <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+                </button>
+                <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-calendario">
+                    <div class="panel-body dashboard-panel-body">
+                        <div class="dashboard-stats-grid">
+                            <div class="dashboard-stat-card">
+                                <div class="dashboard-stat-label">Impegni di oggi</div>
+                                <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.today_label }}</div>
+                                {% if calendario_dashboard.today_records %}
+                                    <div class="dashboard-calendar-list">
+                                        {% for entry in calendario_dashboard.today_records %}
+                                            <div class="dashboard-calendar-entry">
+                                                <div class="dashboard-calendar-entry-head">
+                                                    <span class="calendar-category-pill" style="color: {{ entry.color }}; border-color: {{ entry.color }};">
+                                                        {{ entry.category_label }}
+                                                    </span>
+                                                    <span class="dashboard-calendar-entry-period">{{ entry.period_label }}</span>
+                                                </div>
+                                                {% if entry.url %}
+                                                    <a href="{{ entry.url }}" class="dashboard-calendar-entry-title">{{ entry.title }}</a>
+                                                {% else %}
+                                                    <div class="dashboard-calendar-entry-title">{{ entry.title }}</div>
+                                                {% endif %}
+                                                {% if entry.detail_label %}
+                                                    <div class="dashboard-calendar-entry-detail">{{ entry.detail_label }}</div>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessun impegno o scadenza previsto per oggi.</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="dashboard-stat-card">
+                                <div class="dashboard-stat-label">Eventi della settimana corrente</div>
+                                <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.week_label }}</div>
+                                {% if calendario_dashboard.week_records %}
+                                    <div class="dashboard-calendar-list">
+                                        {% for entry in calendario_dashboard.week_records %}
+                                            <div class="dashboard-calendar-entry">
+                                                <div class="dashboard-calendar-entry-head">
+                                                    <span class="calendar-category-pill" style="color: {{ entry.color }}; border-color: {{ entry.color }};">
+                                                        {{ entry.category_label }}
+                                                    </span>
+                                                    <span class="dashboard-calendar-entry-period">
+                                                        {% if entry.all_day %}
+                                                            {{ entry.start_date|date:"d/m/Y" }}{% if entry.start_date != entry.end_date %} - {{ entry.end_date|date:"d/m/Y" }}{% endif %}
+                                                        {% elif entry.start_date == entry.end_date %}
+                                                            {{ entry.start_date|date:"d/m/Y" }} - {{ entry.period_label }}
+                                                        {% else %}
+                                                            {{ entry.period_label }}
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+                                                {% if entry.url %}
+                                                    <a href="{{ entry.url }}" class="dashboard-calendar-entry-title">{{ entry.title }}</a>
+                                                {% else %}
+                                                    <div class="dashboard-calendar-entry-title">{{ entry.title }}</div>
+                                                {% endif %}
+                                                {% if entry.detail_label %}
+                                                    <div class="dashboard-calendar-entry-detail">{{ entry.detail_label }}</div>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessun evento o scadenza nella settimana corrente.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <script src="{% static 'js/core/collapsible.js' %}"></script>
+    <script src="{% static 'js/pages/dashboard-layout.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisCollapsible) {
+                ArborisCollapsible.initCollapsibleSections(document);
+            }
+            if (window.ArborisDashboardLayout) {
+                ArborisDashboardLayout.init(document);
+            }
+        });
+    </script>
+{% endblock %}

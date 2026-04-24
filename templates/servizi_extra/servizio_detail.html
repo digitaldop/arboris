@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}{{ servizio.nome_servizio }} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ servizio.nome_servizio }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <style>
+        .servizio-extra-overview-card .dashboard-stat-value {
+            font-size: 1.5rem;
+            line-height: 1.2;
+        }
+        .servizio-extra-overview-card .dashboard-stat-value.is-text {
+            font-size: 1.15rem;
+        }
+        .servizio-extra-overview-card .dashboard-stat-note {
+            margin-top: 10px;
+            white-space: pre-line;
+        }
+        .servizio-extra-card-status {
+            position: relative;
+            display: inline-block;
+            vertical-align: middle;
+            min-width: 84px;
+            height: 2.15rem;
+            padding: 0 0.85rem;
+            box-sizing: border-box;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .servizio-extra-card-status-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            text-align: center;
+            transform: translateY(-4px);
+        }
+        .servizio-extra-card-status.is-attiva {
+            background: #d6f5dc;
+            color: #14532d;
+        }
+        .servizio-extra-card-status.is-inattiva {
+            background: #eef2f6;
+            color: #475569;
+        }
+        .servizio-extra-tariffa-meta {
+            display: grid;
+            gap: 0.4rem;
+            margin-top: 0.85rem;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+        .servizio-extra-tariffa-meta strong {
+            color: #0f172a;
+        }
+
+        .servizio-extra-legenda-card {
+            padding: 0.75rem 1rem;
+        }
+        .servizio-extra-legenda {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        .servizio-extra-legenda .legenda-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .servizio-extra-legenda .legenda-chip {
+            display: inline-block;
+            width: 18px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            background: #f5f5f5;
+        }
+
+        .servizio-extra-table-card {
+            padding: 0;
+        }
+        .servizio-extra-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        .servizio-extra-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            font-size: 0.85rem;
+        }
+        .servizio-extra-table th,
+        .servizio-extra-table td {
+            border: 1px solid #dadfe3;
+            padding: 0;
+            vertical-align: top;
+            background: #fff;
+        }
+        .servizio-extra-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: #f3f5f7;
+            font-weight: 600;
+            padding: 0.5rem 0.6rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .servizio-extra-table .sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #fff;
+            min-width: 260px;
+            max-width: 280px;
+        }
+        .servizio-extra-table thead .sticky-col {
+            z-index: 4;
+            background: #f3f5f7;
+        }
+        .servizio-extra-table .studente-col {
+            padding: 0;
+        }
+        .servizio-extra-table .studente-link {
+            display: block;
+            padding: 0.55rem 0.75rem;
+            text-decoration: none;
+            color: inherit;
+        }
+        .servizio-extra-table .studente-link:hover {
+            background: #f1f5f9;
+        }
+        .servizio-extra-table .studente-nome {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .servizio-extra-table .studente-meta {
+            margin-top: 0.18rem;
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+        .servizio-extra-table .colonna-meta {
+            display: block;
+            margin-top: 0.2rem;
+            font-size: 0.72rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .servizio-extra-table .classe-separator td {
+            background: #e8edf2;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+            color: #334155;
+            position: sticky;
+            left: 0;
+        }
+        .servizio-extra-cell {
+            min-width: 140px;
+            max-width: 160px;
+        }
+        .servizio-extra-cell .cell-link {
+            display: block;
+            padding: 0.4rem 0.5rem;
+            color: inherit;
+            text-decoration: none;
+            font-size: 0.8rem;
+            line-height: 1.2;
+        }
+        .servizio-extra-cell .cell-link:hover {
+            filter: brightness(0.96);
+        }
+        .servizio-extra-cell .cell-amount {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .servizio-extra-cell .cell-amount .label {
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .servizio-extra-cell .cell-amount .value {
+            font-weight: 600;
+        }
+        .servizio-extra-cell .cell-date {
+            margin-top: 3px;
+            text-align: right;
+            color: rgba(0, 0, 0, 0.55);
+            font-size: 0.75rem;
+        }
+        .servizio-extra-cell .cell-empty {
+            color: #94a3b8;
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        .servizio-extra-table td.cella-pagata { background: #d6f5dc; }
+        .servizio-extra-table td.cella-parziale { background: #fde9a6; }
+        .servizio-extra-table td.cella-non-pagata { background: #f8c9c9; }
+        .servizio-extra-table td.cella-non-dovuta { background: #eef2f6; }
+        .servizio-extra-table td.cella-assente {
+            background: repeating-linear-gradient(
+                135deg,
+                #fafafa 0px,
+                #fafafa 6px,
+                #eceff2 6px,
+                #eceff2 12px
+            );
+        }
+
+        .servizio-extra-table td.cella-pagata .cell-link { color: #14532d; }
+        .servizio-extra-table td.cella-parziale .cell-link { color: #6b4906; }
+        .servizio-extra-table td.cella-non-pagata .cell-link { color: #7f1d1d; }
+        .servizio-extra-table td.cella-non-dovuta .cell-link { color: #475569; }
+
+        .servizio-extra-legenda .legenda-chip.cella-pagata { background: #d6f5dc; }
+        .servizio-extra-legenda .legenda-chip.cella-parziale { background: #fde9a6; }
+        .servizio-extra-legenda .legenda-chip.cella-non-pagata { background: #f8c9c9; }
+        .servizio-extra-legenda .legenda-chip.cella-non-dovuta { background: #eef2f6; }
+        .servizio-extra-legenda .legenda-chip.cella-assente {
+            background: repeating-linear-gradient(
+                135deg,
+                #fafafa 0px,
+                #fafafa 6px,
+                #eceff2 6px,
+                #eceff2 12px
+            );
+        }
+    </style>
+
+    <div class="page-head">
+        <h1 class="page-title">{{ servizio.nome_servizio }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_tariffe_servizi_extra' %}?servizio={{ servizio.pk }}" class="btn btn-secondary">Tariffe</a>
+            <a href="{% url 'lista_iscrizioni_servizi_extra' %}?servizio={{ servizio.pk }}" class="btn btn-secondary">Iscrizioni</a>
+            <a href="{% url 'lista_rate_servizi_extra' %}?servizio={{ servizio.pk }}" class="btn btn-secondary">Rate</a>
+            {% if can_manage_servizi_extra %}
+                <a href="{% url 'modifica_servizio_extra' servizio.pk %}" class="btn btn-primary">Modifica servizio</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="dashboard-stats-grid">
+            {% for card in overview_cards %}
+                <div class="dashboard-stat-card servizio-extra-overview-card">
+                    <div class="dashboard-stat-label">{{ card.label }}</div>
+                    <div class="dashboard-stat-value {% if card.value_type == 'text' %}is-text{% endif %}">
+                        {% if card.value_type == "currency" %}
+                            EUR {{ card.value|euro }}
+                        {% elif card.value_type == "date" %}
+                            {% if card.value %}
+                                {{ card.value|date:"d/m/Y" }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% else %}
+                            {{ card.value }}
+                        {% endif %}
+                    </div>
+                    <div class="dashboard-stat-note">{{ card.note }}</div>
+                </div>
+            {% endfor %}
+
+            {% for tariffa in tariffe_cards %}
+                <div class="dashboard-stat-card servizio-extra-overview-card">
+                    <div class="dashboard-stat-label">Tariffa</div>
+                    <div class="dashboard-stat-value is-text">{{ tariffa.nome_tariffa }}</div>
+                    <div class="dashboard-stat-note">
+                        <span class="servizio-extra-card-status {% if tariffa.attiva %}is-attiva{% else %}is-inattiva{% endif %}">
+                            <span class="servizio-extra-card-status-label">
+                                {% if tariffa.attiva %}Attiva{% else %}Inattiva{% endif %}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="servizio-extra-tariffa-meta">
+                        <div><strong>Totale:</strong> EUR {{ tariffa.totale_importo|euro }}</div>
+                        <div><strong>Rate:</strong> {{ tariffa.numero_rate }} {% if tariffa.rateizzata %}(rateizzata){% else %}(unica soluzione){% endif %}</div>
+                        <div><strong>Iscrizioni attive:</strong> {{ tariffa.count_iscrizioni_attive }} su {{ tariffa.count_iscrizioni }}</div>
+                        <div>
+                            <strong>Scadenze:</strong>
+                            {% if tariffa.prima_scadenza %}
+                                {{ tariffa.prima_scadenza|date:"d/m/Y" }}{% if tariffa.ultima_scadenza and tariffa.ultima_scadenza != tariffa.prima_scadenza %} - {{ tariffa.ultima_scadenza|date:"d/m/Y" }}{% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="dashboard-stat-card servizio-extra-overview-card">
+                    <div class="dashboard-stat-label">Tariffe</div>
+                    <div class="dashboard-stat-value is-text">Nessuna tariffa</div>
+                    <div class="dashboard-stat-note">Configura almeno una tariffa per generare il piano rate del servizio.</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="page-head" style="margin-top: 22px;">
+        <h2 class="page-title" style="font-size: 1.35rem;">Verifica situazione rette del servizio</h2>
+    </div>
+
+    <div class="content-card servizio-extra-legenda-card">
+        <div class="servizio-extra-legenda">
+            <span class="legenda-item">
+                <span class="legenda-chip cella-pagata"></span>
+                Pagata
+            </span>
+            <span class="legenda-item">
+                <span class="legenda-chip cella-parziale"></span>
+                Pagamento parziale
+            </span>
+            <span class="legenda-item">
+                <span class="legenda-chip cella-non-pagata"></span>
+                Non pagata
+            </span>
+            <span class="legenda-item">
+                <span class="legenda-chip cella-non-dovuta"></span>
+                Non dovuta
+            </span>
+            <span class="legenda-item">
+                <span class="legenda-chip cella-assente"></span>
+                Rata non presente
+            </span>
+        </div>
+    </div>
+
+    <div class="content-card servizio-extra-table-card">
+        <div class="servizio-extra-scroll">
+            <table class="servizio-extra-table">
+                <thead>
+                    <tr>
+                        <th class="sticky-col studente-col">Studente</th>
+                        {% for colonna in colonne %}
+                            <th>
+                                Rata {{ colonna.numero_rata }}
+                                <span class="colonna-meta">{{ colonna.data_scadenza|date:"d/m/Y" }}</span>
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gruppo in righe_per_classe %}
+                        <tr class="classe-separator">
+                            <td colspan="{{ num_colonne }}">Classe: <strong>{{ gruppo.classe_label }}</strong></td>
+                        </tr>
+                        {% for riga in gruppo.righe %}
+                            <tr>
+                                <td class="sticky-col studente-col">
+                                    <a href="{% url 'modifica_iscrizione_servizio_extra' riga.iscrizione.pk %}" class="studente-link" title="Apri iscrizione al servizio">
+                                        <div class="studente-nome">{{ riga.studente.cognome }} {{ riga.studente.nome }}</div>
+                                        <div class="studente-meta">{{ riga.iscrizione.tariffa.nome_tariffa }}</div>
+                                        <div class="studente-meta">Aperto: EUR {{ riga.riepilogo.totale_rimanente|euro }}</div>
+                                    </a>
+                                </td>
+                                {% for cella in riga.celle %}
+                                    {% if cella.rata %}
+                                        <td class="servizio-extra-cell cella-{{ cella.stato }}">
+                                            <a href="{{ cella.url }}?next={{ request.get_full_path|urlencode }}" class="cell-link" title="Apri dettaglio rata">
+                                                <div class="cell-amount">
+                                                    <span class="label">Dovuto</span>
+                                                    <span class="value">EUR {{ cella.rata.importo_finale|euro }}</span>
+                                                </div>
+                                                <div class="cell-amount">
+                                                    <span class="label">Pagato</span>
+                                                    <span class="value">EUR {{ cella.rata.importo_pagato|euro }}</span>
+                                                </div>
+                                                <div class="cell-date">
+                                                    {% if cella.rata.data_pagamento %}
+                                                        {{ cella.rata.data_pagamento|date:"d/m/Y" }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </div>
+                                            </a>
+                                        </td>
+                                    {% else %}
+                                        <td class="servizio-extra-cell cella-assente">
+                                            <div class="cell-empty">-</div>
+                                        </td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per questo servizio.</div></td>
+                            </tr>
+                        {% endfor %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="{{ num_colonne|default:1 }}"><div class="empty-state">Nessuna iscrizione attiva per questo servizio.</div></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

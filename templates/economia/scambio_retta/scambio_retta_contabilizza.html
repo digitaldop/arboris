@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Contabilizza scambio retta - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_scambi_retta' %}">Scambio retta</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Contabilizza</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Contabilizza scambio retta</h1>
+    </div>
+
+    <div class="content-card">
+        <table class="form-table">
+            <tr><th>Familiare</th><td>{{ scambio.familiare }}</td></tr>
+            <tr><th>Studente</th><td>{{ scambio.studente }}</td></tr>
+            <tr><th>Anno scolastico</th><td>{{ scambio.anno_scolastico.nome_anno_scolastico }}</td></tr>
+            <tr><th>Mese riferimento</th><td>{{ scambio.mese_riferimento }}</td></tr>
+            <tr><th>Ore lavorate</th><td>{{ scambio.ore_lavorate }}</td></tr>
+            <tr><th>Importo maturato</th><td>{{ scambio.importo_maturato }}</td></tr>
+            {% if prossima_rata %}
+                <tr><th>Rata destinazione</th><td>{{ prossima_rata.display_label }} - {{ prossima_rata.iscrizione }}</td></tr>
+                    <tr><th>Scadenza rata</th><td>{{ prossima_rata.data_scadenza|it_date|default:"-" }}</td></tr>
+                <tr><th>Credito gia applicato</th><td>{{ prossima_rata.credito_applicato }}</td></tr>
+            {% else %}
+                <tr><th>Rata destinazione</th><td><span class="table-link-danger">Nessuna rata successiva disponibile</span></td></tr>
+            {% endif %}
+        </table>
+
+        <div class="help-text" style="padding: 0 16px 16px 16px;">
+            La contabilizzazione applica il credito maturato alla rata successiva dello studente e registra un movimento nel credito retta.
+        </div>
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            {% if prossima_rata and scambio.approvata and not scambio.contabilizzata %}
+                <button type="submit" class="btn btn-primary">Conferma contabilizzazione</button>
+            {% endif %}
+            <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

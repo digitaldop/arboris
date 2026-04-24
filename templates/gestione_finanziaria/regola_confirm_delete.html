@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina regola {{ regola.nome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_regole_categorizzazione' %}">Regole</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina regola di categorizzazione</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare la regola <strong>{{ regola.nome }}</strong>.</p>
+        <p class="help-text">
+            I movimenti gia' categorizzati da questa regola mantengono la categoria assegnata.
+        </p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <a href="{% url 'lista_regole_categorizzazione' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

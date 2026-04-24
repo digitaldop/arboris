@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ titolo }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{{ titolo }}</h1>
+    </div>
+
+    <form method="post" class="detail-form" id="fondo-piano-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                {% for field in form %}
+                    <tr>
+                        <th>{{ field.label_tag }}</th>
+                        <td>{{ field }} {{ field.errors }}<br><small class="table-muted">{{ field.help_text }}</small></td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                {% if piano %}
+                    <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary">Annulla</a>
+                {% else %}
+                    <a href="{% url 'fondo_piano_lista' %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+    <style>
+        #fondo-piano-form .fondo-piano-field--inactive {
+            opacity: 0.7;
+            background-color: #e8eaed;
+            color: #5f6368;
+            cursor: not-allowed;
+            border-color: #dadce0;
+        }
+        #fondo-piano-form select.fondo-piano-field--inactive {
+            background-color: #e8eaed;
+        }
+    </style>
+    <script>
+        (function () {
+            var form = document.getElementById("fondo-piano-form");
+            var mod = document.getElementById("id_modalita");
+            var fPct = document.getElementById("id_percentuale_su_rette");
+            var fPer = document.getElementById("id_periodicita");
+            var fData = document.getElementById("id_data_primo_versamento");
+            var fImp = document.getElementById("id_importo_versamento_periodico");
+            if (!form || !mod) return;
+            var fieldsAll = [fPct, fPer, fData, fImp].filter(function (el) { return el; });
+            var fieldsPeriod = [fPer, fData, fImp].filter(function (el) { return el; });
+            var CL_INACTIVE = "fondo-piano-field--inactive";
+            function setFieldDisabled(el, dis) {
+                if (!el) return;
+                el.disabled = dis;
+                el.setAttribute("aria-disabled", dis ? "true" : "false");
+                if (dis) {
+                    el.classList.add(CL_INACTIVE);
+                } else {
+                    el.classList.remove(CL_INACTIVE);
+                }
+            }
+            function syncModalita() {
+                var v = (mod.value || "").trim();
+                if (v === "solo_manuale") {
+                    fieldsAll.forEach(function (el) { setFieldDisabled(el, true); });
+                } else if (v === "percentuale_rette") {
+                    setFieldDisabled(fPct, false);
+                    fieldsPeriod.forEach(function (el) { setFieldDisabled(el, true); });
+                } else if (v === "versamenti_periodici") {
+                    setFieldDisabled(fPct, true);
+                    fieldsPeriod.forEach(function (el) { setFieldDisabled(el, false); });
+                } else if (v === "misto") {
+                    fieldsAll.forEach(function (el) { setFieldDisabled(el, false); });
+                } else {
+                    fieldsAll.forEach(function (el) { setFieldDisabled(el, true); });
+                }
+            }
+            mod.addEventListener("change", syncModalita);
+            form.addEventListener("submit", function () {
+                fieldsAll.forEach(function (el) {
+                    if (el && el.disabled) {
+                        el.disabled = false;
+                        el.classList.remove(CL_INACTIVE);
+                    }
+                });
+            });
+            syncModalita();
+        })();
+        (function () {
+            var cb = document.getElementById("id_sempre_attivo");
+            var sel = document.getElementById("id_anno_scolastico");
+            if (!cb || !sel) return;
+            var savedValue = sel.value;
+            var CL = "fondo-piano-field--inactive";
+            function apply() {
+                var on = cb.checked;
+                sel.disabled = on;
+                sel.setAttribute("aria-disabled", on ? "true" : "false");
+                if (on) {
+                    sel.classList.add(CL);
+                } else {
+                    sel.classList.remove(CL);
+                }
+            }
+            cb.addEventListener("change", function () {
+                if (cb.checked) {
+                    savedValue = sel.value;
+                    sel.selectedIndex = 0;
+                } else {
+                    if (savedValue) sel.value = savedValue;
+                }
+                apply();
+            });
+            apply();
+        })();
+    </script>
+{% endblock %}

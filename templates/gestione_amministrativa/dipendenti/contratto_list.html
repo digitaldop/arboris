@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Contratti dipendenti - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Contratti dipendenti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Contratti dipendenti</h1>
+        <div class="page-head-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url 'crea_contratto_dipendente_generico' %}" class="btn btn-primary">Nuovo contratto</a>
+            {% endif %}
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Dipendenti</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Dipendente:
+                <select name="dipendente">
+                    <option value="">Tutti</option>
+                    {% for dipendente in dipendenti %}
+                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Stato:
+                <select name="attivo">
+                    <option value="">Tutti</option>
+                    <option value="1" {% if attivo == "1" %}selected{% endif %}>Attivi</option>
+                    <option value="0" {% if attivo == "0" %}selected{% endif %}>Non attivi</option>
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Dipendente</th>
+                    <th>Periodo</th>
+                    <th>Tipo</th>
+                    <th>CCNL / livello</th>
+                    <th class="column-right">Lordo mensile</th>
+                    <th>Mensilita</th>
+                    <th>Buste collegate</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contratto in contratti %}
+                    <tr>
+                        <td>
+                            {% if contratto.dipendente_id %}
+                                <a href="{% url 'modifica_dipendente' contratto.dipendente_id %}" class="table-link">{{ contratto.dipendente }}</a>
+                            {% else %}
+                                <span class="table-muted">Non assegnato</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</td>
+                        <td>{{ contratto.tipo_contratto|default:"-" }}</td>
+                        <td>
+                            {{ contratto.ccnl|default:"-" }}
+                            {% if contratto.livello %}<br><span class="table-muted">{{ contratto.livello }}</span>{% endif %}
+                        </td>
+                        <td class="column-right">{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</td>
+                        <td>{{ contratto.mensilita_annue }}</td>
+                        <td>{{ contratto.numero_buste }}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">Modifica</a>
+                            {% if can_manage_gestione_amministrativa %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_contratto_dipendente' contratto.pk %}" class="table-link table-link-danger">Elimina</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">Nessun contratto trovato.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

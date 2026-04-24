@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}Nuovo utente{% else %}{{ utente_obj.get_full_name|default:utente_obj.email }}{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_utenti' %}">Utenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if is_new %}Nuovo utente{% else %}{{ utente_obj.get_full_name|default:utente_obj.email }}{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">
+            {% if is_new %}Nuovo utente{% else %}{{ utente_obj.get_full_name|default:utente_obj.email }}{% endif %}
+        </h1>
+        <div class="page-head-actions">
+            {% if can_manage_sistema %}
+                <button type="submit" form="utente-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            <a href="{% url 'lista_utenti' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="utente-form">
+        {% csrf_token %}
+
+        <div class="family-top-layout">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Dati utente</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table">
+                                <tr>
+                                    <th>{{ form.first_name.label_tag }}</th>
+                                    <td>{{ form.first_name }} {{ form.first_name.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.last_name.label_tag }}</th>
+                                    <td>{{ form.last_name }} {{ form.last_name.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.email.label_tag }}</th>
+                                    <td>{{ form.email }} {{ form.email.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.ruolo.label_tag }}</th>
+                                    <td>
+                                        {{ form.ruolo }} {{ form.ruolo.errors }}
+                                        {% if form.ruolo.help_text %}
+                                            <div class="help-text">{{ form.ruolo.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.password.label_tag }}</th>
+                                    <td>
+                                        {{ form.password }}
+                                        {{ form.password.errors }}
+                                        {% if form.password.help_text %}
+                                            <div class="help-text">{{ form.password.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="family-side-column">
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Permessi</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table compact-form-table">
+                                <tr>
+                                    <th>{{ form.controllo_completo.label_tag }}</th>
+                                    <td>
+                                        {{ form.controllo_completo }} {{ form.controllo_completo.errors }}
+                                        {% if form.controllo_completo.help_text %}
+                                            <div class="help-text">{{ form.controllo_completo.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_anagrafica.label_tag }}</th>
+                                    <td>{{ form.permesso_anagrafica }} {{ form.permesso_anagrafica.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_economia.label_tag }}</th>
+                                    <td>{{ form.permesso_economia }} {{ form.permesso_economia.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_sistema.label_tag }}</th>
+                                    <td>{{ form.permesso_sistema }} {{ form.permesso_sistema.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_calendario.label_tag }}</th>
+                                    <td>{{ form.permesso_calendario }} {{ form.permesso_calendario.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_gestione_finanziaria.label_tag }}</th>
+                                    <td>{{ form.permesso_gestione_finanziaria }} {{ form.permesso_gestione_finanziaria.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_gestione_amministrativa.label_tag }}</th>
+                                    <td>{{ form.permesso_gestione_amministrativa }} {{ form.permesso_gestione_amministrativa.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.permesso_servizi_extra.label_tag }}</th>
+                                    <td>{{ form.permesso_servizi_extra }} {{ form.permesso_servizi_extra.errors }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {% if utente_obj %}
+                    <div class="admin-section compact">
+                        <div class="admin-section-title">Riepilogo</div>
+                        <div class="panel">
+                            <div class="panel-body summary-panel-body">
+                                <div class="summary-grid">
+                                    <div class="summary-item">
+                                        <div class="summary-value">{% if utente_obj.is_active %}Sì{% else %}No{% endif %}</div>
+                                        <div class="summary-label">Utente attivo</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">{% if utente_obj.last_login %}Sì{% else %}No{% endif %}</div>
+                                        <div class="summary-label">Ha effettuato accesso</div>
+                                    </div>
+                                    {% if utente_obj.profilo_permessi.ruolo %}
+                                        <div class="summary-item">
+                                            <div class="summary-value">{{ utente_obj.profilo_permessi.get_ruolo_display }}</div>
+                                            <div class="summary-label">Ruolo</div>
+                                        </div>
+                                    {% endif %}
+                                    {% if utente_obj.profilo_permessi.controllo_completo %}
+                                        <div class="summary-item">
+                                            <div class="summary-value">Sì</div>
+                                            <div class="summary-label">Controllo completo</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_sistema %}
+                <button type="submit" class="btn btn-primary">{% if is_new %}Crea utente{% else %}Salva modifiche{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_utenti' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+{% endblock %}

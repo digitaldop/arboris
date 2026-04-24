@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Gestione amministrativa - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Gestione amministrativa</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Gestione amministrativa</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-primary">Dipendenti</a>
+            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Contratti</a>
+            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Buste paga</a>
+            <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Parametri calcolo</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ dipendenti_attivi }}</div>
+                <div class="summary-label">Dipendenti attivi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ dipendenti_totali }}</div>
+                <div class="summary-label">Dipendenti totali</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ contratti_attivi }}</div>
+                <div class="summary-label">Contratti attivi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ buste_periodo_count }}</div>
+                <div class="summary-label">Buste {{ mese|stringformat:"02d" }}/{{ anno }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Confronto previsto / effettivo del mese</h2>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ costo_previsto|euro }} &euro;</div>
+                <div class="summary-label">Costo azienda previsto</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ costo_effettivo|euro }} &euro;</div>
+                <div class="summary-label">Costo azienda effettivo</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ netto_previsto|euro }} &euro;</div>
+                <div class="summary-label">Netti previsti</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ netto_effettivo|euro }} &euro;</div>
+                <div class="summary-label">Netti effettivi</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Ultime buste paga</h2>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Dipendente</th>
+                    <th>Stato</th>
+                    <th class="column-right">Costo previsto</th>
+                    <th class="column-right">Costo effettivo</th>
+                    <th class="column-right">Scostamento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for busta in ultimi_cedolini %}
+                    <tr>
+                        <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
+                        <td>{{ busta.dipendente }}</td>
+                        <td>{{ busta.get_stato_display }}</td>
+                        <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>
+                        <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
+                        <td class="column-right">{{ busta.scostamento_costo_azienda|euro }} &euro;</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">Nessuna busta paga registrata.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

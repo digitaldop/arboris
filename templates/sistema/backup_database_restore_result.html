@@ -1,0 +1,114 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ripristino Database - Arboris</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+        }
+        body {
+            margin: 0;
+            font-family: var(--font-body);
+            background: #f4f7f9;
+            color: #233945;
+        }
+        .restore-result-shell {
+            max-width: 760px;
+            margin: 48px auto;
+            padding: 0 20px;
+        }
+        .restore-result-card {
+            padding: 28px;
+            border: 1px solid #dbe5eb;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: 0 10px 28px rgba(30, 52, 66, 0.08);
+        }
+        .restore-result-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .restore-result-status.success {
+            background: #e6f5ea;
+            color: #2b7443;
+        }
+        .restore-result-status.error {
+            background: #fdecee;
+            color: #9a3341;
+        }
+        h1 {
+            margin: 16px 0 10px;
+            font-size: 34px;
+            font-weight: 300;
+            font-family: var(--font-headings);
+        }
+        .restore-result-lead {
+            margin: 0 0 16px;
+            line-height: 1.6;
+        }
+        .restore-result-details {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border-radius: 12px;
+            background: #f7fafc;
+        }
+        .restore-result-details p {
+            margin: 0 0 10px;
+        }
+        .restore-result-details p:last-child {
+            margin-bottom: 0;
+        }
+        .restore-result-actions {
+            margin-top: 22px;
+        }
+        .restore-result-actions a {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #417690;
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="restore-result-shell">
+        <div class="restore-result-card">
+            <div class="restore-result-status {% if restore_success %}success{% else %}error{% endif %}">
+                {% if restore_success %}Ripristino completato{% else %}Ripristino interrotto{% endif %}
+            </div>
+            <h1>Backup Database</h1>
+            <p class="restore-result-lead">{{ restore_message }}</p>
+
+            <div class="restore-result-details">
+                <p><strong>File importato:</strong> {{ uploaded_backup_name }}</p>
+                {% if safety_backup_name %}
+                    <p><strong>Backup di sicurezza creato prima del ripristino:</strong> {{ safety_backup_name }}</p>
+                {% endif %}
+                {% if restore_success %}
+                    <p>Per sicurezza, chiudi e riapri la sessione di Arboris prima di continuare a lavorare.</p>
+                {% else %}
+                    <p>Verifica il file importato. Se necessario puoi ripartire dal backup di sicurezza creato automaticamente prima del tentativo di ripristino.</p>
+                {% endif %}
+            </div>
+
+            <div class="restore-result-actions">
+                <a href="/">Torna alla dashboard</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

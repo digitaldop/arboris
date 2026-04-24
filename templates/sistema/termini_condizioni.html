@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Termini e condizioni d&rsquo;uso - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Termini e condizioni</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Termini e condizioni d&rsquo;uso</h1>
+    </div>
+
+    <div class="content-card legal-static">
+        <p class="legal-meta">
+            Le presenti condizioni disciplinano l&rsquo;accesso e l&rsquo;utilizzo di
+            <strong>Arboris School Management</strong> in contesti <strong>scolastici e amministrativi</strong>.
+            Il testo &egrave; strutturato come <strong>modello generico</strong>: l&rsquo;ente (scuola) e, se del caso,
+            i fornitori del servizio, possono adottare condizioni aggiuntive o integrative per contratto.
+        </p>
+
+        <h2>1. Oggetto e accettazione</h2>
+        <p>
+            Il software fornisce strumenti per la gestione di anagrafiche, organizzazione scolastica, economia
+            (ove configurata) e correlative funzionalit&agrave;. L&rsquo;utilizzo della piattaforma, anche dopo il primo
+            accesso, implica <strong>presa visione e accettazione</strong> di questa documentazione, salvo
+            clausole che richiedano esplicita manifestazione di consenso separato.
+        </p>
+
+        <h2>2. Descrizione del servizio</h2>
+        <p>
+            Le funzionalit&agrave; dipendono dalla <strong>configurazione</strong> attivata per l&rsquo;istituto
+            (moduli, permessi, integrazioni). Le specifiche, i tempi di risposta e le modalit&agrave; di
+            <strong>assistenza</strong> possono essere definite contrattualmente o nella documentazione interna
+            dell&rsquo;Ente. Non sussiste obbligo di fornire un livello di servizio oltre quanto concordato.
+        </p>
+
+        <h2>3. Account, credenziali e responsabilit&agrave; dell&rsquo;utente</h2>
+        <p>
+            L&rsquo;accesso avviene tramite <strong>account</strong> assegnati o revisionati dal responsabile
+            dell&rsquo;Ente. L&rsquo;utente &egrave; responsabile della <strong>riservatezza</strong> delle
+            credenziali, del logout da sessioni condivise e di ogni attivit&agrave; svolta con il proprio profilo.
+            L&rsquo;Ente adotta il profilazione dei permessi; &egrave; compito del titolare o degli amministratori
+            mappare correttamente ruoli e <strong>diritti d&rsquo;accesso</strong>.
+        </p>
+
+        <h2>4. Uso consentito e divieti</h2>
+        <p>Il software deve essere utilizzato in conformit&agrave; a leggi, regolamenti e buona fede, evitando in particolare di:</p>
+        <ul>
+            <li>inserire dati falsi, non necessari o non pertinenti rispetto alle finalit&agrave; istituzionali;</li>
+            <li>eludere o compromettere misure di sicurezza, log o tracciamento previsti dall&rsquo;Ente;</li>
+            <li>impiegare strumenti automatizzati per estrapolare dati o sovraccaricare in modo anomalo il servizio, salvo consenso o necessit&agrave; documentata;</li>
+            <li>utilizzare la piattaforma in modo da ledere diritti di terzi o della stessa struttura scolastica.</li>
+        </ul>
+
+        <h2>5. Dati, accuratezza e collaborazione con le famiglie</h2>
+        <p>
+            L&rsquo;Ente e gli utenza abilitate sono invitati a mantenere i dati <strong>aggiornati</strong> e coerenti
+            con le fonti ufficiali. Per segnalazioni e rettifiche, valgono le procedure interne di segreteria
+            o quelle rese note alle famiglie, anche in raccordo con quanto indicato in materia di privacy.
+        </p>
+
+        <h2>6. Propriet&agrave; intellettuale e marchi</h2>
+        <p>
+            Software, interfacce, marchi, documentazione e ogni componente fornita restano di <strong>titolarit&agrave;
+            dei rispettivi aventi diritto</strong>. Non &egrave; consentita copia, decompilazione, distribuzione
+            o uso al di fuori di quanto autorizzato, salvo eccezioni inderogabili di legge.
+        </p>
+
+        <h2>7. Disponibilit&agrave;, manutenzioni e limiti di responsabilit&agrave;</h2>
+        <p>
+            Il servizio pu&ograve; essere temporaneamente <strong>non disponibile</strong> per manutenzioni, aggiornamenti,
+            cause di forza maggiore o malfunzionamenti. Salvo obblighi inderogabili o accordi scritti che prevedano
+            clausole diverse, in nessun caso si risponde per <strong>danni indiretti</strong>, mancati guadagni o
+            perdita di dati ove il danno non sia imputabile per dolo o colpa grave, compatibilmente con la disciplina
+            applicabile.
+        </p>
+
+        <h2>8. Sospensione e cessazione</h2>
+        <p>
+            L&rsquo;Ente pu&ograve; sospendere o chiudere accessi in caso di violazione delle presenti condizioni o
+            di esigenze organizzative/tecniche. Alla <strong>cessazione del rapporto</strong> o del diritto d&rsquo;uso
+            (es. fine rapporto lavorativo o collaborazione), l&rsquo;account potr&agrave; essere disattivato secondo
+            i processi interni, nel rispetto di eventuali obblighi di conservazione documentale o legale.
+        </p>
+
+        <h2>9. Modifiche ai termini</h2>
+        <p>
+            I termini possono essere aggiornati: la <strong>data di versione</strong> o le comunicazioni rese
+            dall&rsquo;Ente fanno fede, ove adottate. L&rsquo;uso continuato dopo modifiche sostanziali potr&agrave;
+            valere, ove ammesso dalla legge, come accettazione, salva diversa formalizzazione richiesta
+            al titolare del servizio.
+        </p>
+
+        <h2>10. Legge applicabile e foro (indicazione tipica per rapporti in Italia)</h2>
+        <p>
+            Per i rapporti aventi riferimento all&rsquo;ordinamento italiano, ove ammesso, si intende in genere
+            <strong>applicabile la legge italiana</strong>. Quanto a <strong>competenza territoriale</strong>,
+            fatti salvi i criteri inderogabili, pu&ograve; valere il foro del luogo ove ha sede l&rsquo;Ente o quanto
+            specificato in contratti ulteriori tra le parti. Per conflitti con utenti o terzi, si rimanda
+            all&rsquo;analisi del caso.
+        </p>
+    </div>
+{% endblock %}

@@ -1,0 +1,1259 @@
+{% extends "base.html" %}
+{% load static currency rich_notes %}
+
+{% block title %}
+    {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %} - Arboris School Management
+{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'lista_famiglie' %}">Famiglie</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>{% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">
+            {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
+        </h1>
+        <div class="page-head-actions">
+            {% if famiglia %}
+                <button type="button" class="btn btn-secondary" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">Stampa scheda</button>
+                <button type="button" class="btn btn-primary" id="enable-edit-famiglia-btn">Modifica</button>
+                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-famiglia-btn">Annulla modifiche</button>
+                <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <input type="hidden" name="_edit_scope" id="famiglia-edit-scope" value="{{ edit_scope|default:'view' }}">
+        <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'familiari' }}">
+        <fieldset id="famiglia-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if famiglia %}disabled{% endif %}>
+
+        <!-- INIZIO SEZIONE DATI PRINCIPALI -->
+        <div class="family-top-layout main-fields-section">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Dati principali</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table">
+                                <tr>
+                                    <th>{{ form.cognome_famiglia.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if famiglia and famiglia.cognome_famiglia %}
+                                                {{ famiglia.cognome_famiglia }}
+                                            {% else %}
+                                                <span class="table-muted">Nessun cognome famiglia impostato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.cognome_famiglia }}
+                                        </div>
+                                        {{ form.cognome_famiglia.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.stato_relazione_famiglia.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if famiglia and famiglia.stato_relazione_famiglia %}
+                                                {{ famiglia.stato_relazione_famiglia }}
+                                            {% else %}
+                                                <span class="table-muted">Nessuno stato impostato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-row mode-edit-field">
+                                            {{ form.stato_relazione_famiglia }}
+
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-stato-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn">✎</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn">✖</button>
+                                            </div>
+                                        </div>
+                                        {{ form.stato_relazione_famiglia.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.indirizzo_principale.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if famiglia and famiglia.indirizzo_principale %}
+                                                {{ famiglia.indirizzo_principale.label_full }}
+                                            {% else %}
+                                                <span class="table-muted">Nessun indirizzo impostato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-row mode-edit-field">
+                                            {{ form.indirizzo_principale }}
+
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">✎</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">✖</button>
+                                            </div>
+                                        </div>
+                                        <div class="help-text mode-edit-field">
+                                            Questo indirizzo verrà usato come riferimento per familiari e {{ student_terminology.selected_plural_lower }} quando il loro indirizzo specifico è vuoto.
+                                        </div>
+                                        {{ form.indirizzo_principale.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.attiva.label_tag }}</th>
+                                    <td>
+                                        {{ form.attiva }}
+                                        {{ form.attiva.errors }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin-section compact family-notes-section" id="family-notes-section">
+                    <button type="button" class="admin-section-title collapsible-title" data-target="section-note" data-default-open="false">
+                        <span>Note</span>
+                    </button>
+                    <div class="panel collapsible-panel" id="section-note">
+                        <div class="panel-body family-notes-panel-body">
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- FINE SEZIONE DATI PRINCIPALI -->
+
+            <!-- INIZIO SEZIONE LATERALE DESTRA -->
+            <div class="family-side-column">
+                <!-- INIZIO SEZIONE LATERALE DATI SISTEMA -->
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Sistema</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table compact-form-table">
+                                <tr>
+                                    <th>Data creazione</th>
+                                    <td class="system-readonly-value">
+                                        {% if famiglia %}{{ famiglia.data_creazione }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Data aggiornamento</th>
+                                    <td class="system-readonly-value">
+                                        {% if famiglia %}{{ famiglia.data_aggiornamento }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- FINE SEZIONE LATERALE DATI SISTEMA -->
+
+                <!-- INIZIO SEZIONE LATERALE DI RIEPILOGO -->
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Riepilogo</div>
+                    <div class="panel">
+                        <div class="panel-body summary-panel-body">
+                            <div class="summary-grid">
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_familiari }}</div>
+                                    <div class="summary-label">Familiari</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_studenti }}</div>
+                                    <div class="summary-label">{{ student_terminology.selected_plural }}</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti }}</div>
+                                    <div class="summary-label">Documenti</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_in_scadenza }}</div>
+                                    <div class="summary-label">In scadenza 30 gg</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_scaduti }}</div>
+                                    <div class="summary-label">Scaduti</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_familiari }}</div>
+                                    <div class="summary-label">Doc. familiari</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_studenti }}</div>
+                                    <div class="summary-label">Doc. {{ student_terminology.selected_plural_lower }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- FINE SEZIONE LATERALE DI RIEPILOGO -->
+
+            </div>
+            <!-- FINE SEZIONE LATERALE DESTRA -->
+        </div>
+        <!-- FINE SEZIONE DATI PRINCIPALI -->
+
+        </fieldset>
+        
+
+        <!-- INIZIO CODICE GENERICO DEGLI INLINE-->
+
+        <div class="admin-section inline-lock-container" id="famiglia-inline-lock-container" data-mode-lock-scope="inline">
+            {% if has_form_errors %}
+                <div class="inline-formset-errors">
+                    Verifica i campi evidenziati: alcuni dati della scheda non sono stati salvati.
+                    {% if form.errors %}
+                        <div>{{ form.errors }}</div>
+                    {% endif %}
+                    {% if familiari_formset.non_form_errors %}
+                        <div>{{ familiari_formset.non_form_errors }}</div>
+                    {% endif %}
+                    {% if familiari_formset.errors %}
+                        <div>{{ familiari_formset.errors }}</div>
+                    {% endif %}
+                    {% if studenti_formset.non_form_errors %}
+                        <div>{{ studenti_formset.non_form_errors }}</div>
+                    {% endif %}
+                    {% if studenti_formset.errors %}
+                        <div>{{ studenti_formset.errors }}</div>
+                    {% endif %}
+                    {% if documenti_formset.non_form_errors %}
+                        <div>{{ documenti_formset.non_form_errors }}</div>
+                    {% endif %}
+                    {% if documenti_formset.errors %}
+                        <div>{{ documenti_formset.errors }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            <div class="inline-section-head">
+                <div class="tab-nav">
+                    <button type="button" class="tab-btn{% if active_inline_tab == 'familiari' %} is-active{% endif %}" data-tab-target="tab-familiari" data-tab-base-label="Familiari">
+                        Familiari ({{ count_familiari }})
+                    </button>
+                    <button type="button" class="tab-btn{% if active_inline_tab == 'studenti' %} is-active{% endif %}" data-tab-target="tab-studenti" data-tab-base-label="{{ student_terminology.selected_plural }}">
+                        {{ student_terminology.selected_plural }} ({{ count_studenti }})
+                    </button>
+                    <button type="button" class="tab-btn{% if active_inline_tab == 'documenti' %} is-active{% endif %}" data-tab-target="tab-documenti" data-tab-base-label="Documenti" data-related-document-count="{{ count_documenti_familiari|add:count_documenti_studenti }}">
+                        Documenti ({{ count_documenti }})
+                    </button>
+                </div>
+                {% if famiglia %}
+                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-famiglia-btn">{% if active_inline_tab == "studenti" %}Modifica {{ student_terminology.selected_plural }}{% elif active_inline_tab == "documenti" %}Modifica Documenti{% else %}Modifica Familiari{% endif %}</button>
+                {% endif %}
+            </div>
+            <!-- INIZIO INTESTAZIONI DEI TAB DEGLI INLINE CON CONTEGGIO DEL NUMERO ELEMENTI-->
+            <!-- FINE INTESTAZIONI DEI TAB DEGLI INLINE CON CONTEGGIO DEL NUMERO ELEMENTI-->
+
+        <!-- INIZIO INLINE DEI FAMILIARI -->
+            <div class="tab-panel{% if active_inline_tab == 'familiari' %} is-active{% endif %}" id="tab-familiari" data-inline-scope="familiari">
+                <div class="admin-section-title admin-section-title-with-help">
+                    <span>Familiari</span>
+                    <button
+                        type="button"
+                        class="inline-help-trigger"
+                        data-floating-text="In questa tab vengono mostrati tutti i familiari associati alla famiglia {{ famiglia.cognome_famiglia|default:'-' }}.&#10;&#10;Per aggiungere un familiare, usare il pulsante &quot;Aggiungi un altro familiare&quot;"
+                        aria-label="Informazioni sulla sezione familiari"
+                    >?</button>
+                </div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {% if familiari_formset.non_form_errors %}
+                            <div class="inline-formset-errors">
+                                {{ familiari_formset.non_form_errors }}
+                            </div>
+                        {% endif %}
+                        {{ familiari_formset.management_form }}
+                        <table class="inline-table" id="familiari-table">
+                            <thead>
+                                <tr>
+                                    <th class="inline-name-col">COGNOME</th>
+                                    <th class="inline-name-col">NOME</th>
+                                    <th>PARENTELA</th>
+                                    <th>INDIRIZZO</th>
+                                    <th>TELEFONO</th>
+                                    <th>EMAIL</th>
+                                    <th class="inline-view-only-table-cell">DATA NASCITA</th>
+                                    <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
+                                    <th class="inline-view-only-table-cell">CODICE FISCALE</th>
+                                    <th class="inline-checkbox-heading">CONVIVENTE</th>
+                                    <th class="inline-checkbox-heading">REFERENTE<br>PRINCIPALE</th>
+                                    <th class="inline-checkbox-heading inline-scambio-retta-col">SCAMBIO<br>RETTA</th>
+                                    <th class="mode-edit-only-table-cell">ATTIVO</th>
+                                    <th class="mode-edit-only-table-cell">ELIMINA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in familiari_formset %}
+                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                        {{ f.id }}
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.cognome %}
+                                                    {{ f.instance.cognome }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.cognome }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.nome %}
+                                                    {{ f.instance.nome }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.nome }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.relazione_familiare %}
+                                                    {{ f.instance.relazione_familiare }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicata</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
+                                                {{ f.relazione_familiare }}
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.indirizzo_effettivo %}
+                                                    {{ f.instance.indirizzo_effettivo.label_full }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessun indirizzo</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
+                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                    {{ f.indirizzo }}
+                                                </div>
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                                </div>
+                                            </div>
+
+                                            <div class="inline-address-help" data-role="address-help">
+                                                {% if f.instance.pk and f.instance.indirizzo %}
+                                                    Indirizzo specifico
+                                                {% elif famiglia and famiglia.indirizzo_principale %}
+                                                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                                {% else %}
+                                                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
+                                                {% if f.instance.pk and f.instance.formatted_telefono %}
+                                                    <div class="readonly-action-group">
+                                                        <a href="{{ f.instance.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.formatted_telefono }}</a>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.formatted_telefono }}" data-floating-text="Copia" aria-label="Copia numero di telefono">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">
+                                                {{ f.telefono }}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
+                                                {% if f.instance.pk and f.instance.email %}
+                                                    <div class="readonly-action-group">
+                                                        <a href="mailto:{{ f.instance.email }}">{{ f.instance.email }}</a>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.email }}" data-floating-text="Copia" aria-label="Copia email">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="table-muted">Non indicata</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">
+                                                {{ f.email }}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.data_nascita %}
+                                                    {{ f.instance.data_nascita|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicata</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.luogo_nascita %}
+                                                    {{ f.instance.luogo_nascita }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.codice_fiscale %}
+                                                    <div class="readonly-action-group">
+                                                        <span>{{ f.instance.codice_fiscale }}</span>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-checkbox-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.convivente|si_no }}</div>
+                                            <div class="mode-edit-field">{{ f.convivente }}</div>
+                                        </td>
+                                        <td class="inline-checkbox-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.referente_principale|si_no }}</div>
+                                            <div class="mode-edit-field">{{ f.referente_principale }}</div>
+                                        </td>
+                                        <td class="inline-checkbox-cell inline-scambio-retta-col">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.abilitato_scambio_retta|si_no }}</div>
+                                            <div class="mode-edit-field">{{ f.abilitato_scambio_retta }}</div>
+                                        </td>
+                                        <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ f.attivo }}</td>
+                                        <td class="inline-delete-cell mode-edit-only-table-cell">
+                                            {% if f.instance.pk %}
+                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                            {% else %}
+                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                        <td colspan="14">
+                                            <div class="inline-subform-grid">
+                                                <div class="inline-subform-field">
+                                                    <label>Data nascita</label>
+                                                    {{ f.data_nascita }}
+                                                    {{ f.data_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Sesso</label>
+                                                    {{ f.sesso }}
+                                                    {{ f.sesso.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Luogo nascita</label>
+                                                    <div class="autocomplete-wrapper citta-autocomplete">
+                                                        {{ f.luogo_nascita }}
+                                                    </div>
+                                                    {{ f.luogo_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Codice fiscale</label>
+                                                    {{ f.codice_fiscale }}
+                                                    {{ f.codice_fiscale.errors }}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% if f.non_field_errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="11">{{ f.non_field_errors }}</td>
+                                        </tr>
+                                    {% elif f.errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="11">{{ f.errors }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if not count_familiari %}
+                            <div class="empty-state compact-empty-state inline-empty-state">
+                                Ancora nessun familiare inserito.
+                            </div>
+                        {% endif %}
+                        <div class="inline-add-row inline-add-row-view-enabled">
+                            <button type="button" class="inline-add-btn" onclick="addFamigliaInlineForm('familiari')">+ Aggiungi un altro Familiare.</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <!-- FINE INLINE DEI FAMILIARI -->
+
+        <!-- INIZIO INLINE DEGLI STUDENTI-->
+            <div class="tab-panel{% if active_inline_tab == 'studenti' %} is-active{% endif %}" id="tab-studenti" data-inline-scope="studenti">
+                <div class="admin-section-title">{{ student_terminology.selected_plural }}</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ studenti_formset.management_form }}
+                        <table class="inline-table" id="studenti-table">
+                            <thead>
+                                <tr>
+                                    <th>NOME</th>
+                                    <th>COGNOME</th>
+                                    <th class="inline-address-col">INDIRIZZO</th>
+                                    <th class="inline-view-only-table-cell">DATA NASCITA</th>
+                                    <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
+                                    <th class="inline-view-only-table-cell">CODICE FISCALE</th>
+                                    <th class="inline-checkbox-cell mode-edit-only-table-cell">ATTIVO</th>
+                                    <th class="mode-edit-only-table-cell">ELIMINA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in studenti_formset %}
+                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+                                        {{ f.id }}
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.nome %}
+                                                    {{ f.instance.nome }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.nome }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.cognome %}
+                                                    {{ f.instance.cognome }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.cognome }}</div>
+                                        </td>
+                                        <td class="inline-address-cell inline-address-cell-wide">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.indirizzo_effettivo %}
+                                                    {{ f.instance.indirizzo_effettivo.label_full }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessun indirizzo</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
+                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                    {{ f.indirizzo }}
+                                                </div>
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                                </div>
+                                            </div>
+
+                                            <div class="inline-address-help" data-role="address-help">
+                                                {% if f.instance.pk and f.instance.indirizzo %}
+                                                    Indirizzo specifico
+                                                {% elif famiglia and famiglia.indirizzo_principale %}
+                                                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                                {% else %}
+                                                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.data_nascita %}
+                                                    {{ f.instance.data_nascita|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicata</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.luogo_nascita %}
+                                                    {{ f.instance.luogo_nascita }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-view-only-table-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.codice_fiscale %}
+                                                    <div class="readonly-action-group">
+                                                        <span>{{ f.instance.codice_fiscale }}</span>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell">{{ f.attivo }}</td>
+                                        <td class="inline-delete-cell mode-edit-only-table-cell">
+                                            {% if f.instance.pk %}
+                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                            {% else %}
+                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+                                        <td colspan="8">
+                                            <div class="inline-subform-grid">
+                                                <div class="inline-subform-field">
+                                                    <label>Data nascita</label>
+                                                    {{ f.data_nascita }}
+                                                    {{ f.data_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Sesso</label>
+                                                    {{ f.sesso }}
+                                                    {{ f.sesso.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Luogo nascita</label>
+                                                    <div class="autocomplete-wrapper citta-autocomplete">
+                                                        {{ f.luogo_nascita }}
+                                                    </div>
+                                                    {{ f.luogo_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Codice fiscale</label>
+                                                    {{ f.codice_fiscale }}
+                                                    {{ f.codice_fiscale.errors }}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% if f.non_field_errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="8">{{ f.non_field_errors }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if not count_studenti %}
+                            <div class="empty-state compact-empty-state inline-empty-state">
+                                Ancora nessun {{ student_terminology.selected_singular_lower }} inserito.
+                            </div>
+                        {% endif %}
+                        <div class="inline-add-row inline-add-row-view-enabled">
+                            <button type="button" class="inline-add-btn" onclick="addFamigliaInlineForm('studenti')">+ Aggiungi un altro {{ student_terminology.selected_singular }}.</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <!-- FINE INLINE DEGLI STUDENTI-->
+        
+        <!-- INIZIO INLINE DEI DOCUMENTI -->
+            <div class="tab-panel{% if active_inline_tab == 'documenti' %} is-active{% endif %}" id="tab-documenti" data-inline-scope="documenti">
+                <div class="admin-section-title">Documenti</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ documenti_formset.management_form }}
+                        <table class="inline-table" id="documenti-table">
+                            <thead>
+                                <tr>
+                                    <th>TIPO DOCUMENTO</th>
+                                    <th>DESCRIZIONE</th>
+                                    <th>FILE</th>
+                                    <th>SCADENZA</th>
+                                    <th>VISIBILE</th>
+                                    <th>NOTE</th>
+                                    <th>ELIMINA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in documenti_formset %}
+                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}">
+                                        {{ f.id }}
+                                        <td>
+                                            <div class="inline-related-field">
+                                                {{ f.tipo_documento }}
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">✖</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ f.descrizione }}</td>
+                                        <td class="document-file-cell">
+                                            {{ f.file }}
+                                            {% if f.instance.pk and f.instance.file %}
+                                                <div class="help-text">
+                                                    <a href="{{ f.instance.file.url }}" target="_blank">File attuale</a>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ f.scadenza }}</td>
+                                        <td class="inline-checkbox-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
+                                            <div class="mode-edit-field">{{ f.visibile }}</div>
+                                        </td>
+                                        <td>{{ f.note }}</td>
+                                        <td class="inline-delete-cell">
+                                            {% if f.instance.pk %}
+                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                            {% else %}
+                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% if f.non_field_errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="7">{{ f.non_field_errors }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if not count_documenti %}
+                            <div class="empty-state compact-empty-state inline-empty-state">
+                                Ancora nessun documento caricato.
+                            </div>
+                        {% endif %}
+                        <div class="inline-add-row inline-add-row-view-enabled">
+                            <button type="button" class="inline-add-btn" onclick="addFamigliaInlineForm('documenti')">+ Aggiungi un altro Documento.</button>
+                        </div>
+                        <!-- VISUALIZZAZIONE DEI DOCUMENTI DI FAMILIARI E STUDENTI-->
+                        <div class="aggregated-documents-sections">
+                            <div class="aggregated-documents-block">
+                                <h3 class="aggregated-documents-title">Documenti dei familiari</h3>
+
+                                {% if documenti_familiari %}
+                                    <table class="list-table compact-list-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Familiare</th>
+                                                <th>Tipo documento</th>
+                                                <th>Descrizione</th>
+                                                <th>Scadenza</th>
+                                                <th>Visibile</th>
+                                                <th>File</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for doc in documenti_familiari %}
+                                                <tr>
+                                                    <td>{{ doc.familiare }}</td>
+                                                    <td>{{ doc.tipo_documento }}</td>
+                                                    <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{{ doc.scadenza|default:"—" }}</td>
+                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
+                                                    <td>
+                                                        {% if doc.file %}
+                                                            <a href="{{ doc.file.url }}" target="_blank">Apri</a>
+                                                        {% else %}
+                                                            <span class="table-muted">—</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% else %}
+                                    <div class="empty-state compact-empty-state">
+                                        Nessun documento collegato ai familiari.
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="aggregated-documents-block">
+                                <h3 class="aggregated-documents-title">Documenti associati a {{ student_terminology.selected_plural_lower }}</h3>
+
+                                {% if documenti_studenti %}
+                                    <table class="list-table compact-list-table">
+                                        <thead>
+                                            <tr>
+                                                <th>{{ student_terminology.selected_singular }}</th>
+                                                <th>Tipo documento</th>
+                                                <th>Descrizione</th>
+                                                <th>Scadenza</th>
+                                                <th>Visibile</th>
+                                                <th>File</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for doc in documenti_studenti %}
+                                                <tr>
+                                                    <td>{{ doc.studente }}</td>
+                                                    <td>{{ doc.tipo_documento }}</td>
+                                                    <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{{ doc.scadenza|default:"—" }}</td>
+                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
+                                                    <td>
+                                                        {% if doc.file %}
+                                                            <a href="{{ doc.file.url }}" target="_blank">Apri</a>
+                                                        {% else %}
+                                                            <span class="table-muted">—</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% else %}
+                                    <div class="empty-state compact-empty-state">
+                                        Nessun documento collegato a {{ student_terminology.selected_plural_lower }}.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <!-- FINE VISUALIZZAZIONE DEI DOCUMENTI DI FAMILIARI E STUDENTI-->
+                    </div>
+                </div>
+            </div>
+        <!-- FINE INLINE DEI DOCUMENTI -->
+        </div> <!-- CHIUSURA CODICE DEGLI INLINE -->
+
+        <!-- PULSANTI DI AZIONE DEL FORM -->
+        <div class="form-actions sticky-form-actions mode-edit-only" id="sticky-form-actions">
+            <button type="submit" name="_save" class="btn btn-primary">Salva</button>
+            <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
+            <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un'altra famiglia</button>
+            <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-famiglia-btn">Annulla</button>
+        </div>
+        <div class="sticky-actions-spacer"></div>
+        <!-- FINE PULSANTI DI AZIONE DEL FORM -->
+    </form>
+
+    <!-- TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
+    <template id="familiari-empty-form-template">
+        <tr class="inline-form-row">
+            {{ familiari_formset.empty_form.id }}
+            <td>{{ familiari_formset.empty_form.cognome }}</td>
+            <td>{{ familiari_formset.empty_form.nome }}</td>
+            <td>
+                <div class="inline-related-field">
+                    {{ familiari_formset.empty_form.relazione_familiare }}
+                    <div class="related-actions inline-related-actions">
+                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="inline-related-field">
+                    <div class="autocomplete-wrapper indirizzo-autocomplete">
+                        {{ familiari_formset.empty_form.indirizzo }}
+                    </div>
+                    <div class="related-actions inline-related-actions">
+                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                    </div>
+                </div>
+
+                <div class="inline-address-help" data-role="address-help">
+                    {% if famiglia and famiglia.indirizzo_principale %}
+                        Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                    {% else %}
+                        Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                    {% endif %}
+                </div>
+            </td>
+            <td>{{ familiari_formset.empty_form.telefono }}</td>
+            <td>{{ familiari_formset.empty_form.email }}</td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.convivente }}</td>
+            <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.referente_principale }}</td>
+            <td class="inline-checkbox-cell inline-scambio-retta-col">{{ familiari_formset.empty_form.abilitato_scambio_retta }}</td>
+            <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ familiari_formset.empty_form.attivo }}</td>
+            <td class="inline-delete-cell mode-edit-only-table-cell">
+                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+            </td>
+        </tr>
+        <tr class="inline-subform-row">
+            <td colspan="14">
+                <div class="inline-subform-grid">
+                    <div class="inline-subform-field">
+                        <label>Data nascita</label>
+                        {{ familiari_formset.empty_form.data_nascita }}
+                        {{ familiari_formset.empty_form.data_nascita.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Sesso</label>
+                        {{ familiari_formset.empty_form.sesso }}
+                        {{ familiari_formset.empty_form.sesso.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Luogo nascita</label>
+                        <div class="autocomplete-wrapper citta-autocomplete">
+                            {{ familiari_formset.empty_form.luogo_nascita }}
+                        </div>
+                        {{ familiari_formset.empty_form.luogo_nascita.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Codice fiscale</label>
+                        {{ familiari_formset.empty_form.codice_fiscale }}
+                        {{ familiari_formset.empty_form.codice_fiscale.errors }}
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </template>
+    <!-- FINE TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
+
+    <!-- TEMPLATE RIGA VUOTA STUDENTI INLINE -->
+    <template id="studenti-empty-form-template">
+        <tr class="inline-form-row">
+            {{ studenti_formset.empty_form.id }}
+            <td>{{ studenti_formset.empty_form.nome }}</td>
+            <td>{{ studenti_formset.empty_form.cognome }}</td>
+            <td class="inline-address-cell inline-address-cell-wide">
+                <div class="inline-related-field">
+                    <div class="autocomplete-wrapper indirizzo-autocomplete">
+                        {{ studenti_formset.empty_form.indirizzo }}
+                    </div>
+                    <div class="related-actions inline-related-actions">
+                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                    </div>
+                </div>
+
+                <div class="inline-address-help" data-role="address-help">
+                    {% if famiglia and famiglia.indirizzo_principale %}
+                        Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                    {% else %}
+                        Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                    {% endif %}
+                </div>
+            </td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-view-only-table-cell"></td>
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell">{{ studenti_formset.empty_form.attivo }}</td>
+            <td class="inline-delete-cell mode-edit-only-table-cell">
+                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+            </td>
+        </tr>
+        <tr class="inline-subform-row">
+            <td colspan="8">
+                <div class="inline-subform-grid">
+                    <div class="inline-subform-field">
+                        <label>Data nascita</label>
+                        {{ studenti_formset.empty_form.data_nascita }}
+                        {{ studenti_formset.empty_form.data_nascita.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Sesso</label>
+                        {{ studenti_formset.empty_form.sesso }}
+                        {{ studenti_formset.empty_form.sesso.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Luogo nascita</label>
+                        <div class="autocomplete-wrapper citta-autocomplete">
+                            {{ studenti_formset.empty_form.luogo_nascita }}
+                        </div>
+                        {{ studenti_formset.empty_form.luogo_nascita.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Codice fiscale</label>
+                        {{ studenti_formset.empty_form.codice_fiscale }}
+                        {{ studenti_formset.empty_form.codice_fiscale.errors }}
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </template>
+    <!-- FINE TEMPLATE RIGA VUOTA STUDENTI INLINE -->
+
+    <!-- TEMPLATE RIGA VUOTA DOCUMENTI INLINE -->
+    <template id="documenti-empty-form-template">
+        <tr class="inline-form-row">
+            {{ documenti_formset.empty_form.id }}
+            <td>
+                <div class="inline-related-field">
+                    {{ documenti_formset.empty_form.tipo_documento }}
+                    <div class="related-actions inline-related-actions">
+                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">✎</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">✖</button>
+                    </div>
+                </div>
+            </td>
+            <td>{{ documenti_formset.empty_form.descrizione }}</td>
+            <td>{{ documenti_formset.empty_form.file }}</td>
+            <td>{{ documenti_formset.empty_form.scadenza }}</td>
+            <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
+            <td>{{ documenti_formset.empty_form.note }}</td>
+            <td class="inline-delete-cell">
+                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+            </td>
+        </tr>
+    </template>
+    <!-- FINE TEMPLATE RIGA VUOTA DOCUMENTI INLINE -->
+
+    {% if famiglia and famiglia.indirizzo_principale %}
+        {{ famiglia.indirizzo_principale.label_select|json_script:"famiglia-indirizzo-principale-label" }}
+    {% else %}
+        <script id="famiglia-indirizzo-principale-label" type="application/json">""</script>
+    {% endif %}
+
+    {% if famiglia %}
+        <section class="print-family-sheet" aria-hidden="true">
+            <header class="print-sheet-header">
+                <h1 class="print-sheet-title">Famiglia {{ famiglia.cognome_famiglia }}</h1>
+            </header>
+
+            <section class="print-sheet-section">
+                <h2 class="print-sheet-section-title">Dati principali</h2>
+                <div class="print-sheet-grid">
+                    <div class="print-sheet-item">
+                        <div class="print-sheet-label">Stato relazione famiglia</div>
+                        <div class="print-sheet-value">
+                            {% if famiglia.stato_relazione_famiglia %}
+                                {{ famiglia.stato_relazione_famiglia }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="print-sheet-item">
+                        <div class="print-sheet-label">Indirizzo principale</div>
+                        <div class="print-sheet-value">
+                            {% if famiglia.indirizzo_principale %}
+                                {{ famiglia.indirizzo_principale.label_full }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {% if famiglia.note %}
+                <section class="print-sheet-section">
+                    <h2 class="print-sheet-section-title">Note</h2>
+                    <div class="print-sheet-notes">{{ famiglia.note|render_rich_notes }}</div>
+                </section>
+            {% endif %}
+
+            <section class="print-sheet-section">
+                <h2 class="print-sheet-section-title">Familiari</h2>
+                {% if count_familiari %}
+                    <table class="print-sheet-table">
+                        <thead>
+                            <tr>
+                                <th>Cognome</th>
+                                <th>Nome</th>
+                                <th>Parentela</th>
+                                <th>Data nascita</th>
+                                <th>Luogo nascita</th>
+                                <th>Codice fiscale</th>
+                                <th>Telefono</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in familiari_formset %}
+                                {% if f.instance.pk %}
+                                    <tr>
+                                        <td>{{ f.instance.cognome }}</td>
+                                        <td>{{ f.instance.nome }}</td>
+                                        <td>{{ f.instance.relazione_familiare }}</td>
+                                        <td>{{ f.instance.data_nascita|it_date|default:"-" }}</td>
+                                        <td>{{ f.instance.luogo_nascita|default:"-" }}</td>
+                                        <td>{{ f.instance.codice_fiscale|default:"-" }}</td>
+                                        <td>{{ f.instance.formatted_telefono|default:"-" }}</td>
+                                        <td>{{ f.instance.email|default:"-" }}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="print-sheet-empty">Ancora nessun familiare inserito.</div>
+                {% endif %}
+            </section>
+
+            <section class="print-sheet-section">
+                <h2 class="print-sheet-section-title">{{ student_terminology.selected_plural }}</h2>
+                {% if count_studenti %}
+                    <table class="print-sheet-table">
+                        <thead>
+                            <tr>
+                                <th>Cognome</th>
+                                <th>Nome</th>
+                                <th>Data nascita</th>
+                                <th>Luogo nascita</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in studenti_formset %}
+                                {% if f.instance.pk %}
+                                    <tr>
+                                        <td>{{ f.instance.cognome }}</td>
+                                        <td>{{ f.instance.nome }}</td>
+                                        <td>{{ f.instance.data_nascita|it_date|default:"-" }}</td>
+                                        <td>{{ f.instance.luogo_nascita|default:"-" }}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="print-sheet-empty">Ancora nessun {{ student_terminology.selected_singular_lower }} inserito.</div>
+                {% endif %}
+            </section>
+        </section>
+    {% endif %}
+
+    <!-- RICHIAMO I CORE SCRIPT -->
+    {% load static %}
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/core/collapsible.js' %}"></script>
+    <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
+    <!-- <script src="{% static 'js/pages/famiglia-form.js' %}"></script> -->
+
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=15"></script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const famigliaId = "{{ famiglia.pk|default:'new' }}";
+        const printButton = document.getElementById("print-famiglia-btn");
+        const stickyCancelButton = document.getElementById("sticky-cancel-edit-famiglia-btn");
+        const headerCancelButton = document.getElementById("cancel-edit-famiglia-btn");
+
+        if (printButton) {
+            printButton.addEventListener("click", function () {
+                document.body.classList.add("is-printing-family-sheet");
+                window.setTimeout(function () {
+                    window.print();
+                }, 50);
+            });
+        }
+
+        window.addEventListener("afterprint", function () {
+            document.body.classList.remove("is-printing-family-sheet");
+        });
+
+        if (window.ArborisListRowLinks) {
+            ArborisListRowLinks.init();
+        }
+
+        if (window.ArborisCopyActions) {
+            ArborisCopyActions.init();
+        }
+
+        if (stickyCancelButton) {
+            stickyCancelButton.addEventListener("click", function () {
+                if (headerCancelButton) {
+                    headerCancelButton.click();
+                    return;
+                }
+                if (typeof window.ArborisReloadWithLongWait === "function") {
+                    window.ArborisReloadWithLongWait();
+                } else {
+                    window.location.reload();
+                }
+            });
+        }
+
+        if (!window.ArborisFamigliaForm) {
+            console.error("ArborisFamigliaForm non caricato.");
+            return;
+        }
+
+        try {
+            ArborisFamigliaForm.init({
+                famigliaId: famigliaId,
+                initialActiveTab: "{{ active_inline_tab|default:'familiari' }}",
+                preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
+                urls: {
+                    creaStatoRelazioneFamiglia: "{% url 'crea_stato_relazione_famiglia' %}",
+                    creaIndirizzo: "{% url 'crea_indirizzo' %}",
+                    creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
+                    creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
+                }
+            });
+        } catch (error) {
+            console.error("Errore durante l'inizializzazione della scheda famiglia:", error);
+        }
+
+        if (window.ArborisViewMode) {
+            window.famigliaViewMode = ArborisViewMode.init({
+                formId: "famiglia-detail-form",
+                lockContainerId: "famiglia-lock-container",
+                inlineLockContainerId: "famiglia-inline-lock-container",
+                modeInputId: "famiglia-edit-scope",
+                editButtonId: "enable-edit-famiglia-btn",
+                inlineEditButtonId: "enable-inline-edit-famiglia-btn",
+                cancelButtonId: "cancel-edit-famiglia-btn",
+                startMode: "{{ edit_scope|default:'view' }}",
+                reloadOnCancel: true,
+                onModeChange: function () {
+                    if (window.ArborisFamigliaForm && typeof window.ArborisFamigliaForm.refreshInlineEditScope === "function") {
+                        window.ArborisFamigliaForm.refreshInlineEditScope();
+                    } else if (window.ArborisFamigliaForm && typeof window.ArborisFamigliaForm.refreshLockedTabs === "function") {
+                        window.ArborisFamigliaForm.refreshLockedTabs();
+                    }
+
+                    if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.init === "function") {
+                        ArborisFamigliaAutocomplete.init(document.getElementById("famiglia-lock-container"));
+                        ArborisFamigliaAutocomplete.init(document.getElementById("famiglia-inline-lock-container"));
+                    }
+
+                    if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.refresh === "function") {
+                        ArborisFamigliaAutocomplete.refresh(document.getElementById("famiglia-lock-container"));
+                        ArborisFamigliaAutocomplete.refresh(document.getElementById("famiglia-inline-lock-container"));
+                    }
+                }
+            });
+        }
+    });
+    </script>
+{% endblock %}

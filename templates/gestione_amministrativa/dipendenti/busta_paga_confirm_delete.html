@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina busta paga - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_buste_paga_dipendenti' %}">Buste paga</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina busta paga</h1>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Stai per eliminare la busta paga <strong>{{ busta.periodo_label }}</strong>
+            di <strong>{{ busta.dipendente }}</strong>.
+        </p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

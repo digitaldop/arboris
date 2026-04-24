@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Impostazioni Generali - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Impostazioni generali</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Impostazioni generali</h1>
+        <div class="page-head-actions">
+            {% if can_manage_sistema %}
+                <button type="submit" form="impostazioni-generali-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" id="impostazioni-generali-form">
+        {% csrf_token %}
+
+        <fieldset {% if not can_manage_sistema %}disabled{% endif %}>
+            <div class="family-top-layout">
+                <div class="family-main-column">
+                    <div class="admin-section">
+                        <div class="admin-section-title">Configurazione generale</div>
+                        <div class="panel">
+                            <div class="panel-body" data-terminology-skip="true">
+                                <table class="form-table">
+                                    <tr>
+                                        <th>{{ form.terminologia_studente.label_tag }}</th>
+                                        <td>
+                                            {{ form.terminologia_studente }}
+                                            {{ form.terminologia_studente.errors }}
+                                            {% if form.terminologia_studente.help_text %}
+                                                <div class="help-text">{{ form.terminologia_studente.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>{{ form.mostra_dashboard_prossimo_anno_scolastico.label_tag }}</th>
+                                        <td>
+                                            {{ form.mostra_dashboard_prossimo_anno_scolastico }}
+                                            {{ form.mostra_dashboard_prossimo_anno_scolastico.errors }}
+                                            {% if form.mostra_dashboard_prossimo_anno_scolastico.help_text %}
+                                                <div class="help-text">{{ form.mostra_dashboard_prossimo_anno_scolastico.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-section">
+                        <div class="admin-section-title">Aspetto del software</div>
+                        <div class="panel">
+                            <div class="panel-body" data-terminology-skip="true">
+                                <table class="form-table">
+                                    <tr>
+                                        <th>{{ form.font_principale.label_tag }}</th>
+                                        <td>
+                                            {{ form.font_principale }}
+                                            {{ form.font_principale.errors }}
+                                            {% if form.font_principale.help_text %}
+                                                <div class="help-text">{{ form.font_principale.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>{{ form.font_titoli.label_tag }}</th>
+                                        <td>
+                                            {{ form.font_titoli }}
+                                            {{ form.font_titoli.errors }}
+                                            {% if form.font_titoli.help_text %}
+                                                <div class="help-text">{{ form.font_titoli.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="family-side-column">
+                    <div class="admin-section compact">
+                        <div class="admin-section-title">Riepilogo</div>
+                        <div class="panel">
+                            <div class="panel-body summary-panel-body" data-terminology-skip="true">
+                                <div class="summary-grid">
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {{ impostazioni.termine_studente_singolare|default:"Studente" }}
+                                        </div>
+                                        <div class="summary-label">Singolare</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {{ impostazioni.termine_studente_plurale|default:"Studenti" }}
+                                        </div>
+                                        <div class="summary-label">Plurale</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">Interno</div>
+                                        <div class="summary-label">Calendario</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {{ impostazioni.get_font_principale_display|default:"Manrope" }}
+                                        </div>
+                                        <div class="summary-label">Font principale</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {{ impostazioni.get_font_titoli_display|default:"Manrope" }}
+                                        </div>
+                                        <div class="summary-label">Font titoli</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {% if impostazioni.mostra_dashboard_prossimo_anno_scolastico %}Attivo{% else %}No{% endif %}
+                                        </div>
+                                        <div class="summary-label">Dashboard anno successivo</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_sistema %}
+                <button type="submit" class="btn btn-primary">Salva impostazioni</button>
+            {% endif %}
+            <a href="{% url 'impostazioni_generali_sistema' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+{% endblock %}

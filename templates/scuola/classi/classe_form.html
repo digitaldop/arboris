@@ -1,0 +1,93 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
+
+{% block title %}{% if classe %}Classe {{ classe }}{% else %}Nuova classe{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+{% if not popup %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_classi' %}">Classi</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if classe %}{{ classe }}{% else %}Nuova{% endif %}</span>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if classe %}Classe {{ classe }}{% else %}Nuova classe{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% else %}
+                {% if classe %}
+                    <button type="button" class="btn btn-primary" id="enable-edit-classe-btn">Modifica</button>
+                    <a href="{% url 'elimina_classe' classe.pk %}" class="btn btn-danger">Elimina</a>
+                    <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-classe-btn">Annulla modifiche</button>
+                {% endif %}
+                <a href="{% url 'lista_classi' %}" class="btn btn-secondary">Torna all'elenco</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" id="classe-detail-form" class="detail-form{% if classe and not popup %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <fieldset id="classe-lock-container" class="mode-lock-container" {% if classe and not popup %}disabled{% endif %}>
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.nome_classe.label_tag }}</th>
+                    <td>{{ form.nome_classe }} {{ form.nome_classe.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.sezione_classe.label_tag }}</th>
+                    <td>{{ form.sezione_classe }} {{ form.sezione_classe.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.ordine_classe.label_tag }}</th>
+                    <td>{{ form.ordine_classe }} {{ form.ordine_classe.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.anno_scolastico.label_tag }}</th>
+                    <td>{{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.attiva.label_tag }}</th>
+                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>{{ form.note }} {{ form.note.errors }}</td>
+                </tr>
+            </table>
+            <div class="form-actions{% if not popup %} mode-edit-only{% endif %}">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% else %}
+                    <a href="{% url 'lista_classi' %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+        </fieldset>
+    </form>
+    {% if not popup %}
+        <script src="{% static 'js/core/view-mode.js' %}"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                if (window.ArborisViewMode) {
+                    ArborisViewMode.init({
+                        formId: "classe-detail-form",
+                        lockContainerId: "classe-lock-container",
+                        editButtonId: "enable-edit-classe-btn",
+                        cancelButtonId: "cancel-edit-classe-btn",
+                        startInEditMode: {% if classe %}false{% else %}true{% endif %},
+                        reloadOnCancel: true
+                    });
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock %}

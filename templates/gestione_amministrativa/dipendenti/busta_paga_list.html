@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Buste paga - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Buste paga</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Buste paga dipendenti</h1>
+        <div class="page-head-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url 'crea_busta_paga_dipendente' %}" class="btn btn-primary">Nuova busta paga</a>
+            {% endif %}
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Dipendenti</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Anno:
+                <input type="number" name="anno" value="{{ anno }}" min="2000" max="2100">
+            </label>
+            <label>
+                Mese:
+                <input type="number" name="mese" value="{{ mese }}" min="1" max="12">
+            </label>
+            <label>
+                Dipendente:
+                <select name="dipendente">
+                    <option value="">Tutti</option>
+                    {% for dipendente in dipendenti %}
+                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Dipendente</th>
+                    <th>Stato</th>
+                    <th class="column-right">Netto previsto</th>
+                    <th class="column-right">Netto effettivo</th>
+                    <th class="column-right">Costo previsto</th>
+                    <th class="column-right">Costo effettivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for busta in buste %}
+                    <tr>
+                        <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
+                        <td>{{ busta.dipendente }}</td>
+                        <td>{{ busta.get_stato_display }}</td>
+                        <td class="column-right">{{ busta.netto_previsto|euro }} &euro;</td>
+                        <td class="column-right">{{ busta.netto_effettivo|euro }} &euro;</td>
+                        <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>
+                        <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">Modifica</a>
+                            {% if can_manage_gestione_amministrativa %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_busta_paga_dipendente' busta.pk %}" class="table-link table-link-danger">Elimina</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">Nessuna busta paga trovata.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

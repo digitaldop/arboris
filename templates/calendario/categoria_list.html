@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Categorie calendario - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'calendario_agenda' %}">Calendario</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Categorie</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Categorie calendario</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Torna al calendario</a>
+            {% if can_manage_calendario %}
+                <a href="{% url 'crea_categoria_calendario' %}" class="btn btn-primary">Nuova categoria</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="family-top-layout">
+        <div class="family-main-column">
+            <div class="panel">
+                <div class="panel-body">
+                    {% if categorie %}
+                        <table class="list-table">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th>Colore</th>
+                                    <th>Ordine</th>
+                                    <th>Eventi a calendario</th>
+                                    <th>Attiva</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for categoria_obj in categorie %}
+                                    <tr class="list-row-link" data-row-href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}">
+                                        <td>
+                                            {{ categoria_obj.nome }}
+                                            {% if categoria_obj.is_system_category %}
+                                                <div class="table-muted">Categoria di sistema</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="calendar-category-pill" style="color: {{ categoria_obj.colore }}; border-color: {{ categoria_obj.colore }};">
+                                                {{ categoria_obj.colore }}
+                                            </span>
+                                        </td>
+                                        <td>{{ categoria_obj.ordine }}</td>
+                                        <td>{{ categoria_obj.count_eventi_agenda }}</td>
+                                        <td>{% if categoria_obj.attiva %}Si{% else %}No{% endif %}</td>
+                                        <td class="actions-cell">
+                                            <a href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}" class="table-link">Modifica</a>
+                                            {% if can_manage_calendario and not categoria_obj.is_system_category %}
+                                                <span class="table-muted">|</span>
+                                                <a href="{% url 'elimina_categoria_calendario' categoria_obj.pk %}" class="table-link table-link-danger">Elimina</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="empty-state">Ancora nessuna categoria inserita.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="family-side-column">
+            <div class="admin-section compact">
+                <div class="admin-section-title">Riepilogo</div>
+                <div class="panel">
+                    <div class="panel-body summary-panel-body">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_totali }}</div>
+                                <div class="summary-label">Categorie</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_attive }}</div>
+                                <div class="summary-label">Attive</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+{% endblock %}

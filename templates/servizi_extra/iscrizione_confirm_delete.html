@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina iscrizione servizio extra - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_iscrizioni_servizi_extra' %}">Iscrizioni</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina {{ iscrizione }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina iscrizione servizio extra</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}" class="btn btn-secondary">Torna all'iscrizione</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="settings-warning-box" style="margin-bottom: 18px;">
+            Stai per eliminare l'iscrizione di <strong>{{ iscrizione.studente }}</strong> al servizio
+            <strong>{{ iscrizione.servizio.nome_servizio }}</strong>.
+        </div>
+
+        {% if count_rate %}
+            <div class="help-text" style="margin-bottom: 18px;">
+                Questa iscrizione ha <strong>{{ count_rate }}</strong> rate collegate. Per continuare devi confermare anche la loro eliminazione.
+            </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            {% if count_rate %}
+                <table class="form-table">
+                    <tr>
+                        <th>Conferma rate</th>
+                        <td>
+                            <label><input type="checkbox" name="confirm_delete_rates" value="1"> Confermo l'eliminazione di tutte le rate collegate</label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Testo di conferma</th>
+                        <td>
+                            <input type="text" name="confirm_delete_text" placeholder="Digita ELIMINA">
+                        </td>
+                    </tr>
+                </table>
+            {% endif %}
+
+            <div class="form-actions" style="margin-top: 18px;">
+                <button type="submit" class="btn btn-danger">Elimina iscrizione</button>
+                <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+

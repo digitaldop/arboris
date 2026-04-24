@@ -1,0 +1,15 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+
+{% block title %}Elimina metodo di pagamento - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <p>Stai per eliminare il metodo di pagamento <strong>{{ metodo }}</strong>.</p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+        </form>
+    </div>
+{% endblock %}

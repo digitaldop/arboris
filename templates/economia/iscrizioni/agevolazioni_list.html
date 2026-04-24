@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Agevolazioni - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Agevolazioni</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Agevolazioni</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_agevolazione' %}" class="btn btn-primary">Nuova agevolazione</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome agevolazione</th>
+                    <th>Importo annuale</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for agevolazione in agevolazioni %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_agevolazione' agevolazione.pk %}">
+                        <td>{{ agevolazione.nome_agevolazione }}</td>
+                        <td>{{ agevolazione.importo_annuale_agevolazione }}</td>
+                        <td>{% if agevolazione.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_agevolazione' agevolazione.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_agevolazione' agevolazione.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4"><div class="empty-state">Nessuna agevolazione inserita.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

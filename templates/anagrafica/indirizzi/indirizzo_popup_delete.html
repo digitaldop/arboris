@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Elimina indirizzo</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">Elimina indirizzo</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            <p>Sei sicuro di voler eliminare questo indirizzo?</p>
+            <p><strong>{{ indirizzo }}</strong></p>
+
+            {% if usage.totale %}
+                <div class="message message-warning">
+                    Questo indirizzo è collegato a {{ usage.totale }} record e la sua eliminazione rimuoverà quei collegamenti.
+                </div>
+
+                {% if usage.famiglie %}
+                    <p><strong>Famiglie:</strong> {{ usage.famiglie|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.studenti %}
+                    <p><strong>Studenti:</strong> {{ usage.studenti|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.familiari %}
+                    <p><strong>Familiari:</strong> {{ usage.familiari|join:", " }}</p>
+                {% endif %}
+
+                {% if usage.scuole %}
+                    <p><strong>Scuole:</strong> {{ usage.scuole|join:", " }}</p>
+                {% endif %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="popup" value="1">
+                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Sì, elimina</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

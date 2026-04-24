@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Anni scolastici - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Anni scolastici</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Anni scolastici</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_anno_scolastico' %}" class="btn btn-primary">Nuovo anno scolastico</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome anno scolastico</th>
+                    <th>Data inizio</th>
+                    <th>Data fine</th>
+                    <th>Corrente</th>
+                    <th>Attivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for anno in anni %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_anno_scolastico' anno.pk %}">
+                        <td>{{ anno.nome_anno_scolastico }}</td>
+                        <td>{{ anno.data_inizio }}</td>
+                        <td>{{ anno.data_fine }}</td>
+                        <td>{% if anno.corrente %}Sì{% else %}No{% endif %}</td>
+                        <td>{% if anno.attivo %}Sì{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">Nessun anno scolastico inserito.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

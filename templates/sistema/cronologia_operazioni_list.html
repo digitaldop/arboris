@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cronologia Operazioni - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Cronologia Operazioni</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Cronologia Operazioni</h1>
+    </div>
+
+    <div class="family-top-layout">
+        <div class="family-main-column">
+            <div class="list-toolbar">
+                <form method="get" class="search-form">
+                    <select name="modulo">
+                        <option value="">Tutti i moduli</option>
+                        {% for value, label in moduli_disponibili %}
+                            <option value="{{ value }}" {% if modulo == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="azione">
+                        <option value="">Tutte le operazioni</option>
+                        {% for value, label in azioni_disponibili %}
+                            <option value="{{ value }}" {% if azione == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ q|default:'' }}"
+                        placeholder="Cerca per utente, oggetto o descrizione..."
+                        class="search-input"
+                    >
+                    <button type="submit" class="btn btn-secondary">Filtra</button>
+                    {% if q or azione or modulo %}
+                        <a href="{% url 'cronologia_operazioni_sistema' %}" class="btn btn-secondary">Pulisci</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-body">
+                    {% if operazioni %}
+                        {% if is_truncated %}
+                            <div class="settings-warning-box" style="margin: 0 0 14px;">
+                                Sono mostrate le ultime {{ result_limit }} operazioni sui {{ totale_operazioni }} risultati trovati. Restringi i filtri per un dettaglio piu preciso.
+                            </div>
+                        {% endif %}
+
+                        <table class="list-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Ora</th>
+                                    <th>Utente</th>
+                                    <th>Operazione</th>
+                                    <th>Sezione</th>
+                                    <th>Elemento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for operazione in operazioni %}
+                                    <tr>
+                                        <td>{{ operazione.data_operazione|date:"d/m/Y" }}</td>
+                                        <td>{{ operazione.data_operazione|date:"H:i:s" }}</td>
+                                        <td>{{ operazione.utente_display }}</td>
+                                        <td>
+                                            <span class="audit-action-badge {{ operazione.azione_badge_class }}">
+                                                {{ operazione.get_azione_display }}
+                                            </span>
+                                            <div class="audit-operation-text">{{ operazione.descrizione }}</div>
+                                            {% if operazione.campi_coinvolti %}
+                                                <div class="table-muted">
+                                                    Campi coinvolti: {{ operazione.campi_coinvolti|join:", " }}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ operazione.modulo_label }}</td>
+                                        <td>
+                                            <div>{{ operazione.model_verbose_name }}</div>
+                                            <div class="table-muted">{{ operazione.oggetto_label_display }}</div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="empty-state">Nessuna operazione trovata con i filtri correnti.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="family-side-column">
+            <div class="admin-section compact">
+                <div class="admin-section-title">Riepilogo</div>
+                <div class="panel">
+                    <div class="panel-body summary-panel-body">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-value">{{ totale_operazioni }}</div>
+                                <div class="summary-label">Operazioni trovate</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_creazioni }}</div>
+                                <div class="summary-label">Creazioni</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_modifiche }}</div>
+                                <div class="summary-label">Modifiche</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_eliminazioni }}</div>
+                                <div class="summary-label">Eliminazioni</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

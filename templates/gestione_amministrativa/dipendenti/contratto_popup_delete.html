@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Elimina contratto</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">Elimina contratto</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            {% if blocked or count_buste %}
+                <div class="message message-warning">
+                    Questo contratto ha {{ count_buste }} buste paga collegate. Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
+                </div>
+            {% endif %}
+
+            <p>Sei sicuro di voler eliminare questo contratto?</p>
+            <p><strong>{{ contratto.label_select }}</strong></p>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="popup" value="1">
+                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" {% if count_buste %}disabled{% endif %}>Si', elimina</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

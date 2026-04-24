@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina famiglia - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_famiglie' %}">Famiglie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina famiglia</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            {% if double_confirm %}
+                <p><strong>Attenzione!</strong> Eliminando questa famiglia perderai anche tutti i dati correlati elencati sotto.</p>
+                <p>Vuoi davvero procedere con la cancellazione completa?</p>
+            {% else %}
+                <p>Sei sicuro di voler eliminare questa famiglia?</p>
+            {% endif %}
+
+            <p><strong>{{ famiglia.cognome_famiglia }}</strong></p>
+
+            {% if impact.familiari or impact.studenti or impact.totale_documenti or impact.indirizzi_da_eliminare or impact.indirizzi_condivisi %}
+                <div class="message message-warning">
+                    L'eliminazione della famiglia rimuovera anche i record collegati qui sotto.
+                </div>
+            {% endif %}
+
+            {% if impact.familiari %}
+                <p><strong>Familiari collegati:</strong> {{ impact.familiari|join:", " }}</p>
+            {% endif %}
+
+            {% if impact.studenti %}
+                <p><strong>Studenti collegati:</strong> {{ impact.studenti|join:", " }}</p>
+            {% endif %}
+
+            {% if impact.documenti_famiglia %}
+                <p><strong>Documenti della famiglia:</strong></p>
+                <p>
+                    {% for doc in impact.documenti_famiglia %}
+                        {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+
+            {% if impact.documenti_familiari %}
+                <p><strong>Documenti dei familiari:</strong></p>
+                <p>
+                    {% for doc in impact.documenti_familiari %}
+                        {{ doc.familiare }} - {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+
+            {% if impact.documenti_studenti %}
+                <p><strong>Documenti degli studenti:</strong></p>
+                <p>
+                    {% for doc in impact.documenti_studenti %}
+                        {{ doc.studente }} - {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+
+            {% if impact.indirizzi_da_eliminare %}
+                <p><strong>Indirizzi che verranno eliminati:</strong> {% for item in impact.indirizzi_da_eliminare %}{{ item.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            {% endif %}
+
+            {% if impact.indirizzi_condivisi %}
+                <div class="message message-info">
+                    Gli indirizzi condivisi con record esterni alla famiglia non verranno eliminati, ma solo scollegati dai record che stai cancellando.
+                </div>
+
+                {% for item in impact.indirizzi_condivisi %}
+                    <p><strong>Indirizzo condiviso:</strong> {{ item.label }}</p>
+                    {% if item.usi_esterni.scuole %}
+                        <p><strong>Usato anche da scuole:</strong> {{ item.usi_esterni.scuole|join:", " }}</p>
+                    {% endif %}
+                    {% if item.usi_esterni.famiglie %}
+                        <p><strong>Usato anche da famiglie:</strong> {{ item.usi_esterni.famiglie|join:", " }}</p>
+                    {% endif %}
+                    {% if item.usi_esterni.studenti %}
+                        <p><strong>Usato anche da studenti:</strong> {{ item.usi_esterni.studenti|join:", " }}</p>
+                    {% endif %}
+                    {% if item.usi_esterni.familiari %}
+                        <p><strong>Usato anche da familiari:</strong> {{ item.usi_esterni.familiari|join:", " }}</p>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions">
+                    {% if double_confirm %}
+                        <input type="hidden" name="confirm_delete_related" value="1">
+                        <button type="submit" class="btn btn-primary">Si, elimina tutto</button>
+                        <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">No, annulla</a>
+                    {% else %}
+                        <button type="submit" class="btn btn-primary">Si, continua</button>
+                        <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Annulla</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

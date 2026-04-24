@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Configurazione {{ provider.nome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ provider.nome }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Credenziali PSD2 - {{ provider.nome }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Configura qui le credenziali tecniche del provider PSD2.
+            La <strong>Secret Key</strong> viene cifrata (Fernet) prima di essere salvata;
+            lasciala vuota per mantenere la chiave gia' presente.
+        </p>
+    </div>
+
+    {% if is_redirect_callback_adapter %}
+        <div class="content-card" style="border-left: 4px solid #2563eb;">
+            <h3 style="margin-top:0;">Redirect URI (callback unico per tutte le connessioni)</h3>
+            <p>
+                Questo provider (es. TrueLayer, Enable Banking) richiede che il
+                <strong>redirect URI</strong> sia consentito
+                <strong>esattamente</strong> come nella console
+                dello sviluppatore, <em>anche in sandbox</em> dove applicabile.
+                Un mismatch (anche su una trailing slash) fa fallire il ritorno
+                con <code>code</code> dopo l'autorizzazione.
+            </p>
+            <table class="form-table">
+                <tr>
+                    <th style="width: 260px;">Redirect URI attualmente in uso</th>
+                    <td>
+                        {% if redirect_uri_configurato %}
+                            <code style="user-select: all;">{{ redirect_uri_configurato }}</code>
+                            <br><small class="table-muted">Configurato manualmente qui sotto.</small>
+                        {% else %}
+                            <code style="user-select: all;">{{ redirect_uri_calcolato }}</code>
+                            <br><small class="table-muted">Calcolato automaticamente dall'host della richiesta. Cambia se accedi ad Arboris da un host diverso.</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Cosa fare</th>
+                    <td>
+                        <ol style="margin: 0; padding-left: 1.2rem;">
+                            <li>Copia il valore qui sopra.</li>
+                            <li>Accedi alla <a href="https://console.truelayer.com/" target="_blank" rel="noopener">Console TrueLayer</a> (o alla console del tuo provider OAuth2).</li>
+                            <li>Seleziona la tua applicazione &rarr; <em>App settings</em> / <em>Redirect URIs</em>.</li>
+                            <li>Aggiungi esattamente quel valore tra i redirect URI consentiti e salva.</li>
+                            <li>Attendi alcuni minuti per la propagazione, poi riprova la connessione.</li>
+                        </ol>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if is_oauth_adapter %}
+        <div class="content-card" style="border-left: 4px solid #059669;">
+            <h3 style="margin-top:0;">Conti business e corporate (TrueLayer)</h3>
+            <p>
+                TrueLayer espone retail, <strong>business</strong> e
+                <strong>corporate</strong> come segmenti separati. Per
+                includere anche i conti business delle banche <em>non</em> serve
+                cambiare nulla qui: Arboris omette il parametro
+                <code>providers</code> quando non c'e' un'istituzione
+                specifica o una lista impostata nel campo qui sotto, lasciando
+                che sia la tua app TrueLayer a decidere quali provider mostrare.
+            </p>
+            <p>
+                <strong>Come attivare i provider business/corporate sulla tua app:</strong>
+            </p>
+            <ol style="margin: 0 0 0.75rem 1.2rem;">
+                <li>Apri la <a href="https://console.truelayer.com/" target="_blank" rel="noopener">Console TrueLayer</a> &rarr; la tua app (Arboris Banking).</li>
+                <li>Vai in <em>Data API</em> &rarr; <em>Providers</em> (o <em>Allowed providers</em>).</li>
+                <li>Abilita le banche desiderate per paese e per segmento (<em>retail</em>, <em>business</em>, <em>corporate</em>).</li>
+                <li>Salva la configurazione.</li>
+            </ol>
+            <p style="margin-bottom: 0;">
+                In alternativa, se vuoi forzare via Arboris una lista precisa di
+                providers (utile se piu' app condividono la stessa console),
+                compila il campo <em>&quot;Providers TrueLayer&quot;</em> qui sotto
+                con i provider_id desiderati separati da spazio, ad esempio:
+                <code>uk-ob-all uk-oauth-all it-ob-all fr-ob-all</code>.
+            </p>
+        </div>
+    {% endif %}
+
+    {% if is_enablebanking_adapter %}
+        <div class="content-card" style="border-left: 4px solid #0d9488;">
+            <h3 style="margin-top:0;">Enable Banking (PSD2 / AIS)</h3>
+            <p>
+                Crea l'applicazione nel
+                <a href="https://enablebanking.com/cp/applications" target="_blank" rel="noopener">Control Panel</a>,
+                carica la <strong>public key</strong> (certificato) e salva
+                l'<strong>Application ID</strong> (UUID): va nel campo
+                <em>Secret ID / Client ID / App-id</em> qui sotto.
+            </p>
+            <p>
+                Genera la coppia di chiavi RSA, conserva la <strong>private key PEM</strong>
+                nel campo dedicato: Arboris la usa per firmare i JWT
+                (qualsiasi chiamata all'API) con header <code>kid</code> = Application ID.
+            </p>
+            <p style="margin-bottom:0;">
+                Il <strong>Secret Key / Client Secret</strong> in questa form non
+                e' usato: lascialo vuoto. Registra il
+                <strong>redirect URI</strong> (blocco arancione) nella console Enable Banking
+                esattamente come mostrato; dopo il consenso l'utente torna su Arboris
+                e il <code>code</code> della query viene scambiato con <code>POST /sessions</code>.
+            </p>
+        </div>
+    {% endif %}
+
+    {% if is_saltedge_adapter %}
+        <div class="content-card" style="border-left: 4px solid #7c3aed;">
+            <h3 style="margin-top:0;">Configurazione Salt Edge (Account Information v6)</h3>
+            <p>
+                Salt Edge usa un <strong>Widget</strong> ospitato presso di loro:
+                al momento della connessione Arboris chiama
+                <code>POST /connections/connect</code>, riceve un
+                <code>connect_url</code> e reindirizza l'utente lì. Alla fine
+                dell'autenticazione forte (SCA) l'utente rientra sul nostro
+                callback interno: <em>nessun redirect URI da whitelistare</em>
+                nel pannello Salt Edge.
+            </p>
+            <p style="margin-bottom: 0;">
+                <strong>Credenziali richieste:</strong>
+                <code>App-id</code> va nel campo <em>Secret ID / Client ID / App-id</em>,
+                <code>Secret</code> va nel campo <em>Secret Key / Client Secret / Secret</em>.
+                Le trovi nella
+                <a href="https://www.saltedge.com/clients/profile/secrets" target="_blank" rel="noopener">sezione Secrets</a>
+                del tuo account Salt Edge.
+            </p>
+            <p style="margin-top: 0.75rem; margin-bottom: 0;">
+                <strong>Ambiente di test:</strong> attiva
+                <em>&quot;Includi provider di test&quot;</em> qui sotto per
+                vedere le fake banks di Salt Edge nel widget. Anche in stato
+                <em>Pending</em>/<em>Test</em>, alcuni endpoint (tipicamente
+                <code>POST /connections/connect</code>) possono rispondere con
+                un <strong>403 Forbidden</strong> lato WAF di Salt Edge se la
+                richiesta non e' firmata. In quel caso genera una coppia di
+                chiavi RSA, carica la public key nel dashboard Salt Edge
+                (&quot;Keys&quot;) e incolla la private key PEM nel campo qui
+                sotto: Arboris firmera' automaticamente tutte le chiamate.
+            </p>
+            <p style="margin-bottom: 0;">
+                <strong>Come generare la coppia di chiavi RSA (esempio):</strong>
+            </p>
+<pre style="background:#f8fafc; border:1px solid #e5e7eb; padding:0.75rem; border-radius:4px; font-size:0.85rem; overflow-x:auto; margin-top:0.5rem;">openssl genrsa -out saltedge_private.pem 2048
+openssl rsa -in saltedge_private.pem -pubout -out saltedge_public.pem</pre>
+            <p style="margin-bottom: 0;">
+                Carica <code>saltedge_public.pem</code> nel dashboard Salt
+                Edge (sezione <em>Keys</em> / <em>Public key</em>), poi incolla
+                il contenuto di <code>saltedge_private.pem</code> nel campo
+                &quot;Private key RSA PEM (Salt Edge)&quot; qui sotto.
+            </p>
+        </div>
+    {% endif %}
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.secret_id.label_tag }}</th><td>{{ form.secret_id }} {{ form.secret_id.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.secret_key.label_tag }}</th>
+                    <td>
+                        {{ form.secret_key }} {{ form.secret_key.errors }}
+                        {% if ha_secret_key %}
+                            <br><small class="table-muted">Chiave gia' presente. Lascia vuoto per non modificarla.</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr><th>{{ form.environment.label_tag }}</th><td>{{ form.environment }} {{ form.environment.errors }}<br><small>{{ form.environment.help_text }}</small></td></tr>
+                <tr><th>{{ form.base_url.label_tag }}</th><td>{{ form.base_url }} {{ form.base_url.errors }}<br><small>{{ form.base_url.help_text }}</small></td></tr>
+                {% if is_redirect_callback_adapter %}
+                    <tr>
+                        <th>{{ form.redirect_uri.label_tag }}</th>
+                        <td>
+                            {{ form.redirect_uri }} {{ form.redirect_uri.errors }}
+                            <br><small>{{ form.redirect_uri.help_text }}</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.providers_default.label_tag }}</th>
+                        <td>
+                            {{ form.providers_default }} {{ form.providers_default.errors }}
+                            <br><small>{{ form.providers_default.help_text }}</small>
+                        </td>
+                    </tr>
+                {% endif %}
+                <tr><th>{{ form.country_default.label_tag }}</th><td>{{ form.country_default }} {{ form.country_default.errors }}</td></tr>
+                {% if is_enablebanking_adapter %}
+                    <tr>
+                        <th>{{ form.psu_type.label_tag }}</th>
+                        <td>
+                            {{ form.psu_type }} {{ form.psu_type.errors }}
+                            <br><small>{{ form.psu_type.help_text }}</small>
+                        </td>
+                    </tr>
+                {% endif %}
+                {% if is_saltedge_adapter %}
+                    <tr>
+                        <th>{{ form.include_fake_providers.label_tag }}</th>
+                        <td>
+                            {{ form.include_fake_providers }} {{ form.include_fake_providers.errors }}
+                            <br><small>{{ form.include_fake_providers.help_text }}</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.locale.label_tag }}</th>
+                        <td>
+                            {{ form.locale }} {{ form.locale.errors }}
+                            <br><small>{{ form.locale.help_text }}</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.private_key_pem.label_tag }}</th>
+                        <td>
+                            {{ form.private_key_pem }} {{ form.private_key_pem.errors }}
+                            {% if ha_private_key %}
+                                <br><small class="table-muted">Private key gia' presente (cifrata). Lascia vuoto per non modificarla.</small>
+                            {% endif %}
+                            <br><small>{{ form.private_key_pem.help_text|safe }}</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.private_key_passphrase.label_tag }}</th>
+                        <td>
+                            {{ form.private_key_passphrase }} {{ form.private_key_passphrase.errors }}
+                            {% if ha_private_key_passphrase %}
+                                <br><small class="table-muted">Passphrase gia' presente. Lascia vuoto per non modificarla.</small>
+                            {% endif %}
+                            <br><small>{{ form.private_key_passphrase.help_text }}</small>
+                        </td>
+                    </tr>
+                {% elif is_enablebanking_adapter %}
+                    <tr>
+                        <th>{{ form.private_key_pem.label_tag }}</th>
+                        <td>
+                            {{ form.private_key_pem }} {{ form.private_key_pem.errors }}
+                            {% if ha_private_key %}
+                                <br><small class="table-muted">Private key gia' presente (cifrata). Lascia vuoto per non modificarla.</small>
+                            {% endif %}
+                            <br><small>Private key RSA in PEM per firmare i JWT (obbligatoria). La public key e' gia' stata caricata in Enable Banking.</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.private_key_passphrase.label_tag }}</th>
+                        <td>
+                            {{ form.private_key_passphrase }} {{ form.private_key_passphrase.errors }}
+                            {% if ha_private_key_passphrase %}
+                                <br><small class="table-muted">Passphrase gia' presente. Lascia vuoto per non modificarla.</small>
+                            {% endif %}
+                            <br><small>Opzionale se la PEM e' protetta da passphrase.</small>
+                        </td>
+                    </tr>
+                {% endif %}
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva credenziali</button>
+                <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

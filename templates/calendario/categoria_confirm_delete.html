@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina categoria calendario - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'calendario_agenda' %}">Calendario</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_categorie_calendario' %}">Categorie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina categoria calendario</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            <p>Stai per eliminare la categoria <strong>{{ categoria_obj.nome }}</strong>.</p>
+            <p>Se ci sono eventi collegati, l'operazione non potra essere completata finche non li sposti su un'altra categoria.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions">
+                    {% if can_manage_calendario %}
+                        <button type="submit" class="btn btn-danger">Conferma eliminazione</button>
+                    {% endif %}
+                    <a href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

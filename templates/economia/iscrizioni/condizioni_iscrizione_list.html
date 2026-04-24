@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Condizioni economiche - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Condizioni economiche</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Condizioni economiche</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_condizione_iscrizione' %}" class="btn btn-primary">Nuova condizione economica</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Anno scolastico</th>
+                    <th>Nome condizione</th>
+                    <th>Numero mensilita</th>
+                    <th>Mese prima retta</th>
+                    <th>Giorno scadenza rate</th>
+                    <th>Riduzione speciale ammessa</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for condizione in condizioni %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_condizione_iscrizione' condizione.pk %}">
+                        <td>{{ condizione.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ condizione.nome_condizione_iscrizione }}</td>
+                        <td>{{ condizione.numero_mensilita_default }}</td>
+                        <td>{{ condizione.get_mese_prima_retta_display }}</td>
+                        <td>{% if condizione.giorno_scadenza_rate %}{{ condizione.giorno_scadenza_rate }}{% else %}-{% endif %}</td>
+                        <td>{% if condizione.riduzione_speciale_ammessa %}Si{% else %}No{% endif %}</td>
+                        <td>{% if condizione.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_condizione_iscrizione' condizione.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_condizione_iscrizione' condizione.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8"><div class="empty-state">Nessuna condizione economica inserita.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

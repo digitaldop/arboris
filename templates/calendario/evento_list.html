@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Calendario - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Calendario</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Eventi calendario</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Vista calendario</a>
+            {% if can_manage_calendario %}
+                <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary">Categorie</a>
+                <a href="{% url 'crea_evento_calendario' %}" class="btn btn-primary">Nuovo evento</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="family-top-layout">
+        <div class="family-main-column">
+            <div class="list-toolbar">
+                <form method="get" class="search-form">
+                    <select name="categoria">
+                        <option value="">Tutte le categorie</option>
+                        {% for categoria_obj in categorie %}
+                            <option value="{{ categoria_obj.pk }}" {% if categoria == categoria_obj.pk|stringformat:'s' %}selected{% endif %}>
+                                {{ categoria_obj.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ q|default:'' }}"
+                        placeholder="Cerca per titolo, luogo o descrizione..."
+                        class="search-input"
+                    >
+                    <button type="submit" class="btn btn-secondary">Filtra</button>
+                    {% if categoria or q %}
+                        <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Pulisci</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-body">
+                    {% if eventi %}
+                        <table class="list-table">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Categoria</th>
+                                    <th>Inizio</th>
+                                    <th>Fine</th>
+                                    <th>Durata</th>
+                                    <th>Luogo</th>
+                                    <th>Visibile</th>
+                                    <th>Attivo</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for evento in eventi %}
+                                    <tr{% if evento.url %} class="list-row-link" data-row-href="{{ evento.url }}"{% endif %}>
+                                        <td>
+                                            <div class="calendar-list-title">{{ evento.title }}</div>
+                                            {% if evento.detail_label %}
+                                                <div class="table-muted">{{ evento.detail_label }}</div>
+                                            {% endif %}
+                                            {% if evento.source != "locale" %}
+                                                <div class="table-muted">Scadenza automatica</div>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="calendar-category-pill" style="color: {{ evento.color }}; border-color: {{ evento.color }};">
+                                                {{ evento.category_label }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {{ evento.start_date|it_date }}
+                                            {% if not evento.all_day and evento.start_time %}
+                                                {{ evento.start_time }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ evento.end_date|it_date }}
+                                            {% if not evento.all_day and evento.end_time %}
+                                                {{ evento.end_time }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ evento.duration_label }}</td>
+                                        <td>{{ evento.location|default:"-" }}</td>
+                                        <td>{% if evento.visibile %}Si{% else %}No{% endif %}</td>
+                                        <td>{% if evento.attivo %}Si{% else %}No{% endif %}</td>
+                                        <td class="actions-cell">
+                                            {% if evento.url %}
+                                                <a href="{{ evento.url }}" class="table-link">{{ evento.action_label }}</a>
+                                            {% else %}
+                                                <span class="table-muted">-</span>
+                                            {% endif %}
+                                            {% if can_manage_calendario and evento.delete_url %}
+                                                <span class="table-muted">|</span>
+                                                <a href="{{ evento.delete_url }}" class="table-link table-link-danger">Elimina</a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="empty-state">Ancora nessun evento o scadenza visibile nel calendario.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="family-side-column">
+            <div class="admin-section compact">
+                <div class="admin-section-title">Riepilogo</div>
+                <div class="panel">
+                    <div class="panel-body summary-panel-body">
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_eventi_totali }}</div>
+                                <div class="summary-label">Eventi e scadenze</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_intera_giornata }}</div>
+                                <div class="summary-label">Intera giornata</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-value">{{ count_con_orario }}</div>
+                                <div class="summary-label">Con orario</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+{% endblock %}

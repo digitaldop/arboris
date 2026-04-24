@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina piano - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Conferma eliminazione</h1>
+    </div>
+    <div class="content-card">
+        <p>Stai per eliminare il piano <strong>{{ piano.nome }}</strong> con tutte le scadenze e i movimenti collegati.</p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary table-link-danger" style="background:#b91c1c;">Elimina</button>
+            <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

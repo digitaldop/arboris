@@ -1,0 +1,119 @@
+from django.urls import path
+
+from sistema.permissions import module_edit_permission_required, module_permission_required
+
+from . import views
+
+
+ga_view = module_permission_required("gestione_amministrativa")
+ga_manage = module_permission_required("gestione_amministrativa", level="manage")
+ga_edit = module_edit_permission_required("gestione_amministrativa")
+
+
+urlpatterns = [
+    path(
+        "gestione-amministrativa/",
+        ga_view(views.dashboard_gestione_amministrativa),
+        name="dashboard_gestione_amministrativa",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/",
+        ga_view(views.lista_dipendenti),
+        name="lista_dipendenti",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/nuovo/",
+        ga_manage(views.crea_dipendente),
+        name="crea_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/contratti/",
+        ga_view(views.lista_contratti_dipendenti),
+        name="lista_contratti_dipendenti",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/contratti/nuovo/",
+        ga_manage(views.crea_contratto_dipendente),
+        name="crea_contratto_dipendente_generico",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/tipi-contratto/nuovo/",
+        ga_manage(views.crea_tipo_contratto_dipendente),
+        name="crea_tipo_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/tipi-contratto/<int:pk>/modifica/",
+        ga_edit(views.modifica_tipo_contratto_dipendente),
+        name="modifica_tipo_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/tipi-contratto/<int:pk>/elimina/",
+        ga_manage(views.elimina_tipo_contratto_dipendente),
+        name="elimina_tipo_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/<int:pk>/modifica/",
+        ga_edit(views.modifica_dipendente),
+        name="modifica_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/<int:pk>/elimina/",
+        ga_manage(views.elimina_dipendente),
+        name="elimina_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/<int:dipendente_pk>/contratti/nuovo/",
+        ga_manage(views.crea_contratto_dipendente),
+        name="crea_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/contratti/<int:pk>/modifica/",
+        ga_edit(views.modifica_contratto_dipendente),
+        name="modifica_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/contratti/<int:pk>/elimina/",
+        ga_manage(views.elimina_contratto_dipendente),
+        name="elimina_contratto_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/<int:dipendente_pk>/genera-previsione/",
+        ga_manage(views.genera_previsione_busta_paga),
+        name="genera_previsione_busta_paga",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/buste-paga/",
+        ga_view(views.lista_buste_paga_dipendenti),
+        name="lista_buste_paga_dipendenti",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/buste-paga/nuova/",
+        ga_manage(views.crea_busta_paga_dipendente),
+        name="crea_busta_paga_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/buste-paga/<int:pk>/modifica/",
+        ga_edit(views.modifica_busta_paga_dipendente),
+        name="modifica_busta_paga_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/buste-paga/<int:pk>/elimina/",
+        ga_manage(views.elimina_busta_paga_dipendente),
+        name="elimina_busta_paga_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/parametri-calcolo/",
+        ga_view(views.lista_parametri_calcolo_stipendi),
+        name="lista_parametri_calcolo_stipendi",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/parametri-calcolo/nuovo/",
+        ga_manage(views.crea_parametro_calcolo_stipendio),
+        name="crea_parametro_calcolo_stipendio",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/parametri-calcolo/<int:pk>/modifica/",
+        ga_edit(views.modifica_parametro_calcolo_stipendio),
+        name="modifica_parametro_calcolo_stipendio",
+    ),
+]

@@ -1,0 +1,283 @@
+{% load currency %}
+{% if scambio_retta_inline_context.enabled %}
+    <div class="admin-section" id="scambio-retta-inline">
+        <div class="inline-section-head">
+            <div class="admin-section-title inline-section-title-static">
+                Scambio retta ({{ scambio_retta_inline_context.total_entries }})
+            </div>
+            <a
+                href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&return_to={{ scambio_retta_return_to|urlencode }}"
+                class="btn btn-primary btn-sm"
+            >
+                + Nuova prestazione
+            </a>
+        </div>
+
+        <div class="panel">
+            <div class="panel-body scambio-inline-panel-body">
+                <div class="scambio-inline-summary">
+                    <div class="summary-item">
+                        <div class="summary-value">{{ scambio_retta_inline_context.total_entries }}</div>
+                        <div class="summary-label">Registrazioni</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">{{ scambio_retta_inline_context.total_hours }}</div>
+                        <div class="summary-label">Ore totali</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">EUR {{ scambio_retta_inline_context.total_amount|euro }}</div>
+                        <div class="summary-label">Importo maturato</div>
+                    </div>
+                </div>
+
+                {% if scambio_retta_inline_context.missing_school_year_configuration %}
+                    <div class="empty-state compact-empty-state inline-empty-state">
+                        Per registrare le prestazioni scambio retta serve almeno un anno scolastico configurato.
+                    </div>
+                {% endif %}
+
+                {% for section in scambio_retta_inline_context.sections %}
+                    <div class="scambio-year-section">
+                        <button
+                            type="button"
+                            class="admin-section-title collapsible-title scambio-year-toggle{% if section.default_open %} is-open{% endif %}"
+                            data-target="scambio-year-panel-{{ section.anno_scolastico.id }}"
+                            data-default-open="{{ section.default_open|yesno:'true,false' }}"
+                            data-storage-key="{{ section.collapsible_storage_key }}"
+                        >
+                            <span>{{ section.anno_scolastico.nome_anno_scolastico }}</span>
+                            <span class="scambio-year-toggle-meta">
+                                {{ section.entry_count }} registrazioni
+                                <span class="table-muted">|</span>
+                                {{ section.total_hours }} h
+                                <span class="table-muted">|</span>
+                                EUR {{ section.total_amount|euro }}
+                            </span>
+                        </button>
+
+                        <div class="panel collapsible-panel{% if section.default_open %} is-open{% endif %}" id="scambio-year-panel-{{ section.anno_scolastico.id }}">
+                            <div class="panel-body scambio-year-panel-body">
+                                <div class="scambio-year-toolbar">
+                                    <div class="scambio-view-switch">
+                                        <a
+                                            href="?{{ section.list_query }}#scambio-retta-inline"
+                                            class="scambio-view-btn{% if not section.is_active or scambio_retta_inline_context.active_view == 'list' %} is-active{% endif %}"
+                                        >
+                                            Elenco
+                                        </a>
+                                        <a
+                                            href="?{{ section.week_query }}#scambio-retta-inline"
+                                            class="scambio-view-btn{% if section.is_active and scambio_retta_inline_context.active_view == 'week' %} is-active{% endif %}"
+                                        >
+                                            Vista settimana
+                                        </a>
+                                        <a
+                                            href="?{{ section.month_query }}#scambio-retta-inline"
+                                            class="scambio-view-btn{% if section.is_active and scambio_retta_inline_context.active_view == 'month' %} is-active{% endif %}"
+                                        >
+                                            Vista mensile
+                                        </a>
+                                    </div>
+
+                                    <a
+                                        href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ section.default_reference|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
+                                        class="btn btn-secondary btn-sm"
+                                    >
+                                        + Aggiungi
+                                    </a>
+                                </div>
+
+                                {% if section.is_active and scambio_retta_inline_context.active_view == "week" and section.week %}
+                                    <div class="scambio-calendar-toolbar">
+                                        <div class="scambio-calendar-nav">
+                                            {% if section.week.has_prev %}
+                                                <a href="?{{ section.week.prev_query }}#scambio-retta-inline" class="btn btn-secondary btn-sm">&lt;</a>
+                                            {% else %}
+                                                <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">&lt;</span>
+                                            {% endif %}
+                                            <div class="scambio-calendar-title">{{ section.week.title }}</div>
+                                            {% if section.week.has_next %}
+                                                <a href="?{{ section.week.next_query }}#scambio-retta-inline" class="btn btn-secondary btn-sm">&gt;</a>
+                                            {% else %}
+                                                <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">&gt;</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="scambio-calendar-meta">
+                                            {{ section.week.total_hours }} h
+                                            <span class="table-muted">|</span>
+                                            EUR {{ section.week.total_amount|euro }}
+                                        </div>
+                                    </div>
+
+                                    <div class="scambio-mini-week">
+                                        {% for day in section.week.days %}
+                                            <div class="scambio-mini-day{% if day.is_today %} is-today{% endif %}{% if not day.is_inside_year %} is-outside-year{% endif %}">
+                                                <div class="scambio-mini-day-head">
+                                                    <div class="scambio-mini-day-title">
+                                                        <span>{{ day.weekday_short }}</span>
+                                                        <strong>{{ day.date|date:"d/m" }}</strong>
+                                                    </div>
+                                                    {% if day.is_inside_year %}
+                                                        <a
+                                                            href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ day.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
+                                                            class="scambio-mini-add"
+                                                            aria-label="Aggiungi prestazione il {{ day.date|date:'d/m/Y' }}"
+                                                        >
+                                                            +
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="scambio-mini-day-body">
+                                                    {% for entry in day.entries %}
+                                                        <article class="scambio-mini-entry">
+                                                            <a
+                                                                href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}"
+                                                                class="scambio-mini-entry-title"
+                                                            >
+                                                                {% if entry.ora_ingresso and entry.ora_uscita %}
+                                                                    {{ entry.ora_ingresso|time:"H:i" }} - {{ entry.ora_uscita|time:"H:i" }}
+                                                                {% else %}
+                                                                    {{ entry.ore_lavorate }} h
+                                                                {% endif %}
+                                                            </a>
+                                                            <div class="scambio-mini-entry-text">{{ entry.descrizione }}</div>
+                                                            <div class="scambio-mini-entry-meta">
+                                                                {% if entry.studente %}{{ entry.studente }}<span class="table-muted">|</span>{% endif %}
+                                                                EUR {{ entry.importo_maturato|euro }}
+                                                            </div>
+                                                            <div class="scambio-mini-entry-actions">
+                                                                <a href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link">Modifica</a>
+                                                                <a href="{% url 'elimina_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link table-link-danger">Elimina</a>
+                                                            </div>
+                                                        </article>
+                                                    {% empty %}
+                                                        <div class="scambio-mini-empty">Nessuna prestazione</div>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif section.is_active and scambio_retta_inline_context.active_view == "month" and section.month %}
+                                    <div class="scambio-calendar-toolbar">
+                                        <div class="scambio-calendar-nav">
+                                            {% if section.month.has_prev %}
+                                                <a href="?{{ section.month.prev_query }}#scambio-retta-inline" class="btn btn-secondary btn-sm">&lt;</a>
+                                            {% else %}
+                                                <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">&lt;</span>
+                                            {% endif %}
+                                            <div class="scambio-calendar-title">{{ section.month.title }}</div>
+                                            {% if section.month.has_next %}
+                                                <a href="?{{ section.month.next_query }}#scambio-retta-inline" class="btn btn-secondary btn-sm">&gt;</a>
+                                            {% else %}
+                                                <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">&gt;</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="scambio-calendar-meta">
+                                            {{ section.month.total_hours }} h
+                                            <span class="table-muted">|</span>
+                                            EUR {{ section.month.total_amount|euro }}
+                                        </div>
+                                    </div>
+
+                                    <div class="scambio-mini-month">
+                                        <div class="scambio-mini-month-weekdays">
+                                            {% for weekday_label in section.month.weekday_labels %}
+                                                <div class="scambio-mini-month-weekday">{{ weekday_label }}</div>
+                                            {% endfor %}
+                                        </div>
+
+                                        <div class="scambio-mini-month-grid">
+                                            {% for row in section.month.rows %}
+                                                {% for cell in row %}
+                                                    <div class="scambio-mini-month-cell{% if cell.is_today %} is-today{% endif %}{% if not cell.is_current_month %} is-other-month{% endif %}{% if not cell.is_inside_year %} is-outside-year{% endif %}">
+                                                        <div class="scambio-mini-day-head">
+                                                            <div class="scambio-mini-month-number">{{ cell.date.day }}</div>
+                                                            {% if cell.is_inside_year %}
+                                                                <a
+                                                                    href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ cell.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
+                                                                    class="scambio-mini-add"
+                                                                    aria-label="Aggiungi prestazione il {{ cell.date|date:'d/m/Y' }}"
+                                                                >
+                                                                    +
+                                                                </a>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="scambio-mini-day-body">
+                                                            {% for entry in cell.entries %}
+                                                                <article class="scambio-mini-entry is-compact">
+                                                                    <a
+                                                                        href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}"
+                                                                        class="scambio-mini-entry-title"
+                                                                    >
+                                                                        {% if entry.ora_ingresso %}
+                                                                            {{ entry.ora_ingresso|time:"H:i" }}
+                                                                        {% else %}
+                                                                            {{ entry.ore_lavorate }} h
+                                                                        {% endif %}
+                                                                    </a>
+                                                                    <div class="scambio-mini-entry-text">{{ entry.descrizione }}</div>
+                                                                    <div class="scambio-mini-entry-actions">
+                                                                        <a href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link">Modifica</a>
+                                                                        <a href="{% url 'elimina_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link table-link-danger">Elimina</a>
+                                                                    </div>
+                                                                </article>
+                                                            {% empty %}
+                                                                <div class="scambio-mini-empty">-</div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    {% if section.entries %}
+                                        <table class="inline-table scambio-prestazioni-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data</th>
+                                                    <th>Ora ingresso</th>
+                                                    <th>Ora uscita</th>
+                                                    <th>Mansione svolta</th>
+                                                    <th>Ore</th>
+                                                    <th>Importo</th>
+                                                    <th>Azioni</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for entry in section.entries %}
+                                                    <tr class="inline-form-row list-row-link" data-row-href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}">
+                                                        <td>{{ entry.data|date:"d/m/Y" }}</td>
+                                                        <td>{% if entry.ora_ingresso %}{{ entry.ora_ingresso|time:"H:i" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
+                                                        <td>{% if entry.ora_uscita %}{{ entry.ora_uscita|time:"H:i" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
+                                                        <td>
+                                                            <div>{{ entry.descrizione }}</div>
+                                                            {% if entry.studente %}
+                                                                <div class="table-muted">{{ entry.studente }}</div>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ entry.ore_lavorate }}</td>
+                                                        <td>EUR {{ entry.importo_maturato|euro }}</td>
+                                                        <td class="actions-cell">
+                                                            <a href="{% url 'modifica_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link">Modifica</a>
+                                                            <span class="table-muted">|</span>
+                                                            <a href="{% url 'elimina_prestazione_scambio_retta' entry.pk %}?return_to={{ scambio_retta_return_to|urlencode }}" class="table-link table-link-danger">Elimina</a>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    {% else %}
+                                        <div class="empty-state compact-empty-state inline-empty-state">
+                                            Nessuna prestazione registrata per questo anno scolastico.
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endif %}

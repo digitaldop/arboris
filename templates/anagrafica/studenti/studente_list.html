@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Studenti - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>Studenti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Studenti</h1>
+        <a href="{% url 'crea_studente' %}" class="btn btn-primary">Nuovo studente</a>
+    </div>
+
+    <div class="list-toolbar">
+        <form method="get" class="search-form">
+            <input
+                type="text"
+                name="q"
+                value="{{ q|default:'' }}"
+                placeholder="Cerca per cognome, nome, codice fiscale, famiglia..."
+                class="search-input"
+            >
+            <button type="submit" class="btn btn-secondary">Cerca</button>
+            {% if q %}
+                <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Pulisci</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            {% if studenti %}
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>Cognome</th>
+                            <th>Nome</th>
+                            <th>Famiglia</th>
+                            <th>Data nascita</th>
+                            <th>Codice fiscale</th>
+                            <th>Indirizzo</th>
+                            <th>Attivo</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for studente in studenti %}
+                            <tr
+                                class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == studente.pk|stringformat:'s' %}highlight-row{% endif %}"
+                                data-row-href="{% url 'modifica_studente' studente.pk %}"
+                            >
+                                <td>{{ studente.cognome }}</td>
+                                <td>{{ studente.nome }}</td>
+                                <td>{{ studente.famiglia }}</td>
+                                <td>{{ studente.data_nascita|default:"" }}</td>
+                                <td>{{ studente.codice_fiscale|default:"" }}</td>
+                                <td>
+                                    {% if studente.indirizzo %}
+                                        {{ studente.indirizzo }}
+                                    {% elif studente.famiglia and studente.famiglia.indirizzo_principale %}
+                                        <span class="table-muted">Eredita famiglia</span>
+                                    {% else %}
+                                        <span class="table-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if studente.attivo %}Sì{% else %}No{% endif %}</td>
+                                <td class="actions-cell">
+                                    <a class="table-link" href="{% url 'modifica_studente' studente.pk %}">Modifica</a>
+                                    |
+                                    <a class="table-link table-link-danger" href="{% url 'elimina_studente' studente.pk %}">Elimina</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    Nessuno studente inserito.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

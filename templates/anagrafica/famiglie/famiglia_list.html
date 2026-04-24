@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Famiglie - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>Famiglie</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Famiglie</h1>
+        <a href="{% url 'crea_famiglia' %}" class="btn btn-primary">Nuova famiglia</a>
+    </div>
+
+    <!-- INIZIO BARRA DI RICERCA -->
+    <div class="list-toolbar">
+        <form method="get" class="search-form">
+            <input
+                type="text"
+                name="q"
+                value="{{ q|default:'' }}"
+                placeholder="Cerca per cognome famiglia, familiare, studente, email, telefono..."
+                class="search-input"
+            >
+            <button type="submit" class="btn btn-secondary">Cerca</button>
+            {% if q %}
+                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Pulisci</a>
+            {% endif %}
+        </form>
+    </div>
+    <!-- FINE BARRA DI RICERCA -->
+
+    <div class="panel">
+        <div class="panel-body">
+            {% if famiglie %}
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>Cognome famiglia</th>
+                            <th>Stato relazione</th>
+                            <th>Indirizzo principale</th>
+                            <th>Attiva</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for famiglia in famiglie %}
+                            <tr
+                                class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == famiglia.pk|stringformat:'s' %}highlight-row{% endif %}"
+                                data-row-href="{% url 'modifica_famiglia' famiglia.pk %}"
+                            >
+                                <td>{{ famiglia.cognome_famiglia }}</td>
+                                <td>{{ famiglia.stato_relazione_famiglia }}</td>
+                                <td>
+                                    {% if famiglia.indirizzo_principale %}
+                                        {{ famiglia.indirizzo_principale }}
+                                    {% else %}
+                                        <span class="table-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if famiglia.attiva %}Sì{% else %}No{% endif %}</td>
+                                <td class="actions-cell">
+                                    <a class="table-link" href="{% url 'modifica_famiglia' famiglia.pk %}">Modifica</a>
+                                    |
+                                    <a class="table-link table-link-danger" href="{% url 'elimina_famiglia' famiglia.pk %}">Elimina</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    Nessuna famiglia inserita.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

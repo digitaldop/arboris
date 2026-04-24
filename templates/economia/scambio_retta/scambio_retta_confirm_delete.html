@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina scambio retta - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_scambi_retta' %}">Scambio retta</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina scambio retta</h1>
+    </div>
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare lo scambio retta relativo a <strong>{{ scambio.studente }}</strong> del mese <strong>{{ scambio.mese_riferimento }}</strong>.</p>
+        </div>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

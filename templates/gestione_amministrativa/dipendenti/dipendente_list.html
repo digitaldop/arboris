@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Dipendenti - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Dipendenti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Dipendenti</h1>
+        <div class="page-head-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url 'crea_dipendente' %}" class="btn btn-primary">Nuovo dipendente</a>
+            {% endif %}
+            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Buste paga</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Cerca:
+                <input type="text" name="q" value="{{ q }}" placeholder="Nome, codice, email">
+            </label>
+            <label>
+                Stato:
+                <select name="stato">
+                    <option value="">Tutti</option>
+                    {% for value, label in stati %}
+                        <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Dipendente</th>
+                    <th>Matricola</th>
+                    <th>Codice fiscale</th>
+                    <th>Stato</th>
+                    <th>Assunzione</th>
+                    <th>Contatti</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dipendente in dipendenti %}
+                    <tr>
+                        <td><a href="{% url 'modifica_dipendente' dipendente.pk %}" class="table-link">{{ dipendente }}</a></td>
+                        <td>{{ dipendente.codice_dipendente|default:"-" }}</td>
+                        <td>{{ dipendente.codice_fiscale|default:"-" }}</td>
+                        <td>{{ dipendente.get_stato_display }}</td>
+                        <td>{% if dipendente.data_assunzione %}{{ dipendente.data_assunzione|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                        <td>
+                            {% if dipendente.telefono %}{{ dipendente.telefono }}{% endif %}
+                            {% if dipendente.email %}<br>{{ dipendente.email }}{% endif %}
+                            {% if not dipendente.email and not dipendente.telefono %}-{% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="table-link">Apri</a>
+                            {% if can_manage_gestione_amministrativa %}
+                                <span class="table-muted">|</span>
+                                <form method="post" action="{% url 'genera_previsione_busta_paga' dipendente.pk %}" class="inline-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="anno" value="{{ anno_corrente }}">
+                                    <input type="hidden" name="mese" value="{{ mese_corrente }}">
+                                    <button type="submit" class="table-link button-link">Genera previsione</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">Nessun dipendente trovato.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

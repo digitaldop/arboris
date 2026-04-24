@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}{{ piano.nome }} - Fondo accantonamento{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ piano.nome }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{{ piano.nome }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'fondo_piano_modifica' piano.pk %}" class="btn btn-secondary">Modifica piano</a>
+            <a href="{% url 'fondo_piano_versamento' piano.pk %}" class="btn btn-primary">Versamento</a>
+            <a href="{% url 'fondo_piano_prelievo' piano.pk %}" class="btn btn-primary">Prelievo</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Riepilogo</h2>
+        <p>
+            <strong>Tipologia:</strong>
+            {% if piano.sempre_attivo %}
+                Sempre attivo (non legato a un singolo anno scolastico)
+            {% else %}
+                Anno scolastico: {{ piano.anno_scolastico }}
+            {% endif %}
+            <br>
+            <strong>Modalita' di versamento:</strong> {{ piano.get_modalita_display }}<br>
+            <strong>Deposito:</strong> {{ piano.get_tipo_deposito_display }}{% if piano.descrizione_deposito %} — {{ piano.descrizione_deposito }}{% endif %}<br>
+            {% if piano.percentuale_su_rette %}
+                <strong>Percentuale sulle rette:</strong> {{ piano.percentuale_su_rette }}%<br>
+            {% endif %}
+            {% if piano.periodicita and piano.data_primo_versamento %}
+                <strong>Periodico:</strong> {{ piano.get_periodicita_display }}, primo versamento {{ piano.data_primo_versamento|date:"d/m/Y" }}
+                ({{ piano.importo_versamento_periodico }} €)<br>
+            {% endif %}
+        </p>
+        <p>
+            <strong>Entrate (versamenti):</strong> {{ piano.totale_versamenti }} € —
+            <strong>Uscite (prelievi/sconti):</strong> {{ piano.totale_uscite }} € —
+            <strong>Saldo:</strong> {{ piano.saldo_disponibile }} €
+        </p>
+        {% if piano.percentuale_su_rette %}
+            <p class="table-muted">
+                I versamenti da percentuale sulle rette si allineano al salvataggio delle rate
+                (calcolo sull'importo pagato). Se piu' piani con percentuale competono
+                (stesso anno o piano «sempre attivo»), si usa quello con nome lessicograficamente minore.
+            </p>
+        {% endif %}
+        {% if piano.coordinate_riferimento %}
+            <p class="table-muted"><strong>Note / coordinate (riservate):</strong><br>{{ piano.coordinate_riferimento|linebreaksbr }}</p>
+        {% endif %}
+    </div>
+
+    {% if mostra_sezione_scadenze %}
+        <div class="content-card">
+            <h2 class="section-title">Scadenze periodiche</h2>
+            <form method="post" action="{% url 'fondo_piano_genera_scadenze' piano.pk %}" class="form-actions" style="margin-bottom:1rem;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary">Rigenera scadenze fino a fine anno</button>
+            </form>
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Importo previsto</th>
+                        <th>Stato</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in scadenze %}
+                        <tr>
+                            <td>{{ s.data_scadenza|date:"d/m/Y" }}</td>
+                            <td>{{ s.importo_previsto }} €</td>
+                            <td>{{ s.get_stato_display }}</td>
+                            <td class="actions-cell">
+                                {% if s.stato == "pianificato" %}
+                                    <form method="post" action="{% url 'fondo_scadenza_soddisfa' s.pk %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="table-link" style="background:none;border:none;cursor:pointer;padding:0;">Registra versamento</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="empty-state">Nessuna scadenza. Usa il pulsante qui sopra dopo aver impostato periodicita' e data primo versamento.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    <div class="content-card">
+        <h2 class="section-title">Movimenti (ultimi 200)</h2>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Importo</th>
+                    <th>Dettagli</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimenti %}
+                    <tr>
+                        <td>{{ m.data|date:"d/m/Y" }}</td>
+                        <td>{{ m.get_tipo_display }}</td>
+                        <td>{{ m.importo }} €</td>
+                        <td>
+                            {% if m.tipo == "prelievo" %}
+                                {{ m.richiedente }} — {{ m.motivo|truncatechars:60 }}
+                            {% else %}
+                                {{ m.note|truncatechars:80 }}
+                            {% endif %}
+                            {% if m.rata_iscrizione_id %}
+                                <br><a href="{% url 'modifica_rata_iscrizione' m.rata_iscrizione_id %}" class="table-link">Rata iscrizione</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty-state">Nessun movimento.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="content-card">
+        <a href="{% url 'fondo_piano_elimina' piano.pk %}" class="table-link table-link-danger">Elimina piano</a>
+    </div>
+{% endblock %}

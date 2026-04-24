@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Gestione rata servizio extra - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_rate_servizi_extra' %}">Rate</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ rata.display_label }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Gestione pagamento {{ rata.display_label }}</h1>
+        <div class="page-head-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" form="rata-servizio-extra-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            <a href="{{ back_url }}" class="btn btn-secondary">Torna alle rate</a>
+        </div>
+    </div>
+
+    <form method="post" id="rata-servizio-extra-form">
+        {% csrf_token %}
+
+        <div class="content-card">
+            <table class="form-table" style="margin-bottom: 18px;">
+                <tr>
+                    <th>Studente</th>
+                    <td>{{ rata.iscrizione.studente }}</td>
+                </tr>
+                <tr>
+                    <th>Servizio</th>
+                    <td>{{ rata.iscrizione.servizio.nome_servizio }}</td>
+                </tr>
+                <tr>
+                    <th>Tariffa</th>
+                    <td>{{ rata.iscrizione.tariffa.nome_tariffa }}</td>
+                </tr>
+                <tr>
+                    <th>Importo dovuto</th>
+                    <td>EUR {{ rata.importo_dovuto|euro }}</td>
+                </tr>
+                <tr>
+                    <th>Importo finale</th>
+                    <td>EUR {{ rata.importo_finale|euro }}</td>
+                </tr>
+            </table>
+
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.data_scadenza.label_tag }}</th>
+                    <td>{{ form.data_scadenza }} {{ form.data_scadenza.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.pagata.label_tag }}</th>
+                    <td>{{ form.pagata }} {{ form.pagata.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.importo_pagato.label_tag }}</th>
+                    <td>{{ form.importo_pagato }} {{ form.importo_pagato.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_pagamento.label_tag }}</th>
+                    <td>{{ form.data_pagamento }} {{ form.data_pagamento.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.metodo_pagamento.label_tag }}</th>
+                    <td>{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>{{ form.note }} {{ form.note.errors }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" class="btn btn-primary">Salva modifiche</button>
+            {% endif %}
+            <a href="{{ back_url }}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+{% endblock %}

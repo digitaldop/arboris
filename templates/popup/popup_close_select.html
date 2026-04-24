@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Chiusura finestra</title>
+</head>
+<body>
+    <script>
+        (function () {
+            if (window.opener && !window.opener.closed) {
+                const action = "{{ action|default:'select'|escapejs }}";
+                const fieldName = "{{ field_name|escapejs }}";
+                const objectId = "{{ object_id|escapejs }}";
+                const objectLabel = "{{ object_label|default:''|escapejs }}";
+                const targetInputName = "{{ target_input_name|default:''|escapejs }}";
+
+                if (action === "delete") {
+                    if (typeof window.opener.dismissDeletedRelatedPopup === "function") {
+                        window.opener.dismissDeletedRelatedPopup(
+                            fieldName,
+                            objectId,
+                            targetInputName
+                        );
+                    } else if (typeof window.opener.ArborisReloadWithLongWait === "function") {
+                        window.opener.ArborisReloadWithLongWait();
+                    } else {
+                        window.opener.location.reload();
+                    }
+                } else {
+                    if (typeof window.opener.dismissRelatedPopup === "function") {
+                        window.opener.dismissRelatedPopup(
+                            fieldName,
+                            objectId,
+                            objectLabel,
+                            targetInputName
+                        );
+                    } else if (typeof window.opener.ArborisReloadWithLongWait === "function") {
+                        window.opener.ArborisReloadWithLongWait();
+                    } else {
+                        window.opener.location.reload();
+                    }
+                }
+            }
+            window.close();
+        })();
+    </script>
+</body>
+</html>

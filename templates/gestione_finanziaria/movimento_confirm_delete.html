@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Elimina movimento - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina movimento</h1>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Stai per eliminare il movimento del
+            <strong>{{ movimento.data_contabile|date:"d/m/Y" }}</strong>
+            di importo <strong>{{ movimento.importo|euro }} &euro;</strong>:
+            {{ movimento.descrizione|truncatechars:120|default:"(senza descrizione)" }}.
+        </p>
+        {% if movimento.origine == "banca" %}
+            <div class="message message-error">
+                Attenzione: questo movimento proviene da una sincronizzazione bancaria.
+                Eliminandolo verra' ricreato al prossimo import se il provider lo espone ancora.
+            </div>
+        {% endif %}
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

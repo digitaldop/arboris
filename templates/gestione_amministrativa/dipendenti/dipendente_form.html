@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %} - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_dipendenti' %}">Dipendenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if dipendente %}{{ dipendente }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="dipendente-form" class="detail-form">
+        {% csrf_token %}
+        <div class="family-top-layout">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Anagrafica dipendente</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table">
+                                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                                <tr><th>{{ form.cognome.label_tag }}</th><td>{{ form.cognome }} {{ form.cognome.errors }}</td></tr>
+                                <tr><th>{{ form.data_nascita.label_tag }}</th><td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td></tr>
+                                <tr>
+                                    <th>{{ form.luogo_nascita.label_tag }}</th>
+                                    <td>
+                                        <div class="autocomplete-wrapper citta-autocomplete">
+                                            {{ form.luogo_nascita }}
+                                        </div>
+                                        {{ form.luogo_nascita.errors }}
+                                    </td>
+                                </tr>
+                                <tr><th>{{ form.nazionalita.label_tag }}</th><td>{{ form.nazionalita }} {{ form.nazionalita.errors }}</td></tr>
+                                <tr><th>{{ form.sesso.label_tag }}</th><td>{{ form.sesso }} {{ form.sesso.errors }}</td></tr>
+                                <tr>
+                                    <th>{{ form.codice_fiscale.label_tag }}</th>
+                                    <td>
+                                        {{ form.codice_fiscale }} {{ form.codice_fiscale.errors }}
+                                        <div class="help-text">Calcolato automaticamente quando nome, cognome, data, sesso e luogo di nascita sono completi.</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.indirizzo.label_tag }}</th>
+                                    <td>
+                                        <div class="related-field-row popup-related-field dipendente-address-field">
+                                            <div class="related-field-stack">
+                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                    {{ form.indirizzo }}
+                                                </div>
+                                            </div>
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">&#9998;</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">&#10006;</button>
+                                            </div>
+                                        </div>
+                                        {{ form.indirizzo.errors }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <div class="admin-section-title">Contatti e rapporto</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table">
+                                <tr><th>{{ form.telefono.label_tag }}</th><td>{{ form.telefono }} {{ form.telefono.errors }}</td></tr>
+                                <tr><th>{{ form.email.label_tag }}</th><td>{{ form.email }} {{ form.email.errors }}</td></tr>
+                                <tr><th>{{ form.iban.label_tag }}</th><td>{{ form.iban }} {{ form.iban.errors }}</td></tr>
+                                <tr>
+                                    <th>{{ form.codice_dipendente.label_tag }}</th>
+                                    <td>
+                                        {{ form.codice_dipendente }} {{ form.codice_dipendente.errors }}
+                                        {% if form.codice_dipendente.help_text %}
+                                            <div class="help-text">{{ form.codice_dipendente.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.contratto.label_tag }}</th>
+                                    <td>
+                                        <div class="related-field-row popup-related-field">
+                                            <div class="related-field-stack">
+                                                <div class="autocomplete-wrapper">
+                                                    {{ form.contratto }}
+                                                </div>
+                                            </div>
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-contratto-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-contratto-btn">&#9998;</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-contratto-btn">&#10006;</button>
+                                            </div>
+                                        </div>
+                                        {{ form.contratto.errors }}
+                                    </td>
+                                </tr>
+                                <tr><th>{{ form.stato.label_tag }}</th><td>{{ form.stato }} {{ form.stato.errors }}</td></tr>
+                                <tr><th>{{ form.data_assunzione.label_tag }}</th><td>{{ form.data_assunzione }} {{ form.data_assunzione.errors }}</td></tr>
+                                <tr><th>{{ form.data_cessazione.label_tag }}</th><td>{{ form.data_cessazione }} {{ form.data_cessazione.errors }}</td></tr>
+                                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="family-side-column">
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Contratti</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% if dipendente and can_manage_gestione_amministrativa %}
+                                <div class="form-actions form-actions-compact">
+                                    <a href="{% url 'crea_contratto_dipendente' dipendente.pk %}" class="btn btn-secondary">Nuovo contratto</a>
+                                </div>
+                            {% endif %}
+                            <table class="list-table">
+                                <thead>
+                                    <tr>
+                                        <th>Periodo</th>
+                                        <th>Tipo</th>
+                                        <th class="column-right">Lordo</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for contratto in contratti %}
+                                        <tr>
+                                            <td><a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</a></td>
+                                            <td>{{ contratto.tipo_contratto|default:"-" }}</td>
+                                            <td class="column-right">{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</td>
+                                            <td class="actions-cell">
+                                                <a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">Modifica</a>
+                                                {% if can_manage_gestione_amministrativa %}
+                                                    <span class="table-muted">|</span>
+                                                    <a href="{% url 'elimina_contratto_dipendente' contratto.pk %}" class="table-link table-link-danger">Elimina</a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr><td colspan="4"><div class="empty-state">Nessun contratto registrato.</div></td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Buste paga recenti</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% if dipendente and can_manage_gestione_amministrativa %}
+                                <div class="form-actions form-actions-compact">
+                                    <a href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}" class="btn btn-secondary">Nuova busta</a>
+                                </div>
+                            {% endif %}
+                            <table class="list-table">
+                                <thead>
+                                    <tr>
+                                        <th>Periodo</th>
+                                        <th>Stato</th>
+                                        <th class="column-right">Costo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for busta in buste_paga %}
+                                        <tr>
+                                            <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
+                                            <td>{{ busta.get_stato_display }}</td>
+                                            <td class="column-right">{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr><td colspan="3"><div class="empty-state">Nessuna busta paga.</div></td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <button type="submit" class="btn btn-primary">Salva</button>
+            {% endif %}
+            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Annulla</a>
+            {% if dipendente and can_manage_gestione_amministrativa %}
+                <a href="{% url 'elimina_dipendente' dipendente.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/pages/dipendente-form.js' %}?v=3"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisDipendenteForm) {
+                ArborisDipendenteForm.init({
+                    dipendenteId: "{% if dipendente %}{{ dipendente.pk }}{% endif %}",
+                    urls: {
+                        creaIndirizzo: "{% url 'crea_indirizzo' %}",
+                        creaContratto: "{% url 'crea_contratto_dipendente_generico' %}",
+                        modificaContrattoTemplate: "{% url 'modifica_contratto_dipendente' 0 %}",
+                        eliminaContrattoTemplate: "{% url 'elimina_contratto_dipendente' 0 %}"
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock %}

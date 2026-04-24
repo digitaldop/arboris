@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa servizio extra{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa servizio extra{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" form="tariffa-servizio-extra-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="tariffa-servizio-extra-form">
+        {% csrf_token %}
+
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.servizio.label_tag }}</th>
+                    <td>{{ form.servizio }} {{ form.servizio.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.nome_tariffa.label_tag }}</th>
+                    <td>{{ form.nome_tariffa }} {{ form.nome_tariffa.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.rateizzata.label_tag }}</th>
+                    <td>
+                        {{ form.rateizzata }} {{ form.rateizzata.errors }}
+                        <div class="help-text">{{ form.rateizzata.help_text }}</div>
+                        <div class="help-text" id="tariffa-rate-mode-help">
+                            Se disattiva, la tariffa viene gestita come una sola scadenza.
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.attiva.label_tag }}</th>
+                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
+                </tr>
+            </table>
+
+            <div class="admin-section compact" style="margin-top: 18px;">
+                <div class="admin-section-title">Piano rate della tariffa</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {% if formset.non_form_errors %}
+                            <div class="inline-formset-errors" style="margin-bottom: 12px;">
+                                {{ formset.non_form_errors }}
+                            </div>
+                        {% endif %}
+
+                        {{ formset.management_form }}
+                        <table class="inline-table" id="rate-config-table">
+                            <thead>
+                                <tr>
+                                    <th>Numero rata</th>
+                                    <th>Descrizione</th>
+                                    <th>Importo</th>
+                                    <th>Scadenza</th>
+                                    <th>Cancellare?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in formset %}
+                                    <tr class="inline-form-row">
+                                        {{ f.id }}
+                                        <td>
+                                            {{ f.numero_rata }}
+                                            {{ f.numero_rata.errors }}
+                                        </td>
+                                        <td>
+                                            {{ f.descrizione }}
+                                            {% if f.descrizione.help_text %}
+                                                <div class="help-text">{{ f.descrizione.help_text }}</div>
+                                            {% endif %}
+                                            {{ f.descrizione.errors }}
+                                        </td>
+                                        <td>
+                                            {{ f.importo }}
+                                            {{ f.importo.errors }}
+                                        </td>
+                                        <td>
+                                            {{ f.data_scadenza }}
+                                            {{ f.data_scadenza.errors }}
+                                        </td>
+                                        <td class="inline-delete-cell">
+                                            {% if f.instance.pk %}
+                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                            {% else %}
+                                                <button type="button" class="inline-remove-btn js-remove-rate-row">Rimuovi</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% if f.non_field_errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="5">{{ f.non_field_errors }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <div class="inline-add-row">
+                            <button type="button" class="inline-add-btn" id="add-rate-config-btn">+ Aggiungi un'altra rata</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section compact" style="margin-top: 18px;">
+                <div class="admin-section-title">Note</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ form.note }} {{ form.note.errors }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" class="btn btn-primary">{% if tariffa %}Salva modifiche{% else %}Crea tariffa{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+
+    <template id="rate-config-empty-form-template">
+        <tr class="inline-form-row">
+            {{ formset.empty_form.id }}
+            <td>{{ formset.empty_form.numero_rata }}</td>
+            <td>{{ formset.empty_form.descrizione }}</td>
+            <td>{{ formset.empty_form.importo }}</td>
+            <td>{{ formset.empty_form.data_scadenza }}</td>
+            <td class="inline-delete-cell">
+                <button type="button" class="inline-remove-btn js-remove-rate-row">Rimuovi</button>
+            </td>
+        </tr>
+    </template>
+
+    <script src="{% static 'js/pages/servizi-extra-tariffa-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisServiziExtraTariffaForm) {
+                ArborisServiziExtraTariffaForm.init();
+            }
+        });
+    </script>
+{% endblock %}
+

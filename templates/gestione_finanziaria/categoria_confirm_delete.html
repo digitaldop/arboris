@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina categoria {{ categoria.nome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_categorie_finanziarie' %}">Categorie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina categoria</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare la categoria <strong>{{ categoria.nome }}</strong>.</p>
+
+        {% if ha_vincoli %}
+            <div class="message message-error">
+                <p>La categoria non puo' essere eliminata perche' e' ancora referenziata da altri dati:</p>
+                <ul>
+                    {% if count_movimenti %}<li>Movimenti collegati: {{ count_movimenti }}</li>{% endif %}
+                    {% if count_figlie %}<li>Categorie figlie: {{ count_figlie }}</li>{% endif %}
+                    {% if count_regole %}<li>Regole di categorizzazione collegate: {{ count_regole }}</li>{% endif %}
+                </ul>
+                <p>Per preservare lo storico, puoi <strong>disattivare</strong> la categoria dalla pagina di modifica, oppure spostare altrove i dati collegati prima di eliminarla.</p>
+            </div>
+        {% endif %}
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" {% if ha_vincoli %}disabled{% endif %}>Elimina</button>
+            <a href="{% url 'lista_categorie_finanziarie' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

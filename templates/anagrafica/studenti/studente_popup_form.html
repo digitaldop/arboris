@@ -1,0 +1,95 @@
+{% extends "popup_base.html" %}
+{% load static %}
+
+{% block title %}{% if studente %}Studente {{ studente }}{% else %}Nuovo studente{% endif %} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if studente %}Studente {{ studente }}{% else %}Nuovo studente{% endif %}</h1>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.famiglia.label_tag }}</th>
+                    <td>
+                        <div class="related-field-row popup-related-field">
+                            <div class="related-field-stack">
+                                <div class="autocomplete-wrapper famiglia-autocomplete">
+                                    {{ form.famiglia }}
+                                </div>
+                            </div>
+                            <div class="related-actions">
+                                <button type="button" class="related-btn related-btn-add" id="popup-add-famiglia-btn">+</button>
+                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-famiglia-btn">&#9998;</button>
+                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-famiglia-btn">&#10006;</button>
+                            </div>
+                        </div>
+                        {{ form.famiglia.errors }}
+                    </td>
+                </tr>
+                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                <tr><th>{{ form.cognome.label_tag }}</th><td>{{ form.cognome }} {{ form.cognome.errors }}</td></tr>
+                <tr><th>{{ form.data_nascita.label_tag }}</th><td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td></tr>
+                <tr><th>{{ form.sesso.label_tag }}</th><td>{{ form.sesso }} {{ form.sesso.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.luogo_nascita.label_tag }}</th>
+                    <td>
+                        <div class="related-field-stack">
+                            <div class="autocomplete-wrapper citta-autocomplete">
+                                {{ form.luogo_nascita }}
+                            </div>
+                        </div>
+                        {{ form.luogo_nascita.errors }}
+                    </td>
+                </tr>
+                <tr><th>{{ form.codice_fiscale.label_tag }}</th><td>{{ form.codice_fiscale }} {{ form.codice_fiscale.errors }}<div class="help-text">Calcolato automaticamente quando i dati anagrafici sono completi.</div></td></tr>
+                <tr>
+                    <th>{{ form.indirizzo.label_tag }}</th>
+                    <td>
+                        <div class="related-field-row popup-related-field">
+                            <div class="related-field-stack">
+                                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                    {{ form.indirizzo }}
+                                </div>
+                            </div>
+                            <div class="related-actions">
+                                <button type="button" class="related-btn related-btn-add" id="popup-add-indirizzo-btn">+</button>
+                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-indirizzo-btn">&#9998;</button>
+                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-indirizzo-btn">&#10006;</button>
+                            </div>
+                        </div>
+                        <div class="inline-address-help" id="popup-studente-address-help">
+                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                        </div>
+                        {{ form.indirizzo.errors }}
+                    </td>
+                </tr>
+                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            </div>
+        </div>
+    </form>
+
+    {% if studente and studente.famiglia and studente.famiglia.indirizzo_principale %}
+        {{ studente.famiglia.indirizzo_principale.label_full|json_script:"popup-studente-famiglia-indirizzo-label" }}
+    {% else %}
+        <script id="popup-studente-famiglia-indirizzo-label" type="application/json">""</script>
+    {% endif %}
+
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/pages/studente-popup-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisStudentePopupForm) {
+                ArborisStudentePopupForm.init();
+            }
+        });
+    </script>
+{% endblock %}

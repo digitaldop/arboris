@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina contratto - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_contratti_dipendenti' %}">Contratti dipendenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina contratto</h1>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Stai per eliminare il contratto
+            {% if contratto.dipendente_id %}di <strong>{{ contratto.dipendente }}</strong>{% else %}<strong>non assegnato</strong>{% endif %}
+            dal <strong>{{ contratto.data_inizio|date:"d/m/Y" }}</strong>.
+        </p>
+        {% if count_buste %}
+            <div class="message message-error">
+                Il contratto ha {{ count_buste }} buste paga collegate. Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
+            </div>
+        {% endif %}
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" {% if count_buste %}disabled{% endif %}>Elimina</button>
+            <a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

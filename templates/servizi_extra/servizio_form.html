@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio extra{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio extra{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" form="servizio-extra-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="servizio-extra-form">
+        {% csrf_token %}
+
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.anno_scolastico.label_tag }}</th>
+                    <td>{{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.nome_servizio.label_tag }}</th>
+                    <td>{{ form.nome_servizio }} {{ form.nome_servizio.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.ordine.label_tag }}</th>
+                    <td>
+                        {{ form.ordine }} {{ form.ordine.errors }}
+                        <div class="help-text">Lascia vuoto per assegnare automaticamente il prossimo ordine disponibile.</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.descrizione.label_tag }}</th>
+                    <td>{{ form.descrizione }} {{ form.descrizione.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.attiva.label_tag }}</th>
+                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>{{ form.note }} {{ form.note.errors }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" class="btn btn-primary">{% if servizio %}Salva modifiche{% else %}Crea servizio{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+{% endblock %}
+

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Iscrizioni - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Iscrizioni</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Iscrizioni</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_iscrizione' %}" class="btn btn-primary">Nuova iscrizione</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Studente</th>
+                    <th>Anno scolastico</th>
+                    <th>Classe</th>
+                    <th>Stato</th>
+                    <th>Condizione</th>
+                    <th>Agevolazione</th>
+                    <th>Rate</th>
+                    <th>Non pagante</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for iscrizione in iscrizioni %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_iscrizione' iscrizione.pk %}">
+                        <td>{{ iscrizione.studente }}</td>
+                        <td>{{ iscrizione.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ iscrizione.classe|default:"-" }}</td>
+                        <td>{{ iscrizione.stato_iscrizione }}</td>
+                        <td>{{ iscrizione.condizione_iscrizione.nome_condizione_iscrizione }}</td>
+                        <td>{{ iscrizione.agevolazione|default:"-" }}</td>
+                        <td>{{ iscrizione.rate.count }}</td>
+                        <td>{% if iscrizione.non_pagante %}Si{% else %}No{% endif %}</td>
+                        <td>{% if iscrizione.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'lista_rate_iscrizione' %}?iscrizione={{ iscrizione.pk }}" class="table-link">Rate</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'modifica_iscrizione' iscrizione.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_iscrizione' iscrizione.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="10"><div class="empty-state">Nessuna iscrizione inserita.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Indirizzo salvato - Arboris School Management{% endblock %}
+
+{% block content %}
+    <h1 class="page-title">Indirizzo salvato</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            <div class="success-box">
+                L'indirizzo è stato salvato correttamente.
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'crea_indirizzo' %}" class="btn btn-primary">Nuovo indirizzo</a>
+            <a href="{% url 'lista_indirizzi' %}" class="btn btn-secondary">Vai all'elenco</a>
+        </div>
+    </div>
+{% endblock %}

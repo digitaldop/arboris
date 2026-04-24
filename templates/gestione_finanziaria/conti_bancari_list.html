@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Conti bancari - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Conti bancari</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Conti bancari</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'import_estratto_conto' %}" class="btn btn-primary">Import estratto conto</a>
+            <a href="{% url 'crea_conto_bancario' %}" class="btn btn-secondary">Nuovo conto</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome conto</th>
+                    <th>Banca</th>
+                    <th>IBAN</th>
+                    <th>Provider</th>
+                    <th>Connessione</th>
+                    <th class="column-right">Saldo</th>
+                    <th>Ultimo aggiornamento</th>
+                    <th>Attivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conto in conti %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_conto_bancario' conto.pk %}">
+                        <td>{{ conto.nome_conto }}</td>
+                        <td>{{ conto.banca|default:"-" }}</td>
+                        <td>{{ conto.iban|default:"-" }}</td>
+                        <td>{{ conto.provider }}</td>
+                        <td>{% if conto.connessione %}{{ conto.connessione.etichetta }}{% else %}-{% endif %}</td>
+                        <td class="column-right">{{ conto.saldo_corrente|euro }} &euro;</td>
+                        <td>{% if conto.saldo_corrente_aggiornato_al %}{{ conto.saldo_corrente_aggiornato_al|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                        <td>{% if conto.attivo %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_conto_bancario' conto.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <form method="post" action="{% url 'ricalcola_saldo_conto_bancario' conto.pk %}" style="display:inline;" onclick="event.stopPropagation();">
+                                {% csrf_token %}
+                                <button type="submit" class="table-link" style="background:none;border:none;cursor:pointer;padding:0;">Ricalcola saldo</button>
+                            </form>
+                            {% if conto.provider and conto.provider.tipo == 'psd2' and conto.external_account_id %}
+                                <span class="table-muted">|</span>
+                                <form method="post" action="{% url 'sincronizza_conto_bancario' conto.pk %}" style="display:inline;" onclick="event.stopPropagation();">
+                                    {% csrf_token %}
+                                    <button type="submit" class="table-link" style="background:none;border:none;cursor:pointer;padding:0;">Sincronizza</button>
+                                </form>
+                            {% endif %}
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_conto_bancario' conto.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9">
+                            <div class="empty-state">
+                                Nessun conto bancario configurato. Crea un conto per iniziare a registrare
+                                movimenti e, in futuro, collegare gli estratti conto o un provider PSD2.
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

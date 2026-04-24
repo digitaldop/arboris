@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Pianificazione sincronizzazione PSD2 - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Pianificazione sincronizzazione</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Pianificazione sincronizzazione PSD2</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Connessioni</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Configurazione</h2>
+        <p class="help-text">
+            Lo scheduler esegue automaticamente la sincronizzazione dei conti PSD2 attivi
+            quando scade l'intervallo configurato. L'attivazione avviene su due fronti:
+            durante il normale traffico applicativo (middleware) e tramite il comando
+            <code>python manage.py run_scheduled_psd2_sync</code> da Task Scheduler o cron.
+        </p>
+
+        <form method="post" class="form-grid">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-field">
+                    <label>
+                        {{ form.attivo }} Pianificazione attiva
+                    </label>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Intervallo (ore)</label>
+                    {{ form.intervallo_ore }}
+                    {% if form.intervallo_ore.errors %}
+                        <div class="field-error">{{ form.intervallo_ore.errors|join:" " }}</div>
+                    {% endif %}
+                </div>
+                <div class="form-field">
+                    <label>Giorni di storico da richiedere</label>
+                    {{ form.giorni_storico }}
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>{{ form.sync_saldo }} Sincronizza saldo</label>
+                </div>
+                <div class="form-field">
+                    <label>{{ form.sync_movimenti }} Sincronizza movimenti</label>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" name="azione" value="salva" class="btn btn-primary">Salva</button>
+                <button type="submit" name="azione" value="esegui" class="btn btn-secondary"
+                        onclick="return confirm('Forzare adesso la sincronizzazione di tutti i conti PSD2 attivi?');">
+                    Esegui adesso
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Stato</h2>
+        <table class="list-table">
+            <tbody>
+                <tr>
+                    <th>Ultima esecuzione</th>
+                    <td>{% if config.ultimo_run_at %}{{ config.ultimo_run_at|date:"d/m/Y H:i" }}{% else %}mai{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Ultimo esito</th>
+                    <td>{{ config.get_ultimo_esito_display|default:"-" }}</td>
+                </tr>
+                <tr>
+                    <th>Conti sincronizzati (ultima run)</th>
+                    <td>{{ config.conti_sincronizzati }}</td>
+                </tr>
+                <tr>
+                    <th>Conti in errore (ultima run)</th>
+                    <td>{{ config.conti_in_errore }}</td>
+                </tr>
+                <tr>
+                    <th>Prossima esecuzione prevista</th>
+                    <td>{% if prossima_esecuzione %}{{ prossima_esecuzione|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Esecuzione in corso</th>
+                    <td>{% if config.in_corso %}SI (avviata {{ config.avviato_at|date:"d/m/Y H:i" }}){% else %}No{% endif %}</td>
+                </tr>
+                {% if config.ultimo_messaggio %}
+                    <tr>
+                        <th>Dettagli ultima run</th>
+                        <td><pre class="log-block">{{ config.ultimo_messaggio }}</pre></td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Conti target ({{ conti_target|length }})</h2>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>Conto</th>
+                    <th>IBAN / ID esterno</th>
+                    <th>Ultimo saldo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conto in conti_target %}
+                    <tr>
+                        <td>{{ conto.provider.nome }}</td>
+                        <td>{{ conto.nome_conto }}</td>
+                        <td>{{ conto.iban|default:conto.external_account_id }}</td>
+                        <td>{% if conto.saldo_corrente is not None %}{{ conto.saldo_corrente }} {{ conto.valuta }}{% else %}-{% endif %}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                Nessun conto PSD2 attivo. Crea una connessione dalla pagina
+                                <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>.
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

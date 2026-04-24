@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina connessione bancaria - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina {{ connessione.etichetta }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina connessione "{{ connessione.etichetta }}"</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Provider: <strong>{{ connessione.provider.nome }}</strong></p>
+        <p>Stato attuale: <strong>{{ connessione.get_stato_display }}</strong></p>
+        <p>Conti collegati: <strong>{{ count_conti }}</strong></p>
+
+        {% if count_conti %}
+            <div class="empty-state">
+                La connessione ha conti collegati. Scollega o elimina prima i conti,
+                poi potrai eliminare la connessione.
+            </div>
+            <div class="form-actions">
+                <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Torna all'elenco</a>
+            </div>
+        {% else %}
+            <form method="post" class="detail-form">
+                {% csrf_token %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Elimina definitivamente</button>
+                    <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina servizio extra - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina {{ servizio.nome_servizio }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina servizio extra</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'modifica_servizio_extra' servizio.pk %}" class="btn btn-secondary">Torna al servizio</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="settings-warning-box" style="margin-bottom: 18px;">
+            Stai per eliminare il servizio extra <strong>{{ servizio.nome_servizio }}</strong> dell'anno scolastico
+            <strong>{{ servizio.anno_scolastico.nome_anno_scolastico }}</strong>.
+        </div>
+
+        <table class="form-table">
+            <tr>
+                <th>Tariffe collegate</th>
+                <td>{{ servizio.count_tariffe }}</td>
+            </tr>
+            <tr>
+                <th>Iscrizioni collegate</th>
+                <td>{{ servizio.count_iscrizioni }}</td>
+            </tr>
+        </table>
+
+        <form method="post" style="margin-top: 18px;">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Elimina servizio</button>
+                <a href="{% url 'modifica_servizio_extra' servizio.pk %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

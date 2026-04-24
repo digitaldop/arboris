@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titolo }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">{{ titolo }}</h1>
+
+    <div class="panel">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <div class="panel-body">
+                <table class="form-table">
+                    {% for field in form %}
+                        <tr>
+                            <th>{{ field.label_tag }}</th>
+                            <td>
+                                {{ field }}
+                                {{ field.errors }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento calendario{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_eventi_calendario' %}">Calendario</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento calendario{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if can_manage_calendario %}
+                <button type="submit" form="evento-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            {% if evento and can_manage_calendario %}
+                <a href="{% url 'elimina_evento_calendario' evento.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="evento-form">
+        {% csrf_token %}
+
+        <div class="family-top-layout">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Dati evento</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% if form.non_field_errors %}
+                                <div class="settings-warning-box" style="margin-bottom: 16px;">
+                                    {{ form.non_field_errors }}
+                                </div>
+                            {% endif %}
+                            <table class="form-table">
+                                <tr>
+                                    <th>{{ form.titolo.label_tag }}</th>
+                                    <td>{{ form.titolo }} {{ form.titolo.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.categoria_evento.label_tag }}</th>
+                                    <td>{{ form.categoria_evento }} {{ form.categoria_evento.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.tipologia.label_tag }}</th>
+                                    <td>
+                                        {{ form.tipologia }} {{ form.tipologia.errors }}
+                                        <div class="help-text">Campo opzionale utile per aggiungere un tag o un dettaglio organizzativo.</div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.intera_giornata.label_tag }}</th>
+                                    <td>{{ form.intera_giornata }} {{ form.intera_giornata.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.data_inizio.label_tag }}</th>
+                                    <td>{{ form.data_inizio }} {{ form.data_inizio.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.data_fine.label_tag }}</th>
+                                    <td>
+                                        {{ form.data_fine }} {{ form.data_fine.errors }}
+                                        {% if form.data_fine.help_text %}
+                                            <div class="help-text">{{ form.data_fine.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr class="calendar-time-row">
+                                    <th>{{ form.ora_inizio.label_tag }}</th>
+                                    <td>{{ form.ora_inizio }} {{ form.ora_inizio.errors }}</td>
+                                </tr>
+                                <tr class="calendar-time-row">
+                                    <th>{{ form.ora_fine.label_tag }}</th>
+                                    <td>{{ form.ora_fine }} {{ form.ora_fine.errors }}</td>
+                                </tr>
+                                <tr class="calendar-time-row">
+                                    <th>{{ form.durata_minuti.label_tag }}</th>
+                                    <td>
+                                        {{ form.durata_minuti }} {{ form.durata_minuti.errors }}
+                                        {% if form.durata_minuti.help_text %}
+                                            <div class="help-text">{{ form.durata_minuti.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.ripetizione.label_tag }}</th>
+                                    <td>
+                                        {{ form.ripetizione }} {{ form.ripetizione.errors }}
+                                        <div class="help-text">
+                                            Puoi creare serie giornaliere, nei giorni feriali, settimanali, mensili o annuali. Per i centri estivi resta perfetto il blocco multi-giorno con ricorrenza settimanale.
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="calendar-recurrence-detail-row calendar-recurrence-interval-row">
+                                    <th>
+                                        <label for="{{ form.ripeti_ogni_intervallo.id_for_label }}" id="calendar-recurrence-interval-label">
+                                            {{ form.ripeti_ogni_intervallo.label }}
+                                        </label>
+                                    </th>
+                                    <td>
+                                        {{ form.ripeti_ogni_intervallo }} {{ form.ripeti_ogni_intervallo.errors }}
+                                        {% if form.ripeti_ogni_intervallo.help_text %}
+                                            <div class="help-text" id="calendar-recurrence-interval-help">{{ form.ripeti_ogni_intervallo.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr class="calendar-recurrence-detail-row">
+                                    <th>{{ form.ripetizione_numero_occorrenze.label_tag }}</th>
+                                    <td>
+                                        {{ form.ripetizione_numero_occorrenze }} {{ form.ripetizione_numero_occorrenze.errors }}
+                                        {% if form.ripetizione_numero_occorrenze.help_text %}
+                                            <div class="help-text">{{ form.ripetizione_numero_occorrenze.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr class="calendar-recurrence-detail-row">
+                                    <th>{{ form.ripetizione_fino_al.label_tag }}</th>
+                                    <td>
+                                        {{ form.ripetizione_fino_al }} {{ form.ripetizione_fino_al.errors }}
+                                        {% if form.ripetizione_fino_al.help_text %}
+                                            <div class="help-text">{{ form.ripetizione_fino_al.help_text }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.luogo.label_tag }}</th>
+                                    <td>{{ form.luogo }} {{ form.luogo.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.descrizione.label_tag }}</th>
+                                    <td>{{ form.descrizione }} {{ form.descrizione.errors }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="family-side-column">
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Stato</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table compact-form-table">
+                                <tr>
+                                    <th>{{ form.visibile.label_tag }}</th>
+                                    <td>{{ form.visibile }} {{ form.visibile.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.attivo.label_tag }}</th>
+                                    <td>{{ form.attivo }} {{ form.attivo.errors }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_calendario %}
+                <button type="submit" class="btn btn-primary">{% if evento %}Salva modifiche{% else %}Crea evento{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const allDayField = document.getElementById("id_intera_giornata");
+            const recurrenceField = document.getElementById("id_ripetizione");
+            const recurrenceIntervalLabel = document.getElementById("calendar-recurrence-interval-label");
+            const recurrenceIntervalHelp = document.getElementById("calendar-recurrence-interval-help");
+            const timeRows = document.querySelectorAll(".calendar-time-row");
+            const recurrenceRows = document.querySelectorAll(".calendar-recurrence-detail-row");
+            const recurrenceIntervalRows = document.querySelectorAll(".calendar-recurrence-interval-row");
+
+            if (!allDayField || !timeRows.length) {
+                return;
+            }
+
+            function syncTimeRows() {
+                timeRows.forEach(function (row) {
+                    row.style.display = allDayField.checked ? "none" : "";
+                });
+            }
+
+            function syncRecurrenceRows() {
+                if (!recurrenceField || !recurrenceRows.length) {
+                    return;
+                }
+
+                const showRows = recurrenceField.value && recurrenceField.value !== "nessuna";
+                recurrenceRows.forEach(function (row) {
+                    row.style.display = showRows ? "" : "none";
+                });
+                recurrenceIntervalRows.forEach(function (row) {
+                    row.style.display = showRows && recurrenceField.value !== "giorni_feriali" ? "" : "none";
+                });
+
+                if (recurrenceIntervalLabel || recurrenceIntervalHelp) {
+                    const unitMap = {
+                        giornaliera: "giorni",
+                        giorni_feriali: "giorni feriali",
+                        settimanale: "settimane",
+                        mensile: "mesi",
+                        annuale: "anni",
+                    };
+                    const selectedUnit = unitMap[recurrenceField.value] || "intervalli";
+                    if (recurrenceIntervalLabel) {
+                        recurrenceIntervalLabel.textContent = `Ripeti ogni (${selectedUnit})`;
+                    }
+                    if (recurrenceIntervalHelp) {
+                        recurrenceIntervalHelp.textContent = "Usa 1 per ogni ciclo, oppure un numero maggiore per saltare giorni, settimane, mesi o anni.";
+                    }
+                }
+            }
+
+            allDayField.addEventListener("change", syncTimeRows);
+            if (recurrenceField) {
+                recurrenceField.addEventListener("change", syncRecurrenceRows);
+            }
+            syncTimeRows();
+            syncRecurrenceRows();
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "popup_base.html" %}
+
+{% block title %}Elimina studente - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina studente</h1>
+    </div>
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare lo studente <strong>{{ studente }}</strong>.</p>
+        </div>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+        </form>
+    </div>
+{% endblock %}

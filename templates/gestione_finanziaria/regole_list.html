@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+{% load currency %}
+
+{% block title %}Regole di categorizzazione - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Regole</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Regole di categorizzazione</h1>
+        <div class="page-head-actions">
+            <form method="post" action="{% url 'applica_regole_massiva' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary">Applica regole ai movimenti non categorizzati</button>
+            </form>
+            <a href="{% url 'crea_regola_categorizzazione' %}" class="btn btn-primary">Nuova regola</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Le regole vengono valutate nell'ordine di <strong>priorita'</strong> numerica (dalla piu' bassa
+            alla piu' alta). La prima regola che trova match sul movimento assegna la categoria.
+            I movimenti confermati manualmente dall'utente non vengono mai sovrascritti.
+        </p>
+
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Priorita'</th>
+                    <th>Nome</th>
+                    <th>Condizione</th>
+                    <th>Valore</th>
+                    <th>Categoria assegnata</th>
+                    <th>Applicata</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in regole %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_regola_categorizzazione' r.pk %}">
+                        <td>{{ r.priorita }}</td>
+                        <td>{{ r.nome }}</td>
+                        <td>{{ r.get_condizione_tipo_display }}</td>
+                        <td>
+                            {% if r.condizione_tipo == "importo_range" %}
+                                {% if r.importo_min is not None %}da {{ r.importo_min|euro }}{% endif %}
+                                {% if r.importo_max is not None %} a {{ r.importo_max|euro }}{% endif %}
+                            {% else %}
+                                {{ r.pattern|default:"-" }}
+                            {% endif %}
+                            {% if r.segno_filtro %}<br><small class="table-muted">solo {{ r.get_segno_filtro_display }}</small>{% endif %}
+                        </td>
+                        <td>{{ r.categoria_da_assegnare }}</td>
+                        <td>{{ r.volte_applicata }} volte</td>
+                        <td>{% if r.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_regola_categorizzazione' r.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_regola_categorizzazione' r.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                Nessuna regola configurata. Le regole permettono di assegnare
+                                automaticamente la categoria ai nuovi movimenti in base a descrizione,
+                                controparte, IBAN o importo.
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

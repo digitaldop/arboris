@@ -1,0 +1,66 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Popup - Arboris School Management{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+        }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20">
+    <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
+</head>
+<body class="popup-page">
+    <main class="popup-content-area">
+        {% if messages %}
+            <div class="messages-wrapper">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+    {{ student_terminology|json_script:"student-terminology-data" }}
+    <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=2"></script>
+    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=7"></script>
+    <script src="{% static 'js/core/codice-fiscale.js' %}?v=2"></script>
+    <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
+    <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisTerminology) {
+                ArborisTerminology.init();
+            }
+            if (window.ArborisFloatingTooltips) {
+                ArborisFloatingTooltips.init(document);
+            }
+            if (window.ArborisCopyActions) {
+                ArborisCopyActions.init(document);
+            }
+            if (window.ArborisRichNotes) {
+                ArborisRichNotes.init(document);
+            }
+            if (window.ArborisRelatedPopups) {
+                window.dismissRelatedPopup = ArborisRelatedPopups.dismissRelatedPopup;
+                window.dismissDeletedRelatedPopup = ArborisRelatedPopups.dismissDeletedRelatedPopup;
+            }
+        });
+    </script>
+</body>
+</html>
+
+

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Classi - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Classi</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Classi</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_classe' %}" class="btn btn-primary">Nuova classe</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome classe</th>
+                    <th>Sezione</th>
+                    <th>Ordine</th>
+                    <th>Anno scolastico</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for classe in classi %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_classe' classe.pk %}">
+                        <td>{{ classe.nome_classe }}</td>
+                        <td>{{ classe.sezione_classe|default:"—" }}</td>
+                        <td>{{ classe.ordine_classe }}</td>
+                        <td>{{ classe.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{% if classe.attiva %}Sì{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_classe' classe.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_classe' classe.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">Nessuna classe inserita.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Servizi extra - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Servizi extra</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Servizi extra</h1>
+        <div class="page-head-actions">
+            {% if can_manage_servizi_extra %}
+                <a href="{% url 'crea_servizio_extra' %}" class="btn btn-primary">Nuovo servizio</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Servizio</th>
+                    <th>Anno scolastico</th>
+                    <th>Tariffe</th>
+                    <th>Iscrizioni</th>
+                    <th>Attivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for servizio in servizi %}
+                    <tr class="list-row-link" data-row-href="{% url 'dettaglio_servizio_extra' servizio.pk %}">
+                        <td>{{ servizio.nome_servizio }}</td>
+                        <td>{{ servizio.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ servizio.count_tariffe }}</td>
+                        <td>{{ servizio.count_iscrizioni }}</td>
+                        <td>{% if servizio.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'dettaglio_servizio_extra' servizio.pk %}" class="table-link">Apri</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'lista_tariffe_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Tariffe</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'lista_iscrizioni_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Iscrizioni</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'lista_rate_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Rate</a>
+                            {% if can_manage_servizi_extra %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'modifica_servizio_extra' servizio.pk %}" class="table-link">Modifica</a>
+                            {% endif %}
+                            {% if can_manage_servizi_extra %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_servizio_extra' servizio.pk %}" class="table-link table-link-danger">Elimina</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6"><div class="empty-state">Nessun servizio extra configurato.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

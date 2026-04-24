@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina tariffa servizio extra - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina {{ tariffa.nome_tariffa }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina tariffa servizio extra</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="btn btn-secondary">Torna alla tariffa</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="settings-warning-box" style="margin-bottom: 18px;">
+            Stai per eliminare la tariffa <strong>{{ tariffa.nome_tariffa }}</strong> del servizio
+            <strong>{{ tariffa.servizio.nome_servizio }}</strong>.
+        </div>
+
+        <table class="form-table">
+            <tr>
+                <th>Numero rate configurate</th>
+                <td>{{ count_rate }}</td>
+            </tr>
+            <tr>
+                <th>Iscrizioni collegate</th>
+                <td>{{ tariffa.count_iscrizioni }}</td>
+            </tr>
+        </table>
+
+        <form method="post" style="margin-top: 18px;">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Elimina tariffa</button>
+                <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

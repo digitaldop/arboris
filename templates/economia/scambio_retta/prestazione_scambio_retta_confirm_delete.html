@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina prestazione scambio retta - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{{ return_url }}">{{ back_label }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina prestazione</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina prestazione scambio retta</h1>
+    </div>
+
+    <div class="content-card">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+
+            <p>
+                Stai per eliminare la prestazione del <strong>{{ prestazione.data|date:"d/m/Y" }}</strong>
+                registrata per <strong>{{ prestazione.familiare }}</strong>.
+            </p>
+            <p>
+                {% if prestazione.ora_ingresso and prestazione.ora_uscita %}
+                    Fascia oraria: <strong>{{ prestazione.ora_ingresso|time:"H:i" }} - {{ prestazione.ora_uscita|time:"H:i" }}</strong>.
+                {% else %}
+                    Ore inserite: <strong>{{ prestazione.ore_lavorate }}</strong>.
+                {% endif %}
+            </p>
+            <p>Mansione: <strong>{{ prestazione.descrizione }}</strong>.</p>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+                <a href="{{ return_url }}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

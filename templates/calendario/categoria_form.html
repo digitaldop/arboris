@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{% if categoria_obj %}{{ categoria_obj.nome }}{% else %}Nuova categoria{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'calendario_agenda' %}">Calendario</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_categorie_calendario' %}">Categorie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if categoria_obj %}{{ categoria_obj.nome }}{% else %}Nuova categoria{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if categoria_obj %}{{ categoria_obj.nome }}{% else %}Nuova categoria{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if can_manage_calendario %}
+                <button type="submit" form="categoria-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+            {% endif %}
+            {% if categoria_obj and can_manage_calendario and not categoria_obj.is_system_category %}
+                <a href="{% url 'elimina_categoria_calendario' categoria_obj.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="categoria-form">
+        {% csrf_token %}
+
+        <div class="family-top-layout">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Dati categoria</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% if categoria_obj and categoria_obj.is_system_category %}
+                                <div class="settings-warning-box" style="margin-bottom: 16px;">
+                                    Questa e una categoria di sistema: puoi personalizzare nome, colore e ordine, ma non puoi disattivarla o eliminarla.
+                                </div>
+                            {% endif %}
+                            <table class="form-table">
+                                <tr>
+                                    <th>{{ form.nome.label_tag }}</th>
+                                    <td>{{ form.nome }} {{ form.nome.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.colore.label_tag }}</th>
+                                    <td>{{ form.colore }} {{ form.colore.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.ordine.label_tag }}</th>
+                                    <td>{{ form.ordine }} {{ form.ordine.errors }}</td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.attiva.label_tag }}</th>
+                                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_calendario %}
+                <button type="submit" class="btn btn-primary">{% if categoria_obj %}Salva modifiche{% else %}Crea categoria{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+
+{% block title %}{% if metodo %}Metodo di pagamento {{ metodo }}{% else %}Nuovo metodo di pagamento{% endif %} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if metodo %}Metodo di pagamento {{ metodo }}{% else %}Nuovo metodo di pagamento{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.metodo_pagamento.label_tag }}</th><td>{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</td></tr>
+                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+{% endblock %}

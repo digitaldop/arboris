@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina evento calendario - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_eventi_calendario' %}">Calendario</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina evento calendario</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body empty-state">
+            <p>Stai per eliminare l'evento <strong>{{ evento.titolo }}</strong>.</p>
+            {% if evento.is_recurring %}
+                <p>Essendo una serie ricorrente, verranno rimosse anche tutte le occorrenze generate automaticamente.</p>
+            {% endif %}
+            <p>Questa operazione non puo essere annullata.</p>
+
+            <form method="post" class="form-actions">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+                <a href="{% url 'modifica_evento_calendario' evento.pk %}" class="btn btn-secondary">Annulla</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

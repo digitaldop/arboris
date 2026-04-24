@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Tariffe condizioni economiche - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Tariffe condizioni economiche</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Tariffe condizioni economiche</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_tariffa_condizione_iscrizione' %}" class="btn btn-primary">Nuova tariffa</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Anno scolastico</th>
+                    <th>Condizione</th>
+                    <th>Da figlio</th>
+                    <th>A figlio</th>
+                    <th>Retta annuale</th>
+                    <th>Preiscrizione</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tariffa in tariffe %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_tariffa_condizione_iscrizione' tariffa.pk %}">
+                        <td>{{ tariffa.condizione_iscrizione.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ tariffa.condizione_iscrizione.nome_condizione_iscrizione }}</td>
+                        <td>{{ tariffa.ordine_figlio_da }}</td>
+                        <td>{% if tariffa.ordine_figlio_a %}{{ tariffa.ordine_figlio_a }}{% else %}e oltre{% endif %}</td>
+                        <td>EUR {{ tariffa.retta_annuale|euro }}</td>
+                        <td>EUR {{ tariffa.preiscrizione|euro }}</td>
+                        <td>{% if tariffa.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_tariffa_condizione_iscrizione' tariffa.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_tariffa_condizione_iscrizione' tariffa.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8"><div class="empty-state">Nessuna tariffa inserita.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

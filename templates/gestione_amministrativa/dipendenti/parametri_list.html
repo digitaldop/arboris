@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Parametri calcolo stipendi - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Parametri calcolo</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Parametri calcolo stipendi</h1>
+        <div class="page-head-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url 'crea_parametro_calcolo_stipendio' %}" class="btn btn-primary">Nuovo parametro</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="message message-info">
+            Le aliquote sono configurabili dall'utente: il sistema le usa per le previsioni, senza aggiornarle automaticamente.
+        </div>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Validita</th>
+                    <th>Contributi datore</th>
+                    <th>Contributi dipendente</th>
+                    <th>TFR</th>
+                    <th>INAIL</th>
+                    <th>Stato</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for parametro in parametri %}
+                    <tr>
+                        <td><a href="{% url 'modifica_parametro_calcolo_stipendio' parametro.pk %}" class="table-link">{{ parametro.nome }}</a></td>
+                        <td>{{ parametro.valido_dal|date:"d/m/Y" }} - {% if parametro.valido_al %}{{ parametro.valido_al|date:"d/m/Y" }}{% else %}aperto{% endif %}</td>
+                        <td>{{ parametro.aliquota_contributi_datore }}%</td>
+                        <td>{{ parametro.aliquota_contributi_dipendente }}%</td>
+                        <td>{{ parametro.aliquota_tfr }}%</td>
+                        <td>{{ parametro.aliquota_inail }}%</td>
+                        <td>{% if parametro.attivo %}Attivo{% else %}Non attivo{% endif %}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">Nessun parametro configurato.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

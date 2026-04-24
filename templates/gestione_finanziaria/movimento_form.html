@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{% if movimento %}Modifica movimento{% else %}Nuovo movimento manuale{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if movimento %}Modifica{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if movimento %}Modifica movimento{% else %}Nuovo movimento manuale{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.conto.label_tag }}</th><td>{{ form.conto }} {{ form.conto.errors }}</td></tr>
+                <tr><th>{{ form.data_contabile.label_tag }}</th><td>{{ form.data_contabile }} {{ form.data_contabile.errors }}</td></tr>
+                <tr><th>{{ form.data_valuta.label_tag }}</th><td>{{ form.data_valuta }} {{ form.data_valuta.errors }}</td></tr>
+                <tr><th>{{ form.importo.label_tag }}</th><td>{{ form.importo }} {{ form.importo.errors }}</td></tr>
+                <tr><th>{{ form.valuta.label_tag }}</th><td>{{ form.valuta }} {{ form.valuta.errors }}</td></tr>
+                <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
+                <tr><th>{{ form.controparte.label_tag }}</th><td>{{ form.controparte }} {{ form.controparte.errors }}</td></tr>
+                <tr><th>{{ form.iban_controparte.label_tag }}</th><td>{{ form.iban_controparte }} {{ form.iban_controparte.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.categoria.label_tag }}</th>
+                    <td>
+                        {{ form.categoria }} {{ form.categoria.errors }}
+                        {% if form.categoria.help_text %}
+                            <div class="help-text">{{ form.categoria.help_text }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.incide_su_saldo_banca.label_tag }}</th>
+                    <td>
+                        {{ form.incide_su_saldo_banca }} {{ form.incide_su_saldo_banca.errors }}
+                        {% if form.incide_su_saldo_banca.help_text %}
+                            <div class="help-text">{{ form.incide_su_saldo_banca.help_text }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

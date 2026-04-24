@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titolo }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">{{ titolo }}</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            <p>Sei sicuro di voler eliminare questo elemento?</p>
+            <p><strong>{{ oggetto }}</strong></p>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="popup" value="1">
+                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Sì, elimina</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

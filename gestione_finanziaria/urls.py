@@ -1,0 +1,217 @@
+from django.urls import path
+
+from sistema.permissions import module_edit_permission_required, module_permission_required
+
+from . import views
+
+
+gf_view = module_permission_required("gestione_finanziaria")
+gf_manage = module_permission_required("gestione_finanziaria", level="manage")
+gf_edit = module_edit_permission_required("gestione_finanziaria")
+
+
+urlpatterns = [
+    path(
+        "gestione-finanziaria/",
+        gf_view(views.dashboard_gestione_finanziaria),
+        name="dashboard_gestione_finanziaria",
+    ),
+
+    # Provider bancari
+    path(
+        "gestione-finanziaria/provider/",
+        gf_view(views.lista_provider_bancari),
+        name="lista_provider_bancari",
+    ),
+    path(
+        "gestione-finanziaria/provider/nuovo/",
+        gf_manage(views.crea_provider_bancario),
+        name="crea_provider_bancario",
+    ),
+    path(
+        "gestione-finanziaria/provider/<int:pk>/modifica/",
+        gf_edit(views.modifica_provider_bancario),
+        name="modifica_provider_bancario",
+    ),
+    path(
+        "gestione-finanziaria/provider/<int:pk>/elimina/",
+        gf_manage(views.elimina_provider_bancario),
+        name="elimina_provider_bancario",
+    ),
+
+    # Conti bancari
+    path(
+        "gestione-finanziaria/conti/",
+        gf_view(views.lista_conti_bancari),
+        name="lista_conti_bancari",
+    ),
+    path(
+        "gestione-finanziaria/conti/nuovo/",
+        gf_manage(views.crea_conto_bancario),
+        name="crea_conto_bancario",
+    ),
+    path(
+        "gestione-finanziaria/conti/<int:pk>/modifica/",
+        gf_edit(views.modifica_conto_bancario),
+        name="modifica_conto_bancario",
+    ),
+    path(
+        "gestione-finanziaria/conti/<int:pk>/elimina/",
+        gf_manage(views.elimina_conto_bancario),
+        name="elimina_conto_bancario",
+    ),
+    path(
+        "gestione-finanziaria/conti/<int:pk>/ricalcola-saldo/",
+        gf_manage(views.ricalcola_saldo_conto_bancario),
+        name="ricalcola_saldo_conto_bancario",
+    ),
+
+    # Movimenti finanziari
+    path(
+        "gestione-finanziaria/movimenti/",
+        gf_view(views.lista_movimenti_finanziari),
+        name="lista_movimenti_finanziari",
+    ),
+    path(
+        "gestione-finanziaria/movimenti/nuovo/",
+        gf_manage(views.crea_movimento_manuale),
+        name="crea_movimento_manuale",
+    ),
+    path(
+        "gestione-finanziaria/movimenti/<int:pk>/modifica/",
+        gf_edit(views.modifica_movimento_finanziario),
+        name="modifica_movimento_finanziario",
+    ),
+    path(
+        "gestione-finanziaria/movimenti/<int:pk>/elimina/",
+        gf_manage(views.elimina_movimento_finanziario),
+        name="elimina_movimento_finanziario",
+    ),
+
+    # Regole di categorizzazione
+    path(
+        "gestione-finanziaria/regole/",
+        gf_view(views.lista_regole_categorizzazione),
+        name="lista_regole_categorizzazione",
+    ),
+    path(
+        "gestione-finanziaria/regole/nuova/",
+        gf_manage(views.crea_regola_categorizzazione),
+        name="crea_regola_categorizzazione",
+    ),
+    path(
+        "gestione-finanziaria/regole/<int:pk>/modifica/",
+        gf_edit(views.modifica_regola_categorizzazione),
+        name="modifica_regola_categorizzazione",
+    ),
+    path(
+        "gestione-finanziaria/regole/<int:pk>/elimina/",
+        gf_manage(views.elimina_regola_categorizzazione),
+        name="elimina_regola_categorizzazione",
+    ),
+    path(
+        "gestione-finanziaria/regole/applica-massiva/",
+        gf_manage(views.applica_regole_massiva),
+        name="applica_regole_massiva",
+    ),
+
+    # Import estratto conto (CAMT.053 / CSV)
+    path(
+        "gestione-finanziaria/import-estratto-conto/",
+        gf_manage(views.import_estratto_conto),
+        name="import_estratto_conto",
+    ),
+
+    # Connessioni PSD2
+    path(
+        "gestione-finanziaria/connessioni/",
+        gf_view(views.lista_connessioni_bancarie),
+        name="lista_connessioni_bancarie",
+    ),
+    path(
+        "gestione-finanziaria/provider/<int:pk>/configura-psd2/",
+        gf_manage(views.configura_provider_psd2),
+        name="configura_provider_psd2",
+    ),
+    path(
+        "gestione-finanziaria/provider/<int:provider_pk>/nuova-connessione/",
+        gf_manage(views.nuova_connessione_psd2),
+        name="nuova_connessione_psd2",
+    ),
+    path(
+        "gestione-finanziaria/connessioni/<int:pk>/callback/",
+        views.callback_connessione_psd2,
+        name="callback_connessione_psd2",
+    ),
+    # Redirect URI *fisso* per provider OAuth2 (es. TrueLayer) che richiedono
+    # una URL pre-registrata nella console dello sviluppatore. Il pk della
+    # connessione viene estratto dal parametro "state" nell'URL di ritorno.
+    path(
+        "gestione-finanziaria/connessioni/oauth-callback/",
+        views.callback_oauth_psd2,
+        name="callback_oauth_psd2",
+    ),
+    path(
+        "gestione-finanziaria/connessioni/<int:pk>/elimina/",
+        gf_manage(views.elimina_connessione_psd2),
+        name="elimina_connessione_psd2",
+    ),
+    path(
+        "gestione-finanziaria/conti/<int:pk>/sincronizza/",
+        gf_manage(views.sincronizza_conto_bancario),
+        name="sincronizza_conto_bancario",
+    ),
+
+    # Pianificazione sincronizzazione PSD2
+    path(
+        "gestione-finanziaria/pianificazione-sincronizzazione/",
+        gf_manage(views.pianificazione_sincronizzazione),
+        name="pianificazione_sincronizzazione",
+    ),
+
+    # Riconciliazione movimenti <-> rate iscrizione
+    path(
+        "gestione-finanziaria/riconciliazione/",
+        gf_view(views.lista_movimenti_da_riconciliare),
+        name="lista_movimenti_da_riconciliare",
+    ),
+    path(
+        "gestione-finanziaria/riconciliazione/<int:pk>/",
+        gf_edit(views.riconcilia_movimento),
+        name="riconcilia_movimento",
+    ),
+
+    # Report per categoria
+    path(
+        "gestione-finanziaria/report/categorie-mensile/",
+        gf_view(views.report_categorie_mensile),
+        name="report_categorie_mensile",
+    ),
+    path(
+        "gestione-finanziaria/report/categorie-annuale/",
+        gf_view(views.report_categorie_annuale),
+        name="report_categorie_annuale",
+    ),
+
+    # Categorie finanziarie
+    path(
+        "gestione-finanziaria/categorie/",
+        gf_view(views.lista_categorie_finanziarie),
+        name="lista_categorie_finanziarie",
+    ),
+    path(
+        "gestione-finanziaria/categorie/nuova/",
+        gf_manage(views.crea_categoria_finanziaria),
+        name="crea_categoria_finanziaria",
+    ),
+    path(
+        "gestione-finanziaria/categorie/<int:pk>/modifica/",
+        gf_edit(views.modifica_categoria_finanziaria),
+        name="modifica_categoria_finanziaria",
+    ),
+    path(
+        "gestione-finanziaria/categorie/<int:pk>/elimina/",
+        gf_manage(views.elimina_categoria_finanziaria),
+        name="elimina_categoria_finanziaria",
+    ),
+]

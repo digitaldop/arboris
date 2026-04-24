@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Report categorie annuale - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Report categorie (annuale)</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Report categorie - riepilogo anno {{ anno }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'report_categorie_mensile' %}?anno={{ anno }}" class="btn btn-secondary">Vista mensile</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Anno
+                <select name="anno">
+                    {% for a in anni_disponibili %}
+                        <option value="{{ a }}" {% if a == anno %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                    {% if not anni_disponibili %}
+                        <option value="{{ anno }}" selected>{{ anno }}</option>
+                    {% endif %}
+                </select>
+            </label>
+            <label>
+                Conto
+                <select name="conto">
+                    <option value="">Tutti</option>
+                    {% for c in conti %}
+                        <option value="{{ c.pk }}" {% if conto_selezionato == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nome_conto }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Aggiorna</button>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Sintesi</h2>
+        <table class="list-table">
+            <tbody>
+                <tr><th>Totale entrate</th><td class="column-right"><strong>{{ totale_entrate }} EUR</strong></td></tr>
+                <tr><th>Totale uscite</th><td class="column-right"><strong>{{ totale_uscite }} EUR</strong></td></tr>
+                <tr><th>Saldo netto</th><td class="column-right"><strong>{{ saldo_netto }} EUR</strong></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Entrate per categoria</h2>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    <th class="column-right">Entrate</th>
+                    <th class="column-right">Uscite</th>
+                    <th class="column-right">Netto</th>
+                    <th class="column-right">% sul totale entrate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for riga in righe_entrate %}
+                    <tr>
+                        <td>{{ riga.categoria.nome }}</td>
+                        <td class="column-right">{{ riga.entrate }}</td>
+                        <td class="column-right">{{ riga.uscite }}</td>
+                        <td class="column-right"><strong>{{ riga.netto }}</strong></td>
+                        <td class="column-right">{{ riga.percentuale }}%</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5"><div class="empty-state">Nessuna entrata registrata.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Uscite per categoria</h2>
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Categoria</th>
+                    <th class="column-right">Entrate</th>
+                    <th class="column-right">Uscite</th>
+                    <th class="column-right">Netto</th>
+                    <th class="column-right">% sul totale uscite</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for riga in righe_uscite %}
+                    <tr>
+                        <td>{{ riga.categoria.nome }}</td>
+                        <td class="column-right">{{ riga.entrate }}</td>
+                        <td class="column-right">{{ riga.uscite }}</td>
+                        <td class="column-right"><strong>{{ riga.netto }}</strong></td>
+                        <td class="column-right">{{ riga.percentuale }}%</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5"><div class="empty-state">Nessuna uscita registrata.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

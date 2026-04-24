@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina dipendente - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_dipendenti' %}">Dipendenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina dipendente</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare <strong>{{ dipendente }}</strong>.</p>
+        {% if count_relazioni %}
+            <div class="message message-error">
+                Il dipendente ha contratti, buste paga o documenti collegati. Eliminali o archiviali prima di cancellare l'anagrafica.
+            </div>
+        {% endif %}
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" {% if count_relazioni %}disabled{% endif %}>Elimina</button>
+            <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

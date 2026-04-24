@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Riconciliazione movimento - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_da_riconciliare' %}">Riconciliazione</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Movimento #{{ movimento.pk }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Riconciliazione movimento</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary">Indietro</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Dettaglio movimento</h2>
+        <table class="list-table">
+            <tbody>
+                <tr><th>Data contabile</th><td>{{ movimento.data_contabile|date:"d/m/Y" }}</td></tr>
+                <tr><th>Conto</th><td>{{ movimento.conto.nome_conto|default:"-" }}</td></tr>
+                <tr><th>Importo</th><td><strong>{{ movimento.importo }} {{ movimento.valuta }}</strong></td></tr>
+                <tr><th>Controparte</th><td>{{ movimento.controparte|default:"-" }}</td></tr>
+                <tr><th>IBAN controparte</th><td>{{ movimento.iban_controparte|default:"-" }}</td></tr>
+                <tr><th>Descrizione</th><td>{{ movimento.descrizione|default:"-" }}</td></tr>
+                <tr><th>Categoria</th><td>{{ movimento.categoria.nome|default:"-" }}</td></tr>
+                <tr><th>Stato riconciliazione</th><td>{{ movimento.get_stato_riconciliazione_display }}</td></tr>
+                {% if movimento.rata_iscrizione %}
+                    <tr><th>Rata collegata</th><td>{{ movimento.rata_iscrizione }}</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        {% if gia_riconciliato %}
+            <form method="post" class="inline-form" style="margin-top:1em">
+                {% csrf_token %}
+                <button type="submit" name="azione" value="annulla" class="btn btn-danger"
+                        onclick="return confirm('Annullare la riconciliazione con la rata {{ movimento.rata_iscrizione }}?');">
+                    Annulla riconciliazione
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Rate candidate ({{ candidati|length }})</h2>
+        <p class="help-text">
+            Le rate sono cercate per importo simile (+/- 1 EUR) e ordinate per punteggio di
+            compatibilita'. Marca la rata come pagata per propagare il pagamento al modulo
+            Economia.
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Rata</th>
+                        <th>Iscrizione</th>
+                        <th>Famiglia / studente</th>
+                        <th>Scadenza</th>
+                        <th class="column-right">Importo finale</th>
+                        <th>Pagata</th>
+                        <th class="column-right">Match</th>
+                        <th>Motivazioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidati %}
+                        <tr>
+                            <td><input type="radio" name="rata_pk" value="{{ c.rata.pk }}" required></td>
+                            <td>{{ c.rata.display_label }}</td>
+                            <td>{{ c.rata.iscrizione }}</td>
+                            <td>
+                                {% with studente=c.rata.iscrizione.studente %}
+                                    {{ studente.cognome }} {{ studente.nome }}
+                                {% endwith %}
+                            </td>
+                            <td>{% if c.rata.data_scadenza %}{{ c.rata.data_scadenza|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                            <td class="column-right">{{ c.rata.importo_finale }} EUR</td>
+                            <td>{% if c.rata.pagata %}SI{% else %}No{% endif %}</td>
+                            <td class="column-right">{{ c.score_percentuale }}%</td>
+                            <td>
+                                <ul class="motivazioni-list">
+                                    {% for motivo in c.motivazioni %}
+                                        <li>{{ motivo }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9">
+                                <div class="empty-state">
+                                    Nessuna rata candidata trovata per questo movimento. Verifica
+                                    importo/data oppure usa "Marca come da ignorare".
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if candidati %}
+                <div class="form-row" style="margin-top:1em">
+                    <label>
+                        <input type="checkbox" name="marca_rata_pagata" value="1" checked>
+                        Marca la rata come pagata alla data contabile del movimento
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" name="azione" value="collega" class="btn btn-primary">Collega movimento alla rata</button>
+                    <button type="submit" name="azione" value="ignora" class="btn btn-secondary"
+                            onclick="return confirm('Marcare il movimento come \"da ignorare\"? Non apparira\' piu\' tra quelli da riconciliare.');">
+                        Marca come da ignorare
+                    </button>
+                </div>
+            {% else %}
+                <div class="form-actions">
+                    <button type="submit" name="azione" value="ignora" class="btn btn-secondary">
+                        Marca come da ignorare
+                    </button>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

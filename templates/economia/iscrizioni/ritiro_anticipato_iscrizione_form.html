@@ -1,0 +1,82 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
+
+{% block title %}Ritiro anticipato iscrizione - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Ritiro anticipato iscrizione</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% elif next_url %}
+                <a href="{{ next_url }}" class="btn btn-secondary">Indietro</a>
+            {% else %}
+                <a href="{% url 'modifica_studente' iscrizione.studente.pk %}" class="btn btn-secondary">Torna allo studente</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>Studente</th>
+                    <td>{{ iscrizione.studente }}</td>
+                </tr>
+                <tr>
+                    <th>Anno scolastico</th>
+                    <td>{{ iscrizione.anno_scolastico }}</td>
+                </tr>
+                <tr>
+                    <th>Stato attuale</th>
+                    <td>{{ iscrizione.stato_iscrizione }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_ritiro.label_tag }}</th>
+                    <td>
+                        {{ form.data_ritiro }}
+                        {{ form.data_ritiro.errors }}
+                        <div class="help-text">
+                            Dalla data di ritiro in poi le rate non ancora pagate verranno escluse dal piano.
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>
+                        {{ form.note }}
+                        {{ form.note.errors }}
+                    </td>
+                </tr>
+            </table>
+
+            {% if form.non_field_errors %}
+                <div class="messages-wrapper" style="padding: 0 16px 16px;">
+                    {% for error in form.non_field_errors %}
+                        <div class="message message-error">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="help-text" style="padding: 0 16px 16px;">
+                Lo stato dell'iscrizione passera a <strong>Ritirato</strong> e la data di fine iscrizione verra aggiornata automaticamente.
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Conferma ritiro</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% elif next_url %}
+                    <a href="{{ next_url }}" class="btn btn-secondary">Annulla</a>
+                {% else %}
+                    <a href="{% url 'modifica_studente' iscrizione.studente.pk %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+{% endblock %}

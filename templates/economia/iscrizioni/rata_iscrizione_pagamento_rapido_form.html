@@ -1,0 +1,127 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
+
+{% block title %}Pagamento rapido {{ rata.display_label }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Conferma pagamento {{ rata.display_label }}</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% else %}
+                <a href="{% url 'modifica_rata_iscrizione' rata.pk %}" class="btn btn-secondary">Torna alla rata</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>Studente</th><td>{{ rata.iscrizione.studente }}</td></tr>
+                <tr><th>Anno scolastico</th><td>{{ rata.iscrizione.anno_scolastico }}</td></tr>
+                <tr><th>Voce piano</th><td>{{ rata.display_label }}</td></tr>
+                <tr><th>Importo finale</th><td>EUR {{ rata.importo_finale|euro }}</td></tr>
+                <tr><th>{{ form.pagamento_integrale.label_tag }}</th><td>{{ form.pagamento_integrale }} {{ form.pagamento_integrale.errors }}</td></tr>
+                <tr id="pagamento-parziale-row" class="is-hidden">
+                    <th>{{ form.importo_pagato_personalizzato.label_tag }}</th>
+                    <td>{{ form.importo_pagato_personalizzato }} {{ form.importo_pagato_personalizzato.errors }}</td>
+                </tr>
+                <tr><th>{{ form.data_pagamento.label_tag }}</th><td>{{ form.data_pagamento }} {{ form.data_pagamento.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.metodo_pagamento.label_tag }}</th>
+                    <td>
+                        <div class="related-field-row">
+                            {{ form.metodo_pagamento }}
+                            <div class="related-actions">
+                                <button type="button" class="related-btn related-btn-add" id="add-metodo-pagamento-btn">+</button>
+                                <button type="button" class="related-btn related-btn-edit" id="edit-metodo-pagamento-btn">&#9998;</button>
+                                <button type="button" class="related-btn related-btn-delete" id="delete-metodo-pagamento-btn">&#10006;</button>
+                            </div>
+                        </div>
+                        {{ form.metodo_pagamento.errors }}
+                    </td>
+                </tr>
+            </table>
+            <div class="help-text" style="padding: 0 16px 16px 16px;">
+                Se il pagamento non e integrale, la voce del piano restera aperta e verra registrato l'importo effettivamente pagato.
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-rate-paid">Conferma pagamento</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% else %}
+                    <a href="{% url 'modifica_rata_iscrizione' rata.pk %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const integrale = document.getElementById("id_pagamento_integrale");
+            const parzialeRow = document.getElementById("pagamento-parziale-row");
+            const importoInput = document.getElementById("id_importo_pagato_personalizzato");
+            const metodoSelect = document.getElementById("id_metodo_pagamento");
+            const addBtn = document.getElementById("add-metodo-pagamento-btn");
+            const editBtn = document.getElementById("edit-metodo-pagamento-btn");
+            const deleteBtn = document.getElementById("delete-metodo-pagamento-btn");
+
+            function refreshState() {
+                const isFull = !integrale || integrale.checked;
+                if (parzialeRow) {
+                    parzialeRow.classList.toggle("is-hidden", isFull);
+                }
+                if (importoInput) {
+                    importoInput.disabled = isFull;
+                    if (isFull) {
+                        importoInput.value = "";
+                    }
+                }
+            }
+
+            function refreshMetodoButtons() {
+                const hasValue = metodoSelect && metodoSelect.value;
+                if (editBtn) editBtn.disabled = !hasValue;
+                if (deleteBtn) deleteBtn.disabled = !hasValue;
+            }
+
+            if (integrale) {
+                integrale.addEventListener("change", refreshState);
+            }
+
+            if (addBtn) {
+                addBtn.addEventListener("click", function () {
+                    if (window.ArborisRelatedPopups) {
+                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/nuovo/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
+                    }
+                });
+            }
+
+            if (editBtn) {
+                editBtn.addEventListener("click", function () {
+                    if (metodoSelect && metodoSelect.value && window.ArborisRelatedPopups) {
+                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/' + metodoSelect.value + '/modifica/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
+                    }
+                });
+            }
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", function () {
+                    if (metodoSelect && metodoSelect.value && window.ArborisRelatedPopups) {
+                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/' + metodoSelect.value + '/elimina/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
+                    }
+                });
+            }
+
+            if (metodoSelect) {
+                metodoSelect.addEventListener("change", refreshMetodoButtons);
+            }
+
+            refreshState();
+            refreshMetodoButtons();
+        });
+    </script>
+{% endblock %}

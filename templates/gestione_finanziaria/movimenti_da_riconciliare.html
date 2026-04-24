@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Movimenti da riconciliare - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Riconciliazione movimenti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Movimenti da riconciliare</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Tutti i movimenti</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Conto
+                <select name="conto">
+                    <option value="">Tutti</option>
+                    {% for c in conti %}
+                        <option value="{{ c.pk }}" {% if conto_selezionato == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nome_conto }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <input type="checkbox" name="solo_entrate" value="1" {% if solo_entrate %}checked{% endif %}>
+                Solo entrate
+            </label>
+            <label>
+                Ordine
+                <select name="ordinamento">
+                    <option value="data" {% if ordinamento == "data" %}selected{% endif %}>Data (piu' recente)</option>
+                    <option value="importo" {% if ordinamento == "importo" %}selected{% endif %}>Importo (decrescente)</option>
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+        </form>
+
+        <p class="help-text">
+            Sono mostrati fino a 200 movimenti non ancora collegati ad alcuna rata iscrizione
+            (e non marcati come "da ignorare"). Seleziona un movimento per vedere le rate
+            candidate suggerite automaticamente.
+        </p>
+
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Conto</th>
+                    <th>Descrizione / controparte</th>
+                    <th class="column-right">Importo</th>
+                    <th>Categoria</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movimenti %}
+                    <tr>
+                        <td>{{ m.data_contabile|date:"d/m/Y" }}</td>
+                        <td>{{ m.conto.nome_conto|default:"-" }}</td>
+                        <td>
+                            <strong>{{ m.controparte|default:"-" }}</strong>
+                            <div class="table-muted">{{ m.descrizione|truncatechars:80 }}</div>
+                        </td>
+                        <td class="column-right">{{ m.importo }} {{ m.valuta }}</td>
+                        <td>{{ m.categoria.nome|default:"-" }}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'riconcilia_movimento' m.pk %}" class="table-link">Riconcilia</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">Nessun movimento in attesa di riconciliazione con i filtri correnti.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="help-text">Visualizzati {{ totale_visualizzati }} movimenti.</p>
+    </div>
+{% endblock %}

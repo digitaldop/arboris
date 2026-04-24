@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Indirizzi - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>Indirizzi</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Indirizzi</h1>
+        <a href="{% url 'crea_indirizzo' %}" class="btn btn-primary">Nuovo indirizzo</a>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            {% if indirizzi %}
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>Via</th>
+                            <th>Civico</th>
+                            <th>Città</th>
+                            <th>CAP</th>
+                            <th>Provincia</th>
+                            <th>Regione</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for indirizzo in indirizzi %}
+                            <tr
+                                class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == indirizzo.pk|stringformat:'s' %}highlight-row{% endif %}"
+                                data-row-href="{% url 'modifica_indirizzo' indirizzo.pk %}"
+                            >
+                                <td>{{ indirizzo.via }}</td>
+                                <td>{{ indirizzo.numero_civico|default:"" }}</td>
+                                <td>{{ indirizzo.citta|default:"" }}</td>
+                                <td>{{ indirizzo.cap|default:"" }}</td>
+                                <td>
+                                    {% if indirizzo.provincia %}
+                                        {{ indirizzo.provincia.sigla }} - {{ indirizzo.provincia.nome }}
+                                    {% else %}
+                                        <span class="table-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ indirizzo.regione|default:"—" }}</td>
+                                <td class="actions-cell">
+                                    <a class="table-link" href="{% url 'modifica_indirizzo' indirizzo.pk %}">
+                                        Modifica
+                                    </a>
+                                    |
+                                    <a class="table-link table-link-danger" href="{% url 'elimina_indirizzo' indirizzo.pk %}">
+                                        Elimina
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    Nessun indirizzo inserito.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

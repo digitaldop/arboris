@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titolo }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">{{ titolo }}</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            {% if blocked %}
+                <div class="message message-error">
+                    Questo tipo di contratto e' collegato a {{ usage_count }} record e non puo' essere eliminato.
+                </div>
+            {% elif usage_count %}
+                <div class="message message-warning">
+                    Questo tipo di contratto e' collegato a {{ usage_count }} record e non puo' essere eliminato.
+                </div>
+            {% endif %}
+
+            <p>Sei sicuro di voler eliminare questo tipo di contratto?</p>
+            <p><strong>{{ oggetto }}</strong></p>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="popup" value="1">
+                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" {% if usage_count %}disabled{% endif %}>Si', elimina</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Familiari - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Familiari</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Familiari</h1>
+        <a href="{% url 'crea_familiare' %}" class="btn btn-primary">Nuovo familiare</a>
+    </div>
+
+    <div class="list-toolbar">
+        <form method="get" class="search-form">
+            <input
+                type="text"
+                name="q"
+                value="{{ q|default:'' }}"
+                placeholder="Cerca per cognome, nome, famiglia, relazione, email..."
+                class="search-input"
+            >
+            <button type="submit" class="btn btn-secondary">Cerca</button>
+            {% if q %}
+                <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Pulisci</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            {% if familiari %}
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>Cognome</th>
+                            <th>Nome</th>
+                            <th>Famiglia</th>
+                            <th>Relazione</th>
+                            <th>Telefono</th>
+                            <th>Email</th>
+                            <th>Indirizzo</th>
+                            <th>Referente</th>
+                            <th>Attivo</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for familiare in familiari %}
+                            <tr
+                                class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == familiare.pk|stringformat:'s' %}highlight-row{% endif %}"
+                                data-row-href="{% url 'modifica_familiare' familiare.pk %}"
+                            >
+                                <td>{{ familiare.cognome }}</td>
+                                <td>{{ familiare.nome }}</td>
+                                <td>{{ familiare.famiglia }}</td>
+                                <td>{{ familiare.relazione_familiare }}</td>
+                                <td>{{ familiare.formatted_telefono|default:"" }}</td>
+                                <td>{{ familiare.email|default:"" }}</td>
+                                <td>
+                                    {% if familiare.indirizzo %}
+                                        {{ familiare.indirizzo }}
+                                    {% elif familiare.famiglia and familiare.famiglia.indirizzo_principale %}
+                                        <span class="table-muted">Eredita famiglia</span>
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if familiare.referente_principale %}Si{% else %}No{% endif %}</td>
+                                <td>{% if familiare.attivo %}Si{% else %}No{% endif %}</td>
+                                <td class="actions-cell">
+                                    <a class="table-link" href="{% url 'modifica_familiare' familiare.pk %}">Modifica</a>
+                                    |
+                                    <a class="table-link table-link-danger" href="{% url 'elimina_familiare' familiare.pk %}">Elimina</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    Nessun familiare inserito.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

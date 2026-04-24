@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina provider {{ provider.nome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_provider_bancari' %}">Provider</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina provider</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare il provider <strong>{{ provider.nome }}</strong>.</p>
+
+        {% if ha_vincoli %}
+            <div class="message message-error">
+                <p>Il provider non puo' essere eliminato perche' e' ancora referenziato:</p>
+                <ul>
+                    {% if count_conti %}<li>Conti collegati: {{ count_conti }}</li>{% endif %}
+                    {% if count_connessioni %}<li>Connessioni bancarie: {{ count_connessioni }}</li>{% endif %}
+                </ul>
+                <p>In alternativa puoi <strong>disattivarlo</strong> dalla pagina di modifica.</p>
+            </div>
+        {% endif %}
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" {% if ha_vincoli %}disabled{% endif %}>Elimina</button>
+            <a href="{% url 'lista_provider_bancari' %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

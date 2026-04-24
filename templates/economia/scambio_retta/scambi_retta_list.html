@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scambio retta - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Scambio retta</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Scambio retta</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_scambio_retta' %}" class="btn btn-primary">Nuovo scambio retta</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Familiare</th>
+                    <th>Studente</th>
+                    <th>Anno scolastico</th>
+                    <th>Mese</th>
+                    <th>Ore lavorate</th>
+                    <th>Importo maturato</th>
+                    <th>Approvata</th>
+                    <th>Contabilizzata</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for scambio in scambi %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_scambio_retta' scambio.pk %}">
+                        <td>{{ scambio.familiare }}</td>
+                        <td>{{ scambio.studente }}</td>
+                        <td>{{ scambio.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ scambio.mese_riferimento }}</td>
+                        <td>{{ scambio.ore_lavorate }}</td>
+                        <td>{{ scambio.importo_maturato }}</td>
+                        <td>{% if scambio.approvata %}Si{% else %}No{% endif %}</td>
+                        <td>{% if scambio.contabilizzata %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            {% if scambio.approvata and not scambio.contabilizzata %}
+                                <a href="{% url 'contabilizza_scambio_retta' scambio.pk %}" class="table-link">Contabilizza</a>
+                                <span class="table-muted">|</span>
+                            {% endif %}
+                            <a href="{% url 'modifica_scambio_retta' scambio.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_scambio_retta' scambio.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9"><div class="empty-state">Nessuno scambio retta inserito.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

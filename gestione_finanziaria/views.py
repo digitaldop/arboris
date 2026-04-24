@@ -1,0 +1,1618 @@
+from decimal import Decimal
+
+from django.contrib import messages
+from django.db.models import Count, Q, Sum
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+
+from .forms import (
+    CategoriaFinanziariaForm,
+    ContoBancarioForm,
+    ImportEstrattoContoForm,
+    MovimentoFinanziarioForm,
+    NuovaConnessioneBancariaForm,
+    PianificazioneSincronizzazioneForm,
+    ProviderBancarioForm,
+    ProviderPsd2ConfigForm,
+    RegolaCategorizzazioneForm,
+)
+from .importers import Camt053Parser, CsvImporter, CsvImporterConfig
+from .importers.service import importa_movimenti_da_file
+from .models import (
+    CategoriaFinanziaria,
+    ConnessioneBancaria,
+    ContoBancario,
+    MovimentoFinanziario,
+    OrigineMovimento,
+    ProviderBancario,
+    RegolaCategorizzazione,
+    SincronizzazioneLog,
+    StatoConnessioneBancaria,
+    StatoRiconciliazione,
+    TipoCategoriaFinanziaria,
+    TipoProviderBancario,
+)
+from .providers import (
+    adapter_for_provider,
+    is_enablebanking_adapter,
+    is_oauth_adapter,
+    is_redirect_callback_adapter,
+    is_saltedge_adapter,
+)
+from .providers.enablebanking import EnableBankingAdapter, EnableBankingError
+from .providers.registry import (
+    ADAPTER_SALTEDGE,
+    ADAPTER_TRUELAYER,
+    ProviderConfigurazioneMancante,
+    _adapter_id,
+    configurazione_completa,
+)
+from .providers.saltedge import SaltEdgeAdapter, SaltEdgeError
+from .providers.truelayer import TrueLayerAdapter, TrueLayerError
+from .security import cifra_testo, decifra_testo_safe
+from .scheduler import (
+    get_or_create_singleton,
+    maybe_run_scheduled_sync,
+    prossima_esecuzione_prevista,
+)
+from .services import (
+    annulla_riconciliazione,
+    applica_regole_a_movimento,
+    ricalcola_saldo_corrente_conto,
+    riconcilia_movimento_con_rata,
+    sincronizza_conto_psd2,
+    trova_rate_candidate,
+)
+
+
+def _oauth_redirect_uri(request, provider):
+    """
+    Ritorna il ``redirect_uri`` da usare nelle chiamate OAuth2 al provider.
+
+    Preferisce il valore configurato su ``ProviderBancario.configurazione
+    ['redirect_uri']`` (quello registrato nella console dello sviluppatore).
+    Altrimenti calcola l'URL della view ``callback_oauth_psd2`` dall'host
+    della richiesta corrente.
+
+    IMPORTANTE: deve essere lo stesso valore sia quando si genera l'auth URL
+    sia quando si scambia il code per i token.
+    """
+    cfg = (provider.configurazione or {}) if provider else {}
+    override = (cfg.get("redirect_uri") or "").strip()
+    if override:
+        return override
+    return request.build_absolute_uri(reverse("callback_oauth_psd2"))
+
+
+# =========================================================================
+#  Dashboard del modulo
+# =========================================================================
+
+
+def dashboard_gestione_finanziaria(request):
+    conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+    saldo_totale = conti.aggregate(totale=Sum("saldo_corrente"))["totale"] or Decimal("0")
+
+    ultimi_movimenti = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .order_by("-data_contabile", "-id")[:15]
+    )
+    movimenti_senza_categoria = MovimentoFinanziario.objects.filter(categoria__isnull=True).count()
+    categorie_attive = CategoriaFinanziaria.objects.filter(attiva=True).count()
+    regole_attive = RegolaCategorizzazione.objects.filter(attiva=True).count()
+
+    return render(
+        request,
+        "gestione_finanziaria/dashboard.html",
+        {
+            "conti": conti,
+            "saldo_totale": saldo_totale,
+            "ultimi_movimenti": ultimi_movimenti,
+            "movimenti_senza_categoria": movimenti_senza_categoria,
+            "categorie_attive": categorie_attive,
+            "regole_attive": regole_attive,
+        },
+    )
+
+
+# =========================================================================
+#  Provider bancari - CRUD
+# =========================================================================
+
+
+def lista_provider_bancari(request):
+    provider = ProviderBancario.objects.annotate(
+        numero_conti=Count("conti", distinct=True),
+        numero_connessioni=Count("connessioni", distinct=True),
+    ).order_by("nome")
+    return render(
+        request,
+        "gestione_finanziaria/provider_list.html",
+        {"provider": provider},
+    )
+
+
+def crea_provider_bancario(request):
+    if request.method == "POST":
+        form = ProviderBancarioForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Provider bancario creato correttamente.")
+            return redirect("lista_provider_bancari")
+    else:
+        form = ProviderBancarioForm()
+
+    return render(
+        request,
+        "gestione_finanziaria/provider_form.html",
+        {"form": form, "provider": None},
+    )
+
+
+def modifica_provider_bancario(request, pk):
+    provider = get_object_or_404(ProviderBancario, pk=pk)
+    if request.method == "POST":
+        form = ProviderBancarioForm(request.POST, instance=provider)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Provider bancario aggiornato correttamente.")
+            return redirect("lista_provider_bancari")
+    else:
+        form = ProviderBancarioForm(instance=provider)
+
+    return render(
+        request,
+        "gestione_finanziaria/provider_form.html",
+        {"form": form, "provider": provider},
+    )
+
+
+def elimina_provider_bancario(request, pk):
+    provider = get_object_or_404(ProviderBancario, pk=pk)
+
+    count_conti = provider.conti.count()
+    count_connessioni = provider.connessioni.count()
+    ha_vincoli = bool(count_conti or count_connessioni)
+
+    if request.method == "POST":
+        if ha_vincoli:
+            messages.error(
+                request,
+                "Impossibile eliminare il provider: ha conti o connessioni collegate. "
+                "Puoi disattivarlo invece di eliminarlo.",
+            )
+            return redirect("lista_provider_bancari")
+
+        provider.delete()
+        messages.success(request, "Provider bancario eliminato correttamente.")
+        return redirect("lista_provider_bancari")
+
+    return render(
+        request,
+        "gestione_finanziaria/provider_confirm_delete.html",
+        {
+            "provider": provider,
+            "count_conti": count_conti,
+            "count_connessioni": count_connessioni,
+            "ha_vincoli": ha_vincoli,
+        },
+    )
+
+
+# =========================================================================
+#  Conti bancari - CRUD
+# =========================================================================
+
+
+def lista_conti_bancari(request):
+    conti = (
+        ContoBancario.objects.select_related("provider", "connessione")
+        .order_by("nome_conto")
+    )
+    return render(
+        request,
+        "gestione_finanziaria/conti_bancari_list.html",
+        {"conti": conti},
+    )
+
+
+def crea_conto_bancario(request):
+    if request.method == "POST":
+        form = ContoBancarioForm(request.POST)
+        if form.is_valid():
+            conto = form.save()
+            messages.success(request, f"Conto bancario \"{conto.nome_conto}\" creato correttamente.")
+            return redirect("lista_conti_bancari")
+    else:
+        form = ContoBancarioForm(initial={"valuta": "EUR", "attivo": True})
+
+    return render(
+        request,
+        "gestione_finanziaria/conto_form.html",
+        {"form": form, "conto": None},
+    )
+
+
+def modifica_conto_bancario(request, pk):
+    conto = get_object_or_404(ContoBancario, pk=pk)
+    if request.method == "POST":
+        form = ContoBancarioForm(request.POST, instance=conto)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Conto bancario aggiornato correttamente.")
+            return redirect("lista_conti_bancari")
+    else:
+        form = ContoBancarioForm(instance=conto)
+
+    return render(
+        request,
+        "gestione_finanziaria/conto_form.html",
+        {"form": form, "conto": conto},
+    )
+
+
+def elimina_conto_bancario(request, pk):
+    conto = get_object_or_404(ContoBancario, pk=pk)
+    count_movimenti = conto.movimenti.count()
+    count_saldi = conto.storico_saldi.count()
+    ha_vincoli = bool(count_movimenti or count_saldi)
+
+    if request.method == "POST":
+        if ha_vincoli:
+            messages.error(
+                request,
+                "Impossibile eliminare il conto: ha movimenti o saldi storici collegati. "
+                "Puoi disattivarlo invece di eliminarlo.",
+            )
+            return redirect("lista_conti_bancari")
+
+        conto.delete()
+        messages.success(request, "Conto bancario eliminato correttamente.")
+        return redirect("lista_conti_bancari")
+
+    return render(
+        request,
+        "gestione_finanziaria/conto_confirm_delete.html",
+        {
+            "conto": conto,
+            "count_movimenti": count_movimenti,
+            "count_saldi": count_saldi,
+            "ha_vincoli": ha_vincoli,
+        },
+    )
+
+
+def ricalcola_saldo_conto_bancario(request, pk):
+    conto = get_object_or_404(ContoBancario, pk=pk)
+
+    if request.method == "POST":
+        nuovo_saldo = ricalcola_saldo_corrente_conto(conto)
+        messages.success(
+            request,
+            f"Saldo del conto \"{conto.nome_conto}\" ricalcolato: {nuovo_saldo} {conto.valuta}.",
+        )
+        return redirect("lista_conti_bancari")
+
+    return redirect("lista_conti_bancari")
+
+
+# =========================================================================
+#  Movimenti finanziari - lista + CRUD manuale
+# =========================================================================
+
+
+def lista_movimenti_finanziari(request):
+    movimenti = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
+        .order_by("-data_contabile", "-id")
+    )
+
+    conti_filter = request.GET.get("conto")
+    categoria_filter = request.GET.get("categoria")
+    origine_filter = request.GET.get("origine")
+
+    if conti_filter:
+        movimenti = movimenti.filter(conto_id=conti_filter)
+    if categoria_filter == "none":
+        movimenti = movimenti.filter(categoria__isnull=True)
+    elif categoria_filter:
+        movimenti = movimenti.filter(categoria_id=categoria_filter)
+    if origine_filter:
+        movimenti = movimenti.filter(origine=origine_filter)
+
+    return render(
+        request,
+        "gestione_finanziaria/movimenti_list.html",
+        {
+            "movimenti": movimenti,
+            "conti_disponibili": ContoBancario.objects.filter(attivo=True).order_by("nome_conto"),
+            "categorie_disponibili": CategoriaFinanziaria.objects.filter(attiva=True).order_by(
+                "parent__nome", "nome"
+            ),
+            "origini_disponibili": OrigineMovimento.choices,
+            "conto_selezionato": conti_filter or "",
+            "categoria_selezionata": categoria_filter or "",
+            "origine_selezionata": origine_filter or "",
+        },
+    )
+
+
+def crea_movimento_manuale(request):
+    if request.method == "POST":
+        form = MovimentoFinanziarioForm(request.POST)
+        if form.is_valid():
+            movimento = form.save(commit=False)
+            movimento.origine = OrigineMovimento.MANUALE
+
+            if not movimento.categoria_id:
+                applica_regole_a_movimento(movimento)
+
+            movimento.save()
+
+            if movimento.conto_id and movimento.incide_su_saldo_banca:
+                ricalcola_saldo_corrente_conto(movimento.conto)
+
+            messages.success(request, "Movimento manuale registrato correttamente.")
+            return redirect("lista_movimenti_finanziari")
+    else:
+        form = MovimentoFinanziarioForm(
+            initial={
+                "data_contabile": timezone.now().date(),
+                "valuta": "EUR",
+            }
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_form.html",
+        {"form": form, "movimento": None},
+    )
+
+
+def modifica_movimento_finanziario(request, pk):
+    movimento = get_object_or_404(MovimentoFinanziario, pk=pk)
+    conto_precedente = movimento.conto
+    incide_precedente = movimento.incide_su_saldo_banca
+
+    if request.method == "POST":
+        form = MovimentoFinanziarioForm(request.POST, instance=movimento)
+        if form.is_valid():
+            movimento = form.save(commit=False)
+
+            if "categoria" in form.changed_data and movimento.categoria_id:
+                movimento.categorizzazione_automatica = False
+                movimento.categorizzato_da = request.user if request.user.is_authenticated else None
+                movimento.categorizzato_il = timezone.now()
+
+            movimento.save()
+
+            conti_da_ricalcolare = set()
+            if movimento.conto_id and movimento.incide_su_saldo_banca:
+                conti_da_ricalcolare.add(movimento.conto)
+            if conto_precedente and (
+                conto_precedente != movimento.conto or incide_precedente
+            ):
+                conti_da_ricalcolare.add(conto_precedente)
+            for conto in conti_da_ricalcolare:
+                ricalcola_saldo_corrente_conto(conto)
+
+            messages.success(request, "Movimento aggiornato correttamente.")
+            return redirect("lista_movimenti_finanziari")
+    else:
+        form = MovimentoFinanziarioForm(instance=movimento)
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_form.html",
+        {"form": form, "movimento": movimento},
+    )
+
+
+def elimina_movimento_finanziario(request, pk):
+    movimento = get_object_or_404(MovimentoFinanziario, pk=pk)
+
+    if request.method == "POST":
+        conto_da_ricalcolare = movimento.conto if (movimento.conto_id and movimento.incide_su_saldo_banca) else None
+        movimento.delete()
+        if conto_da_ricalcolare:
+            ricalcola_saldo_corrente_conto(conto_da_ricalcolare)
+        messages.success(request, "Movimento eliminato correttamente.")
+        return redirect("lista_movimenti_finanziari")
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_confirm_delete.html",
+        {"movimento": movimento},
+    )
+
+
+# =========================================================================
+#  Regole di categorizzazione - CRUD
+# =========================================================================
+
+
+def lista_regole_categorizzazione(request):
+    regole = (
+        RegolaCategorizzazione.objects.select_related("categoria_da_assegnare")
+        .order_by("priorita", "nome")
+    )
+    return render(
+        request,
+        "gestione_finanziaria/regole_list.html",
+        {"regole": regole},
+    )
+
+
+def crea_regola_categorizzazione(request):
+    if request.method == "POST":
+        form = RegolaCategorizzazioneForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Regola creata correttamente.")
+            return redirect("lista_regole_categorizzazione")
+    else:
+        form = RegolaCategorizzazioneForm(initial={"priorita": 100, "attiva": True})
+
+    return render(
+        request,
+        "gestione_finanziaria/regola_form.html",
+        {"form": form, "regola": None},
+    )
+
+
+def modifica_regola_categorizzazione(request, pk):
+    regola = get_object_or_404(RegolaCategorizzazione, pk=pk)
+    if request.method == "POST":
+        form = RegolaCategorizzazioneForm(request.POST, instance=regola)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Regola aggiornata correttamente.")
+            return redirect("lista_regole_categorizzazione")
+    else:
+        form = RegolaCategorizzazioneForm(instance=regola)
+
+    return render(
+        request,
+        "gestione_finanziaria/regola_form.html",
+        {"form": form, "regola": regola},
+    )
+
+
+def elimina_regola_categorizzazione(request, pk):
+    regola = get_object_or_404(RegolaCategorizzazione, pk=pk)
+    if request.method == "POST":
+        regola.delete()
+        messages.success(request, "Regola eliminata correttamente.")
+        return redirect("lista_regole_categorizzazione")
+
+    return render(
+        request,
+        "gestione_finanziaria/regola_confirm_delete.html",
+        {"regola": regola},
+    )
+
+
+def applica_regole_massiva(request):
+    """
+    Applica le regole attive a tutti i movimenti ancora non categorizzati.
+    Azione manuale usata dall'utente dalla lista regole / dashboard.
+    """
+
+    if request.method != "POST":
+        return redirect("lista_regole_categorizzazione")
+
+    movimenti = MovimentoFinanziario.objects.filter(categoria__isnull=True)
+    categorizzati = 0
+    for movimento in movimenti:
+        regola = applica_regole_a_movimento(movimento)
+        if regola is not None:
+            movimento.save(
+                update_fields=[
+                    "categoria",
+                    "categorizzazione_automatica",
+                    "regola_categorizzazione",
+                    "categorizzato_il",
+                ]
+            )
+            categorizzati += 1
+
+    if categorizzati:
+        messages.success(
+            request,
+            f"Regole applicate: {categorizzati} movimenti sono stati categorizzati automaticamente.",
+        )
+    else:
+        messages.info(request, "Nessun movimento e' stato categorizzato: nessuna regola ha trovato match.")
+
+    return redirect("lista_regole_categorizzazione")
+
+
+# =========================================================================
+#  Categorie finanziarie - CRUD (invariato rispetto all'iterazione precedente)
+# =========================================================================
+
+
+def lista_categorie_finanziarie(request):
+    categorie = (
+        CategoriaFinanziaria.objects.select_related("parent")
+        .order_by("parent__nome", "ordine", "nome")
+    )
+    return render(
+        request,
+        "gestione_finanziaria/categorie_list.html",
+        {
+            "categorie": categorie,
+            "tipo_choices": TipoCategoriaFinanziaria.choices,
+        },
+    )
+
+
+def crea_categoria_finanziaria(request):
+    if request.method == "POST":
+        form = CategoriaFinanziariaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoria finanziaria creata correttamente.")
+            return redirect("lista_categorie_finanziarie")
+    else:
+        form = CategoriaFinanziariaForm()
+
+    return render(
+        request,
+        "gestione_finanziaria/categoria_form.html",
+        {"form": form, "categoria": None},
+    )
+
+
+def modifica_categoria_finanziaria(request, pk):
+    categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
+
+    if request.method == "POST":
+        form = CategoriaFinanziariaForm(request.POST, instance=categoria)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Categoria finanziaria aggiornata correttamente.")
+            return redirect("lista_categorie_finanziarie")
+    else:
+        form = CategoriaFinanziariaForm(instance=categoria)
+
+    return render(
+        request,
+        "gestione_finanziaria/categoria_form.html",
+        {"form": form, "categoria": categoria},
+    )
+
+
+def elimina_categoria_finanziaria(request, pk):
+    categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
+
+    count_movimenti = categoria.movimenti.count()
+    count_figlie = categoria.figli.count()
+    count_regole = categoria.regole.count()
+    ha_vincoli = bool(count_movimenti or count_figlie or count_regole)
+
+    if request.method == "POST":
+        if ha_vincoli:
+            messages.error(
+                request,
+                "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
+            )
+            return redirect("lista_categorie_finanziarie")
+
+        categoria.delete()
+        messages.success(request, "Categoria finanziaria eliminata correttamente.")
+        return redirect("lista_categorie_finanziarie")
+
+    return render(
+        request,
+        "gestione_finanziaria/categoria_confirm_delete.html",
+        {
+            "categoria": categoria,
+            "count_movimenti": count_movimenti,
+            "count_figlie": count_figlie,
+            "count_regole": count_regole,
+            "ha_vincoli": ha_vincoli,
+        },
+    )
+
+
+# =========================================================================
+#  Import estratti conto (CAMT.053 / CSV)
+# =========================================================================
+
+
+_CSV_COL_FIELDS = [
+    ("csv_col_data_contabile", "colonna_data_contabile"),
+    ("csv_col_data_valuta", "colonna_data_valuta"),
+    ("csv_col_importo", "colonna_importo"),
+    ("csv_col_entrate", "colonna_entrate"),
+    ("csv_col_uscite", "colonna_uscite"),
+    ("csv_col_valuta", "colonna_valuta"),
+    ("csv_col_descrizione", "colonna_descrizione"),
+    ("csv_col_controparte", "colonna_controparte"),
+    ("csv_col_iban_controparte", "colonna_iban_controparte"),
+    ("csv_col_transaction_id", "colonna_transaction_id"),
+]
+
+
+def import_estratto_conto(request):
+    risultato = None
+    form = ImportEstrattoContoForm(
+        request.POST or None,
+        request.FILES or None,
+    )
+
+    if request.method == "POST" and form.is_valid():
+        conto = form.cleaned_data["conto"]
+        formato = form.cleaned_data["formato"]
+        uploaded = form.cleaned_data["file"]
+        raw_bytes = uploaded.read()
+
+        try:
+            if formato == "camt053":
+                parser = Camt053Parser()
+            else:
+                cfg = CsvImporterConfig(
+                    delimiter=form.cleaned_data.get("csv_delimiter") or "",
+                    encoding=form.cleaned_data.get("csv_encoding") or "utf-8-sig",
+                    ha_intestazione=form.cleaned_data.get("csv_ha_intestazione") or False,
+                    formato_data=form.cleaned_data.get("csv_formato_data") or "%d/%m/%Y",
+                    separatore_decimale=form.cleaned_data.get("csv_sep_decimale") or ",",
+                    separatore_migliaia=form.cleaned_data.get("csv_sep_migliaia") or ".",
+                )
+                for form_field, cfg_field in _CSV_COL_FIELDS:
+                    setattr(
+                        cfg,
+                        cfg_field,
+                        ImportEstrattoContoForm.parse_column_ref(form.cleaned_data.get(form_field)),
+                    )
+                parser = CsvImporter(cfg)
+
+            risultato = importa_movimenti_da_file(
+                parser=parser,
+                raw_bytes=raw_bytes,
+                conto=conto,
+                provider=conto.provider,
+                nome_file=getattr(uploaded, "name", ""),
+            )
+
+            if risultato.inseriti:
+                messages.success(
+                    request,
+                    f"Import completato: {risultato.inseriti} movimenti inseriti "
+                    f"(duplicati scartati: {risultato.duplicati}).",
+                )
+            elif risultato.errori:
+                messages.error(
+                    request,
+                    "Import terminato con errori. Controlla i dettagli sotto.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"Nessun nuovo movimento inserito "
+                    f"(letti: {risultato.totale_letti}, duplicati: {risultato.duplicati}).",
+                )
+        except Exception as exc:
+            messages.error(request, f"Import fallito: {exc}")
+
+    return render(
+        request,
+        "gestione_finanziaria/import_estratto_conto.html",
+        {
+            "form": form,
+            "risultato": risultato,
+        },
+    )
+
+
+# =========================================================================
+#  Connessioni PSD2 (configurazione provider + flusso consenso)
+# =========================================================================
+
+
+def lista_connessioni_bancarie(request):
+    psd2_qs = ProviderBancario.objects.filter(tipo=TipoProviderBancario.PSD2).order_by("nome")
+    # Tupla (provider, credenziali complete) per UI: Enable Banking non usa secret_key_cifrata.
+    provider_psd2 = [
+        (p, configurazione_completa(p)) for p in psd2_qs
+    ]
+    connessioni = (
+        ConnessioneBancaria.objects.select_related("provider")
+        .prefetch_related("conti")
+        .order_by("provider__nome", "etichetta")
+    )
+    log_recenti = SincronizzazioneLog.objects.select_related("conto", "connessione").order_by(
+        "-data_operazione"
+    )[:20]
+    return render(
+        request,
+        "gestione_finanziaria/connessioni_list.html",
+        {
+            "provider_psd2": provider_psd2,
+            "connessioni": connessioni,
+            "log_recenti": log_recenti,
+        },
+    )
+
+
+def configura_provider_psd2(request, pk):
+    provider = get_object_or_404(ProviderBancario, pk=pk)
+    if provider.tipo != TipoProviderBancario.PSD2:
+        messages.error(request, "Il provider selezionato non e' di tipo PSD2.")
+        return redirect("lista_provider_bancari")
+
+    cfg_attuale = provider.configurazione or {}
+
+    if request.method == "POST":
+        form = ProviderPsd2ConfigForm(request.POST)
+        if form.is_valid():
+            nuova_cfg = dict(cfg_attuale)
+            nuova_cfg["adapter"] = cfg_attuale.get("adapter") or "gocardless_bad"
+            nuova_cfg["secret_id"] = form.cleaned_data["secret_id"]
+            if form.cleaned_data.get("secret_key"):
+                nuova_cfg["secret_key_cifrata"] = cifra_testo(form.cleaned_data["secret_key"])
+            if form.cleaned_data.get("environment"):
+                nuova_cfg["environment"] = form.cleaned_data["environment"]
+            if form.cleaned_data.get("base_url"):
+                nuova_cfg["base_url"] = form.cleaned_data["base_url"]
+            if form.cleaned_data.get("redirect_uri"):
+                nuova_cfg["redirect_uri"] = form.cleaned_data["redirect_uri"]
+            else:
+                # Permette di rimuovere un redirect_uri precedente lasciando il campo vuoto.
+                nuova_cfg.pop("redirect_uri", None)
+            providers_default_raw = (form.cleaned_data.get("providers_default") or "").strip()
+            if providers_default_raw:
+                # Normalizza in una singola stringa con spazi singoli.
+                nuova_cfg["providers_default"] = " ".join(providers_default_raw.split())
+            else:
+                nuova_cfg.pop("providers_default", None)
+            if form.cleaned_data.get("country_default"):
+                nuova_cfg["country_default"] = form.cleaned_data["country_default"].upper()
+            # Campi specifici Salt Edge (il checkbox viene sempre inviato).
+            nuova_cfg["include_fake_providers"] = bool(
+                form.cleaned_data.get("include_fake_providers")
+            )
+            if form.cleaned_data.get("locale"):
+                nuova_cfg["locale"] = form.cleaned_data["locale"].lower()
+            else:
+                nuova_cfg.pop("locale", None)
+            psu_tipo = (form.cleaned_data.get("psu_type") or "").strip()
+            if psu_tipo in ("personal", "business"):
+                nuova_cfg["psu_type"] = psu_tipo
+            else:
+                nuova_cfg.pop("psu_type", None)
+            # Private key RSA per la firma delle richieste Salt Edge:
+            # trattata come i secret (cifrata prima di salvare; campo vuoto
+            # => mantiene la chiave esistente).
+            pem_nuovo = (form.cleaned_data.get("private_key_pem") or "").strip()
+            if pem_nuovo:
+                nuova_cfg["private_key_pem_cifrato"] = cifra_testo(pem_nuovo)
+            passphrase_nuova = form.cleaned_data.get("private_key_passphrase") or ""
+            if passphrase_nuova:
+                nuova_cfg["private_key_passphrase_cifrata"] = cifra_testo(passphrase_nuova)
+
+            provider.configurazione = nuova_cfg
+            provider.save(update_fields=["configurazione", "data_aggiornamento"])
+            messages.success(request, f"Credenziali del provider '{provider.nome}' aggiornate.")
+            return redirect("lista_connessioni_bancarie")
+    else:
+        form = ProviderPsd2ConfigForm(
+            initial={
+                "secret_id": cfg_attuale.get("secret_id", ""),
+                "environment": cfg_attuale.get("environment", ""),
+                "base_url": cfg_attuale.get("base_url", ""),
+                "redirect_uri": cfg_attuale.get("redirect_uri", ""),
+                "providers_default": cfg_attuale.get("providers_default", ""),
+                "country_default": cfg_attuale.get("country_default", "IT"),
+                "include_fake_providers": bool(
+                    cfg_attuale.get("include_fake_providers") or False
+                ),
+                "locale": cfg_attuale.get("locale", "it"),
+                "psu_type": cfg_attuale.get("psu_type", ""),
+            }
+        )
+
+    # Redirect URI "suggerito" calcolato dal request: lo mostriamo in UI per
+    # permettere all'utente di copiarlo nella console del provider OAuth2
+    # (TrueLayer richiede il whitelisting esatto anche in sandbox).
+    redirect_uri_calcolato = request.build_absolute_uri(reverse("callback_oauth_psd2"))
+
+    saltedge_return_url = request.build_absolute_uri(
+        reverse("callback_connessione_psd2", args=[0])
+    ).replace("/0/callback/", "/<id>/callback/")
+
+    return render(
+        request,
+        "gestione_finanziaria/provider_psd2_config_form.html",
+        {
+            "provider": provider,
+            "form": form,
+            "ha_secret_key": bool(cfg_attuale.get("secret_key_cifrata")),
+            "ha_private_key": bool(cfg_attuale.get("private_key_pem_cifrato")),
+            "ha_private_key_passphrase": bool(
+                cfg_attuale.get("private_key_passphrase_cifrata")
+            ),
+            "redirect_uri_calcolato": redirect_uri_calcolato,
+            "redirect_uri_configurato": cfg_attuale.get("redirect_uri", ""),
+            "is_oauth_adapter": is_oauth_adapter(provider),
+            "is_saltedge_adapter": is_saltedge_adapter(provider),
+            "is_enablebanking_adapter": is_enablebanking_adapter(provider),
+            "is_redirect_callback_adapter": is_redirect_callback_adapter(provider),
+            "saltedge_return_url_template": saltedge_return_url,
+        },
+    )
+
+
+def nuova_connessione_psd2(request, provider_pk):
+    provider = get_object_or_404(ProviderBancario, pk=provider_pk)
+    if provider.tipo != TipoProviderBancario.PSD2:
+        messages.error(request, "Il provider selezionato non e' di tipo PSD2.")
+        return redirect("lista_connessioni_bancarie")
+
+    if not configurazione_completa(provider):
+        messages.error(
+            request,
+            "Provider non configurato: completa le credenziali tecniche (console PSD2) "
+            "prima di avviare una connessione.",
+        )
+        return redirect("configura_provider_psd2", pk=provider.pk)
+
+    country = (provider.configurazione or {}).get("country_default", "IT") or "IT"
+    istituti = []
+    errore_lista = ""
+    try:
+        adapter = adapter_for_provider(provider)
+        istituti = adapter.lista_istituti(country=country)
+    except ProviderConfigurazioneMancante as exc:
+        errore_lista = str(exc)
+    except Exception as exc:
+        errore_lista = f"Errore durante la lettura degli istituti: {exc}"
+
+    if request.method == "POST":
+        form = NuovaConnessioneBancariaForm(request.POST, provider=provider)
+        if form.is_valid():
+            try:
+                adapter = adapter_for_provider(provider)
+                connessione = ConnessioneBancaria.objects.create(
+                    provider=provider,
+                    etichetta=form.cleaned_data["etichetta"],
+                    external_institution_id=form.cleaned_data["institution_id"],
+                    stato=StatoConnessioneBancaria.ATTIVA,
+                )
+                # Provider OAuth2 (es. TrueLayer) richiedono un redirect_uri *fisso*
+                # pre-registrato nella console dello sviluppatore. Usiamo allora
+                # l'URL generico 'callback_oauth_psd2' e passiamo il pk via 'state'.
+                if is_redirect_callback_adapter(provider):
+                    redirect_url = _oauth_redirect_uri(request, provider)
+                else:
+                    redirect_url = request.build_absolute_uri(
+                        reverse("callback_connessione_psd2", args=[connessione.pk])
+                    )
+                info = adapter.crea_connessione(
+                    institution_id=form.cleaned_data["institution_id"],
+                    redirect_url=redirect_url,
+                    reference=f"arboris-{connessione.pk}",
+                    max_historical_days=form.cleaned_data["max_historical_days"],
+                    access_valid_for_days=form.cleaned_data["access_valid_for_days"],
+                )
+                connessione.external_connection_id = info.external_connection_id
+                update_fields = ["external_connection_id", "data_aggiornamento"]
+                # Per Salt Edge il customer_id e' stato creato dall'adapter:
+                # lo conserviamo cifrato su ``access_token_cifrato`` cosi' al
+                # callback sappiamo quale customer interrogare per trovare la
+                # connection_id effettiva.
+                if isinstance(adapter, SaltEdgeAdapter) and adapter.customer_id:
+                    connessione.access_token_cifrato = cifra_testo(adapter.customer_id)
+                    update_fields.append("access_token_cifrato")
+                if info.expires_at:
+                    connessione.consenso_scadenza = info.expires_at
+                    update_fields.append("consenso_scadenza")
+                connessione.save(update_fields=update_fields)
+                return redirect(info.authorization_url)
+            except Exception as exc:
+                messages.error(request, f"Impossibile avviare la connessione: {exc}")
+    else:
+        form = NuovaConnessioneBancariaForm(provider=provider)
+
+    return render(
+        request,
+        "gestione_finanziaria/nuova_connessione_form.html",
+        {
+            "provider": provider,
+            "form": form,
+            "istituti": istituti,
+            "errore_lista": errore_lista,
+            "country": country,
+            "is_truelayer": is_oauth_adapter(provider),
+        },
+    )
+
+
+def _finalizza_connessione_psd2(request, connessione, adapter):
+    """
+    Step comune a tutti i provider dopo che il consenso e' stato concesso:
+    1. chiede l'elenco dei conti al provider;
+    2. crea/aggiorna i :class:`ContoBancario` corrispondenti;
+    3. segna la connessione come ATTIVA.
+    """
+    try:
+        conti_provider = adapter.lista_conti(connessione.external_connection_id)
+    except Exception as exc:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = str(exc)[:1000]
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Errore durante il recupero dei conti: {exc}")
+        return redirect("lista_connessioni_bancarie")
+
+    provider = connessione.provider
+    creati = 0
+    for account in conti_provider:
+        conto, is_new = ContoBancario.objects.get_or_create(
+            provider=provider,
+            external_account_id=account.external_account_id,
+            defaults={
+                "nome_conto": account.name or f"Conto {account.iban or account.external_account_id}",
+                "iban": account.iban,
+                "intestatario": account.owner_name,
+                "valuta": account.currency or "EUR",
+                "connessione": connessione,
+                "attivo": True,
+            },
+        )
+        if not is_new:
+            conto.connessione = connessione
+            if account.iban and not conto.iban:
+                conto.iban = account.iban
+            if account.owner_name and not conto.intestatario:
+                conto.intestatario = account.owner_name
+            conto.save()
+        else:
+            creati += 1
+
+    connessione.stato = StatoConnessioneBancaria.ATTIVA
+    connessione.ultimo_refresh_at = timezone.now()
+    connessione.ultimo_errore = ""
+    connessione.save(
+        update_fields=[
+            "stato",
+            "ultimo_refresh_at",
+            "ultimo_errore",
+            "data_aggiornamento",
+        ]
+    )
+
+    messages.success(
+        request,
+        f"Connessione autorizzata. Conti collegati: {len(conti_provider)} "
+        f"(nuovi: {creati}).",
+    )
+    return redirect("lista_connessioni_bancarie")
+
+
+def callback_connessione_psd2(request, pk):
+    """
+    URL di ritorno dal consenso utente per provider *non* OAuth2 standard
+    (es. GoCardless Bank Account Data). Il provider redirige qui con un
+    parametro ``ref`` e/o ``error``. Interroghiamo l'API per:
+    - verificare lo stato della requisition;
+    - recuperare gli ``accounts`` collegati;
+    - creare/aggiornare i :class:`ContoBancario` corrispondenti.
+    """
+
+    connessione = get_object_or_404(ConnessioneBancaria, pk=pk)
+    provider = connessione.provider
+    if provider.tipo != TipoProviderBancario.PSD2:
+        raise Http404()
+
+    error = request.GET.get("error")
+    if error:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = f"Error return: {error}"
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Autorizzazione negata o fallita: {error}")
+        return redirect("lista_connessioni_bancarie")
+
+    try:
+        adapter = adapter_for_provider(provider, connessione=connessione)
+    except Exception as exc:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = str(exc)[:1000]
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Errore provider: {exc}")
+        return redirect("lista_connessioni_bancarie")
+
+    # Salt Edge: al callback la connection_id vera non arriva come query
+    # param (non c'e' OAuth2). Dobbiamo interrogare /connections?customer_id=
+    # e prendere la piu' recente creata dopo l'inizio del flusso.
+    if isinstance(adapter, SaltEdgeAdapter) and not connessione.external_connection_id:
+        try:
+            connection_id = adapter.trova_connection_id(
+                customer_id=adapter.customer_id,
+                created_after=connessione.data_creazione,
+            )
+        except SaltEdgeError as exc:
+            connessione.stato = StatoConnessioneBancaria.ERRORE
+            connessione.ultimo_errore = str(exc)[:1000]
+            connessione.save(
+                update_fields=["stato", "ultimo_errore", "data_aggiornamento"]
+            )
+            messages.error(request, f"Salt Edge: {exc}")
+            return redirect("lista_connessioni_bancarie")
+        connessione.external_connection_id = connection_id
+        connessione.save(
+            update_fields=["external_connection_id", "data_aggiornamento"]
+        )
+
+    return _finalizza_connessione_psd2(request, connessione, adapter)
+
+
+def callback_oauth_psd2(request):
+    """
+    Callback *fisso* per TrueLayer (OAuth2) e Enable Banking (code -> sessione).
+
+    Il provider redirige qui con ``?code=...&state=arboris-<pk>`` (oppure
+    ``?error=...&state=...``). Per TrueLayer: scambio ``code`` in access/refresh
+    token. Per Enable Banking: ``POST /sessions`` con il ``code`` e salvataggio
+    del ``session_id`` come ``external_connection_id``. Poi flusso comune
+    (lista conti, ecc.).
+    """
+    state = request.GET.get("state") or ""
+    error = request.GET.get("error") or ""
+    code = request.GET.get("code") or ""
+
+    pk = None
+    if state.startswith("arboris-"):
+        try:
+            pk = int(state.split("arboris-", 1)[1])
+        except (ValueError, IndexError):
+            pk = None
+
+    if not pk:
+        messages.error(
+            request,
+            "Callback OAuth2 non valido: parametro 'state' mancante o malformato.",
+        )
+        return redirect("lista_connessioni_bancarie")
+
+    connessione = get_object_or_404(ConnessioneBancaria, pk=pk)
+    provider = connessione.provider
+    if provider.tipo != TipoProviderBancario.PSD2:
+        raise Http404()
+
+    if error:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = f"Error return: {error}"
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Autorizzazione negata o fallita: {error}")
+        return redirect("lista_connessioni_bancarie")
+
+    if not code:
+        messages.error(request, "Callback OAuth2 senza 'code': autorizzazione non completata.")
+        return redirect("lista_connessioni_bancarie")
+
+    try:
+        adapter = adapter_for_provider(provider, connessione=connessione)
+    except Exception as exc:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = str(exc)[:1000]
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Errore provider: {exc}")
+        return redirect("lista_connessioni_bancarie")
+
+    redirect_url = _oauth_redirect_uri(request, provider)
+
+    if isinstance(adapter, TrueLayerAdapter):
+        try:
+            tokens = adapter.scambia_codice_autorizzazione(code, redirect_url=redirect_url)
+        except TrueLayerError as exc:
+            connessione.stato = StatoConnessioneBancaria.ERRORE
+            connessione.ultimo_errore = str(exc)[:1000]
+            connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+            messages.error(request, f"Scambio code -> token fallito: {exc}")
+            return redirect("lista_connessioni_bancarie")
+
+        connessione.access_token_cifrato = cifra_testo(tokens.access_token) if tokens.access_token else ""
+        connessione.refresh_token_cifrato = (
+            cifra_testo(tokens.refresh_token) if tokens.refresh_token else ""
+        )
+        connessione.access_token_scadenza = tokens.access_token_expires_at
+        connessione.save(
+            update_fields=[
+                "access_token_cifrato",
+                "refresh_token_cifrato",
+                "access_token_scadenza",
+                "data_aggiornamento",
+            ]
+        )
+        return _finalizza_connessione_psd2(request, connessione, adapter)
+
+    if isinstance(adapter, EnableBankingAdapter):
+        try:
+            session_id = adapter.scambia_codice_sessione(code)
+        except EnableBankingError as exc:
+            connessione.stato = StatoConnessioneBancaria.ERRORE
+            connessione.ultimo_errore = str(exc)[:1000]
+            connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+            messages.error(request, f"Scambio code -> sessione fallito: {exc}")
+            return redirect("lista_connessioni_bancarie")
+
+        connessione.external_connection_id = session_id
+        connessione.save(
+            update_fields=["external_connection_id", "data_aggiornamento"]
+        )
+        return _finalizza_connessione_psd2(request, connessione, adapter)
+
+    messages.error(
+        request,
+        "Callback ricevuto ma l'adapter del provider non supporta questo flusso.",
+    )
+    return redirect("lista_connessioni_bancarie")
+
+
+def sincronizza_conto_bancario(request, pk):
+    conto = get_object_or_404(ContoBancario, pk=pk)
+
+    if request.method != "POST":
+        return redirect("lista_conti_bancari")
+
+    if conto.provider is None or conto.provider.tipo != TipoProviderBancario.PSD2:
+        messages.error(request, "Questo conto non e' collegato a un provider PSD2.")
+        return redirect("lista_conti_bancari")
+
+    try:
+        log = sincronizza_conto_psd2(conto)
+    except ProviderConfigurazioneMancante as exc:
+        messages.error(request, str(exc))
+        return redirect("lista_conti_bancari")
+    except Exception as exc:
+        messages.error(request, f"Sincronizzazione fallita: {exc}")
+        return redirect("lista_conti_bancari")
+
+    if log.esito == "ok":
+        messages.success(
+            request,
+            f"Sincronizzazione del conto '{conto.nome_conto}' completata: "
+            f"{log.movimenti_inseriti} nuovi movimenti.",
+        )
+    else:
+        messages.warning(
+            request,
+            f"Sincronizzazione conclusa con stato '{log.get_esito_display()}'. "
+            "Controlla i log per i dettagli.",
+        )
+    return redirect("lista_conti_bancari")
+
+
+def elimina_connessione_psd2(request, pk):
+    connessione = get_object_or_404(ConnessioneBancaria, pk=pk)
+
+    count_conti = connessione.conti.count()
+
+    if request.method == "POST":
+        if count_conti:
+            messages.error(
+                request,
+                "Impossibile eliminare la connessione: ha conti bancari collegati. "
+                "Scollega o elimina prima i conti.",
+            )
+            return redirect("lista_connessioni_bancarie")
+
+        connessione.delete()
+        messages.success(request, "Connessione eliminata correttamente.")
+        return redirect("lista_connessioni_bancarie")
+
+    return render(
+        request,
+        "gestione_finanziaria/connessione_confirm_delete.html",
+        {"connessione": connessione, "count_conti": count_conti},
+    )
+
+
+# =========================================================================
+#  Pianificazione sincronizzazione PSD2
+# =========================================================================
+
+
+def pianificazione_sincronizzazione(request):
+    """Configurazione dello scheduler di sincronizzazione PSD2 (singleton)."""
+    config = get_or_create_singleton()
+
+    if request.method == "POST":
+        azione = request.POST.get("azione", "salva")
+
+        if azione == "esegui":
+            config.ultimo_run_at = None
+            config.save(update_fields=["ultimo_run_at", "data_aggiornamento"])
+            try:
+                risultato = maybe_run_scheduled_sync(triggered_by=request.user)
+            except Exception as exc:
+                messages.error(request, f"Esecuzione fallita: {exc}")
+            else:
+                if risultato is None:
+                    messages.warning(
+                        request,
+                        "Impossibile avviare la sincronizzazione: pianificazione disattivata "
+                        "o un'altra esecuzione e' gia' in corso.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Sincronizzazione eseguita: {risultato.conti_sincronizzati} conti ok, "
+                        f"{risultato.conti_in_errore} in errore.",
+                    )
+            return redirect("pianificazione_sincronizzazione")
+
+        form = PianificazioneSincronizzazioneForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Pianificazione aggiornata.")
+            return redirect("pianificazione_sincronizzazione")
+    else:
+        form = PianificazioneSincronizzazioneForm(instance=config)
+
+    conti = list(
+        ContoBancario.objects.filter(
+            attivo=True,
+            provider__tipo=TipoProviderBancario.PSD2,
+        )
+        .exclude(external_account_id="")
+        .select_related("provider", "connessione")
+        .order_by("provider__nome", "nome_conto")
+    )
+
+    return render(
+        request,
+        "gestione_finanziaria/pianificazione_sincronizzazione.html",
+        {
+            "form": form,
+            "config": config,
+            "conti_target": conti,
+            "prossima_esecuzione": prossima_esecuzione_prevista(config),
+        },
+    )
+
+
+# =========================================================================
+#  Riconciliazione movimenti con rate iscrizione
+# =========================================================================
+
+
+def lista_movimenti_da_riconciliare(request):
+    """Elenco dei movimenti non ancora riconciliati, con filtri base."""
+    queryset = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione")
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(rata_iscrizione__isnull=True)
+    )
+
+    conto_id = request.GET.get("conto") or ""
+    if conto_id.isdigit():
+        queryset = queryset.filter(conto_id=int(conto_id))
+
+    solo_entrate = request.GET.get("solo_entrate") == "1"
+    if solo_entrate:
+        queryset = queryset.filter(importo__gt=0)
+
+    ordinamento = request.GET.get("ordinamento", "data")
+    if ordinamento == "importo":
+        queryset = queryset.order_by("-importo", "-data_contabile")
+    else:
+        queryset = queryset.order_by("-data_contabile", "-id")
+
+    movimenti = list(queryset[:200])
+    conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+
+    return render(
+        request,
+        "gestione_finanziaria/movimenti_da_riconciliare.html",
+        {
+            "movimenti": movimenti,
+            "conti": conti,
+            "conto_selezionato": conto_id,
+            "solo_entrate": solo_entrate,
+            "ordinamento": ordinamento,
+            "totale_visualizzati": len(movimenti),
+        },
+    )
+
+
+def riconcilia_movimento(request, pk):
+    """Vista di riconciliazione di un singolo movimento."""
+    movimento = get_object_or_404(
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione"),
+        pk=pk,
+    )
+
+    if request.method == "POST":
+        azione = request.POST.get("azione", "")
+
+        if azione == "annulla":
+            annulla_riconciliazione(movimento)
+            messages.success(request, "Riconciliazione annullata.")
+            return redirect("riconcilia_movimento", pk=movimento.pk)
+
+        if azione == "ignora":
+            movimento.stato_riconciliazione = StatoRiconciliazione.IGNORATO
+            movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
+            messages.success(request, "Movimento marcato come da ignorare.")
+            return redirect("lista_movimenti_da_riconciliare")
+
+        rata_pk = request.POST.get("rata_pk")
+        if not rata_pk or not rata_pk.isdigit():
+            messages.error(request, "Seleziona una rata candidata da collegare.")
+        else:
+            from economia.models.iscrizioni import RataIscrizione
+            try:
+                rata = RataIscrizione.objects.select_related(
+                    "iscrizione__studente__famiglia"
+                ).get(pk=int(rata_pk))
+            except RataIscrizione.DoesNotExist:
+                messages.error(request, "Rata selezionata non trovata.")
+                return redirect("riconcilia_movimento", pk=movimento.pk)
+
+            marca = request.POST.get("marca_rata_pagata") == "1"
+            riconcilia_movimento_con_rata(movimento, rata, utente=request.user, marca_rata_pagata=marca)
+            messages.success(
+                request,
+                f"Movimento riconciliato con {rata}. "
+                + ("Rata marcata come pagata." if marca else "Rata non modificata."),
+            )
+            return redirect("lista_movimenti_da_riconciliare")
+
+    candidati = trova_rate_candidate(movimento)
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_riconciliazione.html",
+        {
+            "movimento": movimento,
+            "candidati": candidati,
+            "gia_riconciliato": movimento.rata_iscrizione_id is not None,
+        },
+    )
+
+
+# =========================================================================
+#  Report per categoria
+# =========================================================================
+
+
+def _anni_disponibili():
+    from django.db.models.functions import ExtractYear
+
+    anni = (
+        MovimentoFinanziario.objects.annotate(anno=ExtractYear("data_contabile"))
+        .values_list("anno", flat=True)
+        .distinct()
+        .order_by("-anno")
+    )
+    return [a for a in anni if a]
+
+
+def _filtra_movimenti_report(request, queryset):
+    conto_id = request.GET.get("conto") or ""
+    if conto_id.isdigit():
+        queryset = queryset.filter(conto_id=int(conto_id))
+    return queryset, conto_id
+
+
+def _espandi_categoria_root(categoria):
+    """Ritorna la lista di id delle categorie (self + tutti i discendenti)."""
+    ids = [categoria.pk]
+    stack = [categoria]
+    while stack:
+        corrente = stack.pop()
+        figli = list(CategoriaFinanziaria.objects.filter(parent=corrente).only("id"))
+        for f in figli:
+            ids.append(f.pk)
+            stack.append(f)
+    return ids
+
+
+def report_categorie_mensile(request):
+    """
+    Report entrate/uscite per categoria, pivot mesi (1..12) su anno scelto.
+
+    Rollup gerarchico: per ogni categoria radice il totale mostrato
+    include i movimenti delle sottocategorie.
+    """
+    from django.db.models.functions import ExtractMonth, ExtractYear
+
+    anni = _anni_disponibili()
+    anno_sel = request.GET.get("anno")
+    try:
+        anno = int(anno_sel) if anno_sel else (anni[0] if anni else timezone.now().year)
+    except ValueError:
+        anno = anni[0] if anni else timezone.now().year
+
+    queryset = MovimentoFinanziario.objects.filter(data_contabile__year=anno).exclude(
+        categoria__isnull=True
+    )
+    queryset, conto_id = _filtra_movimenti_report(request, queryset)
+
+    aggregato = (
+        queryset.annotate(mese=ExtractMonth("data_contabile"))
+        .values("categoria_id", "mese")
+        .annotate(totale=Sum("importo"))
+    )
+
+    mappa = {}
+    for riga in aggregato:
+        cat_id = riga["categoria_id"]
+        mese = riga["mese"]
+        mappa.setdefault(cat_id, {})[mese] = riga["totale"] or Decimal("0")
+
+    categorie_root = list(
+        CategoriaFinanziaria.objects.filter(parent__isnull=True, attiva=True).order_by(
+            "tipo", "ordine", "nome"
+        )
+    )
+
+    righe_report = []
+    totali_mensili = {m: Decimal("0") for m in range(1, 13)}
+    totale_generale = Decimal("0")
+
+    for root in categorie_root:
+        ids_inclusi = _espandi_categoria_root(root)
+        valori_mese = {m: Decimal("0") for m in range(1, 13)}
+        for cid in ids_inclusi:
+            for mese, importo in (mappa.get(cid) or {}).items():
+                if mese is None:
+                    continue
+                valori_mese[int(mese)] += importo or Decimal("0")
+
+        totale_riga = sum(valori_mese.values(), Decimal("0"))
+        if totale_riga == 0:
+            # nascondiamo le categorie senza movimenti per mantenere il report leggibile
+            continue
+        righe_report.append(
+            {
+                "categoria": root,
+                "valori_mese": [valori_mese[m] for m in range(1, 13)],
+                "totale": totale_riga,
+            }
+        )
+        for m in range(1, 13):
+            totali_mensili[m] += valori_mese[m]
+        totale_generale += totale_riga
+
+    conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+    mesi = [
+        "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
+        "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
+    ]
+
+    return render(
+        request,
+        "gestione_finanziaria/report_categorie_mensile.html",
+        {
+            "anno": anno,
+            "anni_disponibili": anni,
+            "righe": righe_report,
+            "totali_mensili": [totali_mensili[m] for m in range(1, 13)],
+            "totale_generale": totale_generale,
+            "mesi": mesi,
+            "conti": conti,
+            "conto_selezionato": conto_id,
+        },
+    )
+
+
+def report_categorie_annuale(request):
+    """
+    Report annuale per categoria: entrate totali, uscite totali, netto
+    e peso % sul totale; rollup gerarchico su categorie radice.
+    """
+    anni = _anni_disponibili()
+    anno_sel = request.GET.get("anno")
+    try:
+        anno = int(anno_sel) if anno_sel else (anni[0] if anni else timezone.now().year)
+    except ValueError:
+        anno = anni[0] if anni else timezone.now().year
+
+    queryset = MovimentoFinanziario.objects.filter(data_contabile__year=anno).exclude(
+        categoria__isnull=True
+    )
+    queryset, conto_id = _filtra_movimenti_report(request, queryset)
+
+    aggregato = (
+        queryset.values("categoria_id")
+        .annotate(
+            totale_entrate=Sum("importo", filter=Q(importo__gt=0)),
+            totale_uscite=Sum("importo", filter=Q(importo__lt=0)),
+        )
+    )
+    per_categoria = {
+        r["categoria_id"]: {
+            "entrate": r["totale_entrate"] or Decimal("0"),
+            "uscite": r["totale_uscite"] or Decimal("0"),
+        }
+        for r in aggregato
+    }
+
+    categorie_root = list(
+        CategoriaFinanziaria.objects.filter(parent__isnull=True, attiva=True).order_by(
+            "tipo", "ordine", "nome"
+        )
+    )
+
+    righe_entrate = []
+    righe_uscite = []
+    tot_entrate = Decimal("0")
+    tot_uscite = Decimal("0")
+
+    for root in categorie_root:
+        ids_inclusi = _espandi_categoria_root(root)
+        entrate = Decimal("0")
+        uscite = Decimal("0")
+        for cid in ids_inclusi:
+            blocco = per_categoria.get(cid)
+            if blocco:
+                entrate += blocco["entrate"]
+                uscite += blocco["uscite"]
+
+        if entrate == 0 and uscite == 0:
+            continue
+
+        riga = {
+            "categoria": root,
+            "entrate": entrate,
+            "uscite": uscite,
+            "netto": entrate + uscite,
+        }
+        if root.tipo == TipoCategoriaFinanziaria.ENTRATA:
+            righe_entrate.append(riga)
+            tot_entrate += entrate
+        elif root.tipo == TipoCategoriaFinanziaria.USCITA:
+            righe_uscite.append(riga)
+            tot_uscite += uscite
+        else:
+            # trasferimenti / misti: li collochiamo dove prevalgono
+            if entrate + uscite >= 0:
+                righe_entrate.append(riga)
+                tot_entrate += entrate
+            else:
+                righe_uscite.append(riga)
+                tot_uscite += uscite
+
+    def _aggiungi_percentuali(righe, totale):
+        if totale == 0:
+            for r in righe:
+                r["percentuale"] = Decimal("0")
+            return
+        for r in righe:
+            delta = r["entrate"] if r["entrate"] else (r["uscite"].copy_abs() if r["uscite"] else Decimal("0"))
+            totale_abs = totale.copy_abs() if hasattr(totale, "copy_abs") else abs(totale)
+            if totale_abs == 0:
+                r["percentuale"] = Decimal("0")
+            else:
+                r["percentuale"] = (delta / totale_abs * Decimal("100")).quantize(Decimal("0.1"))
+
+    _aggiungi_percentuali(righe_entrate, tot_entrate)
+    _aggiungi_percentuali(righe_uscite, tot_uscite)
+
+    righe_entrate.sort(key=lambda r: r["entrate"], reverse=True)
+    righe_uscite.sort(key=lambda r: r["uscite"])  # piu' negativo prima
+
+    conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+
+    return render(
+        request,
+        "gestione_finanziaria/report_categorie_annuale.html",
+        {
+            "anno": anno,
+            "anni_disponibili": anni,
+            "righe_entrate": righe_entrate,
+            "righe_uscite": righe_uscite,
+            "totale_entrate": tot_entrate,
+            "totale_uscite": tot_uscite,
+            "saldo_netto": tot_entrate + tot_uscite,
+            "conti": conti,
+            "conto_selezionato": conto_id,
+        },
+    )
+
+

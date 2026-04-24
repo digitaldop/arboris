@@ -1,0 +1,93 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
+
+{% block title %}{% if anno %}Anno scolastico {{ anno.nome_anno_scolastico }}{% else %}Nuovo anno scolastico{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+{% if not popup %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if anno %}{{ anno.nome_anno_scolastico }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if anno %}Anno scolastico {{ anno.nome_anno_scolastico }}{% else %}Nuovo anno scolastico{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% else %}
+                {% if anno %}
+                    <button type="button" class="btn btn-primary" id="enable-edit-anno-btn">Modifica</button>
+                    <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="btn btn-danger">Elimina</a>
+                    <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-anno-btn">Annulla modifiche</button>
+                {% endif %}
+                <a href="{% url 'lista_anni_scolastici' %}" class="btn btn-secondary">Torna all'elenco</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" id="anno-detail-form" class="detail-form{% if anno and not popup %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <fieldset id="anno-lock-container" class="mode-lock-container" {% if anno and not popup %}disabled{% endif %}>
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.nome_anno_scolastico.label_tag }}</th>
+                    <td>{{ form.nome_anno_scolastico }} {{ form.nome_anno_scolastico.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_inizio.label_tag }}</th>
+                    <td>{{ form.data_inizio }} {{ form.data_inizio.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_fine.label_tag }}</th>
+                    <td>{{ form.data_fine }} {{ form.data_fine.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.corrente.label_tag }}</th>
+                    <td>{{ form.corrente }} {{ form.corrente.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.attivo.label_tag }}</th>
+                    <td>{{ form.attivo }} {{ form.attivo.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>{{ form.note }} {{ form.note.errors }}</td>
+                </tr>
+            </table>
+            <div class="form-actions{% if not popup %} mode-edit-only{% endif %}">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% else %}
+                    <a href="{% url 'lista_anni_scolastici' %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+        </fieldset>
+    </form>
+    {% if not popup %}
+        <script src="{% static 'js/core/view-mode.js' %}"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                if (window.ArborisViewMode) {
+                    ArborisViewMode.init({
+                        formId: "anno-detail-form",
+                        lockContainerId: "anno-lock-container",
+                        editButtonId: "enable-edit-anno-btn",
+                        cancelButtonId: "cancel-edit-anno-btn",
+                        startInEditMode: {% if anno %}false{% else %}true{% endif %},
+                        reloadOnCancel: true
+                    });
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock %}

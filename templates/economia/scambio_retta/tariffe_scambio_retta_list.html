@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tariffe scambio retta - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Tariffe scambio retta</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Tariffe scambio retta</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_tariffa_scambio_retta' %}" class="btn btn-primary">Nuova tariffa</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Valore orario</th>
+                    <th>Definizione</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tariffa in tariffe %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}">
+                        <td>{{ tariffa.valore_orario }}</td>
+                        <td>{{ tariffa.definizione|default:"-" }}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3"><div class="empty-state">Nessuna tariffa scambio retta inserita.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

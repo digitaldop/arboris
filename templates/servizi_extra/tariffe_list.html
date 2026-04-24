@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}{% if servizio_filtro %}Tariffe {{ servizio_filtro.nome_servizio }}{% else %}Tariffe servizi extra{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Tariffe</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">
+            {% if servizio_filtro %}
+                Tariffe {{ servizio_filtro.nome_servizio }}
+            {% else %}
+                Tariffe servizi extra
+            {% endif %}
+        </h1>
+        <div class="page-head-actions">
+            {% if servizio_filtro %}
+                <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary">Scheda servizio</a>
+                <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Tutte le tariffe</a>
+            {% endif %}
+            {% if can_manage_servizi_extra %}
+                <a href="{% url 'crea_tariffa_servizio_extra' %}" class="btn btn-primary">Nuova tariffa</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Tariffa</th>
+                    <th>Servizio</th>
+                    <th>Anno scolastico</th>
+                    <th>Totale</th>
+                    <th>Rate</th>
+                    <th>Rateizzata</th>
+                    <th>Iscrizioni</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tariffa in tariffe %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}">
+                        <td>{{ tariffa.nome_tariffa }}</td>
+                        <td>{{ tariffa.servizio.nome_servizio }}</td>
+                        <td>{{ tariffa.servizio.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>EUR {{ tariffa.totale_importo|euro }}</td>
+                        <td>{{ tariffa.numero_rate }}</td>
+                        <td>{% if tariffa.rateizzata %}Si{% else %}No{% endif %}</td>
+                        <td>{{ tariffa.count_iscrizioni }}</td>
+                        <td>{% if tariffa.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="table-link">Modifica</a>
+                            {% if can_manage_servizi_extra %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}" class="table-link table-link-danger">Elimina</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9"><div class="empty-state">Nessuna tariffa configurata.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

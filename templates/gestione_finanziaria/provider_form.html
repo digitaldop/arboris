@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{% if provider %}Provider {{ provider.nome }}{% else %}Nuovo provider{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_provider_bancari' %}">Provider</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if provider %}{{ provider.nome }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if provider %}Provider {{ provider.nome }}{% else %}Nuovo provider bancario{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_provider_bancari' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                <tr><th>{{ form.tipo.label_tag }}</th><td>{{ form.tipo }} {{ form.tipo.errors }}</td></tr>
+                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <a href="{% url 'lista_provider_bancari' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

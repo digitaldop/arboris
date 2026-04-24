@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}
+    {% if prestazione %}Prestazione scambio retta{% else %}Nuova prestazione scambio retta{% endif %} - Arboris
+{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{{ return_url }}">{{ back_label }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if prestazione %}Prestazione del {{ prestazione.data|date:"d/m/Y" }}{% else %}Nuova prestazione{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if prestazione %}Prestazione scambio retta{% else %}Nuova prestazione scambio retta{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if prestazione %}
+                <button type="button" class="btn btn-primary" id="enable-edit-prestazione-btn">Modifica</button>
+                <a href="{% url 'elimina_prestazione_scambio_retta' prestazione.pk %}?return_to={{ return_to|urlencode }}" class="btn btn-danger">Elimina</a>
+                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-prestazione-btn">Annulla modifiche</button>
+            {% endif %}
+            <a href="{{ return_url }}" class="btn btn-secondary">{{ back_label }}</a>
+        </div>
+    </div>
+
+    <form method="post" id="prestazione-scambio-detail-form" class="detail-form{% if prestazione %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <input type="hidden" name="return_to" value="{{ return_to }}">
+
+        <fieldset id="prestazione-scambio-lock-container" class="mode-lock-container" {% if prestazione %}disabled{% endif %}>
+            <div class="content-card">
+                <table class="form-table">
+                    <tr>
+                        <th>{{ form.familiare.label_tag }}</th>
+                        <td>{{ form.familiare }} {{ form.familiare.errors }}</td>
+                    </tr>
+                    <tr>
+                        <th>Famiglia</th>
+                        <td>
+                            <div id="prestazione-famiglia-preview" class="system-readonly-value">
+                                {% if famiglia_preview %}
+                                    {{ famiglia_preview }}
+                                {% else %}
+                                    <span class="table-muted">Seleziona prima un familiare</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.studente.label_tag }}</th>
+                        <td>
+                            {{ form.studente }}
+                            {% if form.studente.help_text %}<div class="help-text">{{ form.studente.help_text }}</div>{% endif %}
+                            {{ form.studente.errors }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.data.label_tag }}</th>
+                        <td>{{ form.data }} {{ form.data.errors }}</td>
+                    </tr>
+                    <tr>
+                        <th>Anno scolastico</th>
+                        <td>
+                            <div id="prestazione-anno-preview" class="system-readonly-value">
+                                {% if anno_scolastico_preview %}
+                                    {{ anno_scolastico_preview.nome_anno_scolastico }}
+                                {% else %}
+                                    <span class="table-muted">Verra ricavato automaticamente dalla data</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.ora_ingresso.label_tag }}</th>
+                        <td>{{ form.ora_ingresso }} {{ form.ora_ingresso.errors }}</td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.ora_uscita.label_tag }}</th>
+                        <td>{{ form.ora_uscita }} {{ form.ora_uscita.errors }}</td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.ore_lavorate.label_tag }}</th>
+                        <td>
+                            {{ form.ore_lavorate }}
+                            <div class="help-text" id="prestazione-ore-help">{{ form.ore_lavorate.help_text }}</div>
+                            {{ form.ore_lavorate.errors }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.tariffa_scambio_retta.label_tag }}</th>
+                        <td>{{ form.tariffa_scambio_retta }} {{ form.tariffa_scambio_retta.errors }}</td>
+                    </tr>
+                    <tr>
+                        <th>Importo maturato</th>
+                        <td>
+                            <div class="currency-input-group currency-preview-group">
+                                <span class="currency-prefix">EUR</span>
+                                <div class="currency-preview-value" id="prestazione-scambio-importo-preview">
+                                    {% if prestazione %}{{ prestazione.importo_maturato }}{% else %}0.00{% endif %}
+                                </div>
+                            </div>
+                            <div class="help-text">Calcolato automaticamente dal totale ore e dalla tariffa selezionata.</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.descrizione.label_tag }}</th>
+                        <td>
+                            {{ form.descrizione }}
+                            {% if form.descrizione.help_text %}<div class="help-text">{{ form.descrizione.help_text }}</div>{% endif %}
+                            {{ form.descrizione.errors }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>{{ form.note.label_tag }}</th>
+                        <td>{{ form.note }} {{ form.note.errors }}</td>
+                    </tr>
+                </table>
+
+                {% if form.non_field_errors %}
+                    <div class="help-text" style="padding: 0 16px 8px 16px;">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="form-actions mode-edit-only">
+                    <button type="submit" class="btn btn-primary">Salva</button>
+                    <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua</button>
+                    <a href="{{ return_url }}" class="btn btn-secondary">Annulla</a>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+
+    {{ school_year_payload|json_script:"prestazione-scambio-school-years" }}
+
+    <script src="{% static 'js/core/view-mode.js' %}"></script>
+    <script src="{% static 'js/pages/prestazione-scambio-retta-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisViewMode) {
+                ArborisViewMode.init({
+                    formId: "prestazione-scambio-detail-form",
+                    lockContainerId: "prestazione-scambio-lock-container",
+                    editButtonId: "enable-edit-prestazione-btn",
+                    cancelButtonId: "cancel-edit-prestazione-btn",
+                    startInEditMode: {% if prestazione %}false{% else %}true{% endif %},
+                    reloadOnCancel: true
+                });
+            }
+
+            if (window.ArborisPrestazioneScambioRettaForm) {
+                ArborisPrestazioneScambioRettaForm.init();
+            }
+        });
+    </script>
+{% endblock %}

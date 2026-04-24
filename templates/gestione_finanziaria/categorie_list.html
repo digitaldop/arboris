@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Categorie finanziarie - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Categorie</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Categorie finanziarie</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_categoria_finanziaria' %}" class="btn btn-primary">Nuova categoria</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Categoria padre</th>
+                    <th>Colore</th>
+                    <th>Ordine</th>
+                    <th>Attiva</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria in categorie %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_categoria_finanziaria' categoria.pk %}">
+                        <td>{{ categoria.nome }}</td>
+                        <td>{{ categoria.get_tipo_display }}</td>
+                        <td>{% if categoria.parent %}{{ categoria.parent.nome }}{% else %}-{% endif %}</td>
+                        <td>
+                            {% if categoria.colore %}
+                                <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:{{ categoria.colore }};vertical-align:middle;margin-right:6px;"></span>{{ categoria.colore }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ categoria.ordine|default:"-" }}</td>
+                        <td>{% if categoria.attiva %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_categoria_finanziaria' categoria.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_categoria_finanziaria' categoria.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                Nessuna categoria finanziaria impostata. Le categorie permettono di classificare spese e entrate per produrre i report economici.
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

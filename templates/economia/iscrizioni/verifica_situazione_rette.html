@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Verifica situazione rette - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Verifica situazione rette</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <style>
+        .verifica-rette-anno-form {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .verifica-rette-anno-form select.form-control {
+            min-width: 240px;
+        }
+
+        .verifica-rette-legenda-card {
+            padding: 0.75rem 1rem;
+        }
+        .verifica-rette-legenda {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        .verifica-rette-legenda .legenda-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .verifica-rette-legenda .legenda-chip {
+            display: inline-block;
+            width: 18px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            background: #f5f5f5;
+        }
+
+        .verifica-rette-table-card {
+            padding: 0;
+        }
+        .verifica-rette-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .verifica-rette-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            font-size: 0.85rem;
+        }
+        .verifica-rette-table th,
+        .verifica-rette-table td {
+            border: 1px solid #dadfe3;
+            padding: 0;
+            vertical-align: top;
+            background: #fff;
+        }
+        .verifica-rette-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            background: #f3f5f7;
+            font-weight: 600;
+            padding: 0.5rem 0.6rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .verifica-rette-table .sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #fff;
+            min-width: 220px;
+            max-width: 240px;
+        }
+        .verifica-rette-table thead .sticky-col {
+            z-index: 4;
+            background: #f3f5f7;
+        }
+        .verifica-rette-table .studente-col {
+            padding: 0;
+        }
+        .verifica-rette-table .studente-link {
+            display: block;
+            padding: 0.55rem 0.75rem;
+            text-decoration: none;
+            color: inherit;
+        }
+        .verifica-rette-table .studente-link:hover {
+            background: #f1f5f9;
+        }
+        .verifica-rette-table .studente-nome {
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .verifica-rette-table .classe-separator td {
+            background: #e8edf2;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+            color: #334155;
+            position: sticky;
+            left: 0;
+        }
+
+        .verifica-rette-cell {
+            min-width: 130px;
+            max-width: 160px;
+        }
+        .verifica-rette-cell .cell-link {
+            display: block;
+            padding: 0.4rem 0.5rem;
+            color: inherit;
+            text-decoration: none;
+            font-size: 0.8rem;
+            line-height: 1.2;
+        }
+        .verifica-rette-cell .cell-link:hover {
+            filter: brightness(0.96);
+        }
+        .verifica-rette-cell .cell-amount {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .verifica-rette-cell .cell-amount .label {
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .verifica-rette-cell .cell-amount .value {
+            font-weight: 600;
+        }
+        .verifica-rette-cell .cell-date {
+            margin-top: 3px;
+            text-align: right;
+            color: rgba(0, 0, 0, 0.55);
+            font-size: 0.75rem;
+        }
+        .verifica-rette-cell .cell-empty {
+            color: #94a3b8;
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        /* Stati semantici delle celle - specificita' maggiorata per vincere
+           su `.verifica-rette-table td { background: #fff }`. */
+        .verifica-rette-table td.cella-pagata    { background: #d6f5dc; }
+        .verifica-rette-table td.cella-parziale  { background: #fde9a6; }
+        .verifica-rette-table td.cella-non-pagata{ background: #f8c9c9; }
+        .verifica-rette-table td.cella-non-dovuta{ background: #eef2f6; }
+        .verifica-rette-table td.cella-assente   {
+            background: repeating-linear-gradient(
+                135deg,
+                #fafafa 0px,
+                #fafafa 6px,
+                #eceff2 6px,
+                #eceff2 12px
+            );
+        }
+
+        .verifica-rette-table td.cella-pagata .cell-link     { color: #14532d; }
+        .verifica-rette-table td.cella-parziale .cell-link   { color: #6b4906; }
+        .verifica-rette-table td.cella-non-pagata .cell-link { color: #7f1d1d; }
+        .verifica-rette-table td.cella-non-dovuta .cell-link { color: #475569; }
+
+        /* Stessi colori anche sui chip della legenda. */
+        .verifica-rette-legenda .legenda-chip.cella-pagata     { background: #d6f5dc; }
+        .verifica-rette-legenda .legenda-chip.cella-parziale   { background: #fde9a6; }
+        .verifica-rette-legenda .legenda-chip.cella-non-pagata { background: #f8c9c9; }
+        .verifica-rette-legenda .legenda-chip.cella-non-dovuta { background: #eef2f6; }
+        .verifica-rette-legenda .legenda-chip.cella-assente    {
+            background: repeating-linear-gradient(
+                135deg,
+                #fafafa 0px,
+                #fafafa 6px,
+                #eceff2 6px,
+                #eceff2 12px
+            );
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0,0,0,0);
+            white-space: nowrap; border: 0;
+        }
+    </style>
+
+    <div class="page-head">
+        <h1 class="page-title">Verifica situazione rette</h1>
+
+        <div class="page-head-actions">
+            <form method="get" class="verifica-rette-anno-form">
+                <label for="anno_scolastico" class="sr-only">Anno scolastico</label>
+                <select
+                    id="anno_scolastico"
+                    name="anno_scolastico"
+                    class="form-control"
+                    onchange="this.form.submit()"
+                >
+                    {% for anno in anni_scolastici %}
+                        <option
+                            value="{{ anno.pk }}"
+                            {% if anno_scolastico and anno.pk == anno_scolastico.pk %}selected{% endif %}
+                        >
+                            {{ anno.nome_anno_scolastico }}{% if anno.corrente %} (corrente){% endif %}
+                        </option>
+                    {% empty %}
+                        <option value="">Nessun anno scolastico disponibile</option>
+                    {% endfor %}
+                </select>
+                <noscript>
+                    <button type="submit" class="btn btn-secondary">Aggiorna</button>
+                </noscript>
+            </form>
+        </div>
+    </div>
+
+    {% if anno_scolastico %}
+        <div class="content-card verifica-rette-legenda-card">
+            <div class="verifica-rette-legenda">
+                <span class="legenda-item">
+                    <span class="legenda-chip cella-pagata"></span>
+                    Pagata
+                </span>
+                <span class="legenda-item">
+                    <span class="legenda-chip cella-parziale"></span>
+                    Pagamento parziale
+                </span>
+                <span class="legenda-item">
+                    <span class="legenda-chip cella-non-pagata"></span>
+                    Non pagata
+                </span>
+                <span class="legenda-item">
+                    <span class="legenda-chip cella-non-dovuta"></span>
+                    Non dovuta
+                </span>
+                <span class="legenda-item">
+                    <span class="legenda-chip cella-assente"></span>
+                    Rata non presente
+                </span>
+            </div>
+        </div>
+
+        <div class="content-card verifica-rette-table-card">
+            <div class="verifica-rette-scroll">
+                <table class="verifica-rette-table">
+                    <thead>
+                        <tr>
+                            <th class="sticky-col sticky-head studente-col">Studente</th>
+                            {% for colonna in colonne %}
+                                <th class="sticky-head">{{ colonna.label }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gruppo in righe_per_classe %}
+                            <tr class="classe-separator">
+                                <td colspan="{{ num_colonne }}" class="classe-separator-cell">
+                                    Classe: <strong>{{ gruppo.classe_label }}</strong>
+                                </td>
+                            </tr>
+                            {% for riga in gruppo.righe %}
+                                <tr>
+                                    <td class="sticky-col studente-col">
+                                        <a href="{% url 'modifica_studente' riga.studente.pk %}" class="studente-link" title="Apri scheda studente">
+                                            <div class="studente-nome">{{ riga.studente.cognome }} {{ riga.studente.nome }}</div>
+                                        </a>
+                                    </td>
+                                    {% for cella in riga.celle %}
+                                        {% if cella.rata %}
+                                            <td class="verifica-rette-cell cella-{{ cella.stato }}">
+                                                <a href="{{ cella.url }}" class="cell-link" title="Apri dettaglio rata">
+                                                    <div class="cell-amount">
+                                                        <span class="label">Dovuto</span>
+                                                        <span class="value">&euro; {{ cella.rata.importo_finale|euro }}</span>
+                                                    </div>
+                                                    <div class="cell-amount">
+                                                        <span class="label">Pagato</span>
+                                                        <span class="value">&euro; {{ cella.rata.importo_pagato|euro }}</span>
+                                                    </div>
+                                                    <div class="cell-date">
+                                                        {% if cella.rata.data_pagamento %}
+                                                            {{ cella.rata.data_pagamento|it_date }}
+                                                        {% else %}
+                                                            &ndash;
+                                                        {% endif %}
+                                                    </div>
+                                                </a>
+                                            </td>
+                                        {% else %}
+                                            <td class="verifica-rette-cell cella-assente">
+                                                <div class="cell-empty">&mdash;</div>
+                                            </td>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuno studente in questa classe.</div></td>
+                                </tr>
+                            {% endfor %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per l'anno selezionato.</div></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="content-card">
+            <div class="empty-state">
+                Nessun anno scolastico configurato. Imposta un anno scolastico attivo per visualizzare la verifica rette.
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Chiusura finestra</title>
+</head>
+<body>
+    <script>
+        if (window.opener) {
+            if (typeof window.opener.ArborisReloadWithLongWait === "function") {
+                window.opener.ArborisReloadWithLongWait();
+            } else {
+                window.opener.location.reload();
+            }
+        }
+        window.close();
+    </script>
+
+    <p>{{ message }}</p>
+    <p>Puoi chiudere questa finestra.</p>
+</body>
+</html>

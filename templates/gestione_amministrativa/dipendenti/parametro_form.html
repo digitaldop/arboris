@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{% if parametro %}Modifica parametro{% else %}Nuovo parametro{% endif %} - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_parametri_calcolo_stipendi' %}">Parametri calcolo</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if parametro %}Modifica{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if parametro %}Modifica parametro{% else %}Nuovo parametro{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                <tr><th>{{ form.valido_dal.label_tag }}</th><td>{{ form.valido_dal }} {{ form.valido_dal.errors }}</td></tr>
+                <tr><th>{{ form.valido_al.label_tag }}</th><td>{{ form.valido_al }} {{ form.valido_al.errors }}</td></tr>
+                <tr><th>{{ form.aliquota_contributi_datore.label_tag }}</th><td>{{ form.aliquota_contributi_datore }} {{ form.aliquota_contributi_datore.errors }}</td></tr>
+                <tr><th>{{ form.aliquota_contributi_dipendente.label_tag }}</th><td>{{ form.aliquota_contributi_dipendente }} {{ form.aliquota_contributi_dipendente.errors }}</td></tr>
+                <tr><th>{{ form.aliquota_tfr.label_tag }}</th><td>{{ form.aliquota_tfr }} {{ form.aliquota_tfr.errors }}</td></tr>
+                <tr><th>{{ form.aliquota_inail.label_tag }}</th><td>{{ form.aliquota_inail }} {{ form.aliquota_inail.errors }}</td></tr>
+                <tr><th>{{ form.aliquota_altri_oneri.label_tag }}</th><td>{{ form.aliquota_altri_oneri }} {{ form.aliquota_altri_oneri.errors }}</td></tr>
+                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                {% if can_manage_gestione_amministrativa %}
+                    <button type="submit" class="btn btn-primary">Salva</button>
+                {% endif %}
+                <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

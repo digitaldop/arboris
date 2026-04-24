@@ -1,0 +1,493 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Arboris School Management{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+        }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+    <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
+    <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
+</head>
+<body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
+    <header class="site-header">
+        <div class="site-header-inner">
+            <div class="brand">
+                <a href="/">
+                    <div class="logo-container">
+                        <img src="{% static 'images/arboris_logo.png' %}" alt="Arboris" class="logo">
+                    </div>
+                </a>
+            </div>
+
+            <div class="header-school">
+                {% if scuola_header %}
+                    <div class="header-school-name">{{ scuola_header.nome_scuola }}</div>
+                    {% if scuola_header.indirizzo_header_label or scuola_header.telefono_header or scuola_header.email_header %}
+                        <div class="header-school-meta">
+                            {% if scuola_header.indirizzo_header_label %}
+                                <span>{{ scuola_header.indirizzo_header_label }}</span>
+                            {% endif %}
+                            {% if scuola_header.telefono_header %}
+                                <span> - </span>
+                                {% if scuola_header.telefono_header_whatsapp_url %}
+                                    <a href="{{ scuola_header.telefono_header_whatsapp_url }}" class="header-meta-link" target="_blank" rel="noopener noreferrer">{{ scuola_header.telefono_header }}</a>
+                                {% else %}
+                                    <span>{{ scuola_header.telefono_header }}</span>
+                                {% endif %}
+                            {% endif %}
+                            {% if scuola_header.email_header %}
+                                <span> - </span>
+                                {% if scuola_header.email_header_mailto_url %}
+                                    <a href="{{ scuola_header.email_header_mailto_url }}" class="header-meta-link">{{ scuola_header.email_header }}</a>
+                                {% else %}
+                                    <span>{{ scuola_header.email_header }}</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="header-right">
+                <a href="/admin/" class="header-link">Admin Tecnico</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <!-- INIZIO CODICE DELLA SIDEBAR-->
+        <aside class="sidebar">
+            <div class="sidebar-content" id="app-sidebar-content">
+                <div class="sidebar-section sidebar-home-section">
+                    <div class="sidebar-title">Navigazione</div>
+                    <div class="sidebar-home-row">
+                        <nav class="sidebar-nav sidebar-home-nav">
+                            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                                Dashboard
+                            </a>
+                        </nav>
+                        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-expanded="true" aria-controls="app-sidebar-content" title="Comprimi menu laterale">
+                            <span class="sidebar-collapse-icon" aria-hidden="true">&lsaquo;</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-reorder-list" id="sidebar-reorder-list">
+                    {% if can_view_anagrafica %}
+                        <div class="sidebar-section" data-sidebar-section-key="anagrafica">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-anagrafica-panel"
+                                data-storage-key="arboris-sidebar-anagrafica"
+                                data-default-open="true"
+                            >
+                                <span>Anagrafica</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-anagrafica-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'lista_famiglie' %}" class="{% if request.resolver_match.url_name == 'lista_famiglie' %}active{% endif %}">
+                                        Famiglie
+                                    </a>
+
+                                    <a href="{% url 'lista_familiari' %}" class="{% if request.resolver_match.url_name == 'lista_familiari' %}active{% endif %}">
+                                        Familiari
+                                    </a>
+
+                                    <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' %}active{% endif %}">
+                                        Studenti
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_economia %}
+                        <div class="sidebar-section" data-sidebar-section-key="economia">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-economia-panel"
+                                data-storage-key="arboris-sidebar-economia"
+                                data-default-open="true"
+                            >
+                                <span>Economia</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' %}active{% endif %}">
+                                        Iscrizioni
+                                    </a>
+                                    <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' %}active{% endif %}">
+                                        Stati iscrizione
+                                    </a>
+                                    <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' %}active{% endif %}">
+                                        Rate iscrizione
+                                    </a>
+                                    <a href="{% url 'verifica_situazione_rette' %}" class="{% if request.resolver_match.url_name == 'verifica_situazione_rette' %}active{% endif %}">
+                                        Verifica situazione rette
+                                    </a>
+                                    <a href="{% url 'fondo_piano_lista' %}" class="{% if request.resolver_match and request.resolver_match.url_name|slice:':6' == 'fondo_' %}active{% endif %}">
+                                        Fondo accantonamento
+                                    </a>
+                                    <a href="{% url 'lista_scambi_retta' %}" class="{% if request.resolver_match.url_name == 'lista_scambi_retta' or request.resolver_match.url_name == 'crea_scambio_retta' or request.resolver_match.url_name == 'modifica_scambio_retta' %}active{% endif %}">
+                                        Scambio retta
+                                    </a>
+                                    <a href="{% url 'lista_tariffe_scambio_retta' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_scambio_retta' or request.resolver_match.url_name == 'crea_tariffa_scambio_retta' or request.resolver_match.url_name == 'modifica_tariffa_scambio_retta' %}active{% endif %}">
+                                        Tariffe scambio retta
+                                    </a>
+                                </nav>
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-economia-impostazioni-panel"
+                                        data-storage-key="arboris-sidebar-economia-impostazioni"
+                                        data-default-open="true"
+                                    >
+                                        <span>Impostazioni economiche</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-impostazioni-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            <a href="{% url 'lista_condizioni_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_condizioni_iscrizione' %}active{% endif %}">
+                                                Condizioni economiche
+                                            </a>
+                                            <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_condizione_iscrizione' %}active{% endif %}">
+                                                Tariffe
+                                            </a>
+                                            <a href="{% url 'lista_agevolazioni' %}" class="{% if request.resolver_match.url_name == 'lista_agevolazioni' %}active{% endif %}">
+                                                Agevolazioni
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_servizi_extra %}
+                        <div class="sidebar-section" data-sidebar-section-key="servizi-extra">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-servizi-extra-panel"
+                                data-storage-key="arboris-sidebar-servizi-extra"
+                                data-default-open="true"
+                            >
+                                <span>Servizi extra</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-servizi-extra-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    {% for sidebar_servizio in servizi_extra_sidebar_items %}
+                                        <a
+                                            href="{% url 'dettaglio_servizio_extra' sidebar_servizio.pk %}"
+                                            class="{% if current_servizio_extra_id == sidebar_servizio.pk %}active{% endif %}"
+                                            title="{{ sidebar_servizio.anno_scolastico.nome_anno_scolastico }}{% if not sidebar_servizio.attiva %} - inattivo{% endif %}"
+                                        >
+                                            {{ sidebar_servizio.nome_servizio }}
+                                        </a>
+                                    {% empty %}
+                                        <a href="{% url 'lista_servizi_extra' %}" class="{% if request.resolver_match.url_name == 'lista_servizi_extra' %}active{% endif %}">
+                                            Configura servizi extra
+                                        </a>
+                                    {% endfor %}
+                                </nav>
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-servizi-extra-impostazioni-panel"
+                                        data-storage-key="arboris-sidebar-servizi-extra-impostazioni"
+                                        data-default-open="true"
+                                    >
+                                        <span>Impostazioni Servizi Extra</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-servizi-extra-impostazioni-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            <a href="{% url 'lista_servizi_extra' %}" class="{% if request.resolver_match.url_name == 'lista_servizi_extra' or request.resolver_match.url_name == 'crea_servizio_extra' or request.resolver_match.url_name == 'modifica_servizio_extra' or request.resolver_match.url_name == 'elimina_servizio_extra' %}active{% endif %}">
+                                                Servizi
+                                            </a>
+                                            <a href="{% url 'lista_tariffe_servizi_extra' %}" class="{% if request.resolver_match.url_name == 'lista_tariffe_servizi_extra' or request.resolver_match.url_name == 'crea_tariffa_servizio_extra' or request.resolver_match.url_name == 'modifica_tariffa_servizio_extra' or request.resolver_match.url_name == 'elimina_tariffa_servizio_extra' %}active{% endif %}">
+                                                Tariffe
+                                            </a>
+                                            <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni_servizi_extra' or request.resolver_match.url_name == 'crea_iscrizione_servizio_extra' or request.resolver_match.url_name == 'modifica_iscrizione_servizio_extra' or request.resolver_match.url_name == 'elimina_iscrizione_servizio_extra' %}active{% endif %}">
+                                                Iscrizioni
+                                            </a>
+                                            <a href="{% url 'lista_rate_servizi_extra' %}" class="{% if request.resolver_match.url_name == 'lista_rate_servizi_extra' or request.resolver_match.url_name == 'modifica_rata_servizio_extra' %}active{% endif %}">
+                                                Rate
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="sidebar-section" data-sidebar-section-key="scuola">
+                        <button
+                            type="button"
+                            class="sidebar-collapsible collapsible-title is-open"
+                            data-target="sidebar-scuola-panel"
+                            data-storage-key="arboris-sidebar-scuola"
+                            data-default-open="true"
+                        >
+                            <span>Scuola</span>
+                        </button>
+                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-scuola-panel">
+                            <nav class="sidebar-nav sidebar-subnav">
+                                <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' %}active{% endif %}">
+                                    Anni scolastici
+                                </a>
+                                <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' %}active{% endif %}">
+                                    Classi
+                                </a>
+                            </nav>
+                        </div>
+                    </div>
+
+                    {% if can_view_gestione_amministrativa %}
+                        <div class="sidebar-section" data-sidebar-section-key="gestione-amministrativa">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-gestione-amministrativa-panel"
+                                data-storage-key="arboris-sidebar-gestione-amministrativa"
+                                data-default-open="true"
+                            >
+                                <span>Gestione amministrativa</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-amministrativa-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'dashboard_gestione_amministrativa' %}" class="{% if request.resolver_match.url_name == 'dashboard_gestione_amministrativa' %}active{% endif %}">
+                                        Dashboard
+                                    </a>
+                                    <a href="{% url 'lista_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_dipendenti' or request.resolver_match.url_name == 'crea_dipendente' or request.resolver_match.url_name == 'modifica_dipendente' or request.resolver_match.url_name == 'elimina_dipendente' or request.resolver_match.url_name == 'crea_contratto_dipendente' %}active{% endif %}">
+                                        Dipendenti
+                                    </a>
+                                    <a href="{% url 'lista_contratti_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_contratti_dipendenti' or request.resolver_match.url_name == 'modifica_contratto_dipendente' or request.resolver_match.url_name == 'elimina_contratto_dipendente' %}active{% endif %}">
+                                        Contratti
+                                    </a>
+                                    <a href="{% url 'lista_buste_paga_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_buste_paga_dipendenti' or request.resolver_match.url_name == 'crea_busta_paga_dipendente' or request.resolver_match.url_name == 'modifica_busta_paga_dipendente' or request.resolver_match.url_name == 'elimina_busta_paga_dipendente' %}active{% endif %}">
+                                        Buste paga
+                                    </a>
+                                    <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="{% if request.resolver_match.url_name == 'lista_parametri_calcolo_stipendi' or request.resolver_match.url_name == 'crea_parametro_calcolo_stipendio' or request.resolver_match.url_name == 'modifica_parametro_calcolo_stipendio' %}active{% endif %}">
+                                        Parametri calcolo
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_gestione_finanziaria %}
+                        <div class="sidebar-section" data-sidebar-section-key="gestione-finanziaria">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-gestione-finanziaria-panel"
+                                data-storage-key="arboris-sidebar-gestione-finanziaria"
+                                data-default-open="true"
+                            >
+                                <span>Gestione finanziaria</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'dashboard_gestione_finanziaria' %}" class="{% if request.resolver_match.url_name == 'dashboard_gestione_finanziaria' %}active{% endif %}">
+                                        Dashboard
+                                    </a>
+                                    <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
+                                        Conti bancari
+                                    </a>
+                                    <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
+                                        Movimenti
+                                    </a>
+                                    <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
+                                        Categorie
+                                    </a>
+                                    <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
+                                        Regole categorizzazione
+                                    </a>
+                                    {% if can_manage_gestione_finanziaria %}
+                                        <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
+                                            Import estratto conto
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'lista_connessioni_bancarie' %}" class="{% if request.resolver_match.url_name == 'lista_connessioni_bancarie' or request.resolver_match.url_name == 'configura_provider_psd2' or request.resolver_match.url_name == 'nuova_connessione_psd2' or request.resolver_match.url_name == 'elimina_connessione_psd2' %}active{% endif %}">
+                                        Connessioni PSD2
+                                    </a>
+                                    {% if can_manage_gestione_finanziaria %}
+                                        <a href="{% url 'pianificazione_sincronizzazione' %}" class="{% if request.resolver_match.url_name == 'pianificazione_sincronizzazione' %}active{% endif %}">
+                                            Pianificazione sincronizzazione
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
+                                        Riconciliazione
+                                    </a>
+                                    <a href="{% url 'report_categorie_mensile' %}" class="{% if request.resolver_match.url_name == 'report_categorie_mensile' or request.resolver_match.url_name == 'report_categorie_annuale' %}active{% endif %}">
+                                        Report categorie
+                                    </a>
+                                    <a href="{% url 'lista_provider_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_provider_bancari' or request.resolver_match.url_name == 'crea_provider_bancario' or request.resolver_match.url_name == 'modifica_provider_bancario' or request.resolver_match.url_name == 'elimina_provider_bancario' %}active{% endif %}">
+                                        Provider bancari
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_calendario %}
+                        <div class="sidebar-section" data-sidebar-section-key="calendario">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-calendario-panel"
+                                data-storage-key="arboris-sidebar-calendario"
+                                data-default-open="true"
+                            >
+                                <span>Calendario</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-calendario-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'calendario_agenda' %}" class="{% if request.resolver_match.url_name == 'calendario_agenda' %}active{% endif %}">
+                                        Calendario
+                                    </a>
+                                    <a href="{% url 'lista_eventi_calendario' %}" class="{% if request.resolver_match.url_name == 'lista_eventi_calendario' or request.resolver_match.url_name == 'crea_evento_calendario' or request.resolver_match.url_name == 'modifica_evento_calendario' or request.resolver_match.url_name == 'elimina_evento_calendario' %}active{% endif %}">
+                                        Eventi
+                                    </a>
+                                    <a href="{% url 'lista_categorie_calendario' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_calendario' or request.resolver_match.url_name == 'crea_categoria_calendario' or request.resolver_match.url_name == 'modifica_categoria_calendario' or request.resolver_match.url_name == 'elimina_categoria_calendario' %}active{% endif %}">
+                                        Categorie
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_sistema %}
+                        <div class="sidebar-section" data-sidebar-section-key="sistema">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-sistema-panel"
+                                data-storage-key="arboris-sidebar-sistema"
+                                data-default-open="true"
+                            >
+                                <span>Sistema</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
+                                        Scuola
+                                    </a>
+                                    <a href="{% url 'impostazioni_generali_sistema' %}" class="{% if request.resolver_match.url_name == 'impostazioni_generali_sistema' %}active{% endif %}">
+                                        Impostazioni generali
+                                    </a>
+                                    {% if can_manage_sistema %}
+                                        <a href="{% url 'backup_database_sistema' %}" class="{% if request.resolver_match.url_name == 'backup_database_sistema' %}active{% endif %}">
+                                            Backup database
+                                        </a>
+                                    {% endif %}
+                                    {% if can_view_operation_history %}
+                                        <a href="{% url 'cronologia_operazioni_sistema' %}" class="{% if request.resolver_match.url_name == 'cronologia_operazioni_sistema' %}active{% endif %}">
+                                            Cronologia operazioni
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'lista_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_utenti' or request.resolver_match.url_name == 'crea_utente' or request.resolver_match.url_name == 'modifica_utente' %}active{% endif %}">
+                                        Utenti
+                                    </a>
+                                    <a href="/admin/">Admin tecnico</a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="sidebar-reorder-footer">
+                    <label class="sidebar-reorder-toggle">
+                        <span class="sidebar-reorder-copy">
+                            <span class="sidebar-reorder-title">Modalita drag and drop</span>
+                            <span class="sidebar-reorder-help">Attiva il riordino delle sezioni del menu</span>
+                        </span>
+                        <span class="sidebar-reorder-switch">
+                            <input type="checkbox" id="sidebar-reorder-toggle" class="sidebar-reorder-checkbox" aria-controls="sidebar-reorder-list">
+                            <span class="sidebar-reorder-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </aside>
+        <!-- FINE CODICE DELLA SIDEBAR -->
+
+        <main class="content-area">
+            <!-- INIZIO Codice per i messaggi di esito delle interazioni dei form -->
+            {% if messages %}
+                <div class="messages-wrapper">
+                    {% for message in messages %}
+                        <div class="message message-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <!-- FINE Codice per i messaggi di esito delle interazioni dei form -->
+
+            {% block breadcrumb %}{% endblock %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="site-footer-inner">
+            Made by Gliptica - Molding Creativity - Software version: 0.1
+            <span class="site-footer-legal">
+                · <a href="{% url 'informativa_privacy' %}">Privacy</a>
+                · <a href="{% url 'termini_condizioni' %}">Termini e condizioni</a>
+            </span>
+        </div>
+    </footer>
+
+    {{ student_terminology|json_script:"student-terminology-data" }}
+    <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
+    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=7"></script>
+    <script src="{% static 'js/core/collapsible.js' %}"></script>
+    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=2"></script>
+    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=7"></script>
+    <script src="{% static 'js/core/codice-fiscale.js' %}?v=3"></script>
+    <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
+    <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
+    <script src="{% static 'js/core/sidebar-collapse.js' %}?v=2"></script>
+    <script src="{% static 'js/core/sidebar-reorder.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisTerminology) {
+                ArborisTerminology.init();
+            }
+            if (window.ArborisCollapsible) {
+                ArborisCollapsible.initCollapsibleSections(document);
+            }
+            if (window.ArborisFloatingTooltips) {
+                ArborisFloatingTooltips.init(document);
+            }
+            if (window.ArborisCopyActions) {
+                ArborisCopyActions.init(document);
+            }
+            if (window.ArborisRichNotes) {
+                ArborisRichNotes.init(document);
+            }
+            if (window.ArborisSidebarCollapse) {
+                ArborisSidebarCollapse.init();
+            }
+            if (window.ArborisSidebarReorder) {
+                ArborisSidebarReorder.init();
+            }
+        });
+    </script>
+</body>
+</html>

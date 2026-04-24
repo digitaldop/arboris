@@ -1,0 +1,35 @@
+:root {
+    --font-body: "Manrope", Arial, Helvetica, sans-serif;
+    --font-headings: "Manrope", Arial, Helvetica, sans-serif;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select {
+    font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.page-title,
+.section-title,
+.admin-section-title,
+.sidebar-title,
+.collapsible-title,
+.dashboard-section-title,
+.dashboard-economy-card-title,
+.dashboard-economy-section-title,
+.inline-details-panel-title,
+.inline-section-title-static,
+.print-sheet-section-title,
+.calendar-year-card-title,
+.header-school-name {
+    font-family: var(--font-headings);
+}

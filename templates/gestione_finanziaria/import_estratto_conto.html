@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Import estratto conto - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Import estratto conto</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Import estratto conto</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Vai ai movimenti</a>
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Questa e' la <strong>modalita' principale</strong> per importare i movimenti bancari:
+            scarica l&rsquo;estratto dalla tua banca (CAMT.053 XML o, se disponibile, CSV) e caricalo qui.
+        </p>
+        <p>
+            Formati supportati: <strong>CAMT.053 (XML)</strong> o <strong>CSV</strong> (con mapping
+            colonne sotto). I movimenti gia&rsquo; presenti vengono ignorati
+            (deduplica su ID transazione e hash) e vengono applicate le regole di categorizzazione attive.
+        </p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <h2 class="section-title">Parametri principali</h2>
+            <table class="form-table">
+                <tr><th>{{ form.conto.label_tag }}</th><td>{{ form.conto }} {{ form.conto.errors }}</td></tr>
+                <tr><th>{{ form.formato.label_tag }}</th><td>{{ form.formato }} {{ form.formato.errors }}</td></tr>
+                <tr><th>{{ form.file.label_tag }}</th><td>{{ form.file }} {{ form.file.errors }}</td></tr>
+            </table>
+        </div>
+
+        <div class="content-card">
+            <h2 class="section-title">Opzioni CSV</h2>
+            <p class="table-muted">
+                Valorizza questi campi solo se il formato selezionato e' CSV.
+                Le colonne possono essere indicate tramite indice 0-based oppure tramite
+                il nome dell'intestazione (se la prima riga e' un header).
+            </p>
+            <table class="form-table">
+                <tr><th>{{ form.csv_delimiter.label_tag }}</th><td>{{ form.csv_delimiter }} {{ form.csv_delimiter.errors }}<br><small>{{ form.csv_delimiter.help_text }}</small></td></tr>
+                <tr><th>{{ form.csv_encoding.label_tag }}</th><td>{{ form.csv_encoding }} {{ form.csv_encoding.errors }}</td></tr>
+                <tr><th>{{ form.csv_ha_intestazione.label_tag }}</th><td>{{ form.csv_ha_intestazione }} {{ form.csv_ha_intestazione.errors }}</td></tr>
+                <tr><th>{{ form.csv_formato_data.label_tag }}</th><td>{{ form.csv_formato_data }} {{ form.csv_formato_data.errors }}<br><small>{{ form.csv_formato_data.help_text }}</small></td></tr>
+                <tr><th>{{ form.csv_sep_decimale.label_tag }}</th><td>{{ form.csv_sep_decimale }} {{ form.csv_sep_decimale.errors }}</td></tr>
+                <tr><th>{{ form.csv_sep_migliaia.label_tag }}</th><td>{{ form.csv_sep_migliaia }} {{ form.csv_sep_migliaia.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_data_contabile.label_tag }}</th><td>{{ form.csv_col_data_contabile }} {{ form.csv_col_data_contabile.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_data_valuta.label_tag }}</th><td>{{ form.csv_col_data_valuta }} {{ form.csv_col_data_valuta.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_importo.label_tag }}</th><td>{{ form.csv_col_importo }} {{ form.csv_col_importo.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_entrate.label_tag }}</th><td>{{ form.csv_col_entrate }} {{ form.csv_col_entrate.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_uscite.label_tag }}</th><td>{{ form.csv_col_uscite }} {{ form.csv_col_uscite.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_valuta.label_tag }}</th><td>{{ form.csv_col_valuta }} {{ form.csv_col_valuta.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_descrizione.label_tag }}</th><td>{{ form.csv_col_descrizione }} {{ form.csv_col_descrizione.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_controparte.label_tag }}</th><td>{{ form.csv_col_controparte }} {{ form.csv_col_controparte.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_iban_controparte.label_tag }}</th><td>{{ form.csv_col_iban_controparte }} {{ form.csv_col_iban_controparte.errors }}</td></tr>
+                <tr><th>{{ form.csv_col_transaction_id.label_tag }}</th><td>{{ form.csv_col_transaction_id }} {{ form.csv_col_transaction_id.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Importa</button>
+                <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+
+    {% if risultato %}
+        <div class="content-card">
+            <h2 class="section-title">Esito dell'ultimo import</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-value">{{ risultato.totale_letti }}</div>
+                    <div class="summary-label">Movimenti letti</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">{{ risultato.inseriti }}</div>
+                    <div class="summary-label">Nuovi inseriti</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">{{ risultato.duplicati }}</div>
+                    <div class="summary-label">Duplicati scartati</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value">{{ risultato.errori }}</div>
+                    <div class="summary-label">Errori</div>
+                </div>
+            </div>
+            {% if risultato.messaggi %}
+                <ul>
+                    {% for msg in risultato.messaggi %}
+                        <li>{{ msg }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

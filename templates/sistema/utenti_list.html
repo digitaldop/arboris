@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Utenti - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Utenti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Utenti</h1>
+        <div class="page-head-actions">
+            {% if can_manage_sistema %}
+                <a href="{% url 'crea_utente' %}" class="btn btn-primary">Nuovo utente</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <div class="admin-section-title">Gestione utenti</div>
+        <div class="panel">
+            <div class="panel-body">
+                {% if utenti %}
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Nome e cognome</th>
+                                <th>Ruolo</th>
+                                <th>Email</th>
+                                <th>Controllo completo</th>
+                                <th>Anagrafica</th>
+                                <th>Economia</th>
+                                <th>Sistema</th>
+                                <th>Calendario</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for utente in utenti %}
+                                <tr class="list-row-link" data-row-href="{% url 'modifica_utente' utente.pk %}">
+                                    <td>{{ utente.get_full_name|default:utente.username }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.get_ruolo_display|default:"-" }}</td>
+                                    <td>{{ utente.email|default:"-" }}</td>
+                                    <td>{% if utente.profilo_permessi_safe.controllo_completo %}Sì{% else %}No{% endif %}</td>
+                                    <td>{{ utente.profilo_permessi_safe.get_permesso_anagrafica_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.get_permesso_economia_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.get_permesso_sistema_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.get_permesso_calendario_display }}</td>
+                                    <td>{% if utente.is_active %}Attivo{% else %}Disattivo{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">Ancora nessun utente inserito.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+{% endblock %}

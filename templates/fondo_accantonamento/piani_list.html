@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Fondo accantonamento - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Fondo accantonamento</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Piani di accantonamento</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'fondo_piano_nuovo' %}" class="btn btn-primary">Nuovo piano</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Ambito</th>
+                    <th>Mod. di versamento</th>
+                    <th>Deposito</th>
+                    <th>Attivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in piani %}
+                    <tr class="list-row-link" data-row-href="{% url 'fondo_piano_dettaglio' p.pk %}">
+                        <td>{{ p.nome }}</td>
+                        <td>
+                            {% if p.sempre_attivo %}
+                                <span class="table-muted">Sempre attivo</span>
+                            {% else %}
+                                {{ p.anno_scolastico }}
+                            {% endif %}
+                        </td>
+                        <td>{{ p.get_modalita_display }}</td>
+                        <td>{{ p.get_tipo_deposito_display }}{% if p.descrizione_deposito %} — {{ p.descrizione_deposito }}{% endif %}</td>
+                        <td>{% if p.attivo %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'fondo_piano_dettaglio' p.pk %}" class="table-link">Dettaglio</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'fondo_piano_modifica' p.pk %}" class="table-link">Modifica</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6"><div class="empty-state">Nessun piano definito. Creane uno per iniziare.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) ArborisListRowLinks.init();
+        });
+    </script>
+{% endblock %}

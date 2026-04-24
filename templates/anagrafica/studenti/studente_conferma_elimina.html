@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina studente - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'lista_studenti' %}">Studenti</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina studente</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            <p>Sei sicuro di voler eliminare questo studente?</p>
+            <p><strong>{{ studente.cognome }} {{ studente.nome }}</strong></p>
+
+            {% if impact.totale_documenti %}
+                <div class="message message-warning">
+                    L'eliminazione dello studente rimuoverà anche i suoi documenti collegati.
+                </div>
+
+                <p><strong>Documenti collegati:</strong></p>
+                <p>
+                    {% for doc in impact.documenti %}
+                        {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Sì, elimina</button>
+                    <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

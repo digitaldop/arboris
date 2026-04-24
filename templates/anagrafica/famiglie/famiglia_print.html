@@ -1,0 +1,327 @@
+﻿{% load currency %}
+<!DOCTYPE html>
+{% load rich_notes %}
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheda famiglia {{ famiglia.cognome_famiglia }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 14mm;
+        }
+
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+            --text: #1f2933;
+            --muted: #5b6770;
+            --line: #d9e2e8;
+            --panel: #f7fafc;
+            --accent: #2f5f78;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 11.5pt;
+            line-height: 1.35;
+            background: #fff;
+        }
+
+        .sheet {
+            width: 100%;
+        }
+
+        .sheet-header {
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .sheet-title {
+            margin: 0;
+            font-size: 21pt;
+            font-weight: 600;
+            color: var(--accent);
+            font-family: var(--font-headings);
+        }
+
+        .sheet-meta {
+            margin-top: 6px;
+            font-size: 9.5pt;
+            color: var(--muted);
+        }
+
+        .section {
+            margin-top: 18px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 12pt;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-family: var(--font-headings);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 18px;
+        }
+
+        .info-item {
+            padding: 9px 10px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 8px;
+        }
+
+        .info-label {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .info-value {
+            margin-top: 4px;
+            font-size: 11pt;
+        }
+
+        .notes-box {
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            white-space: pre-wrap;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 8px 9px;
+            border: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: var(--panel);
+            font-size: 8.8pt;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .table-muted {
+            color: var(--muted);
+        }
+
+        .empty-block {
+            padding: 12px 14px;
+            border: 1px dashed var(--line);
+            border-radius: 8px;
+            color: var(--muted);
+        }
+
+        .print-toolbar {
+            display: none;
+        }
+
+        @media screen {
+            body {
+                background: #eef3f6;
+                padding: 20px;
+            }
+
+            .sheet {
+                max-width: 210mm;
+                margin: 0 auto;
+                padding: 14mm;
+                background: #fff;
+                box-shadow: 0 10px 30px rgba(31, 41, 51, 0.12);
+            }
+
+            .print-toolbar {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                margin: 0 auto 14px;
+                max-width: 210mm;
+            }
+
+            .print-btn {
+                padding: 9px 14px;
+                border: 1px solid #c9d5dd;
+                border-radius: 6px;
+                background: #fff;
+                color: var(--text);
+                font: inherit;
+                cursor: pointer;
+            }
+
+            .print-btn:hover {
+                background: #f7fafc;
+            }
+        }
+
+        @media print {
+            .sheet {
+                padding: 0;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar">
+        <button type="button" class="print-btn" onclick="window.print()">Stampa</button>
+    </div>
+
+    <main class="sheet">
+        <header class="sheet-header">
+            <h1 class="sheet-title">Famiglia {{ famiglia.cognome_famiglia }}</h1>
+            <div class="sheet-meta">Scheda famiglia stampata il {{ print_date|it_date }}</div>
+        </header>
+
+        <section class="section">
+            <h2 class="section-title">Dati Principali</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Stato relazione famiglia</div>
+                    <div class="info-value">
+                        {% if famiglia.stato_relazione_famiglia %}
+                            {{ famiglia.stato_relazione_famiglia }}
+                        {% else %}
+                            <span class="table-muted">Non indicato</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Indirizzo principale</div>
+                    <div class="info-value">
+                        {% if famiglia.indirizzo_principale %}
+                            {{ famiglia.indirizzo_principale.label_full }}
+                        {% else %}
+                            <span class="table-muted">Non indicato</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {% if famiglia.note %}
+            <section class="section">
+                <h2 class="section-title">Note</h2>
+                <div class="notes-box">{{ famiglia.note|render_rich_notes }}</div>
+            </section>
+        {% endif %}
+
+        <section class="section">
+            <h2 class="section-title">Familiari</h2>
+            {% if familiari %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cognome</th>
+                            <th>Nome</th>
+                            <th>Relazione</th>
+                            <th>Data nascita</th>
+                            <th>Luogo nascita</th>
+                            <th>Codice fiscale</th>
+                            <th>Telefono</th>
+                            <th>Email</th>
+                            <th>Indirizzo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for familiare in familiari %}
+                            <tr>
+                                <td>{{ familiare.cognome }}</td>
+                                <td>{{ familiare.nome }}</td>
+                                <td>{{ familiare.relazione_familiare }}</td>
+                                    <td>{{ familiare.data_nascita|it_date|default:"-" }}</td>
+                                <td>{{ familiare.luogo_nascita|default:"-" }}</td>
+                                <td>{{ familiare.codice_fiscale|default:"-" }}</td>
+                                <td>{{ familiare.formatted_telefono|default:"-" }}</td>
+                                <td>{{ familiare.email|default:"-" }}</td>
+                                <td>
+                                    {% if familiare.indirizzo_effettivo %}
+                                        {{ familiare.indirizzo_effettivo.label_full }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-block">Ancora nessun familiare inserito.</div>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">{{ student_terminology.selected_plural }}</h2>
+            {% if studenti %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cognome</th>
+                            <th>Nome</th>
+                            <th>Data nascita</th>
+                            <th>Luogo nascita</th>
+                            <th>Indirizzo</th>
+                            <th>Attivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for studente in studenti %}
+                            <tr>
+                                <td>{{ studente.cognome }}</td>
+                                <td>{{ studente.nome }}</td>
+                                        <td>{{ studente.data_nascita|it_date|default:"-" }}</td>
+                                <td>{{ studente.luogo_nascita|default:"-" }}</td>
+                                <td>
+                                    {% if studente.indirizzo_effettivo %}
+                                        {{ studente.indirizzo_effettivo.label_full }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{% if studente.attivo %}SÃ¬{% else %}No{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-block">
+                    Ancora nessun {{ student_terminology.selected_singular_lower }} inserito.
+                </div>
+            {% endif %}
+        </section>
+    </main>
+
+</body>
+</html>
+

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}{% if iscrizione %}{{ iscrizione }}{% else %}Nuova iscrizione servizio extra{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_iscrizioni_servizi_extra' %}">Iscrizioni</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if iscrizione %}{{ iscrizione }}{% else %}Nuova iscrizione{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if iscrizione %}{{ iscrizione }}{% else %}Nuova iscrizione servizio extra{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if iscrizione %}
+                {% if can_manage_servizi_extra %}
+                    <form method="post" action="{% url 'ricalcola_rate_iscrizione_servizio_extra' iscrizione.pk %}" class="page-head-inline-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-secondary">Ricalcola rate</button>
+                    </form>
+                    <a href="{% url 'elimina_iscrizione_servizio_extra' iscrizione.pk %}" class="btn btn-danger">Elimina</a>
+                {% endif %}
+                <a href="{% url 'lista_rate_servizi_extra' %}?iscrizione={{ iscrizione.pk }}" class="btn btn-secondary">Vedi rate</a>
+            {% endif %}
+            <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" id="iscrizione-servizio-extra-form">
+        {% csrf_token %}
+
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.studente.label_tag }}</th>
+                    <td>{{ form.studente }} {{ form.studente.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.servizio.label_tag }}</th>
+                    <td>{{ form.servizio }} {{ form.servizio.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.tariffa.label_tag }}</th>
+                    <td>
+                        {{ form.tariffa }} {{ form.tariffa.errors }}
+                        <div class="help-text">Le tariffe disponibili si aggiornano in base al servizio selezionato.</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_iscrizione.label_tag }}</th>
+                    <td>{{ form.data_iscrizione }} {{ form.data_iscrizione.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.data_fine_iscrizione.label_tag }}</th>
+                    <td>
+                        {{ form.data_fine_iscrizione }} {{ form.data_fine_iscrizione.errors }}
+                        <div class="help-text">Se compilata, le rate con scadenza successiva non verranno piu generate.</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.attiva.label_tag }}</th>
+                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
+                </tr>
+            </table>
+
+            {% if iscrizione and riepilogo_servizio %}
+                <div class="economia-summary-box">
+                    <div class="economia-summary-title">Riepilogo servizio extra</div>
+                    <div class="economia-summary-grid">
+                        <div class="economia-summary-item">
+                            <div class="economia-summary-label">Numero rate</div>
+                            <div class="economia-summary-value">{{ riepilogo_servizio.numero_rate }}</div>
+                        </div>
+                        <div class="economia-summary-item">
+                            <div class="economia-summary-label">Totale dovuto</div>
+                            <div class="economia-summary-value">EUR {{ riepilogo_servizio.totale_dovuto|euro }}</div>
+                        </div>
+                        <div class="economia-summary-item">
+                            <div class="economia-summary-label">Totale pagato</div>
+                            <div class="economia-summary-value">EUR {{ riepilogo_servizio.totale_pagato|euro }}</div>
+                        </div>
+                        <div class="economia-summary-item">
+                            <div class="economia-summary-label">Totale rimanente</div>
+                            <div class="economia-summary-value">EUR {{ riepilogo_servizio.totale_rimanente|euro }}</div>
+                        </div>
+                        <div class="economia-summary-item">
+                            <div class="economia-summary-label">Prossima scadenza aperta</div>
+                            <div class="economia-summary-value">{{ riepilogo_servizio.prossima_scadenza|date:"d/m/Y"|default:"-" }}</div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="admin-section compact">
+                <div class="admin-section-title">Note amministrative</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ form.note_amministrative }} {{ form.note_amministrative.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section compact" style="margin-top: 18px;">
+                <div class="admin-section-title">Note</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ form.note }} {{ form.note.errors }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_servizi_extra %}
+                <button type="submit" class="btn btn-primary">{% if iscrizione %}Salva modifiche{% else %}Crea iscrizione{% endif %}</button>
+            {% endif %}
+            <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+
+    <script src="{% static 'js/pages/servizi-extra-iscrizione-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisServiziExtraIscrizioneForm) {
+                ArborisServiziExtraIscrizioneForm.init();
+            }
+        });
+    </script>
+{% endblock %}
+

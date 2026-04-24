@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}
+    {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo familiare{% endif %} - Arboris
+{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_familiari' %}">Familiari</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">
+            {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo familiare{% endif %}
+        </h1>
+        <div class="page-head-actions">
+            {% if familiare %}
+                <button type="button" class="btn btn-primary" id="enable-edit-familiare-btn">Modifica</button>
+                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-familiare-btn">Annulla modifiche</button>
+                <a href="{% url 'elimina_familiare' familiare.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <fieldset id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if familiare %}disabled{% endif %}>
+
+        <div class="family-top-layout">
+            <div class="family-main-column">
+                <div class="admin-section">
+                    <div class="admin-section-title">Dati principali</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <table class="form-table">
+                                <tr{% if familiare and familiare.famiglia %} class="list-row-link" data-row-href="{% url 'modifica_famiglia' familiare.famiglia.pk %}"{% endif %}>
+                                    <th>{{ form.famiglia.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.famiglia %}
+                                                {{ familiare.famiglia }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-row mode-edit-field">
+                                            <div class="related-field-stack">
+                                                <div class="autocomplete-wrapper famiglia-autocomplete">
+                                                    {{ form.famiglia }}
+                                                </div>
+                                            </div>
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-famiglia-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-famiglia-btn">E</button>
+                                            </div>
+                                        </div>
+                                        {{ form.famiglia.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.relazione_familiare.label_tag }}</th>
+                                    <td>
+                                        <div class="related-field-row">
+                                            {{ form.relazione_familiare }}
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-relazione-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-relazione-btn">E</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-relazione-btn">X</button>
+                                            </div>
+                                        </div>
+                                        {{ form.relazione_familiare.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.cognome.label_tag }}</th>
+                                    <td>{{ form.cognome }} {{ form.cognome.errors }}</td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.nome.label_tag }}</th>
+                                    <td>{{ form.nome }} {{ form.nome.errors }}</td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.telefono.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain readonly-display-link">
+                                            {% if familiare and familiare.formatted_telefono %}
+                                                <div class="readonly-action-group">
+                                                    <a href="{{ familiare.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ familiare.formatted_telefono }}</a>
+                                                    <button type="button" class="copy-inline-btn" data-copy-text="{{ familiare.formatted_telefono }}" data-floating-text="Copia" aria-label="Copia numero di telefono">
+                                                        <span class="copy-inline-icon" aria-hidden="true">
+                                                            <span class="copy-inline-icon-back"></span>
+                                                            <span class="copy-inline-icon-front"></span>
+                                                        </span>
+                                                        <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.telefono }} {{ form.telefono.errors }}
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.email.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain readonly-display-link">
+                                            {% if familiare and familiare.email %}
+                                                <div class="readonly-action-group">
+                                                    <a href="mailto:{{ familiare.email }}">{{ familiare.email }}</a>
+                                                    <button type="button" class="copy-inline-btn" data-copy-text="{{ familiare.email }}" data-floating-text="Copia" aria-label="Copia email">
+                                                        <span class="copy-inline-icon" aria-hidden="true">
+                                                            <span class="copy-inline-icon-back"></span>
+                                                            <span class="copy-inline-icon-front"></span>
+                                                        </span>
+                                                        <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.email }} {{ form.email.errors }}
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.codice_fiscale.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.codice_fiscale %}
+                                                <div class="readonly-action-group">
+                                                    <span>{{ familiare.codice_fiscale }}</span>
+                                                    <button type="button" class="copy-inline-btn" data-copy-text="{{ familiare.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                        <span class="copy-inline-icon" aria-hidden="true">
+                                                            <span class="copy-inline-icon-back"></span>
+                                                            <span class="copy-inline-icon-front"></span>
+                                                        </span>
+                                                        <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.codice_fiscale }} {{ form.codice_fiscale.errors }}
+                                            <div class="help-text">Calcolato automaticamente quando i dati anagrafici sono completi.</div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.data_nascita.label_tag }}</th>
+                                    <td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.sesso.label_tag }}</th>
+                                    <td>{{ form.sesso }} {{ form.sesso.errors }}</td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.luogo_nascita.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.luogo_nascita %}
+                                                {{ familiare.luogo_nascita }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-stack mode-edit-field">
+                                            <div class="autocomplete-wrapper citta-autocomplete">
+                                                {{ form.luogo_nascita }}
+                                            </div>
+                                        </div>
+                                        {{ form.luogo_nascita.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.indirizzo.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.indirizzo_effettivo %}
+                                                {{ familiare.indirizzo_effettivo.label_full }}
+                                            {% else %}
+                                                <span class="table-muted">Nessun indirizzo disponibile</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-row mode-edit-field">
+                                            <div class="related-field-stack">
+                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                    {{ form.indirizzo }}
+                                                </div>
+                                            </div>
+                                            <div class="related-actions">
+                                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
+                                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">E</button>
+                                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">X</button>
+                                            </div>
+                                        </div>
+                                        <div class="inline-address-help" id="familiare-address-help">
+                                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                                        </div>
+                                        {{ form.indirizzo.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.convivente.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.convivente|si_no }}</div>
+                                        <div class="mode-edit-field">{{ form.convivente }}</div>
+                                        {{ form.convivente.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.referente_principale.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.referente_principale|si_no }}</div>
+                                        <div class="mode-edit-field">{{ form.referente_principale }}</div>
+                                        {{ form.referente_principale.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.abilitato_scambio_retta.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.abilitato_scambio_retta|si_no }}</div>
+                                        <div class="mode-edit-field">{{ form.abilitato_scambio_retta }}</div>
+                                        {{ form.abilitato_scambio_retta.errors }}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>{{ form.attivo.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.attivo|si_no }}</div>
+                                        <div class="mode-edit-field">{{ form.attivo }}</div>
+                                        {{ form.attivo.errors }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="family-side-column">
+                <div class="admin-section compact">
+                    <button type="button" class="admin-section-title collapsible-title" data-target="section-note" data-default-open="false">
+                        <span>Note</span>
+                    </button>
+                    <div class="panel collapsible-panel" id="section-note">
+                        <div class="panel-body">
+                            {{ form.note }} {{ form.note.errors }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section compact">
+                    <div class="admin-section-title">Riepilogo</div>
+                    <div class="panel">
+                        <div class="panel-body summary-panel-body">
+                            <div class="summary-grid">
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti }}</div>
+                                    <div class="summary-label">Documenti</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_in_scadenza }}</div>
+                                    <div class="summary-label">In scadenza 30 gg</div>
+                                </div>
+
+                                <div class="summary-item">
+                                    <div class="summary-value">{{ count_documenti_scaduti }}</div>
+                                    <div class="summary-label">Scaduti</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section inline-lock-container" id="familiare-inline-lock-container" data-mode-lock-scope="inline">
+            <div class="admin-section">
+                <div class="inline-section-head">
+                    <div class="admin-section-title inline-section-title-static">Figli ({{ count_figli }})</div>
+                    {% if familiare and familiare.famiglia %}
+                        <button type="button" class="btn btn-primary btn-sm figli-quick-add-btn" data-popup-url="{% url 'crea_studente' %}?popup=1&famiglia={{ familiare.famiglia.pk }}">+ Aggiungi figlio</button>
+                    {% endif %}
+                </div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {% if figli %}
+                            <table class="inline-table figli-inline-table">
+                                <thead>
+                                    <tr>
+                                        <th>Cognome</th>
+                                        <th>Nome</th>
+                                        <th>Indirizzo</th>
+                                        <th>Attivo</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for figlio in figli %}
+                                        <tr class="inline-form-row list-row-link" data-row-href="{% url 'modifica_studente' figlio.pk %}">
+                                            <td>{{ figlio.cognome }}</td>
+                                            <td>{{ figlio.nome }}</td>
+                                            <td>
+                                                {% if figlio.indirizzo_effettivo %}
+                                                    {{ figlio.indirizzo_effettivo.label_full }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessun indirizzo</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{% if figlio.attivo %}Sì{% else %}No{% endif %}</td>
+                                            <td class="inline-actions-cell">
+                                                <button type="button" class="related-btn related-btn-edit figlio-quick-edit-btn" data-popup-url="{% url 'modifica_studente' figlio.pk %}?popup=1" title="Modifica veloce">E</button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="empty-state compact-empty-state figli-empty-state">
+                                Nessun figlio inserito.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% include "anagrafica/familiari/includes/scambio_retta_inline.html" %}
+
+            <div class="inline-section-head">
+                <div class="admin-section-title inline-section-title-static">Documenti ({{ count_documenti }})</div>
+                {% if familiare %}
+                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-familiare-btn">Modifica</button>
+                {% endif %}
+            </div>
+
+            <div id="tab-documenti">
+                <div class="panel">
+                    <div class="panel-body">
+                        {{ documenti_formset.management_form }}
+                        <table class="inline-table" id="documenti-table">
+                            <thead>
+                                <tr>
+                                    <th>Tipo documento</th>
+                                    <th>Descrizione</th>
+                                    <th>File</th>
+                                    <th>Scadenza</th>
+                                    <th>Visibile</th>
+                                    <th>Note</th>
+                                    <th>Cancellare?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in documenti_formset %}
+                                    <tr class="inline-form-row">
+                                        {{ f.id }}
+                                        <td>
+                                            <div class="inline-related-field">
+                                                {{ f.tipo_documento }}
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">E</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">X</button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ f.descrizione }}</td>
+                                        <td class="document-file-cell">
+                                            {{ f.file }}
+                                            {% if f.instance.pk and f.instance.file %}
+                                                <div class="help-text">
+                                                    <a href="{{ f.instance.file.url }}" target="_blank">File attuale</a>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ f.scadenza }}</td>
+                                        <td class="inline-checkbox-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
+                                            <div class="mode-edit-field">{{ f.visibile }}</div>
+                                        </td>
+                                        <td>{{ f.note }}</td>
+                                        <td class="inline-delete-cell">
+                                            {% if f.instance.pk %}
+                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                            {% else %}
+                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% if f.non_field_errors %}
+                                        <tr class="inline-errors-row">
+                                            <td colspan="7">{{ f.non_field_errors }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        {% if not count_documenti %}
+                            <div class="empty-state compact-empty-state documenti-empty-state">
+                                Ancora nessun documento caricato.
+                            </div>
+                        {% endif %}
+
+                        <div class="inline-add-row">
+                            <button type="button" class="inline-add-btn" onclick="addInlineForm('documenti')">+ Aggiungi un altro Documento.</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </fieldset>
+
+        <div class="form-actions sticky-form-actions mode-edit-only">
+            <button type="submit" name="_save" class="btn btn-primary">Salva</button>
+            <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
+            <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un altro familiare</button>
+            <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+
+        <div class="sticky-actions-spacer"></div>
+    </form>
+
+    <template id="documenti-empty-form-template">
+        <tr class="inline-form-row">
+            {{ documenti_formset.empty_form.id }}
+            <td>
+                <div class="inline-related-field">
+                    {{ documenti_formset.empty_form.tipo_documento }}
+                    <div class="related-actions inline-related-actions">
+                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">E</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">X</button>
+                    </div>
+                </div>
+            </td>
+            <td>{{ documenti_formset.empty_form.descrizione }}</td>
+            <td>{{ documenti_formset.empty_form.file }}</td>
+            <td>{{ documenti_formset.empty_form.scadenza }}</td>
+            <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
+            <td>{{ documenti_formset.empty_form.note }}</td>
+            <td class="inline-delete-cell">
+                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+            </td>
+        </tr>
+    </template>
+
+    {% if familiare and familiare.famiglia and familiare.famiglia.indirizzo_principale %}
+        {{ familiare.famiglia.indirizzo_principale.label_select|json_script:"familiare-famiglia-indirizzo-label" }}
+    {% else %}
+        <script id="familiare-famiglia-indirizzo-label" type="application/json">""</script>
+    {% endif %}
+
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/core/collapsible.js' %}"></script>
+    <script src="{% static 'js/core/tabs.js' %}"></script>
+    <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=3"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisViewMode) {
+                window.familiareViewMode = ArborisViewMode.init({
+                    formId: "familiare-detail-form",
+                    lockContainerId: "familiare-lock-container",
+                    inlineLockContainerId: "familiare-inline-lock-container",
+                    editButtonId: "enable-edit-familiare-btn",
+                    inlineEditButtonId: "enable-inline-edit-familiare-btn",
+                    cancelButtonId: "cancel-edit-familiare-btn",
+                    startInEditMode: {{ familiare|yesno:"false,true" }},
+                    reloadOnCancel: true
+                });
+            }
+
+            ArborisFamiliareForm.init({
+                familiareId: "{{ familiare.pk|default:'new' }}",
+                urls: {
+                    creaFamiglia: "{% url 'crea_famiglia' %}",
+                    creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
+                    creaIndirizzo: "{% url 'crea_indirizzo' %}",
+                    creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
+                }
+            });
+
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+
+            if (window.ArborisCopyActions) {
+                ArborisCopyActions.init();
+            }
+        });
+    </script>
+{% endblock %}
