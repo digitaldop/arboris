@@ -62,9 +62,11 @@
                         <td>
                             <div class="related-field-stack">
                                 <div class="autocomplete-wrapper citta-autocomplete">
+                                    {{ form.citta_search }}
                                     {{ form.citta }}
                                 </div>
                             </div>
+                            {{ form.citta_search.errors }}
                             {{ form.citta.errors }}
                         </td>
                     </tr>

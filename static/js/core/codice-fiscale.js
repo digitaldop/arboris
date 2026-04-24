@@ -24,15 +24,33 @@
 
     function codeFromDate(dateValue, sex) {
         if (!dateValue || !sex) return "";
-        const date = new Date(dateValue);
-        if (Number.isNaN(date.getTime())) return "";
+        // Campi <input type="date"> usano YYYY-MM-DD: va interpretato come data di calendario locale,
+        // non come UTC, altrimenti giorno/mese possono slittare in alcuni fusi.
+        const raw = String(dateValue).trim();
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+        let y;
+        let monthIndex0;
+        let day;
+        if (m) {
+            y = parseInt(m[1], 10);
+            const mo = parseInt(m[2], 10);
+            day = parseInt(m[3], 10);
+            if (mo < 1 || mo > 12 || day < 1 || day > 31) return "";
+            monthIndex0 = mo - 1;
+        } else {
+            const date = new Date(dateValue);
+            if (Number.isNaN(date.getTime())) return "";
+            y = date.getFullYear();
+            monthIndex0 = date.getMonth();
+            day = date.getDate();
+        }
 
         const months = "ABCDEHLMPRST";
-        const year = `${date.getFullYear()}`.slice(-2);
-        const month = months[date.getMonth()] || "";
-        let day = date.getDate();
-        if (sex === "F") day += 40;
-        return `${year}${month}${String(day).padStart(2, "0")}`;
+        const year = String(y).slice(-2);
+        const month = months[monthIndex0] || "";
+        let d = day;
+        if (sex === "F") d += 40;
+        return `${year}${month}${String(d).padStart(2, "0")}`;
     }
 
     function controlCharacter(partialCode) {
@@ -178,7 +196,18 @@
         hosts.forEach(bindContainer);
     }
 
-    window.ArborisCodiceFiscale = { init };
+    function rebind(root) {
+        const scope = root || document;
+        scope.querySelectorAll("[data-cf-output]").forEach(output => {
+            const host = output.closest(".inline-form-row, .inline-subform-row, form, .panel-body, .content-card");
+            if (host) {
+                host.removeAttribute("data-cf-ready");
+            }
+        });
+        init(scope);
+    }
+
+    window.ArborisCodiceFiscale = { init, rebind };
 
     document.addEventListener("DOMContentLoaded", function () {
         init(document);

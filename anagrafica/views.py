@@ -118,6 +118,90 @@ def build_famiglia_redirect_url(pk, active_inline_tab=None):
     return url
 
 
+def famiglia_familiari_inline_queryset(famiglia=None):
+    if not famiglia:
+        return Familiare.objects.none()
+
+    return (
+        Familiare.objects.filter(famiglia=famiglia)
+        .select_related(
+            "relazione_familiare",
+            "indirizzo__citta__provincia",
+            "indirizzo__provincia",
+            "luogo_nascita__provincia",
+            "famiglia__indirizzo_principale__citta__provincia",
+            "famiglia__indirizzo_principale__provincia",
+        )
+        .order_by("cognome", "nome")
+    )
+
+
+def famiglia_studenti_inline_queryset(famiglia=None):
+    if not famiglia:
+        return Studente.objects.none()
+
+    return (
+        Studente.objects.filter(famiglia=famiglia)
+        .select_related(
+            "indirizzo__citta__provincia",
+            "indirizzo__provincia",
+            "luogo_nascita__provincia",
+            "famiglia__indirizzo_principale__citta__provincia",
+            "famiglia__indirizzo_principale__provincia",
+        )
+        .order_by("cognome", "nome")
+    )
+
+
+def famiglia_documenti_inline_queryset(famiglia=None):
+    if not famiglia:
+        return Documento.objects.none()
+
+    return (
+        Documento.objects.filter(famiglia=famiglia)
+        .select_related("tipo_documento")
+        .order_by("-data_caricamento", "-id")
+    )
+
+
+def build_familiari_formset(*, data=None, instance=None, prefix="familiari"):
+    kwargs = {
+        "prefix": prefix,
+        "queryset": famiglia_familiari_inline_queryset(instance),
+    }
+    if data is not None:
+        kwargs["data"] = data
+    if instance is not None:
+        kwargs["instance"] = instance
+    return FamiliareFormSet(**kwargs)
+
+
+def build_studenti_formset(*, data=None, instance=None, prefix="studenti"):
+    kwargs = {
+        "prefix": prefix,
+        "queryset": famiglia_studenti_inline_queryset(instance),
+    }
+    if data is not None:
+        kwargs["data"] = data
+    if instance is not None:
+        kwargs["instance"] = instance
+    return StudenteFormSet(**kwargs)
+
+
+def build_documenti_famiglia_formset(*, data=None, files=None, instance=None, prefix="documenti"):
+    kwargs = {
+        "prefix": prefix,
+        "queryset": famiglia_documenti_inline_queryset(instance),
+    }
+    if data is not None:
+        kwargs["data"] = data
+    if files is not None:
+        kwargs["files"] = files
+    if instance is not None:
+        kwargs["instance"] = instance
+    return DocumentoFamigliaFormSet(**kwargs)
+
+
 def should_prefer_initial_famiglia_tab(request, allowed_targets):
     if request.method == "POST":
         return True
@@ -981,6 +1065,9 @@ def crea_famiglia(request):
     inline_target = "familiari"
     active_inline_tab = "familiari"
     prefer_initial_active_tab = False
+    familiari_formset = None
+    studenti_formset = None
+    documenti_formset = None
     if request.method == "POST":
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
@@ -990,19 +1077,19 @@ def crea_famiglia(request):
         )
         form = FamigliaForm(request.POST)
         familiari_formset = (
-            FamiliareFormSet(request.POST, prefix="familiari")
+            build_familiari_formset(data=request.POST, prefix="familiari")
             if inline_target in (None, "familiari")
-            else FamiliareFormSet(prefix="familiari")
+            else None
         )
         studenti_formset = (
-            StudenteFormSet(request.POST, prefix="studenti")
+            build_studenti_formset(data=request.POST, prefix="studenti")
             if inline_target in (None, "studenti")
-            else StudenteFormSet(prefix="studenti")
+            else None
         )
         documenti_formset = (
-            DocumentoFamigliaFormSet(request.POST, request.FILES, prefix="documenti")
+            build_documenti_famiglia_formset(data=request.POST, files=request.FILES, prefix="documenti")
             if inline_target in (None, "documenti")
-            else DocumentoFamigliaFormSet(prefix="documenti")
+            else None
         )
 
         form_is_valid = form.is_valid()
@@ -1035,13 +1122,20 @@ def crea_famiglia(request):
 
             messages.success(request, "Famiglia creata correttamente.")
             return redirect(f"{reverse('lista_famiglie')}?highlight={famiglia.pk}")
+
+        if familiari_formset is None:
+            familiari_formset = build_familiari_formset(prefix="familiari")
+        if studenti_formset is None:
+            studenti_formset = build_studenti_formset(prefix="studenti")
+        if documenti_formset is None:
+            documenti_formset = build_documenti_famiglia_formset(prefix="documenti")
     else:
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = FamigliaForm()
-        familiari_formset = FamiliareFormSet(prefix="familiari")
-        studenti_formset = StudenteFormSet(prefix="studenti")
-        documenti_formset = DocumentoFamigliaFormSet(prefix="documenti")
+        familiari_formset = build_familiari_formset(prefix="familiari")
+        studenti_formset = build_studenti_formset(prefix="studenti")
+        documenti_formset = build_documenti_famiglia_formset(prefix="documenti")
 
     today = timezone.localdate()
 
@@ -1073,11 +1167,21 @@ def crea_famiglia(request):
 
 def modifica_famiglia(request, pk):
     allowed_inline_targets = {"familiari", "studenti", "documenti"}
-    famiglia = get_object_or_404(Famiglia, pk=pk)
+    famiglia = get_object_or_404(
+        Famiglia.objects.select_related(
+            "stato_relazione_famiglia",
+            "indirizzo_principale__citta__provincia",
+            "indirizzo_principale__provincia",
+        ),
+        pk=pk,
+    )
     edit_scope = "view"
     inline_target = "familiari"
     active_inline_tab = "familiari"
     prefer_initial_active_tab = False
+    familiari_formset = None
+    studenti_formset = None
+    documenti_formset = None
 
     if request.method == "POST":
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
@@ -1088,19 +1192,24 @@ def modifica_famiglia(request, pk):
         )
         form = FamigliaForm(request.POST, instance=famiglia)
         familiari_formset = (
-            FamiliareFormSet(request.POST, instance=famiglia, prefix="familiari")
+            build_familiari_formset(data=request.POST, instance=famiglia, prefix="familiari")
             if inline_target in (None, "familiari")
-            else FamiliareFormSet(instance=famiglia, prefix="familiari")
+            else None
         )
         studenti_formset = (
-            StudenteFormSet(request.POST, instance=famiglia, prefix="studenti")
+            build_studenti_formset(data=request.POST, instance=famiglia, prefix="studenti")
             if inline_target in (None, "studenti")
-            else StudenteFormSet(instance=famiglia, prefix="studenti")
+            else None
         )
         documenti_formset = (
-            DocumentoFamigliaFormSet(request.POST, request.FILES, instance=famiglia, prefix="documenti")
+            build_documenti_famiglia_formset(
+                data=request.POST,
+                files=request.FILES,
+                instance=famiglia,
+                prefix="documenti",
+            )
             if inline_target in (None, "documenti")
-            else DocumentoFamigliaFormSet(instance=famiglia, prefix="documenti")
+            else None
         )
 
         form_is_valid = form.is_valid()
@@ -1127,33 +1236,42 @@ def modifica_famiglia(request, pk):
 
             messages.success(request, "Modifiche salvate correttamente.")
             return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
+
+        if familiari_formset is None:
+            familiari_formset = build_familiari_formset(instance=famiglia, prefix="familiari")
+        if studenti_formset is None:
+            studenti_formset = build_studenti_formset(instance=famiglia, prefix="studenti")
+        if documenti_formset is None:
+            documenti_formset = build_documenti_famiglia_formset(instance=famiglia, prefix="documenti")
     else:
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = FamigliaForm(instance=famiglia)
-        familiari_formset = FamiliareFormSet(instance=famiglia, prefix="familiari")
-        studenti_formset = StudenteFormSet(instance=famiglia, prefix="studenti")
-        documenti_formset = DocumentoFamigliaFormSet(instance=famiglia, prefix="documenti")
+        familiari_formset = build_familiari_formset(instance=famiglia, prefix="familiari")
+        studenti_formset = build_studenti_formset(instance=famiglia, prefix="studenti")
+        documenti_formset = build_documenti_famiglia_formset(instance=famiglia, prefix="documenti")
 
     today = timezone.localdate()
 
-    documenti_familiari = (
+    documenti_familiari = list(
         Documento.objects
         .filter(familiare__famiglia=famiglia)
         .select_related("familiare", "tipo_documento")
         .order_by("familiare__cognome", "familiare__nome", "-data_caricamento", "-id")
     )
 
-    documenti_studenti = (
+    documenti_studenti = list(
         Documento.objects
         .filter(studente__famiglia=famiglia)
         .select_related("studente", "tipo_documento")
         .order_by("studente__cognome", "studente__nome", "-data_caricamento", "-id")
     )
+    count_documenti_familiari = len(documenti_familiari)
+    count_documenti_studenti = len(documenti_studenti)
     count_documenti_totali = (
         famiglia.documenti.count()
-        + (documenti_familiari.count() if hasattr(documenti_familiari, "count") else 0)
-        + (documenti_studenti.count() if hasattr(documenti_studenti, "count") else 0)
+        + count_documenti_familiari
+        + count_documenti_studenti
     )
 
     return render(
@@ -1179,8 +1297,8 @@ def modifica_famiglia(request, pk):
             ).count(),
             "documenti_familiari": documenti_familiari,
             "documenti_studenti": documenti_studenti,
-            "count_documenti_familiari": documenti_familiari.count() if hasattr(documenti_familiari, "count") else 0,
-            "count_documenti_studenti": documenti_studenti.count() if hasattr(documenti_studenti, "count") else 0,
+            "count_documenti_familiari": count_documenti_familiari,
+            "count_documenti_studenti": count_documenti_studenti,
             "edit_scope": edit_scope,
             "inline_target": inline_target,
             "active_inline_tab": active_inline_tab,

@@ -145,9 +145,11 @@
                                         </div>
                                         <div class="related-field-stack mode-edit-field">
                                             <div class="autocomplete-wrapper citta-autocomplete">
+                                                {{ form.luogo_nascita_search }}
                                                 {{ form.luogo_nascita }}
                                             </div>
                                         </div>
+                                        {{ form.luogo_nascita_search.errors }}
                                         {{ form.luogo_nascita.errors }}
                                     </td>
                                 </tr>
@@ -919,18 +921,17 @@
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
     <script src="{% static 'js/pages/studente-form.js' %}?v=14"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const stickyCancelButton = document.getElementById("sticky-cancel-edit-studente-btn");
-            const headerCancelButton = document.getElementById("cancel-edit-studente-btn");
 
             if (stickyCancelButton) {
                 stickyCancelButton.addEventListener("click", function () {
-                    if (headerCancelButton) {
-                        headerCancelButton.click();
+                    if (window.studenteViewMode && typeof window.studenteViewMode.returnToView === "function") {
+                        window.studenteViewMode.returnToView();
                         return;
                     }
                     if (typeof window.ArborisReloadWithLongWait === "function") {
@@ -984,12 +985,26 @@
                     modeInputId: "studente-edit-scope",
                     startMode: "{{ edit_scope|default:'view' }}",
                     reloadOnCancel: true,
-                    onModeChange: function () {
+                    onModeChange: function (nextMode) {
                         if (window.ArborisStudenteForm && typeof window.ArborisStudenteForm.refreshInlineEditScope === "function") {
                             window.ArborisStudenteForm.refreshInlineEditScope();
                         }
+                        if (nextMode === "full" && window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.rebind === "function") {
+                            const mainEl = document.getElementById("studente-lock-container");
+                            if (mainEl) {
+                                window.ArborisCodiceFiscale.rebind(mainEl);
+                            }
+                        }
                     }
                 });
+            }
+
+            if (window.studenteViewMode) {
+                const formEl = document.getElementById("studente-detail-form");
+                const savedOk = document.querySelector(".messages-wrapper .message-success");
+                if (savedOk && formEl && !formEl.classList.contains("is-view-mode")) {
+                    window.studenteViewMode.setEditing(false);
+                }
             }
         });
     </script>

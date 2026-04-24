@@ -189,9 +189,11 @@
                                         </div>
                                         <div class="related-field-stack mode-edit-field">
                                             <div class="autocomplete-wrapper citta-autocomplete">
+                                                {{ form.luogo_nascita_search }}
                                                 {{ form.luogo_nascita }}
                                             </div>
                                         </div>
+                                        {{ form.luogo_nascita_search.errors }}
                                         {{ form.luogo_nascita.errors }}
                                     </td>
                                 </tr>

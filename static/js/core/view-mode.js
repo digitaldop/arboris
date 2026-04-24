@@ -216,6 +216,14 @@ window.ArborisViewMode = (function () {
 
         applyMode(currentMode);
 
+        function returnToView() {
+            if (config.reloadOnCancel) {
+                reloadPageAfterCancel();
+            } else {
+                applyMode("view");
+            }
+        }
+
         return {
             isEditing: function () {
                 return currentMode !== "view";
@@ -229,6 +237,7 @@ window.ArborisViewMode = (function () {
             setInlineEditing: function (isEditing) {
                 applyMode(isEditing ? "inline" : "view");
             },
+            returnToView: returnToView,
         };
     }
 

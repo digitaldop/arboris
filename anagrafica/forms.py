@@ -84,7 +84,13 @@ class FamigliaSearchMixin:
     famiglia_search = forms.CharField(
         required=False,
         label="Famiglia",
-        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
     )
 
     def setup_famiglia_search(self):
@@ -92,7 +98,13 @@ class FamigliaSearchMixin:
             self.fields["famiglia_search"] = forms.CharField(
                 required=False,
                 label="Famiglia",
-                widget=forms.TextInput(attrs={"autocomplete": "off"}),
+                widget=forms.TextInput(
+                    attrs={
+                        "autocomplete": "new-password",
+                        "autocapitalize": "none",
+                        "spellcheck": "false",
+                    }
+                ),
             )
 
         self.fields["famiglia"].widget.attrs.update(
@@ -104,6 +116,9 @@ class FamigliaSearchMixin:
             {
                 "placeholder": "Cerca una famiglia...",
                 "data-famiglia-search": "1",
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
             }
         )
 
@@ -155,7 +170,13 @@ class IndirizzoSearchMixin:
     indirizzo_search = forms.CharField(
         required=False,
         label="Indirizzo",
-        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
     )
 
     def setup_indirizzo_search(self, field_name="indirizzo", search_field_name="indirizzo_search"):
@@ -163,7 +184,13 @@ class IndirizzoSearchMixin:
             self.fields[search_field_name] = forms.CharField(
                 required=False,
                 label="Indirizzo",
-                widget=forms.TextInput(attrs={"autocomplete": "off"}),
+                widget=forms.TextInput(
+                    attrs={
+                        "autocomplete": "new-password",
+                        "autocapitalize": "none",
+                        "spellcheck": "false",
+                    }
+                ),
             )
 
         self.fields[field_name].widget.attrs.update({"data-indirizzo-hidden": "1"})
@@ -171,6 +198,9 @@ class IndirizzoSearchMixin:
             {
                 "placeholder": "Cerca un indirizzo...",
                 "data-indirizzo-search": "1",
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
             }
         )
 
@@ -220,7 +250,9 @@ class LuogoNascitaCittaMixin:
     def setup_luogo_nascita_autocomplete(self):
         self.fields["luogo_nascita"].widget.attrs.update(
             {
-                "autocomplete": "off",
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
                 "placeholder": "Cerca una città...",
                 "data-citta-search": "1",
             }
@@ -287,7 +319,13 @@ class LuogoNascitaCittaFkMixin:
     luogo_nascita_search = forms.CharField(
         required=False,
         label="Luogo di nascita",
-        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "new-password",
+                "autocapitalize": "none",
+                "spellcheck": "false",
+            }
+        ),
     )
 
     def setup_luogo_nascita_autocomplete_fk(self):
@@ -295,14 +333,17 @@ class LuogoNascitaCittaFkMixin:
             self.fields["luogo_nascita_search"] = forms.CharField(
                 required=False,
                 label="Luogo di nascita",
-                widget=forms.TextInput(attrs={"autocomplete": "off"}),
+                widget=forms.TextInput(
+                    attrs={
+                        "autocomplete": "new-password",
+                        "autocapitalize": "none",
+                        "spellcheck": "false",
+                    }
+                ),
             )
 
-        self.fields["luogo_nascita"].widget = forms.Select(attrs={"data-citta-hidden": "1"})
-        self.fields["luogo_nascita"].queryset = (
-            Citta.objects.filter(attiva=True).select_related("provincia").order_by("nome")
-        )
-        self.fields["luogo_nascita"].label_from_instance = citta_choice_label
+        self.fields["luogo_nascita"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
+        self.fields["luogo_nascita"].queryset = Citta.objects.none()
         self.fields["luogo_nascita_search"].widget.attrs.update(
             {
                 "placeholder": "Cerca una città...",
@@ -347,6 +388,11 @@ class LuogoNascitaCittaFkMixin:
             self.initial["luogo_nascita"] = luogo_nascita_id
         if luogo_nascita_label:
             self.initial["luogo_nascita_search"] = luogo_nascita_label
+        if luogo_nascita_id:
+            self.fields["luogo_nascita"].queryset = (
+                Citta.objects.filter(pk=luogo_nascita_id, attiva=True)
+                .select_related("provincia")
+            )
         if not self.is_bound and luogo_nascita_id and citta:
             self.fields["luogo_nascita"].widget.attrs["data-codice-catastale"] = citta.codice_catastale or ""
 
@@ -411,13 +457,14 @@ class IndirizzoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["citta"].queryset = (
-            Citta.objects.filter(attiva=True)
-            .select_related("provincia", "provincia__regione")
-            .order_by("nome")
+        self.fields["citta"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
+        self.fields["citta"].queryset = Citta.objects.none()
+        self.fields["citta_search"].widget.attrs.update(
+            {
+                "placeholder": "Cerca una cittÃ ...",
+                "data-citta-search": "1",
+            }
         )
-        self.fields["citta"].label_from_instance = citta_choice_label
-        make_searchable_select(self.fields["citta"], "Cerca una città...")
         self.fields["cap_scelto"].required = False
         self.fields["cap_scelto"].label = "CAP"
         self.fields["cap_scelto"].queryset = CAP.objects.none()
@@ -426,6 +473,10 @@ class IndirizzoForm(forms.ModelForm):
         citta_id = None
         if self.is_bound:
             citta_id = self.data.get("citta")
+            self.fields["citta_search"].initial = (
+                self.data.get("citta_search")
+                or ""
+            ).strip()
 
         # Caso 2: form in modifica con instance esistente
         elif self.instance.pk and self.instance.citta_id:
@@ -436,6 +487,14 @@ class IndirizzoForm(forms.ModelForm):
         if citta_id:
             try:
                 citta_id = int(citta_id)
+                citta = (
+                    Citta.objects.filter(pk=citta_id, attiva=True)
+                    .select_related("provincia", "provincia__regione")
+                    .first()
+                )
+                if citta:
+                    self.fields["citta"].queryset = Citta.objects.filter(pk=citta.pk)
+                    self.fields["citta"].widget.attrs["data-codice-catastale"] = citta.codice_catastale or ""
                 self.fields["cap_scelto"].queryset = (
                     CAP.objects.filter(citta_id=citta_id, attivo=True)
                     .order_by("codice")
@@ -504,6 +563,8 @@ class FamigliaForm(forms.ModelForm):
             primo = self.fields["stato_relazione_famiglia"].queryset.first()
             if primo:
                 self.initial["stato_relazione_famiglia"] = primo.pk
+        if not self.instance.pk and not self.is_bound and "attiva" not in self.initial:
+            self.initial["attiva"] = True
 #FINE FORMS PER LE FAMIGLIE
 
 #INIZIO FORMS PER I FAMILIARI
@@ -556,17 +617,6 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         )
         self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
         make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
-        self.setup_famiglia_search()
-        self.setup_indirizzo_search()
-        self.setup_luogo_nascita_autocomplete_fk()
-        make_searchable_select(self.fields["luogo_nascita"], "Cerca una città...")
-        self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
-        self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
-        self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
-        self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
-        self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
-        self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
-        self.fields["telefono"].widget.attrs["placeholder"] = "333 12 34 567"
 
         famiglia_id = None
         if self.is_bound:
@@ -584,17 +634,52 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
 
             if famiglia and famiglia.indirizzo_principale_id:
                 self.initial["indirizzo"] = famiglia.indirizzo_principale_id
+                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
+
+        self.setup_famiglia_search()
+        self.setup_indirizzo_search()
+        self.setup_luogo_nascita_autocomplete_fk()
+        self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
+        self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
+        self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
+        self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
+        self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
+        self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
+
+        if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
+            self.initial["attivo"] = True
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("relazione_familiare"):
             prima_relazione = self.fields["relazione_familiare"].queryset.first()
             if prima_relazione:
                 self.initial["relazione_familiare"] = prima_relazione.pk
 
+    def clean(self):
+        cleaned_data = super().clean()
+        famiglia = cleaned_data.get("famiglia")
+        indirizzo = cleaned_data.get("indirizzo")
+
+        if (
+            famiglia
+            and indirizzo
+            and getattr(famiglia, "indirizzo_principale_id", None)
+            and indirizzo.pk == famiglia.indirizzo_principale_id
+        ):
+            cleaned_data["indirizzo"] = None
+
+        return cleaned_data
+
     def clean_telefono(self):
         return validate_and_normalize_phone_number(self.cleaned_data.get("telefono"))
 
 
 class FamiliareInlineForm(FamiliareForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not self.is_bound and not getattr(self.instance, "pk", None):
+            self.fields["attivo"].initial = True
+
     def has_changed(self):
         changed = super().has_changed()
         if not changed:
@@ -736,15 +821,57 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
         make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
+
+        if (
+            not self.is_bound
+            and not self.initial.get("indirizzo")
+            and not getattr(self.instance, "indirizzo_id", None)
+            and getattr(self.instance, "famiglia_id", None)
+        ):
+            famiglia = getattr(self.instance, "famiglia", None)
+            if famiglia is None:
+                famiglia = (
+                    Famiglia.objects.select_related("indirizzo_principale")
+                    .filter(pk=self.instance.famiglia_id)
+                    .first()
+                )
+            if famiglia and famiglia.indirizzo_principale_id:
+                self.initial["indirizzo"] = famiglia.indirizzo_principale_id
+                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
+
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
-        make_searchable_select(self.fields["luogo_nascita"], "Cerca una città...")
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
         self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
+
+        if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
+            self.initial["attivo"] = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        indirizzo = cleaned_data.get("indirizzo")
+        famiglia = getattr(self.instance, "famiglia", None)
+
+        if famiglia is None and getattr(self.instance, "famiglia_id", None):
+            famiglia = (
+                Famiglia.objects.select_related("indirizzo_principale")
+                .filter(pk=self.instance.famiglia_id)
+                .first()
+            )
+
+        if (
+            famiglia
+            and indirizzo
+            and getattr(famiglia, "indirizzo_principale_id", None)
+            and indirizzo.pk == famiglia.indirizzo_principale_id
+        ):
+            cleaned_data["indirizzo"] = None
+
+        return cleaned_data
 
 
 class StudenteInlineForm(StudenteForm):
@@ -837,7 +964,6 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
         self.setup_luogo_nascita_autocomplete_fk()
-        make_searchable_select(self.fields["luogo_nascita"], "Cerca una città...")
 
 #FINE FORM PER GLI STUDENTI
 
@@ -1013,6 +1139,7 @@ IscrizioneStudenteFormSet = inlineformset_factory(
 )
 
 #FINE FORM PER I DOCUMENTI
+
 
 
 

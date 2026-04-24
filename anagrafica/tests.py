@@ -7,7 +7,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from anagrafica.dati_base_import import run_import_dati_base
-from anagrafica.models import CAP, Citta, Provincia, Regione
+from anagrafica.forms import FamiliareForm, FamiliareInlineForm, StudenteForm, StudenteInlineForm
+from anagrafica.models import CAP, Citta, Famiglia, Familiare, Indirizzo, Provincia, Regione, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
 
 
 class ImportDatiBaseTests(TestCase):
@@ -140,3 +141,173 @@ class AjaxCercaCittaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="panel panel-standalone"')
+
+
+class LuogoNascitaAutocompletePerformanceTests(TestCase):
+    def test_inline_forms_render_selected_birth_city_without_loading_all_cities(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia_roma = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        provincia_milano = Provincia.objects.create(sigla="MI", nome="Milano", regione=regione, ordine=2, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia_roma, codice_catastale="H501", ordine=1, attiva=True)
+        Citta.objects.create(nome="Milano", provincia=provincia_milano, codice_catastale="F205", ordine=2, attiva=True)
+
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare = Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Maria",
+            cognome="Rossi",
+            luogo_nascita=roma,
+            attivo=True,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Luca",
+            cognome="Rossi",
+            luogo_nascita=roma,
+            attivo=True,
+        )
+
+        familiare_form = FamiliareInlineForm(instance=familiare, prefix="familiari-0")
+        studente_form = StudenteInlineForm(instance=studente, prefix="studenti-0")
+
+        self.assertIn('type="hidden"', str(familiare_form["luogo_nascita"]))
+        self.assertIn("Roma (RM)", str(familiare_form["luogo_nascita_search"]))
+        self.assertNotIn("Milano", str(familiare_form["luogo_nascita"]))
+
+        self.assertIn('type="hidden"', str(studente_form["luogo_nascita"]))
+        self.assertIn("Roma (RM)", str(studente_form["luogo_nascita_search"]))
+        self.assertNotIn("Milano", str(studente_form["luogo_nascita"]))
+
+    def test_modifica_famiglia_page_renders_city_search_inputs(self):
+        user = User.objects.create_superuser(
+            username="famiglie@example.com",
+            email="famiglie@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato, attiva=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
+        Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Paolo",
+            cognome="Bianchi",
+            luogo_nascita=roma,
+            attivo=True,
+        )
+        Studente.objects.create(
+            famiglia=famiglia,
+            nome="Anna",
+            cognome="Bianchi",
+            luogo_nascita=roma,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="familiari-0-luogo_nascita_search"')
+        self.assertContains(response, 'name="studenti-0-luogo_nascita_search"')
+
+
+class FamigliaInlineDefaultsTests(TestCase):
+    def test_inline_forms_prefill_family_address(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            indirizzo_principale=indirizzo,
+            attiva=True,
+        )
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare = Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Laura",
+            cognome="Verdi",
+            attivo=True,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Marco",
+            cognome="Verdi",
+            attivo=True,
+        )
+
+        familiare_form = FamiliareInlineForm(instance=familiare, prefix="familiari-0")
+        studente_form = StudenteInlineForm(instance=studente, prefix="studenti-0")
+
+        self.assertEqual(str(familiare_form["indirizzo"].value()), str(indirizzo.pk))
+        self.assertEqual(familiare_form.initial["indirizzo_search"], indirizzo.label_select())
+        self.assertIn('data-inherited-address="1"', str(familiare_form["indirizzo"]))
+
+        self.assertEqual(str(studente_form["indirizzo"].value()), str(indirizzo.pk))
+        self.assertEqual(studente_form.initial["indirizzo_search"], indirizzo.label_select())
+        self.assertIn('data-inherited-address="1"', str(studente_form["indirizzo"]))
+
+    def test_forms_normalize_family_address_back_to_inherited(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            indirizzo_principale=indirizzo,
+            attiva=True,
+        )
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+
+        familiare_form = FamiliareForm(
+            data={
+                "famiglia": famiglia.pk,
+                "relazione_familiare": relazione.pk,
+                "indirizzo": indirizzo.pk,
+                "nome": "Laura",
+                "cognome": "Verdi",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "1980-01-15",
+                "luogo_nascita": roma.pk,
+                "luogo_nascita_search": "Roma (RM)",
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "attivo": "on",
+                "note": "",
+            }
+        )
+        self.assertTrue(familiare_form.is_valid(), familiare_form.errors)
+        self.assertIsNone(familiare_form.cleaned_data["indirizzo"])
+
+        studente_form = StudenteForm(
+            data={
+                "nome": "Marco",
+                "cognome": "Verdi",
+                "sesso": "M",
+                "data_nascita": "2015-05-20",
+                "luogo_nascita": roma.pk,
+                "luogo_nascita_search": "Roma (RM)",
+                "codice_fiscale": "",
+                "indirizzo": indirizzo.pk,
+                "attivo": "on",
+            },
+            instance=Studente(famiglia=famiglia),
+        )
+        self.assertTrue(studente_form.is_valid(), studente_form.errors)
+        self.assertIsNone(studente_form.cleaned_data["indirizzo"])

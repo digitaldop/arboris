@@ -14,10 +14,17 @@
 
         const input = container.querySelector("[data-citta-search]");
         const hidden = container.querySelector("[data-citta-hidden]");
-        const resultsBox = container.querySelector(".citta-results");
+        let resultsBox = container.querySelector(".citta-results");
 
-        if (!input || !hidden || !resultsBox) {
+        if (!input || !hidden) {
             return;
+        }
+
+        if (!resultsBox) {
+            resultsBox = document.createElement("div");
+            resultsBox.className = "citta-results";
+            resultsBox.setAttribute("aria-hidden", "true");
+            container.appendChild(resultsBox);
         }
 
         container.dataset.autocompleteReady = "1";

@@ -31,7 +31,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% endif %}">
+    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% endif %}" autocomplete="off" data-lpignore="true">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="famiglia-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'familiari' }}">
@@ -111,7 +111,7 @@
                                     </td>
                                 </tr>
 
-                                <tr>
+                                <tr class="family-attiva-row">
                                     <th>{{ form.attiva.label_tag }}</th>
                                     <td>
                                         {{ form.attiva }}
@@ -289,8 +289,8 @@
                                     <th class="inline-name-col">COGNOME</th>
                                     <th class="inline-name-col">NOME</th>
                                     <th>PARENTELA</th>
-                                    <th>INDIRIZZO</th>
-                                    <th>TELEFONO</th>
+                                    <th class="inline-family-address-col">INDIRIZZO</th>
+                                    <th class="inline-family-phone-col">TELEFONO</th>
                                     <th>EMAIL</th>
                                     <th class="inline-view-only-table-cell">DATA NASCITA</th>
                                     <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
@@ -298,7 +298,7 @@
                                     <th class="inline-checkbox-heading">CONVIVENTE</th>
                                     <th class="inline-checkbox-heading">REFERENTE<br>PRINCIPALE</th>
                                     <th class="inline-checkbox-heading inline-scambio-retta-col">SCAMBIO<br>RETTA</th>
-                                    <th class="mode-edit-only-table-cell">ATTIVO</th>
+                                    <th class="mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
                                     <th class="mode-edit-only-table-cell">ELIMINA</th>
                                 </tr>
                             </thead>
@@ -343,7 +343,7 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td class="inline-address-cell inline-family-address-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.indirizzo_effettivo %}
                                                     {{ f.instance.indirizzo_effettivo.label_full }}
@@ -372,7 +372,7 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td>
+                                        <td class="inline-phone-cell inline-family-phone-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
                                                 {% if f.instance.pk and f.instance.formatted_telefono %}
                                                     <div class="readonly-action-group">
@@ -462,7 +462,7 @@
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.abilitato_scambio_retta|si_no }}</div>
                                             <div class="mode-edit-field">{{ f.abilitato_scambio_retta }}</div>
                                         </td>
-                                        <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ f.attivo }}</td>
+                                        <td class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
                                         <td class="inline-delete-cell mode-edit-only-table-cell">
                                             {% if f.instance.pk %}
                                                 <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
@@ -487,8 +487,10 @@
                                                 <div class="inline-subform-field">
                                                     <label>Luogo nascita</label>
                                                     <div class="autocomplete-wrapper citta-autocomplete">
+                                                        {{ f.luogo_nascita_search }}
                                                         {{ f.luogo_nascita }}
                                                     </div>
+                                                    {{ f.luogo_nascita_search.errors }}
                                                     {{ f.luogo_nascita.errors }}
                                                 </div>
                                                 <div class="inline-subform-field">
@@ -539,7 +541,7 @@
                                     <th class="inline-view-only-table-cell">DATA NASCITA</th>
                                     <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
                                     <th class="inline-view-only-table-cell">CODICE FISCALE</th>
-                                    <th class="inline-checkbox-cell mode-edit-only-table-cell">ATTIVO</th>
+                                    <th class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
                                     <th class="mode-edit-only-table-cell">ELIMINA</th>
                                 </tr>
                             </thead>
@@ -567,7 +569,7 @@
                                             </div>
                                             <div class="mode-edit-field">{{ f.cognome }}</div>
                                         </td>
-                                        <td class="inline-address-cell inline-address-cell-wide">
+                                        <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.indirizzo_effettivo %}
                                                     {{ f.instance.indirizzo_effettivo.label_full }}
@@ -632,7 +634,7 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell">{{ f.attivo }}</td>
+                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
                                         <td class="inline-delete-cell mode-edit-only-table-cell">
                                             {% if f.instance.pk %}
                                                 <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
@@ -657,8 +659,10 @@
                                                 <div class="inline-subform-field">
                                                     <label>Luogo nascita</label>
                                                     <div class="autocomplete-wrapper citta-autocomplete">
+                                                        {{ f.luogo_nascita_search }}
                                                         {{ f.luogo_nascita }}
                                                     </div>
+                                                    {{ f.luogo_nascita_search.errors }}
                                                     {{ f.luogo_nascita.errors }}
                                                 </div>
                                                 <div class="inline-subform-field">
@@ -879,7 +883,7 @@
                     </div>
                 </div>
             </td>
-            <td>
+            <td class="inline-address-cell inline-family-address-cell">
                 <div class="inline-related-field">
                     <div class="autocomplete-wrapper indirizzo-autocomplete">
                         {{ familiari_formset.empty_form.indirizzo }}
@@ -899,7 +903,7 @@
                     {% endif %}
                 </div>
             </td>
-            <td>{{ familiari_formset.empty_form.telefono }}</td>
+            <td class="inline-phone-cell inline-family-phone-cell">{{ familiari_formset.empty_form.telefono }}</td>
             <td>{{ familiari_formset.empty_form.email }}</td>
             <td class="inline-view-only-table-cell"></td>
             <td class="inline-view-only-table-cell"></td>
@@ -907,7 +911,7 @@
             <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.convivente }}</td>
             <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.referente_principale }}</td>
             <td class="inline-checkbox-cell inline-scambio-retta-col">{{ familiari_formset.empty_form.abilitato_scambio_retta }}</td>
-            <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ familiari_formset.empty_form.attivo }}</td>
+            <td class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-cell">{{ familiari_formset.empty_form.attivo }}</td>
             <td class="inline-delete-cell mode-edit-only-table-cell">
                 <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
             </td>
@@ -928,8 +932,10 @@
                     <div class="inline-subform-field">
                         <label>Luogo nascita</label>
                         <div class="autocomplete-wrapper citta-autocomplete">
+                            {{ familiari_formset.empty_form.luogo_nascita_search }}
                             {{ familiari_formset.empty_form.luogo_nascita }}
                         </div>
+                        {{ familiari_formset.empty_form.luogo_nascita_search.errors }}
                         {{ familiari_formset.empty_form.luogo_nascita.errors }}
                     </div>
                     <div class="inline-subform-field">
@@ -949,7 +955,7 @@
             {{ studenti_formset.empty_form.id }}
             <td>{{ studenti_formset.empty_form.nome }}</td>
             <td>{{ studenti_formset.empty_form.cognome }}</td>
-            <td class="inline-address-cell inline-address-cell-wide">
+            <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
                 <div class="inline-related-field">
                     <div class="autocomplete-wrapper indirizzo-autocomplete">
                         {{ studenti_formset.empty_form.indirizzo }}
@@ -972,7 +978,7 @@
             <td class="inline-view-only-table-cell"></td>
             <td class="inline-view-only-table-cell"></td>
             <td class="inline-view-only-table-cell"></td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell">{{ studenti_formset.empty_form.attivo }}</td>
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ studenti_formset.empty_form.attivo }}</td>
             <td class="inline-delete-cell mode-edit-only-table-cell">
                 <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
             </td>
@@ -993,8 +999,10 @@
                     <div class="inline-subform-field">
                         <label>Luogo nascita</label>
                         <div class="autocomplete-wrapper citta-autocomplete">
+                            {{ studenti_formset.empty_form.luogo_nascita_search }}
                             {{ studenti_formset.empty_form.luogo_nascita }}
                         </div>
+                        {{ studenti_formset.empty_form.luogo_nascita_search.errors }}
                         {{ studenti_formset.empty_form.luogo_nascita.errors }}
                     </div>
                     <div class="inline-subform-field">
@@ -1159,7 +1167,7 @@
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
     <!-- <script src="{% static 'js/pages/famiglia-form.js' %}"></script> -->
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=15"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=16"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

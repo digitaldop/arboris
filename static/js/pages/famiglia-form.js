@@ -249,9 +249,12 @@ window.ArborisFamigliaForm = (function () {
             const help = wrapperCell.querySelector('[data-role="address-help"]');
             if (!help) return;
 
+            const famigliaIndirizzoId = document.getElementById("id_indirizzo_principale")?.value || "";
             const famigliaIndirizzoLabel = getFamigliaIndirizzoPrincipaleLabel();
 
-            if (select.value) {
+            if (select.value && select.value === famigliaIndirizzoId && famigliaIndirizzoLabel) {
+                help.textContent = `Indirizzo famiglia: ${famigliaIndirizzoLabel}`;
+            } else if (select.value) {
                 help.textContent = "Indirizzo specifico";
             } else if (famigliaIndirizzoLabel) {
                 help.textContent = `Erediterà: ${famigliaIndirizzoLabel}`;
@@ -274,6 +277,85 @@ window.ArborisFamigliaForm = (function () {
             }
         }
 
+        function initCodiceFiscale(root) {
+            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.rebind === "function") {
+                window.ArborisCodiceFiscale.rebind(root || document);
+                return;
+            }
+
+            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.init === "function") {
+                window.ArborisCodiceFiscale.init(root || document);
+            }
+        }
+
+        function markInheritedAddress(select, enabled) {
+            if (!select) {
+                return;
+            }
+
+            if (enabled) {
+                select.dataset.inheritedAddress = "1";
+            } else {
+                delete select.dataset.inheritedAddress;
+            }
+        }
+
+        function syncInlineAddressToFamily(select, famigliaIndirizzoId) {
+            if (!select) {
+                return;
+            }
+
+            const isInherited = select.dataset.inheritedAddress === "1";
+            const previousValue = select.value || "";
+
+            if (!famigliaIndirizzoId) {
+                if (isInherited) {
+                    select.value = "";
+                    markInheritedAddress(select, false);
+                    if (previousValue) {
+                        select.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                }
+                refreshInlineAddressHelp(select);
+                return;
+            }
+
+            if (!select.value || isInherited) {
+                select.value = famigliaIndirizzoId;
+                markInheritedAddress(select, true);
+                if (select.value !== previousValue) {
+                    select.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+            }
+
+            refreshInlineAddressHelp(select);
+        }
+
+        function bindInlineAddressTracking(root) {
+            (root || document).querySelectorAll('select[name$="-indirizzo"]').forEach(select => {
+                if (select.dataset.inheritedTrackingBound === "1") {
+                    return;
+                }
+
+                select.dataset.inheritedTrackingBound = "1";
+                select.addEventListener("change", function () {
+                    const famigliaIndirizzoId = document.getElementById("id_indirizzo_principale")?.value || "";
+                    markInheritedAddress(select, Boolean(famigliaIndirizzoId && select.value === famigliaIndirizzoId));
+                    refreshInlineAddressHelp(select);
+                });
+            });
+        }
+
+        function syncInlineAttivoDefault(row) {
+            const hiddenIdInput = row ? row.querySelector('input[type="hidden"][name$="-id"]') : null;
+            const attivoCheckbox = row ? row.querySelector('input[type="checkbox"][name$="-attivo"]') : null;
+            const isPersisted = Boolean(hiddenIdInput && hiddenIdInput.value);
+
+            if (!isPersisted && attivoCheckbox) {
+                attivoCheckbox.checked = true;
+            }
+        }
+
         function syncFamiliareInlineAddresses() {
             const famigliaIndirizzoId = document.getElementById("id_indirizzo_principale")?.value || "";
             const rows = document.querySelectorAll("#familiari-table tbody .inline-form-row");
@@ -291,13 +373,12 @@ window.ArborisFamigliaForm = (function () {
                 }
 
                 const isPersisted = Boolean(hiddenIdInput && hiddenIdInput.value);
-                if (isPersisted) {
-                    refreshInlineAddressHelp(indirizzoSelect);
-                    return;
+                if (!isPersisted && !indirizzoSelect.value) {
+                    markInheritedAddress(indirizzoSelect, true);
                 }
 
-                indirizzoSelect.value = famigliaIndirizzoId || "";
-                refreshInlineAddressHelp(indirizzoSelect);
+                syncInlineAttivoDefault(row);
+                syncInlineAddressToFamily(indirizzoSelect, famigliaIndirizzoId);
             });
         }
 
@@ -321,23 +402,18 @@ window.ArborisFamigliaForm = (function () {
                 const attivoCheckbox = row.querySelector('input[type="checkbox"][name$="-attivo"]');
                 const isPersisted = Boolean(hiddenIdInput && hiddenIdInput.value);
 
-                if (isPersisted) {
-                    if (indirizzoSelect) {
-                        refreshInlineAddressHelp(indirizzoSelect);
-                    }
-                    return;
-                }
-
-                if (cognomeInput) {
+                if (!isPersisted && cognomeInput) {
                     cognomeInput.value = famigliaCognome;
                 }
 
                 if (indirizzoSelect) {
-                    indirizzoSelect.value = famigliaIndirizzoId || "";
-                    refreshInlineAddressHelp(indirizzoSelect);
+                    if (!isPersisted && !indirizzoSelect.value) {
+                        markInheritedAddress(indirizzoSelect, true);
+                    }
+                    syncInlineAddressToFamily(indirizzoSelect, famigliaIndirizzoId);
                 }
 
-                if (attivoCheckbox) {
+                if (!isPersisted && attivoCheckbox) {
                     attivoCheckbox.checked = true;
                 }
             });
@@ -820,7 +896,10 @@ window.ArborisFamigliaForm = (function () {
                 const visibleSubformRow = getFamiliareSubformRow(hiddenRow);
                 if (visibleSubformRow) {
                     initSearchableSelects(visibleSubformRow);
+                    initCodiceFiscale(visibleSubformRow);
                 }
+                bindInlineAddressTracking(hiddenRow);
+                initCodiceFiscale(hiddenRow);
                 wireInlineRelatedButtons(hiddenRow);
                 if (prefix === "familiari") {
                     bindFamiliareInlineSex(hiddenRow);
@@ -872,7 +951,10 @@ window.ArborisFamigliaForm = (function () {
                 initSearchableSelects(newRow);
                 if (subformRow) {
                     initSearchableSelects(subformRow);
+                    initCodiceFiscale(subformRow);
                 }
+                bindInlineAddressTracking(newRow);
+                initCodiceFiscale(newRow);
                 wireInlineRelatedButtons(newRow);
                 if (prefix === "familiari") {
                     bindFamiliareInlineSex(newRow);
@@ -1030,12 +1112,14 @@ window.ArborisFamigliaForm = (function () {
         collapsible.initCollapsibleSections(document);
         bindNotesSectionState();
         initSearchableSelects(document.getElementById("famiglia-lock-container"));
+        bindInlineAddressTracking(document.getElementById("famiglia-inline-lock-container"));
         wireInlineRelatedButtons(document);
         restoreActiveTab();
         syncFamiliareInlineAddresses();
         bindAllFamiliareInlineSex();
         bindAllStudenteInlineSex();
         syncStudenteInlineDefaults();
+        initCodiceFiscale(document.getElementById("famiglia-inline-lock-container"));
         refreshAllInlineAddressHelp();
         refreshTabCounts();
         refreshInlineEditScope();

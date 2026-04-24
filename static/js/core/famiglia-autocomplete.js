@@ -82,7 +82,10 @@
         input.type = "text";
         input.className = "searchable-select-input";
         input.placeholder = placeholder;
-        input.autocomplete = "off";
+        input.autocomplete = "new-password";
+        input.autocapitalize = "none";
+        input.spellcheck = false;
+        input.setAttribute("data-lpignore", "true");
 
         const dropdown = document.createElement("div");
         dropdown.className = "searchable-select-dropdown";

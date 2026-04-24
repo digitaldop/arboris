@@ -1450,6 +1450,24 @@ select:focus {
     max-width: none;
 }
 
+/* In riga con azioni +/matita: non far crescere lo stack oltre il campo, altrimenti i pulsanti finiscono lontano */
+.related-field-row > .related-field-stack {
+    flex: 0 1 auto;
+    max-width: 520px;
+    width: 100%;
+}
+
+.related-field-row > .related-actions {
+    flex: 0 0 auto;
+}
+
+.form-table .related-field-row .famiglia-autocomplete,
+.form-table .related-field-row .citta-autocomplete,
+.form-table .related-field-stack .citta-autocomplete {
+    max-width: 520px;
+    width: 100%;
+}
+
 .searchable-select {
     position: relative;
     width: 100%;
@@ -2439,6 +2457,39 @@ select:focus {
     border-radius: 3px;
 }
 
+.family-attiva-row {
+    display: none;
+}
+
+#familiari-table th.inline-attivo-col,
+#familiari-table td.inline-attivo-cell,
+#studenti-table th.inline-attivo-col,
+#studenti-table td.inline-attivo-cell {
+    display: none;
+}
+
+#familiari-table .inline-family-address-cell {
+    min-width: 320px;
+}
+
+#familiari-table .inline-family-address-cell .inline-related-field {
+    min-width: 300px;
+}
+
+#familiari-table .inline-family-address-cell .inline-related-field select[name*="indirizzo"] {
+    min-width: 260px;
+    max-width: 460px;
+}
+
+#familiari-table .inline-family-phone-cell {
+    width: 160px;
+    min-width: 150px;
+}
+
+#familiari-table .inline-family-phone-cell input {
+    max-width: 160px;
+}
+
 .inline-table .help-text {
     margin-top: 3px;
     font-size: 10px;
@@ -2911,11 +2962,26 @@ select:focus {
     gap: 8px;
 }
 
+.detail-form.is-edit-mode #studenti-table .inline-related-field.mode-edit-field,
+.detail-form.is-inline-edit-mode #studenti-table .inline-related-field.mode-edit-field {
+    gap: 4px;
+}
+
 .detail-form.is-edit-mode #familiari-table .inline-related-field.mode-edit-field .autocomplete-wrapper,
 .detail-form.is-inline-edit-mode #familiari-table .inline-related-field.mode-edit-field .autocomplete-wrapper,
 .detail-form.is-edit-mode #studenti-table .inline-related-field.mode-edit-field .autocomplete-wrapper,
 .detail-form.is-inline-edit-mode #studenti-table .inline-related-field.mode-edit-field .autocomplete-wrapper {
     flex: 1 1 auto;
+    min-width: 0;
+}
+
+.detail-form.is-edit-mode #familiari-table .inline-family-address-cell .mode-edit-field .autocomplete-wrapper,
+.detail-form.is-inline-edit-mode #familiari-table .inline-family-address-cell .mode-edit-field .autocomplete-wrapper {
+    min-width: 240px;
+}
+
+.detail-form.is-edit-mode #studenti-table .inline-studente-address-cell .mode-edit-field .autocomplete-wrapper,
+.detail-form.is-inline-edit-mode #studenti-table .inline-studente-address-cell .mode-edit-field .autocomplete-wrapper {
     min-width: 0;
 }
 
@@ -3335,6 +3401,15 @@ select:focus {
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+#section-note .rich-note-field {
+    padding: 4px 2px 0 4px;
+    box-sizing: border-box;
+}
+
+#section-note .rich-note-toolbar {
+    margin: 0 0 2px 2px;
 }
 
 .rich-note-toolbar[hidden] {
@@ -4702,6 +4777,12 @@ select:focus {
 
 .student-rate-overview {
     padding: 4px 0 0;
+}
+
+.student-rate-overview .empty-state.compact-empty-state,
+.student-rate-overview .compact-empty-state {
+    padding: 12px 14px 16px;
+    box-sizing: border-box;
 }
 
 .student-rate-year-block + .student-rate-year-block {
