@@ -634,6 +634,11 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     overflow: hidden;
 }
 
+.panel.panel-standalone {
+    border-top: 1px solid #ddd;
+    border-radius: 4px;
+}
+
 .panel-body {
     padding: 0;
 }

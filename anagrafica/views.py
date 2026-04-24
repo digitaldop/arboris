@@ -897,6 +897,7 @@ def elimina_indirizzo(request, pk):
 
 
 def ajax_cerca_citta(request):
+    citta_id = (request.GET.get("id") or "").strip()
     q = request.GET.get("q", "").strip()
 
     qs = (
@@ -905,7 +906,12 @@ def ajax_cerca_citta(request):
         .select_related("provincia", "provincia__regione")
     )
 
-    if q:
+    if citta_id:
+        try:
+            qs = qs.filter(pk=int(citta_id))
+        except (TypeError, ValueError):
+            return JsonResponse({"results": []})
+    elif q:
         qs = qs.filter(nome__icontains=q)
 
     qs = qs.order_by("nome")[:20]

@@ -8,9 +8,9 @@
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-sep">&rsaquo;</span>
         <a href="{% url 'lista_indirizzi' %}">Indirizzi</a>
-        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-sep">&rsaquo;</span>
         <span>{% if indirizzo %}Modifica{% else %}Nuovo{% endif %}</span>
     </div>
 {% endblock %}
@@ -31,7 +31,7 @@
     </div>
 
     <div class="info-box">
-        Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
+        Se la citta ha un solo CAP, verra selezionato automaticamente. Se ha piu CAP, potrai scegliere quello corretto dall'elenco.
     </div>
 
     <div class="panel">
@@ -101,7 +101,7 @@
                             {{ form.cap_scelto }}
                             {{ form.cap_scelto.errors }}
                             <div class="help-text" id="cap-help-text">
-                                Seleziona il CAP solo quando la città ne ha più di uno.
+                                Seleziona il CAP solo quando la citta ne ha piu di uno.
                             </div>
                         </td>
                     </tr>
@@ -143,14 +143,14 @@
                 option.textContent = "---------";
                 capSelect.appendChild(option);
                 capSelect.classList.remove("select-single-cap");
-                capHelpText.textContent = "Seleziona il CAP solo quando la città ne ha più di uno.";
+                capHelpText.textContent = "Seleziona il CAP solo quando la citta ne ha piu di uno.";
             }
 
-            function loadCaps(caps) {
+            function loadCaps(caps, preferredCapId) {
                 resetCapSelect();
 
                 if (!caps || !caps.length) {
-                    capHelpText.textContent = "Per questa città non risultano CAP disponibili.";
+                    capHelpText.textContent = "Per questa citta non risultano CAP disponibili.";
                     return;
                 }
 
@@ -161,12 +161,19 @@
                     capSelect.appendChild(option);
                 });
 
-                if (caps.length === 1) {
+                const preferredExists = preferredCapId && caps.some(item => String(item.id) === String(preferredCapId));
+
+                if (preferredExists) {
+                    capSelect.value = String(preferredCapId);
+                    capHelpText.textContent = caps.length === 1
+                        ? "CAP selezionato automaticamente."
+                        : "Questa citta ha piu CAP: seleziona quello corretto.";
+                } else if (caps.length === 1) {
                     capSelect.value = String(caps[0].id);
                     capSelect.classList.add("select-single-cap");
                     capHelpText.textContent = "CAP selezionato automaticamente.";
                 } else {
-                    capHelpText.textContent = "Questa città ha più CAP: seleziona quello corretto.";
+                    capHelpText.textContent = "Questa citta ha piu CAP: seleziona quello corretto.";
                 }
             }
 
@@ -184,12 +191,11 @@
                     return;
                 }
 
-                const selectedText = selectedOption.textContent || "";
-                fetch(`/ajax/cerca-citta/?q=${encodeURIComponent(selectedText)}`)
+                const currentCapValue = capSelect.value;
+                fetch(`/ajax/cerca-citta/?id=${encodeURIComponent(selectedOption.value)}`)
                     .then(response => response.json())
                     .then(data => {
                         const match = (data.results || []).find(item => String(item.id) === String(selectedOption.value))
-                            || (data.results || []).find(item => item.label === selectedText)
                             || null;
 
                         if (!match) {
@@ -201,7 +207,7 @@
 
                         provinciaDisplay.value = `${match.provincia_nome} (${match.provincia_sigla})`;
                         regioneDisplay.value = match.regione_nome || "";
-                        loadCaps(match.caps || []);
+                        loadCaps(match.caps || [], currentCapValue);
                     })
                     .catch(() => {
                         provinciaDisplay.value = "";

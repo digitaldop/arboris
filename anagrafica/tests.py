@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 from django.test import TestCase
+from django.urls import reverse
 
 from anagrafica.dati_base_import import run_import_dati_base
 from anagrafica.models import CAP, Citta, Provincia, Regione
@@ -83,3 +84,50 @@ class ImportDatiBaseTests(TestCase):
         self.assertEqual(second_stats["cap_creati"], 0)
         self.assertEqual(Citta.objects.count(), 2)
         self.assertEqual(CAP.objects.count(), 3)
+
+
+class AjaxCercaCittaTests(TestCase):
+    def test_ajax_cerca_citta_supports_lookup_by_id_with_caps(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        citta = Citta.objects.create(
+            nome="Roma",
+            provincia=provincia,
+            codice_istat="058091",
+            codice_catastale="H501",
+            ordine=1,
+            attiva=True,
+        )
+        cap_1 = CAP.objects.create(codice="00118", citta=citta, ordine=1, attivo=True)
+        cap_2 = CAP.objects.create(codice="00119", citta=citta, ordine=2, attivo=True)
+
+        response = self.client.get(reverse("ajax_cerca_citta"), {"id": citta.pk})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["results"]), 1)
+        result = payload["results"][0]
+        self.assertEqual(result["id"], citta.pk)
+        self.assertEqual(result["provincia_nome"], "Roma")
+        self.assertEqual(result["provincia_sigla"], "RM")
+        self.assertEqual(result["regione_nome"], "Lazio")
+        self.assertEqual(
+            result["caps"],
+            [
+                {"id": cap_1.pk, "codice": "00118"},
+                {"id": cap_2.pk, "codice": "00119"},
+            ],
+        )
+
+    def test_crea_indirizzo_page_renders(self):
+        response = self.client.get(reverse("crea_indirizzo"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_provincia_display"')
+        self.assertContains(response, 'id="id_cap_scelto"')
+
+    def test_lista_famiglie_uses_standalone_panel(self):
+        response = self.client.get(reverse("lista_famiglie"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="panel panel-standalone"')
