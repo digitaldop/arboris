@@ -19,6 +19,8 @@ from .models import (
     FrequenzaBackupAutomatico,
     SistemaBackupDatabaseConfigurazione,
     SistemaDatabaseBackup,
+    SistemaDatabaseRestoreJob,
+    StatoRipristinoDatabase,
     TipoBackupDatabase,
 )
 
@@ -386,6 +388,21 @@ def store_pending_restore_upload(uploaded_file):
     }
 
 
+def create_restore_job_from_upload(uploaded_file, triggered_by=None):
+    """
+    Salva il file su disco senza elaborarlo e crea un record SistemaDatabaseRestoreJob
+    in stato 'in attesa di conferma'.
+    """
+    meta = store_pending_restore_upload(uploaded_file)
+    return SistemaDatabaseRestoreJob.objects.create(
+        stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+        percorso_file=meta["path"],
+        nome_file_originale=meta["original_name"] or "backup.sql",
+        dimensione_file_bytes=meta["size_bytes"],
+        creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
+    )
+
+
 def delete_pending_restore_upload(metadata):
     if not metadata:
         return
@@ -398,6 +415,15 @@ def delete_pending_restore_upload(metadata):
         Path(file_path).unlink(missing_ok=True)
     except Exception:
         pass
+
+
+def cancel_or_delete_restore_job(job: SistemaDatabaseRestoreJob) -> None:
+    """Rimuove file e record per job ancora in attesa di conferma o annullato manualmente."""
+    try:
+        Path(job.percorso_file).unlink(missing_ok=True)
+    except Exception:
+        pass
+    job.delete()
 
 
 def restore_database_from_backup_file(file_path, original_name="", triggered_by=None):

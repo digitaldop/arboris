@@ -2,9 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import get_template
 from pathlib import Path
 
 from .forms import (
@@ -20,20 +19,23 @@ from .forms import (
 )
 from .database_backups import (
     DatabaseBackupError,
+    cancel_or_delete_restore_job,
     create_database_backup,
+    create_restore_job_from_upload,
     delete_pending_restore_upload,
     get_backup_configuration,
-    restore_database_from_backup_file,
-    store_pending_restore_upload,
 )
+from .restore_scheduler import schedule_restore_job
 from .models import (
     AzioneOperazioneCronologia,
     ModuloOperazioneCronologia,
     Scuola,
     SistemaDatabaseBackup,
+    SistemaDatabaseRestoreJob,
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
     SistemaUtentePermessi,
+    StatoRipristinoDatabase,
 )
 from anagrafica.dati_base_import import default_gi_file_path, run_import_dati_base
 
@@ -41,6 +43,7 @@ from .permissions import operational_admin_required
 
 
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
+PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
 CRONOLOGIA_RESULT_LIMIT = 250
 
 
@@ -185,28 +188,45 @@ def importa_dati_base_anagrafica(request):
 
 
 def get_pending_restore_metadata(request):
-    pending = request.session.get(PENDING_RESTORE_SESSION_KEY)
-    if not pending:
-        return None
+    """Job in attesa di conferma ripristino (file già caricato, non ancora in coda)."""
+    job_id = request.session.get(PENDING_RESTORE_JOB_SESSION_KEY)
+    if job_id:
+        try:
+            job = SistemaDatabaseRestoreJob.objects.get(
+                pk=job_id,
+                stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+            )
+        except SistemaDatabaseRestoreJob.DoesNotExist:
+            request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
+            request.session.modified = True
+        else:
+            if not Path(job.percorso_file).exists():
+                cancel_or_delete_restore_job(job)
+                request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
+                request.session.modified = True
+            else:
+                return job
 
-    file_path = pending.get("path", "")
-    if not file_path or not Path(file_path).exists():
-        request.session.pop(PENDING_RESTORE_SESSION_KEY, None)
+    # Sessione legacy (dict con path): non più supportata
+    legacy = request.session.pop(PENDING_RESTORE_SESSION_KEY, None)
+    if legacy:
         request.session.modified = True
-        return None
-
-    return pending
+        delete_pending_restore_upload(legacy)
+    return None
 
 
 def clear_pending_restore_metadata(request):
-    pending = request.session.pop(PENDING_RESTORE_SESSION_KEY, None)
+    job_id = request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
     request.session.modified = True
-    delete_pending_restore_upload(pending)
-
-
-def render_backup_restore_result(context):
-    template = get_template("sistema/backup_database_restore_result.html")
-    return HttpResponse(template.render(context))
+    if job_id:
+        try:
+            job = SistemaDatabaseRestoreJob.objects.get(
+                pk=job_id,
+                stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+            )
+            cancel_or_delete_restore_job(job)
+        except SistemaDatabaseRestoreJob.DoesNotExist:
+            pass
 
 
 def backup_database_sistema(request):
@@ -242,13 +262,17 @@ def backup_database_sistema(request):
             upload_form = SistemaBackupDatabaseUploadForm(request.POST, request.FILES)
             if upload_form.is_valid():
                 clear_pending_restore_metadata(request)
-                pending_restore = store_pending_restore_upload(upload_form.cleaned_data["file_backup"])
-                request.session[PENDING_RESTORE_SESSION_KEY] = pending_restore
+                job = create_restore_job_from_upload(
+                    upload_form.cleaned_data["file_backup"],
+                    triggered_by=request.user,
+                )
+                request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
                 request.session.modified = True
+                pending_restore = job
                 confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
                 messages.warning(
                     request,
-                    "File di backup caricato. Completa il secondo controllo per avviare il ripristino.",
+                    "File di backup salvato sul server. Completa il secondo controllo per mettere in coda il ripristino in background.",
                 )
 
         elif action == "cancel_restore":
@@ -257,42 +281,39 @@ def backup_database_sistema(request):
             return redirect("backup_database_sistema")
 
         elif action == "confirm_restore":
-            pending_restore = get_pending_restore_metadata(request)
-            if not pending_restore:
+            job_in_attesa = get_pending_restore_metadata(request)
+            if not job_in_attesa:
                 messages.error(request, "Carica prima un file di backup da ripristinare.")
                 return redirect("backup_database_sistema")
 
             confirm_form = SistemaBackupDatabaseRestoreConfirmForm(request.POST)
             if confirm_form.is_valid():
+                job = job_in_attesa
+                job.stato = StatoRipristinoDatabase.IN_CODA
+                job.save(update_fields=["stato"])
+                request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
+                request.session.modified = True
                 try:
-                    safety_backup = restore_database_from_backup_file(
-                        pending_restore["path"],
-                        original_name=pending_restore.get("original_name", ""),
-                        triggered_by=request.user,
+                    schedule_restore_job(job.pk)
+                except Exception as exc:  # noqa: BLE001
+                    job.stato = StatoRipristinoDatabase.IN_ATTESA_CONFERMA
+                    job.save(update_fields=["stato"])
+                    request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
+                    request.session.modified = True
+                    messages.error(request, f"Impossibile avviare il ripristino: {exc}")
+                else:
+                    messages.success(
+                        request,
+                        "Ripristino messo in coda. L'elaborazione avviene in background: aggiorna la pagina per lo stato o attendi la fine del processo (può richiedere diversi minuti).",
                     )
-                except DatabaseBackupError as exc:
-                    clear_pending_restore_metadata(request)
-                    return render_backup_restore_result(
-                        {
-                            "restore_success": False,
-                            "restore_message": str(exc),
-                            "uploaded_backup_name": pending_restore.get("original_name") or "backup.sql",
-                            "safety_backup_name": exc.safety_backup.nome_file if exc.safety_backup else "",
-                        },
-                    )
-
-                clear_pending_restore_metadata(request)
-                return render_backup_restore_result(
-                    {
-                        "restore_success": True,
-                        "restore_message": "Ripristino completato correttamente.",
-                        "uploaded_backup_name": pending_restore.get("original_name") or "backup.sql",
-                        "safety_backup_name": safety_backup.nome_file,
-                    },
-                )
+                return redirect("backup_database_sistema")
+            pending_restore = job_in_attesa
 
     backup_records = SistemaDatabaseBackup.objects.select_related("creato_da").order_by("-data_creazione", "-id")[:10]
     ultimo_backup = backup_records[0] if backup_records else None
+    recent_restore_jobs = SistemaDatabaseRestoreJob.objects.select_related("creato_da", "backup_sicurezza").order_by(
+        "-data_creazione", "-id"
+    )[:20]
 
     return render(
         request,
@@ -305,6 +326,7 @@ def backup_database_sistema(request):
             "pending_restore": pending_restore,
             "backup_records": backup_records,
             "ultimo_backup": ultimo_backup,
+            "recent_restore_jobs": recent_restore_jobs,
         },
     )
 

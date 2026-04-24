@@ -153,7 +153,10 @@ class SistemaBackupDatabaseConfigurazioneForm(forms.ModelForm):
 class SistemaBackupDatabaseUploadForm(forms.Form):
     file_backup = forms.FileField(
         label="File di backup",
-        help_text="Carica un file .sql oppure .sql.gz generato da Arboris o da PostgreSQL.",
+        help_text=(
+            "File .sql o .sql.gz (pg_dump) generato da Arboris o da PostgreSQL. "
+            "Il file viene solo salvato sul server; il ripristino parte dopo la conferma e viene eseguito in background."
+        ),
     )
 
     def clean_file_backup(self):

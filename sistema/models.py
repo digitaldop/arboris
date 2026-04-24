@@ -447,6 +447,62 @@ class SistemaDatabaseBackup(models.Model):
         return local_value.strftime("%d/%m/%Y %H:%M")
 
 
+class StatoRipristinoDatabase(models.TextChoices):
+    IN_ATTESA_CONFERMA = "in_attesa_conferma", "In attesa di conferma"
+    IN_CODA = "in_coda", "In coda"
+    IN_CORSO = "in_corso", "In corso"
+    COMPLETATO = "completato", "Completato"
+    ERRORE = "errore", "Errore"
+    ANNULLATO = "annullato", "Annullato"
+
+
+class SistemaDatabaseRestoreJob(models.Model):
+    """
+    Traccia un file di backup caricato per ripristino: prima viene salvato su disco (senza
+    elaborazione), quindi l'elaborazione avviene in un task in background (Celery o thread).
+    """
+    stato = models.CharField(
+        max_length=32,
+        choices=StatoRipristinoDatabase.choices,
+        default=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+    )
+    percorso_file = models.TextField(help_text="Percorso assoluto del file in attesa o appena usato per il restore.")
+    nome_file_originale = models.CharField(max_length=400)
+    dimensione_file_bytes = models.BigIntegerField(default=0)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="ripristini_database",
+        null=True,
+        blank=True,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_avvio_ripristino = models.DateTimeField(null=True, blank=True)
+    data_completamento = models.DateTimeField(null=True, blank=True)
+    messaggio_errore = models.TextField(blank=True)
+    backup_sicurezza = models.ForeignKey(
+        SistemaDatabaseBackup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ripristino_job_collegato",
+    )
+    celery_task_id = models.CharField(max_length=120, blank=True)
+
+    class Meta:
+        db_table = "sistema_database_restore_job"
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Job ripristino database"
+        verbose_name_plural = "Job ripristino database"
+
+    def __str__(self):
+        return f"Ripristino {self.get_stato_display()} - {self.nome_file_originale}"
+
+    @property
+    def size_label(self):
+        return filesizeformat(self.dimensione_file_bytes or 0)
+
+
 class AzioneOperazioneCronologia(models.TextChoices):
     CREAZIONE = "create", "Creazione"
     MODIFICA = "update", "Modifica"

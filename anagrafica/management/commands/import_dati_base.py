@@ -33,8 +33,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--header",
             type=int,
-            default=0,
-            help="Riga di intestazione (0 = prima riga; il comando prova anche la riga 1 se le colonne non coincidono).",
+            default=None,
+            help="Riga intestazione 0-based (pandas). Se omesso, prova automaticamente 1, 0, 2. Esempio forzare prima riga: --header 0",
         )
 
     def handle(self, *args, **options):
@@ -52,7 +52,7 @@ class Command(BaseCommand):
             sheet_name: int | str = int(sheet)
         except ValueError:
             sheet_name = str(sheet)
-        header = int(options.get("header") or 0)
+        header = options.get("header")
 
         try:
             stats = run_import_dati_base(

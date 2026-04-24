@@ -64,17 +64,18 @@
                 <div class="panel">
                     <div class="panel-body">
                         <div class="settings-warning-box" style="margin-bottom: 16px;">
-                            Il ripristino sostituisce integralmente il database corrente. Prima dell'importazione Arboris crea sempre un backup di sicurezza dell'archivio attuale.
+                            Il ripristino sostituisce integralmente il database corrente. Dopo la conferma Arboris mette in coda l'elaborazione
+                            (Celery se <code>CELERY_BROKER_URL</code> è configurato, altrimenti un processo in background). Prima del ripristino viene creato un backup di sicurezza. Ricarica la pagina per vedere lo stato dell'ultimo job.
                         </div>
 
                         {% if pending_restore %}
                             <div class="backup-restore-confirm-box">
                                 <div class="backup-restore-confirm-title">Secondo controllo prima del ripristino</div>
                                 <div class="backup-restore-confirm-meta">
-                                    File selezionato: <strong>{{ pending_restore.original_name }}</strong> - {{ pending_restore.size_label }}
+                                    File selezionato: <strong>{{ pending_restore.nome_file_originale }}</strong> - {{ pending_restore.size_label }}
                                 </div>
                                 <div class="help-text">
-                                    Se confermi, il sistema genera prima un backup di sicurezza e poi avvia il ripristino completo del database.
+                                    Confermando, il file resta su disco e il ripristino viene accodato (la richiesta web non resta in attesa del pg_restore).
                                 </div>
 
                                 <form method="post" class="backup-restore-confirm-form">
@@ -137,6 +138,50 @@
                                     </div>
                                 {% endif %}
                             </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <div class="admin-section-title">Job ripristino (in background)</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {% if recent_restore_jobs %}
+                            <table class="list-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Stato</th>
+                                        <th>File</th>
+                                        <th>Esito / backup sicurezza</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for rj in recent_restore_jobs %}
+                                        <tr>
+                                            <td>{{ rj.data_creazione|date:"d/m/Y H:i" }}</td>
+                                            <td>{{ rj.get_stato_display }}</td>
+                                            <td>
+                                                <span class="table-muted" title="{{ rj.nome_file_originale }}">{{ rj.nome_file_originale|truncatechars:40 }}</span>
+                                            </td>
+                                            <td>
+                                                {% if rj.stato == "errore" and rj.messaggio_errore %}
+                                                    <span class="table-muted" title="{{ rj.messaggio_errore }}">{{ rj.messaggio_errore|truncatechars:64 }}</span>
+                                                {% elif rj.stato == "completato" and rj.backup_sicurezza %}
+                                                    Backup sicurezza: {{ rj.backup_sicurezza.nome_file }}
+                                                {% elif rj.stato == "in_corso" or rj.stato == "in_coda" %}
+                                                    In elaborazione
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="empty-state">Ancora nessun job di ripristino registrato.</div>
                         {% endif %}
                     </div>
                 </div>
@@ -241,7 +286,7 @@
 
                         {% if pending_restore %}
                             <div class="settings-warning-box" style="margin-top: 14px;">
-                                Ripristino in attesa di conferma per il file {{ pending_restore.original_name }}.
+                                Ripristino in attesa di conferma per il file {{ pending_restore.nome_file_originale }}.
                             </div>
                         {% endif %}
                     </div>

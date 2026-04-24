@@ -4,6 +4,7 @@ from .models import (
     SistemaOperazioneCronologia,
     SistemaBackupDatabaseConfigurazione,
     SistemaDatabaseBackup,
+    SistemaDatabaseRestoreJob,
     Scuola,
     ScuolaSocial,
     ScuolaTelefono,
@@ -92,6 +93,35 @@ class SistemaDatabaseBackupAdmin(admin.ModelAdmin):
         "data_creazione",
     )
     search_fields = ("nome_file", "note", "creato_da__username", "creato_da__email")
+
+
+@admin.register(SistemaDatabaseRestoreJob)
+class SistemaDatabaseRestoreJobAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    list_display = (
+        "stato",
+        "nome_file_originale",
+        "creato_da",
+        "data_creazione",
+        "data_completamento",
+    )
+    list_filter = ("stato",)
+    search_fields = ("nome_file_originale", "celery_task_id", "messaggio_errore")
+    readonly_fields = (
+        "stato",
+        "percorso_file",
+        "nome_file_originale",
+        "dimensione_file_bytes",
+        "creato_da",
+        "data_creazione",
+        "data_avvio_ripristino",
+        "data_completamento",
+        "messaggio_errore",
+        "backup_sicurezza",
+        "celery_task_id",
+    )
 
 
 @admin.register(SistemaOperazioneCronologia)

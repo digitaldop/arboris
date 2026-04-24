@@ -41,38 +41,52 @@ def trova_colonna(colonne_norm: dict[str, str], candidati: list[str]) -> str | N
 
 
 def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
-    """Candidati per mapping colonne (stesso schema logico del vecchio import_comuni_istat)."""
+    """Candidati per mapping colonne (ISTAT, export third-party, ecc.)."""
     return {
         "regione": [
             "Denominazione Regione",
             "Regione",
+            "Nome Regione",
+            "Nome regione",
         ],
         "provincia": [
             "Denominazione dell'Unità territoriale sovracomunale (valida a fini statistici)",
             "Denominazione Provincia",
             "Provincia",
+            "Nome Provincia",
+            "Nome provincia",
         ],
         "sigla": [
             "Sigla automobilistica",
             "Sigla",
             "Sigla provincia",
+            "Sig.",
         ],
         "comune": [
             "Denominazione in italiano",
             "Denominazione Comune",
             "Comune",
             "Città",
+            "Nome Comune",
+            "Nome comune",
         ],
         "cap": [
             "Cap",
             "CAP",
+            "Cap.",
         ],
         "codice_istat": [
             "Codice Comune formato numerico",
             "Codice comune formato numerico",
             "Codice ISTAT del Comune",
             "Codice ISTAT comune",
+            "Codice ISTAT",
+            "Cod. ISTAT",
+            "Cod Istat",
             "Codice Comune",
+            "ISTAT",
+            "ProCom",
+            "Codice istat",
         ],
         "codice_catastale": [
             "Codice Catastale del comune",
@@ -81,6 +95,7 @@ def _colonne_anagrafica_comuni() -> dict[str, list[str]]:
             "Codice Catastale",
             "Codice Belfiore",
             "Belfiore",
+            "Catastale",
         ],
     }
 
@@ -338,35 +353,60 @@ def load_excel(
     return pd.read_excel(file_path, **kwargs)
 
 
+def _try_read_and_map_excel(
+    path: Path,
+    *,
+    sheet_name: int | str | None,
+    header_row: int,
+) -> pd.DataFrame:
+    raw = load_excel(path, sheet_name=sheet_name, header=header_row)
+    return mappa_e_normalizza_dataframe(raw, build_column_map(raw))
+
+
+# Molti file (es. gi_comuni_cap) hanno riga 0 = titolo marketing, riga 1 = intestazioni reali.
+DEFAULT_HEADER_ROW_CANDIDATES = (1, 0, 2)
+
+
 def run_import_dati_base(
     file_path: Path | None = None,
     *,
     clear_first: bool = False,
     sheet_name: int | str | None = 0,
-    header: int = 0,
+    header: int | None = None,
 ) -> dict[str, Any]:
     """
     Esegue import comuni+CAP da file Excel. Path predefinito: import/gi_comuni_cap.xlsx sotto BASE_DIR.
-    Ritorna un dict con esito e conteggi; in caso di errore solleva ValidationError o Exception letta in messaggio.
+
+    ``header``: riga 0-based usata da pandas come intestazioni. Se ``None``, prova in ordine le righe
+    1, 0, 2 (tipico: prima riga titolo, seconda nomi colonna).
     """
     path = file_path or default_gi_file_path()
     if not path.is_file():
         raise ValidationError(f"File non trovato: {path}")
 
-    def _read_and_map(hr: int) -> pd.DataFrame:
-        raw = load_excel(path, sheet_name=sheet_name, header=hr)
-        return mappa_e_normalizza_dataframe(raw, build_column_map(raw))
-
-    try:
-        df = _read_and_map(header)
-    except ValidationError as first_err:
-        if header == 0:
+    if header is not None:
+        try:
+            df = _try_read_and_map_excel(path, sheet_name=sheet_name, header_row=header)
+        except ValidationError as e:
+            raise ValidationError(
+                f"Riga intestazione header={header}: {e}"
+            ) from e
+    else:
+        errors: list[tuple[int, str]] = []
+        df = None
+        for hr in DEFAULT_HEADER_ROW_CANDIDATES:
             try:
-                df = _read_and_map(1)
-            except ValidationError:
-                raise first_err
-        else:
-            raise
+                df = _try_read_and_map_excel(path, sheet_name=sheet_name, header_row=hr)
+                break
+            except ValidationError as e:
+                errors.append((hr, str(e)))
+        if df is None:
+            raise ValidationError(
+                "Impossibile riconoscere le colonne nel file Excel. "
+                f"Prove con riga intestazione (0=prima riga) {list(DEFAULT_HEADER_ROW_CANDIDATES)}. "
+                f"Dettagli: {' | '.join(f'header={h}: {msg}' for h, msg in errors)}"
+            )
+
     df_citta, df_cap = prepare_gi_splitta_citta_e_cap(df)
 
     stats: dict[str, Any] = {

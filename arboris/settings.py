@@ -174,3 +174,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #Aggiungo la regola per i file da caricare nella cartella media
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Celery (ripristino database in background). Se CELERY_BROKER_URL è vuoto, si usa un thread worker-side.
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "").strip()
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL).strip() or CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+# Evita attese infinite su code non raggiungibili in sviluppo
+if CELERY_BROKER_URL:
+    CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
