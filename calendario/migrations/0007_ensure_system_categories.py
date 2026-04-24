@@ -64,7 +64,7 @@ def noop_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("calendario", "0004_categoriacalendario_chiave_sistema_and_more"),
+        ("calendario", "0006_extend_recurrence_with_weekdays"),
     ]
 
     operations = [
