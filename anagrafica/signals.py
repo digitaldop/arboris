@@ -1,8 +1,14 @@
+import logging
+
 from django.db import transaction
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 
 from .models import Documento
+from .storage_utils import DOCUMENT_STORAGE_ERROR_TYPES
+
+
+logger = logging.getLogger(__name__)
 
 
 def _delete_document_file_if_unused(file_name, *, exclude_pk=None):
@@ -16,8 +22,15 @@ def _delete_document_file_if_unused(file_name, *, exclude_pk=None):
         return
 
     storage = Documento._meta.get_field("file").storage
-    if storage.exists(file_name):
-        storage.delete(file_name)
+    try:
+        if storage.exists(file_name):
+            storage.delete(file_name)
+    except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+        logger.warning(
+            "Impossibile eliminare il file documento '%s' dallo storage configurato: %s",
+            file_name,
+            exc,
+        )
 
 
 @receiver(pre_save, sender=Documento)

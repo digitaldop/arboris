@@ -1,6 +1,7 @@
 import mimetypes
 
 from django.contrib import messages
+from django.conf import settings
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -11,6 +12,7 @@ from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from django.utils import timezone
 
 from .utils import citta_choice_label
+from .storage_utils import DOCUMENT_STORAGE_ERROR_TYPES, build_document_storage_error_message
 from .forms import (
     IndirizzoForm,
     FamigliaForm,
@@ -85,6 +87,8 @@ def apri_documento(request, pk):
         file_handle = documento.file.open("rb")
     except FileNotFoundError as exc:
         raise Http404("Il file del documento non e disponibile sul server.") from exc
+    except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+        raise Http404(build_document_storage_error_message(exc)) from exc
 
     filename = documento.filename or f"documento-{documento.pk}"
     content_type, _encoding = mimetypes.guess_type(filename)
@@ -1113,30 +1117,34 @@ def crea_famiglia(request):
         documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
 
         if form_is_valid and familiari_is_valid and studenti_is_valid and documenti_is_valid:
-            famiglia = form.save()
+            try:
+                with transaction.atomic():
+                    famiglia = form.save()
 
-            if inline_target in (None, "familiari"):
-                familiari_formset.instance = famiglia
-                familiari_formset.save()
+                    if inline_target in (None, "familiari"):
+                        familiari_formset.instance = famiglia
+                        familiari_formset.save()
 
-            if inline_target in (None, "studenti"):
-                studenti_formset.instance = famiglia
-                studenti_formset.save()
+                    if inline_target in (None, "studenti"):
+                        studenti_formset.instance = famiglia
+                        studenti_formset.save()
 
-            if inline_target in (None, "documenti"):
-                documenti_formset.instance = famiglia
-                documenti_formset.save()
+                    if inline_target in (None, "documenti"):
+                        documenti_formset.instance = famiglia
+                        documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if "_continue" in request.POST:
+                    messages.success(request, "Famiglia creata correttamente. Ora puoi continuare a modificarla.")
+                    return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
 
-            if "_continue" in request.POST:
-                messages.success(request, "Famiglia creata correttamente. Ora puoi continuare a modificarla.")
-                return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
+                if "_addanother" in request.POST:
+                    messages.success(request, "Famiglia creata correttamente. Puoi inserirne un'altra.")
+                    return redirect("crea_famiglia")
 
-            if "_addanother" in request.POST:
-                messages.success(request, "Famiglia creata correttamente. Puoi inserirne un'altra.")
-                return redirect("crea_famiglia")
-
-            messages.success(request, "Famiglia creata correttamente.")
-            return redirect(f"{reverse('lista_famiglie')}?highlight={famiglia.pk}")
+                messages.success(request, "Famiglia creata correttamente.")
+                return redirect(f"{reverse('lista_famiglie')}?highlight={famiglia.pk}")
 
         if familiari_formset is None:
             familiari_formset = build_familiari_formset(prefix="familiari")
@@ -1233,24 +1241,28 @@ def modifica_famiglia(request, pk):
         documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
 
         if form_is_valid and familiari_is_valid and studenti_is_valid and documenti_is_valid:
-            famiglia = form.save()
-            if inline_target in (None, "familiari"):
-                familiari_formset.save()
-            if inline_target in (None, "studenti"):
-                studenti_formset.save()
-            if inline_target in (None, "documenti"):
-                documenti_formset.save()
+            try:
+                with transaction.atomic():
+                    famiglia = form.save()
+                    if inline_target in (None, "familiari"):
+                        familiari_formset.save()
+                    if inline_target in (None, "studenti"):
+                        studenti_formset.save()
+                    if inline_target in (None, "documenti"):
+                        documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if "_continue" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente.")
+                    return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
 
-            if "_continue" in request.POST:
+                if "_addanother" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente. Puoi inserire una nuova famiglia.")
+                    return redirect("crea_famiglia")
+
                 messages.success(request, "Modifiche salvate correttamente.")
                 return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
-
-            if "_addanother" in request.POST:
-                messages.success(request, "Modifiche salvate correttamente. Puoi inserire una nuova famiglia.")
-                return redirect("crea_famiglia")
-
-            messages.success(request, "Modifiche salvate correttamente.")
-            return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
 
         if familiari_formset is None:
             familiari_formset = build_familiari_formset(instance=famiglia, prefix="familiari")
@@ -1666,20 +1678,24 @@ def crea_familiare(request):
         )
 
         if form.is_valid() and documenti_formset.is_valid():
-            familiare = form.save()
-            documenti_formset.instance = familiare
-            documenti_formset.save()
+            try:
+                with transaction.atomic():
+                    familiare = form.save()
+                    documenti_formset.instance = familiare
+                    documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if "_continue" in request.POST:
+                    messages.success(request, "Familiare creato correttamente. Ora puoi continuare a modificarlo.")
+                    return redirect("modifica_familiare", pk=familiare.pk)
 
-            if "_continue" in request.POST:
-                messages.success(request, "Familiare creato correttamente. Ora puoi continuare a modificarlo.")
-                return redirect("modifica_familiare", pk=familiare.pk)
+                if "_addanother" in request.POST:
+                    messages.success(request, "Familiare creato correttamente. Puoi inserirne un altro.")
+                    return redirect("crea_familiare")
 
-            if "_addanother" in request.POST:
-                messages.success(request, "Familiare creato correttamente. Puoi inserirne un altro.")
-                return redirect("crea_familiare")
-
-            messages.success(request, "Familiare creato correttamente.")
-            return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
+                messages.success(request, "Familiare creato correttamente.")
+                return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
     else:
         form = FamiliareForm()
         documenti_formset = DocumentoFamiliareFormSet(prefix="documenti")
@@ -1725,19 +1741,23 @@ def modifica_familiare(request, pk):
         )
 
         if form.is_valid() and documenti_formset.is_valid():
-            familiare = form.save()
-            documenti_formset.save()
+            try:
+                with transaction.atomic():
+                    familiare = form.save()
+                    documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if "_continue" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente.")
+                    return redirect("modifica_familiare", pk=familiare.pk)
 
-            if "_continue" in request.POST:
+                if "_addanother" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo familiare.")
+                    return redirect("crea_familiare")
+
                 messages.success(request, "Modifiche salvate correttamente.")
-                return redirect("modifica_familiare", pk=familiare.pk)
-
-            if "_addanother" in request.POST:
-                messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo familiare.")
-                return redirect("crea_familiare")
-
-            messages.success(request, "Modifiche salvate correttamente.")
-            return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
+                return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
     else:
         form = FamiliareForm(instance=familiare)
         documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
@@ -1992,51 +2012,54 @@ def crea_studente(request):
 
         if form_is_valid and iscrizioni_is_valid and documenti_is_valid:
             missing_rate_count = 0
-            with transaction.atomic():
-                studente = form.save()
+            try:
+                with transaction.atomic():
+                    studente = form.save()
 
-                if inline_target in (None, "iscrizioni"):
-                    iscrizioni_formset.instance = studente
-                    iscrizioni_formset.save()
+                    if inline_target in (None, "iscrizioni"):
+                        iscrizioni_formset.instance = studente
+                        iscrizioni_formset.save()
 
-                if inline_target in (None, "iscrizioni"):
-                    for iscrizione in studente.iscrizioni.select_related(
-                        "anno_scolastico",
-                        "condizione_iscrizione",
-                        "stato_iscrizione",
-                        "agevolazione",
-                        "studente__famiglia",
-                    ):
-                        if (
-                            not getattr(iscrizione, "anno_scolastico_id", None)
-                            or not getattr(iscrizione, "condizione_iscrizione_id", None)
-                            or not getattr(iscrizione, "stato_iscrizione_id", None)
+                    if inline_target in (None, "iscrizioni"):
+                        for iscrizione in studente.iscrizioni.select_related(
+                            "anno_scolastico",
+                            "condizione_iscrizione",
+                            "stato_iscrizione",
+                            "agevolazione",
+                            "studente__famiglia",
                         ):
-                            continue
-                        esito_rate = iscrizione.sync_rate_schedule()
-                        if esito_rate == "missing":
-                            missing_rate_count += 1
+                            if (
+                                not getattr(iscrizione, "anno_scolastico_id", None)
+                                or not getattr(iscrizione, "condizione_iscrizione_id", None)
+                                or not getattr(iscrizione, "stato_iscrizione_id", None)
+                            ):
+                                continue
+                            esito_rate = iscrizione.sync_rate_schedule()
+                            if esito_rate == "missing":
+                                missing_rate_count += 1
 
-                if inline_target in (None, "documenti"):
-                    documenti_formset.instance = studente
-                    documenti_formset.save()
+                    if inline_target in (None, "documenti"):
+                        documenti_formset.instance = studente
+                        documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if missing_rate_count:
+                    messages.warning(
+                        request,
+                        "Una o piu iscrizioni sono state salvate senza generare il piano rate: verifica la tariffa attiva della condizione selezionata.",
+                    )
 
-            if missing_rate_count:
-                messages.warning(
-                    request,
-                    "Una o piu iscrizioni sono state salvate senza generare il piano rate: verifica la tariffa attiva della condizione selezionata.",
-                )
+                if "_continue" in request.POST:
+                    messages.success(request, "Studente creato correttamente. Ora puoi continuare a modificarlo.")
+                    return redirect("modifica_studente", pk=studente.pk)
 
-            if "_continue" in request.POST:
-                messages.success(request, "Studente creato correttamente. Ora puoi continuare a modificarlo.")
-                return redirect("modifica_studente", pk=studente.pk)
+                if "_addanother" in request.POST:
+                    messages.success(request, "Studente creato correttamente. Puoi inserirne un altro.")
+                    return redirect("crea_studente")
 
-            if "_addanother" in request.POST:
-                messages.success(request, "Studente creato correttamente. Puoi inserirne un altro.")
-                return redirect("crea_studente")
-
-            messages.success(request, "Studente creato correttamente.")
-            return redirect(f"{reverse('lista_studenti')}?highlight={studente.pk}")
+                messages.success(request, "Studente creato correttamente.")
+                return redirect(f"{reverse('lista_studenti')}?highlight={studente.pk}")
     else:
         form = StudenteStandaloneForm()
         iscrizioni_formset = IscrizioneStudenteFormSet(prefix="iscrizioni")
@@ -2113,47 +2136,50 @@ def modifica_studente(request, pk):
 
         if form_is_valid and iscrizioni_is_valid and documenti_is_valid:
             missing_rate_count = 0
-            with transaction.atomic():
-                studente = form.save()
-                if inline_target in (None, "iscrizioni"):
-                    iscrizioni_formset.save()
+            try:
+                with transaction.atomic():
+                    studente = form.save()
+                    if inline_target in (None, "iscrizioni"):
+                        iscrizioni_formset.save()
 
-                    for iscrizione in studente.iscrizioni.select_related(
-                        "anno_scolastico",
-                        "condizione_iscrizione",
-                        "stato_iscrizione",
-                        "agevolazione",
-                        "studente__famiglia",
-                    ):
-                        if (
-                            not getattr(iscrizione, "anno_scolastico_id", None)
-                            or not getattr(iscrizione, "condizione_iscrizione_id", None)
-                            or not getattr(iscrizione, "stato_iscrizione_id", None)
+                        for iscrizione in studente.iscrizioni.select_related(
+                            "anno_scolastico",
+                            "condizione_iscrizione",
+                            "stato_iscrizione",
+                            "agevolazione",
+                            "studente__famiglia",
                         ):
-                            continue
-                        esito_rate = iscrizione.sync_rate_schedule()
-                        if esito_rate == "missing":
-                            missing_rate_count += 1
+                            if (
+                                not getattr(iscrizione, "anno_scolastico_id", None)
+                                or not getattr(iscrizione, "condizione_iscrizione_id", None)
+                                or not getattr(iscrizione, "stato_iscrizione_id", None)
+                            ):
+                                continue
+                            esito_rate = iscrizione.sync_rate_schedule()
+                            if esito_rate == "missing":
+                                missing_rate_count += 1
 
-                if inline_target in (None, "documenti"):
-                    documenti_formset.save()
+                    if inline_target in (None, "documenti"):
+                        documenti_formset.save()
+            except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+                messages.error(request, build_document_storage_error_message(exc))
+            else:
+                if missing_rate_count:
+                    messages.warning(
+                        request,
+                        "Una o piu iscrizioni sono state salvate senza generare il piano rate: verifica la tariffa attiva della condizione selezionata.",
+                    )
 
-            if missing_rate_count:
-                messages.warning(
-                    request,
-                    "Una o piu iscrizioni sono state salvate senza generare il piano rate: verifica la tariffa attiva della condizione selezionata.",
-                )
+                if "_continue" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente.")
+                    return redirect("modifica_studente", pk=studente.pk)
 
-            if "_continue" in request.POST:
+                if "_addanother" in request.POST:
+                    messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo studente.")
+                    return redirect("crea_studente")
+
                 messages.success(request, "Modifiche salvate correttamente.")
                 return redirect("modifica_studente", pk=studente.pk)
-
-            if "_addanother" in request.POST:
-                messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo studente.")
-                return redirect("crea_studente")
-
-            messages.success(request, "Modifiche salvate correttamente.")
-            return redirect("modifica_studente", pk=studente.pk)
     else:
         form = StudenteStandaloneForm(instance=studente)
         iscrizioni_formset = IscrizioneStudenteFormSet(instance=studente, prefix="iscrizioni")

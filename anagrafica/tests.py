@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from anagrafica.dati_base_import import run_import_dati_base
 from anagrafica.forms import (
+    DocumentoFamigliaFormSet,
     FamiliareForm,
     FamiliareInlineForm,
     IscrizioneStudenteInlineForm,
@@ -452,3 +453,32 @@ class DocumentoStorageTests(TestCase):
                     documento.delete()
 
                 self.assertFalse(file_path.exists())
+
+    def test_family_document_formset_honors_delete_flag_for_existing_rows(self):
+        documento = Documento.objects.create(
+            famiglia=self.famiglia,
+            tipo_documento=self.tipo_documento,
+            descrizione="Documento da eliminare",
+        )
+
+        formset = DocumentoFamigliaFormSet(
+            data={
+                "documenti-TOTAL_FORMS": "1",
+                "documenti-INITIAL_FORMS": "1",
+                "documenti-MIN_NUM_FORMS": "0",
+                "documenti-MAX_NUM_FORMS": "1000",
+                "documenti-0-id": str(documento.pk),
+                "documenti-0-tipo_documento": str(self.tipo_documento.pk),
+                "documenti-0-descrizione": "Documento da eliminare",
+                "documenti-0-scadenza": "",
+                "documenti-0-note": "",
+                "documenti-0-visibile": "on",
+                "documenti-0-DELETE": "on",
+            },
+            files={},
+            instance=self.famiglia,
+            prefix="documenti",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        self.assertEqual(len(formset.deleted_forms), 1)

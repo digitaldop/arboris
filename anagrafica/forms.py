@@ -1049,6 +1049,9 @@ class DocumentoFamigliaInlineForm(DocumentoFamigliaForm):
         if not changed:
             return False
 
+        if self.data.get(self.add_prefix("DELETE")):
+            return True
+
         meaningful_values = [
             self.data.get(self.add_prefix("tipo_documento"), ""),
             self.data.get(self.add_prefix("descrizione"), ""),
