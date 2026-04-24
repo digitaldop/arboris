@@ -35,13 +35,6 @@ class Migration(migrations.Migration):
                 ("data_completamento", models.DateTimeField(blank=True, null=True)),
                 ("messaggio_errore", models.TextField(blank=True)),
                 ("celery_task_id", models.CharField(blank=True, max_length=120)),
-                ("backup_sicurezza", models.ForeignKey(
-                    blank=True,
-                    null=True,
-                    on_delete=django.db.models.deletion.SET_NULL,
-                    related_name="ripristino_job_collegato",
-                    to="sistema.sistemandatabasebackup",
-                )),
                 ("creato_da", models.ForeignKey(
                     blank=True,
                     null=True,
@@ -56,5 +49,16 @@ class Migration(migrations.Migration):
                 "db_table": "sistema_database_restore_job",
                 "ordering": ["-data_creazione", "-id"],
             },
+        ),
+        migrations.AddField(
+            model_name="sistemadatabaserestorejob",
+            name="backup_sicurezza",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="ripristino_job_collegato",
+                to="sistema.SistemaDatabaseBackup",
+            ),
         ),
     ]
