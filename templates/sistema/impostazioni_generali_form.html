@@ -60,7 +60,11 @@
                     <div class="admin-section">
                         <div class="admin-section-title">Dati anagrafici di base</div>
                         <div class="panel">
-                            <div class="panel-body" data-terminology-skip="true">
+                            <div
+                                class="panel-body import-dati-base-card"
+                                data-terminology-skip="true"
+                                style="padding: 1rem 1.15rem 1.2rem;"
+                            >
                                 <p class="help-text" style="margin-top:0;">
                                     Regione, province, città (con codice ISTAT e codice Belfiore/catastale) e collegamento CAP
                                     vengono letti dal file
@@ -68,21 +72,17 @@
                                     L'import unisce o aggiorna i record; non cancella dati esistenti (né indirizzi collegati).
                                 </p>
                                 {% if can_manage_sistema %}
-                                    <form
-                                        method="post"
-                                        action="{% url 'importa_dati_base_anagrafica' %}"
-                                        style="margin-top:0.75rem;"
-                                        onsubmit="return confirm('Avviare l\'import da gi_comuni_cap.xlsx? L\'operazione pu\u00f2 richiedere qualche minuto.');"
-                                    >
-                                        {% csrf_token %}
+                                    <p style="margin: 0.75rem 0 0;">
                                         <button
                                             type="submit"
                                             class="btn btn-secondary"
-                                            {% if not dati_base_file_ready %}disabled title="File non presente nel deploy"{% endif %}
+                                            form="import-dati-base-form"
+                                            id="import-dati-base-btn"
+                                            {% if not dati_base_file_ready %}disabled title="File non presente nel deploy"{% else %}onclick="return confirm('Procedere con import da gi_comuni_cap.xlsx? Puo richiedere alcuni minuti.');"{% endif %}
                                         >
                                             Importa dati base (comuni, CAP, …)
                                         </button>
-                                    </form>
+                                    </p>
                                 {% endif %}
                                 {% if not dati_base_file_ready %}
                                     <p class="help-text" style="color: var(--color-warning-text, #8a4b00); margin-top:0.5rem;">
@@ -183,4 +183,17 @@
             <a href="{% url 'impostazioni_generali_sistema' %}" class="btn btn-secondary">Annulla</a>
         </div>
     </form>
+
+    {# Form separato: non può stare dentro impostazioni-generali-form (HTML proibisce form annidati). #}
+    {% if can_manage_sistema %}
+        <form
+            id="import-dati-base-form"
+            method="post"
+            action="{% url 'importa_dati_base_anagrafica' %}"
+            style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"
+            aria-hidden="true"
+        >
+            {% csrf_token %}
+        </form>
+    {% endif %}
 {% endblock %}
