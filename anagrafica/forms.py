@@ -412,7 +412,9 @@ class IndirizzoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["citta"].queryset = (
-            Citta.objects.filter(attiva=True).select_related("provincia", "regione").order_by("nome")
+            Citta.objects.filter(attiva=True)
+            .select_related("provincia", "provincia__regione")
+            .order_by("nome")
         )
         self.fields["citta"].label_from_instance = citta_choice_label
         make_searchable_select(self.fields["citta"], "Cerca una città...")
