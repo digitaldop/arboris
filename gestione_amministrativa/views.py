@@ -508,10 +508,18 @@ def lista_parametri_calcolo_stipendi(request):
 
 
 def crea_parametro_calcolo_stipendio(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = ParametroCalcoloStipendioForm(request.POST)
         if form.is_valid():
-            form.save()
+            parametro = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="parametro_calcolo",
+                    object_id=parametro.pk,
+                    object_label=str(parametro),
+                )
             messages.success(request, "Parametro di calcolo creato correttamente.")
             return redirect("lista_parametri_calcolo_stipendi")
     else:
@@ -519,17 +527,25 @@ def crea_parametro_calcolo_stipendio(request):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/parametro_form.html",
-        {"form": form, "parametro": None},
+        "gestione_amministrativa/dipendenti/parametro_popup_form.html" if popup else "gestione_amministrativa/dipendenti/parametro_form.html",
+        {"form": form, "parametro": None, "popup": popup},
     )
 
 
 def modifica_parametro_calcolo_stipendio(request, pk):
     parametro = get_object_or_404(ParametroCalcoloStipendio, pk=pk)
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = ParametroCalcoloStipendioForm(request.POST, instance=parametro)
         if form.is_valid():
-            form.save()
+            parametro = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="parametro_calcolo",
+                    object_id=parametro.pk,
+                    object_label=str(parametro),
+                )
             messages.success(request, "Parametro di calcolo aggiornato correttamente.")
             return redirect("lista_parametri_calcolo_stipendi")
     else:
@@ -537,6 +553,30 @@ def modifica_parametro_calcolo_stipendio(request, pk):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/parametro_form.html",
-        {"form": form, "parametro": parametro},
+        "gestione_amministrativa/dipendenti/parametro_popup_form.html" if popup else "gestione_amministrativa/dipendenti/parametro_form.html",
+        {"form": form, "parametro": parametro, "popup": popup},
+    )
+
+
+def elimina_parametro_calcolo_stipendio(request, pk):
+    parametro = get_object_or_404(ParametroCalcoloStipendio, pk=pk)
+    popup = is_popup_request(request)
+    usage_count = parametro.contratti.count()
+
+    if request.method == "POST":
+        object_id = parametro.pk
+        parametro.delete()
+        if popup:
+            return popup_delete_response(
+                request,
+                field_name="parametro_calcolo",
+                object_id=object_id,
+            )
+        messages.success(request, "Parametro di calcolo eliminato correttamente.")
+        return redirect("lista_parametri_calcolo_stipendi")
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/parametro_popup_delete.html" if popup else "gestione_amministrativa/dipendenti/parametro_confirm_delete.html",
+        {"parametro": parametro, "popup": popup, "usage_count": usage_count},
     )

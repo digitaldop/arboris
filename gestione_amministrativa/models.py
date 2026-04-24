@@ -29,7 +29,7 @@ class SessoDipendente(models.TextChoices):
 
 class RegimeOrarioDipendente(models.TextChoices):
     TEMPO_PIENO = "tempo_pieno", "Tempo pieno"
-    TEMPO_PARZIALE = "tempo_parziale", "Tempo parziale"
+    TEMPO_PARZIALE = "tempo_parziale", "Part-time"
 
 
 class StatoBustaPaga(models.TextChoices):

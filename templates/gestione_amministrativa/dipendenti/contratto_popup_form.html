@@ -22,7 +22,22 @@
                 <table class="form-table">
                     <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
                     <tr><th>{{ form.tipo_contratto.label_tag }}</th><td>{{ form.tipo_contratto }} {{ form.tipo_contratto.errors }}</td></tr>
-                    <tr><th>{{ form.parametro_calcolo.label_tag }}</th><td>{{ form.parametro_calcolo }} {{ form.parametro_calcolo.errors }}</td></tr>
+                    <tr>
+                        <th>{{ form.parametro_calcolo.label_tag }}</th>
+                        <td>
+                            <div class="related-field-row popup-related-field">
+                                <div class="related-field-stack">
+                                    {{ form.parametro_calcolo }}
+                                </div>
+                                <div class="related-actions">
+                                    <button type="button" class="related-btn related-btn-add" id="popup-add-parametro-calcolo-btn">+</button>
+                                    <button type="button" class="related-btn related-btn-edit" id="popup-edit-parametro-calcolo-btn">&#9998;</button>
+                                    <button type="button" class="related-btn related-btn-delete" id="popup-delete-parametro-calcolo-btn">&#10006;</button>
+                                </div>
+                            </div>
+                            {{ form.parametro_calcolo.errors }}
+                        </td>
+                    </tr>
                     <tr><th>{{ form.data_inizio.label_tag }}</th><td>{{ form.data_inizio }} {{ form.data_inizio.errors }}</td></tr>
                     <tr><th>{{ form.data_fine.label_tag }}</th><td>{{ form.data_fine }} {{ form.data_fine.errors }}</td></tr>
                     <tr><th>{{ form.ccnl.label_tag }}</th><td>{{ form.ccnl }} {{ form.ccnl.errors }}</td></tr>
@@ -50,6 +65,21 @@
         </form>
     </div>
 
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=7"></script>
+    <script src="{% static 'js/pages/contratto-popup-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisContrattoPopupForm) {
+                ArborisContrattoPopupForm.init({
+                    urls: {
+                        creaParametroCalcolo: "{% url 'crea_parametro_calcolo_stipendio' %}",
+                        modificaParametroCalcoloTemplate: "{% url 'modifica_parametro_calcolo_stipendio' 0 %}",
+                        eliminaParametroCalcoloTemplate: "{% url 'elimina_parametro_calcolo_stipendio' 0 %}"
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

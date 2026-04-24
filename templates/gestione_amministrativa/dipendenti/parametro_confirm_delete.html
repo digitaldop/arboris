@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina parametro di calcolo - Gestione amministrativa{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_parametri_calcolo_stipendi' %}">Parametri calcolo</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina parametro di calcolo</h1>
+    </div>
+
+    <div class="content-card">
+        {% if usage_count %}
+            <div class="message message-warning">
+                Questo parametro e' collegato a {{ usage_count }} contratti. Eliminandolo, quei contratti perderanno il collegamento diretto.
+            </div>
+        {% endif %}
+        <p>Stai per eliminare il parametro <strong>{{ parametro }}</strong>.</p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <a href="{% url 'modifica_parametro_calcolo_stipendio' parametro.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}

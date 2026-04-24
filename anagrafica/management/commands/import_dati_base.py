@@ -70,6 +70,7 @@ class Command(BaseCommand):
                 f"  Regioni (nuove create in questa run): {stats['regioni_creati']}\n"
                 f"  Province (nuove create in questa run): {stats['province_creati']}\n"
                 f"  Città elaborate (righe): {stats['citta_righe']}\n"
-                f"  CAP creati: {stats['cap_creati']}; CAP saltati (città assente): {stats['cap_saltati']}"
+                f"  CAP creati: {stats['cap_creati']}; CAP saltati (città assente): {stats['cap_saltati']}\n"
+                f"  Durata: {stats.get('durata_secondi', 0)} secondi"
             )
         )

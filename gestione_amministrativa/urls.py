@@ -116,4 +116,9 @@ urlpatterns = [
         ga_edit(views.modifica_parametro_calcolo_stipendio),
         name="modifica_parametro_calcolo_stipendio",
     ),
+    path(
+        "gestione-amministrativa/dipendenti/parametri-calcolo/<int:pk>/elimina/",
+        ga_manage(views.elimina_parametro_calcolo_stipendio),
+        name="elimina_parametro_calcolo_stipendio",
+    ),
 ]

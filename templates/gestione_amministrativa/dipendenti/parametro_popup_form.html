@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>{% if parametro %}Modifica parametro{% else %}Nuovo parametro{% endif %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">{% if parametro %}Modifica parametro{% else %}Nuovo parametro{% endif %}</h1>
+
+    <div class="panel">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <div class="panel-body">
+                <table class="form-table">
+                    <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                    <tr><th>{{ form.valido_dal.label_tag }}</th><td>{{ form.valido_dal }} {{ form.valido_dal.errors }}</td></tr>
+                    <tr><th>{{ form.valido_al.label_tag }}</th><td>{{ form.valido_al }} {{ form.valido_al.errors }}</td></tr>
+                    <tr><th>{{ form.aliquota_contributi_datore.label_tag }}</th><td>{{ form.aliquota_contributi_datore }} {{ form.aliquota_contributi_datore.errors }}</td></tr>
+                    <tr><th>{{ form.aliquota_contributi_dipendente.label_tag }}</th><td>{{ form.aliquota_contributi_dipendente }} {{ form.aliquota_contributi_dipendente.errors }}</td></tr>
+                    <tr><th>{{ form.aliquota_tfr.label_tag }}</th><td>{{ form.aliquota_tfr }} {{ form.aliquota_tfr.errors }}</td></tr>
+                    <tr><th>{{ form.aliquota_inail.label_tag }}</th><td>{{ form.aliquota_inail }} {{ form.aliquota_inail.errors }}</td></tr>
+                    <tr><th>{{ form.aliquota_altri_oneri.label_tag }}</th><td>{{ form.aliquota_altri_oneri }} {{ form.aliquota_altri_oneri.errors }}</td></tr>
+                    <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                    <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+                </table>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

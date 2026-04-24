@@ -181,7 +181,8 @@ def importa_dati_base_anagrafica(request):
             f"Import dati base eseguito. File: {stats.get('file', p)}. "
             f"Nuove regioni: {stats['regioni_creati']}, nuove province: {stats['province_creati']}, "
             f"elaborazione città (righe): {stats['citta_righe']}, CAP creati: {stats['cap_creati']}, "
-            f"CAP non importati (città mancante): {stats['cap_saltati']}."
+            f"CAP non importati (città mancante): {stats['cap_saltati']}, "
+            f"durata: {stats.get('durata_secondi', 0)} secondi."
         ),
     )
     return redirect("impostazioni_generali_sistema")

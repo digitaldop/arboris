@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Elimina parametro di calcolo</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=37">
+</head>
+<body style="padding: 20px;">
+    <h1 class="section-title">Elimina parametro di calcolo</h1>
+
+    <div class="panel">
+        <div class="panel-body" style="padding: 20px;">
+            {% if usage_count %}
+                <div class="message message-warning">
+                    Questo parametro e' collegato a {{ usage_count }} contratti. Eliminandolo, quei contratti perderanno il collegamento diretto.
+                </div>
+            {% endif %}
+
+            <p>Sei sicuro di voler eliminare questo parametro di calcolo?</p>
+            <p><strong>{{ parametro }}</strong></p>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="popup" value="1">
+                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Si', elimina</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

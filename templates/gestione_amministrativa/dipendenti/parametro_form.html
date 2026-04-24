@@ -42,6 +42,9 @@
                     <button type="submit" class="btn btn-primary">Salva</button>
                 {% endif %}
                 <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Annulla</a>
+                {% if parametro and can_manage_gestione_amministrativa %}
+                    <a href="{% url 'elimina_parametro_calcolo_stipendio' parametro.pk %}" class="btn btn-danger">Elimina</a>
+                {% endif %}
             </div>
         </div>
     </form>
