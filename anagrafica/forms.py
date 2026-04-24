@@ -4,7 +4,7 @@ from django.forms import HiddenInput
 from django.forms.models import BaseInlineFormSet
 from django.forms.utils import ErrorDict
 import re
-from .utils import validate_and_normalize_phone_number
+from .utils import citta_choice_label, validate_and_normalize_phone_number
 from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 
@@ -273,7 +273,7 @@ class LuogoNascitaCittaMixin:
         citta = self.cleaned_data.get("luogo_nascita_citta")
 
         if citta:
-            return f"{citta.nome} ({citta.provincia.sigla})"
+            return citta_choice_label(citta)
 
         if value:
             if value == self._initial_luogo_nascita:
@@ -302,7 +302,7 @@ class LuogoNascitaCittaFkMixin:
         self.fields["luogo_nascita"].queryset = (
             Citta.objects.filter(attiva=True).select_related("provincia").order_by("nome")
         )
-        self.fields["luogo_nascita"].label_from_instance = lambda obj: f"{obj.nome} ({obj.provincia.sigla})"
+        self.fields["luogo_nascita"].label_from_instance = citta_choice_label
         self.fields["luogo_nascita_search"].widget.attrs.update(
             {
                 "placeholder": "Cerca una città...",
@@ -414,7 +414,7 @@ class IndirizzoForm(forms.ModelForm):
         self.fields["citta"].queryset = (
             Citta.objects.filter(attiva=True).select_related("provincia", "regione").order_by("nome")
         )
-        self.fields["citta"].label_from_instance = lambda obj: f"{obj.nome} ({obj.provincia.sigla})"
+        self.fields["citta"].label_from_instance = citta_choice_label
         make_searchable_select(self.fields["citta"], "Cerca una città...")
         self.fields["cap_scelto"].required = False
         self.fields["cap_scelto"].label = "CAP"
@@ -428,9 +428,7 @@ class IndirizzoForm(forms.ModelForm):
         # Caso 2: form in modifica con instance esistente
         elif self.instance.pk and self.instance.citta_id:
             citta_id = self.instance.citta_id
-            self.fields["citta_search"].initial = (
-                f"{self.instance.citta.nome} ({self.instance.citta.provincia.sigla})"
-            )
+            self.fields["citta_search"].initial = citta_choice_label(self.instance.citta)
 
         # Popola il queryset CAP in base alla città
         if citta_id:

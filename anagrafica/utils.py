@@ -1,6 +1,21 @@
 from django.core.exceptions import ValidationError
 
 
+def citta_choice_label(citta):
+    """
+    Testo per select/autocomplete. Tollera città con provincia mancante o non caricata
+    (evita 500 in produzione con dati legacy o relazioni parziali).
+    """
+    if citta is None:
+        return ""
+    nome = getattr(citta, "nome", None) or ""
+    prov = getattr(citta, "provincia", None)
+    sigla = getattr(prov, "sigla", None) if prov is not None else None
+    if sigla:
+        return f"{nome} ({sigla})"
+    return nome or str(getattr(citta, "pk", "")) or ""
+
+
 def normalize_phone_number(value):
     raw_value = (value or "").strip()
     if not raw_value:

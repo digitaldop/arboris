@@ -1,21 +1,18 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body style="padding: 20px;">
-    <h1 class="section-title">
-        {% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}
-    </h1>
+{% extends "popup_base.html" %}
+{% load static %}
+
+{% block title %}{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}</h1>
+    </div>
 
     <div class="info-box">
         Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
     </div>
 
-    <div class="panel">
+    <div class="content-card">
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
@@ -99,6 +96,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
+            const cercaCittaBase = "{% url 'ajax_cerca_citta' %}";
             const cittaSelect = document.getElementById("id_citta");
             const capSelect = document.getElementById("id_cap_scelto");
             const provinciaDisplay = document.getElementById("id_provincia_display");
@@ -154,7 +152,9 @@
                 }
 
                 const selectedText = selectedOption.textContent || "";
-                fetch(`/ajax/cerca-citta/?q=${encodeURIComponent(selectedText)}`)
+                const url = new URL(cercaCittaBase, window.location.origin);
+                url.searchParams.set("q", selectedText);
+                fetch(url.toString())
                     .then(response => response.json())
                     .then(data => {
                         const match = (data.results || []).find(item => String(item.id) === String(selectedOption.value))
@@ -185,5 +185,4 @@
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}

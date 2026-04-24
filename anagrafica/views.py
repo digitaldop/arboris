@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from django.utils import timezone
 
+from .utils import citta_choice_label
 from .forms import (
     IndirizzoForm,
     FamigliaForm,
@@ -917,14 +918,15 @@ def ajax_cerca_citta(request):
             .values("id", "codice")
         )
 
+        prov = getattr(c, "provincia", None)
         results.append({
             "id": c.id,
             "nome": c.nome,
-            "label": f"{c.nome} ({c.provincia.sigla})",
+            "label": citta_choice_label(c),
             "codice_catastale": c.codice_catastale,
-            "provincia_nome": c.provincia.nome,
-            "provincia_sigla": c.provincia.sigla,
-            "regione_nome": c.provincia.regione.nome if c.provincia.regione else "",
+            "provincia_nome": getattr(prov, "nome", "") if prov is not None else "",
+            "provincia_sigla": getattr(prov, "sigla", "") if prov is not None else "",
+            "regione_nome": prov.regione.nome if prov and prov.regione else "",
             "caps": caps,
         })
 
