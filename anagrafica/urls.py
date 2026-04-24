@@ -1,14 +1,15 @@
 from django.urls import path
 from . import views
-from sistema.permissions import module_edit_permission_required, module_permission_required
+from sistema.permissions import authenticated_user_required, module_edit_permission_required, module_permission_required
 
 
+app_auth = authenticated_user_required
 anagrafica_view = module_permission_required("anagrafica")
 anagrafica_manage = module_permission_required("anagrafica", level="manage")
 anagrafica_edit = module_edit_permission_required("anagrafica")
 
 urlpatterns = [
-    path("", views.home, name="home"),
+    path("", app_auth(views.home), name="home"),
     #URLS DEGLI INDIRIZZI
     path("indirizzi/", anagrafica_view(views.lista_indirizzi), name="lista_indirizzi"),
     path("indirizzi/nuovo/", anagrafica_manage(views.crea_indirizzo), name="crea_indirizzo"),

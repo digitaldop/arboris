@@ -1,12 +1,32 @@
 from functools import wraps
 
 from django.contrib import messages
+from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
 from .models import LivelloPermesso, RuoloUtente, SistemaUtentePermessi
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def redirect_unauthenticated_user(request):
+    return redirect_to_login(
+        request.get_full_path(),
+        login_url="login",
+        redirect_field_name=REDIRECT_FIELD_NAME,
+    )
+
+
+def authenticated_user_required(view_func):
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        if not getattr(request.user, "is_authenticated", False):
+            return redirect_unauthenticated_user(request)
+        return view_func(request, *args, **kwargs)
+
+    return wrapped
 
 
 def get_user_permission_profile(user):
@@ -22,7 +42,7 @@ def get_user_permission_profile(user):
 
 def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
     if not user or not user.is_authenticated:
-        return True
+        return False
 
     if user.is_superuser:
         return True
@@ -58,9 +78,13 @@ def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZION
     def decorator(view_func):
         @wraps(view_func)
         def wrapped(request, *args, **kwargs):
+            if not getattr(request.user, "is_authenticated", False):
+                return redirect_unauthenticated_user(request)
+
             if not user_has_module_permission(request.user, module_name, level=level):
                 messages.error(request, "Non hai i permessi necessari per accedere a questa sezione.")
                 return redirect("home")
+
             return view_func(request, *args, **kwargs)
 
         return wrapped
@@ -78,6 +102,9 @@ def module_edit_permission_required(module_name):
                 else LivelloPermesso.GESTIONE
             )
 
+            if not getattr(request.user, "is_authenticated", False):
+                return redirect_unauthenticated_user(request)
+
             if not user_has_module_permission(request.user, module_name, level=required_level):
                 messages.error(request, "Non hai i permessi necessari per eseguire questa operazione.")
                 return redirect("home")
@@ -92,8 +119,11 @@ def module_edit_permission_required(module_name):
 def operational_admin_required(view_func):
     @wraps(view_func)
     def wrapped(request, *args, **kwargs):
+        if not getattr(request.user, "is_authenticated", False):
+            return redirect_unauthenticated_user(request)
+
         if not user_is_operational_admin(request.user):
-            messages.error(request, "Questa sezione è riservata all'Amministratore.")
+            messages.error(request, "Questa sezione e riservata all'Amministratore.")
             return redirect("home")
 
         return view_func(request, *args, **kwargs)

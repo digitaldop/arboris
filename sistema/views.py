@@ -1,12 +1,17 @@
 from django.contrib import messages
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from pathlib import Path
 
 from .forms import (
+    ArborisAuthenticationForm,
     SistemaBackupDatabaseConfigurazioneForm,
     SistemaBackupDatabaseRestoreConfirmForm,
     SistemaBackupDatabaseUploadForm,
@@ -45,6 +50,52 @@ from .permissions import operational_admin_required
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
 PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
 CRONOLOGIA_RESULT_LIMIT = 250
+
+
+def resolve_safe_next_url(request, fallback_url_name="home"):
+    next_url = (
+        request.POST.get("next")
+        or request.GET.get("next")
+        or ""
+    ).strip()
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return next_url
+    return reverse(fallback_url_name)
+
+
+def login_view(request):
+    if getattr(request.user, "is_authenticated", False):
+        return redirect(resolve_safe_next_url(request))
+
+    form = ArborisAuthenticationForm(request, data=request.POST or None)
+    next_url = resolve_safe_next_url(request)
+
+    if request.method == "POST" and form.is_valid():
+        auth_login(request, form.get_user())
+        if form.cleaned_data.get("remember_me"):
+            request.session.set_expiry(None)
+        else:
+            request.session.set_expiry(0)
+        messages.success(request, "Accesso eseguito correttamente.")
+        return redirect(next_url)
+
+    response = render(
+        request,
+        "sistema/login.html",
+        {
+            "form": form,
+            "next_url": next_url,
+        },
+    )
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def logout_view(request):
+    if getattr(request.user, "is_authenticated", False):
+        auth_logout(request)
+        messages.info(request, "Hai effettuato il logout.")
+    return redirect("login")
 
 
 def resolve_inline_target(request, allowed_targets):

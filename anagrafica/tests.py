@@ -2,6 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pandas as pd
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
@@ -87,6 +88,14 @@ class ImportDatiBaseTests(TestCase):
 
 
 class AjaxCercaCittaTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="admin@example.com",
+            email="admin@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+
     def test_ajax_cerca_citta_supports_lookup_by_id_with_caps(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)

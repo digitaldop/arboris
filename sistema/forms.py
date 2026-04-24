@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 
@@ -15,6 +16,41 @@ from .models import (
     SistemaBackupDatabaseConfigurazione,
     SistemaUtentePermessi,
 )
+
+
+class ArborisAuthenticationForm(AuthenticationForm):
+    remember_me = forms.BooleanField(
+        label="Mantieni accesso",
+        required=False,
+    )
+
+    username = forms.CharField(
+        label="Email o username",
+        widget=forms.TextInput(
+            attrs={
+                "autofocus": True,
+                "autocomplete": "username",
+                "autocapitalize": "none",
+                "placeholder": "Inserisci email o username",
+                "spellcheck": "false",
+            }
+        ),
+    )
+    password = forms.CharField(
+        label="Password",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "current-password",
+                "placeholder": "Inserisci la password",
+            }
+        ),
+    )
+
+    error_messages = {
+        "invalid_login": "Credenziali non valide. Verifica username e password.",
+        "inactive": "Questo account e disattivato.",
+    }
 
 
 class ScuolaForm(forms.ModelForm):
@@ -206,37 +242,37 @@ class SistemaUtenteForm(forms.ModelForm):
     permesso_anagrafica = forms.ChoiceField(
         label="Modulo anagrafica",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_economia = forms.ChoiceField(
         label="Modulo economia",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_sistema = forms.ChoiceField(
         label="Modulo sistema",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_calendario = forms.ChoiceField(
         label="Modulo calendario",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_gestione_finanziaria = forms.ChoiceField(
         label="Modulo gestione finanziaria",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_gestione_amministrativa = forms.ChoiceField(
         label="Modulo gestione amministrativa",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
     permesso_servizi_extra = forms.ChoiceField(
         label="Modulo servizi extra",
         choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.VISUALIZZAZIONE,
+        initial=LivelloPermesso.NESSUNO,
     )
 
     class Meta:

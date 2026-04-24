@@ -596,6 +596,7 @@ class SistemaOperazioneCronologia(models.Model):
 
 
 class LivelloPermesso(models.TextChoices):
+    NESSUNO = "none", "Nessun accesso"
     VISUALIZZAZIONE = "view", "Sola visualizzazione"
     GESTIONE = "manage", "Anche gestione"
 
@@ -628,37 +629,37 @@ class SistemaUtentePermessi(models.Model):
     permesso_anagrafica = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_economia = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_sistema = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_calendario = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_gestione_finanziaria = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_gestione_amministrativa = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     permesso_servizi_extra = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
-        default=LivelloPermesso.VISUALIZZAZIONE,
+        default=LivelloPermesso.NESSUNO,
     )
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
@@ -683,7 +684,7 @@ class SistemaUtentePermessi(models.Model):
             "gestione_amministrativa": self.permesso_gestione_amministrativa,
             "servizi_extra": self.permesso_servizi_extra,
         }
-        return mapping.get(module_name, LivelloPermesso.VISUALIZZAZIONE)
+        return mapping.get(module_name, LivelloPermesso.NESSUNO)
 
     def has_module_permission(self, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
         if self.controllo_completo:

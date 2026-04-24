@@ -1,0 +1,131 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accedi - Arboris School Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+        }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=39">
+    <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
+</head>
+<body class="login-page">
+    <main class="login-shell">
+        <section class="login-card" aria-labelledby="login-title">
+            <div class="login-brand">
+                <div class="login-brand-header">
+                    <div class="login-brand-logo-wrap">
+                        <img src="{% static 'images/arboris_logo.png' %}" alt="Arboris" class="login-brand-logo">
+                    </div>
+                    <div>
+                        <div class="login-brand-kicker">Arboris</div>
+                        <h1 class="login-brand-title">
+                            {% if scuola_header and scuola_header.nome_scuola %}
+                                {{ scuola_header.nome_scuola }}
+                            {% else %}
+                                Arboris School Management
+                            {% endif %}
+                        </h1>
+                        <p class="login-brand-copy">
+                            Accedi al gestionale per lavorare con anagrafiche, economia, calendario e gli altri moduli abilitati per il tuo profilo.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="login-brand-meta">
+                    {% if scuola_header and scuola_header.indirizzo_header_label %}
+                        <div class="login-brand-meta-item">
+                            <span class="login-brand-meta-label">Sede</span>
+                            <span>{{ scuola_header.indirizzo_header_label }}</span>
+                        </div>
+                    {% endif %}
+                    {% if scuola_header and scuola_header.telefono_header %}
+                        <div class="login-brand-meta-item">
+                            <span class="login-brand-meta-label">Telefono</span>
+                            <span>{{ scuola_header.telefono_header }}</span>
+                        </div>
+                    {% endif %}
+                    {% if scuola_header and scuola_header.email_header %}
+                        <div class="login-brand-meta-item">
+                            <span class="login-brand-meta-label">Email</span>
+                            <span>{{ scuola_header.email_header }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="login-form-wrap">
+                <div class="login-form-head">
+                    <h2 class="login-form-title" id="login-title">Accedi</h2>
+                    <p class="login-form-subtitle">
+                        Il browser puo ricordare username e password se lo consenti. Il flag "Mantieni accesso" evita invece il logout alla chiusura del browser.
+                    </p>
+                </div>
+
+                {% if messages %}
+                    <div class="messages-wrapper">
+                        {% for message in messages %}
+                            <div class="message message-{{ message.tags }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if form.non_field_errors %}
+                    <div class="messages-wrapper">
+                        <div class="message message-error">
+                            {{ form.non_field_errors }}
+                        </div>
+                    </div>
+                {% endif %}
+
+                <form method="post" class="login-form" autocomplete="on">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ next_url }}">
+
+                    <div class="login-field">
+                        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                        {{ form.username }}
+                        {{ form.username.errors }}
+                    </div>
+
+                    <div class="login-field">
+                        <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                        {{ form.password }}
+                        {{ form.password.errors }}
+                    </div>
+
+                    <div class="login-checkbox-row">
+                        <label class="login-checkbox" for="{{ form.remember_me.id_for_label }}">
+                            {{ form.remember_me }}
+                            <span>{{ form.remember_me.label }}</span>
+                        </label>
+                    </div>
+
+                    <div class="login-submit">
+                        <button type="submit" class="btn btn-primary">Accedi</button>
+                    </div>
+                </form>
+
+                <div class="login-footer">
+                    <div>Software version: 0.1</div>
+                    <div class="login-footer-links">
+                        <a href="{% url 'informativa_privacy' %}">Privacy</a>
+                        <a href="{% url 'termini_condizioni' %}">Termini e condizioni</a>
+                        <a href="/admin/">Admin tecnico</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

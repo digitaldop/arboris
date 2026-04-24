@@ -10,6 +10,8 @@ sistema_edit = module_edit_permission_required("sistema")
 
 
 urlpatterns = [
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
     path("privacy/", views.informativa_privacy, name="informativa_privacy"),
     path("termini-e-condizioni/", views.termini_e_condizioni, name="termini_condizioni"),
     path("sistema/scuola/", sistema_edit(views.scuola_sistema), name="scuola_sistema"),

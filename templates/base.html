@@ -14,7 +14,7 @@
             --font-headings: {{ site_fonts.heading_css_stack|safe }};
         }
     </style>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=38">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=39">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
 </head>
@@ -59,7 +59,28 @@
             </div>
 
             <div class="header-right">
-                <a href="/admin/" class="header-link">Admin Tecnico</a>
+                {% if request.user.is_authenticated %}
+                    <div class="header-user-summary">
+                        <div class="header-user-name">
+                            {{ request.user.get_full_name|default:request.user.email|default:request.user.username }}
+                        </div>
+                        <div class="header-user-role">
+                            {% if user_permission_profile and user_permission_profile.ruolo %}
+                                {{ user_permission_profile.get_ruolo_display }}
+                            {% elif request.user.is_superuser %}
+                                Superuser
+                            {% elif request.user.is_staff %}
+                                Staff tecnico
+                            {% else %}
+                                Utente
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{% url 'logout' %}" class="header-link header-link-button">Esci</a>
+                {% endif %}
+                {% if request.user.is_staff or request.user.is_superuser %}
+                    <a href="/admin/" class="header-link">Admin Tecnico</a>
+                {% endif %}
             </div>
         </div>
     </header>
