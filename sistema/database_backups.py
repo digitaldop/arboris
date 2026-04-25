@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.files import File
+from django.core.files.storage import default_storage
 from django.db import OperationalError, ProgrammingError, connections, transaction
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
@@ -51,8 +52,107 @@ def get_backup_configuration():
     return configurazione
 
 
+def get_database_backups_prefix():
+    return (getattr(settings, "DATABASE_BACKUPS_UPLOAD_PREFIX", "db_backups") or "db_backups").strip().strip("/")
+
+
+def get_restore_uploads_prefix():
+    return (getattr(settings, "DATABASE_RESTORE_UPLOAD_PREFIX", "db_restore_uploads") or "db_restore_uploads").strip().strip("/")
+
+
+def is_absolute_file_reference(file_reference):
+    reference = str(file_reference or "").strip()
+    if not reference:
+        return False
+    return Path(reference).is_absolute() or (len(reference) > 1 and reference[1] == ":" and reference[0].isalpha())
+
+
+def get_restore_upload_storage_name(original_name):
+    safe_name = get_valid_filename(Path(original_name or "backup.sql.gz").name) or "backup.sql.gz"
+    return f"{get_restore_uploads_prefix()}/{timezone.localtime():%Y/%m}/{uuid4().hex}_{safe_name}"
+
+
+def restore_file_reference_exists(file_reference):
+    reference = str(file_reference or "").strip()
+    if not reference:
+        return False
+
+    if is_absolute_file_reference(reference):
+        return Path(reference).exists()
+
+    try:
+        return default_storage.exists(reference)
+    except Exception:
+        return False
+
+
+def is_restore_upload_reference(file_reference):
+    reference = str(file_reference or "").strip().replace("\\", "/")
+    if not reference:
+        return False
+    restore_prefix = get_restore_uploads_prefix()
+    return reference.startswith(f"{restore_prefix}/") or "/_pending_restore/" in reference or reference.endswith("/_pending_restore")
+
+
+def delete_restore_file_reference(file_reference):
+    reference = str(file_reference or "").strip()
+    if not reference:
+        return
+
+    if is_absolute_file_reference(reference):
+        try:
+            Path(reference).unlink(missing_ok=True)
+        except Exception:
+            pass
+        return
+
+    try:
+        default_storage.delete(reference)
+    except Exception:
+        pass
+
+
+def build_restore_temp_suffix(reference_name):
+    lower_name = (reference_name or "").lower()
+    if lower_name.endswith(".sql.gz"):
+        return ".sql.gz"
+    if lower_name.endswith(".gz"):
+        return ".gz"
+    return ".sql"
+
+
+def materialize_restore_file_reference(file_reference, *, reference_name=""):
+    reference = str(file_reference or "").strip()
+    if not reference:
+        raise DatabaseBackupError("Il file di backup selezionato non esiste piu.")
+
+    if is_absolute_file_reference(reference):
+        path = Path(reference)
+        if not path.exists():
+            raise DatabaseBackupError("Il file di backup selezionato non esiste piu.")
+        return path, lambda: None
+
+    suffix = build_restore_temp_suffix(reference_name or reference)
+    fd, temp_name = tempfile.mkstemp(prefix="arboris_restore_", suffix=suffix)
+    os.close(fd)
+    temp_path = Path(temp_name)
+
+    try:
+        with default_storage.open(reference, "rb") as source_handle:
+            with temp_path.open("wb") as destination_handle:
+                shutil.copyfileobj(source_handle, destination_handle)
+    except Exception as exc:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise DatabaseBackupError(f"Impossibile leggere il file di backup dallo storage: {exc}") from exc
+
+    return temp_path, lambda: temp_path.unlink(missing_ok=True)
+
+
 def get_backup_root():
-    backup_root = Path(settings.MEDIA_ROOT) / "database_backups"
+    backup_root = Path(tempfile.gettempdir()) / "arboris_database_backups"
     backup_root.mkdir(parents=True, exist_ok=True)
     return backup_root
 
@@ -370,18 +470,17 @@ def maybe_run_scheduled_backup(triggered_by=None):
 
 
 def store_pending_restore_upload(uploaded_file):
-    restore_root = get_pending_restore_root()
-    safe_name = get_valid_filename(uploaded_file.name or "backup.sql.gz") or "backup.sql.gz"
-    target_name = f"{uuid4().hex}_{safe_name}"
-    target_path = restore_root / target_name
+    storage_name = default_storage.save(
+        get_restore_upload_storage_name(uploaded_file.name),
+        uploaded_file,
+    )
+    try:
+        file_size = default_storage.size(storage_name)
+    except Exception:
+        file_size = getattr(uploaded_file, "size", 0) or 0
 
-    with target_path.open("wb") as destination:
-        for chunk in uploaded_file.chunks():
-            destination.write(chunk)
-
-    file_size = target_path.stat().st_size
     return {
-        "path": str(target_path),
+        "storage_name": storage_name,
         "original_name": uploaded_file.name,
         "size_bytes": file_size,
         "size_label": format_size_label(file_size),
@@ -390,15 +489,25 @@ def store_pending_restore_upload(uploaded_file):
 
 def create_restore_job_from_upload(uploaded_file, triggered_by=None):
     """
-    Salva il file su disco senza elaborarlo e crea un record SistemaDatabaseRestoreJob
+    Salva il file nello storage configurato senza elaborarlo e crea un record SistemaDatabaseRestoreJob
     in stato 'in attesa di conferma'.
     """
     meta = store_pending_restore_upload(uploaded_file)
     return SistemaDatabaseRestoreJob.objects.create(
         stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
-        percorso_file=meta["path"],
+        percorso_file=meta["storage_name"],
         nome_file_originale=meta["original_name"] or "backup.sql",
         dimensione_file_bytes=meta["size_bytes"],
+        creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
+    )
+
+
+def create_restore_job_from_backup_record(backup_record, triggered_by=None):
+    return SistemaDatabaseRestoreJob.objects.create(
+        stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+        percorso_file=backup_record.file_backup.name,
+        nome_file_originale=backup_record.nome_file or Path(backup_record.file_backup.name).name,
+        dimensione_file_bytes=backup_record.dimensione_file_bytes,
         creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
     )
 
@@ -407,34 +516,33 @@ def delete_pending_restore_upload(metadata):
     if not metadata:
         return
 
-    file_path = metadata.get("path")
-    if not file_path:
+    file_reference = metadata.get("storage_name") or metadata.get("path")
+    if not file_reference:
         return
 
-    try:
-        Path(file_path).unlink(missing_ok=True)
-    except Exception:
-        pass
+    delete_restore_file_reference(file_reference)
 
 
 def cancel_or_delete_restore_job(job: SistemaDatabaseRestoreJob) -> None:
     """Rimuove file e record per job ancora in attesa di conferma o annullato manualmente."""
-    try:
-        Path(job.percorso_file).unlink(missing_ok=True)
-    except Exception:
-        pass
+    if is_restore_upload_reference(job.percorso_file):
+        delete_restore_file_reference(job.percorso_file)
     job.delete()
 
 
 def restore_database_from_backup_file(file_path, original_name="", triggered_by=None):
-    file_path = Path(file_path)
-    if not file_path.exists():
+    if not restore_file_reference_exists(file_path):
         raise DatabaseBackupError("Il file di backup selezionato non esiste piu.")
 
     safety_backup = create_database_backup(
         triggered_by=triggered_by,
         backup_type=TipoBackupDatabase.SICUREZZA_RIPRISTINO,
-        note=f"Backup di sicurezza creato prima del ripristino da {original_name or file_path.name}",
+        note=f"Backup di sicurezza creato prima del ripristino da {original_name or Path(str(file_path)).name}",
+    )
+
+    materialized_file_path, cleanup_materialized_file = materialize_restore_file_reference(
+        file_path,
+        reference_name=original_name,
     )
 
     db_settings = ensure_postgresql_database()
@@ -445,10 +553,10 @@ def restore_database_from_backup_file(file_path, original_name="", triggered_by=
 
     connections.close_all()
 
-    open_handler = gzip.open if file_path.suffix.lower() == ".gz" else open
+    open_handler = gzip.open if str(original_name or materialized_file_path.name).lower().endswith(".gz") else open
 
     try:
-        with open_handler(file_path, "rb") as restore_handle:
+        with open_handler(materialized_file_path, "rb") as restore_handle:
             result = subprocess.run(
                 command,
                 stdin=restore_handle,
@@ -458,6 +566,7 @@ def restore_database_from_backup_file(file_path, original_name="", triggered_by=
                 check=False,
             )
     finally:
+        cleanup_materialized_file()
         connections.close_all()
 
     if result.returncode != 0:

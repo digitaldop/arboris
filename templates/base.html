@@ -14,7 +14,9 @@
             --font-headings: {{ site_fonts.heading_css_stack|safe }};
         }
     </style>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=43">
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
+    <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=45">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
 </head>
@@ -284,28 +286,6 @@
                         </div>
                     {% endif %}
 
-                    <div class="sidebar-section" data-sidebar-section-key="scuola">
-                        <button
-                            type="button"
-                            class="sidebar-collapsible collapsible-title is-open"
-                            data-target="sidebar-scuola-panel"
-                            data-storage-key="arboris-sidebar-scuola"
-                            data-default-open="true"
-                        >
-                            <span>Scuola</span>
-                        </button>
-                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-scuola-panel">
-                            <nav class="sidebar-nav sidebar-subnav">
-                                <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' %}active{% endif %}">
-                                    Anni scolastici
-                                </a>
-                                <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' %}active{% endif %}">
-                                    Classi
-                                </a>
-                            </nav>
-                        </div>
-                    </div>
-
                     {% if can_view_gestione_amministrativa %}
                         <div class="sidebar-section" data-sidebar-section-key="gestione-amministrativa">
                             <button
@@ -421,7 +401,7 @@
                         </div>
                     {% endif %}
 
-                    {% if can_view_sistema %}
+                    {% if request.user.is_authenticated %}
                         <div class="sidebar-section" data-sidebar-section-key="sistema">
                             <button
                                 type="button"
@@ -433,28 +413,53 @@
                                 <span>Sistema</span>
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-panel">
-                                <nav class="sidebar-nav sidebar-subnav">
-                                    <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
-                                        Scuola
-                                    </a>
-                                    <a href="{% url 'impostazioni_generali_sistema' %}" class="{% if request.resolver_match.url_name == 'impostazioni_generali_sistema' %}active{% endif %}">
-                                        Impostazioni generali
-                                    </a>
-                                    {% if can_manage_sistema %}
-                                        <a href="{% url 'backup_database_sistema' %}" class="{% if request.resolver_match.url_name == 'backup_database_sistema' %}active{% endif %}">
-                                            Backup database
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-sistema-scuola-panel"
+                                        data-storage-key="arboris-sidebar-sistema-scuola"
+                                        data-default-open="true"
+                                    >
+                                        <span>Impostazioni Scuola</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-scuola-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            {% if can_manage_sistema %}
+                                                <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
+                                                    Dati Scuola
+                                                </a>
+                                            {% endif %}
+                                            <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' or request.resolver_match.url_name == 'crea_anno_scolastico' or request.resolver_match.url_name == 'modifica_anno_scolastico' or request.resolver_match.url_name == 'elimina_anno_scolastico' %}active{% endif %}">
+                                                Anni scolastici
+                                            </a>
+                                            <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' or request.resolver_match.url_name == 'crea_classe' or request.resolver_match.url_name == 'modifica_classe' or request.resolver_match.url_name == 'elimina_classe' %}active{% endif %}">
+                                                Classi
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
+                                {% if can_view_sistema %}
+                                    <nav class="sidebar-nav sidebar-subnav">
+                                        <a href="{% url 'impostazioni_generali_sistema' %}" class="{% if request.resolver_match.url_name == 'impostazioni_generali_sistema' %}active{% endif %}">
+                                            Impostazioni generali
                                         </a>
-                                    {% endif %}
-                                    {% if can_view_operation_history %}
-                                        <a href="{% url 'cronologia_operazioni_sistema' %}" class="{% if request.resolver_match.url_name == 'cronologia_operazioni_sistema' %}active{% endif %}">
-                                            Cronologia operazioni
+                                        {% if can_access_database_backups %}
+                                            <a href="{% url 'backup_database_sistema' %}" class="{% if request.resolver_match.url_name == 'backup_database_sistema' %}active{% endif %}">
+                                                Backup database
+                                            </a>
+                                        {% endif %}
+                                        {% if can_view_operation_history %}
+                                            <a href="{% url 'cronologia_operazioni_sistema' %}" class="{% if request.resolver_match.url_name == 'cronologia_operazioni_sistema' %}active{% endif %}">
+                                                Cronologia operazioni
+                                            </a>
+                                        {% endif %}
+                                        <a href="{% url 'lista_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_utenti' or request.resolver_match.url_name == 'crea_utente' or request.resolver_match.url_name == 'modifica_utente' %}active{% endif %}">
+                                            Utenti
                                         </a>
-                                    {% endif %}
-                                    <a href="{% url 'lista_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_utenti' or request.resolver_match.url_name == 'crea_utente' or request.resolver_match.url_name == 'modifica_utente' %}active{% endif %}">
-                                        Utenti
-                                    </a>
-                                    <a href="/admin/">Admin tecnico</a>
-                                </nav>
+                                        <a href="/admin/">Admin tecnico</a>
+                                    </nav>
+                                {% endif %}
                             </div>
                         </div>
                     {% endif %}
@@ -507,9 +512,11 @@
     <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
     <script src="{% static 'js/core/long-wait-cursor.js' %}?v=7"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
-    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=2"></script>
-    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=8"></script>
+    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=4"></script>
+    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
     <script src="{% static 'js/core/codice-fiscale.js' %}?v=4"></script>
+    <script src="{% static 'js/core/browser-autofill.js' %}?v=1"></script>
+    <script src="{% static 'js/core/currency-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
@@ -532,6 +539,12 @@
             }
             if (window.ArborisRichNotes) {
                 ArborisRichNotes.init(document);
+            }
+            if (window.ArborisBrowserAutofill) {
+                ArborisBrowserAutofill.init(document);
+            }
+            if (window.ArborisCurrencyFields) {
+                ArborisCurrencyFields.init(document);
             }
             if (window.ArborisSidebarCollapse) {
                 ArborisSidebarCollapse.init();

@@ -134,9 +134,9 @@
                 <tr class="iscrizione-importo-riduzione-row">
                     <th>{{ form.importo_riduzione_speciale.label_tag }}</th>
                     <td>
-                        <div class="currency-input-group">
-                            <span class="currency-prefix">EUR</span>
+                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
                             {{ form.importo_riduzione_speciale }}
+                            <span class="currency-suffix">EUR</span>
                         </div>
                         <div class="help-text">{{ form.importo_riduzione_speciale.help_text }}</div>
                         {{ form.importo_riduzione_speciale.errors }}

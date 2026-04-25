@@ -74,6 +74,20 @@ def user_is_operational_admin(user):
     )
 
 
+def user_can_access_database_backups(user):
+    if not user or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    profilo = get_user_permission_profile(user)
+    if not profilo:
+        return False
+
+    return profilo.ruolo == RuoloUtente.AMMINISTRATORE
+
+
 def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZIONE):
     def decorator(view_func):
         @wraps(view_func)
@@ -124,6 +138,21 @@ def operational_admin_required(view_func):
 
         if not user_is_operational_admin(request.user):
             messages.error(request, "Questa sezione e riservata all'Amministratore.")
+            return redirect("home")
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapped
+
+
+def database_backup_access_required(view_func):
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        if not getattr(request.user, "is_authenticated", False):
+            return redirect_unauthenticated_user(request)
+
+        if not user_can_access_database_backups(request.user):
+            messages.error(request, "La sezione Backup Database e riservata ad amministratori e superuser.")
             return redirect("home")
 
         return view_func(request, *args, **kwargs)

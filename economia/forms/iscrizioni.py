@@ -4,6 +4,7 @@ from django import forms
 from django.forms import HiddenInput
 from django.db import DatabaseError
 from django.utils import timezone
+from arboris.form_widgets import apply_eur_currency_widget
 from scuola.utils import resolve_default_anno_scolastico
 
 from economia.models import (
@@ -108,6 +109,8 @@ class TariffaCondizioneIscrizioneForm(forms.ModelForm):
         self.fields["ordine_figlio_a"].label = "A figlio"
         self.fields["ordine_figlio_a"].required = False
         self.fields["ordine_figlio_a"].help_text = "Lascia vuoto per indicare 'e oltre'."
+        apply_eur_currency_widget(self.fields["retta_annuale"])
+        apply_eur_currency_widget(self.fields["preiscrizione"])
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("condizione_iscrizione"):
             prima_condizione = self.fields["condizione_iscrizione"].queryset.first()
@@ -119,6 +122,10 @@ class AgevolazioneForm(forms.ModelForm):
     class Meta:
         model = Agevolazione
         fields = ["nome_agevolazione", "importo_annuale_agevolazione", "attiva"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_eur_currency_widget(self.fields["importo_annuale_agevolazione"])
 
 
 class IscrizioneForm(forms.ModelForm):
@@ -159,15 +166,7 @@ class IscrizioneForm(forms.ModelForm):
         self.fields["condizione_iscrizione"].empty_label = None
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].help_text = "Importo in euro."
-        self.fields["importo_riduzione_speciale"].widget = forms.TextInput()
-        self.fields["importo_riduzione_speciale"].widget.attrs.update(
-            {
-                "autocomplete": "off",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-                "placeholder": "0,00",
-            }
-        )
+        apply_eur_currency_widget(self.fields["importo_riduzione_speciale"])
         self.fields["agevolazione"].required = False
         try:
             self.fields["agevolazione"].queryset = self.fields["agevolazione"].queryset.filter(attiva=True).order_by("nome_agevolazione")
@@ -253,6 +252,9 @@ class RataIscrizionePagamentoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_eur_currency_widget(self.fields["importo_pagato"])
+        apply_eur_currency_widget(self.fields["credito_applicato"])
+        apply_eur_currency_widget(self.fields["altri_sgravi"])
         self.fields["metodo_pagamento"].required = False
         self.fields["metodo_pagamento"].queryset = self.fields["metodo_pagamento"].queryset.filter(attivo=True).order_by(
             "metodo_pagamento"
@@ -322,14 +324,7 @@ class RataIscrizionePagamentoRapidoForm(forms.Form):
         self.rata = rata
         self.fields["metodo_pagamento"].queryset = MetodoPagamento.objects.filter(attivo=True).order_by("metodo_pagamento")
         self.fields["data_pagamento"].initial = timezone.localdate()
-        self.fields["importo_pagato_personalizzato"].widget.attrs.update(
-            {
-                "step": "0.01",
-                "min": "0",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-            }
-        )
+        apply_eur_currency_widget(self.fields["importo_pagato_personalizzato"])
 
         if initial_metodo_pagamento_id and not self.is_bound:
             self.initial["metodo_pagamento"] = initial_metodo_pagamento_id

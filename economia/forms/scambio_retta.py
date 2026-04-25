@@ -4,6 +4,7 @@ from django import forms
 
 from anagrafica.models import Famiglia, Familiare, Studente
 from anagrafica.forms import make_searchable_select
+from arboris.form_widgets import apply_eur_currency_widget
 from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
 
@@ -84,14 +85,7 @@ class TariffaScambioRettaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["valore_orario"].help_text = "Valore orario in euro."
-        self.fields["valore_orario"].widget.attrs.update(
-            {
-                "step": "0.01",
-                "min": "0",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-            }
-        )
+        apply_eur_currency_widget(self.fields["valore_orario"])
 
 
 class ScambioRettaForm(forms.ModelForm):

@@ -52,6 +52,7 @@
         Array.from(openWrappers).forEach(wrapper => {
             if (wrapper !== currentWrapper) {
                 wrapper.classList.remove("is-open");
+                wrapper.classList.remove("is-open-upward");
                 openWrappers.delete(wrapper);
                 const instance = instances.get(wrapper.querySelector("select[data-searchable-select='1']"));
                 if (instance) {
@@ -107,14 +108,24 @@
             },
             closeDropdown: function () {
                 wrapper.classList.remove("is-open");
+                wrapper.classList.remove("is-open-upward");
                 openWrappers.delete(wrapper);
                 state.highlightedIndex = -1;
+            },
+            updateDropdownPosition: function () {
+                const inputRect = input.getBoundingClientRect();
+                const desiredHeight = Math.min(dropdown.scrollHeight || 260, 260);
+                const availableBelow = Math.max(0, window.innerHeight - inputRect.bottom - 12);
+                const availableAbove = Math.max(0, inputRect.top - 12);
+                const openUpward = availableBelow < Math.min(180, desiredHeight) && availableAbove > availableBelow;
+                wrapper.classList.toggle("is-open-upward", openUpward);
             },
             openDropdown: function () {
                 if (isLocked(select)) {
                     return;
                 }
                 closeAllExcept(wrapper);
+                state.updateDropdownPosition();
                 wrapper.classList.add("is-open");
                 openWrappers.add(wrapper);
             },
@@ -158,6 +169,7 @@
                     empty.className = "searchable-select-empty";
                     empty.textContent = "Nessun risultato";
                     dropdown.appendChild(empty);
+                    state.updateDropdownPosition();
                     return;
                 }
 
@@ -177,6 +189,8 @@
                     });
                     dropdown.appendChild(row);
                 });
+
+                state.updateDropdownPosition();
             },
         };
 

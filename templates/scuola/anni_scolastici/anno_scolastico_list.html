@@ -19,41 +19,84 @@
         </div>
     </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Nome anno scolastico</th>
-                    <th>Data inizio</th>
-                    <th>Data fine</th>
-                    <th>Corrente</th>
-                    <th>Attivo</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for anno in anni %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_anno_scolastico' anno.pk %}">
-                        <td>{{ anno.nome_anno_scolastico }}</td>
-                        <td>{{ anno.data_inizio }}</td>
-                        <td>{{ anno.data_fine }}</td>
-                        <td>{% if anno.corrente %}Sì{% else %}No{% endif %}</td>
-                        <td>{% if anno.attivo %}Sì{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
+    <div class="admin-section">
+        <div class="admin-section-title">Anni scolastici correnti e futuri</div>
+        <div class="content-card">
+            <table class="list-table">
+                <thead>
                     <tr>
-                        <td colspan="6">
-                            <div class="empty-state">Nessun anno scolastico inserito.</div>
-                        </td>
+                        <th>Nome anno scolastico</th>
+                        <th>Data inizio</th>
+                        <th>Data fine</th>
+                        <th>Corrente</th>
+                        <th>Attivo</th>
+                        <th>Azioni</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for anno in anni_correnti_e_futuri %}
+                        <tr class="list-row-link" data-row-href="{% url 'modifica_anno_scolastico' anno.pk %}">
+                            <td>{{ anno.nome_anno_scolastico }}</td>
+                            <td>{{ anno.data_inizio }}</td>
+                            <td>{{ anno.data_fine }}</td>
+                            <td>{% if anno.corrente %}Si{% else %}No{% endif %}</td>
+                            <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
+                            <td class="actions-cell">
+                                <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">Nessun anno scolastico corrente o futuro disponibile.</div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <div class="admin-section-title">Anni scolastici passati</div>
+        <div class="content-card">
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th>Nome anno scolastico</th>
+                        <th>Data inizio</th>
+                        <th>Data fine</th>
+                        <th>Corrente</th>
+                        <th>Attivo</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for anno in anni_passati %}
+                        <tr class="list-row-link" data-row-href="{% url 'modifica_anno_scolastico' anno.pk %}">
+                            <td>{{ anno.nome_anno_scolastico }}</td>
+                            <td>{{ anno.data_inizio }}</td>
+                            <td>{{ anno.data_fine }}</td>
+                            <td>{% if anno.corrente %}Si{% else %}No{% endif %}</td>
+                            <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
+                            <td class="actions-cell">
+                                <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">Nessun anno scolastico passato disponibile.</div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>

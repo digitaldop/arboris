@@ -1433,6 +1433,13 @@ select:focus {
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 
+.autocomplete-wrapper.is-open-upward .citta-results,
+.autocomplete-wrapper.is-open-upward .famiglia-results,
+.autocomplete-wrapper.is-open-upward #citta-results {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
 .citta-item {
     padding: 8px 10px;
     border-bottom: 1px solid #eee;
@@ -2277,9 +2284,11 @@ select:focus {
     align-items: center;
     gap: 8px;
     width: 100%;
+    max-width: 100%;
 }
 
-.currency-input-group .currency-prefix {
+.currency-input-group .currency-prefix,
+.currency-input-group .currency-suffix {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2297,6 +2306,26 @@ select:focus {
 
 .currency-input-group input {
     width: 100%;
+}
+
+.currency-input-group.currency-input-group-suffix {
+    width: auto;
+}
+
+.currency-input-group.currency-input-group-compact {
+    width: auto;
+    max-width: 240px;
+}
+
+.currency-input-group.currency-input-group-compact input {
+    width: 150px;
+    min-width: 120px;
+    max-width: 170px;
+    flex: 0 1 150px;
+}
+
+.currency-field-compact {
+    max-width: 170px;
 }
 
 .currency-input-group-inline {
@@ -2325,6 +2354,12 @@ select:focus {
 }
 
 .currency-input-group.is-disabled .currency-prefix {
+    background: #f3f5f7;
+    border-color: #d9e0e5;
+    color: #7d8b96;
+}
+
+.currency-input-group.is-disabled .currency-suffix {
     background: #f3f5f7;
     border-color: #d9e0e5;
     color: #7d8b96;
@@ -2499,6 +2534,11 @@ select:focus {
     display: none;
 }
 
+.searchable-select.is-open-upward .searchable-select-dropdown {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
 .family-attiva-row {
     display: none;
 }
@@ -2530,6 +2570,19 @@ select:focus {
 
 #familiari-table .inline-family-phone-cell input {
     max-width: 160px;
+}
+
+#studenti-table .inline-studente-address-cell {
+    min-width: 320px;
+}
+
+#studenti-table .inline-studente-address-cell .inline-related-field {
+    min-width: 300px;
+}
+
+#studenti-table .inline-studente-address-cell .inline-related-field .searchable-select,
+#studenti-table .inline-studente-address-cell .inline-related-field .autocomplete-wrapper {
+    min-width: 240px;
 }
 
 .inline-table .help-text {
@@ -2695,6 +2748,14 @@ select:focus {
 
 .sticky-form-actions .btn {
     white-space: nowrap;
+}
+
+.button-link-reset {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
 }
 
 .page-head-actions .page-head-save-btn {
@@ -3445,12 +3506,14 @@ select:focus {
     flex-wrap: wrap;
 }
 
-#section-note .rich-note-field {
+#section-note .rich-note-field,
+.admin-section.compact .collapsible-panel .panel-body > .rich-note-field {
     padding: 4px 2px 0 4px;
     box-sizing: border-box;
 }
 
-#section-note .rich-note-toolbar {
+#section-note .rich-note-toolbar,
+.admin-section.compact .collapsible-panel .panel-body > .rich-note-field > .rich-note-toolbar {
     margin: 0 0 2px 2px;
 }
 

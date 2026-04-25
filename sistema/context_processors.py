@@ -3,6 +3,7 @@ from django.db.utils import OperationalError, ProgrammingError
 from .models import LivelloPermesso, Scuola, SistemaImpostazioniGenerali, get_site_font_settings
 from .permissions import (
     get_user_permission_profile,
+    user_can_access_database_backups,
     user_has_module_permission,
     user_is_operational_admin,
 )
@@ -219,4 +220,5 @@ def sistema_permissions_context(request):
         "servizi_extra_sidebar_items": servizi_extra_sidebar_items,
         "current_servizio_extra_id": current_servizio_extra_id,
         "can_view_operation_history": user_is_operational_admin(user),
+        "can_access_database_backups": user_can_access_database_backups(user),
     }

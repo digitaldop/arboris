@@ -26,9 +26,11 @@ from .database_backups import (
     DatabaseBackupError,
     cancel_or_delete_restore_job,
     create_database_backup,
+    create_restore_job_from_backup_record,
     create_restore_job_from_upload,
     delete_pending_restore_upload,
     get_backup_configuration,
+    restore_file_reference_exists,
 )
 from .restore_scheduler import schedule_restore_job
 from .models import (
@@ -252,7 +254,7 @@ def get_pending_restore_metadata(request):
             request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
             request.session.modified = True
         else:
-            if not Path(job.percorso_file).exists():
+            if not restore_file_reference_exists(job.percorso_file):
                 cancel_or_delete_restore_job(job)
                 request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
                 request.session.modified = True
@@ -324,8 +326,25 @@ def backup_database_sistema(request):
                 confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
                 messages.warning(
                     request,
-                    "File di backup salvato sul server. Completa il secondo controllo per mettere in coda il ripristino in background.",
+                    "File di backup caricato nello storage protetto. Completa il secondo controllo per mettere in coda il ripristino in background.",
                 )
+
+        elif action == "prepare_restore_backup":
+            backup_id = request.POST.get("backup_id")
+            backup_record = get_object_or_404(SistemaDatabaseBackup, pk=backup_id)
+            clear_pending_restore_metadata(request)
+            job = create_restore_job_from_backup_record(
+                backup_record,
+                triggered_by=request.user,
+            )
+            request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
+            request.session.modified = True
+            pending_restore = job
+            confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
+            messages.warning(
+                request,
+                f"Backup {backup_record.nome_file} selezionato. Completa il secondo controllo per avviare il ripristino in background.",
+            )
 
         elif action == "cancel_restore":
             clear_pending_restore_metadata(request)

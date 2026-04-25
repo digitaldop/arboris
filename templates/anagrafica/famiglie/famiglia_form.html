@@ -891,7 +891,7 @@
                 </div>
             </td>
             <td class="inline-address-cell inline-family-address-cell">
-                <div class="inline-related-field">
+                <div class="inline-related-field mode-edit-field">
                     <div class="autocomplete-wrapper indirizzo-autocomplete">
                         {{ familiari_formset.empty_form.indirizzo }}
                     </div>
@@ -963,7 +963,7 @@
             <td>{{ studenti_formset.empty_form.nome }}</td>
             <td>{{ studenti_formset.empty_form.cognome }}</td>
             <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
-                <div class="inline-related-field">
+                <div class="inline-related-field mode-edit-field">
                     <div class="autocomplete-wrapper indirizzo-autocomplete">
                         {{ studenti_formset.empty_form.indirizzo }}
                     </div>
@@ -1174,7 +1174,7 @@
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
     <!-- <script src="{% static 'js/pages/famiglia-form.js' %}"></script> -->
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=16"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=17"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

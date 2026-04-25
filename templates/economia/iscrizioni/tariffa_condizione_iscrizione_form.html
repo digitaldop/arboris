@@ -40,8 +40,26 @@
                 <tr><th>{{ form.condizione_iscrizione.label_tag }}</th><td>{{ form.condizione_iscrizione }} {{ form.condizione_iscrizione.errors }}</td></tr>
                 <tr><th>{{ form.ordine_figlio_da.label_tag }}</th><td>{{ form.ordine_figlio_da }} {{ form.ordine_figlio_da.errors }}</td></tr>
                 <tr><th>{{ form.ordine_figlio_a.label_tag }}</th><td>{{ form.ordine_figlio_a }} {{ form.ordine_figlio_a.errors }}{% if form.ordine_figlio_a.help_text %}<div class="field-help">{{ form.ordine_figlio_a.help_text }}</div>{% endif %}</td></tr>
-                <tr><th>{{ form.retta_annuale.label_tag }}</th><td>{{ form.retta_annuale }} {{ form.retta_annuale.errors }}</td></tr>
-                <tr><th>{{ form.preiscrizione.label_tag }}</th><td>{{ form.preiscrizione }} {{ form.preiscrizione.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.retta_annuale.label_tag }}</th>
+                    <td>
+                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                            {{ form.retta_annuale }}
+                            <span class="currency-suffix">EUR</span>
+                        </div>
+                        {{ form.retta_annuale.errors }}
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.preiscrizione.label_tag }}</th>
+                    <td>
+                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                            {{ form.preiscrizione }}
+                            <span class="currency-suffix">EUR</span>
+                        </div>
+                        {{ form.preiscrizione.errors }}
+                    </td>
+                </tr>
                 <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
                 <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
             </table>

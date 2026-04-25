@@ -17,6 +17,7 @@ from anagrafica.forms import (
     StudenteInlineForm,
     StudenteStandaloneForm,
 )
+from anagrafica.views import famiglia_studenti_inline_queryset
 from anagrafica.models import (
     CAP,
     Citta,
@@ -406,6 +407,41 @@ class FamigliaInlineDefaultsTests(TestCase):
         form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
 
         self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
+
+    def test_studenti_inline_queryset_orders_students_from_oldest_to_youngest(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            attiva=True,
+        )
+        studente_piu_giovane = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Aurelia",
+            cognome="Verdi",
+            data_nascita="2022-08-28",
+            attivo=True,
+        )
+        studente_piu_vecchio = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Agnese",
+            cognome="Verdi",
+            data_nascita="2020-09-14",
+            attivo=True,
+        )
+        studente_senza_data = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Teresa",
+            cognome="Verdi",
+            attivo=True,
+        )
+
+        studenti = list(famiglia_studenti_inline_queryset(famiglia))
+
+        self.assertEqual(
+            [studente.pk for studente in studenti],
+            [studente_piu_vecchio.pk, studente_piu_giovane.pk, studente_senza_data.pk],
+        )
 
 
 class DocumentoStorageTests(TestCase):

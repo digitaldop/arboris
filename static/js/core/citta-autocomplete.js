@@ -30,9 +30,19 @@
         container.dataset.autocompleteReady = "1";
         let selectedLabel = (input.value || "").trim();
 
+        function updateDropdownPosition() {
+            const inputRect = input.getBoundingClientRect();
+            const desiredHeight = Math.min(resultsBox.scrollHeight || 240, 240);
+            const availableBelow = Math.max(0, window.innerHeight - inputRect.bottom - 12);
+            const availableAbove = Math.max(0, inputRect.top - 12);
+            const openUpward = availableBelow < Math.min(160, desiredHeight) && availableAbove > availableBelow;
+            container.classList.toggle("is-open-upward", openUpward);
+        }
+
         function hideResults() {
             resultsBox.style.display = "none";
             resultsBox.innerHTML = "";
+            container.classList.remove("is-open-upward");
         }
 
         function selectItem(item) {
@@ -64,6 +74,7 @@
                 resultsBox.appendChild(row);
             });
 
+            updateDropdownPosition();
             resultsBox.style.display = "block";
         }
 
@@ -92,6 +103,7 @@
 
         input.addEventListener("focus", function () {
             if (input.value.trim().length >= 2 && resultsBox.children.length) {
+                updateDropdownPosition();
                 resultsBox.style.display = "block";
             }
         });

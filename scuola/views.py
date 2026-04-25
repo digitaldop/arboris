@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from .forms import AnnoScolasticoForm, ClasseForm
 from .models import AnnoScolastico, Classe
@@ -37,8 +38,18 @@ def popup_delete_response(request, field_name, object_id):
 
 
 def lista_anni_scolastici(request):
-    anni = AnnoScolastico.objects.all()
-    return render(request, "scuola/anni_scolastici/anno_scolastico_list.html", {"anni": anni})
+    today = timezone.localdate()
+    anni_qs = AnnoScolastico.objects.all()
+    anni_correnti_e_futuri = anni_qs.filter(data_fine__gte=today).order_by("data_inizio", "id")
+    anni_passati = anni_qs.filter(data_fine__lt=today).order_by("-data_inizio", "-id")
+    return render(
+        request,
+        "scuola/anni_scolastici/anno_scolastico_list.html",
+        {
+            "anni_correnti_e_futuri": anni_correnti_e_futuri,
+            "anni_passati": anni_passati,
+        },
+    )
 
 
 def crea_anno_scolastico(request):

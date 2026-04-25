@@ -829,6 +829,122 @@ window.ArborisFamigliaForm = (function () {
             });
         }
 
+        function parseInlineDateValue(value) {
+            if (!value) {
+                return null;
+            }
+
+            const parsed = new Date(`${value}T00:00:00`);
+            if (Number.isNaN(parsed.getTime())) {
+                return null;
+            }
+
+            return parsed;
+        }
+
+        function getStudentRowBundle(row) {
+            const bundle = [row];
+            let nextRow = row.nextElementSibling;
+
+            if (nextRow && nextRow.classList.contains("inline-subform-row")) {
+                bundle.push(nextRow);
+                nextRow = nextRow.nextElementSibling;
+            }
+
+            if (nextRow && nextRow.classList.contains("inline-errors-row")) {
+                bundle.push(nextRow);
+            }
+
+            return bundle;
+        }
+
+        function compareStudentRowsByAge(leftRow, rightRow) {
+            const leftDateValue = getFamiliareSubformRow(leftRow)?.querySelector('input[name$="-data_nascita"]')?.value || "";
+            const rightDateValue = getFamiliareSubformRow(rightRow)?.querySelector('input[name$="-data_nascita"]')?.value || "";
+            const leftDate = parseInlineDateValue(leftDateValue);
+            const rightDate = parseInlineDateValue(rightDateValue);
+
+            if (leftDate && rightDate) {
+                const dateDiff = leftDate.getTime() - rightDate.getTime();
+                if (dateDiff !== 0) {
+                    return dateDiff;
+                }
+            } else if (leftDate) {
+                return -1;
+            } else if (rightDate) {
+                return 1;
+            }
+
+            const leftCognome = (leftRow.querySelector('input[name$="-cognome"]')?.value || "").trim().toLowerCase();
+            const rightCognome = (rightRow.querySelector('input[name$="-cognome"]')?.value || "").trim().toLowerCase();
+            if (leftCognome !== rightCognome) {
+                return leftCognome.localeCompare(rightCognome, "it");
+            }
+
+            const leftNome = (leftRow.querySelector('input[name$="-nome"]')?.value || "").trim().toLowerCase();
+            const rightNome = (rightRow.querySelector('input[name$="-nome"]')?.value || "").trim().toLowerCase();
+            return leftNome.localeCompare(rightNome, "it");
+        }
+
+        function sortStudentiInlineRows() {
+            const tbody = document.querySelector("#studenti-table tbody");
+            if (!tbody) {
+                return;
+            }
+
+            const bundles = [];
+            let currentRow = tbody.firstElementChild;
+
+            while (currentRow) {
+                if (!currentRow.classList.contains("inline-form-row")) {
+                    currentRow = currentRow.nextElementSibling;
+                    continue;
+                }
+
+                const bundle = getStudentRowBundle(currentRow);
+                bundles.push(bundle);
+                currentRow = bundle[bundle.length - 1].nextElementSibling;
+            }
+
+            const visibleBundles = [];
+            const hiddenBundles = [];
+
+            bundles.forEach(bundle => {
+                const mainRow = bundle[0];
+                if (mainRow.classList.contains("inline-empty-row") && mainRow.classList.contains("is-hidden")) {
+                    hiddenBundles.push(bundle);
+                    return;
+                }
+                visibleBundles.push(bundle);
+            });
+
+            visibleBundles.sort((leftBundle, rightBundle) => compareStudentRowsByAge(leftBundle[0], rightBundle[0]));
+
+            [...visibleBundles, ...hiddenBundles].forEach(bundle => {
+                bundle.forEach(node => tbody.appendChild(node));
+            });
+        }
+
+        function bindStudenteInlineBirthDateOrdering(row) {
+            const dataNascitaInput = getFamiliareSubformRow(row)?.querySelector('input[name$="-data_nascita"]');
+            if (!dataNascitaInput || dataNascitaInput.dataset.orderingBound === "1") {
+                return;
+            }
+
+            dataNascitaInput.dataset.orderingBound = "1";
+            dataNascitaInput.addEventListener("change", sortStudentiInlineRows);
+            dataNascitaInput.addEventListener("input", sortStudentiInlineRows);
+        }
+
+        function bindAllStudenteInlineBirthDateOrdering() {
+            document.querySelectorAll("#studenti-table tbody .inline-form-row").forEach(row => {
+                if (row.classList.contains("inline-empty-row") && row.classList.contains("is-hidden")) {
+                    return;
+                }
+                bindStudenteInlineBirthDateOrdering(row);
+            });
+        }
+
         function isRowPersisted(row) {
             const hiddenIdInput = row.querySelector('input[type="hidden"][name$="-id"]');
             return Boolean(hiddenIdInput && hiddenIdInput.value);
@@ -905,6 +1021,7 @@ window.ArborisFamigliaForm = (function () {
                     bindFamiliareInlineSex(hiddenRow);
                 } else if (prefix === "studenti") {
                     bindStudenteInlineSex(hiddenRow);
+                    bindStudenteInlineBirthDateOrdering(hiddenRow);
                 }
 
                 const firstInput = hiddenRow.querySelector("input[type='text'], input[type='email'], input[type='date'], select, textarea");
@@ -919,6 +1036,7 @@ window.ArborisFamigliaForm = (function () {
                     syncFamiliareInlineAddresses();
                 } else if (prefix === "studenti") {
                     syncStudenteInlineDefaults();
+                    sortStudentiInlineRows();
                 }
                 refreshAllInlineAddressHelp();
                 return;
@@ -960,6 +1078,7 @@ window.ArborisFamigliaForm = (function () {
                     bindFamiliareInlineSex(newRow);
                 } else if (prefix === "studenti") {
                     bindStudenteInlineSex(newRow);
+                    bindStudenteInlineBirthDateOrdering(newRow);
                 }
 
                 const firstInput = newRow.querySelector("input[type='text'], input[type='email'], input[type='date'], select, textarea");
@@ -975,6 +1094,7 @@ window.ArborisFamigliaForm = (function () {
                 syncFamiliareInlineAddresses();
             } else if (prefix === "studenti") {
                 syncStudenteInlineDefaults();
+                sortStudentiInlineRows();
             }
             refreshAllInlineAddressHelp();
         }
@@ -1118,7 +1238,9 @@ window.ArborisFamigliaForm = (function () {
         syncFamiliareInlineAddresses();
         bindAllFamiliareInlineSex();
         bindAllStudenteInlineSex();
+        bindAllStudenteInlineBirthDateOrdering();
         syncStudenteInlineDefaults();
+        sortStudentiInlineRows();
         initCodiceFiscale(document.getElementById("famiglia-inline-lock-container"));
         refreshAllInlineAddressHelp();
         refreshTabCounts();

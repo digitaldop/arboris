@@ -4,12 +4,17 @@ Esecuzione del ripristino database da SistemaDatabaseRestoreJob (task Celery o t
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from django.db import connections
 from django.utils import timezone
 
-from .database_backups import DatabaseBackupError, restore_database_from_backup_file
+from .database_backups import (
+    DatabaseBackupError,
+    delete_restore_file_reference,
+    is_restore_upload_reference,
+    restore_database_from_backup_file,
+    restore_file_reference_exists,
+)
 from .models import SistemaDatabaseRestoreJob, StatoRipristinoDatabase
 
 logger = logging.getLogger(__name__)
@@ -36,10 +41,9 @@ def run_restore_job(job_id: int, *, celery_task_id: str = "") -> None:
         logger.warning("restore job %s stato inatteso: %s", job_id, job.stato)
         return
 
-    path = Path(job.percorso_file)
-    if not path.exists():
+    if not restore_file_reference_exists(job.percorso_file):
         job.stato = StatoRipristinoDatabase.ERRORE
-        job.messaggio_errore = "File di backup non trovato sul server (scaduto o rimosso)."
+        job.messaggio_errore = "File di backup non trovato nello storage (scaduto o rimosso)."
         job.data_completamento = timezone.now()
         job.save(update_fields=["stato", "messaggio_errore", "data_completamento"])
         return
@@ -48,11 +52,11 @@ def run_restore_job(job_id: int, *, celery_task_id: str = "") -> None:
     job.data_avvio_ripristino = timezone.now()
     if celery_task_id:
         job.celery_task_id = celery_task_id[:120]
-    job.save(update_fields=["stato", "data_avvio_ripristino", "celery_task_id"])
+        job.save(update_fields=["stato", "data_avvio_ripristino", "celery_task_id"])
 
     try:
         safety = restore_database_from_backup_file(
-            str(path),
+            job.percorso_file,
             original_name=job.nome_file_originale,
             triggered_by=job.creato_da,
         )
@@ -68,9 +72,7 @@ def run_restore_job(job_id: int, *, celery_task_id: str = "") -> None:
         job.messaggio_errore = ""
         job.data_completamento = timezone.now()
         job.save()
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        if is_restore_upload_reference(job.percorso_file):
+            delete_restore_file_reference(job.percorso_file)
     finally:
         connections.close_all()

@@ -34,9 +34,9 @@
                 <tr>
                     <th>{{ form.valore_orario.label_tag }}</th>
                     <td>
-                        <div class="currency-input-group">
-                            <span class="currency-prefix">EUR</span>
+                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
                             {{ form.valore_orario }}
+                            <span class="currency-suffix">EUR</span>
                         </div>
                         <div class="help-text">{{ form.valore_orario.help_text }}</div>
                         {{ form.valore_orario.errors }}

@@ -200,6 +200,8 @@ LOGOUT_REDIRECT_URL = "login"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+DATABASE_BACKUPS_UPLOAD_PREFIX = os.environ.get("DATABASE_BACKUPS_UPLOAD_PREFIX", "db_backups").strip().strip("/") or "db_backups"
+DATABASE_RESTORE_UPLOAD_PREFIX = os.environ.get("DATABASE_RESTORE_UPLOAD_PREFIX", "db_restore_uploads").strip().strip("/") or "db_restore_uploads"
 
 if USE_S3_MEDIA:
     aws_storage_bucket_name = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()

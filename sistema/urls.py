@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import views
-from .permissions import module_edit_permission_required, module_permission_required
+from .permissions import database_backup_access_required, module_edit_permission_required, module_permission_required
 
 
 sistema_view = module_permission_required("sistema")
@@ -27,12 +27,12 @@ urlpatterns = [
     ),
     path(
         "sistema/backup-database/",
-        sistema_manage(views.backup_database_sistema),
+        database_backup_access_required(views.backup_database_sistema),
         name="backup_database_sistema",
     ),
     path(
         "sistema/backup-database/<int:pk>/scarica/",
-        sistema_manage(views.scarica_backup_database),
+        database_backup_access_required(views.scarica_backup_database),
         name="scarica_backup_database",
     ),
     path(

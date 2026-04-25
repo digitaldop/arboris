@@ -15,7 +15,7 @@
     <div class="page-head">
         <h1 class="page-title">Backup Database</h1>
         <div class="page-head-actions">
-            {% if can_manage_sistema %}
+            {% if can_access_database_backups %}
                 <form method="post" style="display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="create_manual_backup">
@@ -34,7 +34,7 @@
                         <form method="post" id="backup-settings-form">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="save_backup_settings">
-                            <fieldset {% if not can_manage_sistema %}disabled{% endif %}>
+                            <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
                                 <table class="form-table">
                                     <tr>
                                         <th>{{ configurazione_form.frequenza_backup_automatico.label_tag }}</th>
@@ -49,7 +49,7 @@
                                 </table>
                             </fieldset>
 
-                            {% if can_manage_sistema %}
+                            {% if can_access_database_backups %}
                                 <div class="form-actions">
                                     <button type="submit" class="btn btn-primary">Salva configurazione</button>
                                 </div>
@@ -75,7 +75,7 @@
                                     File selezionato: <strong>{{ pending_restore.nome_file_originale }}</strong> - {{ pending_restore.size_label }}
                                 </div>
                                 <div class="help-text">
-                                    Confermando, il file resta su disco e il ripristino viene accodato (la richiesta web non resta in attesa del pg_restore).
+                                    Confermando, il file viene letto dallo storage configurato e il ripristino viene accodato in background senza bloccare la pagina.
                                 </div>
 
                                 <form method="post" class="backup-restore-confirm-form">
@@ -101,7 +101,7 @@
                                         </tr>
                                     </table>
                                     <div class="form-actions">
-                                        {% if can_manage_sistema %}
+                                        {% if can_access_database_backups %}
                                             <button type="submit" class="btn btn-danger">Ripristina database</button>
                                         {% endif %}
                                     </div>
@@ -117,7 +117,7 @@
                             <form method="post" enctype="multipart/form-data">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="upload_restore_file">
-                                <fieldset {% if not can_manage_sistema %}disabled{% endif %}>
+                                <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
                                     <table class="form-table">
                                         <tr>
                                             <th>{{ upload_form.file_backup.label_tag }}</th>
@@ -132,9 +132,9 @@
                                     </table>
                                 </fieldset>
 
-                                {% if can_manage_sistema %}
+                                {% if can_access_database_backups %}
                                     <div class="form-actions">
-                                        <button type="submit" class="btn btn-danger">Continua al controllo ripristino</button>
+                                        <button type="submit" class="btn btn-danger">Carica backup e continua</button>
                                     </div>
                                 {% endif %}
                             </form>
@@ -224,6 +224,15 @@
                                             </td>
                                             <td class="actions-cell">
                                                 <a href="{% url 'scarica_backup_database' backup.pk %}" class="table-link">Scarica</a>
+                                                {% if can_access_database_backups %}
+                                                    <span class="table-muted">|</span>
+                                                    <form method="post" style="display: inline;">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="action" value="prepare_restore_backup">
+                                                        <input type="hidden" name="backup_id" value="{{ backup.pk }}">
+                                                        <button type="submit" class="table-link table-link-danger button-link-reset">Ripristina</button>
+                                                    </form>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                     {% endfor %}

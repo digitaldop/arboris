@@ -14,7 +14,9 @@
             --font-headings: {{ site_fonts.heading_css_stack|safe }};
         }
     </style>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=43">
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
+    <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=45">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
 </head>
 <body class="popup-page">
@@ -34,9 +36,11 @@
     {{ student_terminology|json_script:"student-terminology-data" }}
     <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
     <script src="{% static 'js/core/related-popups.js' %}"></script>
-    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=3"></script>
-    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=8"></script>
+    <script src="{% static 'js/core/citta-autocomplete.js' %}?v=4"></script>
+    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
     <script src="{% static 'js/core/codice-fiscale.js' %}?v=4"></script>
+    <script src="{% static 'js/core/browser-autofill.js' %}?v=1"></script>
+    <script src="{% static 'js/core/currency-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
@@ -54,6 +58,12 @@
             }
             if (window.ArborisRichNotes) {
                 ArborisRichNotes.init(document);
+            }
+            if (window.ArborisBrowserAutofill) {
+                ArborisBrowserAutofill.init(document);
+            }
+            if (window.ArborisCurrencyFields) {
+                ArborisCurrencyFields.init(document);
             }
             if (window.ArborisRelatedPopups) {
                 window.dismissRelatedPopup = ArborisRelatedPopups.dismissRelatedPopup;

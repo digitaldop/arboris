@@ -38,7 +38,16 @@
         <div class="content-card">
             <table class="form-table">
                 <tr><th>{{ form.nome_agevolazione.label_tag }}</th><td>{{ form.nome_agevolazione }} {{ form.nome_agevolazione.errors }}</td></tr>
-                <tr><th>{{ form.importo_annuale_agevolazione.label_tag }}</th><td>{{ form.importo_annuale_agevolazione }} {{ form.importo_annuale_agevolazione.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.importo_annuale_agevolazione.label_tag }}</th>
+                    <td>
+                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                            {{ form.importo_annuale_agevolazione }}
+                            <span class="currency-suffix">EUR</span>
+                        </div>
+                        {{ form.importo_annuale_agevolazione.errors }}
+                    </td>
+                </tr>
                 <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
             </table>
             <div class="form-actions{% if not popup %} mode-edit-only{% endif %}">

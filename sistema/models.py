@@ -1,10 +1,14 @@
+from pathlib import Path
+from urllib.parse import quote, quote_plus
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Max
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
-from urllib.parse import quote, quote_plus
+from django.utils.text import get_valid_filename
 
 from anagrafica.models import Indirizzo
 from .terminology import get_student_terminology
@@ -13,6 +17,12 @@ from .terminology import get_student_terminology
 def next_order_value(model_cls):
     max_value = model_cls.objects.aggregate(max_ordine=Max("ordine"))["max_ordine"]
     return (max_value or 0) + 1
+
+
+def sistema_database_backup_upload_to(_instance, filename):
+    prefix = (getattr(settings, "DATABASE_BACKUPS_UPLOAD_PREFIX", "db_backups") or "db_backups").strip().strip("/")
+    safe_name = get_valid_filename(Path(filename or "backup.sql.gz").name) or "backup.sql.gz"
+    return f"{prefix}/{timezone.localtime():%Y/%m}/{safe_name}"
 
 
 class Scuola(models.Model):
@@ -409,7 +419,7 @@ class SistemaDatabaseBackup(models.Model):
         choices=TipoBackupDatabase.choices,
         default=TipoBackupDatabase.MANUALE,
     )
-    file_backup = models.FileField(upload_to="database_backups/%Y/%m")
+    file_backup = models.FileField(upload_to=sistema_database_backup_upload_to)
     nome_file = models.CharField(max_length=255)
     dimensione_file_bytes = models.BigIntegerField(default=0)
     creato_da = models.ForeignKey(

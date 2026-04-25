@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
+from arboris.form_widgets import apply_eur_currency_widget
 from scuola.utils import resolve_default_anno_scolastico
 
 from servizi_extra.models import (
@@ -83,14 +84,7 @@ class TariffaServizioExtraRataForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["descrizione"].required = False
         self.fields["descrizione"].help_text = "Lascia vuoto per usare automaticamente 'Rata N'."
-        self.fields["importo"].widget.attrs.update(
-            {
-                "autocomplete": "off",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-                "placeholder": "0,00",
-            }
-        )
+        apply_eur_currency_widget(self.fields["importo"])
 
 
 class BaseTariffaServizioExtraRataFormSet(forms.BaseInlineFormSet):
@@ -214,15 +208,7 @@ class RataServizioExtraPagamentoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["importo_pagato"].widget = forms.TextInput()
-        self.fields["importo_pagato"].widget.attrs.update(
-            {
-                "autocomplete": "off",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-                "placeholder": "0,00",
-            }
-        )
+        apply_eur_currency_widget(self.fields["importo_pagato"])
         self.fields["metodo_pagamento"].required = False
         self.fields["metodo_pagamento"].widget.attrs.update({"placeholder": "Contanti, bonifico, POS..."})
 

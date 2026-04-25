@@ -45,7 +45,7 @@ from scuola.utils import resolve_default_anno_scolastico
 from django.forms import modelform_factory
 
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 from django.utils.http import url_has_allowed_host_and_scheme
 
 MONTH_LABELS = {
@@ -223,6 +223,13 @@ def famiglia_studenti_inline_queryset(famiglia=None):
 
     return (
         Studente.objects.filter(famiglia=famiglia)
+        .annotate(
+            data_nascita_vuota=Case(
+                When(data_nascita__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
         .select_related(
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
@@ -230,7 +237,7 @@ def famiglia_studenti_inline_queryset(famiglia=None):
             "famiglia__indirizzo_principale__citta__provincia",
             "famiglia__indirizzo_principale__provincia",
         )
-        .order_by("cognome", "nome")
+        .order_by("data_nascita_vuota", "data_nascita", "cognome", "nome", "id")
     )
 
 

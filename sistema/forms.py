@@ -191,7 +191,7 @@ class SistemaBackupDatabaseUploadForm(forms.Form):
         label="File di backup",
         help_text=(
             "File .sql o .sql.gz (pg_dump) generato da Arboris o da PostgreSQL. "
-            "Il file viene solo salvato sul server; il ripristino parte dopo la conferma e viene eseguito in background."
+            "Il file viene caricato nello storage configurato; il ripristino parte dopo la conferma e viene eseguito in background."
         ),
     )
 
