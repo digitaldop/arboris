@@ -8,6 +8,8 @@ from django.urls import reverse
 
 from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
 from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaUtentePermessi
+from anagrafica.models import Citta, Provincia, Regione
+from anagrafica.models import Indirizzo
 
 
 class AuthenticationInterfaceTests(TestCase):
@@ -154,7 +156,7 @@ class SidebarSistemaTests(TestCase):
 
         labels_in_order = [
             "<span>Impostazioni Scuola</span>",
-            "Dati Scuola",
+            "Dati Generali Scuola",
             "Anni scolastici",
             "Classi",
         ]
@@ -164,6 +166,51 @@ class SidebarSistemaTests(TestCase):
             current_index = sistema_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+
+
+class ScuolaSistemaInterfaceTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="scuola-gestione@example.com",
+            email="scuola-gestione@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+
+        self.regione = Regione.objects.create(nome="Emilia-Romagna")
+        self.provincia = Provincia.objects.create(nome="Bologna", sigla="BO", regione=self.regione)
+        self.citta = Citta.objects.create(nome="Bologna", provincia=self.provincia, attiva=True)
+        self.indirizzo = Indirizzo.objects.create(
+            via="Via Test",
+            numero_civico="1",
+            citta=self.citta,
+        )
+
+    def test_scuola_page_uses_updated_title_and_inline_scopes(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("scuola_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dati Generali Scuola")
+        self.assertContains(response, 'data-inline-scope="telefoni"', html=False)
+        self.assertContains(response, 'data-inline-scope="email"', html=False)
+        self.assertContains(response, 'data-inline-scope="socials"', html=False)
+        self.assertContains(response, reverse("scuola_crea_indirizzo"))
+
+    def test_school_address_popup_routes_are_available_with_system_permissions(self):
+        self.client.force_login(self.user)
+
+        create_response = self.client.get(reverse("scuola_crea_indirizzo"), {"popup": "1"})
+        edit_response = self.client.get(reverse("scuola_modifica_indirizzo", args=[self.indirizzo.pk]), {"popup": "1"})
+        delete_response = self.client.get(reverse("scuola_elimina_indirizzo", args=[self.indirizzo.pk]), {"popup": "1"})
+
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertEqual(delete_response.status_code, 200)
 
 
 class BackupDatabaseAccessTests(TestCase):

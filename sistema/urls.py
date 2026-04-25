@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from anagrafica import views as anagrafica_views
 from .permissions import database_backup_access_required, module_edit_permission_required, module_permission_required
 
 
@@ -15,6 +16,17 @@ urlpatterns = [
     path("privacy/", views.informativa_privacy, name="informativa_privacy"),
     path("termini-e-condizioni/", views.termini_e_condizioni, name="termini_condizioni"),
     path("sistema/scuola/", sistema_edit(views.scuola_sistema), name="scuola_sistema"),
+    path("sistema/scuola/indirizzi/nuovo/", sistema_edit(anagrafica_views.crea_indirizzo), name="scuola_crea_indirizzo"),
+    path(
+        "sistema/scuola/indirizzi/<int:pk>/modifica/",
+        sistema_edit(anagrafica_views.modifica_indirizzo),
+        name="scuola_modifica_indirizzo",
+    ),
+    path(
+        "sistema/scuola/indirizzi/<int:pk>/elimina/",
+        sistema_edit(anagrafica_views.elimina_indirizzo),
+        name="scuola_elimina_indirizzo",
+    ),
     path(
         "sistema/impostazioni-generali/",
         sistema_edit(views.impostazioni_generali_sistema),

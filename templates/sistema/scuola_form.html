@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Scuola - Arboris{% endblock %}
+{% block title %}Dati Generali Scuola - Arboris{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <span>Scuola</span>
+        <span>Dati Generali Scuola</span>
     </div>
 {% endblock %}
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Scuola</h1>
+        <h1 class="page-title">Dati Generali Scuola</h1>
         <div class="page-head-actions">
             {% if scuola and can_manage_sistema %}
                 <button type="button" class="btn btn-primary" id="enable-edit-scuola-btn">Modifica</button>
@@ -30,7 +30,7 @@
             <div class="family-top-layout main-fields-section">
                 <div class="family-main-column">
                     <div class="admin-section">
-                        <div class="admin-section-title">Dati scuola</div>
+                        <div class="admin-section-title">Dati generali scuola</div>
                         <div class="panel">
                             <div class="panel-body">
                                 <table class="form-table">
@@ -166,7 +166,7 @@
                     {% endif %}
                 </div>
 
-                <div class="tab-panel is-active" id="tab-telefoni">
+                <div class="tab-panel is-active" id="tab-telefoni" data-inline-scope="telefoni">
                     <div class="admin-section-title">Telefoni</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -211,7 +211,7 @@
                     </div>
                 </div>
 
-                <div class="tab-panel" id="tab-email">
+                <div class="tab-panel" id="tab-email" data-inline-scope="email">
                     <div class="admin-section-title">Email</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -256,7 +256,7 @@
                     </div>
                 </div>
 
-                <div class="tab-panel" id="tab-socials">
+                <div class="tab-panel" id="tab-socials" data-inline-scope="socials">
                     <div class="admin-section-title">Social</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -351,7 +351,7 @@
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/scuola-form.js' %}?v=7"></script>
+    <script src="{% static 'js/pages/scuola-form.js' %}?v=8"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -359,7 +359,9 @@
                 ArborisScuolaForm.init({
                     scuolaId: "{{ scuola.pk|default:'new' }}",
                     urls: {
-                        creaIndirizzo: "{% url 'crea_indirizzo' %}"
+                        creaIndirizzo: "{% url 'scuola_crea_indirizzo' %}",
+                        modificaIndirizzoBase: "/sistema/scuola/indirizzi/",
+                        eliminaIndirizzoBase: "/sistema/scuola/indirizzi/"
                     }
                 });
             }

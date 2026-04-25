@@ -1,4 +1,6 @@
 window.ArborisScuolaForm = (function () {
+    let refreshLockedTabsHandler = function () {};
+
     function init(config) {
         const relatedPopups = window.ArborisRelatedPopups;
         const collapsible = window.ArborisCollapsible;
@@ -156,11 +158,11 @@ window.ArborisScuolaForm = (function () {
             if (!select.value) return;
 
             if (mode === "edit") {
-                relatedPopups.openRelatedPopup(`/indirizzi/${select.value}/modifica/?popup=1&target_input_name=${target}`);
+                relatedPopups.openRelatedPopup(`${config.urls.modificaIndirizzoBase}${select.value}/modifica/?popup=1&target_input_name=${target}`);
             }
 
             if (mode === "delete") {
-                relatedPopups.openRelatedPopup(`/indirizzi/${select.value}/elimina/?popup=1&target_input_name=${target}`);
+                relatedPopups.openRelatedPopup(`${config.urls.eliminaIndirizzoBase}${select.value}/elimina/?popup=1&target_input_name=${target}`);
             }
         }
 
@@ -300,6 +302,7 @@ window.ArborisScuolaForm = (function () {
         const checkboxOperativo = document.getElementById("id_indirizzo_operativo_diverso");
         const legale = document.getElementById("id_indirizzo_sede_legale");
         const operativo = document.getElementById("id_indirizzo_operativo");
+        const inlineLockRoot = document.getElementById("scuola-inline-lock-container");
 
         const addLegale = document.getElementById("add-indirizzo-legale-btn");
         const editLegale = document.getElementById("edit-indirizzo-legale-btn");
@@ -322,8 +325,8 @@ window.ArborisScuolaForm = (function () {
         prepareExistingEmptyRows("socials-table");
         prepareExistingEmptyRows("telefoni-table");
         prepareExistingEmptyRows("email-table");
-        tabs.bindTabButtons(getScuolaTabStorageKey());
-        document.querySelectorAll(".tab-btn[data-tab-target]").forEach(btn => {
+        tabs.bindTabButtons(getScuolaTabStorageKey(), inlineLockRoot || document);
+        (inlineLockRoot || document).querySelectorAll(".tab-btn[data-tab-target]").forEach(btn => {
             btn.addEventListener("arboris:before-tab-activate", function (event) {
                 if (btn.classList.contains("is-tab-locked")) {
                     event.preventDefault();
@@ -346,7 +349,7 @@ window.ArborisScuolaForm = (function () {
             });
         });
         tabs.restoreActiveTab(getScuolaTabStorageKey());
-        const activeTab = document.querySelector(".tab-btn.is-active");
+        const activeTab = inlineLockRoot ? inlineLockRoot.querySelector(".tab-btn.is-active") : document.querySelector(".tab-btn.is-active");
         if (activeTab) {
             setInlineTarget(activeTab.dataset.tabTarget);
             updateInlineEditButtonLabel(activeTab.dataset.tabTarget);
@@ -356,10 +359,13 @@ window.ArborisScuolaForm = (function () {
         updateAddressButtons();
         refreshTabCounts();
         refreshLockedTabs();
+        refreshLockedTabsHandler = refreshLockedTabs;
     }
 
     return {
         init,
-        refreshLockedTabs,
+        refreshLockedTabs: function () {
+            refreshLockedTabsHandler();
+        },
     };
 })();

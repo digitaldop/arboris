@@ -427,7 +427,7 @@
                                         <nav class="sidebar-nav sidebar-subnav">
                                             {% if can_manage_sistema %}
                                                 <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
-                                                    Dati Scuola
+                                                    Dati Generali Scuola
                                                 </a>
                                             {% endif %}
                                             <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' or request.resolver_match.url_name == 'crea_anno_scolastico' or request.resolver_match.url_name == 'modifica_anno_scolastico' or request.resolver_match.url_name == 'elimina_anno_scolastico' %}active{% endif %}">
