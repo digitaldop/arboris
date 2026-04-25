@@ -95,8 +95,12 @@
         input.addEventListener("input", function () {
             const query = input.value.trim();
             if (query !== selectedLabel) {
+                const hadSelection = Boolean(hidden.value);
                 hidden.value = "";
                 hidden.dataset.codiceCatastale = "";
+                if (hadSelection) {
+                    hidden.dispatchEvent(new Event("change", { bubbles: true }));
+                }
             }
             fetchResults();
         });

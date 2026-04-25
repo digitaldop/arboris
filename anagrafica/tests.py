@@ -12,6 +12,7 @@ from anagrafica.forms import (
     DocumentoFamigliaFormSet,
     FamiliareForm,
     FamiliareInlineForm,
+    IndirizzoForm,
     IscrizioneStudenteInlineForm,
     StudenteForm,
     StudenteInlineForm,
@@ -158,12 +159,21 @@ class AjaxCercaCittaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="id_provincia_display"')
         self.assertContains(response, 'id="id_cap_scelto"')
+        self.assertContains(response, "Via / Strada / Piazza")
+        self.assertContains(response, "Città")
 
     def test_lista_famiglie_uses_standalone_panel(self):
         response = self.client.get(reverse("lista_famiglie"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="panel panel-standalone"')
+
+    def test_indirizzo_form_uses_updated_labels_and_placeholder(self):
+        form = IndirizzoForm()
+
+        self.assertEqual(form.fields["via"].label, "Via / Strada / Piazza")
+        self.assertEqual(form.fields["citta_search"].label, "Città")
+        self.assertEqual(form.fields["citta_search"].widget.attrs.get("placeholder"), "Cerca una città...")
 
 
 class LuogoNascitaAutocompletePerformanceTests(TestCase):

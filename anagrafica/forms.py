@@ -458,11 +458,12 @@ class IndirizzoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.fields["via"].label = "Via / Strada / Piazza"
         self.fields["citta"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
         self.fields["citta"].queryset = Citta.objects.none()
         self.fields["citta_search"].widget.attrs.update(
             {
-                "placeholder": "Cerca una cittÃ ...",
+                "placeholder": "Cerca una città...",
                 "data-citta-search": "1",
             }
         )

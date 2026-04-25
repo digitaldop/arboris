@@ -31,7 +31,7 @@
     </div>
 
     <div class="info-box">
-        Se la citta ha un solo CAP, verra selezionato automaticamente. Se ha piu CAP, potrai scegliere quello corretto dall'elenco.
+        Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
     </div>
 
     <div class="panel">
@@ -103,7 +103,7 @@
                             {{ form.cap_scelto }}
                             {{ form.cap_scelto.errors }}
                             <div class="help-text" id="cap-help-text">
-                                Seleziona il CAP solo quando la citta ne ha piu di uno.
+                                Seleziona il CAP solo quando la città ne ha più di uno.
                             </div>
                         </td>
                     </tr>
@@ -132,7 +132,7 @@
                 });
             }
 
-            const cittaSelect = document.getElementById("id_citta");
+            const cittaInput = document.getElementById("id_citta");
             const capSelect = document.getElementById("id_cap_scelto");
             const provinciaDisplay = document.getElementById("id_provincia_display");
             const regioneDisplay = document.getElementById("id_regione_display");
@@ -145,14 +145,14 @@
                 option.textContent = "---------";
                 capSelect.appendChild(option);
                 capSelect.classList.remove("select-single-cap");
-                capHelpText.textContent = "Seleziona il CAP solo quando la citta ne ha piu di uno.";
+                capHelpText.textContent = "Seleziona il CAP solo quando la città ne ha più di uno.";
             }
 
             function loadCaps(caps, preferredCapId) {
                 resetCapSelect();
 
                 if (!caps || !caps.length) {
-                    capHelpText.textContent = "Per questa citta non risultano CAP disponibili.";
+                    capHelpText.textContent = "Per questa città non risultano CAP disponibili.";
                     return;
                 }
 
@@ -169,35 +169,35 @@
                     capSelect.value = String(preferredCapId);
                     capHelpText.textContent = caps.length === 1
                         ? "CAP selezionato automaticamente."
-                        : "Questa citta ha piu CAP: seleziona quello corretto.";
+                        : "Questa città ha più CAP: seleziona quello corretto.";
                 } else if (caps.length === 1) {
                     capSelect.value = String(caps[0].id);
                     capSelect.classList.add("select-single-cap");
                     capHelpText.textContent = "CAP selezionato automaticamente.";
                 } else {
-                    capHelpText.textContent = "Questa citta ha piu CAP: seleziona quello corretto.";
+                    capHelpText.textContent = "Questa città ha più CAP: seleziona quello corretto.";
                 }
             }
 
             function clearCitySelection() {
-                cittaSelect.value = "";
+                cittaInput.value = "";
                 provinciaDisplay.value = "";
                 regioneDisplay.value = "";
                 resetCapSelect();
             }
 
             function syncCityDetails() {
-                const selectedOption = cittaSelect ? cittaSelect.options[cittaSelect.selectedIndex] : null;
-                if (!selectedOption || !selectedOption.value) {
+                const selectedCityId = cittaInput ? String(cittaInput.value || "").trim() : "";
+                if (!selectedCityId) {
                     clearCitySelection();
                     return;
                 }
 
                 const currentCapValue = capSelect.value;
-                fetch(`/ajax/cerca-citta/?id=${encodeURIComponent(selectedOption.value)}`)
+                fetch(`/ajax/cerca-citta/?id=${encodeURIComponent(selectedCityId)}`)
                     .then(response => response.json())
                     .then(data => {
-                        const match = (data.results || []).find(item => String(item.id) === String(selectedOption.value))
+                        const match = (data.results || []).find(item => String(item.id) === selectedCityId)
                             || null;
 
                         if (!match) {
@@ -218,8 +218,8 @@
                     });
             }
 
-            if (cittaSelect) {
-                cittaSelect.addEventListener("change", syncCityDetails);
+            if (cittaInput) {
+                cittaInput.addEventListener("change", syncCityDetails);
                 syncCityDetails();
             }
         });
