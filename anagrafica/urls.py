@@ -38,6 +38,7 @@ urlpatterns = [
     path("tipi-documento/<int:pk>/modifica/", anagrafica_edit(views.modifica_tipo_documento), name="modifica_tipo_documento"),
     path("tipi-documento/<int:pk>/elimina/", anagrafica_manage(views.elimina_tipo_documento), name="elimina_tipo_documento"),
     path("documenti/<int:pk>/apri/", anagrafica_view(views.apri_documento), name="apri_documento"),
+    path("documenti/<int:pk>/elimina/", anagrafica_manage(views.elimina_documento), name="elimina_documento"),
 
     #URLS DEGLI STUDENTI
     path("studenti/", anagrafica_view(views.lista_studenti), name="lista_studenti"),

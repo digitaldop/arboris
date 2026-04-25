@@ -743,7 +743,14 @@
                                         <td>{{ f.note }}</td>
                                         <td class="inline-delete-cell">
                                             {% if f.instance.pk %}
-                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
+                                                <button
+                                                    type="button"
+                                                    class="inline-remove-btn"
+                                                    data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
+                                                    onclick="ArborisRelatedPopups.openRelatedPopup(this.dataset.popupUrl)"
+                                                >
+                                                    Elimina
+                                                </button>
                                             {% else %}
                                                 <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
                                             {% endif %}

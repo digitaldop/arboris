@@ -46,6 +46,7 @@ from django.forms import modelform_factory
 
 from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.utils.http import url_has_allowed_host_and_scheme
 
 MONTH_LABELS = {
     1: "Gennaio",
@@ -95,6 +96,67 @@ def apri_documento(request, pk):
     response = FileResponse(file_handle, content_type=content_type or "application/octet-stream")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+def elimina_documento(request, pk):
+    documento = get_object_or_404(
+        Documento.objects.select_related("tipo_documento", "famiglia", "familiare", "studente"),
+        pk=pk,
+    )
+    popup = is_popup_request(request)
+    return_url = resolve_document_return_url(request, documento)
+
+    if request.method == "POST":
+        documento.delete()
+
+        if popup:
+            return popup_response(request, "Documento eliminato correttamente.")
+
+        messages.success(request, "Documento eliminato correttamente.")
+        return redirect(return_url)
+
+    return render(
+        request,
+        "anagrafica/documenti/documento_confirm_delete.html",
+        {
+            "documento": documento,
+            "documento_label": build_document_display_label(documento),
+            "documento_owner_label": build_document_owner_label(documento),
+            "popup": popup,
+            "return_url": return_url,
+        },
+    )
+
+
+def build_document_owner_redirect_url(documento):
+    if documento.famiglia_id:
+        return build_famiglia_redirect_url(documento.famiglia_id, "documenti")
+    if documento.familiare_id:
+        return reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
+    if documento.studente_id:
+        return reverse("modifica_studente", kwargs={"pk": documento.studente_id})
+    return reverse("lista_famiglie")
+
+
+def resolve_document_return_url(request, documento):
+    candidate = (request.GET.get("return_to") or request.POST.get("return_to") or "").strip()
+    if candidate and url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}):
+        return candidate
+    return build_document_owner_redirect_url(documento)
+
+
+def build_document_owner_label(documento):
+    if documento.famiglia_id:
+        return f"Famiglia {documento.famiglia}"
+    if documento.familiare_id:
+        return f"Familiare {documento.familiare}"
+    if documento.studente_id:
+        return f"Studente {documento.studente}"
+    return ""
+
+
+def build_document_display_label(documento):
+    return documento.descrizione or documento.filename or str(documento.tipo_documento)
 
 
 def resolve_next_school_year(anno_corrente):
@@ -1403,12 +1465,6 @@ def stampa_famiglia(request, pk):
             "print_date": timezone.localdate(),
         },
     )
-
-#Views per la modifica rapida dello stato di relazione con la scuola, da usare nella lista famiglie
-def popup_response(request, message="Operazione completata."):
-    return render(request, "popup/popup_close.html", {"message": message})
-
-
 def crea_stato_relazione_famiglia(request):
     popup = is_popup_request(request)
 

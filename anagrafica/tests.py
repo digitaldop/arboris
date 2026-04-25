@@ -482,3 +482,59 @@ class DocumentoStorageTests(TestCase):
 
         self.assertTrue(formset.is_valid(), formset.errors)
         self.assertEqual(len(formset.deleted_forms), 1)
+
+    def test_popup_delete_document_removes_record_and_storage_file(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                self.client.force_login(self.user)
+                documento = Documento.objects.create(
+                    famiglia=self.famiglia,
+                    tipo_documento=self.tipo_documento,
+                    descrizione="Documento popup",
+                    file=SimpleUploadedFile("documento-popup.pdf", b"contenuto", content_type="application/pdf"),
+                )
+                file_path = Path(tmpdir) / documento.file.name
+                self.assertTrue(file_path.exists())
+
+                response_get = self.client.get(
+                    reverse("elimina_documento", kwargs={"pk": documento.pk}),
+                    {"popup": "1"},
+                )
+                self.assertEqual(response_get.status_code, 200)
+                self.assertContains(response_get, "Conferma eliminazione")
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    response_post = self.client.post(
+                        reverse("elimina_documento", kwargs={"pk": documento.pk}),
+                        {"popup": "1"},
+                    )
+
+                self.assertEqual(response_post.status_code, 200)
+                self.assertContains(response_post, "window.close()")
+                self.assertFalse(Documento.objects.filter(pk=documento.pk).exists())
+                self.assertFalse(file_path.exists())
+
+    def test_popup_delete_document_succeeds_even_if_storage_file_is_missing(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                self.client.force_login(self.user)
+                documento = Documento.objects.create(
+                    famiglia=self.famiglia,
+                    tipo_documento=self.tipo_documento,
+                    descrizione="Documento orfano",
+                    file=SimpleUploadedFile("documento-orfano.pdf", b"contenuto", content_type="application/pdf"),
+                )
+                file_path = Path(tmpdir) / documento.file.name
+                self.assertTrue(file_path.exists())
+                file_path.unlink()
+                self.assertFalse(file_path.exists())
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    response_post = self.client.post(
+                        reverse("elimina_documento", kwargs={"pk": documento.pk}),
+                        {"popup": "1"},
+                    )
+
+                self.assertEqual(response_post.status_code, 200)
+                self.assertContains(response_post, "window.close()")
+                self.assertFalse(Documento.objects.filter(pk=documento.pk).exists())

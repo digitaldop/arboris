@@ -1,0 +1,41 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+
+{% block title %}Elimina documento - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+{% if not popup %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina documento</span>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina documento</h1>
+    </div>
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare il documento <strong>{{ documento_label }}</strong>.</p>
+            {% if documento_owner_label %}
+                <p>Collegato a: <strong>{{ documento_owner_label }}</strong>.</p>
+            {% endif %}
+            <p>Alla conferma verranno rimossi il record dal database e il file dallo storage, se presente.</p>
+        </div>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            {% if popup %}
+                <input type="hidden" name="popup" value="1">
+            {% endif %}
+            <input type="hidden" name="return_to" value="{{ return_url }}">
+            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            {% else %}
+                <a href="{{ return_url }}" class="btn btn-secondary">Annulla</a>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}
