@@ -31,23 +31,34 @@ window.ArborisDipendenteForm = (function () {
             if (deleteContrattoBtn && contrattoSelect) deleteContrattoBtn.disabled = !contrattoSelect.value;
         }
 
-        if (addIndirizzoBtn && indirizzoSelect) {
+        const dipRoutes = window.ArborisRelatedEntityRoutes;
+
+        if (addIndirizzoBtn && indirizzoSelect && dipRoutes) {
             addIndirizzoBtn.addEventListener("click", function () {
-                relatedPopups.openRelatedPopup(`${config.urls.creaIndirizzo}?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                const cfg = dipRoutes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
+                if (cfg && cfg.addUrl) {
+                    relatedPopups.openRelatedPopup(cfg.addUrl);
+                }
             });
         }
 
-        if (editIndirizzoBtn && indirizzoSelect) {
+        if (editIndirizzoBtn && indirizzoSelect && dipRoutes) {
             editIndirizzoBtn.addEventListener("click", function () {
                 if (!indirizzoSelect.value) return;
-                relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                const cfg = dipRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.editUrl) {
+                    relatedPopups.openRelatedPopup(cfg.editUrl);
+                }
             });
         }
 
-        if (deleteIndirizzoBtn && indirizzoSelect) {
+        if (deleteIndirizzoBtn && indirizzoSelect && dipRoutes) {
             deleteIndirizzoBtn.addEventListener("click", function () {
                 if (!indirizzoSelect.value) return;
-                relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                const cfg = dipRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.deleteUrl) {
+                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
+                }
             });
         }
 

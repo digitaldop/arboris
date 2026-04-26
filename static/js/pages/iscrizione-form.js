@@ -8,13 +8,14 @@ window.ArborisIscrizioneForm = (function () {
         window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
         window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
 
-        function bindRelatedField(config) {
-            const select = document.getElementById(config.selectId);
-            const addBtn = document.getElementById(config.addBtnId);
-            const editBtn = document.getElementById(config.editBtnId);
-            const deleteBtn = document.getElementById(config.deleteBtnId);
+        function bindRelatedField(relatedType, selectId, addBtnId, editBtnId, deleteBtnId) {
+            const select = document.getElementById(selectId);
+            const addBtn = document.getElementById(addBtnId);
+            const editBtn = document.getElementById(editBtnId);
+            const deleteBtn = document.getElementById(deleteBtnId);
+            const routes = window.ArborisRelatedEntityRoutes;
 
-            if (!select || !addBtn || !editBtn || !deleteBtn) {
+            if (!select || !addBtn || !editBtn || !deleteBtn || !routes) {
                 return;
             }
 
@@ -25,82 +26,62 @@ window.ArborisIscrizioneForm = (function () {
             }
 
             addBtn.addEventListener("click", function () {
-                relatedPopups.openRelatedPopup(`${config.baseAddUrl}?popup=1&target_input_name=${encodeURIComponent(select.name)}`);
+                const cfg = routes.buildCrudUrls(relatedType, null, select.name);
+                if (cfg && cfg.addUrl) {
+                    relatedPopups.openRelatedPopup(cfg.addUrl);
+                }
             });
 
             editBtn.addEventListener("click", function () {
                 if (!select.value) return;
-                relatedPopups.openRelatedPopup(`${config.baseEditUrl.replace("__id__", select.value)}?popup=1&target_input_name=${encodeURIComponent(select.name)}`);
+                const cfg = routes.buildCrudUrls(relatedType, select.value, select.name);
+                if (cfg && cfg.editUrl) {
+                    relatedPopups.openRelatedPopup(cfg.editUrl);
+                }
             });
 
             deleteBtn.addEventListener("click", function () {
                 if (!select.value) return;
-                relatedPopups.openRelatedPopup(`${config.baseDeleteUrl.replace("__id__", select.value)}?popup=1&target_input_name=${encodeURIComponent(select.name)}`);
+                const cfg = routes.buildCrudUrls(relatedType, select.value, select.name);
+                if (cfg && cfg.deleteUrl) {
+                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
+                }
             });
 
             select.addEventListener("change", refreshButtons);
             refreshButtons();
         }
 
-        bindRelatedField({
-            selectId: "id_studente",
-            addBtnId: "add-studente-btn",
-            editBtnId: "edit-studente-btn",
-            deleteBtnId: "delete-studente-btn",
-            baseAddUrl: "/studenti/nuovo/",
-            baseEditUrl: "/studenti/__id__/modifica/",
-            baseDeleteUrl: "/studenti/__id__/elimina/",
-        });
-
-        bindRelatedField({
-            selectId: "id_anno_scolastico",
-            addBtnId: "add-anno-scolastico-btn",
-            editBtnId: "edit-anno-scolastico-btn",
-            deleteBtnId: "delete-anno-scolastico-btn",
-            baseAddUrl: "/scuola/anni-scolastici/nuovo/",
-            baseEditUrl: "/scuola/anni-scolastici/__id__/modifica/",
-            baseDeleteUrl: "/scuola/anni-scolastici/__id__/elimina/",
-        });
-
-        bindRelatedField({
-            selectId: "id_classe",
-            addBtnId: "add-classe-btn",
-            editBtnId: "edit-classe-btn",
-            deleteBtnId: "delete-classe-btn",
-            baseAddUrl: "/scuola/classi/nuova/",
-            baseEditUrl: "/scuola/classi/__id__/modifica/",
-            baseDeleteUrl: "/scuola/classi/__id__/elimina/",
-        });
-
-        bindRelatedField({
-            selectId: "id_stato_iscrizione",
-            addBtnId: "add-stato-iscrizione-btn",
-            editBtnId: "edit-stato-iscrizione-btn",
-            deleteBtnId: "delete-stato-iscrizione-btn",
-            baseAddUrl: "/economia/stati-iscrizione/nuovo/",
-            baseEditUrl: "/economia/stati-iscrizione/__id__/modifica/",
-            baseDeleteUrl: "/economia/stati-iscrizione/__id__/elimina/",
-        });
-
-        bindRelatedField({
-            selectId: "id_condizione_iscrizione",
-            addBtnId: "add-condizione-iscrizione-btn",
-            editBtnId: "edit-condizione-iscrizione-btn",
-            deleteBtnId: "delete-condizione-iscrizione-btn",
-            baseAddUrl: "/economia/condizioni-iscrizione/nuova/",
-            baseEditUrl: "/economia/condizioni-iscrizione/__id__/modifica/",
-            baseDeleteUrl: "/economia/condizioni-iscrizione/__id__/elimina/",
-        });
-
-        bindRelatedField({
-            selectId: "id_agevolazione",
-            addBtnId: "add-agevolazione-btn",
-            editBtnId: "edit-agevolazione-btn",
-            deleteBtnId: "delete-agevolazione-btn",
-            baseAddUrl: "/economia/agevolazioni/nuova/",
-            baseEditUrl: "/economia/agevolazioni/__id__/modifica/",
-            baseDeleteUrl: "/economia/agevolazioni/__id__/elimina/",
-        });
+        bindRelatedField("studente", "id_studente", "add-studente-btn", "edit-studente-btn", "delete-studente-btn");
+        bindRelatedField(
+            "anno_scolastico",
+            "id_anno_scolastico",
+            "add-anno-scolastico-btn",
+            "edit-anno-scolastico-btn",
+            "delete-anno-scolastico-btn"
+        );
+        bindRelatedField("classe", "id_classe", "add-classe-btn", "edit-classe-btn", "delete-classe-btn");
+        bindRelatedField(
+            "stato_iscrizione",
+            "id_stato_iscrizione",
+            "add-stato-iscrizione-btn",
+            "edit-stato-iscrizione-btn",
+            "delete-stato-iscrizione-btn"
+        );
+        bindRelatedField(
+            "condizione_iscrizione",
+            "id_condizione_iscrizione",
+            "add-condizione-iscrizione-btn",
+            "edit-condizione-iscrizione-btn",
+            "delete-condizione-iscrizione-btn"
+        );
+        bindRelatedField(
+            "agevolazione",
+            "id_agevolazione",
+            "add-agevolazione-btn",
+            "edit-agevolazione-btn",
+            "delete-agevolazione-btn"
+        );
 
         const condizioneSelect = document.getElementById("id_condizione_iscrizione");
         const agevolazioneSelect = document.getElementById("id_agevolazione");

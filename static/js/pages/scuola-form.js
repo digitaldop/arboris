@@ -5,8 +5,9 @@ window.ArborisScuolaForm = (function () {
         const relatedPopups = window.ArborisRelatedPopups;
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
+        const inlineTabs = window.ArborisInlineTabs;
 
-        if (!relatedPopups || !collapsible || !tabs) {
+        if (!relatedPopups || !collapsible || !tabs || !inlineTabs) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
@@ -14,165 +15,39 @@ window.ArborisScuolaForm = (function () {
         window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
         window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
 
+        const targetInputId = "scuola-inline-target";
+        const inlineLockContainerId = "scuola-inline-lock-container";
+        const formId = "scuola-detail-form";
+        const inlineEditButtonId = "enable-inline-edit-scuola-btn";
+
         function getScuolaTabStorageKey() {
-            return `arboris-scuola-form-active-tab-v2-${config.scuolaId || "new"}`;
+            return "arboris-scuola-form-active-tab-v2-" + (config.scuolaId || "new");
         }
 
         function setInlineTarget(prefixOrTabId) {
-            const input = document.getElementById("scuola-inline-target");
-            if (!input || !prefixOrTabId) {
-                return;
-            }
-
-            input.value = prefixOrTabId.replace(/^tab-/, "");
-        }
-
-        function tabTitleForInlineEditLabel(tabButton) {
-            if (!tabButton) {
-                return "";
-            }
-
-            return tabButton.textContent.replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
+            inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
         }
 
         function updateInlineEditButtonLabel(tabId) {
-            const button = document.getElementById("enable-inline-edit-scuola-btn");
-            if (!button) {
-                return;
-            }
-            if (
-                window.scuolaViewMode &&
-                typeof window.scuolaViewMode.isInlineEditing === "function" &&
-                window.scuolaViewMode.isInlineEditing()
-            ) {
-                return;
-            }
-
-            const root = document.getElementById("scuola-inline-lock-container");
-            const tabBtn = root && tabId ? root.querySelector(`.tab-btn[data-tab-target="${tabId}"]`) : null;
-            const tabTitle = tabTitleForInlineEditLabel(tabBtn);
-
-            button.textContent = tabTitle ? `Modifica ${tabTitle}` : "Modifica";
-        }
-
-        function getPanelFields(panel) {
-            if (!panel) {
-                return [];
-            }
-
-            return Array.from(panel.querySelectorAll("input, textarea, select")).filter(field => field.type !== "hidden");
-        }
-
-        function lockPanelFields(fields, keepSubmittedWhenLocked) {
-            fields.forEach(field => {
-                if (field.closest(".inline-empty-row.is-hidden")) {
-                    field.disabled = true;
-                    field.readOnly = true;
-                    return;
-                }
-
-                const tag = field.tagName.toLowerCase();
-                const type = (field.type || "").toLowerCase();
-                const lockByDisable = tag === "select" || type === "checkbox" || type === "radio" || type === "file";
-
-                field.classList.remove("submit-safe-locked");
-                field.removeAttribute("aria-disabled");
-                field.removeAttribute("tabindex");
-
-                if (lockByDisable) {
-                    if (keepSubmittedWhenLocked) {
-                        field.disabled = false;
-                        field.classList.add("submit-safe-locked");
-                        field.setAttribute("aria-disabled", "true");
-                        field.setAttribute("tabindex", "-1");
-                    } else {
-                        field.disabled = true;
-                    }
-                } else {
-                    field.readOnly = true;
-                }
+            inlineTabs.updateDefaultInlineEditButtonLabel({
+                buttonId: inlineEditButtonId,
+                containerId: inlineLockContainerId,
+                tabId: tabId,
+                getViewMode: function () {
+                    return window.scuolaViewMode;
+                },
             });
         }
 
-        function unlockPanelFields(fields) {
-            fields.forEach(field => {
-                if (field.closest(".inline-empty-row.is-hidden")) {
-                    field.disabled = true;
-                    field.readOnly = true;
-                    return;
-                }
-
-                field.classList.remove("submit-safe-locked");
-                field.removeAttribute("aria-disabled");
-                field.removeAttribute("tabindex");
-                field.disabled = false;
-                field.readOnly = false;
-            });
-        }
-
-        function refreshLockedTabs() {
-            const form = document.getElementById("scuola-detail-form");
-            const panels = document.querySelectorAll("#scuola-inline-lock-container .tab-panel[data-inline-scope]");
-            const input = document.getElementById("scuola-inline-target");
-            const target = input ? input.value : "";
-            const isEditing = Boolean(
-                window.scuolaViewMode &&
-                typeof window.scuolaViewMode.isEditing === "function" &&
-                window.scuolaViewMode.isEditing()
-            );
-            const isInlineEditing = Boolean(
-                window.scuolaViewMode &&
-                typeof window.scuolaViewMode.isInlineEditing === "function" &&
-                window.scuolaViewMode.isInlineEditing()
-            );
-            const lockMessage = "Non è possibile cambiare tab finché non si salvano o annullano le modifiche correnti.";
-
-            if (form) {
-                if (isEditing && target) {
-                    form.dataset.inlineEditTarget = target;
-                } else {
-                    delete form.dataset.inlineEditTarget;
-                }
-            }
-
-            panels.forEach(panel => {
-                const isTarget = isInlineEditing && panel.dataset.inlineScope === target;
-                panel.classList.toggle("is-inline-edit-target", isTarget);
-
-                const panelFields = getPanelFields(panel);
-                if (isInlineEditing) {
-                    if (isTarget) {
-                        unlockPanelFields(panelFields);
-                    } else {
-                        lockPanelFields(panelFields, true);
-                    }
-                } else if (isEditing) {
-                    unlockPanelFields(panelFields);
-                } else {
-                    lockPanelFields(panelFields, false);
-                }
-            });
-
-            document.querySelectorAll("#scuola-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-                const btnTarget = (btn.dataset.tabTarget || "").replace(/^tab-/, "");
-                const locked = isInlineEditing && target && btnTarget !== target;
-                btn.classList.toggle("is-tab-locked", locked);
-
-                if (locked) {
-                    btn.setAttribute("data-tab-lock-message", lockMessage);
-                } else {
-                    btn.removeAttribute("data-tab-lock-message");
-                }
-            });
-
-            if (!isInlineEditing) {
-                const root = document.getElementById("scuola-inline-lock-container");
-                const activeTab = root ? root.querySelector(".tab-btn.is-active") : null;
-                if (activeTab && activeTab.dataset.tabTarget) {
-                    updateInlineEditButtonLabel(activeTab.dataset.tabTarget);
-                }
-            }
-        }
+        const refreshLockedTabs = inlineTabs.createScuolaRefreshLockedTabs({
+            formId: formId,
+            inlineLockContainerId: inlineLockContainerId,
+            targetInputId: targetInputId,
+            getViewMode: function () {
+                return window.scuolaViewMode;
+            },
+            inlineEditButtonId: inlineEditButtonId,
+        });
 
         function isOperativoEnabled() {
             const checkbox = document.getElementById("id_indirizzo_operativo_diverso");
@@ -216,27 +91,35 @@ window.ArborisScuolaForm = (function () {
 
         function openAddressPopup(mode, select) {
             if (!select || select.disabled) return;
-            const target = encodeURIComponent(select.name);
+            const routes = window.ArborisRelatedEntityRoutes;
+            if (!routes) {
+                console.error("ArborisRelatedEntityRoutes non disponibile.");
+                return;
+            }
+            const targetInputName = select.name;
 
             if (mode === "add") {
-                relatedPopups.openRelatedPopup(`${config.urls.creaIndirizzo}?popup=1&target_input_name=${target}`);
+                const cfg = routes.buildCrudUrls("indirizzo", null, targetInputName);
+                if (cfg && cfg.addUrl) {
+                    relatedPopups.openRelatedPopup(cfg.addUrl);
+                }
                 return;
             }
 
             if (!select.value) return;
 
-            if (mode === "edit") {
-                relatedPopups.openRelatedPopup(`${config.urls.modificaIndirizzoBase}${select.value}/modifica/?popup=1&target_input_name=${target}`);
+            const cfg = routes.buildCrudUrls("indirizzo", select.value, targetInputName);
+            if (mode === "edit" && cfg && cfg.editUrl) {
+                relatedPopups.openRelatedPopup(cfg.editUrl);
             }
-
-            if (mode === "delete") {
-                relatedPopups.openRelatedPopup(`${config.urls.eliminaIndirizzoBase}${select.value}/elimina/?popup=1&target_input_name=${target}`);
+            if (mode === "delete" && cfg && cfg.deleteUrl) {
+                relatedPopups.openRelatedPopup(cfg.deleteUrl);
             }
         }
 
         function countActiveRows(tableId) {
             let count = 0;
-            document.querySelectorAll(`#${tableId} tbody .inline-form-row`).forEach(row => {
+            document.querySelectorAll("#" + tableId + " tbody .inline-form-row").forEach(function (row) {
                 if (row.classList.contains("inline-empty-row")) {
                     return;
                 }
@@ -265,7 +148,8 @@ window.ArborisScuolaForm = (function () {
         function rowHasUserData(row) {
             const fields = row.querySelectorAll("input, textarea, select");
 
-            for (const field of fields) {
+            for (let i = 0; i < fields.length; i++) {
+                const field = fields[i];
                 const type = (field.type || "").toLowerCase();
                 if (type === "hidden" || type === "checkbox") {
                     continue;
@@ -279,7 +163,7 @@ window.ArborisScuolaForm = (function () {
         }
 
         function prepareExistingEmptyRows(tableId) {
-            document.querySelectorAll(`#${tableId} tbody .inline-form-row`).forEach(row => {
+            document.querySelectorAll("#" + tableId + " tbody .inline-form-row").forEach(function (row) {
                 if (isRowPersisted(row) || rowHasVisibleErrors(row) || rowHasUserData(row)) {
                     return;
                 }
@@ -295,22 +179,24 @@ window.ArborisScuolaForm = (function () {
                 { tab: "tab-email", table: "email-table", label: "Email" },
             ];
 
-            map.forEach(item => {
-                const button = document.querySelector(`[data-tab-target="${item.tab}"]`);
+            map.forEach(function (item) {
+                const button = document.querySelector('[data-tab-target="' + item.tab + '"]');
                 if (button) {
-                    button.textContent = `${item.label} (${countActiveRows(item.table)})`;
+                    button.textContent = item.label + " (" + countActiveRows(item.table) + ")";
                 }
             });
         }
 
         function bindDeleteCheckboxCounters() {
-            document.querySelectorAll(
-                '#socials-table input[type="checkbox"][name$="-DELETE"], #telefoni-table input[type="checkbox"][name$="-DELETE"], #email-table input[type="checkbox"][name$="-DELETE"]'
-            ).forEach(input => {
-                if (input.dataset.countBound === "1") return;
-                input.dataset.countBound = "1";
-                input.addEventListener("change", refreshTabCounts);
-            });
+            document
+                .querySelectorAll(
+                    '#socials-table input[type="checkbox"][name$="-DELETE"], #telefoni-table input[type="checkbox"][name$="-DELETE"], #email-table input[type="checkbox"][name$="-DELETE"]'
+                )
+                .forEach(function (input) {
+                    if (input.dataset.countBound === "1") return;
+                    input.dataset.countBound = "1";
+                    input.addEventListener("change", refreshTabCounts);
+                });
         }
 
         function removeInlineRow(button) {
@@ -327,39 +213,43 @@ window.ArborisScuolaForm = (function () {
             }
 
             setInlineTarget(prefix);
-            updateInlineEditButtonLabel(`tab-${prefix}`);
+            updateInlineEditButtonLabel("tab-" + prefix);
 
-            const hiddenRow = document.querySelector(`#${prefix}-table tbody .inline-form-row.inline-empty-row.is-hidden`);
+            const hiddenRow = document.querySelector("#" + prefix + "-table tbody .inline-form-row.inline-empty-row.is-hidden");
             if (hiddenRow) {
                 hiddenRow.classList.remove("is-hidden");
                 hiddenRow.classList.remove("inline-empty-row");
 
-                const firstInput = hiddenRow.querySelector("input[type='text'], input[type='url'], input[type='number'], input[type='email']");
+                const firstInput = hiddenRow.querySelector(
+                    "input[type='text'], input[type='url'], input[type='number'], input[type='email']"
+                );
                 if (firstInput) firstInput.focus();
 
-                tabs.activateTab(`tab-${prefix}`, getScuolaTabStorageKey());
+                tabs.activateTab("tab-" + prefix, getScuolaTabStorageKey());
                 refreshTabCounts();
                 return;
             }
 
-            const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+            const totalForms = document.getElementById("id_" + prefix + "-TOTAL_FORMS");
             const currentIndex = parseInt(totalForms.value, 10);
 
-            const template = document.getElementById(`${prefix}-empty-form-template`).innerHTML;
+            const template = document.getElementById(prefix + "-empty-form-template").innerHTML;
             const newRowHtml = template.replace(/__prefix__/g, currentIndex);
 
-            const tbody = document.querySelector(`#${prefix}-table tbody`);
+            const tbody = document.querySelector("#" + prefix + "-table tbody");
             tbody.insertAdjacentHTML("beforeend", newRowHtml);
             totalForms.value = currentIndex + 1;
 
             const newRow = tbody.lastElementChild;
             if (newRow) {
-                const firstInput = newRow.querySelector("input[type='text'], input[type='url'], input[type='number'], input[type='email']");
+                const firstInput = newRow.querySelector(
+                    "input[type='text'], input[type='url'], input[type='number'], input[type='email']"
+                );
                 if (firstInput) firstInput.focus();
             }
 
             bindDeleteCheckboxCounters();
-            tabs.activateTab(`tab-${prefix}`, getScuolaTabStorageKey());
+            tabs.activateTab("tab-" + prefix, getScuolaTabStorageKey());
             refreshLockedTabs();
             refreshTabCounts();
         }
@@ -370,7 +260,7 @@ window.ArborisScuolaForm = (function () {
         const checkboxOperativo = document.getElementById("id_indirizzo_operativo_diverso");
         const legale = document.getElementById("id_indirizzo_sede_legale");
         const operativo = document.getElementById("id_indirizzo_operativo");
-        const inlineLockRoot = document.getElementById("scuola-inline-lock-container");
+        const inlineLockRoot = document.getElementById(inlineLockContainerId);
 
         const addLegale = document.getElementById("add-indirizzo-legale-btn");
         const editLegale = document.getElementById("edit-indirizzo-legale-btn");
@@ -394,25 +284,10 @@ window.ArborisScuolaForm = (function () {
         prepareExistingEmptyRows("telefoni-table");
         prepareExistingEmptyRows("email-table");
         tabs.bindTabButtons(getScuolaTabStorageKey(), inlineLockRoot || document);
-        (inlineLockRoot || document).querySelectorAll(".tab-btn[data-tab-target]").forEach(btn => {
-            btn.addEventListener("arboris:before-tab-activate", function (event) {
-                if (btn.classList.contains("is-tab-locked")) {
-                    event.preventDefault();
-                }
-            });
-
+        (inlineLockRoot || document).querySelectorAll(".tab-btn[data-tab-target]").forEach(function (btn) {
             btn.addEventListener("click", function () {
-                const isInlineEditing = Boolean(
-                    window.scuolaViewMode &&
-                    typeof window.scuolaViewMode.isInlineEditing === "function" &&
-                    window.scuolaViewMode.isInlineEditing()
-                );
-
-                if (!isInlineEditing) {
-                    setInlineTarget(btn.dataset.tabTarget);
-                    updateInlineEditButtonLabel(btn.dataset.tabTarget);
-                }
-
+                setInlineTarget(btn.dataset.tabTarget);
+                updateInlineEditButtonLabel(btn.dataset.tabTarget);
                 refreshLockedTabs();
             });
         });
@@ -431,7 +306,7 @@ window.ArborisScuolaForm = (function () {
     }
 
     return {
-        init,
+        init: init,
         refreshLockedTabs: function () {
             refreshLockedTabsHandler();
         },

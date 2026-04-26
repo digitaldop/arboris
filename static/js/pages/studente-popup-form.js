@@ -155,6 +155,7 @@ window.ArborisStudentePopupForm = (function () {
         function bindPopupActions() {
             const famigliaSelect = document.getElementById("id_famiglia");
             const indirizzoSelect = document.getElementById("id_indirizzo");
+            const routes = window.ArborisRelatedEntityRoutes;
 
             const addFamigliaBtn = document.getElementById("popup-add-famiglia-btn");
             const editFamigliaBtn = document.getElementById("popup-edit-famiglia-btn");
@@ -163,43 +164,66 @@ window.ArborisStudentePopupForm = (function () {
             const editIndirizzoBtn = document.getElementById("popup-edit-indirizzo-btn");
             const deleteIndirizzoBtn = document.getElementById("popup-delete-indirizzo-btn");
 
+            if (!routes) {
+                console.error("ArborisRelatedEntityRoutes non disponibile.");
+                return;
+            }
+
             if (addFamigliaBtn && famigliaSelect) {
                 addFamigliaBtn.addEventListener("click", function () {
-                    relatedPopups.openRelatedPopup(`/famiglie/nuovo/?popup=1&target_input_name=${encodeURIComponent(famigliaSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("famiglia", null, famigliaSelect.name);
+                    if (cfg && cfg.addUrl) {
+                        relatedPopups.openRelatedPopup(cfg.addUrl);
+                    }
                 });
             }
 
             if (editFamigliaBtn && famigliaSelect) {
                 editFamigliaBtn.addEventListener("click", function () {
                     if (!famigliaSelect.value) return;
-                    relatedPopups.openRelatedPopup(`/famiglie/${famigliaSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(famigliaSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("famiglia", famigliaSelect.value, famigliaSelect.name);
+                    if (cfg && cfg.editUrl) {
+                        relatedPopups.openRelatedPopup(cfg.editUrl);
+                    }
                 });
             }
 
             if (deleteFamigliaBtn && famigliaSelect) {
                 deleteFamigliaBtn.addEventListener("click", function () {
                     if (!famigliaSelect.value) return;
-                    relatedPopups.openRelatedPopup(`/famiglie/${famigliaSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(famigliaSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("famiglia", famigliaSelect.value, famigliaSelect.name);
+                    if (cfg && cfg.deleteUrl) {
+                        relatedPopups.openRelatedPopup(cfg.deleteUrl);
+                    }
                 });
             }
 
             if (addIndirizzoBtn && indirizzoSelect) {
                 addIndirizzoBtn.addEventListener("click", function () {
-                    relatedPopups.openRelatedPopup(`/indirizzi/nuovo/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
+                    if (cfg && cfg.addUrl) {
+                        relatedPopups.openRelatedPopup(cfg.addUrl);
+                    }
                 });
             }
 
             if (editIndirizzoBtn && indirizzoSelect) {
                 editIndirizzoBtn.addEventListener("click", function () {
                     if (!indirizzoSelect.value) return;
-                    relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                    if (cfg && cfg.editUrl) {
+                        relatedPopups.openRelatedPopup(cfg.editUrl);
+                    }
                 });
             }
 
             if (deleteIndirizzoBtn && indirizzoSelect) {
                 deleteIndirizzoBtn.addEventListener("click", function () {
                     if (!indirizzoSelect.value) return;
-                    relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                    const cfg = routes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                    if (cfg && cfg.deleteUrl) {
+                        relatedPopups.openRelatedPopup(cfg.deleteUrl);
+                    }
                 });
             }
         }

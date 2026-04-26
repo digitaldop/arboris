@@ -258,20 +258,13 @@
 
         <div class="admin-section inline-lock-container" id="studente-inline-lock-container" data-mode-lock-scope="inline">
             <div class="inline-section-head">
-                <div class="tab-nav">
-                    <button type="button" class="tab-btn is-active" data-tab-target="tab-iscrizioni">
-                        Iscrizioni ({{ count_iscrizioni }})
-                    </button>
-                    <button type="button" class="tab-btn" data-tab-target="tab-documenti">
-                        Documenti ({{ count_documenti }})
-                    </button>
-                </div>
+                {% include "common/inline_tab_nav.html" with tabs=studente_inline_tabs only %}
                 {% if studente %}
-                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-studente-btn">{% if inline_target == "documenti" %}Modifica Documenti{% else %}Modifica Iscrizioni{% endif %}</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-studente-btn">{{ studente_inline_edit_label }}</button>
                 {% endif %}
             </div>
 
-            <div class="tab-panel is-active" id="tab-iscrizioni" data-inline-scope="iscrizioni">
+            <div class="tab-panel{% if inline_target == 'iscrizioni' %} is-active{% endif %}" id="tab-iscrizioni" data-inline-scope="iscrizioni">
                 <div class="admin-section-title">Iscrizioni</div>
                 <div class="panel">
                     <div class="panel-body">
@@ -495,7 +488,7 @@
                 </div>
             </div>
 
-            <div class="tab-panel" id="tab-documenti" data-inline-scope="documenti">
+            <div class="tab-panel{% if inline_target == 'documenti' %} is-active{% endif %}" id="tab-documenti" data-inline-scope="documenti">
                 <div class="admin-section-title">Documenti</div>
                 <div class="panel">
                     <div class="panel-body">
@@ -926,10 +919,11 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=15"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=18"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

@@ -1,0 +1,65 @@
+{# Template nuova riga studenti (clone JS). Richiede: studenti_formset, famiglia #}
+<template id="studenti-empty-form-template">
+    <tr class="inline-form-row">
+        {{ studenti_formset.empty_form.id }}
+        <td>{{ studenti_formset.empty_form.nome }}</td>
+        <td>{{ studenti_formset.empty_form.cognome }}</td>
+        <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
+            <div class="inline-related-field mode-edit-field">
+                <div class="autocomplete-wrapper indirizzo-autocomplete">
+                    {{ studenti_formset.empty_form.indirizzo }}
+                </div>
+                <div class="related-actions inline-related-actions">
+                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                </div>
+            </div>
+
+            <div class="inline-address-help" data-role="address-help">
+                {% if famiglia and famiglia.indirizzo_principale %}
+                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                {% else %}
+                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                {% endif %}
+            </div>
+        </td>
+        <td class="inline-view-only-table-cell"></td>
+        <td class="inline-view-only-table-cell"></td>
+        <td class="inline-view-only-table-cell"></td>
+        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ studenti_formset.empty_form.attivo }}</td>
+        <td class="inline-delete-cell mode-edit-only-table-cell">
+            <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+        </td>
+    </tr>
+    <tr class="inline-subform-row">
+        <td colspan="8">
+            <div class="inline-subform-grid">
+                <div class="inline-subform-field">
+                    <label>Data nascita</label>
+                    {{ studenti_formset.empty_form.data_nascita }}
+                    {{ studenti_formset.empty_form.data_nascita.errors }}
+                </div>
+                <div class="inline-subform-field">
+                    <label>Sesso</label>
+                    {{ studenti_formset.empty_form.sesso }}
+                    {{ studenti_formset.empty_form.sesso.errors }}
+                </div>
+                <div class="inline-subform-field">
+                    <label>Luogo nascita</label>
+                    <div class="autocomplete-wrapper citta-autocomplete">
+                        {{ studenti_formset.empty_form.luogo_nascita_search }}
+                        {{ studenti_formset.empty_form.luogo_nascita }}
+                    </div>
+                    {{ studenti_formset.empty_form.luogo_nascita_search.errors }}
+                    {{ studenti_formset.empty_form.luogo_nascita.errors }}
+                </div>
+                <div class="inline-subform-field">
+                    <label>Codice fiscale</label>
+                    {{ studenti_formset.empty_form.codice_fiscale }}
+                    {{ studenti_formset.empty_form.codice_fiscale.errors }}
+                </div>
+            </div>
+        </td>
+    </tr>
+</template>

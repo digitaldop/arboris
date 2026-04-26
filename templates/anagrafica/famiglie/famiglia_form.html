@@ -246,19 +246,9 @@
                 </div>
             {% endif %}
             <div class="inline-section-head">
-                <div class="tab-nav">
-                    <button type="button" class="tab-btn{% if active_inline_tab == 'familiari' %} is-active{% endif %}" data-tab-target="tab-familiari" data-tab-base-label="Familiari">
-                        Familiari ({{ count_familiari }})
-                    </button>
-                    <button type="button" class="tab-btn{% if active_inline_tab == 'studenti' %} is-active{% endif %}" data-tab-target="tab-studenti" data-tab-base-label="{{ student_terminology.selected_plural }}">
-                        {{ student_terminology.selected_plural }} ({{ count_studenti }})
-                    </button>
-                    <button type="button" class="tab-btn{% if active_inline_tab == 'documenti' %} is-active{% endif %}" data-tab-target="tab-documenti" data-tab-base-label="Documenti" data-related-document-count="{{ count_documenti_familiari|add:count_documenti_studenti }}">
-                        Documenti ({{ count_documenti }})
-                    </button>
-                </div>
+                {% include "common/inline_tab_nav.html" with tabs=famiglia_inline_tabs only %}
                 {% if famiglia %}
-                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-famiglia-btn">{% if active_inline_tab == "studenti" %}Modifica {{ student_terminology.selected_plural }}{% elif active_inline_tab == "documenti" %}Modifica Documenti{% else %}Modifica Familiari{% endif %}</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-famiglia-btn">{{ famiglia_inline_edit_label }}</button>
                 {% endif %}
             </div>
             <!-- INIZIO INTESTAZIONI DEI TAB DEGLI INLINE CON CONTEGGIO DEL NUMERO ELEMENTI-->
@@ -531,164 +521,7 @@
                 <div class="admin-section-title">{{ student_terminology.selected_plural }}</div>
                 <div class="panel">
                     <div class="panel-body">
-                        {{ studenti_formset.management_form }}
-                        <table class="inline-table" id="studenti-table">
-                            <thead>
-                                <tr>
-                                    <th>NOME</th>
-                                    <th>COGNOME</th>
-                                    <th class="inline-address-col">INDIRIZZO</th>
-                                    <th class="inline-view-only-table-cell">DATA NASCITA</th>
-                                    <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
-                                    <th class="inline-view-only-table-cell">CODICE FISCALE</th>
-                                    <th class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
-                                    <th class="mode-edit-only-table-cell">ELIMINA</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for f in studenti_formset %}
-                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
-                                        {{ f.id }}
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.nome %}
-                                                    {{ f.instance.nome }}
-                                                {% else %}
-                                                    <span class="table-muted">Non indicato</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">{{ f.nome }}</div>
-                                        </td>
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.cognome %}
-                                                    {{ f.instance.cognome }}
-                                                {% else %}
-                                                    <span class="table-muted">Non indicato</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">{{ f.cognome }}</div>
-                                        </td>
-                                        <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.indirizzo_effettivo %}
-                                                    {{ f.instance.indirizzo_effettivo.label_full }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessun indirizzo</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="inline-related-field mode-edit-field">
-                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
-                                                    {{ f.indirizzo }}
-                                                </div>
-                                                <div class="related-actions inline-related-actions">
-                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
-                                                </div>
-                                            </div>
-
-                                            <div class="inline-address-help" data-role="address-help">
-                                                {% if f.instance.pk and f.instance.indirizzo %}
-                                                    Indirizzo specifico
-                                                {% elif famiglia and famiglia.indirizzo_principale %}
-                                                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
-                                                {% else %}
-                                                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-view-only-table-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.data_nascita %}
-                                                    {{ f.instance.data_nascita|it_date }}
-                                                {% else %}
-                                                    <span class="table-muted">Non indicata</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-view-only-table-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.luogo_nascita %}
-                                                    {{ f.instance.luogo_nascita }}
-                                                {% else %}
-                                                    <span class="table-muted">Non indicato</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-view-only-table-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.codice_fiscale %}
-                                                    <div class="readonly-action-group">
-                                                        <span>{{ f.instance.codice_fiscale }}</span>
-                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
-                                                            <span class="copy-inline-icon" aria-hidden="true">
-                                                                <span class="copy-inline-icon-back"></span>
-                                                                <span class="copy-inline-icon-front"></span>
-                                                            </span>
-                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                                        </button>
-                                                    </div>
-                                                {% else %}
-                                                    <span class="table-muted">Non indicato</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
-                                        <td class="inline-delete-cell mode-edit-only-table-cell">
-                                            {% if f.instance.pk %}
-                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
-                                            {% else %}
-                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
-                                        <td colspan="8">
-                                            <div class="inline-subform-grid">
-                                                <div class="inline-subform-field">
-                                                    <label>Data nascita</label>
-                                                    {{ f.data_nascita }}
-                                                    {{ f.data_nascita.errors }}
-                                                </div>
-                                                <div class="inline-subform-field">
-                                                    <label>Sesso</label>
-                                                    {{ f.sesso }}
-                                                    {{ f.sesso.errors }}
-                                                </div>
-                                                <div class="inline-subform-field">
-                                                    <label>Luogo nascita</label>
-                                                    <div class="autocomplete-wrapper citta-autocomplete">
-                                                        {{ f.luogo_nascita_search }}
-                                                        {{ f.luogo_nascita }}
-                                                    </div>
-                                                    {{ f.luogo_nascita_search.errors }}
-                                                    {{ f.luogo_nascita.errors }}
-                                                </div>
-                                                <div class="inline-subform-field">
-                                                    <label>Codice fiscale</label>
-                                                    {{ f.codice_fiscale }}
-                                                    {{ f.codice_fiscale.errors }}
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% if f.non_field_errors %}
-                                        <tr class="inline-errors-row">
-                                            <td colspan="8">{{ f.non_field_errors }}</td>
-                                        </tr>
-                                    {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% if not count_studenti %}
-                            <div class="empty-state compact-empty-state inline-empty-state">
-                                Ancora nessun {{ student_terminology.selected_singular_lower }} inserito.
-                            </div>
-                        {% endif %}
-                        <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" onclick="addFamigliaInlineForm('studenti')">+ Aggiungi un altro {{ student_terminology.selected_singular }}.</button>
-                        </div>
+                        {% include "common/inlines/studenti_famiglia_formset_table.html" with studenti_add_onclick="addFamigliaInlineForm('studenti')" %}
                     </div>
                 </div>
             </div>
@@ -957,70 +790,7 @@
     <!-- FINE TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
 
     <!-- TEMPLATE RIGA VUOTA STUDENTI INLINE -->
-    <template id="studenti-empty-form-template">
-        <tr class="inline-form-row">
-            {{ studenti_formset.empty_form.id }}
-            <td>{{ studenti_formset.empty_form.nome }}</td>
-            <td>{{ studenti_formset.empty_form.cognome }}</td>
-            <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
-                <div class="inline-related-field mode-edit-field">
-                    <div class="autocomplete-wrapper indirizzo-autocomplete">
-                        {{ studenti_formset.empty_form.indirizzo }}
-                    </div>
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
-                    </div>
-                </div>
-
-                <div class="inline-address-help" data-role="address-help">
-                    {% if famiglia and famiglia.indirizzo_principale %}
-                        Erediterà: {{ famiglia.indirizzo_principale.label_select }}
-                    {% else %}
-                        Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
-                    {% endif %}
-                </div>
-            </td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ studenti_formset.empty_form.attivo }}</td>
-            <td class="inline-delete-cell mode-edit-only-table-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
-            </td>
-        </tr>
-        <tr class="inline-subform-row">
-            <td colspan="8">
-                <div class="inline-subform-grid">
-                    <div class="inline-subform-field">
-                        <label>Data nascita</label>
-                        {{ studenti_formset.empty_form.data_nascita }}
-                        {{ studenti_formset.empty_form.data_nascita.errors }}
-                    </div>
-                    <div class="inline-subform-field">
-                        <label>Sesso</label>
-                        {{ studenti_formset.empty_form.sesso }}
-                        {{ studenti_formset.empty_form.sesso.errors }}
-                    </div>
-                    <div class="inline-subform-field">
-                        <label>Luogo nascita</label>
-                        <div class="autocomplete-wrapper citta-autocomplete">
-                            {{ studenti_formset.empty_form.luogo_nascita_search }}
-                            {{ studenti_formset.empty_form.luogo_nascita }}
-                        </div>
-                        {{ studenti_formset.empty_form.luogo_nascita_search.errors }}
-                        {{ studenti_formset.empty_form.luogo_nascita.errors }}
-                    </div>
-                    <div class="inline-subform-field">
-                        <label>Codice fiscale</label>
-                        {{ studenti_formset.empty_form.codice_fiscale }}
-                        {{ studenti_formset.empty_form.codice_fiscale.errors }}
-                    </div>
-                </div>
-            </td>
-        </tr>
-    </template>
+    {% include "common/inlines/studenti_famiglia_empty_form_template.html" %}
     <!-- FINE TEMPLATE RIGA VUOTA STUDENTI INLINE -->
 
     <!-- TEMPLATE RIGA VUOTA DOCUMENTI INLINE -->
@@ -1169,12 +939,12 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <!-- <script src="{% static 'js/pages/famiglia-form.js' %}"></script> -->
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=17"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=19"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

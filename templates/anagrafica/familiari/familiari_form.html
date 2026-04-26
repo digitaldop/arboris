@@ -307,54 +307,18 @@
         </div>
 
         <div class="admin-section inline-lock-container" id="familiare-inline-lock-container" data-mode-lock-scope="inline">
+            {% if studenti_formset and studenti_famiglia %}
             <div class="admin-section">
                 <div class="inline-section-head">
-                    <div class="admin-section-title inline-section-title-static">Figli ({{ count_figli }})</div>
-                    {% if familiare and familiare.famiglia %}
-                        <button type="button" class="btn btn-primary btn-sm figli-quick-add-btn" data-popup-url="{% url 'crea_studente' %}?popup=1&famiglia={{ familiare.famiglia.pk }}">+ Aggiungi figlio</button>
-                    {% endif %}
+                    <div class="admin-section-title inline-section-title-static" id="familiare-studenti-heading">{{ student_terminology.selected_plural }} ({{ count_studenti }})</div>
                 </div>
                 <div class="panel">
                     <div class="panel-body">
-                        {% if figli %}
-                            <table class="inline-table figli-inline-table">
-                                <thead>
-                                    <tr>
-                                        <th>Cognome</th>
-                                        <th>Nome</th>
-                                        <th>Indirizzo</th>
-                                        <th>Attivo</th>
-                                        <th>Azioni</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for figlio in figli %}
-                                        <tr class="inline-form-row list-row-link" data-row-href="{% url 'modifica_studente' figlio.pk %}">
-                                            <td>{{ figlio.cognome }}</td>
-                                            <td>{{ figlio.nome }}</td>
-                                            <td>
-                                                {% if figlio.indirizzo_effettivo %}
-                                                    {{ figlio.indirizzo_effettivo.label_full }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessun indirizzo</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{% if figlio.attivo %}Sì{% else %}No{% endif %}</td>
-                                            <td class="inline-actions-cell">
-                                                <button type="button" class="related-btn related-btn-edit figlio-quick-edit-btn" data-popup-url="{% url 'modifica_studente' figlio.pk %}?popup=1" title="Modifica veloce">E</button>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <div class="empty-state compact-empty-state figli-empty-state">
-                                Nessun figlio inserito.
-                            </div>
-                        {% endif %}
+                        {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_onclick="addInlineForm('studenti')" %}
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             {% include "anagrafica/familiari/includes/scambio_retta_inline.html" %}
 
@@ -460,6 +424,13 @@
         <div class="sticky-actions-spacer"></div>
     </form>
 
+    {% if studenti_formset and studenti_famiglia %}
+        {% include "common/inlines/studenti_famiglia_empty_form_template.html" with famiglia=studenti_famiglia %}
+        {% if studente_inline_defaults %}
+            {{ studente_inline_defaults|json_script:"familiare-studenti-inline-defaults" }}
+        {% endif %}
+    {% endif %}
+
     <template id="documenti-empty-form-template">
         <tr class="inline-form-row">
             {{ documenti_formset.empty_form.id }}
@@ -496,7 +467,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=3"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=5"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

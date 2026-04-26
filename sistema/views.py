@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from pathlib import Path
 
+from .inline_context import scuola_inline_head
 from .forms import (
     ArborisAuthenticationForm,
     SistemaBackupDatabaseConfigurazioneForm,
@@ -161,22 +162,27 @@ def scuola_sistema(request):
         telefoni_formset = ScuolaTelefonoFormSet(instance=scuola, prefix="telefoni")
         email_formset = ScuolaEmailFormSet(instance=scuola, prefix="email")
 
-    return render(
-        request,
-        "sistema/scuola_form.html",
-        {
-            "form": form,
-            "scuola": scuola,
-            "socials_formset": socials_formset,
-            "telefoni_formset": telefoni_formset,
-            "email_formset": email_formset,
-            "edit_scope": edit_scope,
-            "inline_target": inline_target,
-            "count_socials": scuola.socials.count() if scuola else 0,
-            "count_telefoni": scuola.telefoni.count() if scuola else 0,
-            "count_email": scuola.email.count() if scuola else 0,
-        },
+    ctx = {
+        "form": form,
+        "scuola": scuola,
+        "socials_formset": socials_formset,
+        "telefoni_formset": telefoni_formset,
+        "email_formset": email_formset,
+        "edit_scope": edit_scope,
+        "inline_target": inline_target,
+        "count_socials": scuola.socials.count() if scuola else 0,
+        "count_telefoni": scuola.telefoni.count() if scuola else 0,
+        "count_email": scuola.email.count() if scuola else 0,
+    }
+    ctx.update(
+        scuola_inline_head(
+            inline_target=inline_target,
+            count_telefoni=ctx["count_telefoni"],
+            count_email=ctx["count_email"],
+            count_socials=ctx["count_socials"],
+        )
     )
+    return render(request, "sistema/scuola_form.html", ctx)
 
 
 def impostazioni_generali_sistema(request):

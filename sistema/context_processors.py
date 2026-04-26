@@ -222,3 +222,9 @@ def sistema_permissions_context(request):
         "can_view_operation_history": user_is_operational_admin(user),
         "can_access_database_backups": user_can_access_database_backups(user),
     }
+
+
+def arboris_popup_manifest_context(request):
+    from sistema.popup_manifest import build_popup_manifest
+
+    return {"arboris_popup_manifest": build_popup_manifest()}

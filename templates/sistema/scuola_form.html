@@ -150,23 +150,13 @@
 
             <div class="admin-section inline-lock-container" id="scuola-inline-lock-container" data-mode-lock-scope="inline">
                 <div class="inline-section-head">
-                    <div class="tab-nav">
-                        <button type="button" class="tab-btn is-active" data-tab-target="tab-telefoni">
-                            Telefoni ({{ count_telefoni }})
-                        </button>
-                        <button type="button" class="tab-btn" data-tab-target="tab-email">
-                            Email ({{ count_email }})
-                        </button>
-                        <button type="button" class="tab-btn" data-tab-target="tab-socials">
-                            Social ({{ count_socials }})
-                        </button>
-                    </div>
+                    {% include "common/inline_tab_nav.html" with tabs=scuola_inline_tabs only %}
                     {% if scuola and can_manage_sistema %}
-                        <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-scuola-btn">{% if inline_target == "email" %}Modifica Email{% elif inline_target == "socials" %}Modifica Social{% else %}Modifica Telefoni{% endif %}</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-scuola-btn">{{ scuola_inline_edit_label }}</button>
                     {% endif %}
                 </div>
 
-                <div class="tab-panel is-active" id="tab-telefoni" data-inline-scope="telefoni">
+                <div class="tab-panel{% if inline_target == 'telefoni' %} is-active{% endif %}" id="tab-telefoni" data-inline-scope="telefoni">
                     <div class="admin-section-title">Telefoni</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -211,7 +201,7 @@
                     </div>
                 </div>
 
-                <div class="tab-panel" id="tab-email" data-inline-scope="email">
+                <div class="tab-panel{% if inline_target == 'email' %} is-active{% endif %}" id="tab-email" data-inline-scope="email">
                     <div class="admin-section-title">Email</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -256,7 +246,7 @@
                     </div>
                 </div>
 
-                <div class="tab-panel" id="tab-socials" data-inline-scope="socials">
+                <div class="tab-panel{% if inline_target == 'socials' %} is-active{% endif %}" id="tab-socials" data-inline-scope="socials">
                     <div class="admin-section-title">Social</div>
                     <div class="panel">
                         <div class="panel-body">
@@ -350,8 +340,9 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/scuola-form.js' %}?v=9"></script>
+    <script src="{% static 'js/pages/scuola-form.js' %}?v=12"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

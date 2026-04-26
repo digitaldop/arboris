@@ -5,6 +5,7 @@ from django.forms import inlineformset_factory
 
 from anagrafica.models import Indirizzo
 from anagrafica.forms import make_searchable_select
+from anagrafica.utils import validate_and_normalize_phone_number
 from .models import (
     LivelloPermesso,
     RuoloUtente,
@@ -123,6 +124,9 @@ class ScuolaTelefonoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["ordine"].required = False
 
+    def clean_telefono(self):
+        return validate_and_normalize_phone_number(self.cleaned_data.get("telefono"))
+
 
 ScuolaTelefonoFormSet = inlineformset_factory(
     Scuola,
@@ -159,12 +163,14 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
         fields = [
             "terminologia_studente",
             "mostra_dashboard_prossimo_anno_scolastico",
+            "formato_visualizzazione_telefono",
             "font_principale",
             "font_titoli",
         ]
         labels = {
             "terminologia_studente": "Dicitura visualizzata per gli studenti",
             "mostra_dashboard_prossimo_anno_scolastico": "Mostra in Dashboard i riepiloghi del prossimo anno scolastico",
+            "formato_visualizzazione_telefono": "Formato numeri di telefono (solo visualizzazione)",
             "font_principale": "Font principale",
             "font_titoli": "Titoli",
         }

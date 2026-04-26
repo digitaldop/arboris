@@ -52,7 +52,7 @@
                     {% if scuola_header and scuola_header.telefono_header %}
                         <div class="login-brand-meta-item">
                             <span class="login-brand-meta-label">Telefono</span>
-                            <span>{{ scuola_header.telefono_header }}</span>
+                            <span>{{ scuola_header.telefono_header_formattato|default:scuola_header.telefono_header }}</span>
                         </div>
                     {% endif %}
                     {% if scuola_header and scuola_header.email_header %}

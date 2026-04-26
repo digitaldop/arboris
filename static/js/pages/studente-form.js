@@ -5,8 +5,9 @@ window.ArborisStudenteForm = (function () {
         const relatedPopups = window.ArborisRelatedPopups;
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
+        const inlineTabs = window.ArborisInlineTabs;
 
-        if (!relatedPopups || !collapsible || !tabs) {
+        if (!relatedPopups || !collapsible || !tabs || !inlineTabs) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
@@ -20,21 +21,12 @@ window.ArborisStudenteForm = (function () {
 
         const studenteInlineRoot = () => document.getElementById("studente-inline-lock-container");
 
+        const targetInputId = "studente-inline-target";
+        const inlineLockContainerId = "studente-inline-lock-container";
+        const inlineEditButtonId = "enable-inline-edit-studente-btn";
+
         function setInlineTarget(prefixOrTabId) {
-            const input = document.getElementById("studente-inline-target");
-            if (!input || !prefixOrTabId) {
-                return;
-            }
-
-            input.value = prefixOrTabId.replace(/^tab-/, "");
-        }
-
-        function tabTitleForInlineEditLabel(tabButton) {
-            if (!tabButton) {
-                return "";
-            }
-
-            return tabButton.textContent.replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
+            inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
         }
 
         function refreshInlineEditScope() {
@@ -82,46 +74,18 @@ window.ArborisStudenteForm = (function () {
         refreshInlineEditScopeHandler = refreshInlineEditScope;
 
         function updateInlineEditButtonLabel(tabId) {
-            const button = document.getElementById("enable-inline-edit-studente-btn");
-            if (!button) {
-                return;
-            }
-            if (
-                window.studenteViewMode &&
-                typeof window.studenteViewMode.isInlineEditing === "function" &&
-                window.studenteViewMode.isInlineEditing()
-            ) {
-                return;
-            }
-
-            const root = studenteInlineRoot();
-            const tabBtn = root && tabId ? root.querySelector(`.tab-btn[data-tab-target="${tabId}"]`) : null;
-            const tabTitle = tabTitleForInlineEditLabel(tabBtn);
-
-            button.textContent = tabTitle ? `Modifica ${tabTitle}` : "Modifica";
+            inlineTabs.updateDefaultInlineEditButtonLabel({
+                buttonId: inlineEditButtonId,
+                containerId: inlineLockContainerId,
+                tabId: tabId,
+                getViewMode: function () {
+                    return window.studenteViewMode;
+                },
+            });
         }
 
         function refreshLockedTabs() {
-            const targetInput = document.getElementById("studente-inline-target");
-            const target = targetInput ? targetInput.value : "";
-            const isInlineEditing = Boolean(
-                window.studenteViewMode &&
-                typeof window.studenteViewMode.isInlineEditing === "function" &&
-                window.studenteViewMode.isInlineEditing()
-            );
-            const lockMessage = "Non è possibile cambiare tab finché non si salvano o annullano le modifiche correnti.";
-
-            document.querySelectorAll("#studente-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-                const btnTarget = (btn.dataset.tabTarget || "").replace(/^tab-/, "");
-                const locked = isInlineEditing && target && btnTarget !== target;
-                btn.classList.toggle("is-tab-locked", locked);
-
-                if (locked) {
-                    btn.setAttribute("data-tab-lock-message", lockMessage);
-                } else {
-                    btn.removeAttribute("data-tab-lock-message");
-                }
-            });
+            inlineTabs.clearTabButtonLockClasses(inlineLockContainerId);
         }
 
         function getSelectedFamigliaOption() {
@@ -336,100 +300,14 @@ window.ArborisStudenteForm = (function () {
             updateMainButtons();
         }
 
-        function getRelatedConfig(relatedType, selectedId, targetInputName) {
-            const suffix = targetInputName ? `&target_input_name=${encodeURIComponent(targetInputName)}` : "";
-
-            if (relatedType === "anno_scolastico") {
-                return {
-                    addUrl: `/scuola/anni-scolastici/nuovo/?popup=1${suffix}`,
-                    editUrl: selectedId ? `/scuola/anni-scolastici/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/scuola/anni-scolastici/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "classe") {
-                return {
-                    addUrl: `/scuola/classi/nuova/?popup=1${suffix}`,
-                    editUrl: selectedId ? `/scuola/classi/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/scuola/classi/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "stato_iscrizione") {
-                return {
-                    addUrl: `/economia/stati-iscrizione/nuovo/?popup=1${suffix}`,
-                    editUrl: selectedId ? `/economia/stati-iscrizione/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/economia/stati-iscrizione/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "condizione_iscrizione") {
-                return {
-                    addUrl: `/economia/condizioni-iscrizione/nuova/?popup=1${suffix}`,
-                    editUrl: selectedId ? `/economia/condizioni-iscrizione/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/economia/condizioni-iscrizione/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "agevolazione") {
-                return {
-                    addUrl: `/economia/agevolazioni/nuova/?popup=1${suffix}`,
-                    editUrl: selectedId ? `/economia/agevolazioni/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/economia/agevolazioni/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "tipo_documento") {
-                return {
-                    addUrl: `${config.urls.creaTipoDocumento}?popup=1${suffix}`,
-                    editUrl: selectedId ? `/tipi-documento/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/tipi-documento/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            return null;
-        }
-
         function wireInlineRelatedButtons(container) {
-            const rows = container.querySelectorAll(".inline-related-field");
-
-            rows.forEach(fieldWrapper => {
-                if (fieldWrapper.dataset.relatedBound === "1") return;
-                fieldWrapper.dataset.relatedBound = "1";
-
-                const select = fieldWrapper.querySelector("select");
-                const addBtn = fieldWrapper.querySelector(".inline-related-add");
-                const editBtn = fieldWrapper.querySelector(".inline-related-edit");
-                const deleteBtn = fieldWrapper.querySelector(".inline-related-delete");
-
-                if (!select || !addBtn || !editBtn || !deleteBtn) return;
-
-                const relatedType = addBtn.dataset.relatedType;
-                const targetInputName = select.name;
-
-                function refreshButtons() {
-                    const selectedId = select.value;
-                    editBtn.disabled = !selectedId;
-                    deleteBtn.disabled = !selectedId;
-                }
-
-                addBtn.onclick = function () {
-                    const cfg = getRelatedConfig(relatedType, null, targetInputName);
-                    if (cfg && cfg.addUrl) relatedPopups.openRelatedPopup(cfg.addUrl);
-                };
-
-                editBtn.onclick = function () {
-                    const cfg = getRelatedConfig(relatedType, select.value, targetInputName);
-                    if (cfg && cfg.editUrl) relatedPopups.openRelatedPopup(cfg.editUrl);
-                };
-
-                deleteBtn.onclick = function () {
-                    const cfg = getRelatedConfig(relatedType, select.value, targetInputName);
-                    if (cfg && cfg.deleteUrl) relatedPopups.openRelatedPopup(cfg.deleteUrl);
-                };
-
-                select.addEventListener("change", refreshButtons);
-                refreshButtons();
+            const routes = window.ArborisRelatedEntityRoutes;
+            if (!routes) {
+                console.error("ArborisRelatedEntityRoutes non disponibile.");
+                return;
+            }
+            routes.wireInlineRelatedButtons(container, {
+                openRelatedPopup: relatedPopups.openRelatedPopup.bind(relatedPopups),
             });
         }
 
@@ -990,24 +868,37 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
-        if (addIndirizzoBtn && indirizzoSelect) {
-            addIndirizzoBtn.addEventListener("click", function () {
-                relatedPopups.openRelatedPopup(`${config.urls.creaIndirizzo}?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
-            });
-        }
+        const studRoutes = window.ArborisRelatedEntityRoutes;
 
-        if (editIndirizzoBtn && indirizzoSelect) {
-            editIndirizzoBtn.addEventListener("click", function () {
-                if (indirizzoSelect.value) {
-                    relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+        if (addIndirizzoBtn && indirizzoSelect && studRoutes) {
+            addIndirizzoBtn.addEventListener("click", function () {
+                const cfg = studRoutes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
+                if (cfg && cfg.addUrl) {
+                    relatedPopups.openRelatedPopup(cfg.addUrl);
                 }
             });
         }
 
-        if (deleteIndirizzoBtn && indirizzoSelect) {
+        if (editIndirizzoBtn && indirizzoSelect && studRoutes) {
+            editIndirizzoBtn.addEventListener("click", function () {
+                if (!indirizzoSelect.value) {
+                    return;
+                }
+                const cfg = studRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.editUrl) {
+                    relatedPopups.openRelatedPopup(cfg.editUrl);
+                }
+            });
+        }
+
+        if (deleteIndirizzoBtn && indirizzoSelect && studRoutes) {
             deleteIndirizzoBtn.addEventListener("click", function () {
-                if (indirizzoSelect.value) {
-                    relatedPopups.openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                if (!indirizzoSelect.value) {
+                    return;
+                }
+                const cfg = studRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.deleteUrl) {
+                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
                 }
             });
         }
@@ -1037,24 +928,9 @@ window.ArborisStudenteForm = (function () {
             tabs.bindTabButtons(getStudenteTabStorageKey(), inlineLockRoot);
         }
         document.querySelectorAll("#studente-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-            btn.addEventListener("arboris:before-tab-activate", function (event) {
-                if (btn.classList.contains("is-tab-locked")) {
-                    event.preventDefault();
-                }
-            });
-
             btn.addEventListener("click", function () {
-                const isInlineEditing = Boolean(
-                    window.studenteViewMode &&
-                    typeof window.studenteViewMode.isInlineEditing === "function" &&
-                    window.studenteViewMode.isInlineEditing()
-                );
-
-                if (!isInlineEditing) {
-                    setInlineTarget(btn.dataset.tabTarget);
-                    updateInlineEditButtonLabel(btn.dataset.tabTarget);
-                }
-
+                setInlineTarget(btn.dataset.tabTarget);
+                updateInlineEditButtonLabel(btn.dataset.tabTarget);
                 refreshInlineEditScope();
             });
         });

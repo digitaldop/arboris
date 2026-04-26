@@ -1,0 +1,16 @@
+{% comment %}
+  Barra tab per sezioni inline (form dettaglio).
+  Variabili: tabs — lista di dict con chiavi: tab_id, label, count, is_active (bool).
+  Opzionali: base_label (data-tab-base-label), show_related_doc_count + related_document_count (data-related-document-count).
+{% endcomment %}
+<div class="tab-nav">
+    {% for t in tabs %}
+        <button
+            type="button"
+            class="tab-btn{% if t.is_active %} is-active{% endif %}"
+            data-tab-target="{{ t.tab_id }}"
+            {% if t.base_label %}data-tab-base-label="{{ t.base_label }}"{% endif %}
+            {% if t.show_related_doc_count %}data-related-document-count="{{ t.related_document_count }}"{% endif %}
+        >{{ t.label }} ({{ t.count }})</button>
+    {% endfor %}
+</div>

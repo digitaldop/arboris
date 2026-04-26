@@ -52,6 +52,21 @@
                                             {% endif %}
                                         </td>
                                     </tr>
+                                    <tr>
+                                        <th>{{ form.formato_visualizzazione_telefono.label_tag }}</th>
+                                        <td>
+                                            {{ form.formato_visualizzazione_telefono }}
+                                            {{ form.formato_visualizzazione_telefono.errors }}
+                                            {% if form.formato_visualizzazione_telefono.help_text %}
+                                                <div class="help-text">{{ form.formato_visualizzazione_telefono.help_text }}</div>
+                                            {% endif %}
+                                            <div class="help-text">
+                                                Esempi con prefisso Italia +39: <strong>+39 345 67 89 675</strong>,
+                                                <strong>+39 345 678 96 75</strong>, <strong>+39 3456789675</strong>.
+                                                In banca dati i numeri sono salvati senza spazi.
+                                            </div>
+                                        </td>
+                                    </tr>
                                 </table>
                             </div>
                         </div>

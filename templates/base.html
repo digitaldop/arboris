@@ -21,6 +21,8 @@
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
 </head>
 <body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
+    {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=1"></script>
     <header class="site-header">
         <div class="site-header-inner">
             <div class="brand">
@@ -42,9 +44,9 @@
                             {% if scuola_header.telefono_header %}
                                 <span> - </span>
                                 {% if scuola_header.telefono_header_whatsapp_url %}
-                                    <a href="{{ scuola_header.telefono_header_whatsapp_url }}" class="header-meta-link" target="_blank" rel="noopener noreferrer">{{ scuola_header.telefono_header }}</a>
+                                    <a href="{{ scuola_header.telefono_header_whatsapp_url }}" class="header-meta-link" target="_blank" rel="noopener noreferrer">{{ scuola_header.telefono_header_formattato|default:scuola_header.telefono_header }}</a>
                                 {% else %}
-                                    <span>{{ scuola_header.telefono_header }}</span>
+                                    <span>{{ scuola_header.telefono_header_formattato|default:scuola_header.telefono_header }}</span>
                                 {% endif %}
                             {% endif %}
                             {% if scuola_header.email_header %}

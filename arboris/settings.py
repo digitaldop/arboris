@@ -97,6 +97,7 @@ TEMPLATES = [
                 'sistema.context_processors.scuola_context',
                 'sistema.context_processors.general_settings_context',
                 'sistema.context_processors.sistema_permissions_context',
+                'sistema.context_processors.arboris_popup_manifest_context',
             ],
         },
     },

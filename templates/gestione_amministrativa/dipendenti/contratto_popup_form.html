@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}?v=42">
 </head>
 <body style="padding: 20px;">
+    {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=1"></script>
     <h1 class="section-title">{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %}</h1>
 
     <div class="panel">
@@ -67,17 +69,11 @@
 
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=8"></script>
-    <script src="{% static 'js/pages/contratto-popup-form.js' %}?v=1"></script>
+    <script src="{% static 'js/pages/contratto-popup-form.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisContrattoPopupForm) {
-                ArborisContrattoPopupForm.init({
-                    urls: {
-                        creaParametroCalcolo: "{% url 'crea_parametro_calcolo_stipendio' %}",
-                        modificaParametroCalcoloTemplate: "{% url 'modifica_parametro_calcolo_stipendio' 0 %}",
-                        eliminaParametroCalcoloTemplate: "{% url 'elimina_parametro_calcolo_stipendio' 0 %}"
-                    }
-                });
+                ArborisContrattoPopupForm.init();
             }
         });
     </script>

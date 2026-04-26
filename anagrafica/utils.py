@@ -46,24 +46,47 @@ def validate_and_normalize_phone_number(value):
     return normalize_phone_number(raw_value)
 
 
-def format_phone_number(value):
+def _phone_display_format_from_settings():
+    try:
+        from sistema.models import SistemaImpostazioniGenerali
+
+        imp = SistemaImpostazioniGenerali.objects.only("formato_visualizzazione_telefono").first()
+        if imp and imp.formato_visualizzazione_telefono:
+            return imp.formato_visualizzazione_telefono
+    except Exception:  # noqa: BLE001
+        pass
+    return "it_plus_n3_2_2_3"
+
+
+def _format_italian_local_10(ten: str, display_format: str) -> str:
+    if len(ten) != 10 or not ten.isdigit():
+        return ten
+    if display_format == "it_plus_n3_3_2_2":
+        return f"{ten[:3]} {ten[3:6]} {ten[6:8]} {ten[8:10]}"
+    if display_format == "it_plus_n10":
+        return ten
+    return f"{ten[:3]} {ten[3:5]} {ten[5:7]} {ten[7:10]}"
+
+
+def format_phone_number(value, display_format=None):
+    """
+    Visualizzazione. In archivio usare valori normalizzati senza spazi (normalize_phone_number / validate_...).
+    """
     normalized = normalize_phone_number(value)
     if not normalized:
         return ""
 
-    prefix = ""
-    local_number = normalized
+    if display_format is None:
+        display_format = _phone_display_format_from_settings()
 
-    if normalized.startswith("+39") and len(normalized[3:]) == 10:
-        prefix = "+39"
-        local_number = normalized[3:]
+    if normalized.startswith("+39") and len(normalized) == 13 and normalized[3:].isdigit() and len(normalized[3:]) == 10:
+        formatted_local = _format_italian_local_10(normalized[3:], display_format)
+        return f"+39 {formatted_local}"
 
-    if len(local_number) == 10 and local_number.isdigit():
-        formatted_local = f"{local_number[:3]} {local_number[3:5]} {local_number[5:7]} {local_number[7:]}"
-    else:
-        formatted_local = local_number
+    if len(normalized) == 10 and normalized.isdigit():
+        return _format_italian_local_10(normalized, display_format)
 
-    return f"{prefix} {formatted_local}".strip()
+    return normalized
 
 
 def whatsapp_url_from_phone(value):

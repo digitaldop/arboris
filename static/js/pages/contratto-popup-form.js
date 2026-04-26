@@ -1,5 +1,5 @@
 window.ArborisContrattoPopupForm = (function () {
-    function init(config) {
+    function init() {
         const relatedPopups = window.ArborisRelatedPopups;
         if (!relatedPopups) {
             return;
@@ -12,10 +12,7 @@ window.ArborisContrattoPopupForm = (function () {
         const addParametroBtn = document.getElementById("popup-add-parametro-calcolo-btn");
         const editParametroBtn = document.getElementById("popup-edit-parametro-calcolo-btn");
         const deleteParametroBtn = document.getElementById("popup-delete-parametro-calcolo-btn");
-
-        function replaceId(url, id) {
-            return url.replace("/0/", `/${id}/`);
-        }
+        const routes = window.ArborisRelatedEntityRoutes;
 
         function updateButtons() {
             if (editParametroBtn && parametroSelect) {
@@ -26,35 +23,36 @@ window.ArborisContrattoPopupForm = (function () {
             }
         }
 
-        if (addParametroBtn && parametroSelect) {
+        if (addParametroBtn && parametroSelect && routes) {
             addParametroBtn.addEventListener("click", function () {
-                relatedPopups.openRelatedPopup(
-                    `${config.urls.creaParametroCalcolo}?popup=1&target_input_name=${encodeURIComponent(parametroSelect.name)}`
-                );
+                const cfg = routes.buildCrudUrls("parametro_calcolo", null, parametroSelect.name);
+                if (cfg && cfg.addUrl) {
+                    relatedPopups.openRelatedPopup(cfg.addUrl);
+                }
             });
         }
 
-        if (editParametroBtn && parametroSelect) {
+        if (editParametroBtn && parametroSelect && routes) {
             editParametroBtn.addEventListener("click", function () {
                 if (!parametroSelect.value) {
                     return;
                 }
-                const url = replaceId(config.urls.modificaParametroCalcoloTemplate, parametroSelect.value);
-                relatedPopups.openRelatedPopup(
-                    `${url}?popup=1&target_input_name=${encodeURIComponent(parametroSelect.name)}`
-                );
+                const cfg = routes.buildCrudUrls("parametro_calcolo", parametroSelect.value, parametroSelect.name);
+                if (cfg && cfg.editUrl) {
+                    relatedPopups.openRelatedPopup(cfg.editUrl);
+                }
             });
         }
 
-        if (deleteParametroBtn && parametroSelect) {
+        if (deleteParametroBtn && parametroSelect && routes) {
             deleteParametroBtn.addEventListener("click", function () {
                 if (!parametroSelect.value) {
                     return;
                 }
-                const url = replaceId(config.urls.eliminaParametroCalcoloTemplate, parametroSelect.value);
-                relatedPopups.openRelatedPopup(
-                    `${url}?popup=1&target_input_name=${encodeURIComponent(parametroSelect.name)}`
-                );
+                const cfg = routes.buildCrudUrls("parametro_calcolo", parametroSelect.value, parametroSelect.name);
+                if (cfg && cfg.deleteUrl) {
+                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
+                }
             });
         }
 

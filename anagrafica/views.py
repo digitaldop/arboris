@@ -39,6 +39,7 @@ from .models import (
 from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from calendario.data import build_dashboard_calendar_data
+from sistema.inline_context import famiglia_inline_head, studente_inline_head
 from sistema.models import Scuola, SistemaImpostazioniGenerali
 from scuola.models import AnnoScolastico, Classe
 from scuola.utils import resolve_default_anno_scolastico
@@ -1231,30 +1232,36 @@ def crea_famiglia(request):
 
     today = timezone.localdate()
 
-    return render(
-        request,
-        "anagrafica/famiglie/famiglia_form.html",
-        {
-            "form": form,
-            "familiari_formset": familiari_formset,
-            "studenti_formset": studenti_formset,
-            "documenti_formset": documenti_formset,
-            "count_familiari": 0,
-            "count_studenti": 0,
-            "count_documenti": 0,
-            "count_documenti_in_scadenza": 0,
-            "count_documenti_scaduti": 0,
-            "documenti_familiari": [],
-            "documenti_studenti": [],
-            "count_documenti_familiari": 0,
-            "count_documenti_studenti": 0,
-            "edit_scope": edit_scope,
-            "inline_target": inline_target,
-            "active_inline_tab": active_inline_tab,
-            "prefer_initial_active_tab": prefer_initial_active_tab,
-            "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count() or documenti_formset.total_error_count()),
-        },
+    ctx = {
+        "form": form,
+        "familiari_formset": familiari_formset,
+        "studenti_formset": studenti_formset,
+        "documenti_formset": documenti_formset,
+        "count_familiari": 0,
+        "count_studenti": 0,
+        "count_documenti": 0,
+        "count_documenti_in_scadenza": 0,
+        "count_documenti_scaduti": 0,
+        "documenti_familiari": [],
+        "documenti_studenti": [],
+        "count_documenti_familiari": 0,
+        "count_documenti_studenti": 0,
+        "edit_scope": edit_scope,
+        "inline_target": inline_target,
+        "active_inline_tab": active_inline_tab,
+        "prefer_initial_active_tab": prefer_initial_active_tab,
+        "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count() or documenti_formset.total_error_count()),
+    }
+    ctx.update(
+        famiglia_inline_head(
+            active_inline_tab=active_inline_tab,
+            count_familiari=ctx["count_familiari"],
+            count_studenti=ctx["count_studenti"],
+            count_documenti=ctx["count_documenti"],
+            related_famiglia_studenti_doc_count=0,
+        )
     )
+    return render(request, "anagrafica/famiglie/famiglia_form.html", ctx)
 
 
 def modifica_famiglia(request, pk):
@@ -1370,38 +1377,44 @@ def modifica_famiglia(request, pk):
         + count_documenti_studenti
     )
 
-    return render(
-        request,
-        "anagrafica/famiglie/famiglia_form.html",
-        {
-            "form": form,
-            "famiglia": famiglia,
-            "familiari_formset": familiari_formset,
-            "studenti_formset": studenti_formset,
-            "documenti_formset": documenti_formset,
-            "count_familiari": famiglia.familiari.count(),
-            "count_studenti": famiglia.studenti.count(),
-            "count_documenti": count_documenti_totali,
-            "count_documenti_in_scadenza": famiglia.documenti.filter(
-                scadenza__isnull=False,
-                scadenza__gte=today,
-                scadenza__lte=today + timedelta(days=30),
-            ).count(),
-            "count_documenti_scaduti": famiglia.documenti.filter(
-                scadenza__isnull=False,
-                scadenza__lt=today,
-            ).count(),
-            "documenti_familiari": documenti_familiari,
-            "documenti_studenti": documenti_studenti,
-            "count_documenti_familiari": count_documenti_familiari,
-            "count_documenti_studenti": count_documenti_studenti,
-            "edit_scope": edit_scope,
-            "inline_target": inline_target,
-            "active_inline_tab": active_inline_tab,
-            "prefer_initial_active_tab": prefer_initial_active_tab,
-            "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count() or documenti_formset.total_error_count()),
-        },
+    ctx = {
+        "form": form,
+        "famiglia": famiglia,
+        "familiari_formset": familiari_formset,
+        "studenti_formset": studenti_formset,
+        "documenti_formset": documenti_formset,
+        "count_familiari": famiglia.familiari.count(),
+        "count_studenti": famiglia.studenti.count(),
+        "count_documenti": count_documenti_totali,
+        "count_documenti_in_scadenza": famiglia.documenti.filter(
+            scadenza__isnull=False,
+            scadenza__gte=today,
+            scadenza__lte=today + timedelta(days=30),
+        ).count(),
+        "count_documenti_scaduti": famiglia.documenti.filter(
+            scadenza__isnull=False,
+            scadenza__lt=today,
+        ).count(),
+        "documenti_familiari": documenti_familiari,
+        "documenti_studenti": documenti_studenti,
+        "count_documenti_familiari": count_documenti_familiari,
+        "count_documenti_studenti": count_documenti_studenti,
+        "edit_scope": edit_scope,
+        "inline_target": inline_target,
+        "active_inline_tab": active_inline_tab,
+        "prefer_initial_active_tab": prefer_initial_active_tab,
+        "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count() or documenti_formset.total_error_count()),
+    }
+    ctx.update(
+        famiglia_inline_head(
+            active_inline_tab=active_inline_tab,
+            count_familiari=ctx["count_familiari"],
+            count_studenti=ctx["count_studenti"],
+            count_documenti=ctx["count_documenti"],
+            related_famiglia_studenti_doc_count=count_documenti_familiari + count_documenti_studenti,
+        )
     )
+    return render(request, "anagrafica/famiglie/famiglia_form.html", ctx)
 
 
 def elimina_famiglia(request, pk):
@@ -1769,8 +1782,10 @@ def crea_familiare(request):
         {
             "form": form,
             "documenti_formset": documenti_formset,
-            "figli": [],
-            "count_figli": 0,
+            "studenti_formset": None,
+            "studenti_famiglia": None,
+            "count_studenti": 0,
+            "studente_inline_defaults": None,
             "count_documenti": 0,
             "count_documenti_in_scadenza": 0,
             "count_documenti_scaduti": 0,
@@ -1794,6 +1809,22 @@ def modifica_familiare(request, pk):
     )
     today = timezone.localdate()
 
+    studenti_formset = None
+
+    def famiglia_for_studenti_inline():
+        if request.method != "POST":
+            return familiare.famiglia if familiare.famiglia_id else None
+        raw = (request.POST.get("famiglia") or "").strip()
+        if raw.isdigit():
+            return (
+                Famiglia.objects.filter(pk=int(raw))
+                .select_related("indirizzo_principale", "indirizzo_principale__citta__provincia")
+                .first()
+            )
+        return None
+
+    famiglia_for_studenti = famiglia_for_studenti_inline()
+
     if request.method == "POST":
         form = FamiliareForm(request.POST, instance=familiare)
         documenti_formset = DocumentoFamiliareFormSet(
@@ -1802,12 +1833,21 @@ def modifica_familiare(request, pk):
             instance=familiare,
             prefix="documenti",
         )
+        if famiglia_for_studenti:
+            studenti_formset = build_studenti_formset(
+                data=request.POST,
+                instance=famiglia_for_studenti,
+                prefix="studenti",
+            )
 
-        if form.is_valid() and documenti_formset.is_valid():
+        studenti_ok = studenti_formset.is_valid() if studenti_formset is not None else True
+        if form.is_valid() and documenti_formset.is_valid() and studenti_ok:
             try:
                 with transaction.atomic():
                     familiare = form.save()
                     documenti_formset.save()
+                    if studenti_formset is not None:
+                        studenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
@@ -1821,15 +1861,21 @@ def modifica_familiare(request, pk):
 
                 messages.success(request, "Modifiche salvate correttamente.")
                 return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
+        if studenti_formset is None and famiglia_for_studenti:
+            studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
     else:
         form = FamiliareForm(instance=familiare)
         documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
+        if famiglia_for_studenti:
+            studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
 
-    figli = (
-        familiare.famiglia.studenti
-        .select_related("indirizzo", "famiglia__indirizzo_principale")
-        .order_by("cognome", "nome")
-    ) if familiare.famiglia_id else Studente.objects.none()
+    count_studenti = famiglia_for_studenti.studenti.count() if famiglia_for_studenti else 0
+    studente_inline_defaults = None
+    if famiglia_for_studenti:
+        studente_inline_defaults = {
+            "indirizzo_principale_id": str(famiglia_for_studenti.indirizzo_principale_id or ""),
+            "cognome_famiglia": famiglia_for_studenti.cognome_famiglia or "",
+        }
     scambio_retta_inline_context = build_familiare_scambio_retta_inline_context(familiare, request.GET)
     scambio_retta_return_to = f"{request.get_full_path()}#scambio-retta-inline"
 
@@ -1840,8 +1886,10 @@ def modifica_familiare(request, pk):
             "form": form,
             "familiare": familiare,
             "documenti_formset": documenti_formset,
-            "figli": figli,
-            "count_figli": figli.count() if hasattr(figli, "count") else 0,
+            "studenti_formset": studenti_formset,
+            "studenti_famiglia": famiglia_for_studenti,
+            "count_studenti": count_studenti,
+            "studente_inline_defaults": studente_inline_defaults,
             "count_documenti": familiare.documenti.count(),
             "count_documenti_in_scadenza": familiare.documenti.filter(
                 scadenza__isnull=False,
@@ -2128,23 +2176,27 @@ def crea_studente(request):
         iscrizioni_formset = IscrizioneStudenteFormSet(prefix="iscrizioni")
         documenti_formset = DocumentoStudenteFormSet(prefix="documenti")
 
-    return render(
-        request,
-        "anagrafica/studenti/studente_form.html",
-        {
-            "form": form,
-            "iscrizioni_formset": iscrizioni_formset,
-            "documenti_formset": documenti_formset,
-            "classe_corrente_label": "",
-            "edit_scope": edit_scope,
-            "inline_target": inline_target,
-            "count_iscrizioni": 0,
-            "count_documenti": 0,
-            "count_documenti_in_scadenza": 0,
-            "count_documenti_scaduti": 0,
-            "rate_overview": [],
-        },
+    ctx = {
+        "form": form,
+        "iscrizioni_formset": iscrizioni_formset,
+        "documenti_formset": documenti_formset,
+        "classe_corrente_label": "",
+        "edit_scope": edit_scope,
+        "inline_target": inline_target,
+        "count_iscrizioni": 0,
+        "count_documenti": 0,
+        "count_documenti_in_scadenza": 0,
+        "count_documenti_scaduti": 0,
+        "rate_overview": [],
+    }
+    ctx.update(
+        studente_inline_head(
+            inline_target=inline_target,
+            count_iscrizioni=ctx["count_iscrizioni"],
+            count_documenti=ctx["count_documenti"],
+        )
     )
+    return render(request, "anagrafica/studenti/studente_form.html", ctx)
 
 
 def modifica_studente(request, pk):
@@ -2256,31 +2308,35 @@ def modifica_studente(request, pk):
     )
     classe_corrente_label = str(iscrizione_corrente.classe) if iscrizione_corrente and iscrizione_corrente.classe else ""
 
-    return render(
-        request,
-        "anagrafica/studenti/studente_form.html",
-        {
-            "form": form,
-            "studente": studente,
-            "iscrizioni_formset": iscrizioni_formset,
-            "documenti_formset": documenti_formset,
-            "classe_corrente_label": classe_corrente_label,
-            "edit_scope": edit_scope,
-            "inline_target": inline_target,
-            "count_iscrizioni": studente.iscrizioni.count(),
-            "count_documenti": studente.documenti.count(),
-            "count_documenti_in_scadenza": studente.documenti.filter(
-                scadenza__isnull=False,
-                scadenza__gte=today,
-                scadenza__lte=today + timedelta(days=30),
-            ).count(),
-            "count_documenti_scaduti": studente.documenti.filter(
-                scadenza__isnull=False,
-                scadenza__lt=today,
-            ).count(),
-            "rate_overview": build_studente_rate_overview(studente),
-        },
+    ctx = {
+        "form": form,
+        "studente": studente,
+        "iscrizioni_formset": iscrizioni_formset,
+        "documenti_formset": documenti_formset,
+        "classe_corrente_label": classe_corrente_label,
+        "edit_scope": edit_scope,
+        "inline_target": inline_target,
+        "count_iscrizioni": studente.iscrizioni.count(),
+        "count_documenti": studente.documenti.count(),
+        "count_documenti_in_scadenza": studente.documenti.filter(
+            scadenza__isnull=False,
+            scadenza__gte=today,
+            scadenza__lte=today + timedelta(days=30),
+        ).count(),
+        "count_documenti_scaduti": studente.documenti.filter(
+            scadenza__isnull=False,
+            scadenza__lt=today,
+        ).count(),
+        "rate_overview": build_studente_rate_overview(studente),
+    }
+    ctx.update(
+        studente_inline_head(
+            inline_target=inline_target,
+            count_iscrizioni=ctx["count_iscrizioni"],
+            count_documenti=ctx["count_documenti"],
+        )
     )
+    return render(request, "anagrafica/studenti/studente_form.html", ctx)
 
 
 def elimina_studente(request, pk):

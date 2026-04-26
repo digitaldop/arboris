@@ -3,6 +3,7 @@ from django.db.models import Q
 
 from anagrafica.forms import make_searchable_select, html5_date_input
 from anagrafica.models import Citta, Indirizzo
+from anagrafica.utils import validate_and_normalize_phone_number
 
 from .models import (
     BustaPagaDipendente,
@@ -200,6 +201,9 @@ class DipendenteForm(forms.ModelForm):
                 contratto.dipendente = dipendente
                 contratto.save(update_fields=["dipendente"])
         return dipendente
+
+    def clean_telefono(self):
+        return validate_and_normalize_phone_number(self.cleaned_data.get("telefono"))
 
     def clean_contratto(self):
         contratto = self.cleaned_data.get("contratto")

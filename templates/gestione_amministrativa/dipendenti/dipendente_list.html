@@ -65,7 +65,7 @@
                         <td>{{ dipendente.get_stato_display }}</td>
                         <td>{% if dipendente.data_assunzione %}{{ dipendente.data_assunzione|date:"d/m/Y" }}{% else %}-{% endif %}</td>
                         <td>
-                            {% if dipendente.telefono %}{{ dipendente.telefono }}{% endif %}
+                            {% if dipendente.formatted_telefono %}{{ dipendente.formatted_telefono }}{% elif dipendente.telefono %}{{ dipendente.telefono }}{% endif %}
                             {% if dipendente.email %}<br>{{ dipendente.email }}{% endif %}
                             {% if not dipendente.email and not dipendente.telefono %}-{% endif %}
                         </td>

@@ -20,6 +20,8 @@
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
 </head>
 <body class="popup-page">
+    {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=1"></script>
     <main class="popup-content-area">
         {% if messages %}
             <div class="messages-wrapper">

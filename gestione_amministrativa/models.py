@@ -134,6 +134,12 @@ class Dipendente(models.Model):
             ),
         ]
 
+    @property
+    def formatted_telefono(self):
+        from anagrafica.utils import format_phone_number
+
+        return format_phone_number(self.telefono) if self.telefono else ""
+
     def __str__(self):
         return self.nome_completo
 

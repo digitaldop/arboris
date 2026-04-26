@@ -78,6 +78,15 @@ class Scuola(models.Model):
         return record.telefono if record else ""
 
     @property
+    def telefono_header_formattato(self):
+        from anagrafica.utils import format_phone_number
+
+        raw = self.telefono_header
+        if not raw:
+            return ""
+        return format_phone_number(raw) or raw
+
+    @property
     def email_header(self):
         record = self.email.order_by("ordine", "id").first()
         return record.email if record else ""
@@ -261,6 +270,23 @@ DEFAULT_SITE_BODY_FONT = GoogleFontChoice.MANROPE
 DEFAULT_SITE_HEADING_FONT = GoogleFontChoice.MANROPE
 
 
+class PhoneDisplayFormat(models.TextChoices):
+    """Solo visualizzazione; in database i numeri sono senza spazi (vedi anagrafica.utils)."""
+
+    IT_PLUS_N3_2_2_3 = (
+        "it_plus_n3_2_2_3",
+        "+ prefisso (se presente) 345 67 89 675",
+    )
+    IT_PLUS_N3_3_2_2 = (
+        "it_plus_n3_3_2_2",
+        "+ prefisso (se presente) 345 678 96 75",
+    )
+    IT_PLUS_N10 = (
+        "it_plus_n10",
+        "+ prefisso (se presente) 3456789675",
+    )
+
+
 def get_google_font_config(font_key):
     return GOOGLE_FONT_LIBRARY.get(font_key, GOOGLE_FONT_LIBRARY[DEFAULT_SITE_BODY_FONT])
 
@@ -331,6 +357,12 @@ class SistemaImpostazioniGenerali(models.Model):
         choices=GoogleFontChoice.choices,
         default=DEFAULT_SITE_HEADING_FONT,
         help_text="Scegli il font Google da usare per titoli, intestazioni e sezioni del software.",
+    )
+    formato_visualizzazione_telefono = models.CharField(
+        max_length=32,
+        choices=PhoneDisplayFormat.choices,
+        default=PhoneDisplayFormat.IT_PLUS_N3_2_2_3,
+        help_text="Come mostrare i numeri di telefono in elenchi e schede (in archivio restano senza spazi).",
     )
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)

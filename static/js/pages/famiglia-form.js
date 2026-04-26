@@ -6,8 +6,9 @@ window.ArborisFamigliaForm = (function () {
         const relatedPopups = window.ArborisRelatedPopups;
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
+        const inlineTabs = window.ArborisInlineTabs;
 
-        if (!relatedPopups || !collapsible || !tabs) {
+        if (!relatedPopups || !collapsible || !tabs || !inlineTabs) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
@@ -24,7 +25,10 @@ window.ArborisFamigliaForm = (function () {
             return `arboris-famiglia-form-active-tab-${config.famigliaId || "new"}`;
         }
 
-        const famigliaInlineRoot = () => document.getElementById("famiglia-inline-lock-container");
+        const inlineLockContainerId = "famiglia-inline-lock-container";
+        const targetInputId = "famiglia-inline-target";
+        const inlineEditButtonId = "enable-inline-edit-famiglia-btn";
+        const famigliaInlineRoot = () => document.getElementById(inlineLockContainerId);
         const defaultInlineTab = config.defaultInlineTab || "familiari";
 
         function normalizeTabId(tabId) {
@@ -58,25 +62,7 @@ window.ArborisFamigliaForm = (function () {
         }
 
         function setInlineTarget(tabId) {
-            const input = document.getElementById("famiglia-inline-target");
-            if (!input || !tabId) {
-                return;
-            }
-
-            input.value = tabId.replace(/^tab-/, "");
-        }
-
-        function tabTitleForInlineEditLabel(tabButton) {
-            if (!tabButton) {
-                return "";
-            }
-
-            const baseLabel = (tabButton.dataset.tabBaseLabel || "").trim();
-            if (baseLabel) {
-                return baseLabel;
-            }
-
-            return tabButton.textContent.replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
+            inlineTabs.setInlineTargetValue(targetInputId, tabId);
         }
 
         function refreshInlineEditScope() {
@@ -122,46 +108,18 @@ window.ArborisFamigliaForm = (function () {
         refreshInlineEditScopeHandler = refreshInlineEditScope;
 
         function updateInlineEditButtonLabel(tabId) {
-            const button = document.getElementById("enable-inline-edit-famiglia-btn");
-            if (!button) {
-                return;
-            }
-            if (
-                window.famigliaViewMode &&
-                typeof window.famigliaViewMode.isInlineEditing === "function" &&
-                window.famigliaViewMode.isInlineEditing()
-            ) {
-                return;
-            }
-
-            const root = famigliaInlineRoot();
-            const tabBtn = root && tabId ? root.querySelector(`.tab-btn[data-tab-target="${tabId}"]`) : null;
-            const tabTitle = tabTitleForInlineEditLabel(tabBtn);
-
-            button.textContent = tabTitle ? `Modifica ${tabTitle}` : "Modifica";
+            inlineTabs.updateDefaultInlineEditButtonLabel({
+                buttonId: inlineEditButtonId,
+                containerId: inlineLockContainerId,
+                tabId: tabId,
+                getViewMode: function () {
+                    return window.famigliaViewMode;
+                },
+            });
         }
 
         function refreshLockedTabs() {
-            const input = document.getElementById("famiglia-inline-target");
-            const target = input ? input.value : "";
-            const isInlineEditing = Boolean(
-                window.famigliaViewMode &&
-                typeof window.famigliaViewMode.isInlineEditing === "function" &&
-                window.famigliaViewMode.isInlineEditing()
-            );
-            const lockMessage = "Non è possibile cambiare tab finché non si salvano o annullano le modifiche correnti.";
-
-            document.querySelectorAll("#famiglia-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-                const btnTarget = (btn.dataset.tabTarget || "").replace(/^tab-/, "");
-                const locked = isInlineEditing && target && btnTarget !== target;
-                btn.classList.toggle("is-tab-locked", locked);
-
-                if (locked) {
-                    btn.setAttribute("data-tab-lock-message", lockMessage);
-                } else {
-                    btn.removeAttribute("data-tab-lock-message");
-                }
-            });
+            inlineTabs.clearTabButtonLockClasses(inlineLockContainerId);
         }
 
         refreshLockedTabsHandler = refreshLockedTabs;
@@ -419,93 +377,19 @@ window.ArborisFamigliaForm = (function () {
             });
         }
 
-        function getRelatedConfig(relatedType, selectedId, targetInputName) {
-            const suffix = targetInputName ? `&target_input_name=${encodeURIComponent(targetInputName)}` : "";
-
-            if (relatedType === "relazione_familiare") {
-                return {
-                    addUrl: `${config.urls.creaRelazioneFamiliare}?popup=1${suffix}`,
-                    editUrl: selectedId ? `/relazioni-familiari/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/relazioni-familiari/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "tipo_documento") {
-                return {
-                    addUrl: `${config.urls.creaTipoDocumento}?popup=1${suffix}`,
-                    editUrl: selectedId ? `/tipi-documento/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/tipi-documento/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            if (relatedType === "indirizzo") {
-                return {
-                    addUrl: `${config.urls.creaIndirizzo}?popup=1${suffix}`,
-                    editUrl: selectedId ? `/indirizzi/${selectedId}/modifica/?popup=1${suffix}` : null,
-                    deleteUrl: selectedId ? `/indirizzi/${selectedId}/elimina/?popup=1${suffix}` : null,
-                };
-            }
-
-            return null;
-        }
-
         function wireInlineRelatedButtons(container) {
-            const rows = container.querySelectorAll(".inline-related-field");
-
-            rows.forEach(fieldWrapper => {
-                if (fieldWrapper.dataset.relatedBound === "1") {
-                    return;
-                }
-
-                fieldWrapper.dataset.relatedBound = "1";
-
-                const select = fieldWrapper.querySelector("select");
-                const addBtn = fieldWrapper.querySelector(".inline-related-add");
-                const editBtn = fieldWrapper.querySelector(".inline-related-edit");
-                const deleteBtn = fieldWrapper.querySelector(".inline-related-delete");
-
-                if (!select || !addBtn || !editBtn || !deleteBtn) {
-                    return;
-                }
-
-                const relatedType = addBtn.dataset.relatedType;
-                const targetInputName = select.name;
-
-                function refreshButtons() {
-                    const selectedId = select.value;
-                    editBtn.disabled = !selectedId;
-                    deleteBtn.disabled = !selectedId;
-
+            const routes = window.ArborisRelatedEntityRoutes;
+            if (!routes) {
+                console.error("ArborisRelatedEntityRoutes non disponibile.");
+                return;
+            }
+            routes.wireInlineRelatedButtons(container, {
+                openRelatedPopup: openRelatedPopup,
+                onRefresh(relatedType, select) {
                     if (relatedType === "indirizzo") {
                         refreshInlineAddressHelp(select);
                     }
-                }
-
-                addBtn.onclick = function () {
-                    const cfg = getRelatedConfig(relatedType, null, targetInputName);
-                    if (cfg && cfg.addUrl) {
-                        openRelatedPopup(cfg.addUrl);
-                    }
-                };
-
-                editBtn.onclick = function () {
-                    const selectedId = select.value;
-                    const cfg = getRelatedConfig(relatedType, selectedId, targetInputName);
-                    if (cfg && cfg.editUrl) {
-                        openRelatedPopup(cfg.editUrl);
-                    }
-                };
-
-                deleteBtn.onclick = function () {
-                    const selectedId = select.value;
-                    const cfg = getRelatedConfig(relatedType, selectedId, targetInputName);
-                    if (cfg && cfg.deleteUrl) {
-                        openRelatedPopup(cfg.deleteUrl);
-                    }
-                };
-
-                select.addEventListener("change", refreshButtons);
-                refreshButtons();
+                },
             });
         }
 
@@ -544,13 +428,13 @@ window.ArborisFamigliaForm = (function () {
                 : 0;
 
             if (tabFamiliari) {
-                tabFamiliari.textContent = `${tabTitleForInlineEditLabel(tabFamiliari)} (${familiariRows})`;
+                tabFamiliari.textContent = `${inlineTabs.inlineLabelFromTabButton(tabFamiliari)} (${familiariRows})`;
             }
             if (tabStudenti) {
-                tabStudenti.textContent = `${tabTitleForInlineEditLabel(tabStudenti)} (${studentiRows})`;
+                tabStudenti.textContent = `${inlineTabs.inlineLabelFromTabButton(tabStudenti)} (${studentiRows})`;
             }
             if (tabDocumenti) {
-                tabDocumenti.textContent = `${tabTitleForInlineEditLabel(tabDocumenti)} (${documentiRows + relatedDocumentCount})`;
+                tabDocumenti.textContent = `${inlineTabs.inlineLabelFromTabButton(tabDocumenti)} (${documentiRows + relatedDocumentCount})`;
             }
         }
 
@@ -1131,46 +1015,73 @@ window.ArborisFamigliaForm = (function () {
             if (deleteIndirizzoBtn && indirizzoSelect) deleteIndirizzoBtn.disabled = !indirizzoSelect.value;
         }
 
-        if (addStatoBtn && statoSelect) {
+        const entityRoutes = window.ArborisRelatedEntityRoutes;
+        if (!entityRoutes) {
+            console.error("ArborisRelatedEntityRoutes non disponibile.");
+        }
+
+        if (addStatoBtn && statoSelect && entityRoutes) {
             addStatoBtn.addEventListener("click", function () {
-                openRelatedPopup(`${config.urls.creaStatoRelazioneFamiglia}?popup=1&target_input_name=${encodeURIComponent(statoSelect.name)}`);
+                const cfg = entityRoutes.buildCrudUrls("stato_relazione_famiglia", null, statoSelect.name);
+                if (cfg && cfg.addUrl) {
+                    openRelatedPopup(cfg.addUrl);
+                }
             });
         }
 
-        if (editStatoBtn && statoSelect) {
+        if (editStatoBtn && statoSelect && entityRoutes) {
             editStatoBtn.addEventListener("click", function () {
-                if (statoSelect.value) {
-                    openRelatedPopup(`/stati-relazione-famiglia/${statoSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(statoSelect.name)}`);
+                if (!statoSelect.value) {
+                    return;
+                }
+                const cfg = entityRoutes.buildCrudUrls("stato_relazione_famiglia", statoSelect.value, statoSelect.name);
+                if (cfg && cfg.editUrl) {
+                    openRelatedPopup(cfg.editUrl);
                 }
             });
         }
 
-        if (deleteStatoBtn && statoSelect) {
+        if (deleteStatoBtn && statoSelect && entityRoutes) {
             deleteStatoBtn.addEventListener("click", function () {
-                if (statoSelect.value) {
-                    openRelatedPopup(`/stati-relazione-famiglia/${statoSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(statoSelect.name)}`);
+                if (!statoSelect.value) {
+                    return;
+                }
+                const cfg = entityRoutes.buildCrudUrls("stato_relazione_famiglia", statoSelect.value, statoSelect.name);
+                if (cfg && cfg.deleteUrl) {
+                    openRelatedPopup(cfg.deleteUrl);
                 }
             });
         }
 
-        if (addIndirizzoBtn && indirizzoSelect) {
+        if (addIndirizzoBtn && indirizzoSelect && entityRoutes) {
             addIndirizzoBtn.addEventListener("click", function () {
-                openRelatedPopup(`${config.urls.creaIndirizzo}?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
-            });
-        }
-
-        if (editIndirizzoBtn && indirizzoSelect) {
-            editIndirizzoBtn.addEventListener("click", function () {
-                if (indirizzoSelect.value) {
-                    openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/modifica/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                const cfg = entityRoutes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
+                if (cfg && cfg.addUrl) {
+                    openRelatedPopup(cfg.addUrl);
                 }
             });
         }
 
-        if (deleteIndirizzoBtn && indirizzoSelect) {
+        if (editIndirizzoBtn && indirizzoSelect && entityRoutes) {
+            editIndirizzoBtn.addEventListener("click", function () {
+                if (!indirizzoSelect.value) {
+                    return;
+                }
+                const cfg = entityRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.editUrl) {
+                    openRelatedPopup(cfg.editUrl);
+                }
+            });
+        }
+
+        if (deleteIndirizzoBtn && indirizzoSelect && entityRoutes) {
             deleteIndirizzoBtn.addEventListener("click", function () {
-                if (indirizzoSelect.value) {
-                    openRelatedPopup(`/indirizzi/${indirizzoSelect.value}/elimina/?popup=1&target_input_name=${encodeURIComponent(indirizzoSelect.name)}`);
+                if (!indirizzoSelect.value) {
+                    return;
+                }
+                const cfg = entityRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
+                if (cfg && cfg.deleteUrl) {
+                    openRelatedPopup(cfg.deleteUrl);
                 }
             });
         }
@@ -1200,30 +1111,10 @@ window.ArborisFamigliaForm = (function () {
         if (inlineLockRoot) {
             tabs.bindTabButtons(getFamigliaTabStorageKey(), inlineLockRoot);
         }
-        document.querySelectorAll("#famiglia-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-            btn.addEventListener("arboris:before-tab-activate", function (event) {
-                if (btn.classList.contains("is-tab-locked")) {
-                    event.preventDefault();
-                }
-            });
-
+        document.querySelectorAll("#" + inlineLockContainerId + " .tab-btn[data-tab-target]").forEach(btn => {
             btn.addEventListener("click", function () {
-                const isInlineEditing = Boolean(
-                    window.famigliaViewMode &&
-                    typeof window.famigliaViewMode.isInlineEditing === "function" &&
-                    window.famigliaViewMode.isInlineEditing()
-                );
-
-                if (btn.classList.contains("is-tab-locked")) {
-                    refreshInlineEditScope();
-                    return;
-                }
-
-                if (!isInlineEditing) {
-                    setInlineTarget(btn.dataset.tabTarget);
-                    updateInlineEditButtonLabel(btn.dataset.tabTarget);
-                }
-
+                setInlineTarget(btn.dataset.tabTarget);
+                updateInlineEditButtonLabel(btn.dataset.tabTarget);
                 syncActiveTabUrl(btn.dataset.tabTarget);
                 refreshInlineEditScope();
             });
