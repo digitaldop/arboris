@@ -4194,20 +4194,25 @@ select:focus {
     text-align: left;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table {
     display: block;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead,
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody {
     display: block;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead {
     display: none;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead tr {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead tr,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead tr {
     display: grid;
     grid-template-columns:
         minmax(220px, 1.15fr)
@@ -4221,7 +4226,8 @@ select:focus {
     padding: 14px 16px 12px;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row {
     display: grid;
     grid-template-columns:
         minmax(220px, 1.15fr)
@@ -4249,24 +4255,42 @@ select:focus {
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(9),
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(10),
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(11),
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(12) {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(12),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(6),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(7),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(8),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(9),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(10),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(11),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(12),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(6),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(7),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(8),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(9),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(10),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(11),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(12) {
     display: none !important;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th,
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td {
     border: 0;
     padding: 0;
     min-width: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th {
     background: transparent;
     padding-top: 0;
     padding-bottom: 2px;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td[data-inline-label]::before {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td[data-inline-label]::before,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td[data-inline-label]::before {
     content: attr(data-inline-label);
     display: block;
     margin-bottom: 8px;
@@ -4279,7 +4303,9 @@ select:focus {
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th:nth-child(13),
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(13),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) {
     display: block !important;
     text-align: center;
     justify-self: center;
@@ -4287,31 +4313,37 @@ select:focus {
     min-width: 150px;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-row {
     display: block;
     border-bottom: 1px solid #e6edf1;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-panel {
     display: block;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open) {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open) {
     display: block;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row > td {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row > td,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-row > td {
     display: block;
     padding: 0 16px 18px;
     border: 0;
     background: #fff;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-trigger-cell {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-trigger-cell,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-trigger-cell {
     display: none;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-grid {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-grid,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-grid {
     grid-template-columns:
         minmax(220px, 1.15fr)
         minmax(220px, 1.15fr)
@@ -4326,95 +4358,115 @@ select:focus {
     padding-left: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field input[type="checkbox"] {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field input[type="checkbox"],
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field input[type="checkbox"] {
     width: auto;
     max-width: none;
     display: block;
     margin: 8px auto 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field {
     min-width: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field > label {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field > label,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field > label {
     margin-bottom: 8px;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-tipo-retta {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-tipo-retta,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-tipo-retta {
     grid-column: 1 / 2;
     margin-left: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-agevolazione {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-agevolazione,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-agevolazione {
     grid-column: 2 / 3;
     margin-left: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-riduzione {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-riduzione,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-riduzione {
     grid-column: 3 / 4;
     text-align: center;
     margin-left: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-importo {
     grid-column: 4 / 5;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-non-pagante {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-non-pagante,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-non-pagante {
     grid-column: 5 / 6;
     text-align: center;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-attiva {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-attiva,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-attiva {
     grid-column: 6 / 7;
     text-align: center;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note-admin {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note-admin,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note-admin {
     grid-column: 1 / 4;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note {
     grid-column: 4 / 7;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note-admin textarea,
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note textarea {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note textarea,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note-admin textarea,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note textarea {
     min-height: 126px;
     width: 100%;
     max-width: none;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th:nth-child(13) {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th:nth-child(13),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead th:nth-child(13) {
     white-space: normal;
     line-height: 1.2;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13),
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) {
     display: flex !important;
     justify-content: center;
     align-items: flex-start;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .delete-label {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .delete-label,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .delete-label {
     display: flex;
     justify-content: center;
     width: 100%;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo .currency-input-group {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo .currency-input-group,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-importo .currency-input-group {
     width: auto;
     max-width: 220px;
     align-items: center;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-agevolazione .inline-related-field,
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo .currency-input-group {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo .currency-input-group,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-agevolazione .inline-related-field,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-importo .currency-input-group {
     margin-left: 0;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo input[name$="-importo_riduzione_speciale"] {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-importo input[name$="-importo_riduzione_speciale"],
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-importo input[name$="-importo_riduzione_speciale"] {
     max-width: 12ch;
     min-width: 12ch;
 }
@@ -4437,7 +4489,9 @@ select:focus {
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .delete-label,
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .inline-remove-btn {
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .inline-remove-btn,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .delete-label,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row > td:nth-of-type(13) .inline-remove-btn {
     display: inline-flex;
     align-items: center;
     white-space: nowrap;
@@ -4446,7 +4500,10 @@ select:focus {
 @media (max-width: 1400px) {
     .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead tr,
     .detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row,
-    .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-grid {
+    .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-grid,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table thead tr,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table tbody .inline-form-row,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
@@ -4457,7 +4514,15 @@ select:focus {
     .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-non-pagante,
     .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-attiva,
     .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note-admin,
-    .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note {
+    .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-field-note,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-agevolazione,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-tipo-retta,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-riduzione,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-importo,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-non-pagante,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-attiva,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note-admin,
+    .detail-form.is-inline-edit-mode #tab-iscrizioni.is-active #iscrizioni-table .inline-details-field-note {
         grid-column: auto;
     }
 }

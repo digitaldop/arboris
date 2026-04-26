@@ -2088,7 +2088,7 @@ def modifica_familiare(request, pk):
                     return redirect("crea_familiare")
 
                 messages.success(request, "Modifiche salvate correttamente.")
-                return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
+                return redirect("modifica_familiare", pk=familiare.pk)
         if studenti_formset is None and famiglia_for_studenti:
             studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
     else:

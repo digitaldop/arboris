@@ -608,7 +608,7 @@ class FamiliareDetailViewTests(TestCase):
         self.assertContains(response, 'name="documenti-0-id"')
         self.assertContains(response, 'class="inline-form-row inline-empty-row is-hidden"')
 
-    def test_modifica_familiare_full_save_redirects_with_blank_inline_rows(self):
+    def test_modifica_familiare_full_save_redirects_to_detail_view_with_blank_inline_rows(self):
         response = self.client.post(
             reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
             {
@@ -658,8 +658,11 @@ class FamiliareDetailViewTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse("lista_familiari"), response["Location"])
+        self.assertRedirects(
+            response,
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            fetch_redirect_response=False,
+        )
 
 
 class StudenteListTests(TestCase):
