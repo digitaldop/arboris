@@ -123,10 +123,11 @@ window.ArborisStudenteForm = (function () {
                     form.classList.toggle("is-inline-iscrizioni-layout", isInlineEditing && target === "iscrizioni");
                 }
 
-                syncIscrizioniInlineDetails();
-                if (isInlineEditing && target === "iscrizioni") {
+                const isFullEditing = Boolean(form && form.classList.contains("is-edit-mode"));
+                if ((isInlineEditing || isFullEditing) && target === "iscrizioni") {
                     ensureVisibleInlineRow("iscrizioni");
                 }
+                syncIscrizioniInlineDetails();
             },
         });
 
