@@ -42,6 +42,7 @@ from anagrafica.models import (
     TipoDocumento,
 )
 from economia.models import (
+    Agevolazione,
     CondizioneIscrizione,
     Iscrizione,
     PrestazioneScambioRetta,
@@ -955,16 +956,29 @@ class StudenteDetailPerformanceTests(TestCase):
             preiscrizione=Decimal("200.00"),
             attiva=True,
         )
-        Iscrizione.objects.create(
+        self.agevolazione = Agevolazione.objects.create(
+            nome_agevolazione="ISEE",
+            importo_annuale_agevolazione=Decimal("300.00"),
+            attiva=True,
+        )
+        self.iscrizione = Iscrizione.objects.create(
             studente=self.studente,
             classe=self.classe,
             anno_scolastico=self.anno,
+            data_iscrizione=date(2025, 9, 15),
+            data_fine_iscrizione=date(2026, 6, 5),
             stato_iscrizione=self.stato_iscrizione,
             condizione_iscrizione=self.condizione,
+            agevolazione=self.agevolazione,
+            riduzione_speciale=True,
+            importo_riduzione_speciale=Decimal("150.00"),
+            non_pagante=True,
+            note_amministrative="Riduzione straordinaria approvata.",
+            note="Verificare rinnovo a giugno.",
             attiva=True,
         )
         self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
-        Documento.objects.create(
+        self.documento = Documento.objects.create(
             studente=self.studente,
             tipo_documento=self.tipo_documento,
             descrizione="Documento studente",
@@ -1001,6 +1015,27 @@ class StudenteDetailPerformanceTests(TestCase):
         ]:
             self.assertEqual(html.count(f'id="id_iscrizioni-0-{field_name}"'), 1)
             self.assertEqual(html.count(f'id="id_iscrizioni-__prefix__-{field_name}"'), 1)
+
+    def test_modifica_studente_view_mode_shows_iscrizione_summary_fields(self):
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tipo di retta")
+        self.assertContains(response, "Retta standard")
+        self.assertContains(response, "Agevolazione")
+        self.assertContains(response, "ISEE")
+        self.assertContains(response, "Riduzione speciale")
+        self.assertContains(response, "Importo riduzione speciale")
+        self.assertContains(response, "Studente non pagante")
+        self.assertContains(response, "Note generali")
+        self.assertContains(response, "Note amministrative")
+
+    def test_modifica_studente_documenti_view_shows_data_caricamento(self):
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "DATA CARICAMENTO")
+        self.assertContains(response, self.documento.data_caricamento.strftime("%d / %m / %Y"))
 
     def test_modifica_studente_without_iscrizioni_renders_revealable_empty_row(self):
         studente_senza_iscrizioni = Studente.objects.create(
@@ -1070,11 +1105,14 @@ class StudenteDetailPerformanceTests(TestCase):
         html = response.content.decode()
         self.assertIn("is-inline-edit-mode", html)
         self.assertIn("is-inline-iscrizioni-layout", html)
-        self.assertIn("iscrizioni-inline-details-grid", html)
+        self.assertIn("iscrizioni-inline-economic-grid", html)
+        self.assertIn("iscrizioni-inline-notes-edit-grid", html)
+        self.assertIn("inline-economic-row", html)
+        self.assertIn("inline-notes-row", html)
         self.assertIn("Mostra dettagli", html)
-        self.assertIn("Dettagli sotto", html)
         self.assertIn('id="id_iscrizioni-0-condizione_iscrizione"', html)
         self.assertIn('id="id_iscrizioni-0-agevolazione"', html)
         self.assertIn('id="id_iscrizioni-0-importo_riduzione_speciale"', html)
         self.assertNotIn('class="inline-form-row inline-empty-row is-hidden">\n                                        <input type="hidden" name="iscrizioni-0-id"', html)
-        self.assertNotIn('class="inline-details-row inline-empty-row is-hidden"', html)
+        self.assertNotIn('class="inline-details-row inline-economic-row inline-empty-row is-hidden"', html)
+        self.assertNotIn('class="inline-details-row inline-notes-row inline-empty-row is-hidden"', html)

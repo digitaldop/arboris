@@ -545,6 +545,7 @@
                                     <th>TIPO DOCUMENTO</th>
                                     <th>DESCRIZIONE</th>
                                     <th>FILE</th>
+                                    <th class="inline-view-only-table-cell">DATA CARICAMENTO</th>
                                     <th>SCADENZA</th>
                                     <th>VISIBILE</th>
                                     <th>NOTE</th>
@@ -574,6 +575,13 @@
                                                 </div>
                                             {% endif %}
                                         </td>
+                                        <td class="inline-view-only-table-cell">
+                                            {% if f.instance.pk and f.instance.data_caricamento %}
+                                                {{ f.instance.data_caricamento|it_date }}
+                                            {% else %}
+                                                <span class="table-muted">-</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ f.scadenza }}</td>
                                         <td class="inline-checkbox-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
@@ -597,7 +605,7 @@
                                     </tr>
                                     {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="7">{{ f.errors }}</td>
+                                            <td colspan="8">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -623,6 +631,7 @@
                                                 <th>Familiare</th>
                                                 <th>Tipo documento</th>
                                                 <th>Descrizione</th>
+                                                <th>Data caricamento</th>
                                                 <th>Scadenza</th>
                                                 <th>Visibile</th>
                                                 <th>File</th>
@@ -634,6 +643,7 @@
                                                     <td>{{ doc.familiare }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
                                                     <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
                                                     <td>{{ doc.scadenza|default:"—" }}</td>
                                                     <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
@@ -664,6 +674,7 @@
                                                 <th>{{ student_terminology.selected_singular }}</th>
                                                 <th>Tipo documento</th>
                                                 <th>Descrizione</th>
+                                                <th>Data caricamento</th>
                                                 <th>Scadenza</th>
                                                 <th>Visibile</th>
                                                 <th>File</th>
@@ -675,6 +686,7 @@
                                                     <td>{{ doc.studente }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
                                                     <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
                                                     <td>{{ doc.scadenza|default:"—" }}</td>
                                                     <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
@@ -815,6 +827,7 @@
             </td>
             <td>{{ documenti_formset.empty_form.descrizione }}</td>
             <td>{{ documenti_formset.empty_form.file }}</td>
+            <td class="inline-view-only-table-cell"><span class="table-muted">-</span></td>
             <td>{{ documenti_formset.empty_form.scadenza }}</td>
             <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
             <td>{{ documenti_formset.empty_form.note }}</td>

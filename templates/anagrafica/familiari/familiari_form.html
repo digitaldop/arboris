@@ -393,6 +393,7 @@
                                     <th>Tipo documento</th>
                                     <th>Descrizione</th>
                                     <th>File</th>
+                                    <th class="inline-view-only-table-cell">Data caricamento</th>
                                     <th>Scadenza</th>
                                     <th>Visibile</th>
                                     <th>Note</th>
@@ -422,6 +423,13 @@
                                                 </div>
                                             {% endif %}
                                         </td>
+                                        <td class="inline-view-only-table-cell">
+                                            {% if f.instance.pk and f.instance.data_caricamento %}
+                                                {{ f.instance.data_caricamento|it_date }}
+                                            {% else %}
+                                                <span class="table-muted">-</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ f.scadenza }}</td>
                                         <td class="inline-checkbox-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
@@ -445,7 +453,7 @@
                                     </tr>
                                     {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="7">{{ f.errors }}</td>
+                                            <td colspan="8">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -500,6 +508,7 @@
             </td>
             <td>{{ documenti_formset.empty_form.descrizione }}</td>
             <td>{{ documenti_formset.empty_form.file }}</td>
+            <td class="inline-view-only-table-cell"><span class="table-muted">-</span></td>
             <td>{{ documenti_formset.empty_form.scadenza }}</td>
             <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
             <td>{{ documenti_formset.empty_form.note }}</td>

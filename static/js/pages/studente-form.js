@@ -159,7 +159,7 @@ window.ArborisStudenteForm = (function () {
             }
 
             return inlineFormsets.getRowBundle(row, {
-                companionClasses: ["inline-details-row"],
+                companionClasses: ["inline-economic-row", "inline-notes-row"],
             });
         }
 
@@ -184,7 +184,8 @@ window.ArborisStudenteForm = (function () {
         function syncIscrizioniInlineDetails() {
             const form = document.getElementById("studente-detail-form");
             const layoutEnabled = Boolean(form && form.classList.contains("is-inline-iscrizioni-layout"));
-            const detailsShouldBeOpen = layoutEnabled;
+            const tabIscrizioni = document.getElementById("tab-iscrizioni");
+            const detailsShouldBeOpen = layoutEnabled || Boolean(tabIscrizioni && tabIscrizioni.classList.contains("is-inline-edit-target"));
 
             document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
                 const state = getIscrizioneBundleState(row);
@@ -449,10 +450,10 @@ window.ArborisStudenteForm = (function () {
         inlineManagers = {
             iscrizioni: createInlineManager("iscrizioni", {
                 prepareOptions: {
-                    companionClasses: ["inline-details-row"],
+                    companionClasses: ["inline-economic-row", "inline-notes-row"],
                 },
                 mountOptions: {
-                    companionClasses: ["inline-details-row"],
+                    companionClasses: ["inline-economic-row", "inline-notes-row"],
                     enableInputs: true,
                     onReady: function (state) {
                         wireIscrizioneBundle(state);
@@ -460,7 +461,7 @@ window.ArborisStudenteForm = (function () {
                     focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
                 },
                 removeOptions: {
-                    companionClasses: ["inline-details-row"],
+                    companionClasses: ["inline-economic-row", "inline-notes-row"],
                 },
             }),
             documenti: createInlineManager("documenti", {
@@ -599,9 +600,9 @@ window.ArborisStudenteForm = (function () {
                 const riduzioneCells = findAllInBundle(".iscrizione-riduzione-cell, .inline-details-field-riduzione");
                 const importoCells = findAllInBundle(".iscrizione-importo-riduzione-cell, .inline-details-field-importo");
 
-                agevolazioneCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
-                riduzioneCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
-                importoCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
+                agevolazioneCells.forEach(cell => cell.classList.remove("is-hidden"));
+                riduzioneCells.forEach(cell => cell.classList.remove("is-hidden"));
+                importoCells.forEach(cell => cell.classList.remove("is-hidden"));
 
                 if (!riduzioniAmmesse) {
                     if (agevolazioneSelect) {

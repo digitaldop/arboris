@@ -2474,19 +2474,27 @@ select:focus {
 }
 
 .inline-remove-btn {
-    border: 1px solid #d0d0d0;
-    background: #f8f8f8;
-    color: #ba2121;
-    border-radius: 3px;
-    padding: 3px 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    padding: 5px 10px;
+    border: 1px solid #cf4d4d;
+    border-radius: 4px;
+    background: #fff1f1;
+    color: #a12626;
     font-size: 11px;
-    cursor: pointer;
+    font-weight: 700;
     line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .inline-remove-btn:hover {
-    background: #fff1f1;
-    border-color: #e0b4b4;
+    background: #ffe1e1;
+    border-color: #bc3838;
 }
 
 .inline-add-row {
@@ -2968,6 +2976,7 @@ select:focus {
 .detail-form.is-edit-mode .inline-lock-container .mode-edit-field,
 .detail-form.is-edit-mode .inline-lock-container .inline-related-field.mode-edit-field,
 .detail-form.is-edit-mode .inline-lock-container .related-field-row.mode-edit-field,
+.detail-form.is-edit-mode .inline-lock-container .mode-edit-only,
 .detail-form.is-edit-mode .inline-lock-container .related-actions,
 .detail-form.is-edit-mode .inline-lock-container .inline-add-row,
 .detail-form.is-edit-mode .inline-lock-container .inline-delete-cell,
@@ -4158,120 +4167,373 @@ select:focus {
 .detail-form #iscrizioni-table {
     width: 100%;
     min-width: 0;
-    table-layout: fixed;
-    display: table;
+    table-layout: auto;
+    display: block;
     margin-left: 0;
     margin-right: 0;
 }
 
-.detail-form #iscrizioni-table th,
+.detail-form #iscrizioni-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
 .detail-form #iscrizioni-table td {
-    padding: 8px 10px;
+    padding: 0;
     vertical-align: top;
 }
 
-.detail-form #iscrizioni-table thead th {
-    text-align: left;
-    vertical-align: middle;
-    white-space: normal;
-    line-height: 1.15;
+.detail-form #iscrizioni-table .inline-form-row,
+.detail-form #iscrizioni-table .inline-details-row,
+.detail-form #iscrizioni-table .inline-errors-row {
+    display: block;
+    width: 100%;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-col-anno {
-    width: 18ch;
+.detail-form #iscrizioni-table .iscrizioni-row-cell {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-col-classe {
-    width: 22ch;
+.detail-form #iscrizioni-table .iscrizioni-inline-main-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px 12px;
+    padding: 14px;
+    border: 1px solid #e5edf2;
+    border-radius: 8px;
+    background: #fff;
+    align-items: start;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-col-data,
-.detail-form #iscrizioni-table .iscrizioni-col-fine {
-    width: 16ch;
-    white-space: nowrap;
+.detail-form #iscrizioni-table .iscrizioni-inline-field {
+    min-width: 0;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-col-stato {
-    width: 22ch;
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .iscrizioni-inline-view-summary,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-view-summary {
+    display: none;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-col-dettagli {
-    width: 15ch;
-    text-align: center;
-}
-
-.detail-form #iscrizioni-table .iscrizioni-col-delete {
-    width: 14ch;
-    text-align: center;
-}
-
-.detail-form #iscrizioni-table .iscrizioni-col-dettagli .mode-view-only,
-.detail-form #iscrizioni-table .iscrizioni-col-delete .delete-label,
-.detail-form #iscrizioni-table .iscrizioni-col-delete .inline-remove-btn {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.detail-form #iscrizioni-table .iscrizioni-inline-edit-hint {
-    justify-content: center;
-    align-items: center;
-    color: #5d6f7d;
+.detail-form #iscrizioni-table .iscrizioni-inline-field > label {
+    display: block;
+    margin-bottom: 8px;
+    color: #5c6f7b;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
     text-transform: uppercase;
 }
 
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-edit-field,
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-view-only {
+    min-width: 0;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-edit-field input[type="date"],
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-edit-field select,
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-edit-field .autocomplete-wrapper,
+.detail-form #iscrizioni-table .iscrizioni-inline-field .mode-edit-field .searchable-select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.detail-form #iscrizioni-table .inline-related-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+}
+
+.detail-form #iscrizioni-table .inline-related-field select,
+.detail-form #iscrizioni-table .inline-related-field .searchable-select,
+.detail-form #iscrizioni-table .inline-related-field .autocomplete-wrapper {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+}
+
+.detail-form #iscrizioni-table .inline-related-actions {
+    display: inline-flex;
+    gap: 2px;
+    flex: 0 0 auto;
+    align-self: start;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-field-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-field-actions > label {
+    width: 100%;
+    text-align: center;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-field-actions .mode-view-only,
+.detail-form #iscrizioni-table .iscrizioni-inline-delete-wrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-edit-hint {
+    display: none !important;
+}
+
 .detail-form #iscrizioni-table .inline-details-row > td {
-    padding: 0 10px 12px;
+    padding: 0;
     border-top: 0;
-    background: #fff;
+    background: transparent;
 }
 
 .detail-form #iscrizioni-table .inline-details-panel {
-    margin: 0;
+    margin: 0 0 0;
     padding: 14px 16px 16px;
     border: 1px solid #e5edf2;
-    border-radius: 8px;
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
     background: #f9fbfc;
-}
-
-.detail-form.is-view-mode #iscrizioni-table .inline-details-row > td {
-    padding-top: 0;
-    padding-bottom: 0;
-    background: transparent;
-    border-bottom: 0;
-}
-
-.detail-form.is-view-mode #iscrizioni-table .inline-details-panel:not(.is-open) {
-    display: none;
-}
-
-.detail-form.is-view-mode #iscrizioni-table .inline-details-panel.is-open {
-    margin-bottom: 12px;
-}
-
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel,
-.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-panel {
     display: block;
 }
 
-.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open),
-.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open) {
-    display: block;
+.detail-form #iscrizioni-table .inline-form-row + .inline-details-row .inline-details-panel {
+    margin-top: -8px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-toggle,
+.detail-form.is-view-mode #iscrizioni-table .inline-details-toggle,
 .detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-toggle {
     display: none;
 }
 
-.detail-form #iscrizioni-table .iscrizioni-inline-details-grid {
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-field-actions {
+    display: none;
+}
+
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-field-actions {
+    display: flex !important;
+    justify-content: flex-start;
+    text-align: center;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-main-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: stretch;
+}
+
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-main-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px 12px;
+    overflow: visible;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table tbody {
+    gap: 0;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .iscrizioni-inline-main-grid,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-main-grid {
+    padding: 12px 28px 10px;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-field {
+    flex: 1 1 112px;
+    min-width: 98px;
+}
+
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-field {
+    flex: initial;
+    min-width: 0;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-field > label {
+    margin-bottom: 6px;
+    font-size: 10px;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .inline-details-row > td {
+    padding-top: 8px;
+    padding-bottom: 0;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row > td,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row > td {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .inline-economic-row {
+    display: none;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row {
+    display: block !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row.inline-empty-row.is-hidden,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row.inline-empty-row.is-hidden {
+    display: none !important;
+}
+
+.detail-form #iscrizioni-table .inline-economic-row > td.iscrizioni-row-cell {
+    display: block !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .iscrizioni-inline-edit-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .iscrizioni-inline-edit-panel {
+    display: block !important;
+    min-height: 1px;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-form-row + .inline-details-row .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row + .inline-details-row .inline-details-panel {
+    margin-top: 0;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .inline-details-panel,
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-notes-row .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row .inline-details-panel {
+    margin: 0;
+    padding: 10px 14px;
+    border-color: #e5edf2;
+    border-top: 1px solid #edf2f5;
+    border-left: 1px solid #e5edf2;
+    border-right: 1px solid #e5edf2;
+    background: #fff;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .inline-details-panel {
+    border-bottom: 0;
+    border-radius: 0;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-notes-row .inline-details-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row .inline-details-panel {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5edf2;
+    border-radius: 0 0 8px 8px;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .iscrizioni-inline-economic-grid,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .iscrizioni-inline-economic-grid {
+    display: grid !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .inline-details-field,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .inline-details-field,
+.detail-form #iscrizioni-table .inline-economic-row .inline-details-field.is-hidden {
+    display: block !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .mode-edit-field,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .mode-edit-field {
+    display: block !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .inline-related-field.mode-edit-field,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .inline-related-field.mode-edit-field {
+    display: grid !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-economic-row .mode-view-only,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row .mode-view-only {
+    display: none !important;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-view-notes {
+    display: block;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .iscrizioni-inline-view-notes,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-view-notes {
+    display: none !important;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-notes-toggle {
+    padding: 8px 12px;
+    border: 1px solid #e5edf2;
+    border-radius: 6px 6px 0 0;
+    background: #f9fbfc;
+    color: #2f657f;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-view-notes-panel {
+    padding: 12px 14px 14px;
+    border: 1px solid #e5edf2;
+    border-top: 0;
+    border-radius: 0 0 6px 6px;
+    background: #f9fbfc;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-view-notes-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-view-notes-field {
+    min-width: 0;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-view-notes-field > label {
+    display: block;
+    margin-bottom: 6px;
+    color: #5c6f7b;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-edit-panel,
+.detail-form:not(.is-inline-iscrizioni-layout) #iscrizioni-table .iscrizioni-inline-notes-edit-panel {
+    display: none !important;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .iscrizioni-inline-edit-panel,
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .iscrizioni-inline-notes-edit-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-edit-panel,
+.detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-notes-edit-panel {
+    display: block !important;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-economic-grid,
+.detail-form #iscrizioni-table .iscrizioni-inline-notes-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 14px;
     align-items: start;
+}
+
+.detail-form #iscrizioni-table .iscrizioni-inline-notes-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .detail-form #iscrizioni-table .inline-details-field {
@@ -4304,7 +4566,7 @@ select:focus {
 
 .detail-form #iscrizioni-table .inline-details-field-note-admin,
 .detail-form #iscrizioni-table .inline-details-field-note {
-    grid-column: span 2;
+    grid-column: auto;
 }
 
 .detail-form #iscrizioni-table .inline-details-field-agevolazione .inline-related-field,
@@ -4325,7 +4587,8 @@ select:focus {
 }
 
 @media (max-width: 1400px) {
-    .detail-form #iscrizioni-table .iscrizioni-inline-details-grid {
+    .detail-form #iscrizioni-table .iscrizioni-inline-economic-grid,
+    .detail-form #iscrizioni-table .iscrizioni-inline-notes-edit-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -4333,18 +4596,15 @@ select:focus {
     .detail-form #iscrizioni-table .inline-details-field-note {
         grid-column: 1 / -1;
     }
+
+    .detail-form #iscrizioni-table .iscrizioni-inline-view-notes-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 1100px) {
-    .detail-form #iscrizioni-table .iscrizioni-col-dettagli {
-        width: 12ch;
-    }
-
-    .detail-form #iscrizioni-table .iscrizioni-col-delete {
-        width: 11ch;
-    }
-
-    .detail-form #iscrizioni-table .iscrizioni-inline-details-grid {
+    .detail-form #iscrizioni-table .iscrizioni-inline-economic-grid,
+    .detail-form #iscrizioni-table .iscrizioni-inline-notes-edit-grid {
         grid-template-columns: 1fr;
     }
 
