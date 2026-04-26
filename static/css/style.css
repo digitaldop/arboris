@@ -4203,6 +4203,10 @@ select:focus {
     display: block;
 }
 
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead {
+    display: none;
+}
+
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead tr {
     display: grid;
     grid-template-columns:
@@ -4260,6 +4264,18 @@ select:focus {
     background: transparent;
     padding-top: 0;
     padding-bottom: 2px;
+}
+
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table tbody .inline-form-row > td[data-inline-label]::before {
+    content: attr(data-inline-label);
+    display: block;
+    margin-bottom: 8px;
+    color: #5c6f7b;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+    white-space: normal;
 }
 
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table thead th:nth-child(13),

@@ -59,6 +59,7 @@ window.ArborisTabs = (function () {
 
                 if (!btn.dispatchEvent(beforeEvent) || beforeEvent.defaultPrevented) {
                     event.preventDefault();
+                    event.stopImmediatePropagation();
                     return;
                 }
 

@@ -32,7 +32,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="studente-detail-form" class="detail-form{% if studente %} is-view-mode{% endif %}">
+    <form method="post" enctype="multipart/form-data" id="studente-detail-form" class="detail-form{% if studente %}{% if edit_scope == 'inline' %} is-inline-edit-mode{% elif edit_scope == 'full' %} is-edit-mode{% else %} is-view-mode{% endif %}{% else %} is-edit-mode{% endif %}{% if show_inline_iscrizioni_editor %} is-inline-iscrizioni-layout{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="studente-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="studente-inline-target" value="{{ inline_target|default:'iscrizioni' }}">
@@ -291,9 +291,9 @@
                             </thead>
                             <tbody>
                                 {% for f in iscrizioni_formset %}
-                                    <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-form-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
-                                        <td>
+                                        <td data-inline-label="Anno scolastico">
                                             <div class="inline-related-field">
                                                 {{ f.anno_scolastico }}
                                                 <div class="related-actions inline-related-actions">
@@ -303,7 +303,7 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-inline-label="Classe">
                                             <div class="inline-related-field">
                                                 {{ f.classe }}
                                                 <div class="related-actions inline-related-actions">
@@ -313,9 +313,9 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{{ f.data_iscrizione }}</td>
+                                        <td data-inline-label="Data iscrizione">{{ f.data_iscrizione }}</td>
                                         {% if studente %}
-                                            <td>
+                                            <td data-inline-label="Fine iscrizione">
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                     {% if f.instance.pk and f.instance.data_fine_effettiva %}
                                                         {{ f.instance.data_fine_effettiva|it_date }}
@@ -331,7 +331,7 @@
                                                 </div>
                                             </td>
                                         {% endif %}
-                                        <td>
+                                        <td data-inline-label="Stato">
                                             <div class="inline-related-field">
                                                 {{ f.stato_iscrizione }}
                                                 <div class="related-actions inline-related-actions">
@@ -341,7 +341,7 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-inline-label="Tipo di retta">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.condizione_iscrizione %}
                                                     {{ f.instance.condizione_iscrizione }}
@@ -350,7 +350,7 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td class="iscrizione-agevolazione-cell">
+                                        <td class="iscrizione-agevolazione-cell" data-inline-label="Agevolazione">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.agevolazione %}
                                                     {{ f.instance.agevolazione }}
@@ -359,10 +359,10 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell">
+                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell" data-inline-label="Riduzione speciale">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.riduzione_speciale|si_no }}</div>
                                         </td>
-                                        <td class="iscrizione-importo-riduzione-cell">
+                                        <td class="iscrizione-importo-riduzione-cell" data-inline-label="Importo riduzione speciale">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.riduzione_speciale and f.instance.importo_riduzione_speciale and f.instance.importo_riduzione_speciale > 0 %}
                                                     EUR {{ f.instance.importo_riduzione_speciale|euro }}
@@ -371,13 +371,13 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide">
+                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide" data-inline-label="Studente non pagante">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.non_pagante|si_no }}</div>
                                         </td>
-                                        <td class="inline-checkbox-cell">
+                                        <td class="inline-checkbox-cell" data-inline-label="Iscrizione attiva">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.attiva|si_no }}</div>
                                         </td>
-                                        <td class="inline-details-trigger-cell">
+                                        <td class="inline-details-trigger-cell" data-inline-label="Dettagli">
                                             <button
                                                 type="button"
                                                 class="inline-details-toggle collapsible-title"
@@ -389,7 +389,7 @@
                                                 <span data-collapsible-label>Mostra note</span>
                                             </button>
                                         </td>
-                                        <td class="inline-delete-cell mode-edit-only-table-cell">
+                                        <td class="inline-delete-cell mode-edit-only-table-cell" data-inline-label="Elimina iscrizione">
                                             {% if f.instance.pk %}
                                                 <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                             {% else %}
@@ -397,7 +397,7 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    <tr class="inline-details-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-details-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
                                         <td colspan="{% if studente %}13{% else %}12{% endif %}">
                                             <div class="inline-details-panel collapsible-panel" id="iscrizioni-note-panel-{{ forloop.counter0 }}">
                                                 <div class="inline-details-grid">
@@ -727,7 +727,7 @@
     <template id="iscrizioni-empty-form-template">
         <tr class="inline-form-row">
             {{ iscrizioni_formset.empty_form.id }}
-            <td>
+            <td data-inline-label="Anno scolastico">
                 <div class="inline-related-field">
                     {{ iscrizioni_formset.empty_form.anno_scolastico }}
                     <div class="related-actions inline-related-actions">
@@ -737,7 +737,7 @@
                     </div>
                 </div>
             </td>
-            <td>
+            <td data-inline-label="Classe">
                 <div class="inline-related-field">
                     {{ iscrizioni_formset.empty_form.classe }}
                     <div class="related-actions inline-related-actions">
@@ -747,14 +747,14 @@
                     </div>
                 </div>
             </td>
-            <td>{{ iscrizioni_formset.empty_form.data_iscrizione }}</td>
+            <td data-inline-label="Data iscrizione">{{ iscrizioni_formset.empty_form.data_iscrizione }}</td>
             {% if studente %}
-                <td>
+                <td data-inline-label="Fine iscrizione">
                     {{ iscrizioni_formset.empty_form.data_fine_iscrizione.as_hidden }}
                     <span class="table-muted">&mdash;</span>
                 </td>
             {% endif %}
-            <td>
+            <td data-inline-label="Stato">
                 <div class="inline-related-field">
                     {{ iscrizioni_formset.empty_form.stato_iscrizione }}
                     <div class="related-actions inline-related-actions">
@@ -764,17 +764,17 @@
                     </div>
                 </div>
             </td>
-            <td><span class="table-muted">-</span></td>
-            <td class="iscrizione-agevolazione-cell">
+            <td data-inline-label="Tipo di retta"><span class="table-muted">-</span></td>
+            <td class="iscrizione-agevolazione-cell" data-inline-label="Agevolazione">
                 <span class="table-muted">Nessuna</span>
             </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell"><span class="table-muted">-</span></td>
-            <td class="iscrizione-importo-riduzione-cell">
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell" data-inline-label="Riduzione speciale"><span class="table-muted">-</span></td>
+            <td class="iscrizione-importo-riduzione-cell" data-inline-label="Importo riduzione speciale">
                 <span class="table-muted">Nessuno</span>
             </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide"><span class="table-muted">-</span></td>
-            <td class="inline-checkbox-cell"><span class="table-muted">-</span></td>
-            <td class="inline-details-trigger-cell">
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide" data-inline-label="Studente non pagante"><span class="table-muted">-</span></td>
+            <td class="inline-checkbox-cell" data-inline-label="Iscrizione attiva"><span class="table-muted">-</span></td>
+            <td class="inline-details-trigger-cell" data-inline-label="Dettagli">
                 <button
                     type="button"
                     class="inline-details-toggle collapsible-title"
@@ -786,7 +786,7 @@
                     <span data-collapsible-label>Mostra note</span>
                 </button>
             </td>
-            <td class="inline-delete-cell">
+            <td class="inline-delete-cell" data-inline-label="Elimina iscrizione">
                 <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
@@ -883,12 +883,12 @@
 
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
-    <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=3"></script>
+    <script src="{% static 'js/core/tabs.js' %}?v=3"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=33"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=34"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

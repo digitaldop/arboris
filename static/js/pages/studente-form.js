@@ -26,6 +26,8 @@ window.ArborisStudenteForm = (function () {
         const targetInputId = "studente-inline-target";
         const inlineLockContainerId = "studente-inline-lock-container";
         const inlineEditButtonId = "enable-inline-edit-studente-btn";
+        let inlineManagers = null;
+        let suppressAutoEmptyInlineMount = false;
 
         function setInlineTarget(prefixOrTabId) {
             inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
@@ -71,6 +73,9 @@ window.ArborisStudenteForm = (function () {
                 }
 
                 syncIscrizioniInlineDetails();
+                if (isInlineEditing && target === "iscrizioni") {
+                    ensureVisibleInlineRow("iscrizioni");
+                }
             },
         });
 
@@ -368,7 +373,29 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
-        const inlineManagers = {
+        function hasVisibleInlineRows(prefix) {
+            const table = document.getElementById(prefix + "-table");
+            if (!table) {
+                return false;
+            }
+
+            return Array.from(table.querySelectorAll("tbody .inline-form-row")).some(function (row) {
+                return !row.classList.contains("is-hidden");
+            });
+        }
+
+        function ensureVisibleInlineRow(prefix) {
+            if (suppressAutoEmptyInlineMount || !inlineManagers || !inlineManagers[prefix] || hasVisibleInlineRows(prefix)) {
+                return;
+            }
+
+            const mounted = inlineManagers[prefix].add();
+            if (mounted) {
+                refreshTabCounts();
+            }
+        }
+
+        inlineManagers = {
             iscrizioni: createInlineManager("iscrizioni", {
                 prepareOptions: {
                     companionClasses: ["inline-details-row"],
@@ -564,17 +591,22 @@ window.ArborisStudenteForm = (function () {
             setInlineTarget(prefix);
             tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
 
-            if (window.studenteViewMode && !window.studenteViewMode.isEditing()) {
-                window.studenteViewMode.setInlineEditing(true);
-            }
+            suppressAutoEmptyInlineMount = true;
+            try {
+                if (window.studenteViewMode && !window.studenteViewMode.isEditing()) {
+                    window.studenteViewMode.setInlineEditing(true);
+                }
 
-            refreshInlineEditScope();
-            updateInlineEditButtonLabel(`tab-${prefix}`);
+                refreshInlineEditScope();
+                updateInlineEditButtonLabel(`tab-${prefix}`);
 
-            const mounted = manager.add();
+                const mounted = manager.add();
 
-            if (!mounted) {
-                return;
+                if (!mounted) {
+                    return;
+                }
+            } finally {
+                suppressAutoEmptyInlineMount = false;
             }
 
             refreshInlineEditScope();
@@ -629,6 +661,13 @@ window.ArborisStudenteForm = (function () {
         const inlineLockRoot = studenteInlineRoot();
         if (inlineLockRoot) {
             tabs.bindTabButtons(getStudenteTabStorageKey(), inlineLockRoot);
+            inlineTabs.bindTabNavigationLock({
+                containerId: inlineLockContainerId,
+                targetInputId: targetInputId,
+                getViewMode: function () {
+                    return window.studenteViewMode;
+                },
+            });
         }
         document.querySelectorAll("#studente-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
             btn.addEventListener("click", function () {

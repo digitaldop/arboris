@@ -805,3 +805,80 @@ class StudenteDetailPerformanceTests(TestCase):
         ]:
             self.assertEqual(html.count(f'id="id_iscrizioni-0-{field_name}"'), 1)
             self.assertEqual(html.count(f'id="id_iscrizioni-__prefix__-{field_name}"'), 1)
+
+    def test_modifica_studente_without_iscrizioni_renders_revealable_empty_row(self):
+        studente_senza_iscrizioni = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Agnese",
+            cognome="Bersani",
+            luogo_nascita=self.citta,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": studente_senza_iscrizioni.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_iscrizioni-0-anno_scolastico"')
+        self.assertContains(response, 'id="id_iscrizioni-0-classe"')
+        self.assertContains(response, 'id="id_iscrizioni-0-condizione_iscrizione"')
+        self.assertContains(response, 'id="iscrizioni-empty-form-template"')
+        self.assertContains(response, 'data-inline-action="add" data-inline-prefix="iscrizioni"')
+
+    def test_modifica_studente_inline_iscrizioni_rerenders_complete_visible_editor(self):
+        studente_senza_iscrizioni = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Agnese",
+            cognome="Bersani",
+            luogo_nascita=self.citta,
+            attivo=True,
+        )
+
+        response = self.client.post(
+            reverse("modifica_studente", kwargs={"pk": studente_senza_iscrizioni.pk}),
+            {
+                "_edit_scope": "inline",
+                "_inline_target": "iscrizioni",
+                "famiglia": self.famiglia.pk,
+                "cognome": "Bersani",
+                "nome": "",
+                "sesso": "F",
+                "data_nascita": "2020-09-14",
+                "luogo_nascita": self.citta.pk,
+                "luogo_nascita_search": "Bologna (BO)",
+                "codice_fiscale": "",
+                "indirizzo": "",
+                "attivo": "on",
+                "note": "",
+                "iscrizioni-TOTAL_FORMS": "1",
+                "iscrizioni-INITIAL_FORMS": "0",
+                "iscrizioni-MIN_NUM_FORMS": "0",
+                "iscrizioni-MAX_NUM_FORMS": "1000",
+                "iscrizioni-0-id": "",
+                "iscrizioni-0-anno_scolastico": "",
+                "iscrizioni-0-classe": "",
+                "iscrizioni-0-data_iscrizione": "",
+                "iscrizioni-0-data_fine_iscrizione": "",
+                "iscrizioni-0-stato_iscrizione": "",
+                "iscrizioni-0-condizione_iscrizione": "",
+                "iscrizioni-0-agevolazione": "",
+                "iscrizioni-0-riduzione_speciale": "",
+                "iscrizioni-0-importo_riduzione_speciale": "",
+                "iscrizioni-0-non_pagante": "",
+                "iscrizioni-0-attiva": "on",
+                "iscrizioni-0-note_amministrative": "",
+                "iscrizioni-0-note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("is-inline-edit-mode", html)
+        self.assertIn("is-inline-iscrizioni-layout", html)
+        self.assertIn('data-inline-label="Anno scolastico"', html)
+        self.assertIn('data-inline-label="Classe"', html)
+        self.assertIn('data-inline-label="Stato"', html)
+        self.assertIn('id="id_iscrizioni-0-condizione_iscrizione"', html)
+        self.assertIn('id="id_iscrizioni-0-agevolazione"', html)
+        self.assertIn('id="id_iscrizioni-0-importo_riduzione_speciale"', html)
+        self.assertNotIn('class="inline-form-row inline-empty-row is-hidden">\n                                        <input type="hidden" name="iscrizioni-0-id"', html)
+        self.assertNotIn('class="inline-details-row inline-empty-row is-hidden"', html)

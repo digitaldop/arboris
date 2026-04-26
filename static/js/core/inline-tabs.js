@@ -3,6 +3,8 @@
  * Le pagine (scuola, studente, …) forniscono id e riferimenti a ArborisViewMode.
  */
 window.ArborisInlineTabs = (function () {
+    const DEFAULT_TAB_LOCK_MESSAGE = "Salva o annulla le modifiche della tab corrente prima di cambiare sezione.";
+
     function titleFromTabButtonText(tabButton) {
         if (!tabButton) {
             return "";
@@ -84,6 +86,20 @@ window.ArborisInlineTabs = (function () {
         input.value = prefixOrTabId.replace(/^tab-/, "");
     }
 
+    function normalizeTabTarget(prefixOrTabId) {
+        return (prefixOrTabId || "").replace(/^tab-/, "");
+    }
+
+    function isInlineEditing(getViewMode) {
+        const vm = getViewMode && getViewMode();
+        return Boolean(vm && typeof vm.isInlineEditing === "function" && vm.isInlineEditing());
+    }
+
+    function currentInlineTarget(targetInputId) {
+        const input = document.getElementById(targetInputId);
+        return normalizeTabTarget(input ? input.value : "");
+    }
+
     function clearTabButtonLockClasses(containerId) {
         const root = document.getElementById(containerId);
         if (!root) {
@@ -92,6 +108,58 @@ window.ArborisInlineTabs = (function () {
         root.querySelectorAll(".tab-btn[data-tab-target]").forEach(function (btn) {
             btn.classList.remove("is-tab-locked");
             btn.removeAttribute("data-tab-lock-message");
+            btn.removeAttribute("title");
+        });
+    }
+
+    function refreshTabButtonLocks(o) {
+        const root = document.getElementById(o.containerId);
+        if (!root) {
+            return;
+        }
+
+        const activeTarget = currentInlineTarget(o.targetInputId);
+        const locked = isInlineEditing(o.getViewMode);
+        const message = o.message || DEFAULT_TAB_LOCK_MESSAGE;
+
+        root.querySelectorAll(".tab-btn[data-tab-target]").forEach(function (btn) {
+            const isLocked = locked && normalizeTabTarget(btn.dataset.tabTarget) !== activeTarget;
+            btn.classList.toggle("is-tab-locked", isLocked);
+
+            if (isLocked) {
+                btn.dataset.tabLockMessage = message;
+                btn.setAttribute("title", message);
+            } else {
+                btn.removeAttribute("data-tab-lock-message");
+                btn.removeAttribute("title");
+            }
+        });
+    }
+
+    function bindTabNavigationLock(o) {
+        const root = document.getElementById(o.containerId);
+        if (!root || root.dataset.inlineTabLockBound === "1") {
+            return;
+        }
+
+        root.dataset.inlineTabLockBound = "1";
+        root.addEventListener("arboris:before-tab-activate", function (event) {
+            const nextTarget = normalizeTabTarget(event.detail && event.detail.tabId);
+            const activeTarget = currentInlineTarget(o.targetInputId);
+
+            if (!isInlineEditing(o.getViewMode) || !nextTarget || nextTarget === activeTarget) {
+                return;
+            }
+
+            event.preventDefault();
+            refreshTabButtonLocks(o);
+
+            if (event.detail && event.detail.button) {
+                const message = o.message || DEFAULT_TAB_LOCK_MESSAGE;
+                event.detail.button.classList.add("is-tab-locked");
+                event.detail.button.dataset.tabLockMessage = message;
+                event.detail.button.setAttribute("title", message);
+            }
         });
     }
 
@@ -140,7 +208,12 @@ window.ArborisInlineTabs = (function () {
                 }
             });
 
-            clearTabButtonLockClasses(o.inlineLockContainerId);
+            refreshTabButtonLocks({
+                containerId: o.inlineLockContainerId,
+                targetInputId: o.targetInputId,
+                getViewMode: o.getViewMode,
+                message: o.tabLockMessage,
+            });
 
             if (!isInlineEditing) {
                 const root = document.getElementById(o.inlineLockContainerId);
@@ -183,6 +256,8 @@ window.ArborisInlineTabs = (function () {
         unlockPanelFields: unlockPanelFields,
         setInlineTargetValue: setInlineTargetValue,
         clearTabButtonLockClasses: clearTabButtonLockClasses,
+        refreshTabButtonLocks: refreshTabButtonLocks,
+        bindTabNavigationLock: bindTabNavigationLock,
         createRefreshLockedTabs: createRefreshLockedTabs,
         createScuolaRefreshLockedTabs: createRefreshLockedTabs,
         updateDefaultInlineEditButtonLabel: updateDefaultInlineEditButtonLabel,

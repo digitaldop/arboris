@@ -218,6 +218,15 @@ window.ArborisScuolaForm = (function () {
             },
         });
         tabs.bindTabButtons(getScuolaTabStorageKey(), inlineLockRoot || document);
+        if (inlineLockRoot) {
+            inlineTabs.bindTabNavigationLock({
+                containerId: inlineLockContainerId,
+                targetInputId: targetInputId,
+                getViewMode: function () {
+                    return window.scuolaViewMode;
+                },
+            });
+        }
         (inlineLockRoot || document).querySelectorAll(".tab-btn[data-tab-target]").forEach(function (btn) {
             btn.addEventListener("click", function () {
                 setInlineTarget(btn.dataset.tabTarget);

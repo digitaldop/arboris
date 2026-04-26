@@ -119,7 +119,13 @@ window.ArborisFamigliaForm = (function () {
         }
 
         function refreshLockedTabs() {
-            inlineTabs.clearTabButtonLockClasses(inlineLockContainerId);
+            inlineTabs.refreshTabButtonLocks({
+                containerId: inlineLockContainerId,
+                targetInputId: targetInputId,
+                getViewMode: function () {
+                    return window.famigliaViewMode;
+                },
+            });
         }
 
         refreshLockedTabsHandler = refreshLockedTabs;
@@ -674,6 +680,13 @@ window.ArborisFamigliaForm = (function () {
         const inlineLockRoot = famigliaInlineRoot();
         if (inlineLockRoot) {
             tabs.bindTabButtons(getFamigliaTabStorageKey(), inlineLockRoot);
+            inlineTabs.bindTabNavigationLock({
+                containerId: inlineLockContainerId,
+                targetInputId: targetInputId,
+                getViewMode: function () {
+                    return window.famigliaViewMode;
+                },
+            });
         }
         document.querySelectorAll("#" + inlineLockContainerId + " .tab-btn[data-tab-target]").forEach(btn => {
             btn.addEventListener("click", function () {
