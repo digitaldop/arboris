@@ -1,103 +1,49 @@
 window.ArborisDipendenteForm = (function () {
     function init(config) {
-        const relatedPopups = window.ArborisRelatedPopups;
-        if (!relatedPopups) {
+        const dipRoutes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = dipRoutes && dipRoutes.initRelatedPopups();
+        if (!relatedPopups || !dipRoutes) {
             return;
         }
 
-        window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
-        window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
-
-        const indirizzoSelect = document.getElementById("id_indirizzo");
-        const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
-        const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
-        const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
         const contrattoSelect = document.getElementById("id_contratto");
-        const addContrattoBtn = document.getElementById("add-contratto-btn");
-        const editContrattoBtn = document.getElementById("edit-contratto-btn");
-        const deleteContrattoBtn = document.getElementById("delete-contratto-btn");
 
-        function replaceId(url, id) {
-            return url.replace("/0/", `/${id}/`);
-        }
+        dipRoutes.wireCrudButtonsById({
+            selectId: "id_indirizzo",
+            relatedType: "indirizzo",
+            addBtnId: "add-indirizzo-btn",
+            editBtnId: "edit-indirizzo-btn",
+            deleteBtnId: "delete-indirizzo-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
 
-        function updateAddressButtons() {
-            if (editIndirizzoBtn && indirizzoSelect) editIndirizzoBtn.disabled = !indirizzoSelect.value;
-            if (deleteIndirizzoBtn && indirizzoSelect) deleteIndirizzoBtn.disabled = !indirizzoSelect.value;
-        }
-
-        function updateContrattoButtons() {
-            if (editContrattoBtn && contrattoSelect) editContrattoBtn.disabled = !contrattoSelect.value;
-            if (deleteContrattoBtn && contrattoSelect) deleteContrattoBtn.disabled = !contrattoSelect.value;
-        }
-
-        const dipRoutes = window.ArborisRelatedEntityRoutes;
-
-        if (addIndirizzoBtn && indirizzoSelect && dipRoutes) {
-            addIndirizzoBtn.addEventListener("click", function () {
-                const cfg = dipRoutes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
-                if (cfg && cfg.addUrl) {
-                    relatedPopups.openRelatedPopup(cfg.addUrl);
-                }
-            });
-        }
-
-        if (editIndirizzoBtn && indirizzoSelect && dipRoutes) {
-            editIndirizzoBtn.addEventListener("click", function () {
-                if (!indirizzoSelect.value) return;
-                const cfg = dipRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
-                if (cfg && cfg.editUrl) {
-                    relatedPopups.openRelatedPopup(cfg.editUrl);
-                }
-            });
-        }
-
-        if (deleteIndirizzoBtn && indirizzoSelect && dipRoutes) {
-            deleteIndirizzoBtn.addEventListener("click", function () {
-                if (!indirizzoSelect.value) return;
-                const cfg = dipRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
-                if (cfg && cfg.deleteUrl) {
-                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
-                }
-            });
-        }
-
-        if (indirizzoSelect) {
-            indirizzoSelect.addEventListener("change", updateAddressButtons);
-        }
-
-        if (addContrattoBtn && contrattoSelect) {
-            addContrattoBtn.addEventListener("click", function () {
-                let url = `${config.urls.creaContratto}?popup=1&target_input_name=${encodeURIComponent(contrattoSelect.name)}`;
+        dipRoutes.wireCustomCrudButtonsById({
+            select: contrattoSelect,
+            addBtnId: "add-contratto-btn",
+            editBtnId: "edit-contratto-btn",
+            deleteBtnId: "delete-contratto-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+            bindKey: contrattoSelect ? `contratto_dipendente:${contrattoSelect.name}` : "contratto_dipendente:id_contratto",
+            addUrl: function () {
+                let url = dipRoutes.withPopupQuery(config.urls.creaContratto, contrattoSelect ? contrattoSelect.name : "contratto");
                 if (config.dipendenteId) {
                     url += `&dipendente=${encodeURIComponent(config.dipendenteId)}`;
                 }
-                relatedPopups.openRelatedPopup(url);
-            });
-        }
-
-        if (editContrattoBtn && contrattoSelect) {
-            editContrattoBtn.addEventListener("click", function () {
-                if (!contrattoSelect.value) return;
-                const url = replaceId(config.urls.modificaContrattoTemplate, contrattoSelect.value);
-                relatedPopups.openRelatedPopup(`${url}?popup=1&target_input_name=${encodeURIComponent(contrattoSelect.name)}`);
-            });
-        }
-
-        if (deleteContrattoBtn && contrattoSelect) {
-            deleteContrattoBtn.addEventListener("click", function () {
-                if (!contrattoSelect.value) return;
-                const url = replaceId(config.urls.eliminaContrattoTemplate, contrattoSelect.value);
-                relatedPopups.openRelatedPopup(`${url}?popup=1&target_input_name=${encodeURIComponent(contrattoSelect.name)}`);
-            });
-        }
-
-        if (contrattoSelect) {
-            contrattoSelect.addEventListener("change", updateContrattoButtons);
-        }
-
-        updateAddressButtons();
-        updateContrattoButtons();
+                return url;
+            },
+            editUrl: function (selectedId) {
+                return dipRoutes.withPopupQuery(
+                    dipRoutes.substituteId(config.urls.modificaContrattoTemplate, selectedId),
+                    contrattoSelect ? contrattoSelect.name : "contratto"
+                );
+            },
+            deleteUrl: function (selectedId) {
+                return dipRoutes.withPopupQuery(
+                    dipRoutes.substituteId(config.urls.eliminaContrattoTemplate, selectedId),
+                    contrattoSelect ? contrattoSelect.name : "contratto"
+                );
+            },
+        });
     }
 
     return { init };

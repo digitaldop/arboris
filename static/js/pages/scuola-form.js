@@ -2,19 +2,17 @@ window.ArborisScuolaForm = (function () {
     let refreshLockedTabsHandler = function () {};
 
     function init(config) {
-        const relatedPopups = window.ArborisRelatedPopups;
+        const relatedRoutes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = relatedRoutes && relatedRoutes.initRelatedPopups();
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
         const inlineTabs = window.ArborisInlineTabs;
         const inlineFormsets = window.ArborisInlineFormsets;
 
-        if (!relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets) {
+        if (!relatedPopups || !relatedRoutes || !collapsible || !tabs || !inlineTabs || !inlineFormsets) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
-
-        window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
-        window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
 
         const targetInputId = "scuola-inline-target";
         const inlineLockContainerId = "scuola-inline-lock-container";
@@ -108,13 +106,38 @@ window.ArborisScuolaForm = (function () {
                 });
         }
 
-        function removeInlineRow(button) {
-            if (inlineFormsets.removeInlineRow(button)) {
+        function createSimpleInlineManager(prefix) {
+            return inlineFormsets.createManager({
+                prefix: prefix,
+                mountOptions: {
+                    focusSelector: "input[type='text'], input[type='url'], input[type='number'], input[type='email']",
+                },
+            });
+        }
+
+        const inlineManagers = {
+            socials: createSimpleInlineManager("socials"),
+            telefoni: createSimpleInlineManager("telefoni"),
+            email: createSimpleInlineManager("email"),
+        };
+
+        function removeManagedInlineRow(button) {
+            const row = button && button.closest ? button.closest("tr") : null;
+            const table = row ? row.closest("table") : null;
+            const manager = table ? inlineManagers[table.id.replace("-table", "")] : null;
+            const removed = manager ? manager.remove(button) : inlineFormsets.removeInlineRow(button);
+
+            if (removed) {
                 refreshTabCounts();
             }
         }
 
-        function addInlineForm(prefix) {
+        function addManagedInlineForm(prefix) {
+            const manager = inlineManagers[prefix];
+            if (!manager) {
+                return;
+            }
+
             if (window.scuolaViewMode && !window.scuolaViewMode.isEditing()) {
                 window.scuolaViewMode.setInlineEditing(true);
             }
@@ -122,10 +145,7 @@ window.ArborisScuolaForm = (function () {
             setInlineTarget(prefix);
             updateInlineEditButtonLabel("tab-" + prefix);
 
-            const mounted = inlineFormsets.mountInlineForm(prefix, {
-                enableInputs: true,
-                focusSelector: "input[type='text'], input[type='url'], input[type='number'], input[type='email']",
-            });
+            const mounted = manager.add();
 
             if (!mounted) {
                 return;
@@ -136,9 +156,6 @@ window.ArborisScuolaForm = (function () {
             refreshLockedTabs();
             refreshTabCounts();
         }
-
-        window.removeInlineRow = removeInlineRow;
-        window.addInlineForm = addInlineForm;
 
         const checkboxOperativo = document.getElementById("id_indirizzo_operativo_diverso");
         const legale = document.getElementById("id_indirizzo_sede_legale");
@@ -154,51 +171,52 @@ window.ArborisScuolaForm = (function () {
         let refreshLegaleButtons = function () {};
         let refreshOperativoButtons = function () {};
 
-        const relatedRoutes = window.ArborisRelatedEntityRoutes;
-        if (!relatedRoutes) {
-            console.error("ArborisRelatedEntityRoutes non disponibile.");
-        }
+        const legaleCrud = relatedRoutes.wireCrudButtonsById({
+            select: legale,
+            relatedType: "indirizzo",
+            addBtn: addLegale,
+            editBtn: editLegale,
+            deleteBtn: deleteLegale,
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+        refreshLegaleButtons = legaleCrud.refresh;
 
-        if (legale && relatedRoutes) {
-            const legaleCrud = relatedRoutes.wireCrudButtons({
-                select: legale,
-                relatedType: "indirizzo",
-                addBtn: addLegale,
-                editBtn: editLegale,
-                deleteBtn: deleteLegale,
-                openRelatedPopup: relatedPopups.openRelatedPopup,
-            });
-            refreshLegaleButtons = legaleCrud.refresh;
-        }
-
-        if (operativo && relatedRoutes) {
-            const operativoCrud = relatedRoutes.wireCrudButtons({
-                select: operativo,
-                relatedType: "indirizzo",
-                addBtn: addOperativo,
-                editBtn: editOperativo,
-                deleteBtn: deleteOperativo,
-                openRelatedPopup: relatedPopups.openRelatedPopup,
-                isAddDisabled: function () {
-                    return !isOperativoEnabled();
-                },
-                isEditDisabled: function (select, selectedId) {
-                    return !isOperativoEnabled() || select.disabled || !selectedId;
-                },
-                isDeleteDisabled: function (select, selectedId) {
-                    return !isOperativoEnabled() || select.disabled || !selectedId;
-                },
-            });
-            refreshOperativoButtons = operativoCrud.refresh;
-        }
+        const operativoCrud = relatedRoutes.wireCrudButtonsById({
+            select: operativo,
+            relatedType: "indirizzo",
+            addBtn: addOperativo,
+            editBtn: editOperativo,
+            deleteBtn: deleteOperativo,
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+            isAddDisabled: function () {
+                return !isOperativoEnabled();
+            },
+            isEditDisabled: function (select, selectedId) {
+                return !isOperativoEnabled() || select.disabled || !selectedId;
+            },
+            isDeleteDisabled: function (select, selectedId) {
+                return !isOperativoEnabled() || select.disabled || !selectedId;
+            },
+        });
+        refreshOperativoButtons = operativoCrud.refresh;
 
         if (checkboxOperativo) checkboxOperativo.addEventListener("change", updateAddressButtons);
         if (legale) legale.addEventListener("change", updateAddressButtons);
         if (operativo) operativo.addEventListener("change", updateAddressButtons);
 
-        inlineFormsets.prepareExistingEmptyRows("socials-table");
-        inlineFormsets.prepareExistingEmptyRows("telefoni-table");
-        inlineFormsets.prepareExistingEmptyRows("email-table");
+        Object.keys(inlineManagers).forEach(function (key) {
+            inlineManagers[key].prepare();
+        });
+        inlineFormsets.wireActionTriggers(document, {
+            handlers: {
+                add: function (prefix) {
+                    addManagedInlineForm(prefix);
+                },
+                remove: function (_prefix, element) {
+                    removeManagedInlineRow(element);
+                },
+            },
+        });
         tabs.bindTabButtons(getScuolaTabStorageKey(), inlineLockRoot || document);
         (inlineLockRoot || document).querySelectorAll(".tab-btn[data-tab-target]").forEach(function (btn) {
             btn.addEventListener("click", function () {

@@ -50,6 +50,69 @@ window.ArborisRelatedEntityRoutes = (function () {
         };
     }
 
+    function createNoopBinding() {
+        return {
+            refresh: function () {},
+        };
+    }
+
+    function resolveDisabledState(options, select, kind, selectedId) {
+        var predicate = null;
+
+        if (kind === "add") {
+            predicate = options.isAddDisabled;
+        } else if (kind === "edit") {
+            predicate = options.isEditDisabled;
+        } else if (kind === "delete") {
+            predicate = options.isDeleteDisabled;
+        }
+
+        if (typeof predicate === "function") {
+            return Boolean(predicate(select, selectedId));
+        }
+
+        if (kind === "add") {
+            return Boolean(select.disabled);
+        }
+
+        return Boolean(select.disabled || !selectedId);
+    }
+
+    function resolveActionUrl(builder, selectedId, select) {
+        if (!builder) {
+            return null;
+        }
+
+        if (typeof builder === "function") {
+            return builder(selectedId, select) || null;
+        }
+
+        return builder;
+    }
+
+    function resolveElement(elementOrId) {
+        if (!elementOrId) {
+            return null;
+        }
+
+        if (typeof elementOrId === "string") {
+            return document.getElementById(elementOrId);
+        }
+
+        return elementOrId;
+    }
+
+    function initRelatedPopups() {
+        var relatedPopups = window.ArborisRelatedPopups;
+        if (!relatedPopups) {
+            return null;
+        }
+
+        window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
+        window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
+        return relatedPopups;
+    }
+
     /**
      * @param {{
      *   select: HTMLSelectElement,
@@ -79,53 +142,25 @@ window.ArborisRelatedEntityRoutes = (function () {
             (window.ArborisRelatedPopups && window.ArborisRelatedPopups.openRelatedPopup);
 
         if (!select || !relatedType || !openRelatedPopup) {
-            return {
-                refresh: function () {},
-            };
+            return createNoopBinding();
         }
 
         var targetInputName = options.targetInputName || select.name;
         var bindKey = [relatedType, targetInputName].join(":");
 
-        function defaultDisabledState(selectedId) {
-            return Boolean(select.disabled || !selectedId);
-        }
-
-        function resolveDisabledState(kind, selectedId) {
-            var predicate = null;
-
-            if (kind === "add") {
-                predicate = options.isAddDisabled;
-            } else if (kind === "edit") {
-                predicate = options.isEditDisabled;
-            } else if (kind === "delete") {
-                predicate = options.isDeleteDisabled;
-            }
-
-            if (typeof predicate === "function") {
-                return Boolean(predicate(select, selectedId));
-            }
-
-            if (kind === "add") {
-                return Boolean(select.disabled);
-            }
-
-            return defaultDisabledState(selectedId);
-        }
-
         function refresh() {
             var selectedId = select.value || "";
 
             if (addBtn) {
-                addBtn.disabled = resolveDisabledState("add", selectedId);
+                addBtn.disabled = resolveDisabledState(options, select, "add", selectedId);
             }
 
             if (editBtn) {
-                editBtn.disabled = resolveDisabledState("edit", selectedId);
+                editBtn.disabled = resolveDisabledState(options, select, "edit", selectedId);
             }
 
             if (deleteBtn) {
-                deleteBtn.disabled = resolveDisabledState("delete", selectedId);
+                deleteBtn.disabled = resolveDisabledState(options, select, "delete", selectedId);
             }
 
             if (typeof options.onRefresh === "function") {
@@ -174,6 +209,175 @@ window.ArborisRelatedEntityRoutes = (function () {
     }
 
     /**
+     * @param {{
+     *   select: HTMLSelectElement,
+     *   addBtn?: HTMLButtonElement | null,
+     *   editBtn?: HTMLButtonElement | null,
+     *   deleteBtn?: HTMLButtonElement | null,
+     *   addUrl?: string | ((selectedId: string, select: HTMLSelectElement) => string | null),
+     *   editUrl?: string | ((selectedId: string, select: HTMLSelectElement) => string | null),
+     *   deleteUrl?: string | ((selectedId: string, select: HTMLSelectElement) => string | null),
+     *   openRelatedPopup?: function(string): void,
+     *   onRefresh?: function(HTMLSelectElement): void,
+     *   isAddDisabled?: function(HTMLSelectElement, string): boolean,
+     *   isEditDisabled?: function(HTMLSelectElement, string): boolean,
+     *   isDeleteDisabled?: function(HTMLSelectElement, string): boolean,
+     *   bindKey?: string | null,
+     * }} options
+     * @returns {{refresh: function(): void}}
+     */
+    function wireCustomCrudButtons(options) {
+        options = options || {};
+
+        var select = options.select;
+        var addBtn = options.addBtn || null;
+        var editBtn = options.editBtn || null;
+        var deleteBtn = options.deleteBtn || null;
+        var openRelatedPopup =
+            options.openRelatedPopup ||
+            (window.ArborisRelatedPopups && window.ArborisRelatedPopups.openRelatedPopup);
+
+        if (!select || !openRelatedPopup) {
+            return createNoopBinding();
+        }
+
+        var bindKey = options.bindKey || ["custom", select.name || select.id || "field"].join(":");
+
+        function refresh() {
+            var selectedId = select.value || "";
+
+            if (addBtn) {
+                addBtn.disabled = resolveDisabledState(options, select, "add", selectedId);
+            }
+
+            if (editBtn) {
+                editBtn.disabled = resolveDisabledState(options, select, "edit", selectedId);
+            }
+
+            if (deleteBtn) {
+                deleteBtn.disabled = resolveDisabledState(options, select, "delete", selectedId);
+            }
+
+            if (typeof options.onRefresh === "function") {
+                options.onRefresh(select);
+            }
+        }
+
+        if (select.dataset.relatedCustomCrudButtonsBound !== bindKey) {
+            select.dataset.relatedCustomCrudButtonsBound = bindKey;
+
+            if (addBtn) {
+                addBtn.addEventListener("click", function () {
+                    var url = resolveActionUrl(options.addUrl, "", select);
+                    if (url) {
+                        openRelatedPopup(url);
+                    }
+                });
+            }
+
+            if (editBtn) {
+                editBtn.addEventListener("click", function () {
+                    var url = resolveActionUrl(options.editUrl, select.value || "", select);
+                    if (url) {
+                        openRelatedPopup(url);
+                    }
+                });
+            }
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", function () {
+                    var url = resolveActionUrl(options.deleteUrl, select.value || "", select);
+                    if (url) {
+                        openRelatedPopup(url);
+                    }
+                });
+            }
+
+            select.addEventListener("change", refresh);
+        }
+
+        refresh();
+
+        return {
+            refresh: refresh,
+        };
+    }
+
+    /**
+     * @param {object} options
+     * @returns {{refresh: function(): void}}
+     */
+    function wireCrudButtonsById(options) {
+        options = options || {};
+
+        return wireCrudButtons({
+            select: resolveElement(options.select || options.selectId),
+            relatedType: options.relatedType,
+            addBtn: resolveElement(options.addBtn || options.addBtnId),
+            editBtn: resolveElement(options.editBtn || options.editBtnId),
+            deleteBtn: resolveElement(options.deleteBtn || options.deleteBtnId),
+            targetInputName: options.targetInputName || null,
+            openRelatedPopup: options.openRelatedPopup,
+            onRefresh: options.onRefresh,
+            isAddDisabled: options.isAddDisabled,
+            isEditDisabled: options.isEditDisabled,
+            isDeleteDisabled: options.isDeleteDisabled,
+        });
+    }
+
+    /**
+     * @param {Array<object>} configs
+     * @param {{openRelatedPopup?: function(string): void, onRefresh?: function(string, HTMLSelectElement): void}|undefined} sharedOptions
+     */
+    function wireCrudButtonsGroup(configs, sharedOptions) {
+        sharedOptions = sharedOptions || {};
+
+        (configs || []).forEach(function (config) {
+            wireCrudButtonsById({
+                selectId: config.selectId,
+                select: config.select,
+                relatedType: config.relatedType,
+                addBtnId: config.addBtnId,
+                addBtn: config.addBtn,
+                editBtnId: config.editBtnId,
+                editBtn: config.editBtn,
+                deleteBtnId: config.deleteBtnId,
+                deleteBtn: config.deleteBtn,
+                targetInputName: config.targetInputName,
+                openRelatedPopup: config.openRelatedPopup || sharedOptions.openRelatedPopup,
+                onRefresh: config.onRefresh || sharedOptions.onRefresh,
+                isAddDisabled: config.isAddDisabled,
+                isEditDisabled: config.isEditDisabled,
+                isDeleteDisabled: config.isDeleteDisabled,
+            });
+        });
+    }
+
+    /**
+     * @param {object} options
+     * @returns {{refresh: function(): void}}
+     */
+    function wireCustomCrudButtonsById(options) {
+        options = options || {};
+
+        return wireCustomCrudButtons({
+            select: resolveElement(options.select || options.selectId),
+            addBtn: resolveElement(options.addBtn || options.addBtnId),
+            editBtn: resolveElement(options.editBtn || options.editBtnId),
+            deleteBtn: resolveElement(options.deleteBtn || options.deleteBtnId),
+            addUrl: options.addUrl,
+            editUrl: options.editUrl,
+            deleteUrl: options.deleteUrl,
+            openRelatedPopup: options.openRelatedPopup,
+            onRefresh: options.onRefresh,
+            isAddDisabled: options.isAddDisabled,
+            isEditDisabled: options.isEditDisabled,
+            isDeleteDisabled: options.isDeleteDisabled,
+            bindKey: options.bindKey || null,
+        });
+    }
+
+    /**
      * @param {Element} container
      * @param {{openRelatedPopup?: function(string): void, onRefresh?: function(string, HTMLSelectElement): void}|undefined} options
      */
@@ -216,10 +420,50 @@ window.ArborisRelatedEntityRoutes = (function () {
         });
     }
 
+    /**
+     * @param {Element|Document} container
+     * @param {{openRelatedPopup?: function(string): void, selector?: string}|undefined} options
+     */
+    function wirePopupTriggerElements(container, options) {
+        options = options || {};
+        var root = container || document;
+        var selector = options.selector || '[data-related-popup-trigger="1"]';
+        var openRelatedPopup =
+            options.openRelatedPopup ||
+            (window.ArborisRelatedPopups && window.ArborisRelatedPopups.openRelatedPopup);
+
+        if (!root || !openRelatedPopup || typeof root.querySelectorAll !== "function") {
+            return;
+        }
+
+        root.querySelectorAll(selector).forEach(function (element) {
+            if (element.dataset.relatedPopupTriggerBound === "1") {
+                return;
+            }
+
+            element.dataset.relatedPopupTriggerBound = "1";
+            element.addEventListener("click", function (event) {
+                var popupUrl = element.dataset.popupUrl;
+                if (!popupUrl || element.disabled) {
+                    return;
+                }
+
+                event.preventDefault();
+                openRelatedPopup(popupUrl);
+            });
+        });
+    }
+
     return {
         buildCrudUrls: buildCrudUrls,
+        initRelatedPopups: initRelatedPopups,
         wireCrudButtons: wireCrudButtons,
+        wireCrudButtonsById: wireCrudButtonsById,
+        wireCrudButtonsGroup: wireCrudButtonsGroup,
+        wireCustomCrudButtons: wireCustomCrudButtons,
+        wireCustomCrudButtonsById: wireCustomCrudButtonsById,
         wireInlineRelatedButtons: wireInlineRelatedButtons,
+        wirePopupTriggerElements: wirePopupTriggerElements,
         withPopupQuery: withPopupQuery,
         substituteId: substituteId,
     };

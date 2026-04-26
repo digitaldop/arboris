@@ -44,6 +44,10 @@ window.ArborisInlineFormsets = (function () {
         };
     }
 
+    function getPrimaryCompanionRow(row, options) {
+        return getCompanionRows(row, options)[0] || null;
+    }
+
     function isRowPersisted(row) {
         const hiddenIdInput = row ? row.querySelector('input[type="hidden"][name$="-id"]') : null;
         return Boolean(hiddenIdInput && hiddenIdInput.value);
@@ -322,8 +326,96 @@ window.ArborisInlineFormsets = (function () {
         return count;
     }
 
+    function createManager(config) {
+        const cfg = Object.assign({}, config || {});
+
+        function resolveTableId() {
+            return cfg.tableId || (cfg.prefix ? cfg.prefix + "-table" : "");
+        }
+
+        function prepare() {
+            const tableId = resolveTableId();
+            if (!tableId) {
+                return;
+            }
+
+            prepareExistingEmptyRows(tableId, cfg.prepareOptions || {});
+        }
+
+        function add() {
+            if (!cfg.prefix) {
+                return null;
+            }
+
+            const mountOptions = Object.assign({}, cfg.mountOptions || {});
+            if (!mountOptions.tableId && cfg.tableId) {
+                mountOptions.tableId = cfg.tableId;
+            }
+            if (!mountOptions.totalFormsId && cfg.totalFormsId) {
+                mountOptions.totalFormsId = cfg.totalFormsId;
+            }
+            if (!mountOptions.templateId && cfg.templateId) {
+                mountOptions.templateId = cfg.templateId;
+            }
+
+            return mountInlineForm(cfg.prefix, mountOptions);
+        }
+
+        function remove(buttonOrRow) {
+            return removeInlineRow(buttonOrRow, cfg.removeOptions || {});
+        }
+
+        function count() {
+            const tableId = resolveTableId();
+            if (!tableId) {
+                return 0;
+            }
+
+            return countPersistedRows(tableId);
+        }
+
+        return {
+            add: add,
+            count: count,
+            prepare: prepare,
+            remove: remove,
+            tableId: resolveTableId(),
+        };
+    }
+
+    function wireActionTriggers(container, options) {
+        const root = container || document;
+        const cfg = options || {};
+        const selector = cfg.selector || "[data-inline-action]";
+        const handlers = cfg.handlers || {};
+
+        if (!root || typeof root.querySelectorAll !== "function") {
+            return;
+        }
+
+        root.querySelectorAll(selector).forEach(function (element) {
+            if (element.dataset.inlineActionTriggerBound === "1") {
+                return;
+            }
+
+            element.dataset.inlineActionTriggerBound = "1";
+            element.addEventListener("click", function (event) {
+                const action = element.dataset.inlineAction || "";
+                const handler = handlers[action];
+
+                if (typeof handler !== "function") {
+                    return;
+                }
+
+                event.preventDefault();
+                handler(element.dataset.inlinePrefix || "", element);
+            });
+        });
+    }
+
     return {
         getCompanionRows: getCompanionRows,
+        getPrimaryCompanionRow: getPrimaryCompanionRow,
         getErrorRow: getErrorRow,
         getRowBundle: getRowBundle,
         isRowPersisted: isRowPersisted,
@@ -338,5 +430,7 @@ window.ArborisInlineFormsets = (function () {
         mountInlineForm: mountInlineForm,
         removeInlineRow: removeInlineRow,
         countPersistedRows: countPersistedRows,
+        createManager: createManager,
+        wireActionTriggers: wireActionTriggers,
     };
 })();

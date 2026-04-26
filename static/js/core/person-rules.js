@@ -85,7 +85,110 @@ window.ArborisPersonRules = (function () {
         return "";
     }
 
+    function resolveElement(elementOrSelector, root) {
+        if (!elementOrSelector) {
+            return null;
+        }
+
+        if (typeof elementOrSelector === "string") {
+            return (root || document).querySelector(elementOrSelector);
+        }
+
+        return elementOrSelector;
+    }
+
+    function applyInferredSex(sexSelect, inferredSex, options) {
+        options = options || {};
+
+        if (!sexSelect || !inferredSex) {
+            return false;
+        }
+
+        if (sexSelect.value) {
+            if (sexSelect.value === inferredSex) {
+                return false;
+            }
+
+            if (!options.overwriteExisting) {
+                return false;
+            }
+        }
+
+        sexSelect.value = inferredSex;
+        sexSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+    }
+
+    function bindSexFromFirstName(options) {
+        options = options || {};
+
+        const root = options.root || document;
+        const nameInput = resolveElement(options.nameInput || options.nameSelector, root);
+        const sexSelect = resolveElement(options.sexSelect || options.sexSelector, root);
+        const bindFlag = options.bindFlag || "personRulesFirstNameBound";
+        const events = options.events || ["change", "input"];
+
+        function sync() {
+            if (!nameInput || !sexSelect) {
+                return false;
+            }
+
+            return applyInferredSex(sexSelect, inferSexFromFirstName(nameInput.value), options);
+        }
+
+        if (!nameInput || !sexSelect) {
+            return { sync: sync };
+        }
+
+        if (nameInput.dataset[bindFlag] !== "1") {
+            nameInput.dataset[bindFlag] = "1";
+            events.forEach(function (eventName) {
+                nameInput.addEventListener(eventName, sync);
+            });
+        }
+
+        sync();
+        return { sync: sync };
+    }
+
+    function bindSexFromRelation(options) {
+        options = options || {};
+
+        const root = options.root || document;
+        const relationSelect = resolveElement(options.relationSelect || options.relationSelector, root);
+        const sexSelect = resolveElement(options.sexSelect || options.sexSelector, root);
+        const bindFlag = options.bindFlag || "personRulesRelationBound";
+        const events = options.events || ["change"];
+
+        function sync() {
+            if (!relationSelect || !sexSelect) {
+                return false;
+            }
+
+            const selectedOption = relationSelect.options[relationSelect.selectedIndex];
+            const relationLabel = selectedOption ? selectedOption.textContent : "";
+            return applyInferredSex(sexSelect, inferSexFromRelationLabel(relationLabel), options);
+        }
+
+        if (!relationSelect || !sexSelect) {
+            return { sync: sync };
+        }
+
+        if (relationSelect.dataset[bindFlag] !== "1") {
+            relationSelect.dataset[bindFlag] = "1";
+            events.forEach(function (eventName) {
+                relationSelect.addEventListener(eventName, sync);
+            });
+        }
+
+        sync();
+        return { sync: sync };
+    }
+
     return {
+        applyInferredSex: applyInferredSex,
+        bindSexFromFirstName: bindSexFromFirstName,
+        bindSexFromRelation: bindSexFromRelation,
         normalizeText: normalizeText,
         inferSexFromFirstName: inferSexFromFirstName,
         inferSexFromRelationLabel: inferSexFromRelationLabel,

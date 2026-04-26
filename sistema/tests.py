@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
 from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaUtentePermessi
+from .popup_manifest import build_popup_manifest
 from anagrafica.models import Citta, Provincia, Regione
 from anagrafica.models import Indirizzo
 
@@ -166,6 +167,16 @@ class SidebarSistemaTests(TestCase):
             current_index = sistema_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+
+
+class PopupManifestTests(TestCase):
+    def test_popup_manifest_exposes_metodo_pagamento_crud_routes(self):
+        manifest = build_popup_manifest()
+
+        self.assertIn("metodo_pagamento", manifest)
+        self.assertEqual(manifest["metodo_pagamento"]["add"], reverse("crea_metodo_pagamento"))
+        self.assertIn("__ID__", manifest["metodo_pagamento"]["edit"])
+        self.assertIn("__ID__", manifest["metodo_pagamento"]["delete"])
 
 
 class ScuolaSistemaInterfaceTests(TestCase):

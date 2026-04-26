@@ -1,19 +1,18 @@
 window.ArborisFamiliareForm = (function () {
     function init(config) {
-        const relatedPopups = window.ArborisRelatedPopups;
+        const routes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = routes && routes.initRelatedPopups();
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
         const inlineFormsets = window.ArborisInlineFormsets;
         const personRules = window.ArborisPersonRules;
         const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
+        const formTools = window.ArborisAnagraficaFormTools;
 
-        if (!relatedPopups || !collapsible || !tabs || !inlineFormsets || !personRules || !familyLinkedAddress) {
+        if (!routes || !relatedPopups || !collapsible || !tabs || !inlineFormsets || !personRules || !familyLinkedAddress || !formTools) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
-
-        window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
-        window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
 
         function getFamiliareTabStorageKey() {
             return `arboris-familiare-form-active-tab-${config.familiareId || "new"}`;
@@ -34,103 +33,27 @@ window.ArborisFamiliareForm = (function () {
             panel.classList.add("is-active");
         }
 
-        function refreshAddressHelp() {
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            const help = document.getElementById("familiare-address-help");
-            if (!indirizzoSelect || !help) return;
-
-            if (indirizzoSelect.value) {
-                help.textContent = "Indirizzo specifico";
-                return;
-            }
-
-            const node = document.getElementById("familiare-famiglia-indirizzo-label");
-            let label = "";
-
-            if (node) {
-                try {
-                    label = JSON.parse(node.textContent);
-                } catch (e) {}
-            }
-
-            if (label) {
-                help.textContent = `Ereditera: ${label}`;
-            } else {
-                help.textContent = "Se lasci vuoto, verra usato l'indirizzo principale della famiglia";
-            }
-        }
-
-        function getSelectedFamigliaOption() {
-            const famigliaSelect = document.getElementById("id_famiglia");
-            if (!famigliaSelect) {
-                return null;
-            }
-
-            return famigliaSelect.options[famigliaSelect.selectedIndex] || null;
-        }
-
-        function syncSexFromRelazioneFamiliare() {
-            const relazioneSelect = document.getElementById("id_relazione_familiare");
-            const sessoSelect = document.getElementById("id_sesso");
-
-            if (!relazioneSelect || !sessoSelect) {
-                return;
-            }
-
-            const selectedOption = relazioneSelect.options[relazioneSelect.selectedIndex];
-            const inferredSex = personRules.inferSexFromRelationLabel(selectedOption ? selectedOption.textContent : "");
-
-            if (!inferredSex || sessoSelect.value === inferredSex) {
-                return;
-            }
-
-            sessoSelect.value = inferredSex;
-            sessoSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
-        function syncInheritedAddressFromFamiglia() {
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            const selectedFamiglia = getSelectedFamigliaOption();
-
-            if (!indirizzoSelect) {
-                return;
-            }
-
-            if (!selectedFamiglia || !selectedFamiglia.value) {
-                refreshAddressHelp();
-                return;
-            }
-
-            const familyAddressId = selectedFamiglia.dataset.indirizzoFamigliaId || "";
-            indirizzoSelect.value = familyAddressId || "";
-
-            refreshAddressHelp();
-            updateMainButtons();
+        function bindStandaloneSexFromRelazioneFamiliare() {
+            personRules.bindSexFromRelation({
+                relationSelect: document.getElementById("id_relazione_familiare"),
+                sexSelect: document.getElementById("id_sesso"),
+                bindFlag: "familiareRelationSexBound",
+            });
         }
 
         function updateMainButtons() {
-            const famigliaSelect = document.getElementById("id_famiglia");
-            const relazioneSelect = document.getElementById("id_relazione_familiare");
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-
-            const editFamigliaBtn = document.getElementById("edit-famiglia-btn");
-
-            if (editFamigliaBtn && famigliaSelect) editFamigliaBtn.disabled = !famigliaSelect.value;
+            refreshFamigliaNavigation();
             refreshRelazioneButtons();
             refreshIndirizzoButtons();
         }
 
         function wireInlineRelatedButtons(container) {
-            const routes = window.ArborisRelatedEntityRoutes;
-            if (!routes) {
-                console.error("ArborisRelatedEntityRoutes non disponibile.");
-                return;
-            }
-            routes.wireInlineRelatedButtons(container, {
-                openRelatedPopup: relatedPopups.openRelatedPopup.bind(relatedPopups),
+            formTools.wireInlineRelatedButtons(container, {
+                routes: routes,
+                relatedPopups: relatedPopups,
                 onRefresh(relatedType, select) {
                     if (relatedType === "indirizzo" && select && select.closest("#studenti-table")) {
-                        familyLinkedAddress.refreshInlineAddressHelp(select, studentiInlineAddressConfig);
+                        studentiInlineAddressCollection.refreshSelectHelp(select);
                     }
                 },
             });
@@ -182,43 +105,21 @@ window.ArborisFamiliareForm = (function () {
             },
             attivoSelector: 'input[type="checkbox"][name$="-attivo"]',
         }, studentiInlineAddressConfig);
+        const studentiInlineAddressCollection = familyLinkedAddress.createInlineAddressCollection(studentiInlineAddressTrackingConfig);
+        const studentiInlineAddressDefaults = familyLinkedAddress.createInlineAddressCollection(studentiInlineDefaultsConfig);
 
         function getFamiliareSubformRow(row) {
-            const subformRow = row.nextElementSibling;
-            if (subformRow && subformRow.classList.contains("inline-subform-row")) {
-                return subformRow;
-            }
-            return null;
-        }
-
-        function syncStudenteInlineSex(row) {
-            const nomeInput = row.querySelector('input[name$="-nome"]');
-            const subformRow = getFamiliareSubformRow(row);
-            const sessoSelect = subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null;
-            if (!nomeInput || !sessoSelect || sessoSelect.value) {
-                return;
-            }
-            const inferredSex = personRules.inferSexFromFirstName(nomeInput.value);
-            if (!inferredSex) {
-                return;
-            }
-            sessoSelect.value = inferredSex;
-            sessoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            return inlineFormsets.getPrimaryCompanionRow(row, { companionClasses: ["inline-subform-row"] });
         }
 
         function bindStudenteInlineSex(row) {
-            const nomeInput = row.querySelector('input[name$="-nome"]');
-            if (!nomeInput || nomeInput.dataset.familiareSexBound === "1") {
-                return;
-            }
-            nomeInput.dataset.familiareSexBound = "1";
-            nomeInput.addEventListener("change", function () {
-                syncStudenteInlineSex(row);
+            const subformRow = getFamiliareSubformRow(row);
+            personRules.bindSexFromFirstName({
+                root: row,
+                nameSelector: 'input[name$="-nome"]',
+                sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
+                bindFlag: "familiareSexBound",
             });
-            nomeInput.addEventListener("input", function () {
-                syncStudenteInlineSex(row);
-            });
-            syncStudenteInlineSex(row);
         }
 
         function bindAllStudenteInlineSex() {
@@ -227,43 +128,6 @@ window.ArborisFamiliareForm = (function () {
                     return;
                 }
                 bindStudenteInlineSex(row);
-            });
-        }
-
-        function syncFamiliareStudenteInlineDefaults() {
-            if (!document.getElementById("studenti-table")) {
-                return;
-            }
-            familyLinkedAddress.syncInlineRows("#studenti-table tbody .inline-form-row", studentiInlineDefaultsConfig);
-        }
-
-        function initSearchableSelects(root) {
-            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.init === "function") {
-                window.ArborisFamigliaAutocomplete.init(root || document);
-            }
-            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.refresh === "function") {
-                window.ArborisFamigliaAutocomplete.refresh(root || document);
-            }
-        }
-
-        function initCodiceFiscale(root) {
-            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.rebind === "function") {
-                window.ArborisCodiceFiscale.rebind(root || document);
-                return;
-            }
-            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.init === "function") {
-                window.ArborisCodiceFiscale.init(root || document);
-            }
-        }
-
-        function prepareExistingStudentiEmptyRows() {
-            if (!document.getElementById("studenti-table")) {
-                return;
-            }
-            inlineFormsets.prepareExistingEmptyRows("studenti-table", {
-                companionClasses: ["inline-subform-row"],
-                includeCompanionRowsInData: true,
-                ignoreSelects: true,
             });
         }
 
@@ -284,45 +148,78 @@ window.ArborisFamiliareForm = (function () {
             }
         }
 
-        function removeInlineRow(button) {
-            if (inlineFormsets.removeInlineRow(button, { companionClasses: ["inline-subform-row"] })) {
+        function createInlineManager(prefix, options) {
+            return inlineFormsets.createManager({
+                prefix: prefix,
+                prepareOptions: options && options.prepareOptions ? options.prepareOptions : {},
+                mountOptions: options && options.mountOptions ? options.mountOptions : {},
+                removeOptions: options && options.removeOptions ? options.removeOptions : {},
+            });
+        }
+
+        const inlineManagers = {
+            studenti: createInlineManager("studenti", {
+                prepareOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    includeCompanionRowsInData: true,
+                    ignoreSelects: true,
+                },
+                mountOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    enableInputs: true,
+                    onReady: function (state) {
+                        const row = state.row;
+                        wireInlineRelatedButtons(row);
+                        formTools.initSearchableSelects(row);
+                        const subformRow = state.companionRows[0] || getFamiliareSubformRow(row);
+                        if (subformRow) {
+                            formTools.initSearchableSelects(subformRow);
+                            formTools.initCodiceFiscale(subformRow);
+                        }
+                        studentiInlineAddressCollection.bindTracking(row);
+                        formTools.initCodiceFiscale(row);
+                        bindStudenteInlineSex(row);
+                        studentiInlineAddressDefaults.syncRows();
+                    },
+                    focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+                },
+                removeOptions: {
+                    companionClasses: ["inline-subform-row"],
+                },
+            }),
+            documenti: createInlineManager("documenti", {
+                mountOptions: {
+                    enableInputs: true,
+                    onReady: function (state) {
+                        wireInlineRelatedButtons(state.row);
+                    },
+                    focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+                },
+            }),
+        };
+
+        function removeManagedInlineRow(button) {
+            const row = button && button.closest ? button.closest("tr") : null;
+            const table = row ? row.closest("table") : null;
+            const manager = table ? inlineManagers[table.id.replace("-table", "")] : null;
+            const removed = manager ? manager.remove(button) : null;
+
+            if (removed) {
                 refreshTabCounts();
             }
         }
 
-        function prepareExistingEmptyRows(tableId) {
-            inlineFormsets.prepareExistingEmptyRows(tableId, {
-                companionClasses: [],
-            });
-        }
+        function addManagedInlineForm(prefix) {
+            const manager = inlineManagers[prefix];
+            if (!manager) {
+                return;
+            }
 
-        function addInlineForm(prefix) {
             if (window.familiareViewMode && !window.familiareViewMode.isEditing()) {
                 window.familiareViewMode.setInlineEditing(true);
             }
 
-            const companionClasses = prefix === "studenti" ? ["inline-subform-row"] : [];
-            const mounted = inlineFormsets.mountInlineForm(prefix, {
-                companionClasses: companionClasses,
-                enableInputs: true,
-                onReady: function (state) {
-                    const row = state.row;
-                    wireInlineRelatedButtons(row);
-                    if (prefix === "studenti") {
-                        initSearchableSelects(row);
-                        const subformRow = state.companionRows[0] || getFamiliareSubformRow(row);
-                        if (subformRow) {
-                            initSearchableSelects(subformRow);
-                            initCodiceFiscale(subformRow);
-                        }
-                        familyLinkedAddress.bindInlineAddressTracking(row, studentiInlineAddressTrackingConfig);
-                        initCodiceFiscale(row);
-                        bindStudenteInlineSex(row);
-                        syncFamiliareStudenteInlineDefaults();
-                    }
-                },
-                focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
-            });
+            const mounted = manager.add();
 
             if (!mounted) {
                 return;
@@ -331,9 +228,6 @@ window.ArborisFamiliareForm = (function () {
             activatePanelIfPresent(`tab-${prefix}`);
             refreshTabCounts();
         }
-
-        window.removeInlineRow = removeInlineRow;
-        window.addInlineForm = addInlineForm;
 
         const famigliaSelect = document.getElementById("id_famiglia");
         const relazioneSelect = document.getElementById("id_relazione_familiare");
@@ -347,86 +241,81 @@ window.ArborisFamiliareForm = (function () {
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
+        let refreshFamigliaNavigation = function () {};
         let refreshRelazioneButtons = function () {};
         let refreshIndirizzoButtons = function () {};
 
-        if (addFamigliaBtn && famigliaSelect) {
-            addFamigliaBtn.addEventListener("click", function () {
-                window.location.href = config.urls.creaFamiglia;
-            });
-        }
+        const famigliaNavigation = formTools.bindFamigliaNavigation({
+            familySelect: famigliaSelect,
+            addBtn: addFamigliaBtn,
+            editBtn: editFamigliaBtn,
+            createUrl: config.urls.creaFamiglia,
+        });
+        refreshFamigliaNavigation = famigliaNavigation.refresh;
 
-        if (editFamigliaBtn && famigliaSelect) {
-            editFamigliaBtn.addEventListener("click", function () {
-                if (famigliaSelect.value) {
-                    window.location.href = `/famiglie/${famigliaSelect.value}/modifica/`;
-                }
-            });
-        }
+        const relazioneCrud = routes.wireCrudButtonsById({
+            select: relazioneSelect,
+            relatedType: "relazione_familiare",
+            addBtn: addRelazioneBtn,
+            editBtn: editRelazioneBtn,
+            deleteBtn: deleteRelazioneBtn,
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+        refreshRelazioneButtons = relazioneCrud.refresh;
 
-        const famRoutes = window.ArborisRelatedEntityRoutes;
+        const indirizzoCrud = routes.wireCrudButtonsById({
+            select: indirizzoSelect,
+            relatedType: "indirizzo",
+            addBtn: addIndirizzoBtn,
+            editBtn: editIndirizzoBtn,
+            deleteBtn: deleteIndirizzoBtn,
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+        refreshIndirizzoButtons = indirizzoCrud.refresh;
+        refreshFamigliaNavigation();
 
-        if (relazioneSelect && famRoutes) {
-            const relazioneCrud = famRoutes.wireCrudButtons({
-                select: relazioneSelect,
-                relatedType: "relazione_familiare",
-                addBtn: addRelazioneBtn,
-                editBtn: editRelazioneBtn,
-                deleteBtn: deleteRelazioneBtn,
-                openRelatedPopup: relatedPopups.openRelatedPopup,
-            });
-            refreshRelazioneButtons = relazioneCrud.refresh;
-        }
-
-        if (indirizzoSelect && famRoutes) {
-            const indirizzoCrud = famRoutes.wireCrudButtons({
-                select: indirizzoSelect,
-                relatedType: "indirizzo",
-                addBtn: addIndirizzoBtn,
-                editBtn: editIndirizzoBtn,
-                deleteBtn: deleteIndirizzoBtn,
-                openRelatedPopup: relatedPopups.openRelatedPopup,
-            });
-            refreshIndirizzoButtons = indirizzoCrud.refresh;
-        }
-
-        if (famigliaSelect) {
-            famigliaSelect.addEventListener("change", function () {
-                syncInheritedAddressFromFamiglia();
-                updateMainButtons();
-                refreshAddressHelp();
-            });
-        }
+        formTools.bindFamilyAddressController({
+            familyLinkedAddress: familyLinkedAddress,
+            familySelect: famigliaSelect,
+            addressSelect: indirizzoSelect,
+            helpElement: document.getElementById("familiare-address-help"),
+            fallbackLabelScriptId: "familiare-famiglia-indirizzo-label",
+            onRefreshButtons: updateMainButtons,
+            unselectedFamilyPrefix: "Ereditera: ",
+        });
 
         if (relazioneSelect) {
             relazioneSelect.addEventListener("change", function () {
-                syncSexFromRelazioneFamiliare();
                 updateMainButtons();
             });
         }
 
-        if (indirizzoSelect) {
-            indirizzoSelect.addEventListener("change", function () {
-                updateMainButtons();
-                refreshAddressHelp();
-            });
-        }
-
-        prepareExistingEmptyRows("documenti-table");
-        prepareExistingStudentiEmptyRows();
+        inlineManagers.documenti.prepare();
+        inlineManagers.studenti.prepare();
         tabs.bindTabButtons(getFamiliareTabStorageKey());
         collapsible.initCollapsibleSections(document);
         wireInlineRelatedButtons(document);
+        inlineFormsets.wireActionTriggers(document, {
+            handlers: {
+                add: function (prefix) {
+                    addManagedInlineForm(prefix);
+                },
+                remove: function (_prefix, element) {
+                    removeManagedInlineRow(element);
+                },
+            },
+        });
+        routes.wirePopupTriggerElements(document, {
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
         document.querySelectorAll("#studenti-table tbody .inline-form-row").forEach(row => {
-            familyLinkedAddress.bindInlineAddressTracking(row, studentiInlineAddressTrackingConfig);
+            studentiInlineAddressCollection.bindTracking(row);
         });
         bindAllStudenteInlineSex();
         tabs.restoreActiveTab(getFamiliareTabStorageKey());
-        syncInheritedAddressFromFamiglia();
-        syncSexFromRelazioneFamiliare();
-        syncFamiliareStudenteInlineDefaults();
+        bindStandaloneSexFromRelazioneFamiliare();
+        studentiInlineAddressDefaults.syncRows();
         updateMainButtons();
-        refreshAddressHelp();
         refreshTabCounts();
     }
 

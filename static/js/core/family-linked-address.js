@@ -217,6 +217,34 @@ window.ArborisFamilyLinkedAddress = (function () {
         });
     }
 
+    function createInlineAddressCollection(config) {
+        const cfg = Object.assign({}, config || {});
+
+        function bindTracking(root) {
+            bindInlineAddressTracking(root || cfg.root || document, cfg);
+        }
+
+        function syncRows(root) {
+            syncInlineRows(root || cfg.rowSelector || cfg.root, cfg);
+        }
+
+        function refreshSelectHelp(select) {
+            refreshInlineAddressHelp(select, cfg);
+        }
+
+        function refreshCollectionHelp(root) {
+            refreshInlineAddressHelpForCollection(root || cfg.root || document, cfg);
+        }
+
+        return {
+            config: cfg,
+            bindTracking: bindTracking,
+            syncRows: syncRows,
+            refreshSelectHelp: refreshSelectHelp,
+            refreshCollectionHelp: refreshCollectionHelp,
+        };
+    }
+
     function createController(config) {
         const familySelect = config.familySelect;
         const addressSelect = config.addressSelect;
@@ -370,6 +398,7 @@ window.ArborisFamilyLinkedAddress = (function () {
         applyInlineRowDefaults: applyInlineRowDefaults,
         syncInlineRows: syncInlineRows,
         refreshInlineAddressHelpForCollection: refreshInlineAddressHelpForCollection,
+        createInlineAddressCollection: createInlineAddressCollection,
         createController: createController,
     };
 })();

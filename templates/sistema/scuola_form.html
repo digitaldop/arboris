@@ -181,7 +181,7 @@
                                                 {% if f.instance.pk %}
                                                     <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                                 {% else %}
-                                                    <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                    <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -195,7 +195,7 @@
                             </table>
 
                             <div class="inline-add-row">
-                                <button type="button" class="inline-add-btn" onclick="addInlineForm('telefoni')">+ Aggiungi un altro telefono.</button>
+                                <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="telefoni">+ Aggiungi un altro telefono.</button>
                             </div>
                         </div>
                     </div>
@@ -226,7 +226,7 @@
                                                 {% if f.instance.pk %}
                                                     <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                                 {% else %}
-                                                    <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                    <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -240,7 +240,7 @@
                             </table>
 
                             <div class="inline-add-row">
-                                <button type="button" class="inline-add-btn" onclick="addInlineForm('email')">+ Aggiungi un'altra email.</button>
+                                <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="email">+ Aggiungi un'altra email.</button>
                             </div>
                         </div>
                     </div>
@@ -271,7 +271,7 @@
                                                 {% if f.instance.pk %}
                                                     <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                                 {% else %}
-                                                    <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                    <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                                 {% endif %}
                                             </td>
                                         </tr>
@@ -285,7 +285,7 @@
                             </table>
 
                             <div class="inline-add-row">
-                                <button type="button" class="inline-add-btn" onclick="addInlineForm('socials')">+ Aggiungi un altro social.</button>
+                                <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="socials">+ Aggiungi un altro social.</button>
                             </div>
                         </div>
                     </div>
@@ -308,7 +308,7 @@
             <td>{{ socials_formset.empty_form.link }}</td>
             <td>{{ socials_formset.empty_form.ordine }}</td>
             <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
     </template>
@@ -320,7 +320,7 @@
             <td>{{ telefoni_formset.empty_form.telefono }}</td>
             <td>{{ telefoni_formset.empty_form.ordine }}</td>
             <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
     </template>
@@ -332,7 +332,7 @@
             <td>{{ email_formset.empty_form.email }}</td>
             <td>{{ email_formset.empty_form.ordine }}</td>
             <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
     </template>
@@ -342,7 +342,7 @@
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
     <script src="{% static 'js/core/inline-tabs.js' %}?v=3"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/scuola-form.js' %}?v=15"></script>
+    <script src="{% static 'js/pages/scuola-form.js' %}?v=18"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

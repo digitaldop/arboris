@@ -1,71 +1,49 @@
 window.ArborisStudentePopupForm = (function () {
     function init() {
-        const relatedPopups = window.ArborisRelatedPopups;
+        const routes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = routes && routes.initRelatedPopups();
         const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
-        if (!relatedPopups || !familyLinkedAddress) {
+        const formTools = window.ArborisAnagraficaFormTools;
+        if (!relatedPopups || !familyLinkedAddress || !routes || !formTools) {
             return;
         }
 
-        window.dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
-        window.dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
-
         function updateButtons() {
-            const famigliaSelect = document.getElementById("id_famiglia");
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-
             refreshFamigliaButtons();
             refreshIndirizzoButtons();
         }
 
         function bindPopupActions() {
-            const famigliaSelect = document.getElementById("id_famiglia");
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            const routes = window.ArborisRelatedEntityRoutes;
-
-            const addFamigliaBtn = document.getElementById("popup-add-famiglia-btn");
-            const editFamigliaBtn = document.getElementById("popup-edit-famiglia-btn");
-            const deleteFamigliaBtn = document.getElementById("popup-delete-famiglia-btn");
-            const addIndirizzoBtn = document.getElementById("popup-add-indirizzo-btn");
-            const editIndirizzoBtn = document.getElementById("popup-edit-indirizzo-btn");
-            const deleteIndirizzoBtn = document.getElementById("popup-delete-indirizzo-btn");
             refreshFamigliaButtons = function () {};
             refreshIndirizzoButtons = function () {};
 
-            if (!routes) {
-                console.error("ArborisRelatedEntityRoutes non disponibile.");
-                return;
-            }
+            const famigliaCrud = routes.wireCrudButtonsById({
+                selectId: "id_famiglia",
+                relatedType: "famiglia",
+                addBtnId: "popup-add-famiglia-btn",
+                editBtnId: "popup-edit-famiglia-btn",
+                deleteBtnId: "popup-delete-famiglia-btn",
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+            refreshFamigliaButtons = famigliaCrud.refresh;
 
-            if (famigliaSelect) {
-                const famigliaCrud = routes.wireCrudButtons({
-                    select: famigliaSelect,
-                    relatedType: "famiglia",
-                    addBtn: addFamigliaBtn,
-                    editBtn: editFamigliaBtn,
-                    deleteBtn: deleteFamigliaBtn,
-                    openRelatedPopup: relatedPopups.openRelatedPopup,
-                });
-                refreshFamigliaButtons = famigliaCrud.refresh;
-            }
-
-            if (indirizzoSelect) {
-                const indirizzoCrud = routes.wireCrudButtons({
-                    select: indirizzoSelect,
-                    relatedType: "indirizzo",
-                    addBtn: addIndirizzoBtn,
-                    editBtn: editIndirizzoBtn,
-                    deleteBtn: deleteIndirizzoBtn,
-                    openRelatedPopup: relatedPopups.openRelatedPopup,
-                });
-                refreshIndirizzoButtons = indirizzoCrud.refresh;
-            }
+            const indirizzoCrud = routes.wireCrudButtonsById({
+                selectId: "id_indirizzo",
+                relatedType: "indirizzo",
+                addBtnId: "popup-add-indirizzo-btn",
+                editBtnId: "popup-edit-indirizzo-btn",
+                deleteBtnId: "popup-delete-indirizzo-btn",
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+            refreshIndirizzoButtons = indirizzoCrud.refresh;
         }
 
         const famigliaSelect = document.getElementById("id_famiglia");
         const indirizzoSelect = document.getElementById("id_indirizzo");
         let refreshFamigliaButtons = function () {};
         let refreshIndirizzoButtons = function () {};
-        const familyLinkController = familyLinkedAddress.createController({
+        formTools.bindFamilyAddressController({
+            familyLinkedAddress: familyLinkedAddress,
             familySelect: famigliaSelect,
             addressSelect: indirizzoSelect,
             surnameInput: document.getElementById("id_cognome"),
@@ -74,22 +52,7 @@ window.ArborisStudentePopupForm = (function () {
             onRefreshButtons: updateButtons,
         });
 
-        if (famigliaSelect) {
-            famigliaSelect.addEventListener("change", function () {
-                familyLinkController.syncFamigliaDefaults();
-            });
-        }
-
-        if (indirizzoSelect) {
-            indirizzoSelect.addEventListener("change", function () {
-                familyLinkController.syncInheritedStateFromAddress();
-            });
-        }
-
         bindPopupActions();
-        familyLinkController.syncFamigliaDefaults();
-        familyLinkController.updateInheritedAddressPlaceholder();
-        familyLinkController.refreshAddressHelp();
         updateButtons();
     }
 

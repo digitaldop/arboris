@@ -411,7 +411,7 @@
                                             {% if f.instance.pk %}
                                                 <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                             {% else %}
-                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -482,7 +482,7 @@
                         </table>
 
                         <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" onclick="addInlineForm('iscrizioni')">+ Aggiungi un'altra Iscrizione.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="iscrizioni">+ Aggiungi un'altra Iscrizione.</button>
                         </div>
                     </div>
                 </div>
@@ -584,12 +584,12 @@
                                                     type="button"
                                                     class="inline-remove-btn"
                                                     data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                                    onclick="ArborisRelatedPopups.openRelatedPopup(this.dataset.popupUrl)"
+                                                    data-related-popup-trigger="1"
                                                 >
                                                     Elimina
                                                 </button>
                                             {% else %}
-                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -603,7 +603,7 @@
                         </table>
 
                         <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" onclick="addInlineForm('documenti')">+ Aggiungi un altro Documento.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento.</button>
                         </div>
                     </div>
                 </div>
@@ -659,7 +659,9 @@
                                                         <button
                                                             type="button"
                                                             class="btn btn-rate-withdraw btn-sm"
-                                                            data-withdrawal-popup="1"
+                                                            data-window-popup="1"
+                                                            data-popup-window-name="arboris-withdrawal-popup"
+                                                            data-popup-window-features="width=760,height=720,resizable=yes,scrollbars=yes"
                                                             data-popup-url="{% url 'ritiro_anticipato_iscrizione' item.iscrizione.pk %}?popup=1&next={{ request.get_full_path|urlencode }}"
                                                         >
                                                             Chiudi iscrizione
@@ -707,7 +709,7 @@
                                                                     <div class="student-rate-card-actions">
                                                                         <a href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm">Dettaglio rata</a>
                                                                         {% if can_manage_economia and not month.pagata %}
-                                                                            <button type="button" class="btn btn-rate-paid btn-sm" data-rate-payment-popup="1" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">Conferma pagamento</button>
+                                                                            <button type="button" class="btn btn-rate-paid btn-sm" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=760,height=680,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">Conferma pagamento</button>
                                                                         {% endif %}
                                                                     </div>
                                                                 {% endif %}
@@ -822,7 +824,7 @@
                 </button>
             </td>
             <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
         <tr class="inline-details-row">
@@ -905,7 +907,7 @@
             <td>{{ documenti_formset.empty_form.note }}</td>
             <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ documenti_formset.empty_form.visibile }}</td>
             <td class="inline-delete-cell mode-edit-only-table-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
     </template>
@@ -923,7 +925,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=23"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=31"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

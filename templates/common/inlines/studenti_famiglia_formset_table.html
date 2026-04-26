@@ -1,5 +1,5 @@
 {% load currency %}
-{# Tabella inline studenti (stesso markup ovunque: famiglia, familiare, …). Richiede: studenti_formset, famiglia, count_studenti, studenti_add_onclick #}
+{# Tabella inline studenti (stesso markup ovunque: famiglia, familiare, …). Richiede: studenti_formset, famiglia, count_studenti, studenti_add_action, studenti_add_prefix #}
 {{ studenti_formset.management_form }}
 <table class="inline-table" id="studenti-table">
     <thead>
@@ -108,7 +108,7 @@
                     {% if f.instance.pk %}
                         <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                     {% else %}
-                        <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                        <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                     {% endif %}
                 </td>
             </tr>
@@ -156,5 +156,10 @@
     </div>
 {% endif %}
 <div class="inline-add-row inline-add-row-view-enabled">
-    <button type="button" class="inline-add-btn" onclick="{{ studenti_add_onclick }}">+ Aggiungi un altro {{ student_terminology.selected_singular }}.</button>
+    <button
+        type="button"
+        class="inline-add-btn"
+        data-inline-action="{{ studenti_add_action|default:'add' }}"
+        data-inline-prefix="{{ studenti_add_prefix|default:'studenti' }}"
+    >+ Aggiungi un altro {{ student_terminology.selected_singular }}.</button>
 </div>

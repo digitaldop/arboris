@@ -3,25 +3,22 @@ window.ArborisFamigliaForm = (function () {
     let refreshLockedTabsHandler = function () {};
 
     function init(config) {
-        const relatedPopups = window.ArborisRelatedPopups;
+        const entityRoutes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = entityRoutes && entityRoutes.initRelatedPopups();
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
         const inlineTabs = window.ArborisInlineTabs;
         const inlineFormsets = window.ArborisInlineFormsets;
         const personRules = window.ArborisPersonRules;
         const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
+        const formTools = window.ArborisAnagraficaFormTools;
 
-        if (!relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets || !personRules || !familyLinkedAddress) {
+        if (!entityRoutes || !relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets || !personRules || !familyLinkedAddress || !formTools) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
 
         const openRelatedPopup = relatedPopups.openRelatedPopup;
-        const dismissRelatedPopup = relatedPopups.dismissRelatedPopup;
-        const dismissDeletedRelatedPopup = relatedPopups.dismissDeletedRelatedPopup;
-
-        window.dismissRelatedPopup = dismissRelatedPopup;
-        window.dismissDeletedRelatedPopup = dismissDeletedRelatedPopup;
 
         // Funzione per gestire la persistenza della tab attiva
         function getFamigliaTabStorageKey() {
@@ -227,61 +224,23 @@ window.ArborisFamigliaForm = (function () {
             attivoSelector: 'input[type="checkbox"][name$="-attivo"]',
         }, famigliaInlineAddressConfig);
 
-        function refreshInlineAddressHelp(select) {
-            familyLinkedAddress.refreshInlineAddressHelp(select, famigliaInlineAddressConfig);
-        }
-        function refreshAllInlineAddressHelp() {
-            familyLinkedAddress.refreshInlineAddressHelpForCollection(
-                document.getElementById("famiglia-inline-lock-container"),
-                Object.assign({ selector: 'select[name$="-indirizzo"]' }, famigliaInlineAddressConfig)
-            );
-        }
-
-        function initSearchableSelects(root) {
-            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.init === "function") {
-                window.ArborisFamigliaAutocomplete.init(root || document);
-            }
-            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.refresh === "function") {
-                window.ArborisFamigliaAutocomplete.refresh(root || document);
-            }
-        }
-
-        function initCodiceFiscale(root) {
-            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.rebind === "function") {
-                window.ArborisCodiceFiscale.rebind(root || document);
-                return;
-            }
-
-            if (window.ArborisCodiceFiscale && typeof window.ArborisCodiceFiscale.init === "function") {
-                window.ArborisCodiceFiscale.init(root || document);
-            }
-        }
-
-        function syncFamiliareInlineAddresses() {
-            familyLinkedAddress.syncInlineRows("#familiari-table tbody .inline-form-row", familiariInlineDefaultsConfig);
-        }
-
-
         function getFamigliaCognome() {
             return document.getElementById("id_cognome_famiglia")?.value?.trim() || "";
         }
 
-        function syncStudenteInlineDefaults() {
-            familyLinkedAddress.syncInlineRows("#studenti-table tbody .inline-form-row", studentiInlineDefaultsConfig);
-        }
-
+        const famigliaInlineAddressCollection = familyLinkedAddress.createInlineAddressCollection(
+            Object.assign({ selector: 'select[name$="-indirizzo"]' }, famigliaInlineAddressTrackingConfig)
+        );
+        const familiariInlineAddressDefaults = familyLinkedAddress.createInlineAddressCollection(familiariInlineDefaultsConfig);
+        const studentiInlineAddressDefaults = familyLinkedAddress.createInlineAddressCollection(studentiInlineDefaultsConfig);
 
         function wireInlineRelatedButtons(container) {
-            const routes = window.ArborisRelatedEntityRoutes;
-            if (!routes) {
-                console.error("ArborisRelatedEntityRoutes non disponibile.");
-                return;
-            }
-            routes.wireInlineRelatedButtons(container, {
-                openRelatedPopup: openRelatedPopup,
+            formTools.wireInlineRelatedButtons(container, {
+                routes: entityRoutes,
+                relatedPopups: relatedPopups,
                 onRefresh(relatedType, select) {
                     if (relatedType === "indirizzo") {
-                        familyLinkedAddress.refreshInlineAddressHelp(select, famigliaInlineAddressConfig);
+                        famigliaInlineAddressCollection.refreshSelectHelp(select);
                     }
                 },
             });
@@ -315,18 +274,110 @@ window.ArborisFamigliaForm = (function () {
             }
         }
 
-        function removeInlineRow(button) {
-            if (inlineFormsets.removeInlineRow(button, { companionClasses: ["inline-subform-row"] })) {
+        function createInlineManager(prefix, options) {
+            return inlineFormsets.createManager({
+                prefix: prefix,
+                prepareOptions: options && options.prepareOptions ? options.prepareOptions : {},
+                mountOptions: options && options.mountOptions ? options.mountOptions : {},
+                removeOptions: options && options.removeOptions ? options.removeOptions : {},
+            });
+        }
+
+        function hideInlineState(state) {
+            [state.row].concat(state.companionRows).forEach(function (node) {
+                clearRowData(node);
+                setRowInputsEnabled(node, false);
+            });
+        }
+
+        const inlineManagers = {
+            familiari: createInlineManager("familiari", {
+                prepareOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    includeCompanionRowsInData: true,
+                    ignoreSelects: true,
+                    onHide: hideInlineState,
+                },
+                mountOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    enableInputs: true,
+                    onReady: function (state) {
+                        const row = state.row;
+                        const subformRow = state.companionRows[0] || getFamiliareSubformRow(row);
+                        primeNewFamiliareRow(row);
+                        formTools.initSearchableSelects(row);
+                        if (subformRow) {
+                            formTools.initSearchableSelects(subformRow);
+                            formTools.initCodiceFiscale(subformRow);
+                        }
+                        famigliaInlineAddressCollection.bindTracking(row);
+                        formTools.initCodiceFiscale(row);
+                        wireInlineRelatedButtons(row);
+                        bindFamiliareInlineSex(row);
+                    },
+                    focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+                },
+                removeOptions: {
+                    companionClasses: ["inline-subform-row"],
+                },
+            }),
+            studenti: createInlineManager("studenti", {
+                prepareOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    includeCompanionRowsInData: true,
+                    ignoreSelects: true,
+                    onHide: hideInlineState,
+                },
+                mountOptions: {
+                    companionClasses: ["inline-subform-row"],
+                    enableInputs: true,
+                    onReady: function (state) {
+                        const row = state.row;
+                        const subformRow = state.companionRows[0] || getFamiliareSubformRow(row);
+                        formTools.initSearchableSelects(row);
+                        if (subformRow) {
+                            formTools.initSearchableSelects(subformRow);
+                            formTools.initCodiceFiscale(subformRow);
+                        }
+                        famigliaInlineAddressCollection.bindTracking(row);
+                        formTools.initCodiceFiscale(row);
+                        wireInlineRelatedButtons(row);
+                        bindStudenteInlineSex(row);
+                        bindStudenteInlineBirthDateOrdering(row);
+                    },
+                    focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+                },
+                removeOptions: {
+                    companionClasses: ["inline-subform-row"],
+                },
+            }),
+            documenti: createInlineManager("documenti", {
+                prepareOptions: {
+                    onHide: hideInlineState,
+                },
+                mountOptions: {
+                    enableInputs: true,
+                    onReady: function (state) {
+                        wireInlineRelatedButtons(state.row);
+                    },
+                    focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+                },
+            }),
+        };
+
+        function removeManagedInlineRow(button) {
+            const row = button && button.closest ? button.closest("tr") : null;
+            const table = row ? row.closest("table") : null;
+            const manager = table ? inlineManagers[table.id.replace("-table", "")] : null;
+            const removed = manager ? manager.remove(button) : null;
+
+            if (removed) {
                 refreshTabCounts();
             }
         }
 
         function getFamiliareSubformRow(row) {
-            const subformRow = row.nextElementSibling;
-            if (subformRow && subformRow.classList.contains("inline-subform-row")) {
-                return subformRow;
-            }
-            return null;
+            return inlineFormsets.getPrimaryCompanionRow(row, { companionClasses: ["inline-subform-row"] });
         }
 
         function clearRowData(row) {
@@ -382,37 +433,14 @@ window.ArborisFamigliaForm = (function () {
             }
         }
 
-        function syncFamiliareInlineSex(row) {
-            const relazioneSelect = row.querySelector('select[name$="-relazione_familiare"]');
-            const subformRow = getFamiliareSubformRow(row);
-            const sessoSelect = subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null;
-
-            if (!relazioneSelect || !sessoSelect) {
-                return;
-            }
-
-            const selectedOption = relazioneSelect.options[relazioneSelect.selectedIndex];
-            const inferredSex = personRules.inferSexFromRelationLabel(selectedOption ? selectedOption.textContent : "");
-
-            if (!inferredSex || sessoSelect.value === inferredSex) {
-                return;
-            }
-
-            sessoSelect.value = inferredSex;
-            sessoSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
         function bindFamiliareInlineSex(row) {
-            const relazioneSelect = row.querySelector('select[name$="-relazione_familiare"]');
-            if (!relazioneSelect || relazioneSelect.dataset.sexBound === "1") {
-                return;
-            }
-
-            relazioneSelect.dataset.sexBound = "1";
-            relazioneSelect.addEventListener("change", function () {
-                syncFamiliareInlineSex(row);
+            const subformRow = getFamiliareSubformRow(row);
+            personRules.bindSexFromRelation({
+                root: row,
+                relationSelector: 'select[name$="-relazione_familiare"]',
+                sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
+                bindFlag: "sexBound",
             });
-            syncFamiliareInlineSex(row);
         }
 
         function bindAllFamiliareInlineSex() {
@@ -424,38 +452,14 @@ window.ArborisFamigliaForm = (function () {
             });
         }
 
-        function syncStudenteInlineSex(row) {
-            const nomeInput = row.querySelector('input[name$="-nome"]');
-            const subformRow = getFamiliareSubformRow(row);
-            const sessoSelect = subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null;
-
-            if (!nomeInput || !sessoSelect || sessoSelect.value) {
-                return;
-            }
-
-            const inferredSex = personRules.inferSexFromFirstName(nomeInput.value);
-            if (!inferredSex) {
-                return;
-            }
-
-            sessoSelect.value = inferredSex;
-            sessoSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
         function bindStudenteInlineSex(row) {
-            const nomeInput = row.querySelector('input[name$="-nome"]');
-            if (!nomeInput || nomeInput.dataset.sexBound === "1") {
-                return;
-            }
-
-            nomeInput.dataset.sexBound = "1";
-            nomeInput.addEventListener("change", function () {
-                syncStudenteInlineSex(row);
+            const subformRow = getFamiliareSubformRow(row);
+            personRules.bindSexFromFirstName({
+                root: row,
+                nameSelector: 'input[name$="-nome"]',
+                sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
+                bindFlag: "sexBound",
             });
-            nomeInput.addEventListener("input", function () {
-                syncStudenteInlineSex(row);
-            });
-            syncStudenteInlineSex(row);
         }
 
         function bindAllStudenteInlineSex() {
@@ -571,47 +575,13 @@ window.ArborisFamigliaForm = (function () {
             });
         }
 
-        function prepareExistingEmptyRows(tableId) {
-            inlineFormsets.prepareExistingEmptyRows(tableId, {
-                companionClasses: ["inline-subform-row"],
-                includeCompanionRowsInData: true,
-                ignoreSelects: true,
-                onHide: function (state) {
-                    [state.row].concat(state.companionRows).forEach(function (node) {
-                        clearRowData(node);
-                        setRowInputsEnabled(node, false);
-                    });
-                },
-            });
-        }
+        function addManagedInlineForm(prefix) {
+            const manager = inlineManagers[prefix];
+            if (!manager) {
+                return;
+            }
 
-        function addInlineForm(prefix) {
-            const mounted = inlineFormsets.mountInlineForm(prefix, {
-                companionClasses: ["inline-subform-row"],
-                enableInputs: true,
-                onReady: function (state) {
-                    const row = state.row;
-                    const subformRow = state.companionRows[0] || getFamiliareSubformRow(row);
-                    if (prefix === "familiari") {
-                        primeNewFamiliareRow(row);
-                    }
-                    initSearchableSelects(row);
-                    if (subformRow) {
-                        initSearchableSelects(subformRow);
-                        initCodiceFiscale(subformRow);
-                    }
-                    familyLinkedAddress.bindInlineAddressTracking(row, famigliaInlineAddressTrackingConfig);
-                    initCodiceFiscale(row);
-                    wireInlineRelatedButtons(row);
-                    if (prefix === "familiari") {
-                        bindFamiliareInlineSex(row);
-                    } else if (prefix === "studenti") {
-                        bindStudenteInlineSex(row);
-                        bindStudenteInlineBirthDateOrdering(row);
-                    }
-                },
-                focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
-            });
+            const mounted = manager.add();
 
             if (!mounted) {
                 return;
@@ -621,12 +591,12 @@ window.ArborisFamigliaForm = (function () {
             activateTab(tabId);
             refreshTabCounts();
             if (prefix === "familiari") {
-                syncFamiliareInlineAddresses();
+                familiariInlineAddressDefaults.syncRows();
             } else if (prefix === "studenti") {
-                syncStudenteInlineDefaults();
+                studentiInlineAddressDefaults.syncRows();
                 sortStudentiInlineRows();
             }
-            refreshAllInlineAddressHelp();
+            famigliaInlineAddressCollection.refreshCollectionHelp(document.getElementById("famiglia-inline-lock-container"));
         }
 
         function addInlineFormFromView(prefix) {
@@ -634,12 +604,8 @@ window.ArborisFamigliaForm = (function () {
                 window.famigliaViewMode.setInlineEditing(true);
             }
 
-            addInlineForm(prefix);
+            addManagedInlineForm(prefix);
         }
-
-        window.removeInlineRow = removeInlineRow;
-        window.addInlineForm = addInlineForm;
-        window.addFamigliaInlineForm = addInlineFormFromView;
 
         const statoSelect = document.getElementById("id_stato_relazione_famiglia");
         const indirizzoSelect = document.getElementById("id_indirizzo_principale");
@@ -660,34 +626,25 @@ window.ArborisFamigliaForm = (function () {
             refreshIndirizzoButtons();
         }
 
-        const entityRoutes = window.ArborisRelatedEntityRoutes;
-        if (!entityRoutes) {
-            console.error("ArborisRelatedEntityRoutes non disponibile.");
-        }
+        const statoCrud = entityRoutes.wireCrudButtonsById({
+            select: statoSelect,
+            relatedType: "stato_relazione_famiglia",
+            addBtn: addStatoBtn,
+            editBtn: editStatoBtn,
+            deleteBtn: deleteStatoBtn,
+            openRelatedPopup: openRelatedPopup,
+        });
+        refreshStatoButtons = statoCrud.refresh;
 
-        if (statoSelect && entityRoutes) {
-            const statoCrud = entityRoutes.wireCrudButtons({
-                select: statoSelect,
-                relatedType: "stato_relazione_famiglia",
-                addBtn: addStatoBtn,
-                editBtn: editStatoBtn,
-                deleteBtn: deleteStatoBtn,
-                openRelatedPopup: openRelatedPopup,
-            });
-            refreshStatoButtons = statoCrud.refresh;
-        }
-
-        if (indirizzoSelect && entityRoutes) {
-            const indirizzoCrud = entityRoutes.wireCrudButtons({
-                select: indirizzoSelect,
-                relatedType: "indirizzo",
-                addBtn: addIndirizzoBtn,
-                editBtn: editIndirizzoBtn,
-                deleteBtn: deleteIndirizzoBtn,
-                openRelatedPopup: openRelatedPopup,
-            });
-            refreshIndirizzoButtons = indirizzoCrud.refresh;
-        }
+        const indirizzoCrud = entityRoutes.wireCrudButtonsById({
+            select: indirizzoSelect,
+            relatedType: "indirizzo",
+            addBtn: addIndirizzoBtn,
+            editBtn: editIndirizzoBtn,
+            deleteBtn: deleteIndirizzoBtn,
+            openRelatedPopup: openRelatedPopup,
+        });
+        refreshIndirizzoButtons = indirizzoCrud.refresh;
 
         if (statoSelect) {
             statoSelect.addEventListener("change", updateMainRelatedButtons);
@@ -696,20 +653,24 @@ window.ArborisFamigliaForm = (function () {
         if (indirizzoSelect) {
             indirizzoSelect.addEventListener("change", updateMainRelatedButtons);
             indirizzoSelect.addEventListener("change", function () {
-                syncFamiliareInlineAddresses();
-                syncStudenteInlineDefaults();
-                refreshAllInlineAddressHelp();
+                familiariInlineAddressDefaults.syncRows();
+                studentiInlineAddressDefaults.syncRows();
+                famigliaInlineAddressCollection.refreshCollectionHelp(document.getElementById("famiglia-inline-lock-container"));
             });
         }
 
         if (cognomeFamigliaInput) {
-            cognomeFamigliaInput.addEventListener("input", syncStudenteInlineDefaults);
-            cognomeFamigliaInput.addEventListener("change", syncStudenteInlineDefaults);
+            cognomeFamigliaInput.addEventListener("input", function () {
+                studentiInlineAddressDefaults.syncRows();
+            });
+            cognomeFamigliaInput.addEventListener("change", function () {
+                studentiInlineAddressDefaults.syncRows();
+            });
         }
 
-        prepareExistingEmptyRows("familiari-table");
-        prepareExistingEmptyRows("studenti-table");
-        prepareExistingEmptyRows("documenti-table");
+        inlineManagers.familiari.prepare();
+        inlineManagers.studenti.prepare();
+        inlineManagers.documenti.prepare();
         const inlineLockRoot = famigliaInlineRoot();
         if (inlineLockRoot) {
             tabs.bindTabButtons(getFamigliaTabStorageKey(), inlineLockRoot);
@@ -725,18 +686,34 @@ window.ArborisFamigliaForm = (function () {
         updateMainRelatedButtons();
         collapsible.initCollapsibleSections(document);
         bindNotesSectionState();
-        initSearchableSelects(document.getElementById("famiglia-lock-container"));
-        familyLinkedAddress.bindInlineAddressTracking(document.getElementById("famiglia-inline-lock-container"), famigliaInlineAddressTrackingConfig);
+        formTools.initSearchableSelects(document.getElementById("famiglia-lock-container"));
+        famigliaInlineAddressCollection.bindTracking(document.getElementById("famiglia-inline-lock-container"));
         wireInlineRelatedButtons(document);
+        inlineFormsets.wireActionTriggers(document, {
+            handlers: {
+                add: function (prefix) {
+                    addManagedInlineForm(prefix);
+                },
+                "add-view": function (prefix) {
+                    addInlineFormFromView(prefix);
+                },
+                remove: function (_prefix, element) {
+                    removeManagedInlineRow(element);
+                },
+            },
+        });
+        entityRoutes.wirePopupTriggerElements(document, {
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
         restoreActiveTab();
-        syncFamiliareInlineAddresses();
+        familiariInlineAddressDefaults.syncRows();
         bindAllFamiliareInlineSex();
         bindAllStudenteInlineSex();
         bindAllStudenteInlineBirthDateOrdering();
-        syncStudenteInlineDefaults();
+        studentiInlineAddressDefaults.syncRows();
         sortStudentiInlineRows();
-        initCodiceFiscale(document.getElementById("famiglia-inline-lock-container"));
-        refreshAllInlineAddressHelp();
+        formTools.initCodiceFiscale(document.getElementById("famiglia-inline-lock-container"));
+        famigliaInlineAddressCollection.refreshCollectionHelp(document.getElementById("famiglia-inline-lock-container"));
         refreshTabCounts();
         refreshInlineEditScope();
         syncNotesSectionState();

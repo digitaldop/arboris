@@ -314,7 +314,7 @@
                 </div>
                 <div class="panel">
                     <div class="panel-body">
-                        {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_onclick="addInlineForm('studenti')" %}
+                        {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_action="add" studenti_add_prefix="studenti" %}
                     </div>
                 </div>
             </div>
@@ -380,12 +380,12 @@
                                                     type="button"
                                                     class="inline-remove-btn"
                                                     data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                                    onclick="ArborisRelatedPopups.openRelatedPopup(this.dataset.popupUrl)"
+                                                    data-related-popup-trigger="1"
                                                 >
                                                     Elimina
                                                 </button>
                                             {% else %}
-                                                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                                                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -405,7 +405,7 @@
                         {% endif %}
 
                         <div class="inline-add-row">
-                            <button type="button" class="inline-add-btn" onclick="addInlineForm('documenti')">+ Aggiungi un altro Documento.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento.</button>
                         </div>
                     </div>
                 </div>
@@ -450,7 +450,7 @@
             <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
             <td>{{ documenti_formset.empty_form.note }}</td>
             <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" onclick="removeInlineRow(this)">Rimuovi</button>
+                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
     </template>
@@ -467,7 +467,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=11"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=19"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

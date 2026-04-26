@@ -58,70 +58,15 @@
             </div>
         </div>
     </form>
-
+    {% if not popup %}
+        <script src="{% static 'js/core/related-popups.js' %}"></script>
+    {% endif %}
+    <script src="{% static 'js/pages/rata-iscrizione-pagamento-rapido-form.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const integrale = document.getElementById("id_pagamento_integrale");
-            const parzialeRow = document.getElementById("pagamento-parziale-row");
-            const importoInput = document.getElementById("id_importo_pagato_personalizzato");
-            const metodoSelect = document.getElementById("id_metodo_pagamento");
-            const addBtn = document.getElementById("add-metodo-pagamento-btn");
-            const editBtn = document.getElementById("edit-metodo-pagamento-btn");
-            const deleteBtn = document.getElementById("delete-metodo-pagamento-btn");
-
-            function refreshState() {
-                const isFull = !integrale || integrale.checked;
-                if (parzialeRow) {
-                    parzialeRow.classList.toggle("is-hidden", isFull);
-                }
-                if (importoInput) {
-                    importoInput.disabled = isFull;
-                    if (isFull) {
-                        importoInput.value = "";
-                    }
-                }
+            if (window.ArborisRataIscrizionePagamentoRapidoForm) {
+                ArborisRataIscrizionePagamentoRapidoForm.init();
             }
-
-            function refreshMetodoButtons() {
-                const hasValue = metodoSelect && metodoSelect.value;
-                if (editBtn) editBtn.disabled = !hasValue;
-                if (deleteBtn) deleteBtn.disabled = !hasValue;
-            }
-
-            if (integrale) {
-                integrale.addEventListener("change", refreshState);
-            }
-
-            if (addBtn) {
-                addBtn.addEventListener("click", function () {
-                    if (window.ArborisRelatedPopups) {
-                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/nuovo/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
-                    }
-                });
-            }
-
-            if (editBtn) {
-                editBtn.addEventListener("click", function () {
-                    if (metodoSelect && metodoSelect.value && window.ArborisRelatedPopups) {
-                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/' + metodoSelect.value + '/modifica/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
-                    }
-                });
-            }
-
-            if (deleteBtn) {
-                deleteBtn.addEventListener("click", function () {
-                    if (metodoSelect && metodoSelect.value && window.ArborisRelatedPopups) {
-                        ArborisRelatedPopups.openRelatedPopup('/economia/metodi-pagamento/' + metodoSelect.value + '/elimina/?popup=1&target_input_name=' + encodeURIComponent('metodo_pagamento'));
-                    }
-                });
-            }
-
-            if (metodoSelect) {
-                metodoSelect.addEventListener("change", refreshMetodoButtons);
-            }
-
-            refreshState();
-            refreshMetodoButtons();
         });
     </script>
 {% endblock %}
