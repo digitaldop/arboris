@@ -2,19 +2,70 @@ window.ArborisStudenteForm = (function () {
     let refreshInlineEditScopeHandler = function () {};
 
     function init(config) {
-        const routes = window.ArborisRelatedEntityRoutes;
-        const relatedPopups = routes && routes.initRelatedPopups();
-        const collapsible = window.ArborisCollapsible;
-        const tabs = window.ArborisTabs;
-        const inlineTabs = window.ArborisInlineTabs;
+        const routes = window.ArborisRelatedEntityRoutes || null;
+        const relatedPopups = routes && typeof routes.initRelatedPopups === "function"
+            ? (routes.initRelatedPopups() || window.ArborisRelatedPopups || null)
+            : (window.ArborisRelatedPopups || null);
+        const collapsible = window.ArborisCollapsible || {
+            initCollapsibleSections: function () {},
+        };
+        const tabs = window.ArborisTabs || {
+            activateTab: function (tabId) {
+                document.querySelectorAll(".tab-btn").forEach(function (btn) {
+                    btn.classList.remove("is-active");
+                });
+                document.querySelectorAll(".tab-panel").forEach(function (panel) {
+                    panel.classList.remove("is-active");
+                });
+                const btn = document.querySelector('[data-tab-target="' + tabId + '"]');
+                const panel = document.getElementById(tabId);
+                if (btn) btn.classList.add("is-active");
+                if (panel) panel.classList.add("is-active");
+            },
+            bindTabButtons: function () {},
+            restoreActiveTab: function () {},
+        };
+        const inlineTabs = window.ArborisInlineTabs || {
+            setInlineTargetValue: function (targetInputId, prefixOrTabId) {
+                const input = document.getElementById(targetInputId);
+                if (!input || !prefixOrTabId) {
+                    return;
+                }
+                input.value = prefixOrTabId.replace(/^tab-/, "");
+            },
+            updateDefaultInlineEditButtonLabel: function () {},
+            createRefreshLockedTabs: function (options) {
+                return function () {
+                    if (options && typeof options.onAfterRefresh === "function") {
+                        options.onAfterRefresh();
+                    }
+                };
+            },
+            bindTabNavigationLock: function () {},
+        };
         const inlineFormsets = window.ArborisInlineFormsets;
-        const personRules = window.ArborisPersonRules;
-        const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
-        const formTools = window.ArborisAnagraficaFormTools;
+        const personRules = window.ArborisPersonRules || {
+            bindSexFromFirstName: function () {},
+        };
+        const familyLinkedAddress = window.ArborisFamilyLinkedAddress || null;
+        const formTools = window.ArborisAnagraficaFormTools || null;
 
-        if (!routes || !relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets || !personRules || !familyLinkedAddress || !formTools) {
-            console.error("Arboris core JS non caricato correttamente.");
+        if (!inlineFormsets) {
+            console.error("Arboris inline formsets non caricati: impossibile inizializzare la scheda studente.");
             return;
+        }
+
+        const missingOptionalDeps = [];
+        if (!routes) missingOptionalDeps.push("ArborisRelatedEntityRoutes");
+        if (!relatedPopups) missingOptionalDeps.push("ArborisRelatedPopups");
+        if (!window.ArborisTabs) missingOptionalDeps.push("ArborisTabs");
+        if (!window.ArborisInlineTabs) missingOptionalDeps.push("ArborisInlineTabs");
+        if (!window.ArborisPersonRules) missingOptionalDeps.push("ArborisPersonRules");
+        if (!familyLinkedAddress) missingOptionalDeps.push("ArborisFamilyLinkedAddress");
+        if (!formTools) missingOptionalDeps.push("ArborisAnagraficaFormTools");
+
+        if (missingOptionalDeps.length) {
+            console.warn("ArborisStudenteForm: dipendenze opzionali mancanti o non pronte:", missingOptionalDeps.join(", "));
         }
 
         function getStudenteTabStorageKey() {
@@ -93,6 +144,9 @@ window.ArborisStudenteForm = (function () {
         }
 
         function wireInlineRelatedButtons(container) {
+            if (!formTools || typeof formTools.wireInlineRelatedButtons !== "function" || !routes || !relatedPopups) {
+                return;
+            }
             formTools.wireInlineRelatedButtons(container, {
                 routes: routes,
                 relatedPopups: relatedPopups,
@@ -624,33 +678,39 @@ window.ArborisStudenteForm = (function () {
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
         let refreshIndirizzoButtons = function () {};
-        formTools.bindFamilyAddressController({
-            familyLinkedAddress: familyLinkedAddress,
-            familySelect: famigliaSelect,
-            addressSelect: indirizzoSelect,
-            surnameInput: document.getElementById("id_cognome"),
-            helpElement: document.getElementById("studente-address-help"),
-            fallbackLabelScriptId: "studente-famiglia-indirizzo-label",
-            onRefreshButtons: updateMainButtons,
-        });
+        if (formTools && familyLinkedAddress && typeof formTools.bindFamilyAddressController === "function") {
+            formTools.bindFamilyAddressController({
+                familyLinkedAddress: familyLinkedAddress,
+                familySelect: famigliaSelect,
+                addressSelect: indirizzoSelect,
+                surnameInput: document.getElementById("id_cognome"),
+                helpElement: document.getElementById("studente-address-help"),
+                fallbackLabelScriptId: "studente-famiglia-indirizzo-label",
+                onRefreshButtons: updateMainButtons,
+            });
+        }
 
-        const famigliaNavigation = formTools.bindFamigliaNavigation({
-            familySelect: famigliaSelect,
-            addBtn: addFamigliaBtn,
-            editBtn: editFamigliaBtn,
-            createUrl: config.urls.creaFamiglia,
-        });
-        refreshFamigliaNavigation = famigliaNavigation.refresh;
+        if (formTools && typeof formTools.bindFamigliaNavigation === "function") {
+            const famigliaNavigation = formTools.bindFamigliaNavigation({
+                familySelect: famigliaSelect,
+                addBtn: addFamigliaBtn,
+                editBtn: editFamigliaBtn,
+                createUrl: config.urls.creaFamiglia,
+            });
+            refreshFamigliaNavigation = famigliaNavigation.refresh;
+        }
 
-        const indirizzoCrud = routes.wireCrudButtonsById({
-            select: indirizzoSelect,
-            relatedType: "indirizzo",
-            addBtn: addIndirizzoBtn,
-            editBtn: editIndirizzoBtn,
-            deleteBtn: deleteIndirizzoBtn,
-            openRelatedPopup: relatedPopups.openRelatedPopup,
-        });
-        refreshIndirizzoButtons = indirizzoCrud.refresh;
+        if (routes && typeof routes.wireCrudButtonsById === "function" && relatedPopups && typeof relatedPopups.openRelatedPopup === "function") {
+            const indirizzoCrud = routes.wireCrudButtonsById({
+                select: indirizzoSelect,
+                relatedType: "indirizzo",
+                addBtn: addIndirizzoBtn,
+                editBtn: editIndirizzoBtn,
+                deleteBtn: deleteIndirizzoBtn,
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+            refreshIndirizzoButtons = indirizzoCrud.refresh;
+        }
         refreshFamigliaNavigation();
 
         inlineManagers.iscrizioni.prepare();
@@ -688,9 +748,11 @@ window.ArborisStudenteForm = (function () {
                 },
             },
         });
-        routes.wirePopupTriggerElements(document, {
-            openRelatedPopup: relatedPopups.openRelatedPopup,
-        });
+        if (routes && typeof routes.wirePopupTriggerElements === "function" && relatedPopups && typeof relatedPopups.openRelatedPopup === "function") {
+            routes.wirePopupTriggerElements(document, {
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+        }
         if (window.ArborisPopupWindowTriggers) {
             ArborisPopupWindowTriggers.wire(document);
         }
