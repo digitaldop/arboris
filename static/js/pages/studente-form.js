@@ -123,8 +123,7 @@ window.ArborisStudenteForm = (function () {
                     form.classList.toggle("is-inline-iscrizioni-layout", isInlineEditing && target === "iscrizioni");
                 }
 
-                const isFullEditing = Boolean(form && form.classList.contains("is-edit-mode"));
-                if ((isInlineEditing || isFullEditing) && target === "iscrizioni") {
+                if (isInlineEditing && target === "iscrizioni") {
                     ensureVisibleInlineRow("iscrizioni");
                 }
                 syncIscrizioniInlineDetails();
@@ -185,10 +184,7 @@ window.ArborisStudenteForm = (function () {
         function syncIscrizioniInlineDetails() {
             const form = document.getElementById("studente-detail-form");
             const layoutEnabled = Boolean(form && form.classList.contains("is-inline-iscrizioni-layout"));
-            const detailsShouldBeOpen = Boolean(
-                layoutEnabled ||
-                (form && form.classList.contains("is-edit-mode"))
-            );
+            const detailsShouldBeOpen = layoutEnabled;
 
             document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
                 const state = getIscrizioneBundleState(row);

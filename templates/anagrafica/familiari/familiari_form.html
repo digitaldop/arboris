@@ -21,9 +21,8 @@
             {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo familiare{% endif %}
         </h1>
         <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_familiari' %}">Indietro</button>
             {% if familiare %}
-                <button type="button" class="btn btn-primary" id="enable-edit-familiare-btn">Modifica</button>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-familiare-btn">Annulla modifiche</button>
                 <a href="{% url 'elimina_familiare' familiare.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Torna all'elenco</a>
@@ -38,7 +37,14 @@
         <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
                 <div class="admin-section">
-                    <div class="admin-section-title">Dati principali</div>
+                    <div class="admin-section-title admin-section-title-actionbar">
+                        <span class="admin-section-title-label">Dati principali</span>
+                        {% if familiare %}
+                            <div class="admin-section-title-actions">
+                                <button type="button" class="admin-section-title-btn" id="enable-edit-familiare-btn">Modifica dati principali</button>
+                            </div>
+                        {% endif %}
+                    </div>
                     <div class="panel">
                         <div class="panel-body">
                             <table class="form-table">
@@ -70,7 +76,14 @@
                                 <tr>
                                     <th>{{ form.relazione_familiare.label_tag }}</th>
                                     <td>
-                                        <div class="related-field-row">
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.relazione_familiare %}
+                                                {{ familiare.relazione_familiare }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="related-field-row mode-edit-field">
                                             {{ form.relazione_familiare }}
                                             <div class="related-actions">
                                                 <button type="button" class="related-btn related-btn-add" id="add-relazione-btn">+</button>
@@ -84,12 +97,32 @@
 
                                 <tr>
                                     <th>{{ form.cognome.label_tag }}</th>
-                                    <td>{{ form.cognome }} {{ form.cognome.errors }}</td>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.cognome %}
+                                                {{ familiare.cognome }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.cognome }}</div>
+                                        {{ form.cognome.errors }}
+                                    </td>
                                 </tr>
 
                                 <tr>
                                     <th>{{ form.nome.label_tag }}</th>
-                                    <td>{{ form.nome }} {{ form.nome.errors }}</td>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.nome %}
+                                                {{ familiare.nome }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.nome }}</div>
+                                        {{ form.nome.errors }}
+                                    </td>
                                 </tr>
 
                                 <tr>
@@ -170,12 +203,32 @@
 
                                 <tr>
                                     <th>{{ form.data_nascita.label_tag }}</th>
-                                    <td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.data_nascita %}
+                                                {{ familiare.data_nascita|it_date }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.data_nascita }}</div>
+                                        {{ form.data_nascita.errors }}
+                                    </td>
                                 </tr>
 
                                 <tr>
                                     <th>{{ form.sesso.label_tag }}</th>
-                                    <td>{{ form.sesso }} {{ form.sesso.errors }}</td>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.sesso %}
+                                                {{ familiare.get_sesso_display }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicato</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.sesso }}</div>
+                                        {{ form.sesso.errors }}
+                                    </td>
                                 </tr>
 
                                 <tr>
@@ -221,7 +274,7 @@
                                                 <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">X</button>
                                             </div>
                                         </div>
-                                        <div class="inline-address-help" id="familiare-address-help">
+                                        <div class="inline-address-help mode-edit-field" id="familiare-address-help">
                                             Se lasci vuoto, verra usato l'indirizzo principale della famiglia
                                         </div>
                                         {{ form.indirizzo.errors }}
@@ -416,10 +469,10 @@
         </fieldset>
 
         <div class="form-actions sticky-form-actions mode-edit-only">
-            <button type="submit" name="_save" class="btn btn-primary">Salva</button>
+            <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>
             <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
             <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un altro familiare</button>
-            <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Annulla</a>
+            <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-familiare-btn">Annulla</button>
         </div>
 
         <div class="sticky-actions-spacer"></div>
@@ -467,11 +520,13 @@
     <script src="{% static 'js/core/tabs.js' %}"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=8"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
     <script src="{% static 'js/pages/familiare-form.js' %}?v=20"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
+            const stickyCancelButton = document.getElementById("sticky-cancel-edit-familiare-btn");
+
             if (window.ArborisViewMode) {
                 window.familiareViewMode = ArborisViewMode.init({
                     formId: "familiare-detail-form",
@@ -479,7 +534,6 @@
                     inlineLockContainerId: "familiare-inline-lock-container",
                     editButtonId: "enable-edit-familiare-btn",
                     inlineEditButtonId: "enable-inline-edit-familiare-btn",
-                    cancelButtonId: "cancel-edit-familiare-btn",
                     modeInputId: "familiare-edit-scope",
                     startMode: "{{ edit_scope|default:'view' }}",
                     reloadOnCancel: true
@@ -502,6 +556,20 @@
 
             if (window.ArborisCopyActions) {
                 ArborisCopyActions.init();
+            }
+
+            if (stickyCancelButton) {
+                stickyCancelButton.addEventListener("click", function () {
+                    if (window.familiareViewMode && typeof window.familiareViewMode.returnToView === "function") {
+                        window.familiareViewMode.returnToView();
+                        return;
+                    }
+                    if (typeof window.ArborisReloadWithLongWait === "function") {
+                        window.ArborisReloadWithLongWait();
+                    } else {
+                        window.location.reload();
+                    }
+                });
             }
 
             if (window.familiareViewMode) {

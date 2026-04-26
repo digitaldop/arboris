@@ -21,11 +21,9 @@
             {% if studente %}{{ studente.nome }} {{ studente.cognome }}{% if classe_corrente_label %} - {{ classe_corrente_label }}{% endif %}{% else %}Nuovo studente{% endif %}
         </h1>
         <div class="page-head-actions">
-            <button type="button" class="btn btn-secondary" id="back-studente-btn"
+            <button type="button" class="btn btn-secondary js-page-back-btn" id="back-studente-btn"
                     data-fallback-url="{% url 'lista_studenti' %}">Indietro</button>
             {% if studente %}
-                <button type="button" class="btn btn-primary" id="enable-edit-studente-btn">Modifica</button>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-studente-btn">Annulla modifiche</button>
                 <a href="{% url 'elimina_studente' studente.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Torna all'elenco</a>
@@ -41,7 +39,14 @@
         <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
                 <div class="admin-section">
-                    <div class="admin-section-title">Dati principali</div>
+                    <div class="admin-section-title admin-section-title-actionbar">
+                        <span class="admin-section-title-label">Dati principali</span>
+                        {% if studente %}
+                            <div class="admin-section-title-actions">
+                                <button type="button" class="admin-section-title-btn" id="enable-edit-studente-btn">Modifica dati principali</button>
+                            </div>
+                        {% endif %}
+                    </div>
                     <div class="panel">
                         <div class="panel-body">
                             <table class="form-table">
@@ -715,7 +720,7 @@
         {% endif %}
 
         <div class="form-actions sticky-form-actions mode-edit-only">
-            <button type="submit" name="_save" class="btn btn-primary">Salva</button>
+            <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>
             <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
             <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un altro studente</button>
             <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-studente-btn">Annulla</button>
@@ -887,8 +892,8 @@
     <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=8"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=37"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=38"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -912,25 +917,6 @@
                 ArborisListRowLinks.init();
             }
 
-            const backButton = document.getElementById("back-studente-btn");
-            if (backButton) {
-                backButton.addEventListener("click", function () {
-                    const fallback = backButton.dataset.fallbackUrl || "/";
-                    // Se c'e' una history di navigazione interna, torniamo indietro,
-                    // altrimenti fallback all'elenco studenti.
-                    if (window.history.length > 1 && document.referrer) {
-                        try {
-                            const refUrl = new URL(document.referrer, window.location.origin);
-                            if (refUrl.origin === window.location.origin) {
-                                window.history.back();
-                                return;
-                            }
-                        } catch (e) { /* fallthrough */ }
-                    }
-                    window.location.assign(fallback);
-                });
-            }
-
             if (window.ArborisViewMode) {
                 window.studenteViewMode = ArborisViewMode.init({
                     formId: "studente-detail-form",
@@ -938,7 +924,6 @@
                     inlineLockContainerId: "studente-inline-lock-container",
                     editButtonId: "enable-edit-studente-btn",
                     inlineEditButtonId: "enable-inline-edit-studente-btn",
-                    cancelButtonId: "cancel-edit-studente-btn",
                     modeInputId: "studente-edit-scope",
                     startMode: "{{ edit_scope|default:'view' }}",
                     reloadOnCancel: true,

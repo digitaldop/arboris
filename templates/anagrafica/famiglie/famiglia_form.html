@@ -21,10 +21,8 @@
             {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
         </h1>
         <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">Indietro</button>
             {% if famiglia %}
-                <button type="button" class="btn btn-secondary" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">Stampa scheda</button>
-                <button type="button" class="btn btn-primary" id="enable-edit-famiglia-btn">Modifica</button>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-famiglia-btn">Annulla modifiche</button>
                 <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Torna all'elenco</a>
@@ -41,7 +39,15 @@
         <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
                 <div class="admin-section">
-                    <div class="admin-section-title">Dati principali</div>
+                    <div class="admin-section-title admin-section-title-actionbar">
+                        <span class="admin-section-title-label">Dati principali</span>
+                        {% if famiglia %}
+                            <div class="admin-section-title-actions">
+                                <button type="button" class="admin-section-title-btn" id="enable-edit-famiglia-btn">Modifica dati principali</button>
+                                <button type="button" class="admin-section-title-btn" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">Stampa scheda</button>
+                            </div>
+                        {% endif %}
+                    </div>
                     <div class="panel">
                         <div class="panel-body">
                             <table class="form-table">
@@ -698,7 +704,7 @@
 
         <!-- PULSANTI DI AZIONE DEL FORM -->
         <div class="form-actions sticky-form-actions mode-edit-only" id="sticky-form-actions">
-            <button type="submit" name="_save" class="btn btn-primary">Salva</button>
+            <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>
             <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
             <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un'altra famiglia</button>
             <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-famiglia-btn">Annulla</button>
@@ -942,7 +948,7 @@
     <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
 
     <script src="{% static 'js/pages/famiglia-form.js' %}?v=34"></script>
 
@@ -951,7 +957,6 @@
         const famigliaId = "{{ famiglia.pk|default:'new' }}";
         const printButton = document.getElementById("print-famiglia-btn");
         const stickyCancelButton = document.getElementById("sticky-cancel-edit-famiglia-btn");
-        const headerCancelButton = document.getElementById("cancel-edit-famiglia-btn");
 
         if (printButton) {
             printButton.addEventListener("click", function () {
@@ -976,8 +981,8 @@
 
         if (stickyCancelButton) {
             stickyCancelButton.addEventListener("click", function () {
-                if (headerCancelButton) {
-                    headerCancelButton.click();
+                if (window.famigliaViewMode && typeof window.famigliaViewMode.returnToView === "function") {
+                    window.famigliaViewMode.returnToView();
                     return;
                 }
                 if (typeof window.ArborisReloadWithLongWait === "function") {
@@ -1017,7 +1022,6 @@
                 modeInputId: "famiglia-edit-scope",
                 editButtonId: "enable-edit-famiglia-btn",
                 inlineEditButtonId: "enable-inline-edit-famiglia-btn",
-                cancelButtonId: "cancel-edit-famiglia-btn",
                 startMode: "{{ edit_scope|default:'view' }}",
                 reloadOnCancel: true,
                 onModeChange: function () {

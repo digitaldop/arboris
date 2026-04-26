@@ -67,14 +67,6 @@
             return;
         }
 
-        const hasEditToggle = Boolean(
-            pageHeadActions.querySelector('button[id^="enable-edit-"], button[id*="enable-edit"]')
-        );
-
-        if (form.classList.contains("detail-form") && form.classList.contains("is-view-mode") && !hasEditToggle) {
-            return;
-        }
-
         const sourceSubmitButton = actionBar.querySelector('button[type="submit"], input[type="submit"]');
         if (!sourceSubmitButton) {
             return;
@@ -83,7 +75,7 @@
         const saveButton = document.createElement("button");
         saveButton.type = "submit";
         saveButton.className = "btn btn-save-soft page-head-save-btn";
-        saveButton.textContent = "Salva";
+        saveButton.textContent = "Salva le modifiche";
         saveButton.setAttribute("form", form.id);
         saveButton.dataset.autoSaveFor = form.id;
 
@@ -97,6 +89,31 @@
         }
 
         pageHeadActions.insertAdjacentElement("afterbegin", saveButton);
+    }
+
+    function bindBackButtons(container) {
+        (container || document).querySelectorAll(".js-page-back-btn[data-fallback-url]").forEach(button => {
+            if (button.dataset.backBound === "1") {
+                return;
+            }
+
+            button.dataset.backBound = "1";
+            button.addEventListener("click", function () {
+                const fallback = button.dataset.fallbackUrl || "/";
+
+                if (window.history.length > 1 && document.referrer) {
+                    try {
+                        const refUrl = new URL(document.referrer, window.location.origin);
+                        if (refUrl.origin === window.location.origin) {
+                            window.history.back();
+                            return;
+                        }
+                    } catch (e) {}
+                }
+
+                window.location.assign(fallback);
+            });
+        });
     }
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -113,5 +130,7 @@
             ensureStickyActionBar(actionBar);
             ensureHeaderSaveButton(form, actionBar, findPageHeadActionsForForm(form));
         });
+
+        bindBackButtons(document);
     });
 })();

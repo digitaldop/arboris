@@ -1507,12 +1507,12 @@ def modifica_famiglia(request, pk):
         form = FamigliaForm(request.POST, instance=famiglia)
         familiari_formset = (
             build_familiari_formset(data=request.POST, instance=famiglia, prefix="familiari")
-            if inline_target in (None, "familiari")
+            if inline_target == "familiari"
             else None
         )
         studenti_formset = (
             build_studenti_formset(data=request.POST, instance=famiglia, prefix="studenti")
-            if inline_target in (None, "studenti")
+            if inline_target == "studenti"
             else None
         )
         documenti_formset = (
@@ -1522,24 +1522,24 @@ def modifica_famiglia(request, pk):
                 instance=famiglia,
                 prefix="documenti",
             )
-            if inline_target in (None, "documenti")
+            if inline_target == "documenti"
             else None
         )
 
         form_is_valid = form.is_valid()
-        familiari_is_valid = familiari_formset.is_valid() if inline_target in (None, "familiari") else True
-        studenti_is_valid = studenti_formset.is_valid() if inline_target in (None, "studenti") else True
-        documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
+        familiari_is_valid = familiari_formset.is_valid() if inline_target == "familiari" else True
+        studenti_is_valid = studenti_formset.is_valid() if inline_target == "studenti" else True
+        documenti_is_valid = documenti_formset.is_valid() if inline_target == "documenti" else True
 
         if form_is_valid and familiari_is_valid and studenti_is_valid and documenti_is_valid:
             try:
                 with transaction.atomic():
                     famiglia = form.save()
-                    if inline_target in (None, "familiari"):
+                    if inline_target == "familiari":
                         familiari_formset.save()
-                    if inline_target in (None, "studenti"):
+                    if inline_target == "studenti":
                         studenti_formset.save()
-                    if inline_target in (None, "documenti"):
+                    if inline_target == "documenti":
                         documenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
@@ -2045,36 +2045,41 @@ def modifica_familiare(request, pk):
         if edit_scope == "view":
             return redirect(request.get_full_path())
 
+        inline_editing = edit_scope == "inline"
         famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
         form = (
             FamiliareForm(instance=familiare)
-            if edit_scope == "inline"
+            if inline_editing
             else FamiliareForm(request.POST, instance=familiare)
         )
-        documenti_formset = DocumentoFamiliareFormSet(
-            request.POST,
-            request.FILES,
-            instance=familiare,
-            prefix="documenti",
-        )
+        if inline_editing:
+            documenti_formset = DocumentoFamiliareFormSet(
+                request.POST,
+                request.FILES,
+                instance=familiare,
+                prefix="documenti",
+            )
+        else:
+            documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
         if famiglia_for_studenti:
             studenti_formset = build_studenti_formset(
-                data=request.POST,
+                data=request.POST if inline_editing else None,
                 instance=famiglia_for_studenti,
                 prefix="studenti",
             )
 
-        studenti_ok = studenti_formset.is_valid() if studenti_formset is not None else True
-        form_ok = True if edit_scope == "inline" else form.is_valid()
-        documenti_ok = documenti_formset.is_valid()
+        studenti_ok = studenti_formset.is_valid() if inline_editing and studenti_formset is not None else True
+        form_ok = True if inline_editing else form.is_valid()
+        documenti_ok = documenti_formset.is_valid() if inline_editing else True
 
         if form_ok and documenti_ok and studenti_ok:
             try:
                 with transaction.atomic():
-                    if edit_scope != "inline":
+                    if not inline_editing:
                         familiare = form.save()
-                    documenti_formset.save()
-                    if studenti_formset is not None:
+                    if inline_editing:
+                        documenti_formset.save()
+                    if inline_editing and studenti_formset is not None:
                         studenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
@@ -2501,7 +2506,7 @@ def modifica_studente(request, pk):
                 prefix="iscrizioni",
                 queryset=iscrizioni_queryset,
             )
-            if inline_target in (None, "iscrizioni")
+            if inline_target == "iscrizioni"
             else build_iscrizioni_studente_formset(
                 instance=studente,
                 prefix="iscrizioni",
@@ -2516,7 +2521,7 @@ def modifica_studente(request, pk):
                 prefix="documenti",
                 queryset=documenti_queryset,
             )
-            if inline_target in (None, "documenti")
+            if inline_target == "documenti"
             else build_documenti_studente_formset(
                 instance=studente,
                 prefix="documenti",
@@ -2525,15 +2530,15 @@ def modifica_studente(request, pk):
         )
 
         form_is_valid = form.is_valid()
-        iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target in (None, "iscrizioni") else True
-        documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
+        iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target == "iscrizioni" else True
+        documenti_is_valid = documenti_formset.is_valid() if inline_target == "documenti" else True
 
         if form_is_valid and iscrizioni_is_valid and documenti_is_valid:
             missing_rate_count = 0
             try:
                 with transaction.atomic():
                     studente = form.save()
-                    if inline_target in (None, "iscrizioni"):
+                    if inline_target == "iscrizioni":
                         iscrizioni_formset.save()
 
                         for iscrizione in studente.iscrizioni.select_related(
@@ -2553,7 +2558,7 @@ def modifica_studente(request, pk):
                             if esito_rate == "missing":
                                 missing_rate_count += 1
 
-                    if inline_target in (None, "documenti"):
+                    if inline_target == "documenti":
                         documenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))

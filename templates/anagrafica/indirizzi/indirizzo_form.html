@@ -21,10 +21,9 @@
             {% if indirizzo %}Indirizzo {{ indirizzo.label_select }}{% else %}Nuovo indirizzo{% endif %}
         </h1>
         <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_indirizzi' %}">Indietro</button>
             {% if indirizzo %}
-                <button type="button" class="btn btn-primary" id="enable-edit-indirizzo-btn">Modifica</button>
                 <a href="{% url 'elimina_indirizzo' indirizzo.pk %}" class="btn btn-danger">Elimina</a>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-indirizzo-btn">Annulla modifiche</button>
             {% endif %}
             <a href="{% url 'lista_indirizzi' %}" class="btn btn-secondary">Torna all'elenco</a>
         </div>
@@ -34,7 +33,16 @@
         Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
     </div>
 
-    <div class="panel">
+    <div class="admin-section">
+        <div class="admin-section-title admin-section-title-actionbar">
+            <span class="admin-section-title-label">Dati principali</span>
+            {% if indirizzo %}
+                <div class="admin-section-title-actions">
+                    <button type="button" class="admin-section-title-btn" id="enable-edit-indirizzo-btn">Modifica dati principali</button>
+                </div>
+            {% endif %}
+        </div>
+        <div class="panel">
         <form method="post" id="indirizzo-detail-form" class="detail-form{% if indirizzo %} is-view-mode{% endif %}">
             {% csrf_token %}
             <fieldset id="indirizzo-lock-container" class="mode-lock-container" {% if indirizzo %}disabled{% endif %}>
@@ -112,23 +120,39 @@
             </fieldset>
 
             <div class="form-actions mode-edit-only">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <a href="{% url 'lista_indirizzi' %}" class="btn btn-secondary">Annulla</a>
+                <button type="submit" class="btn btn-save-soft">Salva</button>
+                <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-indirizzo-btn">Annulla</button>
             </div>
         </form>
+        </div>
     </div>
 
-    <script src="{% static 'js/core/view-mode.js' %}"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
+            const stickyCancelButton = document.getElementById("sticky-cancel-edit-indirizzo-btn");
+
             if (window.ArborisViewMode) {
-                ArborisViewMode.init({
+                window.indirizzoViewMode = ArborisViewMode.init({
                     formId: "indirizzo-detail-form",
                     lockContainerId: "indirizzo-lock-container",
                     editButtonId: "enable-edit-indirizzo-btn",
-                    cancelButtonId: "cancel-edit-indirizzo-btn",
                     startInEditMode: {% if indirizzo %}false{% else %}true{% endif %},
                     reloadOnCancel: true
+                });
+            }
+
+            if (stickyCancelButton) {
+                stickyCancelButton.addEventListener("click", function () {
+                    if (window.indirizzoViewMode && typeof window.indirizzoViewMode.returnToView === "function") {
+                        window.indirizzoViewMode.returnToView();
+                        return;
+                    }
+                    if (typeof window.ArborisReloadWithLongWait === "function") {
+                        window.ArborisReloadWithLongWait();
+                    } else {
+                        window.location.reload();
+                    }
                 });
             }
 

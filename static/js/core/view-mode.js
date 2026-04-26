@@ -127,7 +127,7 @@ window.ArborisViewMode = (function () {
 
             if (isFullEditing) {
                 unlockFields(mainFields);
-                unlockFields(inlineFields);
+                lockFields(inlineFields, true);
             } else if (isInlineEditing) {
                 lockFields(mainFields, true);
                 unlockFields(inlineFields);
@@ -138,6 +138,7 @@ window.ArborisViewMode = (function () {
 
             if (editButton) {
                 editButton.textContent = isFullEditing ? "Annulla modifiche" : editButtonDefaultLabel;
+                editButton.classList.toggle("is-hidden", isInlineEditing);
             }
 
             if (cancelButton) {

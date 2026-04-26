@@ -16,9 +16,9 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=50">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=51">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
-    <script src="{% static 'js/core/detail-form-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/detail-form-actions.js' %}?v=2"></script>
 </head>
 <body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
