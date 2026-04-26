@@ -277,29 +277,30 @@
                         <table class="inline-table" id="iscrizioni-table">
                             <thead>
                                 <tr>
-                                    <th>ANNO SCOLASTICO</th>
-                                    <th>CLASSE</th>
-                                    <th>DATA ISCRIZIONE</th>
+                                    <th class="iscrizioni-col-anno">ANNO SCOLASTICO</th>
+                                    <th class="iscrizioni-col-classe">CLASSE</th>
+                                    <th class="iscrizioni-col-data">DATA ISCRIZIONE</th>
                                     {% if studente %}
-                                        <th>FINE ISCRIZIONE</th>
+                                        <th class="iscrizioni-col-fine">FINE ISCRIZIONE</th>
                                     {% endif %}
-                                    <th>STATO</th>
-                                    <th>TIPO DI RETTA</th>
-                                    <th>AGEVOLAZIONE</th>
-                                    <th>RIDUZIONE SPECIALE</th>
-                                    <th>IMPORTO RIDUZIONE SPECIALE</th>
-                                    <th>STUDENTE NON PAGANTE</th>
-                                    <th>ISCRIZIONE ATTIVA</th>
-                                    <th></th>
-                                    <th class="mode-edit-only-table-cell">ELIMINA ISCRIZIONE</th>
+                                    <th class="iscrizioni-col-stato">STATO</th>
+                                    <th class="iscrizioni-col-dettagli">DETTAGLI</th>
+                                    <th class="mode-edit-only-table-cell iscrizioni-col-delete">ELIMINA ISCRIZIONE</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for f in iscrizioni_formset %}
                                     <tr class="inline-form-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
-                                        <td data-inline-label="Anno scolastico">
-                                            <div class="inline-related-field">
+                                        <td class="iscrizioni-col-anno">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.anno_scolastico %}
+                                                    {{ f.instance.anno_scolastico }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
                                                 {{ f.anno_scolastico }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="anno_scolastico">+</button>
@@ -308,8 +309,15 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td data-inline-label="Classe">
-                                            <div class="inline-related-field">
+                                        <td class="iscrizioni-col-classe">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.classe %}
+                                                    {{ f.instance.classe }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
                                                 {{ f.classe }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="classe">+</button>
@@ -318,12 +326,25 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td data-inline-label="Data iscrizione">{{ f.data_iscrizione }}</td>
+                                        <td class="iscrizioni-col-data">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.data_iscrizione %}
+                                                    {{ f.instance.data_iscrizione|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">
+                                                {{ f.data_iscrizione }}
+                                            </div>
+                                        </td>
                                         {% if studente %}
-                                            <td data-inline-label="Fine iscrizione">
+                                            <td class="iscrizioni-col-fine">
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                     {% if f.instance.pk and f.instance.data_fine_effettiva %}
                                                         {{ f.instance.data_fine_effettiva|it_date }}
+                                                    {% else %}
+                                                        <span class="table-muted">-</span>
                                                     {% endif %}
                                                 </div>
                                                 <div class="mode-edit-field">
@@ -336,8 +357,15 @@
                                                 </div>
                                             </td>
                                         {% endif %}
-                                        <td data-inline-label="Stato">
-                                            <div class="inline-related-field">
+                                        <td class="iscrizioni-col-stato">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.stato_iscrizione %}
+                                                    {{ f.instance.stato_iscrizione }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
                                                 {{ f.stato_iscrizione }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="stato_iscrizione">+</button>
@@ -346,55 +374,22 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td data-inline-label="Tipo di retta">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.condizione_iscrizione %}
-                                                    {{ f.instance.condizione_iscrizione }}
-                                                {% else %}
-                                                    <span class="table-muted">-</span>
-                                                {% endif %}
+                                        <td class="iscrizioni-col-dettagli">
+                                            <div class="mode-view-only">
+                                                <button
+                                                    type="button"
+                                                    class="inline-details-toggle collapsible-title"
+                                                    data-target="iscrizioni-note-panel-{{ forloop.counter0 }}"
+                                                    data-default-open="false"
+                                                    data-label-closed="Mostra dettagli"
+                                                    data-label-open="Nascondi dettagli"
+                                                >
+                                                    <span data-collapsible-label>Mostra dettagli</span>
+                                                </button>
                                             </div>
+                                            <div class="mode-edit-only iscrizioni-inline-edit-hint">Dettagli sotto</div>
                                         </td>
-                                        <td class="iscrizione-agevolazione-cell" data-inline-label="Agevolazione">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.agevolazione %}
-                                                    {{ f.instance.agevolazione }}
-                                                {% else %}
-                                                    Nessuna
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell" data-inline-label="Riduzione speciale">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.riduzione_speciale|si_no }}</div>
-                                        </td>
-                                        <td class="iscrizione-importo-riduzione-cell" data-inline-label="Importo riduzione speciale">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.riduzione_speciale and f.instance.importo_riduzione_speciale and f.instance.importo_riduzione_speciale > 0 %}
-                                                    EUR {{ f.instance.importo_riduzione_speciale|euro }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessuno</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-checkbox-cell inline-checkbox-cell-wide" data-inline-label="Studente non pagante">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.non_pagante|si_no }}</div>
-                                        </td>
-                                        <td class="inline-checkbox-cell" data-inline-label="Iscrizione attiva">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.attiva|si_no }}</div>
-                                        </td>
-                                        <td class="inline-details-trigger-cell" data-inline-label="Dettagli">
-                                            <button
-                                                type="button"
-                                                class="inline-details-toggle collapsible-title"
-                                                data-target="iscrizioni-note-panel-{{ forloop.counter0 }}"
-                                                data-default-open="false"
-                                                data-label-closed="Mostra note"
-                                                data-label-open="Nascondi note"
-                                            >
-                                                <span data-collapsible-label>Mostra note</span>
-                                            </button>
-                                        </td>
-                                        <td class="inline-delete-cell mode-edit-only-table-cell" data-inline-label="Elimina iscrizione">
+                                        <td class="inline-delete-cell mode-edit-only-table-cell iscrizioni-col-delete">
                                             {% if f.instance.pk %}
                                                 <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
                                             {% else %}
@@ -403,57 +398,115 @@
                                         </td>
                                     </tr>
                                     <tr class="inline-details-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
-                                        <td colspan="{% if studente %}13{% else %}12{% endif %}">
-                                            <div class="inline-details-panel collapsible-panel" id="iscrizioni-note-panel-{{ forloop.counter0 }}">
-                                                <div class="inline-details-grid">
-                                                    <div class="inline-details-field inline-details-field-tipo-retta mode-edit-field">
-                                                        <label>Tipo di retta</label>
-                                                        <div class="inline-related-field">
-                                                            {{ f.condizione_iscrizione }}
-                                                            <div class="related-actions inline-related-actions">
-                                                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="condizione_iscrizione">+</button>
-                                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="condizione_iscrizione">&#9998;</button>
-                                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="condizione_iscrizione">&#10006;</button>
+                                        <td colspan="{% if studente %}7{% else %}6{% endif %}">
+                                            <div class="inline-details-panel collapsible-panel{% if show_inline_iscrizioni_editor or f.errors %} is-open{% endif %}" id="iscrizioni-note-panel-{{ forloop.counter0 }}">
+                                                <div class="iscrizioni-inline-details">
+                                                    <div class="inline-details-grid iscrizioni-inline-details-grid">
+                                                        <div class="inline-details-field inline-details-field-tipo-retta">
+                                                            <label>Tipo di retta</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.condizione_iscrizione %}
+                                                                    {{ f.instance.condizione_iscrizione }}
+                                                                {% else %}
+                                                                    <span class="table-muted">-</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="inline-related-field mode-edit-field">
+                                                                {{ f.condizione_iscrizione }}
+                                                                <div class="related-actions inline-related-actions">
+                                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="condizione_iscrizione">+</button>
+                                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="condizione_iscrizione">&#9998;</button>
+                                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="condizione_iscrizione">&#10006;</button>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-agevolazione mode-edit-field">
-                                                        <label>Agevolazione</label>
-                                                        <div class="inline-related-field">
-                                                            {{ f.agevolazione }}
-                                                            <div class="related-actions inline-related-actions">
-                                                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="agevolazione">+</button>
-                                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="agevolazione">&#9998;</button>
-                                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="agevolazione">&#10006;</button>
+                                                        <div class="inline-details-field inline-details-field-agevolazione iscrizione-agevolazione-cell">
+                                                            <label>Agevolazione</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.agevolazione %}
+                                                                    {{ f.instance.agevolazione }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Nessuna</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="inline-related-field mode-edit-field">
+                                                                {{ f.agevolazione }}
+                                                                <div class="related-actions inline-related-actions">
+                                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="agevolazione">+</button>
+                                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="agevolazione">&#9998;</button>
+                                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="agevolazione">&#10006;</button>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-riduzione mode-edit-field">
-                                                        <label>Riduzione speciale</label>
-                                                        {{ f.riduzione_speciale }}
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-importo mode-edit-field">
-                                                        <label>Importo riduzione speciale</label>
-                                                        <div class="currency-input-group currency-input-group-inline">
-                                                            <span class="currency-prefix">EUR</span>
-                                                            {{ f.importo_riduzione_speciale }}
+                                                        <div class="inline-details-field inline-details-field-riduzione iscrizione-riduzione-cell">
+                                                            <label>Riduzione speciale</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {{ f.instance.riduzione_speciale|si_no }}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.riduzione_speciale }}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-non-pagante mode-edit-field">
-                                                        <label>Studente non pagante</label>
-                                                        {{ f.non_pagante }}
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-attiva mode-edit-field">
-                                                        <label>Iscrizione attiva</label>
-                                                        {{ f.attiva }}
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-note-admin">
-                                                        <label>Note amministrative</label>
-                                                        {{ f.note_amministrative }}
-                                                    </div>
-                                                    <div class="inline-details-field inline-details-field-note">
-                                                        <label>Note</label>
-                                                        {{ f.note }}
+                                                        <div class="inline-details-field inline-details-field-importo iscrizione-importo-riduzione-cell">
+                                                            <label>Importo riduzione speciale</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.riduzione_speciale and f.instance.importo_riduzione_speciale and f.instance.importo_riduzione_speciale > 0 %}
+                                                                    EUR {{ f.instance.importo_riduzione_speciale|euro }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Nessuno</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                <div class="currency-input-group currency-input-group-inline">
+                                                                    <span class="currency-prefix">EUR</span>
+                                                                    {{ f.importo_riduzione_speciale }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-non-pagante">
+                                                            <label>Studente non pagante</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {{ f.instance.non_pagante|si_no }}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.non_pagante }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-attiva">
+                                                            <label>Iscrizione attiva</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {{ f.instance.attiva|si_no }}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.attiva }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-note-admin">
+                                                            <label>Note amministrative</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.note_amministrative %}
+                                                                    {{ f.instance.note_amministrative }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Nessuna</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.note_amministrative }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-note">
+                                                            <label>Note</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.note %}
+                                                                    {{ f.instance.note }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Nessuna</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.note }}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -461,7 +514,7 @@
                                     </tr>
                                     {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="{% if studente %}13{% else %}12{% endif %}">{{ f.errors }}</td>
+                                            <td colspan="{% if studente %}7{% else %}6{% endif %}">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -732,8 +785,11 @@
     <template id="iscrizioni-empty-form-template">
         <tr class="inline-form-row">
             {{ iscrizioni_formset.empty_form.id }}
-            <td data-inline-label="Anno scolastico">
-                <div class="inline-related-field">
+            <td class="iscrizioni-col-anno">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">-</span>
+                </div>
+                <div class="inline-related-field mode-edit-field">
                     {{ iscrizioni_formset.empty_form.anno_scolastico }}
                     <div class="related-actions inline-related-actions">
                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="anno_scolastico">+</button>
@@ -742,8 +798,11 @@
                     </div>
                 </div>
             </td>
-            <td data-inline-label="Classe">
-                <div class="inline-related-field">
+            <td class="iscrizioni-col-classe">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">-</span>
+                </div>
+                <div class="inline-related-field mode-edit-field">
                     {{ iscrizioni_formset.empty_form.classe }}
                     <div class="related-actions inline-related-actions">
                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="classe">+</button>
@@ -752,15 +811,30 @@
                     </div>
                 </div>
             </td>
-            <td data-inline-label="Data iscrizione">{{ iscrizioni_formset.empty_form.data_iscrizione }}</td>
+            <td class="iscrizioni-col-data">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">-</span>
+                </div>
+                <div class="mode-edit-field">
+                    {{ iscrizioni_formset.empty_form.data_iscrizione }}
+                </div>
+            </td>
             {% if studente %}
-                <td data-inline-label="Fine iscrizione">
-                    {{ iscrizioni_formset.empty_form.data_fine_iscrizione.as_hidden }}
-                    <span class="table-muted">&mdash;</span>
+                <td class="iscrizioni-col-fine">
+                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                        <span class="table-muted">-</span>
+                    </div>
+                    <div class="mode-edit-field">
+                        {{ iscrizioni_formset.empty_form.data_fine_iscrizione.as_hidden }}
+                        <span class="table-muted">&mdash;</span>
+                    </div>
                 </td>
             {% endif %}
-            <td data-inline-label="Stato">
-                <div class="inline-related-field">
+            <td class="iscrizioni-col-stato">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">-</span>
+                </div>
+                <div class="inline-related-field mode-edit-field">
                     {{ iscrizioni_formset.empty_form.stato_iscrizione }}
                     <div class="related-actions inline-related-actions">
                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="stato_iscrizione">+</button>
@@ -769,39 +843,36 @@
                     </div>
                 </div>
             </td>
-            <td data-inline-label="Tipo di retta"><span class="table-muted">-</span></td>
-            <td class="iscrizione-agevolazione-cell" data-inline-label="Agevolazione">
-                <span class="table-muted">Nessuna</span>
+            <td class="iscrizioni-col-dettagli">
+                <div class="mode-view-only">
+                    <button
+                        type="button"
+                        class="inline-details-toggle collapsible-title"
+                        data-target="iscrizioni-note-panel-__prefix__"
+                        data-default-open="false"
+                        data-label-closed="Mostra dettagli"
+                        data-label-open="Nascondi dettagli"
+                    >
+                        <span data-collapsible-label>Mostra dettagli</span>
+                    </button>
+                </div>
+                <div class="mode-edit-only iscrizioni-inline-edit-hint">Dettagli sotto</div>
             </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell" data-inline-label="Riduzione speciale"><span class="table-muted">-</span></td>
-            <td class="iscrizione-importo-riduzione-cell" data-inline-label="Importo riduzione speciale">
-                <span class="table-muted">Nessuno</span>
-            </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide" data-inline-label="Studente non pagante"><span class="table-muted">-</span></td>
-            <td class="inline-checkbox-cell" data-inline-label="Iscrizione attiva"><span class="table-muted">-</span></td>
-            <td class="inline-details-trigger-cell" data-inline-label="Dettagli">
-                <button
-                    type="button"
-                    class="inline-details-toggle collapsible-title"
-                    data-target="iscrizioni-note-panel-__prefix__"
-                    data-default-open="false"
-                    data-label-closed="Mostra note"
-                    data-label-open="Nascondi note"
-                >
-                    <span data-collapsible-label>Mostra note</span>
-                </button>
-            </td>
-            <td class="inline-delete-cell" data-inline-label="Elimina iscrizione">
+            <td class="inline-delete-cell mode-edit-only-table-cell iscrizioni-col-delete">
                 <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
         <tr class="inline-details-row">
-            <td colspan="{% if studente %}13{% else %}12{% endif %}">
+            <td colspan="{% if studente %}7{% else %}6{% endif %}">
                 <div class="inline-details-panel collapsible-panel" id="iscrizioni-note-panel-__prefix__">
-                    <div class="inline-details-grid">
-                        <div class="inline-details-field inline-details-field-tipo-retta mode-edit-field">
+                    <div class="iscrizioni-inline-details">
+                        <div class="inline-details-grid iscrizioni-inline-details-grid">
+                        <div class="inline-details-field inline-details-field-tipo-retta">
                             <label>Tipo di retta</label>
-                            <div class="inline-related-field">
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">-</span>
+                            </div>
+                            <div class="inline-related-field mode-edit-field">
                                 {{ iscrizioni_formset.empty_form.condizione_iscrizione }}
                                 <div class="related-actions inline-related-actions">
                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="condizione_iscrizione">+</button>
@@ -810,9 +881,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="inline-details-field inline-details-field-agevolazione mode-edit-field">
+                        <div class="inline-details-field inline-details-field-agevolazione iscrizione-agevolazione-cell">
                             <label>Agevolazione</label>
-                            <div class="inline-related-field">
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Nessuna</span>
+                            </div>
+                            <div class="inline-related-field mode-edit-field">
                                 {{ iscrizioni_formset.empty_form.agevolazione }}
                                 <div class="related-actions inline-related-actions">
                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="agevolazione">+</button>
@@ -821,32 +895,63 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="inline-details-field inline-details-field-riduzione mode-edit-field">
+                        <div class="inline-details-field inline-details-field-riduzione iscrizione-riduzione-cell">
                             <label>Riduzione speciale</label>
-                            {{ iscrizioni_formset.empty_form.riduzione_speciale }}
-                        </div>
-                        <div class="inline-details-field inline-details-field-importo mode-edit-field">
-                            <label>Importo riduzione speciale</label>
-                            <div class="currency-input-group currency-input-group-inline">
-                                <span class="currency-prefix">EUR</span>
-                                {{ iscrizioni_formset.empty_form.importo_riduzione_speciale }}
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">-</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.riduzione_speciale }}
                             </div>
                         </div>
-                        <div class="inline-details-field inline-details-field-non-pagante mode-edit-field">
-                            <label>Studente non pagante</label>
-                            {{ iscrizioni_formset.empty_form.non_pagante }}
+                        <div class="inline-details-field inline-details-field-importo iscrizione-importo-riduzione-cell">
+                            <label>Importo riduzione speciale</label>
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Nessuno</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                <div class="currency-input-group currency-input-group-inline">
+                                    <span class="currency-prefix">EUR</span>
+                                    {{ iscrizioni_formset.empty_form.importo_riduzione_speciale }}
+                                </div>
+                            </div>
                         </div>
-                        <div class="inline-details-field inline-details-field-attiva mode-edit-field">
+                        <div class="inline-details-field inline-details-field-non-pagante">
+                            <label>Studente non pagante</label>
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">-</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.non_pagante }}
+                            </div>
+                        </div>
+                        <div class="inline-details-field inline-details-field-attiva">
                             <label>Iscrizione attiva</label>
-                            {{ iscrizioni_formset.empty_form.attiva }}
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">-</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.attiva }}
+                            </div>
                         </div>
                         <div class="inline-details-field inline-details-field-note-admin">
                             <label>Note amministrative</label>
-                            {{ iscrizioni_formset.empty_form.note_amministrative }}
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Nessuna</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.note_amministrative }}
+                            </div>
                         </div>
                         <div class="inline-details-field inline-details-field-note">
                             <label>Note</label>
-                            {{ iscrizioni_formset.empty_form.note }}
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Nessuna</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.note }}
+                            </div>
+                        </div>
                         </div>
                     </div>
                 </div>
