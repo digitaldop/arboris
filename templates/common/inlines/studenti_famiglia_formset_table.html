@@ -70,7 +70,7 @@
                 <td class="inline-view-only-table-cell">
                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                         {% if f.instance.pk and f.instance.data_nascita %}
-                            {{ f.instance.data_nascita|it_date }}
+                            {{ f.instance.data_nascita|it_date_with_age }}
                         {% else %}
                             <span class="table-muted">Non indicata</span>
                         {% endif %}

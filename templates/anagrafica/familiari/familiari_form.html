@@ -32,6 +32,7 @@
     <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %}{% if edit_scope == 'inline' %} is-inline-edit-mode{% elif edit_scope == 'full' %} is-edit-mode{% else %} is-view-mode{% endif %}{% else %} is-edit-mode{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
+        <input type="hidden" name="_inline_target" id="familiare-inline-target" value="{{ inline_target|default:'studenti' }}">
         <div id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
 
         <div class="family-top-layout main-fields-section">
@@ -206,7 +207,7 @@
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
                                             {% if familiare and familiare.data_nascita %}
-                                                {{ familiare.data_nascita|it_date }}
+                                                {{ familiare.data_nascita|it_date_with_age }}
                                             {% else %}
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
@@ -357,86 +358,153 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="admin-section inline-lock-container" id="familiare-inline-lock-container" data-mode-lock-scope="inline">
-            {% if studenti_formset and studenti_famiglia %}
-            <div class="admin-section">
-                <div class="inline-section-head">
-                    <div class="admin-section-title inline-section-title-static" id="familiare-studenti-heading">{{ student_terminology.selected_plural }} ({{ count_studenti }})</div>
-                </div>
-                <div class="panel">
-                    <div class="panel-body">
-                        {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_action="add" studenti_add_prefix="studenti" %}
+                <div class="admin-section compact">
+                    <button type="button" class="admin-section-title collapsible-title" data-target="section-sistema" data-default-open="false">
+                        <span>Sistema</span>
+                    </button>
+                    <div class="panel collapsible-panel" id="section-sistema">
+                        <div class="panel-body">
+                            <table class="form-table compact-form-table">
+                                <tr>
+                                    <th>Ultima modifica</th>
+                                    <td class="system-readonly-value">
+                                        {% if familiare %}{{ familiare.data_aggiornamento|date:"d / m / Y H:i" }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Modificato da</th>
+                                    <td class="system-readonly-value">
+                                        {% if familiare %}{{ familiare_aggiornato_da_label|default:"-" }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
+        </div>
 
-            {% include "anagrafica/familiari/includes/scambio_retta_inline.html" %}
+        </div>
 
+        <div class="admin-section inline-lock-container" id="familiare-inline-lock-container" data-mode-lock-scope="inline">
             <div class="inline-section-head">
-                <div class="admin-section-title inline-section-title-static">Documenti ({{ count_documenti }})</div>
+                {% if familiare_inline_tabs %}
+                    {% include "common/inline_tab_nav.html" with tabs=familiare_inline_tabs only %}
+                {% endif %}
                 {% if familiare %}
-                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-familiare-btn">Modifica</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-familiare-btn">{{ familiare_inline_edit_label|default:"Modifica" }}</button>
                 {% endif %}
             </div>
 
-            <div id="tab-documenti">
+            {% if studenti_formset and studenti_famiglia %}
+                <div class="tab-panel{% if inline_target == 'studenti' %} is-active{% endif %}" id="tab-studenti" data-inline-scope="studenti">
+                    <div class="admin-section-title inline-section-title-static" id="familiare-studenti-heading">{{ student_terminology.selected_plural }} ({{ count_studenti }})</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_action="add" studenti_add_prefix="studenti" %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="tab-panel{% if inline_target == 'documenti' %} is-active{% endif %}" id="tab-documenti" data-inline-scope="documenti">
+                <div class="admin-section-title inline-section-title-static">Documenti ({{ count_documenti }})</div>
                 <div class="panel">
                     <div class="panel-body">
                         {{ documenti_formset.management_form }}
                         <table class="inline-table" id="documenti-table">
                             <thead>
                                 <tr>
+                                    <th>File</th>
                                     <th>Tipo documento</th>
                                     <th>Descrizione</th>
-                                    <th>File</th>
                                     <th class="inline-view-only-table-cell">Data caricamento</th>
                                     <th>Scadenza</th>
-                                    <th>Visibile</th>
                                     <th>Note</th>
-                                    <th>Cancellare?</th>
+                                    <th class="mode-edit-only-table-cell">Visibile</th>
+                                    <th class="mode-edit-only-table-cell">Elimina</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for f in documenti_formset %}
                                     <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
+                                        <td class="document-file-cell">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
+                                                {% if f.instance.pk and f.instance.file %}
+                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.filename }}</a>
+                                                {% else %}
+                                                    <span class="table-muted">Nessun file</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">
+                                                {{ f.file }}
+                                                {% if f.instance.pk and f.instance.file %}
+                                                    <div class="help-text">
+                                                        <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale: {{ f.instance.filename }}</a>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
                                         <td>
-                                            <div class="inline-related-field">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.tipo_documento %}
+                                                    {{ f.instance.tipo_documento }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
                                                 {{ f.tipo_documento }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">E</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">X</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">&#9998;</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">&#10006;</button>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{{ f.descrizione }}</td>
-                                        <td class="document-file-cell">
-                                            {{ f.file }}
-                                            {% if f.instance.pk and f.instance.file %}
-                                                <div class="help-text">
-                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale</a>
-                                                </div>
-                                            {% endif %}
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.descrizione %}
+                                                    {{ f.instance.descrizione }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna descrizione</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.descrizione }}</div>
                                         </td>
                                         <td class="inline-view-only-table-cell">
-                                            {% if f.instance.pk and f.instance.data_caricamento %}
-                                                {{ f.instance.data_caricamento|it_date }}
-                                            {% else %}
-                                                <span class="table-muted">-</span>
-                                            {% endif %}
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.data_caricamento %}
+                                                    {{ f.instance.data_caricamento|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
                                         </td>
-                                        <td>{{ f.scadenza }}</td>
-                                        <td class="inline-checkbox-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
-                                            <div class="mode-edit-field">{{ f.visibile }}</div>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.scadenza %}
+                                                    {{ f.instance.scadenza|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna scadenza</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.scadenza }}</div>
                                         </td>
-                                        <td>{{ f.note }}</td>
-                                        <td class="inline-delete-cell">
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.note %}
+                                                    {{ f.instance.note }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna nota</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.note }}</div>
+                                        </td>
+                                        <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ f.visibile }}</td>
+                                        <td class="inline-delete-cell mode-edit-only-table-cell">
                                             {% if f.instance.pk %}
                                                 <button
                                                     type="button"
@@ -466,7 +534,7 @@
                             </div>
                         {% endif %}
 
-                        <div class="inline-add-row">
+                        <div class="inline-add-row inline-add-row-view-enabled">
                             <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento.</button>
                         </div>
                     </div>
@@ -474,7 +542,7 @@
             </div>
         </div>
 
-        </div>
+        {% include "anagrafica/familiari/includes/scambio_retta_inline.html" %}
 
         <div class="form-actions sticky-form-actions mode-edit-only">
             <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>
@@ -496,23 +564,50 @@
     <template id="documenti-empty-form-template">
         <tr class="inline-form-row">
             {{ documenti_formset.empty_form.id }}
+            <td class="document-file-cell">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">Nessun file</span>
+                </div>
+                <div class="mode-edit-field">{{ documenti_formset.empty_form.file }}</div>
+            </td>
             <td>
-                <div class="inline-related-field">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">Non indicato</span>
+                </div>
+                <div class="inline-related-field mode-edit-field">
                     {{ documenti_formset.empty_form.tipo_documento }}
                     <div class="related-actions inline-related-actions">
                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">E</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">X</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">&#9998;</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">&#10006;</button>
                     </div>
                 </div>
             </td>
-            <td>{{ documenti_formset.empty_form.descrizione }}</td>
-            <td>{{ documenti_formset.empty_form.file }}</td>
-            <td class="inline-view-only-table-cell"><span class="table-muted">-</span></td>
-            <td>{{ documenti_formset.empty_form.scadenza }}</td>
-            <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
-            <td>{{ documenti_formset.empty_form.note }}</td>
-            <td class="inline-delete-cell">
+            <td>
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">Nessuna descrizione</span>
+                </div>
+                <div class="mode-edit-field">{{ documenti_formset.empty_form.descrizione }}</div>
+            </td>
+            <td class="inline-view-only-table-cell">
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">-</span>
+                </div>
+            </td>
+            <td>
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">Nessuna scadenza</span>
+                </div>
+                <div class="mode-edit-field">{{ documenti_formset.empty_form.scadenza }}</div>
+            </td>
+            <td>
+                <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                    <span class="table-muted">Nessuna nota</span>
+                </div>
+                <div class="mode-edit-field">{{ documenti_formset.empty_form.note }}</div>
+            </td>
+            <td class="inline-checkbox-cell mode-edit-only-table-cell">{{ documenti_formset.empty_form.visibile }}</td>
+            <td class="inline-delete-cell mode-edit-only-table-cell">
                 <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
@@ -526,11 +621,12 @@
 
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
-    <script src="{% static 'js/core/tabs.js' %}"></script>
+    <script src="{% static 'js/core/tabs.js' %}?v=3"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=20"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=23"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -545,7 +641,12 @@
                     inlineEditButtonId: "enable-inline-edit-familiare-btn",
                     modeInputId: "familiare-edit-scope",
                     startMode: "{{ edit_scope|default:'view' }}",
-                    reloadOnCancel: true
+                    reloadOnCancel: true,
+                    onModeChange: function () {
+                        if (window.ArborisFamiliareForm && typeof window.ArborisFamiliareForm.refreshInlineEditScope === "function") {
+                            window.ArborisFamiliareForm.refreshInlineEditScope();
+                        }
+                    }
                 });
             }
 

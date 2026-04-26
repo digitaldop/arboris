@@ -111,7 +111,7 @@
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
                                             {% if studente and studente.data_nascita %}
-                                                {{ studente.data_nascita|it_date }}
+                                                {{ studente.data_nascita|it_date_with_age }}
                                             {% else %}
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
@@ -1179,8 +1179,8 @@
     <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=42"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=44"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

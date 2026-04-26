@@ -51,6 +51,7 @@ from economia.models import (
     TariffaCondizioneIscrizione,
 )
 from scuola.models import AnnoScolastico, Classe
+from sistema.models import AzioneOperazioneCronologia, SistemaOperazioneCronologia
 
 
 class ImportDatiBaseTests(TestCase):
@@ -267,6 +268,57 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="familiari-0-luogo_nascita_search"')
         self.assertContains(response, 'name="studenti-0-luogo_nascita_search"')
+
+    def test_modifica_famiglia_page_shows_system_audit_users(self):
+        user = User.objects.create_superuser(
+            username="audit-famiglie@example.com",
+            email="audit-famiglie@example.com",
+            password="Password123!",
+            first_name="Giulia",
+            last_name="Rossi",
+        )
+        updater = User.objects.create_user(
+            username="audit-operatore@example.com",
+            email="audit-operatore@example.com",
+            password="Password123!",
+            first_name="Marco",
+            last_name="Bianchi",
+        )
+        self.client.force_login(user)
+
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Audit", stato_relazione_famiglia=stato, attiva=True)
+        base_kwargs = {
+            "modulo": "anagrafica",
+            "app_label": "anagrafica",
+            "model_name": "famiglia",
+            "model_verbose_name": "Famiglia",
+            "oggetto_id": str(famiglia.pk),
+            "oggetto_label": str(famiglia),
+            "campi_coinvolti": [],
+        }
+        SistemaOperazioneCronologia.objects.create(
+            **base_kwargs,
+            azione=AzioneOperazioneCronologia.CREAZIONE,
+            utente=user,
+            utente_label=user.get_full_name(),
+            descrizione="Creata famiglia.",
+        )
+        SistemaOperazioneCronologia.objects.create(
+            **base_kwargs,
+            azione=AzioneOperazioneCronologia.MODIFICA,
+            utente=updater,
+            utente_label=updater.get_full_name(),
+            descrizione="Modificata famiglia.",
+        )
+
+        response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Creato da")
+        self.assertContains(response, "Giulia Rossi")
+        self.assertContains(response, "Aggiornato da")
+        self.assertContains(response, "Marco Bianchi")
 
 
 class FamigliaInlineDefaultsTests(TestCase):

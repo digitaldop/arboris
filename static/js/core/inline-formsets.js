@@ -290,6 +290,25 @@ window.ArborisInlineFormsets = (function () {
         };
     }
 
+    function markBundleForAddOnlyEdit(state, options) {
+        const cfg = options || {};
+        const form = typeof cfg.form === "string" ? document.getElementById(cfg.form) : cfg.form;
+
+        if (form) {
+            form.classList.add("is-inline-add-only-mode");
+        }
+
+        if (!state || !state.bundle) {
+            return;
+        }
+
+        state.bundle.forEach(function (node) {
+            if (node) {
+                node.classList.add("is-inline-active-edit-row");
+            }
+        });
+    }
+
     function removeInlineRow(buttonOrRow, options) {
         const row = buttonOrRow && buttonOrRow.closest ? buttonOrRow.closest("tr") : buttonOrRow;
         if (!row) {
@@ -428,6 +447,7 @@ window.ArborisInlineFormsets = (function () {
         appendInlineForm: appendInlineForm,
         focusFirstField: focusFirstField,
         mountInlineForm: mountInlineForm,
+        markBundleForAddOnlyEdit: markBundleForAddOnlyEdit,
         removeInlineRow: removeInlineRow,
         countPersistedRows: countPersistedRows,
         createManager: createManager,

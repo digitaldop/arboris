@@ -41,7 +41,13 @@ from economia.models.iscrizioni import add_months_safe
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from calendario.data import build_dashboard_calendar_data
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
-from sistema.models import Scuola, SistemaImpostazioniGenerali
+from sistema.models import (
+    AzioneOperazioneCronologia,
+    Scuola,
+    SistemaImpostazioniGenerali,
+    SistemaOperazioneCronologia,
+)
+from sistema.terminology import get_student_terminology
 from scuola.models import AnnoScolastico, Classe
 from scuola.utils import resolve_default_anno_scolastico
 from django.forms import modelform_factory
@@ -199,6 +205,84 @@ def build_famiglia_redirect_url(pk, active_inline_tab=None):
     if active_inline_tab and active_inline_tab != "familiari":
         return f"{url}?tab={active_inline_tab}"
     return url
+
+
+def build_familiare_redirect_url(pk, active_inline_tab=None, default_tab="studenti"):
+    url = reverse("modifica_familiare", kwargs={"pk": pk})
+    if active_inline_tab and active_inline_tab != default_tab:
+        return f"{url}?tab={active_inline_tab}"
+    return url
+
+
+def famiglia_audit_labels(famiglia):
+    if not famiglia or not famiglia.pk:
+        return "-", "-"
+
+    entries = SistemaOperazioneCronologia.objects.filter(
+        app_label="anagrafica",
+        model_name="famiglia",
+        oggetto_id=str(famiglia.pk),
+    )
+    created_entry = (
+        entries
+        .filter(azione=AzioneOperazioneCronologia.CREAZIONE)
+        .order_by("data_operazione", "id")
+        .first()
+    )
+    updated_entry = (
+        entries
+        .filter(azione=AzioneOperazioneCronologia.MODIFICA)
+        .order_by("-data_operazione", "-id")
+        .first()
+    ) or created_entry
+
+    created_by = created_entry.utente_display if created_entry else "-"
+    updated_by = updated_entry.utente_display if updated_entry else "-"
+    return created_by, updated_by
+
+
+def audit_user_label_with_role(entry):
+    if not entry:
+        return "-"
+
+    label = entry.utente_display
+    ruolo_label = ""
+    user = entry.utente
+    if user:
+        profilo = getattr(user, "profilo_permessi", None)
+        if profilo and profilo.ruolo:
+            ruolo_label = profilo.get_ruolo_display()
+        elif user.is_superuser:
+            ruolo_label = "Superuser"
+
+    return f"{label} ({ruolo_label})" if ruolo_label else label
+
+
+def last_update_audit_label(instance):
+    if not instance or not instance.pk:
+        return "-"
+
+    entries = SistemaOperazioneCronologia.objects.select_related(
+        "utente",
+        "utente__profilo_permessi",
+    ).filter(
+        app_label=instance._meta.app_label,
+        model_name=instance._meta.model_name,
+        oggetto_id=str(instance.pk),
+    )
+    entry = (
+        entries
+        .filter(azione=AzioneOperazioneCronologia.MODIFICA)
+        .order_by("-data_operazione", "-id")
+        .first()
+    ) or (
+        entries
+        .filter(azione=AzioneOperazioneCronologia.CREAZIONE)
+        .order_by("-data_operazione", "-id")
+        .first()
+    )
+
+    return audit_user_label_with_role(entry)
 
 
 def famiglia_familiari_inline_queryset(famiglia=None):
@@ -1591,10 +1675,13 @@ def modifica_famiglia(request, pk):
         + count_documenti_familiari
         + count_documenti_studenti
     )
+    famiglia_creata_da_label, famiglia_aggiornata_da_label = famiglia_audit_labels(famiglia)
 
     ctx = {
         "form": form,
         "famiglia": famiglia,
+        "famiglia_creata_da_label": famiglia_creata_da_label,
+        "famiglia_aggiornata_da_label": famiglia_aggiornata_da_label,
         "familiari_formset": familiari_formset,
         "studenti_formset": studenti_formset,
         "documenti_formset": documenti_formset,
@@ -2007,6 +2094,17 @@ def crea_familiare(request):
             "scambio_retta_inline_context": {"enabled": False, "sections": []},
             "scambio_retta_return_to": "",
             "edit_scope": "full",
+            "inline_target": "documenti",
+            "familiare_inline_tabs": [
+                {
+                    "tab_id": "tab-documenti",
+                    "label": "Documenti",
+                    "base_label": "Documenti",
+                    "count": 0,
+                    "is_active": True,
+                },
+            ],
+            "familiare_inline_edit_label": "Modifica Documenti",
         },
     )
 
@@ -2086,14 +2184,28 @@ def modifica_familiare(request, pk):
             else:
                 if "_continue" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente.")
-                    return redirect("modifica_familiare", pk=familiare.pk)
+                    target = (request.POST.get("_inline_target") or "").strip()
+                    allowed_targets = ["documenti"]
+                    if studenti_formset is not None:
+                        allowed_targets.insert(0, "studenti")
+                    default_target = "studenti" if "studenti" in allowed_targets else "documenti"
+                    if target not in allowed_targets:
+                        target = default_target
+                    return redirect(build_familiare_redirect_url(familiare.pk, target, default_target))
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo familiare.")
                     return redirect("crea_familiare")
 
                 messages.success(request, "Modifiche salvate correttamente.")
-                return redirect("modifica_familiare", pk=familiare.pk)
+                target = (request.POST.get("_inline_target") or "").strip()
+                allowed_targets = ["documenti"]
+                if studenti_formset is not None:
+                    allowed_targets.insert(0, "studenti")
+                default_target = "studenti" if "studenti" in allowed_targets else "documenti"
+                if target not in allowed_targets:
+                    target = default_target
+                return redirect(build_familiare_redirect_url(familiare.pk, target, default_target))
         if studenti_formset is None and famiglia_for_studenti:
             studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
     else:
@@ -2112,6 +2224,31 @@ def modifica_familiare(request, pk):
         }
     scambio_retta_inline_context = build_familiare_scambio_retta_inline_context(familiare, request.GET)
     scambio_retta_return_to = f"{request.get_full_path()}#scambio-retta-inline"
+    allowed_inline_targets = ["documenti"]
+    if studenti_formset is not None:
+        allowed_inline_targets.insert(0, "studenti")
+    default_inline_target = "studenti" if "studenti" in allowed_inline_targets else "documenti"
+    inline_target = resolve_active_inline_tab(request, allowed_inline_targets, default_inline_target)
+    familiare_inline_tabs = []
+    familiare_inline_edit_label = "Modifica Documenti"
+    if studenti_formset is not None:
+        terminology = get_student_terminology()
+        familiare_inline_tabs.append({
+            "tab_id": "tab-studenti",
+            "label": terminology["selected_plural"],
+            "base_label": terminology["selected_plural"],
+            "count": count_studenti,
+            "is_active": inline_target == "studenti",
+        })
+        if inline_target == "studenti":
+            familiare_inline_edit_label = f"Modifica {terminology['selected_plural']}"
+    familiare_inline_tabs.append({
+        "tab_id": "tab-documenti",
+        "label": "Documenti",
+        "base_label": "Documenti",
+        "count": familiare.documenti.count(),
+        "is_active": inline_target == "documenti",
+    })
 
     return render(
         request,
@@ -2137,6 +2274,10 @@ def modifica_familiare(request, pk):
             "scambio_retta_inline_context": scambio_retta_inline_context,
             "scambio_retta_return_to": scambio_retta_return_to,
             "edit_scope": edit_scope,
+            "inline_target": inline_target,
+            "familiare_inline_tabs": familiare_inline_tabs,
+            "familiare_inline_edit_label": familiare_inline_edit_label,
+            "familiare_aggiornato_da_label": last_update_audit_label(familiare),
         },
     )
 

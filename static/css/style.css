@@ -2145,6 +2145,7 @@ select:focus {
 /* INIZIO STILE DEGLI INLINE */
 .inline-table {
     width: 100%;
+    border-top: 1px solid #eee;
     border-collapse: collapse;
     font-size: 12px;
     table-layout: auto;
@@ -2296,11 +2297,11 @@ select:focus {
     display: block;
 }
 
-/* Colonna "Scambio retta": come le altre checkbox, vertical-align top (middle qui vinceva sull'id e centrava la checkbox in celle alte) */
+/* Colonna "Scambio retta": resta allineata alle altre celle compatte della riga. */
 #familiari-table th.inline-scambio-retta-col,
 #familiari-table td.inline-scambio-retta-col {
     text-align: center;
-    vertical-align: top;
+    vertical-align: middle;
 }
 
 /* In modifica: come le altre celle checkbox (block + text-align), niente flex che disallinea in vertical-align:top */
@@ -3011,6 +3012,26 @@ select:focus {
     pointer-events: none;
 }
 
+.detail-form.is-edit-mode .inline-lock-container.is-inline-readonly-view .inline-subform-row {
+    display: none !important;
+}
+
+.detail-form.is-edit-mode .inline-lock-container.is-inline-readonly-view .mode-view-only {
+    display: block !important;
+}
+
+.detail-form.is-edit-mode .inline-lock-container.is-inline-readonly-view .mode-view-only.readonly-display-inline {
+    display: inline-flex !important;
+}
+
+.detail-form.is-edit-mode .inline-lock-container.is-inline-readonly-view .readonly-display-plain {
+    display: block !important;
+}
+
+.detail-form.is-edit-mode .inline-lock-container.is-inline-readonly-view .inline-view-only-table-cell {
+    display: table-cell !important;
+}
+
 .mode-view-only {
     display: none;
 }
@@ -3044,6 +3065,52 @@ select:focus {
 
 .detail-form.is-inline-edit-mode .inline-lock-container .inline-address-help {
     display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .mode-view-only {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .mode-view-only.readonly-display-inline {
+    display: inline-flex !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .readonly-display-plain {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .mode-edit-field,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .inline-related-field.mode-edit-field,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .related-field-row.mode-edit-field,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .mode-edit-only,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .related-actions,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .inline-delete-cell,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .mode-edit-only-table-cell,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .inline-address-help {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) .inline-view-only-table-cell {
+    display: table-cell !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-subform-row:not(.is-inline-active-edit-row) {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) textarea,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode .inline-lock-container .tab-panel.is-inline-edit-target .inline-form-row:not(.is-inline-active-edit-row) select {
+    pointer-events: none;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: #555;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: auto;
 }
 
 .detail-form.is-inline-edit-mode #famiglia-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .mode-view-only {
@@ -3137,6 +3204,51 @@ select:focus {
 }
 
 .detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) input[type="checkbox"] {
+    pointer-events: none;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .mode-view-only {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .mode-edit-field,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .inline-related-field.mode-edit-field,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .related-field-row.mode-edit-field,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .related-actions,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .inline-add-row,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .inline-delete-cell,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .mode-edit-only-table-cell,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .inline-address-help {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) .mode-view-only.readonly-display-inline {
+    display: inline-flex !important;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) textarea,
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) select {
+    pointer-events: none;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: #555;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: auto;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: none;
+}
+
+.detail-form.is-inline-edit-mode #familiare-inline-lock-container .tab-panel[data-inline-scope]:not(.is-inline-edit-target) input[type="checkbox"] {
     pointer-events: none;
 }
 
@@ -3805,10 +3917,19 @@ select:focus {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    text-align: left;
     gap: 14px;
     background: #f2f7fa;
     font-size: 14px;
+}
+
+.scambio-year-toggle > span:first-of-type {
+    margin-right: auto;
+}
+
+.scambio-year-toggle::after {
+    margin-left: 8px;
 }
 
 .scambio-year-toggle-meta {
@@ -3831,6 +3952,11 @@ select:focus {
     justify-content: space-between;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+.scambio-year-toolbar {
+    padding-left: 6px;
+    padding-right: 6px;
 }
 
 .scambio-view-switch {
@@ -4180,6 +4306,10 @@ select:focus {
     width: 100%;
 }
 
+.detail-form.is-view-mode #iscrizioni-table tbody {
+    gap: 0;
+}
+
 .detail-form #iscrizioni-table td {
     padding: 0;
     vertical-align: top;
@@ -4339,6 +4469,16 @@ select:focus {
     align-items: stretch;
 }
 
+.detail-form.is-view-mode #iscrizioni-table .iscrizioni-inline-main-grid {
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    padding-bottom: 8px;
+}
+
+.detail-form.is-view-mode #iscrizioni-table .inline-notes-row {
+    margin-bottom: 12px;
+}
+
 .detail-form.is-inline-edit-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .iscrizioni-inline-main-grid {
     display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -4475,7 +4615,7 @@ select:focus {
 }
 
 .detail-form #iscrizioni-table .iscrizioni-inline-notes-toggle {
-    padding: 8px 12px;
+    padding: 6px 12px;
     border: 1px solid #e5edf2;
     border-radius: 6px 6px 0 0;
     background: #f9fbfc;
@@ -4484,12 +4624,27 @@ select:focus {
     font-weight: 600;
 }
 
+.detail-form.is-view-mode #iscrizioni-table .iscrizioni-inline-notes-toggle {
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    background: #fff;
+}
+
+.detail-form.is-view-mode #iscrizioni-table .iscrizioni-inline-notes-toggle.is-open {
+    border-radius: 0;
+}
+
 .detail-form #iscrizioni-table .iscrizioni-inline-view-notes-panel {
     padding: 12px 14px 14px;
     border: 1px solid #e5edf2;
     border-top: 0;
     border-radius: 0 0 6px 6px;
     background: #f9fbfc;
+}
+
+.detail-form.is-view-mode #iscrizioni-table .iscrizioni-inline-view-notes-panel {
+    background: #fff;
+    border-radius: 0 0 8px 8px;
 }
 
 .detail-form #iscrizioni-table .iscrizioni-inline-view-notes-grid {
@@ -4584,6 +4739,70 @@ select:focus {
 .detail-form #iscrizioni-table .inline-details-field-importo input[name$="-importo_riduzione_speciale"] {
     max-width: 12ch;
     min-width: 12ch;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row:not(.is-inline-active-edit-row) .iscrizioni-inline-main-grid {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 12px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: stretch;
+    padding: 14px 14px 8px;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row:not(.is-inline-active-edit-row) .iscrizioni-inline-field {
+    flex: 1 1 112px;
+    min-width: 98px;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row:not(.is-inline-active-edit-row) .iscrizioni-inline-field > label {
+    margin-bottom: 6px;
+    font-size: 10px;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row:not(.is-inline-active-edit-row) .iscrizioni-inline-view-summary {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-form-row:not(.is-inline-active-edit-row) .iscrizioni-inline-field-actions {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-economic-row:not(.is-inline-active-edit-row) {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row:not(.is-inline-active-edit-row) {
+    display: block !important;
+    margin-bottom: 12px;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row:not(.is-inline-active-edit-row) .mode-view-only,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row:not(.is-inline-active-edit-row) .readonly-display-plain {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row:not(.is-inline-active-edit-row) .mode-edit-field,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row:not(.is-inline-active-edit-row) .inline-related-field.mode-edit-field,
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-details-row:not(.is-inline-active-edit-row) .related-actions {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row:not(.is-inline-active-edit-row) .iscrizioni-inline-view-notes {
+    display: block !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row:not(.is-inline-active-edit-row) .iscrizioni-inline-notes-edit-panel {
+    display: none !important;
+}
+
+.detail-form.is-inline-edit-mode.is-inline-add-only-mode #tab-iscrizioni.is-inline-edit-target #iscrizioni-table .inline-notes-row:not(.is-inline-active-edit-row) .iscrizioni-inline-notes-toggle {
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    background: #fff;
 }
 
 @media (max-width: 1400px) {
@@ -4838,6 +5057,199 @@ select:focus {
 .detail-form.is-view-mode #studenti-table .readonly-action-group {
     display: flex;
     min-width: 0;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table .inline-subform-row,
+.detail-form.is-inline-readonly-mode #studenti-table .inline-subform-row {
+    display: none !important;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table {
+    font-size: 10.5px;
+    width: max(100%, 1600px);
+    max-width: none;
+    min-width: 1500px;
+    table-layout: fixed;
+    display: table;
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th,
+.detail-form.is-inline-readonly-mode #familiari-table td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 5px;
+    padding-right: 5px;
+    vertical-align: middle;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(1),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(1),
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(2),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(2) {
+    width: 11ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(3),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(3) {
+    width: 9ch;
+    padding-right: 14px;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(4),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(4) {
+    width: 31ch;
+    padding-left: 8px;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(5),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(5) {
+    width: 14ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(6),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(6) {
+    width: 24ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(7),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(7) {
+    width: 11ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(8),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(8) {
+    width: 20ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(9),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(9) {
+    width: 16ch;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(10),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(10),
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(11),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(11),
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(12),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(12) {
+    width: 8ch;
+    text-align: center;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(10),
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(11),
+.detail-form.is-inline-readonly-mode #familiari-table th:nth-child(12) {
+    font-size: 9.5px;
+    line-height: 1.1;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(1),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(2),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(3),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(4),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(5),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(6),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(7),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(8),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(9),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(10),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(11),
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(12) {
+    white-space: nowrap;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table .readonly-display-inline,
+.detail-form.is-inline-readonly-mode #studenti-table .readonly-display-inline {
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table .readonly-action-group,
+.detail-form.is-inline-readonly-mode #studenti-table .readonly-action-group {
+    display: flex;
+    min-width: 0;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table .readonly-action-group > a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(12) .readonly-display-inline,
+.detail-form.is-inline-readonly-mode #familiari-table td:nth-child(12) .readonly-display-plain,
+.detail-form.is-inline-readonly-mode #familiari-table td.inline-scambio-retta-col .mode-view-only.readonly-display-inline {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table {
+    font-size: 10.5px;
+    width: max(100%, 1320px);
+    max-width: none;
+    min-width: 1240px;
+    table-layout: fixed;
+    display: table;
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th,
+.detail-form.is-inline-readonly-mode #studenti-table td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 5px;
+    padding-right: 5px;
+    vertical-align: middle;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(1),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(1),
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(2),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(2) {
+    width: 12ch;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(3),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(3) {
+    width: 34ch;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(4),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(4) {
+    width: 11ch;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(5),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(5) {
+    width: 18ch;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table th:nth-child(6),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(6) {
+    width: 17ch;
+}
+
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(1),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(2),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(3),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(4),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(5),
+.detail-form.is-inline-readonly-mode #studenti-table td:nth-child(6) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .figli-inline-table tr[data-row-href] {

@@ -1,22 +1,59 @@
 window.ArborisFamiliareForm = (function () {
+    let refreshInlineEditScopeHandler = function () {};
+
     function init(config) {
         const routes = window.ArborisRelatedEntityRoutes;
         const relatedPopups = routes && routes.initRelatedPopups();
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
+        const inlineTabs = window.ArborisInlineTabs;
         const inlineFormsets = window.ArborisInlineFormsets;
         const personRules = window.ArborisPersonRules;
         const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
         const formTools = window.ArborisAnagraficaFormTools;
 
-        if (!routes || !relatedPopups || !collapsible || !tabs || !inlineFormsets || !personRules || !familyLinkedAddress || !formTools) {
+        if (!routes || !relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets || !personRules || !familyLinkedAddress || !formTools) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
 
+        const targetInputId = "familiare-inline-target";
+        const inlineLockContainerId = "familiare-inline-lock-container";
+        const inlineEditButtonId = "enable-inline-edit-familiare-btn";
+
         function getFamiliareTabStorageKey() {
             return `arboris-familiare-form-active-tab-${config.familiareId || "new"}`;
         }
+
+        function setInlineTarget(prefixOrTabId) {
+            inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
+        }
+
+        function updateInlineEditButtonLabel(tabId) {
+            inlineTabs.updateDefaultInlineEditButtonLabel({
+                buttonId: inlineEditButtonId,
+                containerId: inlineLockContainerId,
+                tabId: tabId,
+                getViewMode: function () {
+                    return window.familiareViewMode;
+                },
+            });
+        }
+
+        const refreshLockedTabs = inlineTabs.createRefreshLockedTabs({
+            formId: "familiare-detail-form",
+            inlineLockContainerId: inlineLockContainerId,
+            targetInputId: targetInputId,
+            getViewMode: function () {
+                return window.familiareViewMode;
+            },
+            inlineEditButtonId: inlineEditButtonId,
+        });
+
+        function refreshInlineEditScope() {
+            refreshLockedTabs();
+        }
+        refreshInlineEditScopeHandler = refreshInlineEditScope;
 
         function activatePanelIfPresent(tabId) {
             const panel = document.getElementById(tabId);
@@ -25,12 +62,18 @@ window.ArborisFamiliareForm = (function () {
             }
 
             if (document.querySelector(`[data-tab-target="${tabId}"]`)) {
+                setInlineTarget(tabId);
                 tabs.activateTab(tabId, getFamiliareTabStorageKey());
+                updateInlineEditButtonLabel(tabId);
+                refreshInlineEditScope();
                 return;
             }
 
             document.querySelectorAll(".tab-panel").forEach(existingPanel => existingPanel.classList.remove("is-active"));
             panel.classList.add("is-active");
+            setInlineTarget(tabId);
+            updateInlineEditButtonLabel(tabId);
+            refreshInlineEditScope();
         }
 
         function bindStandaloneSexFromRelazioneFamiliare() {
@@ -142,6 +185,11 @@ window.ArborisFamiliareForm = (function () {
             const studentiHeading = document.getElementById("familiare-studenti-heading");
             if (studentiHeading && document.getElementById("studenti-table")) {
                 const n = countPersistedRows("studenti-table");
+                const tabStudenti = document.querySelector('[data-tab-target="tab-studenti"]');
+                if (tabStudenti) {
+                    const tabLabel = inlineTabs.inlineLabelFromTabButton(tabStudenti);
+                    tabStudenti.textContent = `${tabLabel} (${n})`;
+                }
                 const label = studentiHeading.dataset.baseLabel || studentiHeading.textContent.replace(/\s*\(\d+\)\s*$/, "").trim();
                 studentiHeading.dataset.baseLabel = label;
                 studentiHeading.textContent = `${label} (${n})`;
@@ -215,6 +263,16 @@ window.ArborisFamiliareForm = (function () {
                 return;
             }
 
+            const form = document.getElementById("familiare-detail-form");
+            const isAlreadyAddOnlyMode = Boolean(form && form.classList.contains("is-inline-add-only-mode"));
+            const shouldUseAddOnlyMode = Boolean(
+                window.familiareViewMode &&
+                (!window.familiareViewMode.isEditing() || isAlreadyAddOnlyMode)
+            );
+
+            setInlineTarget(prefix);
+            activatePanelIfPresent(`tab-${prefix}`);
+
             if (window.familiareViewMode && !window.familiareViewMode.isEditing()) {
                 window.familiareViewMode.setInlineEditing(true);
             }
@@ -225,7 +283,12 @@ window.ArborisFamiliareForm = (function () {
                 return;
             }
 
-            activatePanelIfPresent(`tab-${prefix}`);
+            if (shouldUseAddOnlyMode && mounted.state) {
+                inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
+                    form: "familiare-detail-form",
+                });
+            }
+
             refreshTabCounts();
         }
 
@@ -320,7 +383,24 @@ window.ArborisFamiliareForm = (function () {
 
         inlineManagers.documenti.prepare();
         inlineManagers.studenti.prepare();
-        tabs.bindTabButtons(getFamiliareTabStorageKey());
+        const inlineLockRoot = document.getElementById(inlineLockContainerId);
+        if (inlineLockRoot) {
+            tabs.bindTabButtons(getFamiliareTabStorageKey(), inlineLockRoot);
+            inlineTabs.bindTabNavigationLock({
+                containerId: inlineLockContainerId,
+                targetInputId: targetInputId,
+                getViewMode: function () {
+                    return window.familiareViewMode;
+                },
+            });
+        }
+        document.querySelectorAll("#familiare-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
+            btn.addEventListener("click", function () {
+                setInlineTarget(btn.dataset.tabTarget);
+                updateInlineEditButtonLabel(btn.dataset.tabTarget);
+                refreshInlineEditScope();
+            });
+        });
         collapsible.initCollapsibleSections(document);
         wireInlineRelatedButtons(document);
         inlineFormsets.wireActionTriggers(document, {
@@ -341,14 +421,23 @@ window.ArborisFamiliareForm = (function () {
         });
         bindAllStudenteInlineSex();
         tabs.restoreActiveTab(getFamiliareTabStorageKey());
+        const activeTab = inlineLockRoot ? inlineLockRoot.querySelector(".tab-btn.is-active") : null;
+        if (activeTab && activeTab.dataset.tabTarget) {
+            setInlineTarget(activeTab.dataset.tabTarget);
+            updateInlineEditButtonLabel(activeTab.dataset.tabTarget);
+        }
         bindStandaloneSexFromRelazioneFamiliare();
         bindScambioRettaNavigation();
         studentiInlineAddressDefaults.syncRows();
         updateMainButtons();
         refreshTabCounts();
+        refreshInlineEditScope();
     }
 
     return {
         init,
+        refreshInlineEditScope: function () {
+            refreshInlineEditScopeHandler();
+        },
     };
 })();

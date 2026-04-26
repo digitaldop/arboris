@@ -83,6 +83,15 @@ window.ArborisViewMode = (function () {
         });
     }
 
+    function clearInlineAddOnlyMode(form) {
+        if (!form) return;
+
+        form.classList.remove("is-inline-add-only-mode");
+        form.querySelectorAll(".is-inline-active-edit-row").forEach(row => {
+            row.classList.remove("is-inline-active-edit-row");
+        });
+    }
+
     function init(config) {
         const form = document.getElementById(config.formId);
         const mainContainer = document.getElementById(config.lockContainerId);
@@ -124,6 +133,15 @@ window.ArborisViewMode = (function () {
             form.classList.toggle("is-view-mode", currentMode === "view");
             form.classList.toggle("is-edit-mode", isFullEditing);
             form.classList.toggle("is-inline-edit-mode", isInlineEditing);
+            form.classList.toggle("is-inline-readonly-mode", isFullEditing);
+
+            if (inlineContainer) {
+                inlineContainer.classList.toggle("is-inline-readonly-view", isFullEditing);
+            }
+
+            if (!isInlineEditing) {
+                clearInlineAddOnlyMode(form);
+            }
 
             if (isFullEditing) {
                 unlockFields(mainFields);

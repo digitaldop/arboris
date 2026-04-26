@@ -640,6 +640,14 @@ window.ArborisStudenteForm = (function () {
                 return;
             }
 
+            const form = document.getElementById("studente-detail-form");
+            const isAlreadyAddOnlyMode = Boolean(form && form.classList.contains("is-inline-add-only-mode"));
+            const shouldUseAddOnlyMode = Boolean(
+                window.studenteViewMode &&
+                (!window.studenteViewMode.isEditing() || isAlreadyAddOnlyMode)
+            );
+            let mounted = null;
+
             setInlineTarget(prefix);
             tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
 
@@ -652,10 +660,16 @@ window.ArborisStudenteForm = (function () {
                 refreshInlineEditScope();
                 updateInlineEditButtonLabel(`tab-${prefix}`);
 
-                const mounted = manager.add();
+                mounted = manager.add();
 
                 if (!mounted) {
                     return;
+                }
+
+                if (shouldUseAddOnlyMode && mounted.state) {
+                    inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
+                        form: "studente-detail-form",
+                    });
                 }
             } finally {
                 suppressAutoEmptyInlineMount = false;

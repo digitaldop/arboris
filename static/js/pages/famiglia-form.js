@@ -70,11 +70,6 @@ window.ArborisFamigliaForm = (function () {
             const panels = document.querySelectorAll('#famiglia-inline-lock-container .tab-panel[data-inline-scope]');
             const targetInput = document.getElementById("famiglia-inline-target");
             const target = targetInput ? targetInput.value : "";
-            const isEditing = Boolean(
-                window.famigliaViewMode &&
-                typeof window.famigliaViewMode.isEditing === "function" &&
-                window.famigliaViewMode.isEditing()
-            );
             const isInlineEditing = Boolean(
                 window.famigliaViewMode &&
                 typeof window.famigliaViewMode.isInlineEditing === "function" &&
@@ -82,7 +77,7 @@ window.ArborisFamigliaForm = (function () {
             );
 
             if (form) {
-                if (isEditing && target) {
+                if (isInlineEditing && target) {
                     form.dataset.inlineEditTarget = target;
                 } else {
                     delete form.dataset.inlineEditTarget;
@@ -90,7 +85,7 @@ window.ArborisFamigliaForm = (function () {
             }
 
             panels.forEach(panel => {
-                const isTarget = isEditing && panel.dataset.inlineScope === target;
+                const isTarget = isInlineEditing && panel.dataset.inlineScope === target;
                 panel.classList.toggle("is-inline-edit-target", isTarget);
             });
 
@@ -584,13 +579,13 @@ window.ArborisFamigliaForm = (function () {
         function addManagedInlineForm(prefix) {
             const manager = inlineManagers[prefix];
             if (!manager) {
-                return;
+                return null;
             }
 
             const mounted = manager.add();
 
             if (!mounted) {
-                return;
+                return null;
             }
 
             const tabId = `tab-${prefix}`;
@@ -603,14 +598,29 @@ window.ArborisFamigliaForm = (function () {
                 sortStudentiInlineRows();
             }
             famigliaInlineAddressCollection.refreshCollectionHelp(document.getElementById("famiglia-inline-lock-container"));
+
+            return mounted;
         }
 
         function addInlineFormFromView(prefix) {
+            const form = document.getElementById("famiglia-detail-form");
+            const isAlreadyAddOnlyMode = Boolean(form && form.classList.contains("is-inline-add-only-mode"));
+            const shouldUseAddOnlyMode = Boolean(
+                window.famigliaViewMode &&
+                (!window.famigliaViewMode.isEditing() || isAlreadyAddOnlyMode)
+            );
+
             if (window.famigliaViewMode && !window.famigliaViewMode.isEditing()) {
                 window.famigliaViewMode.setInlineEditing(true);
             }
 
-            addManagedInlineForm(prefix);
+            const mounted = addManagedInlineForm(prefix);
+
+            if (shouldUseAddOnlyMode && mounted && mounted.state) {
+                inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
+                    form: "famiglia-detail-form",
+                });
+            }
         }
 
         const statoSelect = document.getElementById("id_stato_relazione_famiglia");

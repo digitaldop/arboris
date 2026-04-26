@@ -157,9 +157,21 @@
                                     </td>
                                 </tr>
                                 <tr>
+                                    <th>Creato da</th>
+                                    <td class="system-readonly-value">
+                                        {% if famiglia %}{{ famiglia_creata_da_label|default:"-" }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
                                     <th>Data aggiornamento</th>
                                     <td class="system-readonly-value">
                                         {% if famiglia %}{{ famiglia.data_aggiornamento }}{% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Aggiornato da</th>
+                                    <td class="system-readonly-value">
+                                        {% if famiglia %}{{ famiglia_aggiornata_da_label|default:"-" }}{% else %}-{% endif %}
                                     </td>
                                 </tr>
                             </table>
@@ -413,7 +425,7 @@
                                         <td class="inline-view-only-table-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.data_nascita %}
-                                                    {{ f.instance.data_nascita|it_date }}
+                                                    {{ f.instance.data_nascita|it_date_with_age }}
                                                 {% else %}
                                                     <span class="table-muted">Non indicata</span>
                                                 {% endif %}
@@ -961,9 +973,9 @@
     <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=34"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=36"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
