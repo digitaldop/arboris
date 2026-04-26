@@ -291,7 +291,7 @@
                             </thead>
                             <tbody>
                                 {% for f in iscrizioni_formset %}
-                                    <tr class="inline-form-row{% if not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
                                         <td>
                                             <div class="inline-related-field">
@@ -415,7 +415,7 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    <tr class="inline-details-row{% if not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-details-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         <td colspan="{% if studente %}13{% else %}12{% endif %}">
                                             <div class="inline-details-panel collapsible-panel" id="iscrizioni-note-panel-{{ forloop.counter0 }}">
                                                 <div class="inline-details-grid">
@@ -472,9 +472,9 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    {% if f.non_field_errors %}
+                                    {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="{% if studente %}13{% else %}12{% endif %}">{{ f.non_field_errors }}</td>
+                                            <td colspan="{% if studente %}13{% else %}12{% endif %}">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -507,7 +507,7 @@
                             </thead>
                             <tbody>
                                 {% for f in documenti_formset %}
-                                    <tr class="inline-form-row{% if not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
                                         <td class="document-file-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
@@ -593,9 +593,9 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    {% if f.non_field_errors %}
+                                    {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="7">{{ f.non_field_errors }}</td>
+                                            <td colspan="7">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -919,11 +919,11 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=3"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=18"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=23"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

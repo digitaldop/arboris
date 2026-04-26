@@ -84,9 +84,9 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertFalse(response.context["can_view_anagrafica"])
         self.assertFalse(response.context["can_view_economia"])
         self.assertFalse(response.context["can_view_gestione_amministrativa"])
-        self.assertNotContains(response, reverse("lista_famiglie"))
-        self.assertNotContains(response, reverse("lista_iscrizioni"))
-        self.assertNotContains(response, reverse("lista_dipendenti"))
+        self.assertNotContains(response, f'href="{reverse("lista_famiglie")}"', html=False)
+        self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
+        self.assertNotContains(response, f'href="{reverse("lista_dipendenti")}"', html=False)
 
 
 class SidebarEconomiaTests(TestCase):

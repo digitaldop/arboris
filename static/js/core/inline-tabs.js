@@ -104,7 +104,7 @@ window.ArborisInlineTabs = (function () {
      * @param {string} o.inlineEditButtonId
      * @param {function} [o.onAfterRefresh] chiamata dopo l'aggiornamento pannelli
      */
-    function createScuolaRefreshLockedTabs(o) {
+    function createRefreshLockedTabs(o) {
         return function refreshLockedTabs() {
             const form = document.getElementById(o.formId);
             const panels = document.querySelectorAll("#" + o.inlineLockContainerId + " .tab-panel[data-inline-scope]");
@@ -183,7 +183,8 @@ window.ArborisInlineTabs = (function () {
         unlockPanelFields: unlockPanelFields,
         setInlineTargetValue: setInlineTargetValue,
         clearTabButtonLockClasses: clearTabButtonLockClasses,
-        createScuolaRefreshLockedTabs: createScuolaRefreshLockedTabs,
+        createRefreshLockedTabs: createRefreshLockedTabs,
+        createScuolaRefreshLockedTabs: createRefreshLockedTabs,
         updateDefaultInlineEditButtonLabel: updateDefaultInlineEditButtonLabel,
     };
 })();

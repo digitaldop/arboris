@@ -16,7 +16,7 @@
     </thead>
     <tbody>
         {% for f in studenti_formset %}
-            <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+            <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
                 {{ f.id }}
                 <td>
                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
@@ -112,7 +112,7 @@
                     {% endif %}
                 </td>
             </tr>
-            <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+            <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
                 <td colspan="8">
                     <div class="inline-subform-grid">
                         <div class="inline-subform-field">
@@ -142,9 +142,9 @@
                     </div>
                 </td>
             </tr>
-            {% if f.non_field_errors %}
+            {% if f.errors %}
                 <tr class="inline-errors-row">
-                    <td colspan="8">{{ f.non_field_errors }}</td>
+                    <td colspan="8">{{ f.errors }}</td>
                 </tr>
             {% endif %}
         {% endfor %}

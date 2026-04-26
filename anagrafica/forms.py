@@ -759,7 +759,7 @@ FamiliareFormSet = inlineformset_factory(
 #FINE FORMS PER I FAMILIARI
 
 #INIZIO FORM PER I DOCUMENTI DEI FAMILIARI
-class DocumentoFamiliareForm(forms.ModelForm):
+class DocumentoBaseForm(forms.ModelForm):
     class Meta:
         model = Documento
         fields = [
@@ -778,15 +778,64 @@ class DocumentoFamiliareForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["tipo_documento"].queryset = (
-            TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
-        )
+        tipi_documento = TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
+        self.fields["tipo_documento"].queryset = tipi_documento
+        self.fields["tipo_documento"].error_messages["required"] = "Seleziona un tipo documento."
+
+        if tipi_documento.exists():
+            self.fields["tipo_documento"].empty_label = None
+            if (
+                not self.is_bound
+                and not getattr(self.instance, "pk", None)
+                and not self.initial.get("tipo_documento")
+            ):
+                primo_tipo = tipi_documento.first()
+                self.initial["tipo_documento"] = primo_tipo.pk
+                self.fields["tipo_documento"].initial = primo_tipo.pk
+
+
+class DocumentoInlineForm(DocumentoBaseForm):
+    def has_changed(self):
+        changed = super().has_changed()
+        if not changed:
+            return False
+
+        if self.data.get(self.add_prefix("DELETE")):
+            return True
+
+        meaningful_values = [
+            self.data.get(self.add_prefix("tipo_documento"), ""),
+            self.data.get(self.add_prefix("descrizione"), ""),
+            self.data.get(self.add_prefix("file"), ""),
+            self.data.get(self.add_prefix("scadenza"), ""),
+            self.data.get(self.add_prefix("note"), ""),
+        ]
+
+        if not any((value or "").strip() for value in meaningful_values):
+            return False
+
+        return True
+
+
+class DocumentoInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
+    meaningful_field_names = (
+        "tipo_documento",
+        "descrizione",
+        "file",
+        "scadenza",
+        "note",
+    )
+
+
+class DocumentoFamiliareForm(DocumentoInlineForm):
+    pass
 
 
 DocumentoFamiliareFormSet = inlineformset_factory(
     Familiare,
     Documento,
     form=DocumentoFamiliareForm,
+    formset=DocumentoInlineBaseFormSet,
     fk_name="familiare",
     extra=1,
     can_delete=True,
@@ -1020,100 +1069,32 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
 
 #INIZIO FORM PER I DOCUMENTI
 
-class DocumentoFamigliaForm(forms.ModelForm):
-    class Meta:
-        model = Documento
-        fields = [
-            "tipo_documento",
-            "descrizione",
-            "file",
-            "scadenza",
-            "visibile",
-            "note",
-        ]
-        widgets = {
-            "descrizione": forms.TextInput(),
-            "scadenza": html5_date_input(),
-            "note": forms.TextInput(),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["tipo_documento"].queryset = (
-            TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
-        )
+class DocumentoFamigliaForm(DocumentoBaseForm):
+    pass
 
 
-class DocumentoFamigliaInlineForm(DocumentoFamigliaForm):
-    def has_changed(self):
-        changed = super().has_changed()
-        if not changed:
-            return False
-
-        if self.data.get(self.add_prefix("DELETE")):
-            return True
-
-        meaningful_values = [
-            self.data.get(self.add_prefix("tipo_documento"), ""),
-            self.data.get(self.add_prefix("descrizione"), ""),
-            self.data.get(self.add_prefix("file"), ""),
-            self.data.get(self.add_prefix("scadenza"), ""),
-            self.data.get(self.add_prefix("note"), ""),
-        ]
-
-        if not any((value or "").strip() for value in meaningful_values):
-            return False
-
-        return True
-
-
-class DocumentoFamigliaInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
-    meaningful_field_names = (
-        "tipo_documento",
-        "descrizione",
-        "file",
-        "scadenza",
-        "note",
-    )
+class DocumentoFamigliaInlineForm(DocumentoInlineForm):
+    pass
 
 
 DocumentoFamigliaFormSet = inlineformset_factory(
     Famiglia,
     Documento,
     form=DocumentoFamigliaInlineForm,
-    formset=DocumentoFamigliaInlineBaseFormSet,
+    formset=DocumentoInlineBaseFormSet,
     fk_name="famiglia",
     extra=1,
     can_delete=True,
 )
 
-class DocumentoStudenteForm(forms.ModelForm):
-    class Meta:
-        model = Documento
-        fields = [
-            "tipo_documento",
-            "descrizione",
-            "file",
-            "scadenza",
-            "visibile",
-            "note",
-        ]
-        widgets = {
-            "descrizione": forms.TextInput(),
-            "scadenza": html5_date_input(),
-            "note": forms.TextInput(),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["tipo_documento"].queryset = (
-            TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
-        )
+class DocumentoStudenteForm(DocumentoInlineForm):
+    pass
 
 DocumentoStudenteFormSet = inlineformset_factory(
     Studente,
     Documento,
     form=DocumentoStudenteForm,
+    formset=DocumentoInlineBaseFormSet,
     fk_name="studente",
     extra=1,
     can_delete=True,
@@ -1198,7 +1179,6 @@ IscrizioneStudenteFormSet = inlineformset_factory(
 )
 
 #FINE FORM PER I DOCUMENTI
-
 
 
 

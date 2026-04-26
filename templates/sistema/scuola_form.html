@@ -185,9 +185,9 @@
                                                 {% endif %}
                                             </td>
                                         </tr>
-                                        {% if f.non_field_errors %}
+                                        {% if f.errors %}
                                             <tr class="inline-errors-row">
-                                                <td colspan="4">{{ f.non_field_errors }}</td>
+                                                <td colspan="4">{{ f.errors }}</td>
                                             </tr>
                                         {% endif %}
                                     {% endfor %}
@@ -230,9 +230,9 @@
                                                 {% endif %}
                                             </td>
                                         </tr>
-                                        {% if f.non_field_errors %}
+                                        {% if f.errors %}
                                             <tr class="inline-errors-row">
-                                                <td colspan="4">{{ f.non_field_errors }}</td>
+                                                <td colspan="4">{{ f.errors }}</td>
                                             </tr>
                                         {% endif %}
                                     {% endfor %}
@@ -275,9 +275,9 @@
                                                 {% endif %}
                                             </td>
                                         </tr>
-                                        {% if f.non_field_errors %}
+                                        {% if f.errors %}
                                             <tr class="inline-errors-row">
-                                                <td colspan="4">{{ f.non_field_errors }}</td>
+                                                <td colspan="4">{{ f.errors }}</td>
                                             </tr>
                                         {% endif %}
                                     {% endfor %}
@@ -340,9 +340,9 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=3"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/scuola-form.js' %}?v=12"></script>
+    <script src="{% static 'js/pages/scuola-form.js' %}?v=15"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

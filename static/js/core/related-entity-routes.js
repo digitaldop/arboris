@@ -51,6 +51,129 @@ window.ArborisRelatedEntityRoutes = (function () {
     }
 
     /**
+     * @param {{
+     *   select: HTMLSelectElement,
+     *   relatedType: string,
+     *   addBtn?: HTMLButtonElement | null,
+     *   editBtn?: HTMLButtonElement | null,
+     *   deleteBtn?: HTMLButtonElement | null,
+     *   targetInputName?: string | null,
+     *   openRelatedPopup?: function(string): void,
+     *   onRefresh?: function(string, HTMLSelectElement): void,
+     *   isAddDisabled?: function(HTMLSelectElement, string): boolean,
+     *   isEditDisabled?: function(HTMLSelectElement, string): boolean,
+     *   isDeleteDisabled?: function(HTMLSelectElement, string): boolean,
+     * }} options
+     * @returns {{refresh: function(): void}}
+     */
+    function wireCrudButtons(options) {
+        options = options || {};
+
+        var select = options.select;
+        var relatedType = options.relatedType;
+        var addBtn = options.addBtn || null;
+        var editBtn = options.editBtn || null;
+        var deleteBtn = options.deleteBtn || null;
+        var openRelatedPopup =
+            options.openRelatedPopup ||
+            (window.ArborisRelatedPopups && window.ArborisRelatedPopups.openRelatedPopup);
+
+        if (!select || !relatedType || !openRelatedPopup) {
+            return {
+                refresh: function () {},
+            };
+        }
+
+        var targetInputName = options.targetInputName || select.name;
+        var bindKey = [relatedType, targetInputName].join(":");
+
+        function defaultDisabledState(selectedId) {
+            return Boolean(select.disabled || !selectedId);
+        }
+
+        function resolveDisabledState(kind, selectedId) {
+            var predicate = null;
+
+            if (kind === "add") {
+                predicate = options.isAddDisabled;
+            } else if (kind === "edit") {
+                predicate = options.isEditDisabled;
+            } else if (kind === "delete") {
+                predicate = options.isDeleteDisabled;
+            }
+
+            if (typeof predicate === "function") {
+                return Boolean(predicate(select, selectedId));
+            }
+
+            if (kind === "add") {
+                return Boolean(select.disabled);
+            }
+
+            return defaultDisabledState(selectedId);
+        }
+
+        function refresh() {
+            var selectedId = select.value || "";
+
+            if (addBtn) {
+                addBtn.disabled = resolveDisabledState("add", selectedId);
+            }
+
+            if (editBtn) {
+                editBtn.disabled = resolveDisabledState("edit", selectedId);
+            }
+
+            if (deleteBtn) {
+                deleteBtn.disabled = resolveDisabledState("delete", selectedId);
+            }
+
+            if (typeof options.onRefresh === "function") {
+                options.onRefresh(relatedType, select);
+            }
+        }
+
+        if (select.dataset.relatedCrudButtonsBound !== bindKey) {
+            select.dataset.relatedCrudButtonsBound = bindKey;
+
+            if (addBtn) {
+                addBtn.addEventListener("click", function () {
+                    var cfg = buildCrudUrls(relatedType, null, targetInputName);
+                    if (cfg && cfg.addUrl) {
+                        openRelatedPopup(cfg.addUrl);
+                    }
+                });
+            }
+
+            if (editBtn) {
+                editBtn.addEventListener("click", function () {
+                    var cfg = buildCrudUrls(relatedType, select.value, targetInputName);
+                    if (cfg && cfg.editUrl) {
+                        openRelatedPopup(cfg.editUrl);
+                    }
+                });
+            }
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", function () {
+                    var cfg = buildCrudUrls(relatedType, select.value, targetInputName);
+                    if (cfg && cfg.deleteUrl) {
+                        openRelatedPopup(cfg.deleteUrl);
+                    }
+                });
+            }
+
+            select.addEventListener("change", refresh);
+        }
+
+        refresh();
+
+        return {
+            refresh: refresh,
+        };
+    }
+
+    /**
      * @param {Element} container
      * @param {{openRelatedPopup?: function(string): void, onRefresh?: function(string, HTMLSelectElement): void}|undefined} options
      */
@@ -80,45 +203,22 @@ window.ArborisRelatedEntityRoutes = (function () {
             }
 
             var relatedType = addBtn.dataset.relatedType;
-            var targetInputName = select.name;
-
-            function refreshButtons() {
-                var sid = select.value;
-                editBtn.disabled = !sid;
-                deleteBtn.disabled = !sid;
-                if (onRefresh) {
-                    onRefresh(relatedType, select);
-                }
-            }
-
-            addBtn.onclick = function () {
-                var cfg = buildCrudUrls(relatedType, null, targetInputName);
-                if (cfg && cfg.addUrl) {
-                    openRelatedPopup(cfg.addUrl);
-                }
-            };
-
-            editBtn.onclick = function () {
-                var cfg = buildCrudUrls(relatedType, select.value, targetInputName);
-                if (cfg && cfg.editUrl) {
-                    openRelatedPopup(cfg.editUrl);
-                }
-            };
-
-            deleteBtn.onclick = function () {
-                var cfg = buildCrudUrls(relatedType, select.value, targetInputName);
-                if (cfg && cfg.deleteUrl) {
-                    openRelatedPopup(cfg.deleteUrl);
-                }
-            };
-
-            select.addEventListener("change", refreshButtons);
-            refreshButtons();
+            wireCrudButtons({
+                select: select,
+                relatedType: relatedType,
+                addBtn: addBtn,
+                editBtn: editBtn,
+                deleteBtn: deleteBtn,
+                targetInputName: select.name,
+                openRelatedPopup: openRelatedPopup,
+                onRefresh: onRefresh,
+            });
         });
     }
 
     return {
         buildCrudUrls: buildCrudUrls,
+        wireCrudButtons: wireCrudButtons,
         wireInlineRelatedButtons: wireInlineRelatedButtons,
         withPopupQuery: withPopupQuery,
         substituteId: substituteId,

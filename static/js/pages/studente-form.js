@@ -6,8 +6,11 @@ window.ArborisStudenteForm = (function () {
         const collapsible = window.ArborisCollapsible;
         const tabs = window.ArborisTabs;
         const inlineTabs = window.ArborisInlineTabs;
+        const inlineFormsets = window.ArborisInlineFormsets;
+        const personRules = window.ArborisPersonRules;
+        const familyLinkedAddress = window.ArborisFamilyLinkedAddress;
 
-        if (!relatedPopups || !collapsible || !tabs || !inlineTabs) {
+        if (!relatedPopups || !collapsible || !tabs || !inlineTabs || !inlineFormsets || !personRules || !familyLinkedAddress) {
             console.error("Arboris core JS non caricato correttamente.");
             return;
         }
@@ -30,45 +33,7 @@ window.ArborisStudenteForm = (function () {
         }
 
         function refreshInlineEditScope() {
-            const form = document.getElementById("studente-detail-form");
-            const panels = document.querySelectorAll('#studente-inline-lock-container .tab-panel[data-inline-scope]');
-            const targetInput = document.getElementById("studente-inline-target");
-            const target = targetInput ? targetInput.value : "";
-            const isEditing = Boolean(
-                window.studenteViewMode &&
-                typeof window.studenteViewMode.isEditing === "function" &&
-                window.studenteViewMode.isEditing()
-            );
-            const isInlineEditing = Boolean(
-                window.studenteViewMode &&
-                typeof window.studenteViewMode.isInlineEditing === "function" &&
-                window.studenteViewMode.isInlineEditing()
-            );
-
-            if (form) {
-                form.classList.toggle("is-inline-iscrizioni-layout", isEditing && target === "iscrizioni");
-
-                if (isEditing && target) {
-                    form.dataset.inlineEditTarget = target;
-                } else {
-                    delete form.dataset.inlineEditTarget;
-                }
-            }
-
-            panels.forEach(panel => {
-                const isTarget = isEditing && panel.dataset.inlineScope === target;
-                panel.classList.toggle("is-inline-edit-target", isTarget);
-            });
-
             refreshLockedTabs();
-
-            if (!isInlineEditing) {
-                const root = studenteInlineRoot();
-                const activeTab = root ? root.querySelector(".tab-btn.is-active") : null;
-                if (activeTab && activeTab.dataset.tabTarget) {
-                    updateInlineEditButtonLabel(activeTab.dataset.tabTarget);
-                }
-            }
         }
 
         refreshInlineEditScopeHandler = refreshInlineEditScope;
@@ -84,64 +49,31 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
-        function refreshLockedTabs() {
-            inlineTabs.clearTabButtonLockClasses(inlineLockContainerId);
-        }
+        const refreshLockedTabs = inlineTabs.createRefreshLockedTabs({
+            formId: "studente-detail-form",
+            inlineLockContainerId: inlineLockContainerId,
+            targetInputId: targetInputId,
+            getViewMode: function () {
+                return window.studenteViewMode;
+            },
+            inlineEditButtonId: inlineEditButtonId,
+            onAfterRefresh: function () {
+                const form = document.getElementById("studente-detail-form");
+                const targetInput = document.getElementById(targetInputId);
+                const target = targetInput ? targetInput.value : "";
+                const isInlineEditing = Boolean(
+                    window.studenteViewMode &&
+                    typeof window.studenteViewMode.isInlineEditing === "function" &&
+                    window.studenteViewMode.isInlineEditing()
+                );
 
-        function getSelectedFamigliaOption() {
-            const famigliaSelect = document.getElementById("id_famiglia");
-            if (!famigliaSelect) {
-                return null;
-            }
+                if (form) {
+                    form.classList.toggle("is-inline-iscrizioni-layout", isInlineEditing && target === "iscrizioni");
+                }
+            },
+        });
 
-            return famigliaSelect.options[famigliaSelect.selectedIndex] || null;
-        }
-
-        function getSelectedFamigliaAddressId() {
-            const selectedOption = getSelectedFamigliaOption();
-            return selectedOption ? (selectedOption.dataset.indirizzoFamigliaId || "") : "";
-        }
-
-        function normalizePersonName(value) {
-            return (value || "")
-                .toString()
-                .trim()
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-        }
-
-        function inferSexFromFirstName(value) {
-            const firstName = normalizePersonName(value).split(/\s+/)[0] || "";
-            if (!firstName) {
-                return "";
-            }
-
-            const commonMaleEndingInA = [
-                "andrea",
-                "luca",
-                "nicola",
-                "mattia",
-                "elia",
-                "tobia",
-                "enea",
-                "gianluca",
-            ];
-
-            if (commonMaleEndingInA.includes(firstName)) {
-                return "M";
-            }
-
-            if (firstName.endsWith("a")) {
-                return "F";
-            }
-
-            if (firstName.endsWith("o")) {
-                return "M";
-            }
-
-            return "";
-        }
+        let familyLinkController = null;
 
         function syncStandaloneSexFromNome() {
             const nomeInput = document.getElementById("id_nome");
@@ -151,7 +83,7 @@ window.ArborisStudenteForm = (function () {
                 return;
             }
 
-            const inferredSex = inferSexFromFirstName(nomeInput.value);
+            const inferredSex = personRules.inferSexFromFirstName(nomeInput.value);
             if (!inferredSex) {
                 return;
             }
@@ -172,132 +104,12 @@ window.ArborisStudenteForm = (function () {
             syncStandaloneSexFromNome();
         }
 
-        function updateInheritedAddressPlaceholder() {
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            if (!indirizzoSelect || !indirizzoSelect.options.length) return;
-
-            const emptyOption = indirizzoSelect.options[0];
-            if (!emptyOption) return;
-
-            if (!indirizzoSelect.dataset.defaultEmptyLabel) {
-                indirizzoSelect.dataset.defaultEmptyLabel = emptyOption.textContent;
-            }
-
-            const selectedFamily = getSelectedFamigliaOption();
-            const familyAddress = selectedFamily ? selectedFamily.dataset.indirizzoFamiglia || "" : "";
-
-            emptyOption.textContent = familyAddress || indirizzoSelect.dataset.defaultEmptyLabel;
-        }
-
-        function refreshAddressHelp() {
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            const help = document.getElementById("studente-address-help");
-            if (!indirizzoSelect || !help) return;
-
-            const familyAddressId = getSelectedFamigliaAddressId();
-            const selectedFamily = getSelectedFamigliaOption();
-
-            if (indirizzoSelect.value && familyAddressId && indirizzoSelect.value === familyAddressId) {
-                const familyAddress = selectedFamily ? selectedFamily.dataset.indirizzoFamiglia || "" : "";
-                help.textContent = familyAddress
-                    ? `Indirizzo famiglia: ${familyAddress}`
-                    : "Indirizzo famiglia";
-                return;
-            }
-
-            if (indirizzoSelect.value) {
-                help.textContent = "Indirizzo specifico";
-                return;
-            }
-
-            if (selectedFamily) {
-                const familyAddress = selectedFamily.dataset.indirizzoFamiglia || "";
-                if (familyAddress) {
-                    help.textContent = `Usa indirizzo famiglia: ${familyAddress}`;
-                    return;
-                }
-            }
-
-            const node = document.getElementById("studente-famiglia-indirizzo-label");
-            let label = "";
-
-            if (node) {
-                try {
-                    label = JSON.parse(node.textContent);
-                } catch (e) {}
-            }
-
-            help.textContent = label
-                ? `Usa indirizzo famiglia: ${label}`
-                : "Se lasci vuoto, verra usato l'indirizzo principale della famiglia";
-        }
-
         function updateMainButtons() {
             const famigliaSelect = document.getElementById("id_famiglia");
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-
             const editFamigliaBtn = document.getElementById("edit-famiglia-btn");
-            const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
-            const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
 
             if (editFamigliaBtn && famigliaSelect) editFamigliaBtn.disabled = !famigliaSelect.value;
-            if (editIndirizzoBtn && indirizzoSelect) editIndirizzoBtn.disabled = !indirizzoSelect.value;
-            if (deleteIndirizzoBtn && indirizzoSelect) deleteIndirizzoBtn.disabled = !indirizzoSelect.value;
-        }
-
-        function markInheritedAddress(indirizzoSelect, enabled) {
-            if (!indirizzoSelect) {
-                return;
-            }
-
-            if (enabled) {
-                indirizzoSelect.dataset.inheritedAddress = "1";
-            } else {
-                delete indirizzoSelect.dataset.inheritedAddress;
-            }
-        }
-
-        function syncFamigliaDefaults() {
-            const cognomeInput = document.getElementById("id_cognome");
-            const indirizzoSelect = document.getElementById("id_indirizzo");
-            const selectedOption = getSelectedFamigliaOption();
-            const familyAddressId = selectedOption ? (selectedOption.dataset.indirizzoFamigliaId || "") : "";
-            const previousValue = indirizzoSelect ? (indirizzoSelect.value || "") : "";
-
-            if (!selectedOption || !selectedOption.value) {
-                if (indirizzoSelect && indirizzoSelect.dataset.inheritedAddress === "1" && previousValue) {
-                    indirizzoSelect.value = "";
-                    markInheritedAddress(indirizzoSelect, false);
-                    indirizzoSelect.dispatchEvent(new Event("change", { bubbles: true }));
-                }
-                updateInheritedAddressPlaceholder();
-                refreshAddressHelp();
-                updateMainButtons();
-                return;
-            }
-
-            if (cognomeInput) {
-                cognomeInput.value = selectedOption.dataset.cognomeFamiglia || "";
-            }
-
-            if (indirizzoSelect) {
-                const isInherited = indirizzoSelect.dataset.inheritedAddress === "1";
-                if ((!indirizzoSelect.value || isInherited) && familyAddressId) {
-                    indirizzoSelect.value = familyAddressId;
-                    markInheritedAddress(indirizzoSelect, true);
-                } else if (!familyAddressId && isInherited) {
-                    indirizzoSelect.value = "";
-                    markInheritedAddress(indirizzoSelect, false);
-                }
-
-                if ((indirizzoSelect.value || "") !== previousValue) {
-                    indirizzoSelect.dispatchEvent(new Event("change", { bubbles: true }));
-                }
-            }
-
-            updateInheritedAddressPlaceholder();
-            refreshAddressHelp();
-            updateMainButtons();
+            refreshIndirizzoButtons();
         }
 
         function wireInlineRelatedButtons(container) {
@@ -311,31 +123,10 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
-        function countPersistedRows(tableId) {
-            const rows = document.querySelectorAll(`#${tableId} tbody .inline-form-row`);
-            let count = 0;
-
-            rows.forEach(row => {
-                if (row.classList.contains("inline-empty-row")) {
-                    return;
-                }
-                const deleteCheckbox = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
-                if (deleteCheckbox && deleteCheckbox.checked) {
-                    return;
-                }
-                const hiddenIdInput = row.querySelector('input[type="hidden"][name$="-id"]');
-                if (hiddenIdInput && hiddenIdInput.value) {
-                    count += 1;
-                }
-            });
-
-            return count;
-        }
-
         function refreshTabCounts() {
-            const iscrizioniRows = countPersistedRows("iscrizioni-table");
+            const iscrizioniRows = inlineFormsets.countPersistedRows("iscrizioni-table");
             const tabIscrizioni = document.querySelector('[data-tab-target="tab-iscrizioni"]');
-            const documentiRows = countPersistedRows("documenti-table");
+            const documentiRows = inlineFormsets.countPersistedRows("documenti-table");
             const tabDocumenti = document.querySelector('[data-tab-target="tab-documenti"]');
             if (tabIscrizioni) tabIscrizioni.textContent = `Iscrizioni (${iscrizioniRows})`;
             if (tabDocumenti) tabDocumenti.textContent = `Documenti (${documentiRows})`;
@@ -560,89 +351,14 @@ window.ArborisStudenteForm = (function () {
         }
 
         function removeInlineRow(button) {
-            const row = button.closest("tr");
-            if (row) {
-                const detailsRow = row.nextElementSibling;
-                if (detailsRow && detailsRow.classList.contains("inline-details-row")) {
-                    detailsRow.remove();
-                }
-
-                const errorsRow = row.nextElementSibling;
-                if (errorsRow && errorsRow.classList.contains("inline-errors-row")) {
-                    errorsRow.remove();
-                }
-
-                row.remove();
+            if (inlineFormsets.removeInlineRow(button, { companionClasses: ["inline-details-row"] })) {
                 refreshTabCounts();
             }
         }
 
-        function isRowPersisted(row) {
-            const hiddenIdInput = row.querySelector('input[type="hidden"][name$="-id"]');
-            return Boolean(hiddenIdInput && hiddenIdInput.value);
-        }
-
-        function rowHasVisibleErrors(row) {
-            let nextRow = row.nextElementSibling;
-
-            if (nextRow && nextRow.classList.contains("inline-details-row")) {
-                nextRow = nextRow.nextElementSibling;
-            }
-
-            return Boolean(nextRow && nextRow.classList.contains("inline-errors-row"));
-        }
-
-        function rowHasUserData(row) {
-            const fields = row.querySelectorAll("input, textarea, select");
-
-            for (const field of fields) {
-                const type = (field.type || "").toLowerCase();
-                if (type === "hidden" || type === "checkbox") {
-                    continue;
-                }
-                if ((field.value || "").trim() !== "") {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         function prepareExistingEmptyRows(tableId) {
-            document.querySelectorAll(`#${tableId} tbody .inline-form-row`).forEach(row => {
-                if (isRowPersisted(row) || rowHasVisibleErrors(row) || rowHasUserData(row)) {
-                    return;
-                }
-
-                row.classList.add("inline-empty-row", "is-hidden");
-
-                const detailsRow = row.nextElementSibling;
-                if (detailsRow && detailsRow.classList.contains("inline-details-row")) {
-                    detailsRow.classList.add("inline-empty-row", "is-hidden");
-                }
-            });
-        }
-
-        function setRowInputsEnabled(row, enabled) {
-            if (!row) {
-                return;
-            }
-
-            row.querySelectorAll("input, textarea, select").forEach(field => {
-                if (field.type === "hidden") {
-                    return;
-                }
-
-                if (enabled) {
-                    field.disabled = false;
-                    field.readOnly = false;
-                    field.classList.remove("submit-safe-locked");
-                    field.removeAttribute("aria-disabled");
-                    field.removeAttribute("tabindex");
-                } else {
-                    field.disabled = true;
-                    field.readOnly = true;
-                }
+            inlineFormsets.prepareExistingEmptyRows(tableId, {
+                companionClasses: ["inline-details-row"],
             });
         }
 
@@ -777,63 +493,20 @@ window.ArborisStudenteForm = (function () {
             refreshInlineEditScope();
             updateInlineEditButtonLabel(`tab-${prefix}`);
 
-            const hiddenRow = document.querySelector(`#${prefix}-table tbody .inline-form-row.inline-empty-row.is-hidden`);
-            if (hiddenRow) {
-                hiddenRow.classList.remove("is-hidden");
-                hiddenRow.classList.remove("inline-empty-row");
-                setRowInputsEnabled(hiddenRow, true);
+            const mounted = inlineFormsets.mountInlineForm(prefix, {
+                companionClasses: ["inline-details-row"],
+                enableInputs: true,
+                onReady: function (state) {
+                    wireInlineRelatedButtons(state.row);
+                    if (prefix === "iscrizioni") {
+                        wireIscrizioneRow(state.row);
+                    }
+                },
+                focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
+            });
 
-                const detailsRow = hiddenRow.nextElementSibling;
-                if (detailsRow && detailsRow.classList.contains("inline-details-row")) {
-                    detailsRow.classList.remove("is-hidden");
-                    detailsRow.classList.remove("inline-empty-row");
-                    setRowInputsEnabled(detailsRow, true);
-                }
-
-                wireInlineRelatedButtons(hiddenRow);
-                if (prefix === "iscrizioni") {
-                    wireIscrizioneRow(hiddenRow);
-                }
-
-                const firstInput = hiddenRow.querySelector("input[type='text'], input[type='email'], input[type='date'], select, textarea");
-                if (firstInput) firstInput.focus();
-
-                tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
-                refreshInlineEditScope();
-                refreshTabCounts();
+            if (!mounted) {
                 return;
-            }
-
-            const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
-            const currentIndex = parseInt(totalForms.value, 10);
-
-            const template = document.getElementById(`${prefix}-empty-form-template`).innerHTML;
-            const newRowHtml = template.replace(/__prefix__/g, currentIndex);
-
-            const tbody = document.querySelector(`#${prefix}-table tbody`);
-            tbody.insertAdjacentHTML("beforeend", newRowHtml);
-
-            totalForms.value = currentIndex + 1;
-
-            const newRow = tbody.lastElementChild;
-            if (newRow) {
-                const mainRow = newRow.classList.contains("inline-details-row")
-                    ? newRow.previousElementSibling
-                    : newRow;
-                const detailsRow = mainRow ? mainRow.nextElementSibling : null;
-
-                setRowInputsEnabled(mainRow, true);
-                if (detailsRow && detailsRow.classList.contains("inline-details-row")) {
-                    setRowInputsEnabled(detailsRow, true);
-                }
-
-                wireInlineRelatedButtons(mainRow);
-                if (prefix === "iscrizioni") {
-                    wireIscrizioneRow(mainRow);
-                }
-
-                const firstInput = mainRow.querySelector("input[type='text'], input[type='email'], input[type='date'], select, textarea");
-                if (firstInput) firstInput.focus();
             }
 
             tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
@@ -853,6 +526,15 @@ window.ArborisStudenteForm = (function () {
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
+        let refreshIndirizzoButtons = function () {};
+        familyLinkController = familyLinkedAddress.createController({
+            familySelect: famigliaSelect,
+            addressSelect: indirizzoSelect,
+            surnameInput: document.getElementById("id_cognome"),
+            helpElement: document.getElementById("studente-address-help"),
+            fallbackLabelScriptId: "studente-famiglia-indirizzo-label",
+            onRefreshButtons: updateMainButtons,
+        });
 
         if (addFamigliaBtn && famigliaSelect) {
             addFamigliaBtn.addEventListener("click", function () {
@@ -870,53 +552,27 @@ window.ArborisStudenteForm = (function () {
 
         const studRoutes = window.ArborisRelatedEntityRoutes;
 
-        if (addIndirizzoBtn && indirizzoSelect && studRoutes) {
-            addIndirizzoBtn.addEventListener("click", function () {
-                const cfg = studRoutes.buildCrudUrls("indirizzo", null, indirizzoSelect.name);
-                if (cfg && cfg.addUrl) {
-                    relatedPopups.openRelatedPopup(cfg.addUrl);
-                }
+        if (indirizzoSelect && studRoutes) {
+            const indirizzoCrud = studRoutes.wireCrudButtons({
+                select: indirizzoSelect,
+                relatedType: "indirizzo",
+                addBtn: addIndirizzoBtn,
+                editBtn: editIndirizzoBtn,
+                deleteBtn: deleteIndirizzoBtn,
+                openRelatedPopup: relatedPopups.openRelatedPopup,
             });
-        }
-
-        if (editIndirizzoBtn && indirizzoSelect && studRoutes) {
-            editIndirizzoBtn.addEventListener("click", function () {
-                if (!indirizzoSelect.value) {
-                    return;
-                }
-                const cfg = studRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
-                if (cfg && cfg.editUrl) {
-                    relatedPopups.openRelatedPopup(cfg.editUrl);
-                }
-            });
-        }
-
-        if (deleteIndirizzoBtn && indirizzoSelect && studRoutes) {
-            deleteIndirizzoBtn.addEventListener("click", function () {
-                if (!indirizzoSelect.value) {
-                    return;
-                }
-                const cfg = studRoutes.buildCrudUrls("indirizzo", indirizzoSelect.value, indirizzoSelect.name);
-                if (cfg && cfg.deleteUrl) {
-                    relatedPopups.openRelatedPopup(cfg.deleteUrl);
-                }
-            });
+            refreshIndirizzoButtons = indirizzoCrud.refresh;
         }
 
         if (famigliaSelect) {
             famigliaSelect.addEventListener("change", function () {
-                syncFamigliaDefaults();
-                updateMainButtons();
-                refreshAddressHelp();
+                familyLinkController.syncFamigliaDefaults();
             });
         }
 
         if (indirizzoSelect) {
             indirizzoSelect.addEventListener("change", function () {
-                const familyAddressId = getSelectedFamigliaAddressId();
-                markInheritedAddress(indirizzoSelect, Boolean(familyAddressId && indirizzoSelect.value === familyAddressId));
-                updateMainButtons();
-                refreshAddressHelp();
+                familyLinkController.syncInheritedStateFromAddress();
             });
         }
 
@@ -943,10 +599,10 @@ window.ArborisStudenteForm = (function () {
             updateInlineEditButtonLabel(activeTab.dataset.tabTarget);
         }
         refreshInlineEditScope();
-        syncFamigliaDefaults();
-        updateInheritedAddressPlaceholder();
+        familyLinkController.syncFamigliaDefaults();
+        familyLinkController.updateInheritedAddressPlaceholder();
         updateMainButtons();
-        refreshAddressHelp();
+        familyLinkController.refreshAddressHelp();
         refreshTabCounts();
         bindRateRecalcForms();
         bindRatePaymentPopups();

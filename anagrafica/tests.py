@@ -10,6 +10,8 @@ from django.urls import reverse
 from anagrafica.dati_base_import import run_import_dati_base
 from anagrafica.forms import (
     DocumentoFamigliaFormSet,
+    DocumentoStudenteForm,
+    DocumentoStudenteFormSet,
     FamiliareForm,
     FamiliareInlineForm,
     IndirizzoForm,
@@ -559,6 +561,59 @@ class DocumentoStorageTests(TestCase):
                 self.assertContains(response_post, "window.close()")
                 self.assertFalse(Documento.objects.filter(pk=documento.pk).exists())
                 self.assertFalse(file_path.exists())
+
+
+class DocumentoInlineFormTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="documenti-inline@example.com",
+            email="documenti-inline@example.com",
+            password="Password123!",
+        )
+        self.regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Roma", provincia=self.provincia, codice_catastale="H501", ordine=1, attiva=True)
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(cognome_famiglia="Neri", stato_relazione_famiglia=self.stato, attiva=True)
+        self.studente = Studente.objects.create(famiglia=self.famiglia, nome="Luca", cognome="Neri", attivo=True)
+        self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+
+    def test_documento_studente_form_defaults_to_first_tipo_documento(self):
+        secondo = TipoDocumento.objects.create(tipo_documento="Secondo", ordine=2, attivo=True)
+        primo = self.tipo_documento
+
+        form = DocumentoStudenteForm(prefix="documenti-0")
+
+        self.assertIsNone(form.fields["tipo_documento"].empty_label)
+        self.assertEqual(form.initial["tipo_documento"], primo.pk)
+        self.assertEqual(list(form.fields["tipo_documento"].queryset), [primo, secondo])
+
+    def test_documento_studente_formset_requires_tipo_documento_with_clear_message(self):
+        formset = DocumentoStudenteFormSet(
+            data={
+                "documenti-TOTAL_FORMS": "1",
+                "documenti-INITIAL_FORMS": "0",
+                "documenti-MIN_NUM_FORMS": "0",
+                "documenti-MAX_NUM_FORMS": "1000",
+                "documenti-0-tipo_documento": "",
+                "documenti-0-descrizione": "Documento senza tipo",
+                "documenti-0-scadenza": "",
+                "documenti-0-note": "",
+                "documenti-0-visibile": "on",
+            },
+            files={
+                "documenti-0-file": SimpleUploadedFile(
+                    "documento-test.pdf",
+                    b"contenuto-pdf",
+                    content_type="application/pdf",
+                )
+            },
+            instance=self.studente,
+            prefix="documenti",
+        )
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn("Seleziona un tipo documento.", formset.forms[0].errors["tipo_documento"])
 
     def test_popup_delete_document_succeeds_even_if_storage_file_is_missing(self):
         with TemporaryDirectory() as tmpdir:

@@ -294,7 +294,7 @@
                             </thead>
                             <tbody>
                                 {% for f in familiari_formset %}
-                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
                                         {{ f.id }}
                                         <td>
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
@@ -461,7 +461,7 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                    <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
                                         <td colspan="14">
                                             <div class="inline-subform-grid">
                                                 <div class="inline-subform-field">
@@ -547,7 +547,7 @@
                             </thead>
                             <tbody>
                                 {% for f in documenti_formset %}
-                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.non_field_errors %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
                                         <td>
                                             <div class="inline-related-field">
@@ -589,9 +589,9 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    {% if f.non_field_errors %}
+                                    {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="7">{{ f.non_field_errors }}</td>
+                                            <td colspan="7">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -939,12 +939,12 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=2"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=2"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=3"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=19"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=25"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

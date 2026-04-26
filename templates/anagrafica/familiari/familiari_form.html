@@ -389,9 +389,9 @@
                                             {% endif %}
                                         </td>
                                     </tr>
-                                    {% if f.non_field_errors %}
+                                    {% if f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="7">{{ f.non_field_errors }}</td>
+                                            <td colspan="7">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -467,7 +467,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=11"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
