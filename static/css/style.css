@@ -4280,6 +4280,10 @@ select:focus {
     display: block;
 }
 
+.detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-panel.collapsible-panel:not(.is-open) {
+    display: block;
+}
+
 .detail-form.is-inline-iscrizioni-layout #iscrizioni-table .inline-details-row > td {
     display: block;
     padding: 0 16px 18px;
@@ -6325,4 +6329,3 @@ select:focus {
         align-items: flex-start;
     }
 }
-

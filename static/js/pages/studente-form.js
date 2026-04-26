@@ -69,6 +69,8 @@ window.ArborisStudenteForm = (function () {
                 if (form) {
                     form.classList.toggle("is-inline-iscrizioni-layout", isInlineEditing && target === "iscrizioni");
                 }
+
+                syncIscrizioniInlineDetails();
             },
         });
 
@@ -90,6 +92,81 @@ window.ArborisStudenteForm = (function () {
                 routes: routes,
                 relatedPopups: relatedPopups,
             });
+        }
+
+        function getIscrizioneBundleState(row) {
+            if (!row) {
+                return null;
+            }
+
+            return inlineFormsets.getRowBundle(row, {
+                companionClasses: ["inline-details-row"],
+            });
+        }
+
+        function setInlineDetailsToggleState(toggle, isOpen) {
+            if (!toggle) {
+                return;
+            }
+
+            toggle.classList.toggle("is-open", isOpen);
+            toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+            const labelNode = toggle.querySelector("[data-collapsible-label]");
+            if (!labelNode) {
+                return;
+            }
+
+            labelNode.textContent = isOpen
+                ? (toggle.dataset.labelOpen || labelNode.textContent)
+                : (toggle.dataset.labelClosed || labelNode.textContent);
+        }
+
+        function syncIscrizioniInlineDetails() {
+            const form = document.getElementById("studente-detail-form");
+            const layoutEnabled = Boolean(form && form.classList.contains("is-inline-iscrizioni-layout"));
+
+            document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
+                const state = getIscrizioneBundleState(row);
+                if (!state || !state.companionRows.length) {
+                    return;
+                }
+
+                const toggle = row.querySelector(".inline-details-toggle");
+
+                state.companionRows.forEach(function (companionRow) {
+                    const panel = companionRow.querySelector(".inline-details-panel");
+                    if (!panel || companionRow.classList.contains("is-hidden")) {
+                        return;
+                    }
+
+                    if (layoutEnabled) {
+                        panel.classList.add("is-open");
+                        panel.dataset.inlineForcedOpen = "1";
+                        setInlineDetailsToggleState(toggle, true);
+                        return;
+                    }
+
+                    if (panel.dataset.inlineForcedOpen === "1") {
+                        panel.classList.remove("is-open");
+                        delete panel.dataset.inlineForcedOpen;
+                        setInlineDetailsToggleState(toggle, false);
+                    }
+                });
+            });
+        }
+
+        function wireIscrizioneBundle(state) {
+            if (!state || !state.row) {
+                return;
+            }
+
+            wireInlineRelatedButtons(state.row);
+            state.companionRows.forEach(function (companionRow) {
+                wireInlineRelatedButtons(companionRow);
+            });
+            wireIscrizioneRow(state.row);
+            syncIscrizioniInlineDetails();
         }
 
         function refreshTabCounts() {
@@ -293,8 +370,7 @@ window.ArborisStudenteForm = (function () {
                     companionClasses: ["inline-details-row"],
                     enableInputs: true,
                     onReady: function (state) {
-                        wireInlineRelatedButtons(state.row);
-                        wireIscrizioneRow(state.row);
+                        wireIscrizioneBundle(state);
                     },
                     focusSelector: "input[type='text'], input[type='email'], input[type='date'], select, textarea",
                 },
@@ -316,10 +392,14 @@ window.ArborisStudenteForm = (function () {
         function removeManagedInlineRow(button) {
             const row = button && button.closest ? button.closest("tr") : null;
             const table = row ? row.closest("table") : null;
-            const manager = table ? inlineManagers[table.id.replace("-table", "")] : null;
+            const prefix = table ? table.id.replace("-table", "") : "";
+            const manager = prefix ? inlineManagers[prefix] : null;
             const removed = manager ? manager.remove(button) : null;
 
             if (removed) {
+                if (prefix === "iscrizioni") {
+                    syncIscrizioniInlineDetails();
+                }
                 refreshTabCounts();
             }
         }
@@ -452,11 +532,13 @@ window.ArborisStudenteForm = (function () {
                 return;
             }
 
+            setInlineTarget(prefix);
+            tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
+
             if (window.studenteViewMode && !window.studenteViewMode.isEditing()) {
                 window.studenteViewMode.setInlineEditing(true);
             }
 
-            setInlineTarget(prefix);
             refreshInlineEditScope();
             updateInlineEditButtonLabel(`tab-${prefix}`);
 
@@ -466,7 +548,6 @@ window.ArborisStudenteForm = (function () {
                 return;
             }
 
-            tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
             refreshInlineEditScope();
             refreshTabCounts();
         }
@@ -513,7 +594,9 @@ window.ArborisStudenteForm = (function () {
 
         inlineManagers.iscrizioni.prepare();
         inlineManagers.documenti.prepare();
-        document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(wireIscrizioneRow);
+        document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
+            wireIscrizioneBundle(getIscrizioneBundleState(row));
+        });
         const inlineLockRoot = studenteInlineRoot();
         if (inlineLockRoot) {
             tabs.bindTabButtons(getStudenteTabStorageKey(), inlineLockRoot);
