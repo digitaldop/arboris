@@ -565,6 +565,103 @@ class FamiliareScambioRettaInlineTests(TestCase):
         self.assertTrue(self.familiare.abilitato_scambio_retta)
 
 
+class FamiliareDetailViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="familiare-detail@example.com",
+            email="familiare-detail@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.regione = Regione.objects.create(nome="Emilia-Romagna", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="BO", nome="Bologna", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Bologna", provincia=self.provincia, codice_catastale="A944", ordine=1, attiva=True)
+        self.indirizzo = Indirizzo.objects.create(
+            via="Via Roma",
+            numero_civico="1",
+            citta=self.citta,
+            provincia=self.provincia,
+            regione=self.regione,
+        )
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=self.stato,
+            indirizzo_principale=self.indirizzo,
+            attiva=True,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione,
+            nome="Ada",
+            cognome="Rossi",
+            sesso="F",
+            attivo=True,
+        )
+
+    def test_modifica_familiare_renders_view_mode_and_hidden_blank_document_row(self):
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="familiare-detail-form" class="detail-form is-view-mode"')
+        self.assertContains(response, 'name="documenti-0-id"')
+        self.assertContains(response, 'class="inline-form-row inline-empty-row is-hidden"')
+
+    def test_modifica_familiare_full_save_redirects_with_blank_inline_rows(self):
+        response = self.client.post(
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            {
+                "_edit_scope": "full",
+                "famiglia": self.famiglia.pk,
+                "relazione_familiare": self.relazione.pk,
+                "indirizzo": "",
+                "nome": "Ada",
+                "cognome": "Rossi",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "",
+                "luogo_nascita": "",
+                "luogo_nascita_search": "",
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "attivo": "on",
+                "note": "",
+                "studenti-TOTAL_FORMS": "1",
+                "studenti-INITIAL_FORMS": "0",
+                "studenti-MIN_NUM_FORMS": "0",
+                "studenti-MAX_NUM_FORMS": "1000",
+                "studenti-0-id": "",
+                "studenti-0-cognome": "",
+                "studenti-0-nome": "",
+                "studenti-0-sesso": "",
+                "studenti-0-data_nascita": "",
+                "studenti-0-luogo_nascita": "",
+                "studenti-0-luogo_nascita_search": "",
+                "studenti-0-codice_fiscale": "",
+                "studenti-0-indirizzo": "",
+                "studenti-0-attivo": "on",
+                "documenti-TOTAL_FORMS": "1",
+                "documenti-INITIAL_FORMS": "0",
+                "documenti-MIN_NUM_FORMS": "0",
+                "documenti-MAX_NUM_FORMS": "1000",
+                "documenti-0-id": "",
+                "documenti-0-tipo_documento": "",
+                "documenti-0-descrizione": "",
+                "documenti-0-file": "",
+                "documenti-0-scadenza": "",
+                "documenti-0-visibile": "on",
+                "documenti-0-note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("lista_familiari"), response["Location"])
+
+
 class StudenteListTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser(

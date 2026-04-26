@@ -30,7 +30,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %} is-view-mode{% endif %}">
+    <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %}{% if edit_scope == 'inline' %} is-inline-edit-mode{% elif edit_scope == 'full' %} is-edit-mode{% else %} is-view-mode{% endif %}{% else %} is-edit-mode{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
         <fieldset id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if familiare %}disabled{% endif %}>
@@ -348,7 +348,7 @@
                             </thead>
                             <tbody>
                                 {% for f in documenti_formset %}
-                                    <tr class="inline-form-row">
+                                    <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
                                         <td>
                                             <div class="inline-related-field">
@@ -467,7 +467,7 @@
     <script src="{% static 'js/core/tabs.js' %}"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=8"></script>
     <script src="{% static 'js/pages/familiare-form.js' %}?v=20"></script>
 
     <script>
@@ -482,7 +482,6 @@
                     cancelButtonId: "cancel-edit-familiare-btn",
                     modeInputId: "familiare-edit-scope",
                     startMode: "{{ edit_scope|default:'view' }}",
-                    startInEditMode: {{ familiare|yesno:"false,true" }},
                     reloadOnCancel: true
                 });
             }
@@ -503,6 +502,14 @@
 
             if (window.ArborisCopyActions) {
                 ArborisCopyActions.init();
+            }
+
+            if (window.familiareViewMode) {
+                const formEl = document.getElementById("familiare-detail-form");
+                const savedOk = document.querySelector(".messages-wrapper .message-success");
+                if (savedOk && formEl && !formEl.classList.contains("is-view-mode")) {
+                    window.familiareViewMode.setEditing(false);
+                }
             }
         });
     </script>

@@ -36,7 +36,8 @@ def env_bool(name, default=False):
 SECRET_KEY = '1+f0hexzqb_3t%ps51)re9wc7%0&&(pe!)=#*2v2yjyh^%9!-v'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+HAS_DATABASE_URL = bool(os.environ.get("DATABASE_URL"))
+DEBUG = env_bool("DEBUG", default=not HAS_DATABASE_URL)
 
 ALLOWED_HOSTS = [
     "localhost",
@@ -187,7 +188,7 @@ STORAGES = {
     "staticfiles": {
         "BACKEND": (
             "django.contrib.staticfiles.storage.StaticFilesStorage"
-            if "test" in sys.argv
+            if DEBUG or "test" in sys.argv
             else "whitenoise.storage.CompressedManifestStaticFilesStorage"
         ),
     },
