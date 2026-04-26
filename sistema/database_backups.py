@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files import File
 from django.core.files.storage import default_storage
 from django.db import OperationalError, ProgrammingError, connections, transaction
@@ -27,6 +28,8 @@ from .models import (
 
 
 MAX_DATABASE_BACKUPS = 10
+BACKUP_SCHEDULE_CHECK_CACHE_KEY = "sistema:backup_schedule_recent_check"
+BACKUP_SCHEDULE_CHECK_TTL_SECONDS = 60
 
 
 class DatabaseBackupError(Exception):
@@ -401,12 +404,28 @@ def is_backup_due(configurazione, now=None):
 
 
 def maybe_run_scheduled_backup(triggered_by=None):
-    try:
-        with transaction.atomic():
-            SistemaBackupDatabaseConfigurazione.objects.get_or_create(pk=1)
-            configurazione = SistemaBackupDatabaseConfigurazione.objects.select_for_update().get(pk=1)
-            now = timezone.now()
+    if not cache.add(BACKUP_SCHEDULE_CHECK_CACHE_KEY, True, BACKUP_SCHEDULE_CHECK_TTL_SECONDS):
+        return None
 
+    now = timezone.now()
+
+    try:
+        configurazione = (
+            SistemaBackupDatabaseConfigurazione.objects.only(
+                "id",
+                "frequenza_backup_automatico",
+                "ultimo_backup_automatico_at",
+                "backup_automatico_in_corso",
+                "backup_automatico_avviato_at",
+            )
+            .filter(pk=1)
+            .first()
+        )
+        if not configurazione or not is_backup_due(configurazione, now=now):
+            return None
+
+        with transaction.atomic():
+            configurazione = SistemaBackupDatabaseConfigurazione.objects.select_for_update().get(pk=1)
             if not is_backup_due(configurazione, now=now):
                 return None
 

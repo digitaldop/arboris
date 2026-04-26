@@ -61,10 +61,8 @@
                                 <td>{{ studente.data_nascita|default:"" }}</td>
                                 <td>{{ studente.codice_fiscale|default:"" }}</td>
                                 <td>
-                                    {% if studente.indirizzo %}
-                                        {{ studente.indirizzo }}
-                                    {% elif studente.famiglia and studente.famiglia.indirizzo_principale %}
-                                        <span class="table-muted">Eredita famiglia</span>
+                                    {% if studente.indirizzo_effettivo %}
+                                        {{ studente.indirizzo_effettivo.label_full }}
                                     {% else %}
                                         <span class="table-muted">—</span>
                                     {% endif %}

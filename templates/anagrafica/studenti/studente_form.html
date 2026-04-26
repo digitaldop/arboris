@@ -342,13 +342,12 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <div class="inline-related-field">
-                                                {{ f.condizione_iscrizione }}
-                                                <div class="related-actions inline-related-actions">
-                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="condizione_iscrizione">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="condizione_iscrizione">&#9998;</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="condizione_iscrizione">&#10006;</button>
-                                                </div>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.condizione_iscrizione %}
+                                                    {{ f.instance.condizione_iscrizione }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
                                             </div>
                                         </td>
                                         <td class="iscrizione-agevolazione-cell">
@@ -359,18 +358,9 @@
                                                     Nessuna
                                                 {% endif %}
                                             </div>
-                                            <div class="inline-related-field mode-edit-field">
-                                                {{ f.agevolazione }}
-                                                <div class="related-actions inline-related-actions">
-                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="agevolazione">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="agevolazione">&#9998;</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="agevolazione">&#10006;</button>
-                                                </div>
-                                            </div>
                                         </td>
                                         <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.riduzione_speciale|si_no }}</div>
-                                            <div class="mode-edit-field">{{ f.riduzione_speciale }}</div>
                                         </td>
                                         <td class="iscrizione-importo-riduzione-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
@@ -380,20 +370,12 @@
                                                     <span class="table-muted">Nessuno</span>
                                                 {% endif %}
                                             </div>
-                                            <div class="mode-edit-field">
-                                                <div class="currency-input-group currency-input-group-inline">
-                                                    <span class="currency-prefix">EUR</span>
-                                                    {{ f.importo_riduzione_speciale }}
-                                                </div>
-                                            </div>
                                         </td>
                                         <td class="inline-checkbox-cell inline-checkbox-cell-wide">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.non_pagante|si_no }}</div>
-                                            <div class="mode-edit-field">{{ f.non_pagante }}</div>
                                         </td>
                                         <td class="inline-checkbox-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.attiva|si_no }}</div>
-                                            <div class="mode-edit-field">{{ f.attiva }}</div>
                                         </td>
                                         <td class="inline-details-trigger-cell">
                                             <button
@@ -782,35 +764,16 @@
                     </div>
                 </div>
             </td>
-            <td>
-                <div class="inline-related-field">
-                    {{ iscrizioni_formset.empty_form.condizione_iscrizione }}
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="condizione_iscrizione">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="condizione_iscrizione">&#9998;</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="condizione_iscrizione">&#10006;</button>
-                    </div>
-                </div>
-            </td>
+            <td><span class="table-muted">-</span></td>
             <td class="iscrizione-agevolazione-cell">
-                <div class="inline-related-field">
-                    {{ iscrizioni_formset.empty_form.agevolazione }}
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="agevolazione">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="agevolazione">&#9998;</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="agevolazione">&#10006;</button>
-                    </div>
-                </div>
+                <span class="table-muted">Nessuna</span>
             </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell">{{ iscrizioni_formset.empty_form.riduzione_speciale }}</td>
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide iscrizione-riduzione-cell"><span class="table-muted">-</span></td>
             <td class="iscrizione-importo-riduzione-cell">
-                <div class="currency-input-group currency-input-group-inline">
-                    <span class="currency-prefix">EUR</span>
-                    {{ iscrizioni_formset.empty_form.importo_riduzione_speciale }}
-                </div>
+                <span class="table-muted">Nessuno</span>
             </td>
-            <td class="inline-checkbox-cell inline-checkbox-cell-wide">{{ iscrizioni_formset.empty_form.non_pagante }}</td>
-            <td class="inline-checkbox-cell">{{ iscrizioni_formset.empty_form.attiva }}</td>
+            <td class="inline-checkbox-cell inline-checkbox-cell-wide"><span class="table-muted">-</span></td>
+            <td class="inline-checkbox-cell"><span class="table-muted">-</span></td>
             <td class="inline-details-trigger-cell">
                 <button
                     type="button"
@@ -925,7 +888,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=32"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=33"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

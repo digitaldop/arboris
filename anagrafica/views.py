@@ -36,7 +36,8 @@ from .models import (
     Documento,
     Familiare,
 )
-from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione
+from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione, TariffaCondizioneIscrizione
+from economia.models.iscrizioni import add_months_safe
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from calendario.data import build_dashboard_calendar_data
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
@@ -46,7 +47,7 @@ from scuola.utils import resolve_default_anno_scolastico
 from django.forms import modelform_factory
 
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
+from django.db.models import Case, Count, IntegerField, Prefetch, Q, Sum, Value, When
 from django.utils.http import url_has_allowed_host_and_scheme
 
 MONTH_LABELS = {
@@ -291,6 +292,103 @@ def build_documenti_famiglia_formset(*, data=None, files=None, instance=None, pr
     return DocumentoFamigliaFormSet(**kwargs)
 
 
+def studente_iscrizioni_inline_queryset(studente=None):
+    if not studente:
+        return Iscrizione.objects.none()
+
+    ordered_rate_queryset = RataIscrizione.objects.order_by(
+        "anno_riferimento",
+        "mese_riferimento",
+        "numero_rata",
+        "id",
+    )
+    tariffa_queryset = TariffaCondizioneIscrizione.objects.filter(attiva=True).order_by(
+        "ordine_figlio_da",
+        "ordine_figlio_a",
+        "id",
+    )
+
+    return (
+        Iscrizione.objects.filter(studente=studente)
+        .select_related(
+            "studente__famiglia",
+            "anno_scolastico",
+            "classe",
+            "stato_iscrizione",
+            "condizione_iscrizione",
+            "agevolazione",
+        )
+        .prefetch_related(
+            Prefetch("rate", queryset=ordered_rate_queryset),
+            Prefetch("condizione_iscrizione__tariffe", queryset=tariffa_queryset),
+        )
+        .order_by("-anno_scolastico__data_inizio", "-id")
+    )
+
+
+def studente_documenti_inline_queryset(studente=None):
+    if not studente:
+        return Documento.objects.none()
+
+    return (
+        Documento.objects.filter(studente=studente)
+        .select_related("tipo_documento")
+        .order_by("-data_caricamento", "-id")
+    )
+
+
+def build_iscrizioni_studente_formset(*, data=None, instance=None, prefix="iscrizioni", queryset=None):
+    kwargs = {
+        "prefix": prefix,
+        "queryset": queryset if queryset is not None else studente_iscrizioni_inline_queryset(instance),
+    }
+    if data is not None:
+        kwargs["data"] = data
+    if instance is not None:
+        kwargs["instance"] = instance
+    return IscrizioneStudenteFormSet(**kwargs)
+
+
+def build_documenti_studente_formset(*, data=None, files=None, instance=None, prefix="documenti", queryset=None):
+    kwargs = {
+        "prefix": prefix,
+        "queryset": queryset if queryset is not None else studente_documenti_inline_queryset(instance),
+    }
+    if data is not None:
+        kwargs["data"] = data
+    if files is not None:
+        kwargs["files"] = files
+    if instance is not None:
+        kwargs["instance"] = instance
+    return DocumentoStudenteFormSet(**kwargs)
+
+
+def build_studente_document_counts(studente, today):
+    counts = studente.documenti.aggregate(
+        totale=Count("id"),
+        in_scadenza=Count(
+            "id",
+            filter=Q(
+                scadenza__isnull=False,
+                scadenza__gte=today,
+                scadenza__lte=today + timedelta(days=30),
+            ),
+        ),
+        scaduti=Count(
+            "id",
+            filter=Q(
+                scadenza__isnull=False,
+                scadenza__lt=today,
+            ),
+        ),
+    )
+    return {
+        "count_documenti": counts["totale"] or 0,
+        "count_documenti_in_scadenza": counts["in_scadenza"] or 0,
+        "count_documenti_scaduti": counts["scaduti"] or 0,
+    }
+
+
 def should_prefer_initial_famiglia_tab(request, allowed_targets):
     if request.method == "POST":
         return True
@@ -406,6 +504,88 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
         )
 
     return dashboard_rows
+
+
+def build_studente_projected_rate_plan(iscrizione, tariffa, importo_preiscrizione):
+    if not iscrizione.condizione_iscrizione_id or not iscrizione.studente_id or not iscrizione.studente.famiglia_id:
+        return []
+
+    prima_scadenza = iscrizione.get_prima_scadenza_rate()
+    if not prima_scadenza:
+        return []
+
+    data_fine_effettiva = iscrizione.data_fine_effettiva
+    mese_fine_effettiva = data_fine_effettiva.replace(day=1) if data_fine_effettiva else None
+    if not iscrizione.non_pagante and not tariffa:
+        return []
+
+    numero_rate = max(iscrizione.condizione_iscrizione.numero_mensilita_default or 0, 1)
+    if iscrizione.non_pagante:
+        importo_annuo = Decimal("0.00")
+    else:
+        importo_annuo = (
+            (tariffa.retta_annuale or Decimal("0.00"))
+            - iscrizione.get_importo_agevolazione_applicata()
+            - iscrizione.get_importo_riduzione_applicata()
+        )
+        importo_annuo = max(importo_annuo, Decimal("0.00"))
+
+    importo_base = (importo_annuo / numero_rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    importo_residuo = importo_annuo - (importo_base * numero_rate)
+    piano = []
+
+    if importo_preiscrizione > 0:
+        anno_scolastico_label = iscrizione.anno_scolastico.nome_anno_scolastico if iscrizione.anno_scolastico_id and iscrizione.anno_scolastico else ""
+        anno_riferimento = (
+            iscrizione.anno_scolastico.data_inizio.year
+            if iscrizione.anno_scolastico_id and iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio
+            else date.today().year
+        )
+        descrizione = (
+            f"Preiscrizione AS {anno_scolastico_label}"
+            if anno_scolastico_label
+            else "Preiscrizione"
+        )
+        piano.append(
+            {
+                "famiglia_id": iscrizione.studente.famiglia_id,
+                "tipo_rata": RataIscrizione.TIPO_PREISCRIZIONE,
+                "numero_rata": 0,
+                "mese_riferimento": 1,
+                "anno_riferimento": anno_riferimento,
+                "descrizione": descrizione,
+                "importo_dovuto": importo_preiscrizione,
+                "data_scadenza": None,
+                "credito_applicato": Decimal("0.00"),
+                "altri_sgravi": Decimal("0.00"),
+                "importo_finale": importo_preiscrizione,
+            }
+        )
+
+    giorno_scadenza = iscrizione.get_giorno_scadenza_rate()
+
+    for indice in range(numero_rate):
+        data_scadenza = add_months_safe(prima_scadenza, indice, target_day=giorno_scadenza)
+        if mese_fine_effettiva and data_scadenza.replace(day=1) > mese_fine_effettiva:
+            break
+        importo_rata = importo_base + (importo_residuo if indice == numero_rate - 1 else Decimal("0.00"))
+        piano.append(
+            {
+                "famiglia_id": iscrizione.studente.famiglia_id,
+                "tipo_rata": RataIscrizione.TIPO_MENSILE,
+                "numero_rata": indice + 1,
+                "mese_riferimento": data_scadenza.month,
+                "anno_riferimento": data_scadenza.year,
+                "descrizione": f"Rata {indice + 1}/{numero_rate} - {data_scadenza.strftime('%m/%Y')}",
+                "importo_dovuto": importo_rata,
+                "data_scadenza": data_scadenza,
+                "credito_applicato": Decimal("0.00"),
+                "altri_sgravi": Decimal("0.00"),
+                "importo_finale": importo_rata,
+            }
+        )
+
+    return piano
 
 
 def build_economia_dashboard_data(anno_corrente):
@@ -584,20 +764,39 @@ def build_economia_dashboard_data(anno_corrente):
     }
 
 
-def build_studente_rate_overview(studente):
+def build_studente_rate_overview(studente, iscrizioni=None):
     overview = []
 
-    iscrizioni = (
-        studente.iscrizioni.select_related(
-            "anno_scolastico",
-            "classe",
-            "stato_iscrizione",
-            "condizione_iscrizione",
-            "agevolazione",
-        )
-        .prefetch_related("rate")
-        .order_by("-anno_scolastico__data_inizio", "-id")
-    )
+    iscrizioni = list(iscrizioni) if iscrizioni is not None else list(studente_iscrizioni_inline_queryset(studente))
+    ordine_figlio_mappa = {}
+
+    if studente.famiglia_id:
+        anni_scolastici_ids = {
+            iscrizione.anno_scolastico_id
+            for iscrizione in iscrizioni
+            if iscrizione.anno_scolastico_id
+        }
+        if anni_scolastici_ids:
+            iscrizioni_famiglia = (
+                Iscrizione.objects.filter(
+                    studente__famiglia_id=studente.famiglia_id,
+                    anno_scolastico_id__in=anni_scolastici_ids,
+                )
+                .select_related("studente")
+                .order_by(
+                    "anno_scolastico_id",
+                    "studente__data_nascita",
+                    "studente__cognome",
+                    "studente__nome",
+                    "studente_id",
+                    "id",
+                )
+            )
+
+            progressivi_per_anno = defaultdict(int)
+            for iscrizione_famiglia in iscrizioni_famiglia:
+                progressivi_per_anno[iscrizione_famiglia.anno_scolastico_id] += 1
+                ordine_figlio_mappa[iscrizione_famiglia.pk] = progressivi_per_anno[iscrizione_famiglia.anno_scolastico_id]
 
     for iscrizione in iscrizioni:
         if (
@@ -607,9 +806,21 @@ def build_studente_rate_overview(studente):
         ):
             continue
 
-        tariffa = iscrizione.get_tariffa_applicabile()
-        rate = list(iscrizione.rate.order_by("anno_riferimento", "mese_riferimento", "numero_rata", "id"))
-        importo_preiscrizione = iscrizione.get_importo_preiscrizione_dovuto()
+        ordine_figlio = ordine_figlio_mappa.get(iscrizione.pk)
+        tariffe_condizione = list(iscrizione.condizione_iscrizione.tariffe.all())
+        tariffa = None
+        if not iscrizione.non_pagante and ordine_figlio is not None:
+            tariffa = next(
+                (
+                    item for item in tariffe_condizione
+                    if item.ordine_figlio_da <= ordine_figlio
+                    and (item.ordine_figlio_a is None or item.ordine_figlio_a >= ordine_figlio)
+                ),
+                None,
+            )
+
+        rate = list(iscrizione.rate.all())
+        importo_preiscrizione = Decimal("0.00") if iscrizione.non_pagante or not tariffa else (tariffa.preiscrizione or Decimal("0.00"))
 
         if rate:
             months = [
@@ -633,7 +844,11 @@ def build_studente_rate_overview(studente):
                 for rata in rate
             ]
         else:
-            piano = iscrizione.build_rate_plan()
+            piano = build_studente_projected_rate_plan(
+                iscrizione,
+                tariffa=tariffa,
+                importo_preiscrizione=importo_preiscrizione,
+            )
             months = [
                 {
                     "label": (
@@ -2041,7 +2256,21 @@ def lista_studenti(request):
 
     studenti = (
         Studente.objects
-        .select_related("famiglia", "indirizzo", "indirizzo__citta", "luogo_nascita", "luogo_nascita__provincia")
+        .select_related(
+            "famiglia",
+            "famiglia__indirizzo_principale",
+            "famiglia__indirizzo_principale__citta",
+            "famiglia__indirizzo_principale__provincia",
+            "famiglia__indirizzo_principale__regione",
+            "famiglia__indirizzo_principale__cap_scelto",
+            "indirizzo",
+            "indirizzo__citta",
+            "indirizzo__provincia",
+            "indirizzo__regione",
+            "indirizzo__cap_scelto",
+            "luogo_nascita",
+            "luogo_nascita__provincia",
+        )
         .order_by("cognome", "nome")
     )
 
@@ -2107,14 +2336,14 @@ def crea_studente(request):
         )
         form = StudenteStandaloneForm(request.POST)
         iscrizioni_formset = (
-            IscrizioneStudenteFormSet(request.POST, prefix="iscrizioni")
+            build_iscrizioni_studente_formset(data=request.POST, prefix="iscrizioni")
             if inline_target in (None, "iscrizioni")
-            else IscrizioneStudenteFormSet(prefix="iscrizioni")
+            else build_iscrizioni_studente_formset(prefix="iscrizioni")
         )
         documenti_formset = (
-            DocumentoStudenteFormSet(request.POST, request.FILES, prefix="documenti")
+            build_documenti_studente_formset(data=request.POST, files=request.FILES, prefix="documenti")
             if inline_target in (None, "documenti")
-            else DocumentoStudenteFormSet(prefix="documenti")
+            else build_documenti_studente_formset(prefix="documenti")
         )
 
         form_is_valid = form.is_valid()
@@ -2173,8 +2402,8 @@ def crea_studente(request):
                 return redirect(f"{reverse('lista_studenti')}?highlight={studente.pk}")
     else:
         form = StudenteStandaloneForm()
-        iscrizioni_formset = IscrizioneStudenteFormSet(prefix="iscrizioni")
-        documenti_formset = DocumentoStudenteFormSet(prefix="documenti")
+        iscrizioni_formset = build_iscrizioni_studente_formset(prefix="iscrizioni")
+        documenti_formset = build_documenti_studente_formset(prefix="documenti")
 
     ctx = {
         "form": form,
@@ -2201,7 +2430,19 @@ def crea_studente(request):
 
 def modifica_studente(request, pk):
     studente = get_object_or_404(
-        Studente.objects.select_related("famiglia", "indirizzo", "luogo_nascita", "luogo_nascita__provincia"),
+        Studente.objects.select_related(
+            "famiglia",
+            "famiglia__indirizzo_principale",
+            "famiglia__indirizzo_principale__provincia",
+            "famiglia__indirizzo_principale__regione",
+            "famiglia__indirizzo_principale__citta__provincia",
+            "indirizzo",
+            "indirizzo__provincia",
+            "indirizzo__regione",
+            "indirizzo__citta__provincia",
+            "luogo_nascita",
+            "luogo_nascita__provincia",
+        ),
         pk=pk,
     )
     today = timezone.localdate()
@@ -2228,6 +2469,9 @@ def modifica_studente(request, pk):
             },
         )
 
+    iscrizioni_queryset = studente_iscrizioni_inline_queryset(studente)
+    documenti_queryset = studente_documenti_inline_queryset(studente)
+
     if request.method == "POST":
         edit_scope, inline_target = resolve_inline_target(
             request,
@@ -2235,14 +2479,33 @@ def modifica_studente(request, pk):
         )
         form = StudenteStandaloneForm(request.POST, instance=studente)
         iscrizioni_formset = (
-            IscrizioneStudenteFormSet(request.POST, instance=studente, prefix="iscrizioni")
+            build_iscrizioni_studente_formset(
+                data=request.POST,
+                instance=studente,
+                prefix="iscrizioni",
+                queryset=iscrizioni_queryset,
+            )
             if inline_target in (None, "iscrizioni")
-            else IscrizioneStudenteFormSet(instance=studente, prefix="iscrizioni")
+            else build_iscrizioni_studente_formset(
+                instance=studente,
+                prefix="iscrizioni",
+                queryset=iscrizioni_queryset,
+            )
         )
         documenti_formset = (
-            DocumentoStudenteFormSet(request.POST, request.FILES, instance=studente, prefix="documenti")
+            build_documenti_studente_formset(
+                data=request.POST,
+                files=request.FILES,
+                instance=studente,
+                prefix="documenti",
+                queryset=documenti_queryset,
+            )
             if inline_target in (None, "documenti")
-            else DocumentoStudenteFormSet(instance=studente, prefix="documenti")
+            else build_documenti_studente_formset(
+                instance=studente,
+                prefix="documenti",
+                queryset=documenti_queryset,
+            )
         )
 
         form_is_valid = form.is_valid()
@@ -2297,16 +2560,35 @@ def modifica_studente(request, pk):
                 return redirect("modifica_studente", pk=studente.pk)
     else:
         form = StudenteStandaloneForm(instance=studente)
-        iscrizioni_formset = IscrizioneStudenteFormSet(instance=studente, prefix="iscrizioni")
-        documenti_formset = DocumentoStudenteFormSet(instance=studente, prefix="documenti")
+        iscrizioni_formset = build_iscrizioni_studente_formset(
+            instance=studente,
+            prefix="iscrizioni",
+            queryset=iscrizioni_queryset,
+        )
+        documenti_formset = build_documenti_studente_formset(
+            instance=studente,
+            prefix="documenti",
+            queryset=documenti_queryset,
+        )
 
+    iscrizioni_correnti_list = list(iscrizioni_queryset)
     iscrizione_corrente = (
-        studente.iscrizioni.select_related("classe", "anno_scolastico")
-        .filter(classe__isnull=False)
-        .order_by("-attiva", "-anno_scolastico__data_inizio", "-pk")
-        .first()
+        next(
+            (
+                item for item in sorted(
+                    (iscrizione for iscrizione in iscrizioni_correnti_list if iscrizione.classe_id),
+                    key=lambda iscrizione: (
+                        0 if iscrizione.attiva else 1,
+                        -(iscrizione.anno_scolastico.data_inizio.toordinal() if iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio else 0),
+                        -iscrizione.pk,
+                    ),
+                )
+            ),
+            None,
+        )
     )
     classe_corrente_label = str(iscrizione_corrente.classe) if iscrizione_corrente and iscrizione_corrente.classe else ""
+    document_counts = build_studente_document_counts(studente, today)
 
     ctx = {
         "form": form,
@@ -2316,18 +2598,11 @@ def modifica_studente(request, pk):
         "classe_corrente_label": classe_corrente_label,
         "edit_scope": edit_scope,
         "inline_target": inline_target,
-        "count_iscrizioni": studente.iscrizioni.count(),
-        "count_documenti": studente.documenti.count(),
-        "count_documenti_in_scadenza": studente.documenti.filter(
-            scadenza__isnull=False,
-            scadenza__gte=today,
-            scadenza__lte=today + timedelta(days=30),
-        ).count(),
-        "count_documenti_scaduti": studente.documenti.filter(
-            scadenza__isnull=False,
-            scadenza__lt=today,
-        ).count(),
-        "rate_overview": build_studente_rate_overview(studente),
+        "count_iscrizioni": len(iscrizioni_correnti_list),
+        "count_documenti": document_counts["count_documenti"],
+        "count_documenti_in_scadenza": document_counts["count_documenti_in_scadenza"],
+        "count_documenti_scaduti": document_counts["count_documenti_scaduti"],
+        "rate_overview": build_studente_rate_overview(studente, iscrizioni_correnti_list),
     }
     ctx.update(
         studente_inline_head(

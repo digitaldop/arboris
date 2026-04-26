@@ -1,5 +1,7 @@
 """URL paths for related-entity CRUD popups (single source of truth for JS)."""
 
+from functools import lru_cache
+
 from django.urls import reverse
 
 # Must match placeholder used in static/js/core/related-entity-routes.js
@@ -14,6 +16,7 @@ def _crud_triplet(crea_name: str, modifica_name: str, elimina_name: str) -> dict
     }
 
 
+@lru_cache(maxsize=1)
 def build_popup_manifest() -> dict[str, dict[str, str]]:
     """Keys match data-related-type / logical entity names used in form JavaScript."""
     return {

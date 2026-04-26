@@ -36,7 +36,12 @@ def get_user_permission_profile(user):
     if user.is_superuser:
         return None
 
+    cached = getattr(user, "_arboris_permission_profile_cache", None)
+    if cached is not None:
+        return cached
+
     profilo, _ = SistemaUtentePermessi.objects.get_or_create(user=user)
+    user._arboris_permission_profile_cache = profilo
     return profilo
 
 

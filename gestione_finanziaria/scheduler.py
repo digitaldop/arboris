@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Optional
 
+from django.core.cache import cache
 from django.db import OperationalError, ProgrammingError, transaction
 from django.utils import timezone
 
@@ -33,6 +34,8 @@ from .services import sincronizza_conto_psd2
 
 
 STUCK_TIMEOUT = timedelta(hours=2)
+SYNC_SCHEDULE_CHECK_CACHE_KEY = "gestione_finanziaria:sync_schedule_recent_check"
+SYNC_SCHEDULE_CHECK_TTL_SECONDS = 60
 
 
 def get_or_create_singleton() -> PianificazioneSincronizzazione:
@@ -63,7 +66,6 @@ def _acquire_lock(now) -> Optional[PianificazioneSincronizzazione]:
     """Tenta di prendere il lock di esecuzione. Ritorna la config se preso, None altrimenti."""
     try:
         with transaction.atomic():
-            PianificazioneSincronizzazione.objects.get_or_create(pk=1)
             config = PianificazioneSincronizzazione.objects.select_for_update().get(pk=1)
 
             if not is_sync_due(config, now=now):
@@ -99,7 +101,32 @@ def maybe_run_scheduled_sync(triggered_by=None) -> Optional[PianificazioneSincro
     l'esecuzione e' partita, None altrimenti.
     """
 
+    if not cache.add(SYNC_SCHEDULE_CHECK_CACHE_KEY, True, SYNC_SCHEDULE_CHECK_TTL_SECONDS):
+        return None
+
     now = timezone.now()
+    try:
+        config_snapshot = (
+            PianificazioneSincronizzazione.objects.only(
+                "id",
+                "attivo",
+                "intervallo_ore",
+                "ultimo_run_at",
+                "in_corso",
+                "avviato_at",
+                "sync_saldo",
+                "sync_movimenti",
+                "giorni_storico",
+            )
+            .filter(pk=1)
+            .first()
+        )
+    except (OperationalError, ProgrammingError, PianificazioneSincronizzazione.DoesNotExist):
+        return None
+
+    if config_snapshot is None or not is_sync_due(config_snapshot, now=now):
+        return None
+
     config = _acquire_lock(now)
     if config is None:
         return None

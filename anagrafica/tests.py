@@ -1,10 +1,16 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from datetime import date
+from decimal import Decimal
+from collections import Counter
+import re
 
 import pandas as pd
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from anagrafica.dati_base_import import run_import_dati_base
@@ -35,6 +41,13 @@ from anagrafica.models import (
     Studente,
     TipoDocumento,
 )
+from economia.models import (
+    CondizioneIscrizione,
+    Iscrizione,
+    StatoIscrizione,
+    TariffaCondizioneIscrizione,
+)
+from scuola.models import AnnoScolastico, Classe
 
 
 class ImportDatiBaseTests(TestCase):
@@ -456,6 +469,50 @@ class FamigliaInlineDefaultsTests(TestCase):
         )
 
 
+class StudenteListTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="lista-studenti@example.com",
+            email="lista-studenti@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.regione = Regione.objects.create(nome="Emilia-Romagna", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="BO", nome="Bologna", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Crevalcore", provincia=self.provincia, codice_catastale="D166", ordine=1, attiva=True)
+        self.cap = CAP.objects.create(codice="40014", citta=self.citta, ordine=1, attivo=True)
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+
+    def test_lista_studenti_shows_effective_address_instead_of_inheritance_label(self):
+        indirizzo_famiglia = Indirizzo.objects.create(
+            via="Via Don Lorenzo Milani",
+            numero_civico="70",
+            citta=self.citta,
+            cap_scelto=self.cap,
+        )
+        indirizzo_studente = Indirizzo.objects.create(
+            via="Via Specifica",
+            numero_civico="12",
+            citta=self.citta,
+            cap_scelto=self.cap,
+        )
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bersani",
+            stato_relazione_famiglia=self.stato,
+            indirizzo_principale=indirizzo_famiglia,
+            attiva=True,
+        )
+        Studente.objects.create(famiglia=famiglia, cognome="Bersani", nome="Agnese", attivo=True)
+        Studente.objects.create(famiglia=famiglia, cognome="Bersani", nome="Teresa", indirizzo=indirizzo_studente, attivo=True)
+
+        response = self.client.get(reverse("lista_studenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Via Don Lorenzo Milani 70 - Crevalcore (BO) - 40014")
+        self.assertContains(response, "Via Specifica 12 - Crevalcore (BO) - 40014")
+        self.assertNotContains(response, "Eredita famiglia")
+
+
 class DocumentoStorageTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser(
@@ -639,3 +696,112 @@ class DocumentoInlineFormTests(TestCase):
                 self.assertEqual(response_post.status_code, 200)
                 self.assertContains(response_post, "window.close()")
                 self.assertFalse(Documento.objects.filter(pk=documento.pk).exists())
+
+
+class StudenteDetailPerformanceTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="studente-performance@example.com",
+            email="studente-performance@example.com",
+            password="Password123!",
+        )
+        self.regione = Regione.objects.create(nome="Emilia-Romagna", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="BO", nome="Bologna", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Bologna", provincia=self.provincia, codice_catastale="A944", ordine=1, attiva=True)
+        self.indirizzo = Indirizzo.objects.create(
+            via="Via Roma",
+            numero_civico="1",
+            citta=self.citta,
+            provincia=self.provincia,
+            regione=self.regione,
+        )
+        self.stato_famiglia = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bersani",
+            stato_relazione_famiglia=self.stato_famiglia,
+            indirizzo_principale=self.indirizzo,
+            attiva=True,
+        )
+        self.studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            indirizzo=self.indirizzo,
+            nome="Aurelia",
+            cognome="Bersani",
+            luogo_nascita=self.citta,
+            attivo=True,
+        )
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            corrente=True,
+        )
+        self.classe = Classe.objects.create(
+            anno_scolastico=self.anno,
+            nome_classe="Infanzia",
+            sezione_classe="A",
+            ordine_classe=1,
+            attiva=True,
+        )
+        self.stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            riduzione_speciale_ammessa=True,
+            attiva=True,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("4100.00"),
+            preiscrizione=Decimal("200.00"),
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente,
+            classe=self.classe,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            attiva=True,
+        )
+        self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+        Documento.objects.create(
+            studente=self.studente,
+            tipo_documento=self.tipo_documento,
+            descrizione="Documento studente",
+        )
+        self.client.force_login(self.user)
+
+    def test_modifica_studente_page_stays_within_reasonable_query_budget(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        normalized = Counter(re.sub(r"\s+", " ", item["sql"]).strip()[:260] for item in queries.captured_queries)
+        self.assertLess(
+            len(queries),
+            65,
+            msg="\n".join(
+                [f"Total queries: {len(queries)}"]
+                + [f"{count}x {sql}" for sql, count in normalized.most_common(20)]
+            ),
+        )
+
+    def test_modifica_studente_inline_iscrizioni_renders_each_edit_field_once(self):
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        for field_name in [
+            "condizione_iscrizione",
+            "agevolazione",
+            "riduzione_speciale",
+            "importo_riduzione_speciale",
+            "non_pagante",
+            "attiva",
+        ]:
+            self.assertEqual(html.count(f'id="id_iscrizioni-0-{field_name}"'), 1)
+            self.assertEqual(html.count(f'id="id_iscrizioni-__prefix__-{field_name}"'), 1)

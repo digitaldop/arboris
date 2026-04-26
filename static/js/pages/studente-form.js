@@ -125,6 +125,10 @@ window.ArborisStudenteForm = (function () {
         function syncIscrizioniInlineDetails() {
             const form = document.getElementById("studente-detail-form");
             const layoutEnabled = Boolean(form && form.classList.contains("is-inline-iscrizioni-layout"));
+            const detailsShouldBeOpen = Boolean(
+                layoutEnabled ||
+                (form && form.classList.contains("is-edit-mode"))
+            );
 
             document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
                 const state = getIscrizioneBundleState(row);
@@ -136,11 +140,14 @@ window.ArborisStudenteForm = (function () {
 
                 state.companionRows.forEach(function (companionRow) {
                     const panel = companionRow.querySelector(".inline-details-panel");
-                    if (!panel || companionRow.classList.contains("is-hidden")) {
+                    if (!panel) {
                         return;
                     }
 
-                    if (layoutEnabled) {
+                    if (detailsShouldBeOpen) {
+                        if (!row.classList.contains("is-hidden")) {
+                            companionRow.classList.remove("inline-empty-row", "is-hidden");
+                        }
                         panel.classList.add("is-open");
                         panel.dataset.inlineForcedOpen = "1";
                         setInlineDetailsToggleState(toggle, true);
@@ -435,13 +442,35 @@ window.ArborisStudenteForm = (function () {
                 return;
             }
 
-            const annoSelect = row.querySelector('select[name$="-anno_scolastico"]');
-            const classeSelect = row.querySelector('select[name$="-classe"]');
-            const condizioneSelect = row.querySelector('select[name$="-condizione_iscrizione"]');
-            const agevolazioneSelect = row.querySelector('select[name$="-agevolazione"]');
-            const riduzioneCheckbox = row.querySelector('input[type="checkbox"][name$="-riduzione_speciale"]');
-            const importoRiduzioneInput = row.querySelector('input[name$="-importo_riduzione_speciale"]');
-            const dataFineInput = row.querySelector('input[name$="-data_fine_iscrizione"]');
+            const state = getIscrizioneBundleState(row);
+            const searchRoots = state ? [state.row].concat(state.companionRows) : [row];
+
+            function findInBundle(selector) {
+                for (const root of searchRoots) {
+                    const match = root ? root.querySelector(selector) : null;
+                    if (match) {
+                        return match;
+                    }
+                }
+                return null;
+            }
+
+            function findAllInBundle(selector) {
+                return searchRoots.reduce(function (items, root) {
+                    if (!root) {
+                        return items;
+                    }
+                    return items.concat(Array.from(root.querySelectorAll(selector)));
+                }, []);
+            }
+
+            const annoSelect = findInBundle('select[name$="-anno_scolastico"]');
+            const classeSelect = findInBundle('select[name$="-classe"]');
+            const condizioneSelect = findInBundle('select[name$="-condizione_iscrizione"]');
+            const agevolazioneSelect = findInBundle('select[name$="-agevolazione"]');
+            const riduzioneCheckbox = findInBundle('input[type="checkbox"][name$="-riduzione_speciale"]');
+            const importoRiduzioneInput = findInBundle('input[name$="-importo_riduzione_speciale"]');
+            const dataFineInput = findInBundle('input[name$="-data_fine_iscrizione"]');
 
             if (!annoSelect || !classeSelect || !condizioneSelect) {
                 return;
@@ -488,13 +517,13 @@ window.ArborisStudenteForm = (function () {
                 const riduzioniAmmesse = !selectedCondizione || selectedCondizione.dataset.riduzioneSpecialeAmmessa !== "0";
                 const enabled = riduzioniAmmesse && riduzioneCheckbox.checked;
                 const currencyGroup = importoRiduzioneInput.closest(".currency-input-group");
-                const agevolazioneCell = row.querySelector(".iscrizione-agevolazione-cell");
-                const riduzioneCell = row.querySelector(".iscrizione-riduzione-cell");
-                const importoCell = row.querySelector(".iscrizione-importo-riduzione-cell");
+                const agevolazioneCells = findAllInBundle(".iscrizione-agevolazione-cell, .inline-details-field-agevolazione");
+                const riduzioneCells = findAllInBundle(".iscrizione-riduzione-cell, .inline-details-field-riduzione");
+                const importoCells = findAllInBundle(".iscrizione-importo-riduzione-cell, .inline-details-field-importo");
 
-                if (agevolazioneCell) agevolazioneCell.classList.toggle("is-hidden", !riduzioniAmmesse);
-                if (riduzioneCell) riduzioneCell.classList.toggle("is-hidden", !riduzioniAmmesse);
-                if (importoCell) importoCell.classList.toggle("is-hidden", !riduzioniAmmesse);
+                agevolazioneCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
+                riduzioneCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
+                importoCells.forEach(cell => cell.classList.toggle("is-hidden", !riduzioniAmmesse));
 
                 if (!riduzioniAmmesse) {
                     if (agevolazioneSelect) {

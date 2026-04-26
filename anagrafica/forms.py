@@ -8,6 +8,7 @@ from .utils import citta_choice_label, validate_and_normalize_phone_number
 from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 from scuola.utils import resolve_default_anno_scolastico
+from scuola.models import AnnoScolastico, Classe
 
 from django.forms import inlineformset_factory
 from .models import (
@@ -27,6 +28,18 @@ def make_searchable_select(field, placeholder):
             "data-searchable-placeholder": placeholder,
         }
     )
+
+
+def prime_queryset(queryset):
+    list(queryset)
+    return queryset
+
+
+def bind_primed_queryset(field, queryset):
+    """Attach an already-evaluated queryset without letting ModelChoiceField clone it."""
+    field._queryset = queryset
+    field.widget.choices = field.choices
+    return queryset
 
 
 class ClasseInlineSelect(forms.Select):
@@ -777,19 +790,27 @@ class DocumentoBaseForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        shared_lookups = kwargs.pop("shared_lookups", None) or {}
         super().__init__(*args, **kwargs)
-        tipi_documento = TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
-        self.fields["tipo_documento"].queryset = tipi_documento
+
+        tipi_documento = shared_lookups.get("tipi_documento")
+        primo_tipo = shared_lookups.get("primo_tipo_documento")
+        if tipi_documento is None:
+            tipi_documento = prime_queryset(
+                TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
+            )
+            primo_tipo = next(iter(tipi_documento), None)
+
+        bind_primed_queryset(self.fields["tipo_documento"], tipi_documento)
         self.fields["tipo_documento"].error_messages["required"] = "Seleziona un tipo documento."
 
-        if tipi_documento.exists():
+        if primo_tipo:
             self.fields["tipo_documento"].empty_label = None
             if (
                 not self.is_bound
                 and not getattr(self.instance, "pk", None)
                 and not self.initial.get("tipo_documento")
             ):
-                primo_tipo = tipi_documento.first()
                 self.initial["tipo_documento"] = primo_tipo.pk
                 self.fields["tipo_documento"].initial = primo_tipo.pk
 
@@ -825,6 +846,21 @@ class DocumentoInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
         "scadenza",
         "note",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tipi_documento = prime_queryset(
+            TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento")
+        )
+        self.shared_lookups = {
+            "tipi_documento": tipi_documento,
+            "primo_tipo_documento": next(iter(tipi_documento), None),
+        }
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["shared_lookups"] = self.shared_lookups
+        return kwargs
 
 
 class DocumentoFamiliareForm(DocumentoInlineForm):
@@ -1130,19 +1166,44 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        shared_lookups = kwargs.pop("shared_lookups", None) or {}
         super().__init__(*args, **kwargs)
 
-        self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
-        self.fields["classe"].queryset = self.fields["classe"].queryset.select_related("anno_scolastico").order_by(
-            "-anno_scolastico__data_inizio",
-            "ordine_classe",
-            "nome_classe",
-            "sezione_classe",
-        )
-        self.fields["stato_iscrizione"].queryset = StatoIscrizione.objects.filter(attiva=True).order_by("ordine", "stato_iscrizione")
-        self.fields["condizione_iscrizione"].queryset = CondizioneIscrizione.objects.select_related("anno_scolastico").filter(
-            attiva=True
-        ).order_by("-anno_scolastico__data_inizio", "nome_condizione_iscrizione")
+        anno_scolastico_qs = shared_lookups.get("anno_scolastico_queryset")
+        if anno_scolastico_qs is None:
+            anno_scolastico_qs = prime_queryset(
+                self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
+            )
+        bind_primed_queryset(self.fields["anno_scolastico"], anno_scolastico_qs)
+
+        classe_qs = shared_lookups.get("classe_queryset")
+        if classe_qs is None:
+            classe_qs = prime_queryset(
+                self.fields["classe"].queryset.select_related("anno_scolastico").order_by(
+                    "-anno_scolastico__data_inizio",
+                    "ordine_classe",
+                    "nome_classe",
+                    "sezione_classe",
+                )
+            )
+        bind_primed_queryset(self.fields["classe"], classe_qs)
+
+        stato_iscrizione_qs = shared_lookups.get("stato_iscrizione_queryset")
+        if stato_iscrizione_qs is None:
+            stato_iscrizione_qs = prime_queryset(
+                StatoIscrizione.objects.filter(attiva=True).order_by("ordine", "stato_iscrizione")
+            )
+        bind_primed_queryset(self.fields["stato_iscrizione"], stato_iscrizione_qs)
+
+        condizione_qs = shared_lookups.get("condizione_queryset")
+        if condizione_qs is None:
+            condizione_qs = prime_queryset(
+                CondizioneIscrizione.objects.select_related("anno_scolastico").filter(attiva=True).order_by(
+                    "-anno_scolastico__data_inizio",
+                    "nome_condizione_iscrizione",
+                )
+            )
+        bind_primed_queryset(self.fields["condizione_iscrizione"], condizione_qs)
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].widget = forms.TextInput()
         self.fields["importo_riduzione_speciale"].widget.attrs.update(
@@ -1155,13 +1216,20 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             }
         )
         self.fields["agevolazione"].required = False
-        try:
-            self.fields["agevolazione"].queryset = Agevolazione.objects.filter(attiva=True).order_by("nome_agevolazione")
-        except DatabaseError:
-            self.fields["agevolazione"].queryset = Agevolazione.objects.none()
+        agevolazione_qs = shared_lookups.get("agevolazione_queryset")
+        if agevolazione_qs is None:
+            try:
+                agevolazione_qs = prime_queryset(
+                    Agevolazione.objects.filter(attiva=True).order_by("nome_agevolazione")
+                )
+            except DatabaseError:
+                agevolazione_qs = Agevolazione.objects.none()
+        bind_primed_queryset(self.fields["agevolazione"], agevolazione_qs)
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
-            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
+            anno_predefinito = shared_lookups.get("default_anno_scolastico")
+            if anno_predefinito is None:
+                anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
             if anno_predefinito:
                 self.initial["anno_scolastico"] = anno_predefinito.pk
 
@@ -1169,17 +1237,60 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()
 
 
+class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        anno_scolastico_queryset = prime_queryset(
+            AnnoScolastico.objects.order_by("-data_inizio", "-id")
+        )
+        classe_queryset = prime_queryset(
+            Classe.objects.select_related("anno_scolastico").order_by(
+                "-anno_scolastico__data_inizio",
+                "ordine_classe",
+                "nome_classe",
+                "sezione_classe",
+            )
+        )
+        stato_iscrizione_queryset = prime_queryset(
+            StatoIscrizione.objects.filter(attiva=True).order_by("ordine", "stato_iscrizione")
+        )
+        condizione_queryset = prime_queryset(
+            CondizioneIscrizione.objects.select_related("anno_scolastico").filter(attiva=True).order_by(
+                "-anno_scolastico__data_inizio",
+                "nome_condizione_iscrizione",
+            )
+        )
+        try:
+            agevolazione_queryset = prime_queryset(
+                Agevolazione.objects.filter(attiva=True).order_by("nome_agevolazione")
+            )
+        except DatabaseError:
+            agevolazione_queryset = Agevolazione.objects.none()
+
+        self.shared_lookups = {
+            "anno_scolastico_queryset": anno_scolastico_queryset,
+            "classe_queryset": classe_queryset,
+            "stato_iscrizione_queryset": stato_iscrizione_queryset,
+            "condizione_queryset": condizione_queryset,
+            "agevolazione_queryset": agevolazione_queryset,
+            "default_anno_scolastico": resolve_default_anno_scolastico(anno_scolastico_queryset),
+        }
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["shared_lookups"] = self.shared_lookups
+        return kwargs
+
+
 IscrizioneStudenteFormSet = inlineformset_factory(
     Studente,
     Iscrizione,
     form=IscrizioneStudenteInlineForm,
+    formset=IscrizioneStudenteInlineBaseFormSet,
     fk_name="studente",
     extra=1,
     can_delete=True,
 )
 
 #FINE FORM PER I DOCUMENTI
-
-
-
-

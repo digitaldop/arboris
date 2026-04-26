@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db.utils import OperationalError, ProgrammingError
 
 from .models import LivelloPermesso, Scuola, SistemaImpostazioniGenerali, get_site_font_settings
@@ -36,14 +37,21 @@ def get_current_permission_module(request):
 
 
 def scuola_context(request):
-    scuola = (
-        Scuola.objects.select_related(
-            "indirizzo_sede_legale__citta__provincia",
-            "indirizzo_operativo__citta__provincia",
+    scuola = cache.get("sistema:scuola_header")
+    if scuola is None:
+        scuola = (
+            Scuola.objects.select_related(
+                "indirizzo_sede_legale__provincia",
+                "indirizzo_sede_legale__regione",
+                "indirizzo_sede_legale__citta__provincia",
+                "indirizzo_operativo__provincia",
+                "indirizzo_operativo__regione",
+                "indirizzo_operativo__citta__provincia",
+            )
+            .prefetch_related("telefoni", "email")
+            .first()
         )
-        .prefetch_related("telefoni", "email")
-        .first()
-    )
+        cache.set("sistema:scuola_header", scuola, 300)
 
     return {
         "scuola_header": scuola,
@@ -52,7 +60,10 @@ def scuola_context(request):
 
 def general_settings_context(request):
     try:
-        general_settings = SistemaImpostazioniGenerali.objects.first()
+        general_settings = cache.get("sistema:general_settings")
+        if general_settings is None:
+            general_settings = SistemaImpostazioniGenerali.objects.first()
+            cache.set("sistema:general_settings", general_settings, 300)
     except (OperationalError, ProgrammingError):
         general_settings = None
 
