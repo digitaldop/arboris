@@ -887,8 +887,8 @@
     <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=7"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=34"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=8"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=35"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -931,15 +931,6 @@
                 });
             }
 
-            ArborisStudenteForm.init({
-                studenteId: "{{ studente.pk|default:'new' }}",
-                urls: {
-                    creaFamiglia: "{% url 'crea_famiglia' %}",
-                    creaIndirizzo: "{% url 'crea_indirizzo' %}",
-                    creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
-                }
-            });
-
             if (window.ArborisViewMode) {
                 window.studenteViewMode = ArborisViewMode.init({
                     formId: "studente-detail-form",
@@ -964,6 +955,15 @@
                     }
                 });
             }
+
+            ArborisStudenteForm.init({
+                studenteId: "{{ studente.pk|default:'new' }}",
+                urls: {
+                    creaFamiglia: "{% url 'crea_famiglia' %}",
+                    creaIndirizzo: "{% url 'crea_indirizzo' %}",
+                    creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
+                }
+            });
 
             if (window.studenteViewMode) {
                 const formEl = document.getElementById("studente-detail-form");
