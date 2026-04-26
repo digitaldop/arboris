@@ -44,7 +44,9 @@ from anagrafica.models import (
 from economia.models import (
     CondizioneIscrizione,
     Iscrizione,
+    PrestazioneScambioRetta,
     StatoIscrizione,
+    TariffaScambioRetta,
     TariffaCondizioneIscrizione,
 )
 from scuola.models import AnnoScolastico, Classe
@@ -467,6 +469,100 @@ class FamigliaInlineDefaultsTests(TestCase):
             [studente.pk for studente in studenti],
             [studente_piu_vecchio.pk, studente_piu_giovane.pk, studente_senza_data.pk],
         )
+
+
+class FamiliareScambioRettaInlineTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="familiare-scambio@example.com",
+            email="familiare-scambio@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.regione = Regione.objects.create(nome="Emilia-Romagna", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(sigla="BO", nome="Bologna", regione=self.regione, ordine=1, attiva=True)
+        self.citta = Citta.objects.create(nome="Bologna", provincia=self.provincia, codice_catastale="A944", ordine=1, attiva=True)
+        self.indirizzo = Indirizzo.objects.create(
+            via="Via Roma",
+            numero_civico="1",
+            citta=self.citta,
+            provincia=self.provincia,
+            regione=self.regione,
+        )
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=self.stato,
+            indirizzo_principale=self.indirizzo,
+            attiva=True,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione,
+            nome="Ada",
+            cognome="Rossi",
+            sesso="F",
+            abilitato_scambio_retta=True,
+            attivo=True,
+        )
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            corrente=True,
+            attivo=True,
+        )
+        self.tariffa = TariffaScambioRetta.objects.create(
+            valore_orario=Decimal("10.00"),
+            definizione="Base",
+        )
+        PrestazioneScambioRetta.objects.create(
+            familiare=self.familiare,
+            famiglia=self.famiglia,
+            anno_scolastico=self.anno,
+            data=date(2026, 4, 20),
+            descrizione="Supporto mensa",
+            ore_lavorate=Decimal("2.00"),
+            tariffa_scambio_retta=self.tariffa,
+        )
+
+    def test_scambio_retta_view_switch_get_keeps_familiare_enabled(self):
+        url = reverse("modifica_familiare", kwargs={"pk": self.familiare.pk})
+
+        for view_name in ["week", "month"]:
+            response = self.client.get(
+                url,
+                {
+                    "scambio_year": self.anno.pk,
+                    "scambio_view": view_name,
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.familiare.refresh_from_db()
+            self.assertTrue(self.familiare.abilitato_scambio_retta)
+            self.assertContains(response, "Scambio retta")
+            self.assertContains(response, "Vista settimana")
+            self.assertContains(response, "Vista mensile")
+
+    def test_view_mode_post_cannot_disable_scambio_retta(self):
+        url = reverse("modifica_familiare", kwargs={"pk": self.familiare.pk})
+
+        response = self.client.post(
+            url,
+            {
+                "_edit_scope": "view",
+                "famiglia": self.famiglia.pk,
+                "relazione_familiare": self.relazione.pk,
+                "nome": self.familiare.nome,
+                "cognome": self.familiare.cognome,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.familiare.refresh_from_db()
+        self.assertTrue(self.familiare.abilitato_scambio_retta)
 
 
 class StudenteListTests(TestCase):

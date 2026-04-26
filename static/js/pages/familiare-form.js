@@ -229,6 +229,34 @@ window.ArborisFamiliareForm = (function () {
             refreshTabCounts();
         }
 
+        function bindScambioRettaNavigation() {
+            const root = document.getElementById("scambio-retta-inline");
+            if (!root) {
+                return;
+            }
+
+            root.querySelectorAll(".scambio-view-btn, .scambio-calendar-nav a").forEach(link => {
+                if (link.dataset.scambioNavigationBound === "1") {
+                    return;
+                }
+
+                link.dataset.scambioNavigationBound = "1";
+                link.addEventListener("click", function (event) {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    if (typeof window.ArborisArmLongWaitForNavigationUrl === "function") {
+                        window.ArborisArmLongWaitForNavigationUrl(link.href);
+                    }
+                    window.location.assign(link.href);
+                });
+            });
+        }
+
         const famigliaSelect = document.getElementById("id_famiglia");
         const relazioneSelect = document.getElementById("id_relazione_familiare");
         const indirizzoSelect = document.getElementById("id_indirizzo");
@@ -314,6 +342,7 @@ window.ArborisFamiliareForm = (function () {
         bindAllStudenteInlineSex();
         tabs.restoreActiveTab(getFamiliareTabStorageKey());
         bindStandaloneSexFromRelazioneFamiliare();
+        bindScambioRettaNavigation();
         studentiInlineAddressDefaults.syncRows();
         updateMainButtons();
         refreshTabCounts();

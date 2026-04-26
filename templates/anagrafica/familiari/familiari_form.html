@@ -32,9 +32,10 @@
 
     <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %} is-view-mode{% endif %}">
         {% csrf_token %}
+        <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
         <fieldset id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if familiare %}disabled{% endif %}>
 
-        <div class="family-top-layout">
+        <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
                 <div class="admin-section">
                     <div class="admin-section-title">Dati principali</div>
@@ -467,7 +468,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=6"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=19"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=20"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -479,6 +480,8 @@
                     editButtonId: "enable-edit-familiare-btn",
                     inlineEditButtonId: "enable-inline-edit-familiare-btn",
                     cancelButtonId: "cancel-edit-familiare-btn",
+                    modeInputId: "familiare-edit-scope",
+                    startMode: "{{ edit_scope|default:'view' }}",
                     startInEditMode: {{ familiare|yesno:"false,true" }},
                     reloadOnCancel: true
                 });

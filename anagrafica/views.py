@@ -2006,6 +2006,7 @@ def crea_familiare(request):
             "count_documenti_scaduti": 0,
             "scambio_retta_inline_context": {"enabled": False, "sections": []},
             "scambio_retta_return_to": "",
+            "edit_scope": "full",
         },
     )
 
@@ -2023,11 +2024,12 @@ def modifica_familiare(request, pk):
         pk=pk,
     )
     today = timezone.localdate()
+    edit_scope = "view"
 
     studenti_formset = None
 
-    def famiglia_for_studenti_inline():
-        if request.method != "POST":
+    def famiglia_for_studenti_inline(current_edit_scope=None):
+        if request.method != "POST" or current_edit_scope == "inline":
             return familiare.famiglia if familiare.famiglia_id else None
         raw = (request.POST.get("famiglia") or "").strip()
         if raw.isdigit():
@@ -2038,10 +2040,17 @@ def modifica_familiare(request, pk):
             )
         return None
 
-    famiglia_for_studenti = famiglia_for_studenti_inline()
-
     if request.method == "POST":
-        form = FamiliareForm(request.POST, instance=familiare)
+        edit_scope = (request.POST.get("_edit_scope") or "full").strip()
+        if edit_scope == "view":
+            return redirect(request.get_full_path())
+
+        famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
+        form = (
+            FamiliareForm(instance=familiare)
+            if edit_scope == "inline"
+            else FamiliareForm(request.POST, instance=familiare)
+        )
         documenti_formset = DocumentoFamiliareFormSet(
             request.POST,
             request.FILES,
@@ -2056,10 +2065,14 @@ def modifica_familiare(request, pk):
             )
 
         studenti_ok = studenti_formset.is_valid() if studenti_formset is not None else True
-        if form.is_valid() and documenti_formset.is_valid() and studenti_ok:
+        form_ok = True if edit_scope == "inline" else form.is_valid()
+        documenti_ok = documenti_formset.is_valid()
+
+        if form_ok and documenti_ok and studenti_ok:
             try:
                 with transaction.atomic():
-                    familiare = form.save()
+                    if edit_scope != "inline":
+                        familiare = form.save()
                     documenti_formset.save()
                     if studenti_formset is not None:
                         studenti_formset.save()
@@ -2079,6 +2092,7 @@ def modifica_familiare(request, pk):
         if studenti_formset is None and famiglia_for_studenti:
             studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
     else:
+        famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
         form = FamiliareForm(instance=familiare)
         documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
         if famiglia_for_studenti:
@@ -2117,6 +2131,7 @@ def modifica_familiare(request, pk):
             ).count(),
             "scambio_retta_inline_context": scambio_retta_inline_context,
             "scambio_retta_return_to": scambio_retta_return_to,
+            "edit_scope": edit_scope,
         },
     )
 
