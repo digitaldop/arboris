@@ -45,7 +45,7 @@
         <div class="panel">
         <form method="post" id="indirizzo-detail-form" class="detail-form{% if indirizzo %} is-view-mode{% endif %}">
             {% csrf_token %}
-            <fieldset id="indirizzo-lock-container" class="mode-lock-container" {% if indirizzo %}disabled{% endif %}>
+            <div id="indirizzo-lock-container" class="mode-lock-container">
 
             <div class="panel-body">
                 <table class="form-table">
@@ -117,7 +117,7 @@
                     </tr>
                 </table>
             </div>
-            </fieldset>
+            </div>
 
             <div class="form-actions mode-edit-only">
                 <button type="submit" class="btn btn-save-soft">Salva</button>

@@ -32,7 +32,7 @@
     <form method="post" enctype="multipart/form-data" id="familiare-detail-form" class="detail-form{% if familiare %}{% if edit_scope == 'inline' %} is-inline-edit-mode{% elif edit_scope == 'full' %} is-edit-mode{% else %} is-view-mode{% endif %}{% else %} is-edit-mode{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
-        <fieldset id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if familiare %}disabled{% endif %}>
+        <div id="familiare-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
 
         <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
@@ -466,7 +466,7 @@
             </div>
         </div>
 
-        </fieldset>
+        </div>
 
         <div class="form-actions sticky-form-actions mode-edit-only">
             <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>

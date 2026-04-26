@@ -3181,7 +3181,7 @@ select:focus {
     margin-top: 6px;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table {
     width: 100%;
     min-width: 0;
     table-layout: fixed;
@@ -3190,22 +3190,22 @@ select:focus {
     margin-right: 0;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table thead {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table thead {
     display: table-header-group;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table tbody {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table tbody {
     display: table-row-group;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table thead tr,
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table tbody .inline-form-row,
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-details-row {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table thead tr,
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table tbody .inline-form-row,
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-details-row {
     display: table-row;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table thead th,
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table tbody td {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table thead th,
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table tbody td {
     display: table-cell !important;
     border: 0;
     min-width: 0;
@@ -3216,30 +3216,30 @@ select:focus {
     vertical-align: middle;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table thead th {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table thead th {
     text-align: left;
     white-space: normal;
     line-height: 1.15;
     background: transparent;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-details-row > td {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-details-row > td {
     padding: 0;
     background: #f9fbfc;
     border-bottom: 1px solid #e6edf1;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-details-panel {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-details-panel {
     display: none;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-details-trigger-cell,
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-details-trigger-cell .inline-details-toggle {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-details-trigger-cell,
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-details-trigger-cell .inline-details-toggle {
     text-align: center;
 }
 
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .mode-edit-only-table-cell,
-.detail-form.is-inline-edit-mode:not(.is-inline-iscrizioni-layout) #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"] #iscrizioni-table .inline-delete-cell {
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .mode-edit-only-table-cell,
+.detail-form.is-inline-edit-mode #studente-inline-lock-container .tab-panel[data-inline-scope="iscrizioni"]:not(.is-inline-edit-target) #iscrizioni-table .inline-delete-cell {
     display: none !important;
 }
 

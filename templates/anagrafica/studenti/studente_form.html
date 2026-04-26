@@ -34,7 +34,7 @@
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="studente-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="studente-inline-target" value="{{ inline_target|default:'iscrizioni' }}">
-        <fieldset id="studente-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if studente %}disabled{% endif %}>
+        <div id="studente-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
 
         <div class="family-top-layout main-fields-section">
             <div class="family-main-column">
@@ -596,7 +596,7 @@
                 </div>
             </div>
         </div>
-        </fieldset>
+        </div>
 
         {% if studente %}
             <div class="admin-section compact student-rate-section">
@@ -889,7 +889,7 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=3"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>

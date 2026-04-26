@@ -202,7 +202,7 @@ window.ArborisInlineTabs = (function () {
                         lockPanelFields(panelFields, true);
                     }
                 } else if (isEditing) {
-                    unlockPanelFields(panelFields);
+                    lockPanelFields(panelFields, true);
                 } else {
                     lockPanelFields(panelFields, false);
                 }

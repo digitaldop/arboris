@@ -33,7 +33,7 @@
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="famiglia-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'familiari' }}">
-        <fieldset id="famiglia-lock-container" class="mode-lock-container" data-mode-lock-scope="main" {% if famiglia %}disabled{% endif %}>
+        <div id="famiglia-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
 
         <!-- INIZIO SEZIONE DATI PRINCIPALI -->
         <div class="family-top-layout main-fields-section">
@@ -219,7 +219,7 @@
         </div>
         <!-- FINE SEZIONE DATI PRINCIPALI -->
 
-        </fieldset>
+        </div>
         
 
         <!-- INIZIO CODICE GENERICO DEGLI INLINE-->
@@ -945,7 +945,7 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=3"></script>
-    <script src="{% static 'js/core/inline-tabs.js' %}?v=4"></script>
+    <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=9"></script>
