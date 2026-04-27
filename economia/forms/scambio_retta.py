@@ -125,6 +125,16 @@ class ScambioRettaForm(forms.ModelForm):
         self.fields["mese_riferimento"].widget = forms.Select(choices=MONTH_CHOICES)
         self.fields["anno_scolastico"].empty_label = None
         self.fields["tariffa_scambio_retta"].empty_label = None
+        self.fields["famiglia"].required = False
+        self.fields["famiglia"].widget.attrs.update(
+            {
+                "class": f"{self.fields['famiglia'].widget.attrs.get('class', '')} submit-safe-locked".strip(),
+                "aria-disabled": "true",
+                "tabindex": "-1",
+                "data-keep-submitted-locked": "1",
+            }
+        )
+        make_searchable_select(self.fields["familiare"], "Cerca un familiare...")
         make_searchable_select(self.fields["famiglia"], "Cerca una famiglia...")
 
         self.fields["ore_lavorate"].help_text = "Numero ore lavorate per il mese selezionato."
@@ -138,6 +148,9 @@ class ScambioRettaForm(forms.ModelForm):
 
         self.fields["famiglia"].help_text = "Viene proposta automaticamente quando selezioni il familiare."
 
+        famiglia_id = self._resolve_famiglia_id_from_familiare()
+        self.filter_studenti_by_famiglia(famiglia_id)
+
         if not self.instance.pk and not self.is_bound:
             if not self.initial.get("anno_scolastico"):
                 anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
@@ -148,6 +161,38 @@ class ScambioRettaForm(forms.ModelForm):
                 prima_tariffa = self.fields["tariffa_scambio_retta"].queryset.first()
                 if prima_tariffa:
                     self.initial["tariffa_scambio_retta"] = prima_tariffa.pk
+
+    def _resolve_famiglia_id_from_familiare(self):
+        familiare_pk = None
+        if self.is_bound:
+            familiare_pk = self.data.get(self.add_prefix("familiare")) or self.data.get("familiare")
+        elif self.instance.pk and self.instance.familiare_id:
+            familiare_pk = self.instance.familiare_id
+        elif self.initial.get("familiare"):
+            familiare_pk = self.initial["familiare"]
+
+        if not familiare_pk:
+            return self.instance.famiglia_id if self.instance.pk else None
+
+        return (
+            self.fields["familiare"]
+            .queryset.filter(pk=familiare_pk)
+            .values_list("famiglia_id", flat=True)
+            .first()
+        )
+
+    def filter_studenti_by_famiglia(self, famiglia_id):
+        queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
+        if famiglia_id:
+            queryset = queryset.filter(famiglia_id=famiglia_id)
+        self.fields["studente"].queryset = queryset
+
+    def clean(self):
+        cleaned_data = super().clean()
+        familiare = cleaned_data.get("familiare")
+        if familiare:
+            cleaned_data["famiglia"] = familiare.famiglia
+        return cleaned_data
 
 
 class PrestazioneScambioRettaForm(forms.ModelForm):

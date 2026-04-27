@@ -17,12 +17,13 @@
     <div class="page-head">
         <h1 class="page-title">{% if iscrizione %}Iscrizione {{ iscrizione }}{% else %}Nuova iscrizione{% endif %}</h1>
         <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_iscrizioni' %}">Indietro</button>
             {% if iscrizione %}
                 {% if can_manage_economia %}
                     <button type="button" class="btn btn-primary" id="enable-edit-iscrizione-btn">Modifica</button>
                     <form method="post" action="{% url 'ricalcola_rate_iscrizione' iscrizione.pk %}" class="page-head-inline-form">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-secondary">Ricalcola rate</button>
+                        <button type="submit" class="btn btn-rate-recalc">Ricalcola rate</button>
                     </form>
                     {% if iscrizione.attiva %}
                         <a href="{% url 'ritiro_anticipato_iscrizione' iscrizione.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-rate-withdraw">Chiudi iscrizione</a>
@@ -40,11 +41,18 @@
         {% csrf_token %}
         <fieldset id="iscrizione-lock-container" class="mode-lock-container" {% if iscrizione %}disabled{% endif %}>
         <div class="content-card">
-            <table class="form-table">
-                <tr>
+            <table class="form-table iscrizione-main-table">
+                <tr{% if iscrizione and iscrizione.studente_id %} class="list-row-link" data-row-href="{% url 'modifica_studente' iscrizione.studente.pk %}"{% endif %}>
                     <th>{{ form.studente.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.studente %}
+                                {{ iscrizione.studente }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.studente }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-studente-btn">+</button>
@@ -58,7 +66,14 @@
                 <tr>
                     <th>{{ form.anno_scolastico.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.anno_scolastico %}
+                                {{ iscrizione.anno_scolastico }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.anno_scolastico }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-anno-scolastico-btn">+</button>
@@ -72,7 +87,14 @@
                 <tr>
                     <th>{{ form.classe.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.classe %}
+                                {{ iscrizione.classe }}
+                            {% else %}
+                                <span class="table-muted">Non assegnata</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.classe }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-classe-btn">+</button>
@@ -84,14 +106,51 @@
                         <div class="help-text">Puo rimanere vuota se lo studente non e ancora assegnato a una classe.</div>
                     </td>
                 </tr>
-                <tr><th>{{ form.data_iscrizione.label_tag }}</th><td>{{ form.data_iscrizione }} {{ form.data_iscrizione.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.data_iscrizione.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.data_iscrizione %}
+                                {{ iscrizione.data_iscrizione|it_date }}
+                            {% elif iscrizione and iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio %}
+                                {{ iscrizione.anno_scolastico.data_inizio|it_date }}
+                            {% else %}
+                                <span class="table-muted">Non indicata</span>
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            {{ form.data_iscrizione }} {{ form.data_iscrizione.errors }}
+                        </div>
+                    </td>
+                </tr>
                 {% if iscrizione %}
-                    <tr><th>{{ form.data_fine_iscrizione.label_tag }}</th><td>{{ form.data_fine_iscrizione }} {{ form.data_fine_iscrizione.errors }}</td></tr>
+                    <tr>
+                        <th>{{ form.data_fine_iscrizione.label_tag }}</th>
+                        <td>
+                            <div class="mode-view-only readonly-display readonly-display-plain">
+                                {% if iscrizione.data_fine_effettiva %}
+                                    {{ iscrizione.data_fine_effettiva|it_date }}
+                                {% else %}
+                                    <span class="table-muted">Non indicata</span>
+                                {% endif %}
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ form.data_fine_iscrizione }} {{ form.data_fine_iscrizione.errors }}
+                            </div>
+                        </td>
+                    </tr>
                 {% endif %}
                 <tr>
                     <th>{{ form.stato_iscrizione.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.stato_iscrizione %}
+                                {{ iscrizione.stato_iscrizione }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.stato_iscrizione }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-stato-iscrizione-btn">+</button>
@@ -105,7 +164,14 @@
                 <tr>
                     <th>{{ form.condizione_iscrizione.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.condizione_iscrizione %}
+                                {{ iscrizione.condizione_iscrizione }}
+                            {% else %}
+                                <span class="table-muted">Non indicata</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.condizione_iscrizione }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-condizione-iscrizione-btn">+</button>
@@ -119,7 +185,14 @@
                 <tr class="iscrizione-agevolazione-row">
                     <th>{{ form.agevolazione.label_tag }}</th>
                     <td>
-                        <div class="related-field-row">
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.agevolazione %}
+                                {{ iscrizione.agevolazione }}
+                            {% else %}
+                                Nessuna
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
                             {{ form.agevolazione }}
                             <div class="related-actions mode-edit-only">
                                 <button type="button" class="related-btn related-btn-add" id="add-agevolazione-btn">+</button>
@@ -130,22 +203,51 @@
                         {{ form.agevolazione.errors }}
                     </td>
                 </tr>
-                <tr class="iscrizione-riduzione-row"><th>{{ form.riduzione_speciale.label_tag }}</th><td>{{ form.riduzione_speciale }} {{ form.riduzione_speciale.errors }}</td></tr>
-                <tr class="iscrizione-importo-riduzione-row">
-                    <th>{{ form.importo_riduzione_speciale.label_tag }}</th>
+                <tr class="iscrizione-riduzione-row">
+                    <th>{{ form.riduzione_speciale.label_tag }}</th>
                     <td>
-                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                            {{ form.importo_riduzione_speciale }}
-                            <span class="currency-suffix">EUR</span>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.riduzione_speciale %}Si{% else %}Nessuna{% endif %}
                         </div>
-                        <div class="help-text">{{ form.importo_riduzione_speciale.help_text }}</div>
-                        {{ form.importo_riduzione_speciale.errors }}
+                        <div class="mode-edit-field">
+                            {{ form.riduzione_speciale }} {{ form.riduzione_speciale.errors }}
+                        </div>
                     </td>
                 </tr>
-                <tr><th>{{ form.non_pagante.label_tag }}</th><td>{{ form.non_pagante }} {{ form.non_pagante.errors }}</td></tr>
+                <tr class="iscrizione-importo-riduzione-row{% if iscrizione and not iscrizione.riduzione_speciale %} hide-in-view-mode{% endif %}">
+                    <th>{{ form.importo_riduzione_speciale.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.riduzione_speciale and iscrizione.importo_riduzione_speciale %}
+                                EUR {{ iscrizione.importo_riduzione_speciale|euro }}
+                            {% else %}
+                                <span class="table-muted">Nessuno</span>
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                {{ form.importo_riduzione_speciale }}
+                                <span class="currency-suffix">EUR</span>
+                            </div>
+                            <div class="help-text">{{ form.importo_riduzione_speciale.help_text }}</div>
+                            {{ form.importo_riduzione_speciale.errors }}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="iscrizione-non-pagante-row">
+                    <th>{{ form.non_pagante.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.non_pagante %}Si{% else %}No{% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            {{ form.non_pagante }} {{ form.non_pagante.errors }}
+                        </div>
+                    </td>
+                </tr>
                 <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
             </table>
-            <div class="help-text" style="padding: 0 16px 16px 16px;">
+            <div class="help-text iscrizione-rate-help">
                 Le rate vengono generate in automatico al salvataggio dell'iscrizione, inclusa l'eventuale preiscrizione. Se modifichi l'iscrizione prima di registrare pagamenti, il piano rate viene riallineato automaticamente.
             </div>
             {% if iscrizione and riepilogo_economico %}
@@ -219,13 +321,22 @@
             </div>
         </div>
         </fieldset>
+
+        {% if iscrizione %}
+            {% include "common/rate_overview.html" with rate_overview=rate_overview rate_overview_storage_key=iscrizione.pk rate_overview_empty_message="Nessun piano rate disponibile per questa iscrizione." %}
+        {% endif %}
     </form>
 
     <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=4"></script>
+    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=5"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+
             if (window.ArborisViewMode) {
                 ArborisViewMode.init({
                     formId: "iscrizione-detail-form",

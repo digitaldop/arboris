@@ -62,6 +62,7 @@ window.ArborisIscrizioneForm = (function () {
         const agevolazioneRow = document.querySelector(".iscrizione-agevolazione-row");
         const riduzioneRow = document.querySelector(".iscrizione-riduzione-row");
         const importoRow = document.querySelector(".iscrizione-importo-riduzione-row");
+        const detailForm = document.getElementById("iscrizione-detail-form");
 
         if (condizioneSelect && riduzioneCheckbox && importoInput) {
             function condizioneAmmetteRiduzioni() {
@@ -72,11 +73,19 @@ window.ArborisIscrizioneForm = (function () {
             function syncRiduzioneSpeciale() {
                 const riduzioniAmmesse = condizioneAmmetteRiduzioni();
                 const enabled = riduzioniAmmesse && riduzioneCheckbox.checked;
+                const isViewMode = detailForm && detailForm.classList.contains("is-view-mode");
                 const currencyGroup = importoInput.closest(".currency-input-group");
+
+                if (isViewMode) {
+                    if (agevolazioneRow) agevolazioneRow.classList.remove("is-hidden");
+                    if (riduzioneRow) riduzioneRow.classList.remove("is-hidden");
+                    if (importoRow) importoRow.classList.toggle("is-hidden", !riduzioneCheckbox.checked);
+                    return;
+                }
 
                 if (agevolazioneRow) agevolazioneRow.classList.toggle("is-hidden", !riduzioniAmmesse);
                 if (riduzioneRow) riduzioneRow.classList.toggle("is-hidden", !riduzioniAmmesse);
-                if (importoRow) importoRow.classList.toggle("is-hidden", !riduzioniAmmesse);
+                if (importoRow) importoRow.classList.toggle("is-hidden", !riduzioniAmmesse || !enabled);
 
                 if (!riduzioniAmmesse) {
                     if (agevolazioneSelect) {
@@ -98,6 +107,14 @@ window.ArborisIscrizioneForm = (function () {
 
             condizioneSelect.addEventListener("change", syncRiduzioneSpeciale);
             riduzioneCheckbox.addEventListener("change", syncRiduzioneSpeciale);
+            ["enable-edit-iscrizione-btn", "cancel-edit-iscrizione-btn"].forEach(function (buttonId) {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener("click", function () {
+                        window.setTimeout(syncRiduzioneSpeciale, 0);
+                    });
+                }
+            });
             syncRiduzioneSpeciale();
         }
     }

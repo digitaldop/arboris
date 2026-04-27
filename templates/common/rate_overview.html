@@ -1,0 +1,120 @@
+{% load currency %}
+
+<div class="admin-section compact student-rate-section">
+    <button type="button" class="admin-section-title collapsible-title is-open" data-target="student-rate-overview-panel" data-storage-key="student-rate-overview-{{ rate_overview_storage_key }}" data-default-open="true">
+        <span>Riepilogo rate per anno scolastico</span>
+    </button>
+    <div class="panel collapsible-panel is-open" id="student-rate-overview-panel">
+        <div class="panel-body">
+            <div class="student-rate-overview">
+                {% if rate_overview %}
+                    {% for item in rate_overview %}
+                        <div class="student-rate-year-block">
+                            <div class="student-rate-year-head">
+                                <button type="button" class="student-rate-year-toggle collapsible-title is-open" data-target="student-rate-year-panel-{{ item.iscrizione.pk }}" data-storage-key="student-rate-year-{{ item.iscrizione.pk }}" data-default-open="true">
+                                    <div class="student-rate-year-title">{{ item.anno_label }}</div>
+                                    <div class="student-rate-year-head-right">
+                                        <div class="student-rate-year-meta">
+                                            <span>{{ item.condizione_label }}{% if item.has_tariffa %} - EUR {{ item.retta_annuale_base|euro }} - {{ item.numero_mensilita }} rate mensili da EUR {{ item.rata_standard|euro }} - Preiscrizione: EUR {{ item.preiscrizione|euro }}{% endif %}</span>
+                                            {% if item.agevolazione_label %}
+                                                <span>Agevolazioni: {{ item.agevolazione_label }}</span>
+                                            {% endif %}
+                                            {% if item.riduzione_retta_speciale %}
+                                                <span>Riduzione retta speciale: EUR {{ item.riduzione_retta_speciale|euro }}</span>
+                                            {% endif %}
+                                            <span>Stato: {{ item.stato_label }}</span>
+                                            {% if item.classe_label %}
+                                                <span>Classe: {{ item.classe_label }}</span>
+                                            {% endif %}
+                                            {% if item.has_projected_plan %}
+                                                <span class="table-muted">Piano stimato</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </button>
+                                <div class="student-rate-year-actions">
+                                    {% if can_manage_economia and item.iscrizione.pk %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-rate-recalc btn-sm student-rate-recalc-btn"
+                                            data-rate-recalc-form="1"
+                                            data-action-url="{% url 'ricalcola_rate_iscrizione' item.iscrizione.pk %}"
+                                            data-next-url="{{ request.path }}"
+                                        >
+                                            Ricalcola rate
+                                        </button>
+                                        {% if item.iscrizione.attiva %}
+                                            <button
+                                                type="button"
+                                                class="btn btn-rate-withdraw btn-sm"
+                                                data-window-popup="1"
+                                                data-popup-window-name="arboris-withdrawal-popup"
+                                                data-popup-window-features="width=760,height=720,resizable=yes,scrollbars=yes"
+                                                data-popup-url="{% url 'ritiro_anticipato_iscrizione' item.iscrizione.pk %}?popup=1&next={{ request.get_full_path|urlencode }}"
+                                            >
+                                                Chiudi iscrizione
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="collapsible-panel is-open" id="student-rate-year-panel-{{ item.iscrizione.pk }}">
+                                <div class="student-rate-timeline">
+                                    {% for month_row in item.month_rows %}
+                                        <div class="student-rate-timeline-row" style="--student-rate-row-items: {{ month_row|length }};">
+                                            {% for month in month_row %}
+                                                <div class="student-rate-card{% if month.pagata %} is-paid{% endif %}{% if month.is_projected %} is-projected{% endif %}{% if month.is_preiscrizione %} is-preiscrizione{% endif %}">
+                                                    {% if month.is_preiscrizione %}
+                                                        <div class="student-rate-card-badge">Preiscrizione</div>
+                                                    {% endif %}
+                                                    <div class="student-rate-card-month">{{ month.label }}</div>
+                                                    {% if not month.is_preiscrizione %}
+                                                        <div class="student-rate-card-number">Rata {{ month.numero_rata }}</div>
+                                                    {% endif %}
+                                                    <div class="student-rate-card-amount">Dovuto: EUR {{ month.importo_dovuto|euro }}</div>
+                                                    <div class="student-rate-card-amount">Finale: EUR {{ month.importo_finale|euro }}</div>
+                                                    {% if month.credito_applicato %}
+                                                        <div class="student-rate-card-detail">Credito: EUR {{ month.credito_applicato|euro }}</div>
+                                                    {% endif %}
+                                                    {% if month.altri_sgravi %}
+                                                        <div class="student-rate-card-detail">Sgravi: EUR {{ month.altri_sgravi|euro }}</div>
+                                                    {% endif %}
+                                                    {% if month.data_scadenza %}
+                                                        <div class="student-rate-card-detail">Scadenza: {{ month.data_scadenza|it_date }}</div>
+                                                    {% endif %}
+                                                    {% if month.data_pagamento %}
+                                                        <div class="student-rate-card-detail">Pagata il: {{ month.data_pagamento|it_date }}</div>
+                                                    {% endif %}
+                                                    {% if month.is_projected %}
+                                                        <div class="student-rate-card-status">Prevista</div>
+                                                    {% elif month.pagata %}
+                                                        <div class="student-rate-card-status">Pagata{% if month.importo_pagato %} - EUR {{ month.importo_pagato|euro }}{% endif %}</div>
+                                                    {% else %}
+                                                        <div class="student-rate-card-status">Da pagare</div>
+                                                    {% endif %}
+                                                    {% if month.rata_pk %}
+                                                        <div class="student-rate-card-actions">
+                                                            <a href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm">Dettaglio rata</a>
+                                                            {% if can_manage_economia and not month.pagata %}
+                                                                <button type="button" class="btn btn-rate-paid btn-sm" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=760,height=680,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">Conferma pagamento</button>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state compact-empty-state">
+                        {{ rate_overview_empty_message|default:"Nessun piano rate disponibile." }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

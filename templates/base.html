@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=69">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=71">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=2"></script>
 </head>
@@ -526,6 +526,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>
     <script src="{% static 'js/core/popup-window-triggers.js' %}?v=1"></script>
+    <script src="{% static 'js/core/rate-recalc-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/rich-notes.js' %}?v=2"></script>
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
     <script src="{% static 'js/core/sidebar-collapse.js' %}?v=2"></script>
@@ -537,6 +538,9 @@
             }
             if (window.ArborisCollapsible) {
                 ArborisCollapsible.initCollapsibleSections(document);
+            }
+            if (window.ArborisRateRecalcActions) {
+                ArborisRateRecalcActions.init(document);
             }
             if (window.ArborisFloatingTooltips) {
                 ArborisFloatingTooltips.init(document);

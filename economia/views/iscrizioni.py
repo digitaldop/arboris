@@ -490,7 +490,23 @@ def crea_iscrizione(request):
 
 
 def modifica_iscrizione(request, pk):
-    iscrizione = get_object_or_404(Iscrizione, pk=pk)
+    from anagrafica.views import build_studente_rate_overview
+
+    iscrizione = get_object_or_404(
+        Iscrizione.objects.select_related(
+            "studente",
+            "studente__famiglia",
+            "anno_scolastico",
+            "classe",
+            "stato_iscrizione",
+            "condizione_iscrizione",
+            "agevolazione",
+        ).prefetch_related(
+            "rate",
+            "condizione_iscrizione__tariffe",
+        ),
+        pk=pk,
+    )
 
     if request.method == "POST":
         form = IscrizioneForm(request.POST, instance=iscrizione)
@@ -518,6 +534,13 @@ def modifica_iscrizione(request, pk):
     else:
         form = IscrizioneForm(instance=iscrizione)
 
+    rate_overview = [
+        item
+        for item in build_studente_rate_overview(iscrizione.studente, [iscrizione])
+        if item["iscrizione"].pk == iscrizione.pk
+        and item["iscrizione"].anno_scolastico_id == iscrizione.anno_scolastico_id
+    ]
+
     return render(
         request,
         "economia/iscrizioni/iscrizione_form.html",
@@ -525,6 +548,7 @@ def modifica_iscrizione(request, pk):
             "form": form,
             "iscrizione": iscrizione,
             "riepilogo_economico": iscrizione.get_riepilogo_economico(),
+            "rate_overview": rate_overview,
         },
     )
 

@@ -31,33 +31,9 @@ window.ArborisScambioRettaForm = (function () {
             const selectedOption = getSelectedOption(familiareSelect);
             const famigliaId = selectedOption ? selectedOption.dataset.famigliaId || "" : "";
 
-            if (famigliaId) {
+            if (famigliaSelect.value !== famigliaId) {
                 famigliaSelect.value = famigliaId;
-            }
-        }
-
-        function filterFamiliariByFamiglia() {
-            const famigliaId = famigliaSelect.value;
-            let hasSelectedVisibleOption = false;
-
-            Array.from(familiareSelect.options).forEach(option => {
-                if (!option.value) {
-                    option.hidden = false;
-                    option.disabled = false;
-                    return;
-                }
-
-                const isVisible = !famigliaId || option.dataset.famigliaId === famigliaId;
-                option.hidden = !isVisible;
-                option.disabled = !isVisible;
-
-                if (isVisible && option.selected) {
-                    hasSelectedVisibleOption = true;
-                }
-            });
-
-            if (familiareSelect.value && !hasSelectedVisibleOption) {
-                familiareSelect.value = "";
+                famigliaSelect.dispatchEvent(new Event("change", { bubbles: true }));
             }
         }
 
@@ -96,19 +72,16 @@ window.ArborisScambioRettaForm = (function () {
 
         familiareSelect.addEventListener("change", function () {
             syncFamilyFromFamiliare();
-            filterFamiliariByFamiglia();
             filterStudentiByFamiglia();
         });
 
         famigliaSelect.addEventListener("change", function () {
-            filterFamiliariByFamiglia();
             filterStudentiByFamiglia();
         });
         oreInput.addEventListener("input", refreshImportoPreview);
         tariffaSelect.addEventListener("change", refreshImportoPreview);
 
         syncFamilyFromFamiliare();
-        filterFamiliariByFamiglia();
         filterStudentiByFamiglia();
         refreshImportoPreview();
     }

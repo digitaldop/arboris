@@ -3637,6 +3637,10 @@ select:focus {
     background: #e8f3f9;
 }
 
+.detail-form.is-view-mode .form-table tr.hide-in-view-mode {
+    display: none;
+}
+
 @media (max-width: 900px) {
     .sticky-form-actions {
         position: sticky;
@@ -4339,6 +4343,13 @@ select:focus {
     border-radius: 8px;
     background: #fff;
     align-items: start;
+    transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.detail-form.is-view-mode #iscrizioni-table .inline-form-row[data-row-href]:hover .iscrizioni-inline-main-grid {
+    border-color: #b9d8e5;
+    background: #eef7fb;
+    box-shadow: inset 4px 0 0 #3f7f96;
 }
 
 .detail-form #iscrizioni-table .iscrizioni-inline-field {
@@ -5669,6 +5680,14 @@ select:focus {
     border: 1px solid #d8e3ea;
     border-radius: 8px;
     background: #f8fbfc;
+}
+
+.iscrizione-main-table {
+    margin-bottom: 8px;
+}
+
+.iscrizione-rate-help {
+    padding: 8px 16px 16px 16px;
 }
 
 .economia-summary-title {

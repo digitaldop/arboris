@@ -2,6 +2,7 @@ from datetime import date
 
 from django.test import TestCase
 
+from anagrafica.models import Famiglia, Familiare, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
 from economia.forms import (
     AgevolazioneForm,
     CondizioneIscrizioneForm,
@@ -9,7 +10,7 @@ from economia.forms import (
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
-from economia.models import StatoIscrizione
+from economia.models import StatoIscrizione, TariffaScambioRetta
 from scuola.models import AnnoScolastico
 
 
@@ -65,3 +66,61 @@ class EconomiaCurrencyWidgetTests(TestCase):
         self.assertEqual(preiscrizione_field.widget.attrs["data-currency"], "EUR")
         self.assertIn("currency-field-compact", retta_field.widget.attrs["class"])
         self.assertIn("currency-field-compact", preiscrizione_field.widget.attrs["class"])
+
+
+class ScambioRettaFormFamilySyncTests(TestCase):
+    def setUp(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore")
+        self.famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato)
+        self.altra_famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato)
+        self.familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=relazione,
+            nome="Mario",
+            cognome="Bianchi",
+            abilitato_scambio_retta=True,
+        )
+        self.studente = Studente.objects.create(famiglia=self.famiglia, nome="Luca", cognome="Bianchi")
+        self.altro_studente = Studente.objects.create(famiglia=self.altra_famiglia, nome="Anna", cognome="Rossi")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            corrente=True,
+        )
+        self.tariffa = TariffaScambioRetta.objects.create(valore_orario="10.00", definizione="Standard")
+
+    def test_familiare_is_searchable_and_famiglia_is_locked(self):
+        form = ScambioRettaForm()
+
+        self.assertEqual(form.fields["familiare"].widget.attrs["data-searchable-select"], "1")
+        self.assertEqual(form.fields["familiare"].widget.attrs["data-searchable-placeholder"], "Cerca un familiare...")
+        self.assertEqual(form.fields["famiglia"].widget.attrs["data-searchable-select"], "1")
+        self.assertIn("submit-safe-locked", form.fields["famiglia"].widget.attrs["class"])
+        self.assertEqual(form.fields["famiglia"].widget.attrs["aria-disabled"], "true")
+        self.assertEqual(form.fields["famiglia"].widget.attrs["data-keep-submitted-locked"], "1")
+
+    def test_famiglia_is_derived_from_selected_familiare_on_submit(self):
+        form = ScambioRettaForm(
+            data={
+                "familiare": self.familiare.pk,
+                "famiglia": self.altra_famiglia.pk,
+                "studente": self.studente.pk,
+                "anno_scolastico": self.anno.pk,
+                "mese_riferimento": 9,
+                "descrizione": "Supporto mensa",
+                "ore_lavorate": "2.00",
+                "tariffa_scambio_retta": self.tariffa.pk,
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["famiglia"], self.famiglia)
+
+    def test_studenti_are_limited_to_selected_familiare_family(self):
+        form = ScambioRettaForm(data={"familiare": self.familiare.pk})
+
+        self.assertIn(self.studente, form.fields["studente"].queryset)
+        self.assertNotIn(self.altro_studente, form.fields["studente"].queryset)

@@ -20,6 +20,7 @@ from economia.models import (
 
 class DateInput(forms.DateInput):
     input_type = "date"
+    format = "%Y-%m-%d"
 
 
 class CondizioneIscrizioneSelect(forms.Select):
@@ -215,6 +216,16 @@ class IscrizioneForm(forms.ModelForm):
                 if prima_condizione:
                     self.initial["condizione_iscrizione"] = prima_condizione.pk
 
+        if not self.is_bound:
+            anno_per_date = self.instance.anno_scolastico if self.instance.pk and self.instance.anno_scolastico_id else None
+            if anno_per_date is None and anno_scolastico_id:
+                anno_per_date = self.fields["anno_scolastico"].queryset.filter(pk=anno_scolastico_id).first()
+            if anno_per_date:
+                if not self.initial.get("data_iscrizione") and not getattr(self.instance, "data_iscrizione", None):
+                    self.initial["data_iscrizione"] = anno_per_date.data_inizio
+                if not self.initial.get("data_fine_iscrizione") and not getattr(self.instance, "data_fine_iscrizione", None):
+                    self.initial["data_fine_iscrizione"] = anno_per_date.data_fine
+
         if not getattr(self.instance, "pk", None):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()
 
@@ -229,6 +240,16 @@ class IscrizioneForm(forms.ModelForm):
                     "Se in Fondo accantonamento e' attiva una regola per l'agevolazione scelta, "
                     "le uscite SCONTO_RETTA vengono sincronizzate con le rate mensili."
                 )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        anno_scolastico = cleaned_data.get("anno_scolastico")
+        if anno_scolastico:
+            if not cleaned_data.get("data_iscrizione"):
+                cleaned_data["data_iscrizione"] = anno_scolastico.data_inizio
+            if not cleaned_data.get("data_fine_iscrizione"):
+                cleaned_data["data_fine_iscrizione"] = anno_scolastico.data_fine
+        return cleaned_data
 
 
 class RataIscrizionePagamentoForm(forms.ModelForm):

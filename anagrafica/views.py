@@ -259,8 +259,13 @@ def audit_user_label_with_role(entry):
 
 
 def last_update_audit_label(instance):
+    entry = last_update_audit_entry(instance)
+    return audit_user_label_with_role(entry)
+
+
+def last_update_audit_entry(instance):
     if not instance or not instance.pk:
-        return "-"
+        return None
 
     entries = SistemaOperazioneCronologia.objects.select_related(
         "utente",
@@ -282,7 +287,15 @@ def last_update_audit_label(instance):
         .first()
     )
 
-    return audit_user_label_with_role(entry)
+    return entry
+
+
+def last_update_audit_info(instance):
+    entry = last_update_audit_entry(instance)
+    return {
+        "data": entry.data_operazione if entry else None,
+        "utente_label": audit_user_label_with_role(entry),
+    }
 
 
 def famiglia_familiari_inline_queryset(famiglia=None):
@@ -2249,6 +2262,7 @@ def modifica_familiare(request, pk):
         "count": familiare.documenti.count(),
         "is_active": inline_target == "documenti",
     })
+    familiare_audit_info = last_update_audit_info(familiare)
 
     return render(
         request,
@@ -2277,7 +2291,8 @@ def modifica_familiare(request, pk):
             "inline_target": inline_target,
             "familiare_inline_tabs": familiare_inline_tabs,
             "familiare_inline_edit_label": familiare_inline_edit_label,
-            "familiare_aggiornato_da_label": last_update_audit_label(familiare),
+            "familiare_ultima_modifica_data": familiare_audit_info["data"],
+            "familiare_aggiornato_da_label": familiare_audit_info["utente_label"],
         },
     )
 
@@ -2751,6 +2766,7 @@ def modifica_studente(request, pk):
     )
     classe_corrente_label = str(iscrizione_corrente.classe) if iscrizione_corrente and iscrizione_corrente.classe else ""
     document_counts = build_studente_document_counts(studente, today)
+    studente_audit_info = last_update_audit_info(studente)
 
     ctx = {
         "form": form,
@@ -2766,6 +2782,8 @@ def modifica_studente(request, pk):
         "count_documenti_in_scadenza": document_counts["count_documenti_in_scadenza"],
         "count_documenti_scaduti": document_counts["count_documenti_scaduti"],
         "rate_overview": build_studente_rate_overview(studente, iscrizioni_correnti_list),
+        "studente_ultima_modifica_data": studente_audit_info["data"],
+        "studente_aggiornato_da_label": studente_audit_info["utente_label"],
     }
     ctx.update(
         studente_inline_head(

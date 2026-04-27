@@ -359,29 +359,31 @@
                     </div>
                 </div>
 
-                <div class="admin-section compact">
-                    <button type="button" class="admin-section-title collapsible-title" data-target="section-sistema" data-default-open="false">
-                        <span>Sistema</span>
-                    </button>
-                    <div class="panel collapsible-panel" id="section-sistema">
-                        <div class="panel-body">
-                            <table class="form-table compact-form-table">
-                                <tr>
-                                    <th>Ultima modifica</th>
-                                    <td class="system-readonly-value">
-                                        {% if familiare %}{{ familiare.data_aggiornamento|date:"d / m / Y H:i" }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Modificato da</th>
-                                    <td class="system-readonly-value">
-                                        {% if familiare %}{{ familiare_aggiornato_da_label|default:"-" }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                            </table>
+                {% if can_view_system_tables %}
+                    <div class="admin-section compact">
+                        <button type="button" class="admin-section-title collapsible-title" data-target="section-sistema" data-default-open="false">
+                            <span>Sistema</span>
+                        </button>
+                        <div class="panel collapsible-panel" id="section-sistema">
+                            <div class="panel-body">
+                                <table class="form-table compact-form-table">
+                                    <tr>
+                                        <th>Ultima modifica</th>
+                                        <td class="system-readonly-value">
+                                            {% if familiare_ultima_modifica_data %}{{ familiare_ultima_modifica_data|date:"d / m / Y H:i" }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Modificato da</th>
+                                        <td class="system-readonly-value">
+                                            {% if familiare %}{{ familiare_aggiornato_da_label|default:"-" }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
+                {% endif %}
             </div>
         </div>
 

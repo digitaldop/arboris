@@ -144,41 +144,43 @@
 
             <!-- INIZIO SEZIONE LATERALE DESTRA -->
             <div class="family-side-column">
-                <!-- INIZIO SEZIONE LATERALE DATI SISTEMA -->
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Sistema</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table compact-form-table">
-                                <tr>
-                                    <th>Data creazione</th>
-                                    <td class="system-readonly-value">
-                                        {% if famiglia %}{{ famiglia.data_creazione }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Creato da</th>
-                                    <td class="system-readonly-value">
-                                        {% if famiglia %}{{ famiglia_creata_da_label|default:"-" }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Data aggiornamento</th>
-                                    <td class="system-readonly-value">
-                                        {% if famiglia %}{{ famiglia.data_aggiornamento }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Aggiornato da</th>
-                                    <td class="system-readonly-value">
-                                        {% if famiglia %}{{ famiglia_aggiornata_da_label|default:"-" }}{% else %}-{% endif %}
-                                    </td>
-                                </tr>
-                            </table>
+                {% if can_view_system_tables %}
+                    <!-- INIZIO SEZIONE LATERALE DATI SISTEMA -->
+                    <div class="admin-section compact">
+                        <div class="admin-section-title">Sistema</div>
+                        <div class="panel">
+                            <div class="panel-body">
+                                <table class="form-table compact-form-table">
+                                    <tr>
+                                        <th>Data creazione</th>
+                                        <td class="system-readonly-value">
+                                            {% if famiglia %}{{ famiglia.data_creazione }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Creato da</th>
+                                        <td class="system-readonly-value">
+                                            {% if famiglia %}{{ famiglia_creata_da_label|default:"-" }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Data aggiornamento</th>
+                                        <td class="system-readonly-value">
+                                            {% if famiglia %}{{ famiglia.data_aggiornamento }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Aggiornato da</th>
+                                        <td class="system-readonly-value">
+                                            {% if famiglia %}{{ famiglia_aggiornata_da_label|default:"-" }}{% else %}-{% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <!-- FINE SEZIONE LATERALE DATI SISTEMA -->
+                    <!-- FINE SEZIONE LATERALE DATI SISTEMA -->
+                {% endif %}
 
                 <!-- INIZIO SEZIONE LATERALE DI RIEPILOGO -->
                 <div class="admin-section compact">

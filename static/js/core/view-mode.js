@@ -54,11 +54,23 @@ window.ArborisViewMode = (function () {
         });
     }
 
+    function keepFieldSubmittedButLocked(field) {
+        field.disabled = false;
+        field.classList.add("submit-safe-locked");
+        field.setAttribute("aria-disabled", "true");
+        field.setAttribute("tabindex", "-1");
+    }
+
     function unlockFields(fields) {
         fields.forEach(field => {
             if (field.closest(".inline-empty-row.is-hidden")) {
                 field.disabled = true;
                 field.readOnly = true;
+                return;
+            }
+
+            if (field.dataset.keepSubmittedLocked === "1") {
+                keepFieldSubmittedButLocked(field);
                 return;
             }
 

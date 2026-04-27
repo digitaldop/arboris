@@ -210,6 +210,8 @@ def sistema_permissions_context(request):
         except (OperationalError, ProgrammingError):
             servizi_extra_sidebar_items = []
 
+    can_view_system_tables = user_is_operational_admin(user)
+
     return {
         "user_permission_profile": profilo,
         "current_permission_module": current_module,
@@ -230,7 +232,8 @@ def sistema_permissions_context(request):
         "can_manage_gestione_amministrativa": can_manage_gestione_amministrativa,
         "servizi_extra_sidebar_items": servizi_extra_sidebar_items,
         "current_servizio_extra_id": current_servizio_extra_id,
-        "can_view_operation_history": user_is_operational_admin(user),
+        "can_view_operation_history": can_view_system_tables,
+        "can_view_system_tables": can_view_system_tables,
         "can_access_database_backups": user_can_access_database_backups(user),
     }
 
