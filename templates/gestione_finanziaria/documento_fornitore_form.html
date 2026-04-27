@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}{% if documento %}Documento {{ documento.numero_documento }}{% else %}Nuovo documento fornitore{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_documenti_fornitori' %}">Documenti fornitori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if documento %}{{ documento.numero_documento }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if documento %}Documento {{ documento.numero_documento }}{% else %}Nuovo documento fornitore{% endif %}</h1>
+        <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_documenti_fornitori' %}">Indietro</button>
+            {% if documento %}
+                <a href="{% url 'elimina_documento_fornitore' documento.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="detail-form" id="documento-fornitore-form">
+        {% csrf_token %}
+        <div class="admin-section">
+            <div class="admin-section-title">Dati documento</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="form-table">
+                        <tr>
+                            <th>{{ form.fornitore.label_tag }}</th>
+                            <td>
+                                <div class="related-field-row popup-related-field documento-fornitore-related">
+                                    <div class="related-field-stack">
+                                        {{ form.fornitore }}
+                                    </div>
+                                    <div class="related-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-fornitore-btn">+</button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-fornitore-btn">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-fornitore-btn">&#10006;</button>
+                                    </div>
+                                </div>
+                                {{ form.fornitore.errors }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>{{ form.categoria_spesa.label_tag }}</th>
+                            <td>
+                                <div class="related-field-row popup-related-field documento-fornitore-related">
+                                    <div class="related-field-stack">
+                                        {{ form.categoria_spesa }}
+                                    </div>
+                                    <div class="related-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-documento-categoria-spesa-btn">+</button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-documento-categoria-spesa-btn">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-documento-categoria-spesa-btn">&#10006;</button>
+                                    </div>
+                                </div>
+                                {{ form.categoria_spesa.errors }}
+                            </td>
+                        </tr>
+                        <tr><th>{{ form.tipo_documento.label_tag }}</th><td>{{ form.tipo_documento }} {{ form.tipo_documento.errors }}</td></tr>
+                        <tr><th>{{ form.numero_documento.label_tag }}</th><td>{{ form.numero_documento }} {{ form.numero_documento.errors }}</td></tr>
+                        <tr><th>{{ form.data_documento.label_tag }}</th><td>{{ form.data_documento }} {{ form.data_documento.errors }}</td></tr>
+                        <tr><th>{{ form.data_ricezione.label_tag }}</th><td>{{ form.data_ricezione }} {{ form.data_ricezione.errors }}</td></tr>
+                        <tr><th>{{ form.anno_competenza.label_tag }}</th><td>{{ form.anno_competenza }} {{ form.anno_competenza.errors }}</td></tr>
+                        <tr><th>{{ form.mese_competenza.label_tag }}</th><td>{{ form.mese_competenza }} {{ form.mese_competenza.errors }}</td></tr>
+                        <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">Importi</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="form-table">
+                        <tr><th>{{ form.imponibile.label_tag }}</th><td>{{ form.imponibile }}{{ form.imponibile.errors }}</td></tr>
+                        <tr><th>{{ form.aliquota_iva.label_tag }}</th><td>{{ form.aliquota_iva }} {{ form.aliquota_iva.errors }}</td></tr>
+                        <tr><th>{{ form.iva.label_tag }}</th><td>{{ form.iva }}{{ form.iva.errors }}</td></tr>
+                        <tr><th>{{ form.totale.label_tag }}</th><td>{{ form.totale }}{{ form.totale.errors }}</td></tr>
+                        <tr><th>{{ form.stato.label_tag }}</th><td>{{ form.stato }} {{ form.stato.errors }}</td></tr>
+                        <tr><th>{{ form.allegato.label_tag }}</th><td>{{ form.allegato }} {{ form.allegato.errors }}</td></tr>
+                        <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">Scadenze pagamento</div>
+            <div class="panel">
+                <div class="panel-body">
+                    {{ formset.management_form }}
+                    {{ formset.non_form_errors }}
+                    <table class="list-table supplier-deadlines-table" id="scadenze-fornitore-table">
+                        <thead>
+                            <tr>
+                                <th>Data scadenza</th>
+                                <th>Previsto</th>
+                                <th>Pagato</th>
+                                <th>Data pagamento</th>
+                                <th>Stato</th>
+                                <th>Conto</th>
+                                <th>Movimento</th>
+                                <th>Elimina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scadenza_form in formset.forms %}
+                                <tr class="inline-form-row supplier-deadline-main-row">
+                                    <td>{{ scadenza_form.id }}{{ scadenza_form.data_scadenza }}{{ scadenza_form.data_scadenza.errors }}</td>
+                                    <td>{{ scadenza_form.importo_previsto }}{{ scadenza_form.importo_previsto.errors }}</td>
+                                    <td>{{ scadenza_form.importo_pagato }}{{ scadenza_form.importo_pagato.errors }}</td>
+                                    <td>{{ scadenza_form.data_pagamento }}{{ scadenza_form.data_pagamento.errors }}</td>
+                                    <td>{{ scadenza_form.stato }}{{ scadenza_form.stato.errors }}</td>
+                                    <td>
+                                        <div class="inline-related-field supplier-deadline-related">
+                                            {{ scadenza_form.conto_bancario }}
+                                            <div class="related-actions inline-related-actions">
+                                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="conto_bancario">+</button>
+                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="conto_bancario">&#9998;</button>
+                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="conto_bancario">&#10006;</button>
+                                            </div>
+                                        </div>
+                                        {{ scadenza_form.conto_bancario.errors }}
+                                    </td>
+                                    <td>
+                                        <div class="inline-related-field supplier-deadline-related">
+                                            {{ scadenza_form.movimento_finanziario }}
+                                            <div class="related-actions inline-related-actions">
+                                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="movimento_finanziario">+</button>
+                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="movimento_finanziario">&#9998;</button>
+                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="movimento_finanziario">&#10006;</button>
+                                            </div>
+                                        </div>
+                                        {{ scadenza_form.movimento_finanziario.errors }}
+                                    </td>
+                                    <td>
+                                        {% if scadenza_form.instance.pk %}
+                                            <span class="supplier-deadline-delete-field">{{ scadenza_form.DELETE }}</span>
+                                            <button type="button" class="inline-remove-btn" data-inline-delete-existing="1">Elimina</button>
+                                        {% else %}
+                                            <button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr class="supplier-deadline-note-row">
+                                    <td colspan="8">
+                                        <label for="{{ scadenza_form.note.id_for_label }}">Note</label>
+                                        {{ scadenza_form.note }}
+                                        {{ scadenza_form.note.errors }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <template id="scadenze-fornitore-empty-form-template">
+                        <tr class="inline-form-row supplier-deadline-main-row">
+                            <td>{{ formset.empty_form.id }}{{ formset.empty_form.data_scadenza }}</td>
+                            <td>{{ formset.empty_form.importo_previsto }}</td>
+                            <td>{{ formset.empty_form.importo_pagato }}</td>
+                            <td>{{ formset.empty_form.data_pagamento }}</td>
+                            <td>{{ formset.empty_form.stato }}</td>
+                            <td>
+                                <div class="inline-related-field supplier-deadline-related">
+                                    {{ formset.empty_form.conto_bancario }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="conto_bancario">+</button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="conto_bancario">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="conto_bancario">&#10006;</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="inline-related-field supplier-deadline-related">
+                                    {{ formset.empty_form.movimento_finanziario }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="movimento_finanziario">+</button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="movimento_finanziario">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="movimento_finanziario">&#10006;</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button></td>
+                        </tr>
+                        <tr class="supplier-deadline-note-row">
+                            <td colspan="8">
+                                <label for="{{ formset.empty_form.note.id_for_label }}">Note</label>
+                                {{ formset.empty_form.note }}
+                            </td>
+                        </tr>
+                    </template>
+                    <p class="supplier-deadline-add-row">
+                        <button type="button" class="inline-add-btn supplier-deadline-add-btn" id="add-scadenza-fornitore">+ Aggiungi un'altra scadenza</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            <button type="submit" class="btn btn-primary">Salva</button>
+            <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/pages/documento-fornitore-form.js' %}?v=2"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisDocumentoFornitoreForm) {
+                ArborisDocumentoFornitoreForm.init();
+            }
+        });
+    </script>
+{% endblock %}

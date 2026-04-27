@@ -133,6 +133,57 @@ class SidebarEconomiaTests(TestCase):
             previous_index = current_index
 
 
+class SidebarGestioneFinanziariaTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="gestione-finanziaria@example.com",
+            email="gestione-finanziaria@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+
+    def test_home_renders_conti_correnti_sidebar_in_requested_order(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        start = content.index('id="sidebar-gestione-finanziaria-panel"')
+        end = content.index('data-sidebar-section-key="sistema"', start)
+        gestione_finanziaria_section = content[start:end]
+
+        labels_in_order = [
+            "Dashboard",
+            "<span>Fornitori</span>",
+            "Fornitori",
+            "Documenti fornitori",
+            "Scadenziario fornitori",
+            "Categorie spesa",
+            "<span>Conti correnti</span>",
+            "Conti bancari",
+            "Movimenti",
+            "Categorie movimenti",
+            "Import estratto conto",
+            "Riconciliazione",
+            "Report categorie",
+            "<span>Impostazioni conti correnti</span>",
+            "Regole categorizzazione",
+            "Connessioni PSD2",
+            "Provider bancari",
+            "Pianificazione sincronizzazione",
+        ]
+
+        previous_index = -1
+        for label in labels_in_order:
+            current_index = gestione_finanziaria_section.index(label)
+            self.assertGreater(current_index, previous_index)
+            previous_index = current_index
+
+
 class SidebarSistemaTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -177,6 +228,28 @@ class PopupManifestTests(TestCase):
         self.assertEqual(manifest["metodo_pagamento"]["add"], reverse("crea_metodo_pagamento"))
         self.assertIn("__ID__", manifest["metodo_pagamento"]["edit"])
         self.assertIn("__ID__", manifest["metodo_pagamento"]["delete"])
+
+    def test_popup_manifest_exposes_categoria_spesa_crud_routes(self):
+        manifest = build_popup_manifest()
+
+        self.assertIn("categoria_spesa", manifest)
+        self.assertEqual(manifest["categoria_spesa"]["add"], reverse("crea_categoria_spesa"))
+        self.assertIn("__ID__", manifest["categoria_spesa"]["edit"])
+        self.assertIn("__ID__", manifest["categoria_spesa"]["delete"])
+
+    def test_popup_manifest_exposes_supplier_document_related_routes(self):
+        manifest = build_popup_manifest()
+
+        expected = {
+            "fornitore": "crea_fornitore",
+            "conto_bancario": "crea_conto_bancario",
+            "movimento_finanziario": "crea_movimento_manuale",
+        }
+        for key, add_route in expected.items():
+            self.assertIn(key, manifest)
+            self.assertEqual(manifest[key]["add"], reverse(add_route))
+            self.assertIn("__ID__", manifest[key]["edit"])
+            self.assertIn("__ID__", manifest[key]["delete"])
 
 
 class ScuolaSistemaInterfaceTests(TestCase):

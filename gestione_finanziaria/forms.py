@@ -1,23 +1,58 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 
 from django import forms
+from django.forms import inlineformset_factory
+
+from arboris.form_widgets import apply_eur_currency_widget
 
 from .models import (
+    CategoriaSpesa,
     CategoriaFinanziaria,
     ConnessioneBancaria,
     ContoBancario,
+    DocumentoFornitore,
+    Fornitore,
     MovimentoFinanziario,
     PianificazioneSincronizzazione,
     ProviderBancario,
     RegolaCategorizzazione,
+    ScadenzaPagamentoFornitore,
+    StatoScadenzaFornitore,
 )
 
 
 # =========================================================================
 #  Categorie finanziarie
 # =========================================================================
+
+
+MESE_COMPETENZA_CHOICES = [
+    ("", "---------"),
+    (1, "Gennaio"),
+    (2, "Febbraio"),
+    (3, "Marzo"),
+    (4, "Aprile"),
+    (5, "Maggio"),
+    (6, "Giugno"),
+    (7, "Luglio"),
+    (8, "Agosto"),
+    (9, "Settembre"),
+    (10, "Ottobre"),
+    (11, "Novembre"),
+    (12, "Dicembre"),
+]
+
+
+def make_searchable_select(field, placeholder):
+    field.widget.attrs.update(
+        {
+            "data-searchable-select": "1",
+            "data-searchable-placeholder": placeholder,
+        }
+    )
 
 
 class CategoriaFinanziariaForm(forms.ModelForm):
@@ -61,6 +96,276 @@ class CategoriaFinanziariaForm(forms.ModelForm):
             queryset = queryset.exclude(pk=self.instance.pk)
         self.fields["parent"].queryset = queryset
         self.fields["parent"].empty_label = "--- nessuna (categoria radice) ---"
+
+
+# =========================================================================
+#  Categorie spesa, fornitori e documenti passivi
+# =========================================================================
+
+
+class CategoriaSpesaForm(forms.ModelForm):
+    class Meta:
+        model = CategoriaSpesa
+        fields = ["nome", "descrizione", "ordine", "attiva"]
+        labels = {
+            "nome": "Nome categoria",
+            "descrizione": "Descrizione",
+            "ordine": "Ordine",
+            "attiva": "Attiva",
+        }
+        widgets = {
+            "descrizione": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["descrizione"].required = False
+        self.fields["ordine"].required = False
+
+
+class FornitoreForm(forms.ModelForm):
+    class Meta:
+        model = Fornitore
+        fields = [
+            "denominazione",
+            "tipo_soggetto",
+            "categoria_spesa",
+            "codice_fiscale",
+            "partita_iva",
+            "indirizzo",
+            "telefono",
+            "email",
+            "pec",
+            "codice_sdi",
+            "referente",
+            "iban",
+            "banca",
+            "note",
+            "attivo",
+        ]
+        labels = {
+            "denominazione": "Denominazione / ragione sociale",
+            "tipo_soggetto": "Tipo soggetto",
+            "categoria_spesa": "Categoria di spesa",
+            "codice_fiscale": "Codice fiscale",
+            "partita_iva": "Partita IVA",
+            "indirizzo": "Indirizzo",
+            "telefono": "Telefono",
+            "email": "Email",
+            "pec": "PEC",
+            "codice_sdi": "Codice SDI",
+            "referente": "Referente",
+            "iban": "IBAN",
+            "banca": "Banca",
+            "note": "Note",
+            "attivo": "Attivo",
+        }
+        widgets = {
+            "note": forms.Textarea(attrs={"rows": 3}),
+            "iban": forms.TextInput(attrs={"placeholder": "IT00 X0000 0000 0000000000000"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        optional_fields = [
+            "categoria_spesa",
+            "codice_fiscale",
+            "partita_iva",
+            "indirizzo",
+            "telefono",
+            "email",
+            "pec",
+            "codice_sdi",
+            "referente",
+            "iban",
+            "banca",
+            "note",
+        ]
+        for field_name in optional_fields:
+            self.fields[field_name].required = False
+        self.fields["categoria_spesa"].queryset = CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome")
+        self.fields["categoria_spesa"].empty_label = "--- nessuna ---"
+
+
+class DocumentoFornitoreForm(forms.ModelForm):
+    class Meta:
+        model = DocumentoFornitore
+        fields = [
+            "fornitore",
+            "categoria_spesa",
+            "tipo_documento",
+            "numero_documento",
+            "data_documento",
+            "data_ricezione",
+            "anno_competenza",
+            "mese_competenza",
+            "descrizione",
+            "imponibile",
+            "aliquota_iva",
+            "iva",
+            "totale",
+            "stato",
+            "allegato",
+            "note",
+        ]
+        labels = {
+            "fornitore": "Fornitore",
+            "categoria_spesa": "Categoria di spesa",
+            "tipo_documento": "Tipo documento",
+            "numero_documento": "Numero documento",
+            "data_documento": "Data documento",
+            "data_ricezione": "Data ricezione",
+            "anno_competenza": "Anno competenza",
+            "mese_competenza": "Mese competenza",
+            "descrizione": "Descrizione",
+            "imponibile": "Imponibile",
+            "aliquota_iva": "Aliquota IVA %",
+            "iva": "IVA",
+            "totale": "Totale documento",
+            "stato": "Stato",
+            "allegato": "Allegato",
+            "note": "Note",
+        }
+        widgets = {
+            "data_documento": forms.DateInput(attrs={"type": "date"}),
+            "data_ricezione": forms.DateInput(attrs={"type": "date"}),
+            "mese_competenza": forms.Select(choices=MESE_COMPETENZA_CHOICES),
+            "descrizione": forms.TextInput(attrs={"placeholder": "Causale o descrizione sintetica"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        optional_fields = [
+            "categoria_spesa",
+            "data_ricezione",
+            "anno_competenza",
+            "mese_competenza",
+            "descrizione",
+            "imponibile",
+            "iva",
+            "totale",
+            "allegato",
+            "note",
+        ]
+        for field_name in optional_fields:
+            self.fields[field_name].required = False
+        self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
+        make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
+        self.fields["categoria_spesa"].queryset = CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome")
+        self.fields["categoria_spesa"].empty_label = "--- usa categoria del fornitore ---"
+        self.fields["mese_competenza"].choices = MESE_COMPETENZA_CHOICES
+        for field_name in ("imponibile", "iva", "totale"):
+            apply_eur_currency_widget(self.fields[field_name], compact=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        imponibile = cleaned.get("imponibile")
+        aliquota_iva = cleaned.get("aliquota_iva") or Decimal("0.00")
+        iva = cleaned.get("iva")
+        totale = cleaned.get("totale")
+
+        if imponibile in (None, "") and totale in (None, ""):
+            self.add_error("imponibile", "Inserisci l'imponibile oppure il totale documento.")
+            self.add_error("totale", "Inserisci il totale documento oppure l'imponibile.")
+            return cleaned
+
+        moltiplicatore_iva = Decimal("1.00") + (aliquota_iva / Decimal("100"))
+
+        total_is_source = totale not in (None, "") and (
+            imponibile in (None, "") or (imponibile == Decimal("0.00") and totale != Decimal("0.00"))
+        )
+
+        if total_is_source:
+            if moltiplicatore_iva == Decimal("0.00"):
+                imponibile = totale
+            else:
+                imponibile = (totale / moltiplicatore_iva).quantize(Decimal("0.01"))
+            iva = (totale - imponibile).quantize(Decimal("0.01"))
+            cleaned["imponibile"] = imponibile
+            cleaned["iva"] = iva
+            cleaned["totale"] = totale.quantize(Decimal("0.01"))
+            return cleaned
+
+        if imponibile not in (None, ""):
+            iva = (imponibile * aliquota_iva / Decimal("100")).quantize(Decimal("0.01"))
+            cleaned["iva"] = iva
+            cleaned["totale"] = (imponibile + iva).quantize(Decimal("0.01"))
+        return cleaned
+
+
+class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
+    class Meta:
+        model = ScadenzaPagamentoFornitore
+        fields = [
+            "data_scadenza",
+            "importo_previsto",
+            "importo_pagato",
+            "data_pagamento",
+            "stato",
+            "conto_bancario",
+            "movimento_finanziario",
+            "note",
+        ]
+        labels = {
+            "data_scadenza": "Data scadenza",
+            "importo_previsto": "Importo previsto",
+            "importo_pagato": "Importo pagato",
+            "data_pagamento": "Data pagamento",
+            "stato": "Stato",
+            "conto_bancario": "Conto",
+            "movimento_finanziario": "Movimento collegato",
+            "note": "Note",
+        }
+        widgets = {
+            "data_scadenza": forms.DateInput(attrs={"type": "date"}),
+            "data_pagamento": forms.DateInput(attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        optional_fields = ["data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
+        for field_name in optional_fields:
+            self.fields[field_name].required = False
+        self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+        self.fields["conto_bancario"].empty_label = "--- nessuno ---"
+        self.fields["movimento_finanziario"].queryset = MovimentoFinanziario.objects.order_by("-data_contabile", "-id")
+        self.fields["movimento_finanziario"].empty_label = "--- nessuno ---"
+        make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
+        make_searchable_select(self.fields["movimento_finanziario"], "Cerca un movimento...")
+        apply_eur_currency_widget(self.fields["importo_previsto"])
+        apply_eur_currency_widget(self.fields["importo_pagato"])
+
+    def clean(self):
+        cleaned = super().clean()
+        if "stato" not in self.changed_data:
+            temp = ScadenzaPagamentoFornitore(
+                data_scadenza=cleaned.get("data_scadenza"),
+                importo_previsto=cleaned.get("importo_previsto") or Decimal("0.00"),
+                importo_pagato=cleaned.get("importo_pagato") or Decimal("0.00"),
+                stato=cleaned.get("stato") or StatoScadenzaFornitore.PREVISTA,
+            )
+            cleaned["stato"] = temp.calcola_stato_automatico()
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if "stato" in self.changed_data:
+            instance._preserve_manual_stato = True
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+ScadenzaPagamentoFornitoreFormSet = inlineformset_factory(
+    DocumentoFornitore,
+    ScadenzaPagamentoFornitore,
+    form=ScadenzaPagamentoFornitoreForm,
+    extra=1,
+    can_delete=True,
+)
 
 
 # =========================================================================

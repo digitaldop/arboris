@@ -187,6 +187,44 @@ class AjaxCercaCittaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="panel panel-standalone"')
 
+    def test_famiglie_omonime_show_disambiguating_context(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=stato,
+            indirizzo_principale=indirizzo,
+            attiva=True,
+        )
+        Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
+        Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Mario",
+            cognome="Rossi",
+            referente_principale=True,
+            attivo=True,
+        )
+        Studente.objects.create(famiglia=famiglia, nome="Luca", cognome="Rossi", attivo=True)
+
+        self.assertEqual(str(famiglia), "Rossi")
+        self.assertIn("Referenti: Mario Rossi", famiglia.label_select())
+        self.assertIn("Studenti: Luca Rossi", famiglia.label_select())
+        self.assertIn("Indirizzo: Via Roma 10 - Roma", famiglia.label_select())
+
+        response = self.client.get(reverse("lista_famiglie"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Referenti: Mario Rossi")
+        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
+
+        form = StudenteStandaloneForm()
+        self.assertIn("Rossi - Referenti: Mario Rossi", str(form["famiglia"]))
+
     def test_indirizzo_form_uses_updated_labels_and_placeholder(self):
         form = IndirizzoForm()
 
@@ -431,6 +469,7 @@ class FamigliaInlineDefaultsTests(TestCase):
         form = StudenteStandaloneForm(initial={"famiglia": famiglia.pk})
 
         self.assertEqual(str(form["indirizzo"].value()), str(indirizzo.pk))
+        self.assertEqual(form.initial["famiglia_search"], famiglia.label_select())
         self.assertEqual(form.initial["indirizzo_search"], indirizzo.label_select())
         self.assertIn('data-inherited-address="1"', str(form["indirizzo"]))
         self.assertIn('data-cf-luogo-id="1"', str(form["luogo_nascita"]))

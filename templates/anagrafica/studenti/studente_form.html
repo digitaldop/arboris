@@ -56,7 +56,12 @@
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
                                             {% if studente and studente.famiglia %}
-                                                {{ studente.famiglia }}
+                                                <div class="table-main-text">{{ studente.famiglia.cognome_famiglia }}</div>
+                                                {% with referenti=studente.famiglia.referenti_label %}
+                                                    {% if referenti %}
+                                                        <div class="table-subtext">Referenti: {{ referenti }}</div>
+                                                    {% endif %}
+                                                {% endwith %}
                                             {% else %}
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
@@ -636,7 +641,7 @@
                         </table>
 
                         <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="iscrizioni">+ Aggiungi un'altra Iscrizione.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="iscrizioni">+ Aggiungi un'altra Iscrizione</button>
                         </div>
                     </div>
                 </div>
@@ -767,7 +772,7 @@
                         </table>
 
                         <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento</button>
                         </div>
                     </div>
                 </div>

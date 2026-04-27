@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina fornitore - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_fornitori' %}">Fornitori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina fornitore</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare il fornitore <strong>{{ fornitore.denominazione }}</strong>.</p>
+        {% if ha_vincoli %}
+            <p class="message message-error">
+                Non puo essere eliminato: ha {{ count_documenti }} documenti collegati. Puoi disattivarlo dalla scheda.
+            </p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger" {% if ha_vincoli %}disabled{% endif %}>Elimina</button>
+                <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

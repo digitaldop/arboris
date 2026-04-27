@@ -1,0 +1,47 @@
+{% extends "popup_base.html" %}
+
+{% block title %}{{ popup_title }} - Arboris{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{{ popup_title }}</h1>
+    </div>
+
+    <form method="post" class="detail-form" autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="popup" value="1">
+        <input type="hidden" name="target_input_name" value="{{ target_input_name|default:'' }}">
+
+        <div class="content-card">
+            <table class="form-table">
+                {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
+                {% for field in form.visible_fields %}
+                    <tr>
+                        <th>{{ field.label_tag }}</th>
+                        <td>
+                            {{ field }}
+                            {{ field.errors }}
+                            {% if field.help_text %}
+                                <div class="help-text">{{ field.help_text }}</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            </div>
+        </div>
+    </form>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisFamigliaAutocomplete) {
+                ArborisFamigliaAutocomplete.init(document);
+            }
+        });
+    </script>
+{% endblock %}

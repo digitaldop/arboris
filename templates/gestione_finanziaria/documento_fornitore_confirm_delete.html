@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Elimina documento fornitore - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_documenti_fornitori' %}">Documenti fornitori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina documento fornitore</h1>
+    </div>
+
+    <div class="content-card">
+        <p>
+            Stai per eliminare <strong>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</strong>
+            del fornitore <strong>{{ documento.fornitore.denominazione }}</strong>.
+        </p>
+        <p class="table-muted">Totale: {{ documento.totale|euro }} &euro;</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Elimina</button>
+                <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

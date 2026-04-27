@@ -42,6 +42,34 @@ def bind_primed_queryset(field, queryset):
     return queryset
 
 
+def famiglia_choice_queryset():
+    return (
+        Famiglia.objects
+        .select_related(
+            "stato_relazione_famiglia",
+            "indirizzo_principale",
+            "indirizzo_principale__citta",
+            "indirizzo_principale__provincia",
+            "indirizzo_principale__regione",
+            "indirizzo_principale__cap_scelto",
+        )
+        .prefetch_related("familiari", "studenti")
+        .order_by("cognome_famiglia", "id")
+    )
+
+
+def famiglia_choice_label(famiglia):
+    if hasattr(famiglia, "label_select"):
+        return famiglia.label_select()
+    return str(famiglia)
+
+
+def configure_famiglia_choice_field(field):
+    field.queryset = famiglia_choice_queryset()
+    field.label_from_instance = famiglia_choice_label
+    make_searchable_select(field, "Cerca una famiglia...")
+
+
 class ClasseInlineSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
@@ -86,7 +114,7 @@ class FamigliaStudenteSelect(forms.Select):
             option["attrs"]["data-indirizzo-famiglia-id"] = famiglia.indirizzo_principale_id or ""
             option["attrs"]["data-search-text"] = " ".join(
                 part for part in [
-                    famiglia.cognome_famiglia or "",
+                    famiglia_choice_label(famiglia),
                     famiglia.indirizzo_principale.label_full() if famiglia.indirizzo_principale else "",
                 ] if part
             ).strip()
@@ -150,19 +178,19 @@ class FamigliaSearchMixin:
             if famiglia_id:
                 famiglia = self.fields["famiglia"].queryset.filter(pk=famiglia_id).first()
                 if famiglia and not famiglia_label:
-                    famiglia_label = str(famiglia)
+                    famiglia_label = famiglia_choice_label(famiglia)
         else:
             famiglia = self.initial.get("famiglia") or getattr(self.instance, "famiglia", None)
             if famiglia:
                 if hasattr(famiglia, "pk"):
                     famiglia_id = famiglia.pk
-                    famiglia_label = str(famiglia)
+                    famiglia_label = famiglia_choice_label(famiglia)
                 else:
                     famiglia_id = famiglia
                     famiglia_obj = self.fields["famiglia"].queryset.filter(pk=famiglia).first()
                     if famiglia_obj:
                         famiglia = famiglia_obj
-                        famiglia_label = str(famiglia_obj)
+                        famiglia_label = famiglia_choice_label(famiglia_obj)
 
         if famiglia_id:
             self.initial["famiglia"] = famiglia_id
@@ -617,11 +645,7 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         self.fields["indirizzo"].help_text = (
             "Se lasci vuoto, verrà usato automaticamente l'indirizzo principale della famiglia."
         )
-        self.fields["famiglia"].queryset = (
-            Famiglia.objects.select_related("stato_relazione_famiglia")
-            .order_by("cognome_famiglia")
-        )
-        make_searchable_select(self.fields["famiglia"], "Cerca una famiglia...")
+        configure_famiglia_choice_field(self.fields["famiglia"])
         self.fields["relazione_familiare"].queryset = (
             RelazioneFamiliare.objects.order_by("ordine", "relazione")
         )
@@ -1028,11 +1052,7 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.fields["famiglia"].queryset = (
-            Famiglia.objects.select_related("stato_relazione_famiglia")
-            .order_by("cognome_famiglia")
-        )
-        make_searchable_select(self.fields["famiglia"], "Cerca una famiglia...")
+        configure_famiglia_choice_field(self.fields["famiglia"])
 
         self.fields["indirizzo"].queryset = (
             Indirizzo.objects.select_related("citta", "provincia", "regione")

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Scadenziario fornitori - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Scadenziario fornitori</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Scadenziario fornitori</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_documento_fornitore' %}" class="btn btn-primary">Nuovo documento</a>
+        </div>
+    </div>
+
+    <div class="summary-grid" style="margin-bottom:16px;">
+        <div class="summary-item">
+            <div class="summary-value">{{ totale_previsto|euro }} &euro;</div>
+            <div class="summary-label">Previsto</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ totale_pagato|euro }} &euro;</div>
+            <div class="summary-label">Pagato</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ totale_residuo|euro }} &euro;</div>
+            <div class="summary-label">Residuo</div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <select name="stato">
+                <option value="aperte" {% if stato == "aperte" %}selected{% endif %}>Aperte</option>
+                {% for value, label in stati %}
+                    <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="fornitore">
+                <option value="">Tutti i fornitori</option>
+                {% for fornitore in fornitori %}
+                    <option value="{{ fornitore.pk }}" {% if fornitore_selezionato == fornitore.pk|stringformat:"s" %}selected{% endif %}>{{ fornitore.denominazione }}</option>
+                {% endfor %}
+            </select>
+            <select name="categoria">
+                <option value="">Tutte le categorie</option>
+                {% for categoria in categorie %}
+                    <option value="{{ categoria.pk }}" {% if categoria_selezionata == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nome }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Scadenza</th>
+                    <th>Fornitore</th>
+                    <th>Documento</th>
+                    <th>Categoria</th>
+                    <th class="column-right">Previsto</th>
+                    <th class="column-right">Pagato</th>
+                    <th class="column-right">Residuo</th>
+                    <th>Stato</th>
+                    <th>Conto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for scadenza in scadenze %}
+                    <tr class="{% if scadenza.e_scaduta %}row-warning{% endif %}">
+                        <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
+                        <td>{{ scadenza.documento.fornitore.denominazione }}</td>
+                        <td>
+                            <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="table-link">
+                                {{ scadenza.documento.get_tipo_documento_display }} {{ scadenza.documento.numero_documento }}
+                            </a>
+                        </td>
+                        <td>{{ scadenza.documento.categoria_spesa|default:"-" }}</td>
+                        <td class="column-right">{{ scadenza.importo_previsto|euro }} &euro;</td>
+                        <td class="column-right">{{ scadenza.importo_pagato|euro }} &euro;</td>
+                        <td class="column-right">{{ scadenza.importo_residuo|euro }} &euro;</td>
+                        <td>{{ scadenza.get_stato_display }}</td>
+                        <td>{{ scadenza.conto_bancario|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9"><div class="empty-state">Nessuna scadenza trovata.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

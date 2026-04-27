@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Documenti fornitori - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Documenti fornitori</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Documenti fornitori</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_documento_fornitore' %}" class="btn btn-primary">Nuovo documento</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <input type="search" name="q" value="{{ q }}" placeholder="Cerca numero, descrizione, fornitore...">
+            <select name="fornitore">
+                <option value="">Tutti i fornitori</option>
+                {% for fornitore in fornitori %}
+                    <option value="{{ fornitore.pk }}" {% if fornitore_selezionato == fornitore.pk|stringformat:"s" %}selected{% endif %}>{{ fornitore.denominazione }}</option>
+                {% endfor %}
+            </select>
+            <select name="categoria">
+                <option value="">Tutte le categorie</option>
+                {% for categoria in categorie %}
+                    <option value="{{ categoria.pk }}" {% if categoria_selezionata == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nome }}</option>
+                {% endfor %}
+            </select>
+            <select name="stato">
+                <option value="">Tutti gli stati</option>
+                {% for value, label in stati %}
+                    <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Fornitore</th>
+                    <th>Data</th>
+                    <th>Categoria</th>
+                    <th class="column-right">Imponibile</th>
+                    <th class="column-right">IVA</th>
+                    <th class="column-right">Totale</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for documento in documenti %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}">
+                        <td>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</td>
+                        <td>{{ documento.fornitore.denominazione }}</td>
+                        <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                        <td>{{ documento.categoria_spesa|default:"-" }}</td>
+                        <td class="column-right">{{ documento.imponibile|euro }} &euro;</td>
+                        <td class="column-right">{{ documento.iva|euro }} &euro;</td>
+                        <td class="column-right">{{ documento.totale|euro }} &euro;</td>
+                        <td>{{ documento.get_stato_display }}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_documento_fornitore' documento.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_documento_fornitore' documento.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9"><div class="empty-state">Nessun documento fornitore trovato.</div></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

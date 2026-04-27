@@ -17,6 +17,73 @@ urlpatterns = [
         name="dashboard_gestione_finanziaria",
     ),
 
+    # Fornitori e documenti passivi
+    path(
+        "gestione-finanziaria/categorie-spesa/",
+        gf_view(views.lista_categorie_spesa),
+        name="lista_categorie_spesa",
+    ),
+    path(
+        "gestione-finanziaria/categorie-spesa/nuova/",
+        gf_manage(views.crea_categoria_spesa),
+        name="crea_categoria_spesa",
+    ),
+    path(
+        "gestione-finanziaria/categorie-spesa/<int:pk>/modifica/",
+        gf_edit(views.modifica_categoria_spesa),
+        name="modifica_categoria_spesa",
+    ),
+    path(
+        "gestione-finanziaria/categorie-spesa/<int:pk>/elimina/",
+        gf_manage(views.elimina_categoria_spesa),
+        name="elimina_categoria_spesa",
+    ),
+    path(
+        "gestione-finanziaria/fornitori/",
+        gf_view(views.lista_fornitori),
+        name="lista_fornitori",
+    ),
+    path(
+        "gestione-finanziaria/fornitori/nuovo/",
+        gf_manage(views.crea_fornitore),
+        name="crea_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/fornitori/<int:pk>/modifica/",
+        gf_edit(views.modifica_fornitore),
+        name="modifica_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/fornitori/<int:pk>/elimina/",
+        gf_manage(views.elimina_fornitore),
+        name="elimina_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/documenti-fornitori/",
+        gf_view(views.lista_documenti_fornitori),
+        name="lista_documenti_fornitori",
+    ),
+    path(
+        "gestione-finanziaria/documenti-fornitori/nuovo/",
+        gf_manage(views.crea_documento_fornitore),
+        name="crea_documento_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/documenti-fornitori/<int:pk>/modifica/",
+        gf_edit(views.modifica_documento_fornitore),
+        name="modifica_documento_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/documenti-fornitori/<int:pk>/elimina/",
+        gf_manage(views.elimina_documento_fornitore),
+        name="elimina_documento_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/scadenziario-fornitori/",
+        gf_view(views.scadenziario_fornitori),
+        name="scadenziario_fornitori",
+    ),
+
     # Provider bancari
     path(
         "gestione-finanziaria/provider/",

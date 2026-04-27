@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=73">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=78">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=2"></script>
 </head>
@@ -338,40 +338,97 @@
                                     <a href="{% url 'dashboard_gestione_finanziaria' %}" class="{% if request.resolver_match.url_name == 'dashboard_gestione_finanziaria' %}active{% endif %}">
                                         Dashboard
                                     </a>
-                                    <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
-                                        Conti bancari
-                                    </a>
-                                    <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
-                                        Movimenti
-                                    </a>
-                                    <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
-                                        Categorie
-                                    </a>
-                                    <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
-                                        Regole categorizzazione
-                                    </a>
-                                    {% if can_manage_gestione_finanziaria %}
-                                        <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
-                                            Import estratto conto
-                                        </a>
-                                    {% endif %}
-                                    <a href="{% url 'lista_connessioni_bancarie' %}" class="{% if request.resolver_match.url_name == 'lista_connessioni_bancarie' or request.resolver_match.url_name == 'configura_provider_psd2' or request.resolver_match.url_name == 'nuova_connessione_psd2' or request.resolver_match.url_name == 'elimina_connessione_psd2' %}active{% endif %}">
-                                        Connessioni PSD2
-                                    </a>
-                                    {% if can_manage_gestione_finanziaria %}
-                                        <a href="{% url 'pianificazione_sincronizzazione' %}" class="{% if request.resolver_match.url_name == 'pianificazione_sincronizzazione' %}active{% endif %}">
-                                            Pianificazione sincronizzazione
-                                        </a>
-                                    {% endif %}
-                                    <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
-                                        Riconciliazione
-                                    </a>
-                                    <a href="{% url 'report_categorie_mensile' %}" class="{% if request.resolver_match.url_name == 'report_categorie_mensile' or request.resolver_match.url_name == 'report_categorie_annuale' %}active{% endif %}">
-                                        Report categorie
-                                    </a>
-                                    <a href="{% url 'lista_provider_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_provider_bancari' or request.resolver_match.url_name == 'crea_provider_bancario' or request.resolver_match.url_name == 'modifica_provider_bancario' or request.resolver_match.url_name == 'elimina_provider_bancario' %}active{% endif %}">
-                                        Provider bancari
-                                    </a>
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-gestione-finanziaria-fornitori-panel"
+                                            data-storage-key="arboris-sidebar-gestione-finanziaria-fornitori"
+                                            data-default-open="true"
+                                        >
+                                            <span>Fornitori</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-fornitori-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                <a href="{% url 'lista_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_fornitori' or request.resolver_match.url_name == 'crea_fornitore' or request.resolver_match.url_name == 'modifica_fornitore' or request.resolver_match.url_name == 'elimina_fornitore' %}active{% endif %}">
+                                                    Fornitori
+                                                </a>
+                                                <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' %}active{% endif %}">
+                                                    Documenti fornitori
+                                                </a>
+                                                <a href="{% url 'scadenziario_fornitori' %}" class="{% if request.resolver_match.url_name == 'scadenziario_fornitori' %}active{% endif %}">
+                                                    Scadenziario fornitori
+                                                </a>
+                                                <a href="{% url 'lista_categorie_spesa' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_spesa' or request.resolver_match.url_name == 'crea_categoria_spesa' or request.resolver_match.url_name == 'modifica_categoria_spesa' or request.resolver_match.url_name == 'elimina_categoria_spesa' %}active{% endif %}">
+                                                    Categorie spesa
+                                                </a>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-gestione-finanziaria-conti-panel"
+                                            data-storage-key="arboris-sidebar-gestione-finanziaria-conti"
+                                            data-default-open="true"
+                                        >
+                                            <span>Conti correnti</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-conti-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
+                                                    Conti bancari
+                                                </a>
+                                                <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
+                                                    Movimenti
+                                                </a>
+                                                <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
+                                                    Categorie movimenti
+                                                </a>
+                                                {% if can_manage_gestione_finanziaria %}
+                                                    <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
+                                                        Import estratto conto
+                                                    </a>
+                                                {% endif %}
+                                                <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
+                                                    Riconciliazione
+                                                </a>
+                                                <a href="{% url 'report_categorie_mensile' %}" class="{% if request.resolver_match.url_name == 'report_categorie_mensile' or request.resolver_match.url_name == 'report_categorie_annuale' %}active{% endif %}">
+                                                    Report categorie
+                                                </a>
+                                                <div class="sidebar-subsection sidebar-subsection-nested">
+                                                    <button
+                                                        type="button"
+                                                        class="sidebar-collapsible collapsible-title is-open"
+                                                        data-target="sidebar-gestione-finanziaria-conti-impostazioni-panel"
+                                                        data-storage-key="arboris-sidebar-gestione-finanziaria-conti-impostazioni"
+                                                        data-default-open="true"
+                                                    >
+                                                        <span>Impostazioni conti correnti</span>
+                                                    </button>
+                                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-conti-impostazioni-panel">
+                                                        <nav class="sidebar-nav sidebar-subnav">
+                                                            <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
+                                                                Regole categorizzazione
+                                                            </a>
+                                                            <a href="{% url 'lista_connessioni_bancarie' %}" class="{% if request.resolver_match.url_name == 'lista_connessioni_bancarie' or request.resolver_match.url_name == 'configura_provider_psd2' or request.resolver_match.url_name == 'nuova_connessione_psd2' or request.resolver_match.url_name == 'elimina_connessione_psd2' %}active{% endif %}">
+                                                                Connessioni PSD2
+                                                            </a>
+                                                            <a href="{% url 'lista_provider_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_provider_bancari' or request.resolver_match.url_name == 'crea_provider_bancario' or request.resolver_match.url_name == 'modifica_provider_bancario' or request.resolver_match.url_name == 'elimina_provider_bancario' %}active{% endif %}">
+                                                                Provider bancari
+                                                            </a>
+                                                            {% if can_manage_gestione_finanziaria %}
+                                                                <a href="{% url 'pianificazione_sincronizzazione' %}" class="{% if request.resolver_match.url_name == 'pianificazione_sincronizzazione' %}active{% endif %}">
+                                                                    Pianificazione sincronizzazione
+                                                                </a>
+                                                            {% endif %}
+                                                        </nav>
+                                                    </div>
+                                                </div>
+                                            </nav>
+                                        </div>
+                                    </div>
                                 </nav>
                             </div>
                         </div>
@@ -521,7 +578,7 @@
     <script src="{% static 'js/core/person-rules.js' %}?v=2"></script>
     <script src="{% static 'js/core/family-linked-address.js' %}?v=4"></script>
     <script src="{% static 'js/core/browser-autofill.js' %}?v=1"></script>
-    <script src="{% static 'js/core/currency-fields.js' %}?v=1"></script>
+    <script src="{% static 'js/core/currency-fields.js' %}?v=2"></script>
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>

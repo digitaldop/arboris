@@ -260,10 +260,32 @@
     }
 
     function openDayView(state, day) {
+        clearPendingDayClick(state);
         state.selectedDate = cloneDate(day);
         state.currentDate = cloneDate(day);
         state.currentView = "day";
         state.render();
+    }
+
+    function clearPendingDayClick(state) {
+        if (!state.pendingDayClickTimer) {
+            return;
+        }
+        window.clearTimeout(state.pendingDayClickTimer);
+        state.pendingDayClickTimer = null;
+    }
+
+    function scheduleDaySelection(state, day, options) {
+        const config = options || {};
+        clearPendingDayClick(state);
+        state.pendingDayClickTimer = window.setTimeout(function () {
+            state.pendingDayClickTimer = null;
+            state.selectedDate = cloneDate(day);
+            if (config.updateCurrentDate) {
+                state.currentDate = cloneDate(day);
+            }
+            state.render();
+        }, 220);
     }
 
     function getQuickCreateDialog(root, state) {
@@ -640,17 +662,16 @@
                 if (event.target.closest("a, button")) {
                     return;
                 }
-                state.selectedDate = cloneDate(day);
-                if (!isSameMonth(day, monthStart)) {
-                    state.currentDate = cloneDate(day);
-                }
-                state.render();
+                scheduleDaySelection(state, day, {
+                    updateCurrentDate: !isSameMonth(day, monthStart),
+                });
             });
 
             cell.addEventListener("dblclick", function (event) {
                 if (event.target.closest("a, button")) {
                     return;
                 }
+                event.preventDefault();
                 openDayView(state, day);
             });
 
@@ -660,9 +681,9 @@
             dayButton.textContent = `${day.getDate()}`;
             dayButton.addEventListener("click", (event) => {
                 event.stopPropagation();
-                state.selectedDate = cloneDate(day);
-                state.currentDate = cloneDate(day);
-                state.render();
+                scheduleDaySelection(state, day, {
+                    updateCurrentDate: true,
+                });
             });
             dayButton.addEventListener("dblclick", (event) => {
                 event.preventDefault();
@@ -1071,9 +1092,9 @@
                 }
 
                 dayButton.addEventListener("click", () => {
-                    state.selectedDate = cloneDate(day);
-                    state.currentDate = cloneDate(day);
-                    state.render();
+                    scheduleDaySelection(state, day, {
+                        updateCurrentDate: true,
+                    });
                 });
                 dayButton.addEventListener("dblclick", (event) => {
                     event.preventDefault();
@@ -1162,6 +1183,7 @@
             createUrl: root.dataset.createUrl,
             fullCreateUrl: root.dataset.fullCreateUrl,
             csrfToken: root.dataset.csrfToken,
+            pendingDayClickTimer: null,
             quickDialog: null,
             render: null,
         };
@@ -1188,6 +1210,7 @@
 
         document.querySelectorAll("[data-calendar-nav]").forEach((button) => {
             button.addEventListener("click", () => {
+                clearPendingDayClick(state);
                 const action = button.dataset.calendarNav;
 
                 if (action === "today") {
@@ -1223,6 +1246,7 @@
 
         document.querySelectorAll("[data-calendar-view]").forEach((button) => {
             button.addEventListener("click", () => {
+                clearPendingDayClick(state);
                 const nextView = button.dataset.calendarView;
                 if (!["day", "month", "week", "year"].includes(nextView)) {
                     return;

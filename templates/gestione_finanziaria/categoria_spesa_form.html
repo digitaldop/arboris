@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{% if categoria %}Categoria spesa {{ categoria.nome }}{% else %}Nuova categoria spesa{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_categorie_spesa' %}">Categorie spesa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if categoria %}{{ categoria.nome }}{% else %}Nuova{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if categoria %}Categoria spesa {{ categoria.nome }}{% else %}Nuova categoria spesa{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
+                <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
+                <tr><th>{{ form.ordine.label_tag }}</th><td>{{ form.ordine }} {{ form.ordine.errors }}</td></tr>
+                <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

@@ -65,6 +65,26 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "modifica_metodo_pagamento",
             "elimina_metodo_pagamento",
         ),
+        "categoria_spesa": _crud_triplet(
+            "crea_categoria_spesa",
+            "modifica_categoria_spesa",
+            "elimina_categoria_spesa",
+        ),
+        "fornitore": _crud_triplet(
+            "crea_fornitore",
+            "modifica_fornitore",
+            "elimina_fornitore",
+        ),
+        "conto_bancario": _crud_triplet(
+            "crea_conto_bancario",
+            "modifica_conto_bancario",
+            "elimina_conto_bancario",
+        ),
+        "movimento_finanziario": _crud_triplet(
+            "crea_movimento_manuale",
+            "modifica_movimento_finanziario",
+            "elimina_movimento_finanziario",
+        ),
         "studente": _crud_triplet(
             "crea_studente",
             "modifica_studente",

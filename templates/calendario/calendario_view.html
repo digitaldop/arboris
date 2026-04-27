@@ -52,7 +52,14 @@
             </div>
 
             <div class="admin-section compact">
-                <div class="admin-section-title">Categorie</div>
+                <div class="admin-section-title admin-section-title-actionbar">
+                    <span class="admin-section-title-label">Categorie</span>
+                    {% if can_manage_calendario %}
+                        <div class="admin-section-title-actions">
+                            <a href="{% url 'lista_categorie_calendario' %}" class="admin-section-title-btn admin-section-title-icon-btn" title="Modifica categorie" aria-label="Modifica categorie">&#9998;</a>
+                        </div>
+                    {% endif %}
+                </div>
                 <div class="panel">
                     <div class="panel-body calendar-side-panel-body">
                         {% if calendar_categories %}
@@ -138,5 +145,5 @@
 
     {{ calendar_entries|json_script:"calendar-agenda-data" }}
     {{ calendar_categories_payload|json_script:"calendar-categories-data" }}
-    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=4"></script>
+    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=5"></script>
 {% endblock %}

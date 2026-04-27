@@ -54,7 +54,12 @@
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
                                             {% if familiare and familiare.famiglia %}
-                                                {{ familiare.famiglia }}
+                                                <div class="table-main-text">{{ familiare.famiglia.cognome_famiglia }}</div>
+                                                {% with referenti=familiare.famiglia.referenti_label %}
+                                                    {% if referenti %}
+                                                        <div class="table-subtext">Referenti: {{ referenti }}</div>
+                                                    {% endif %}
+                                                {% endwith %}
                                             {% else %}
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
@@ -537,7 +542,7 @@
                         {% endif %}
 
                         <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento.</button>
+                            <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="documenti">+ Aggiungi un altro Documento</button>
                         </div>
                     </div>
                 </div>

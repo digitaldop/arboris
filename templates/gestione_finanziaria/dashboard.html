@@ -21,9 +21,12 @@
             <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Connessioni PSD2</a>
             <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary">Riconciliazione</a>
             <a href="{% url 'report_categorie_mensile' %}" class="btn btn-secondary">Report categorie</a>
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Fornitori</a>
+            <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary">Scadenziario fornitori</a>
             <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary">Conti</a>
             <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Movimenti</a>
-            <a href="{% url 'lista_categorie_finanziarie' %}" class="btn btn-secondary">Categorie</a>
+            <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Categorie spesa</a>
+            <a href="{% url 'lista_categorie_finanziarie' %}" class="btn btn-secondary">Categorie movimenti</a>
             <a href="{% url 'lista_regole_categorizzazione' %}" class="btn btn-secondary">Regole</a>
         </div>
     </div>
@@ -40,11 +43,19 @@
             </div>
             <div class="summary-item">
                 <div class="summary-value">{{ categorie_attive }}</div>
-                <div class="summary-label">Categorie attive</div>
+                <div class="summary-label">Categorie movimenti attive</div>
             </div>
             <div class="summary-item">
                 <div class="summary-value">{{ movimenti_senza_categoria }}</div>
                 <div class="summary-label">Movimenti da categorizzare</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ fornitori_attivi }}</div>
+                <div class="summary-label">Fornitori attivi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ scadenze_fornitori_aperte }}</div>
+                <div class="summary-label">Scadenze fornitori aperte</div>
             </div>
             <div class="summary-item">
                 <div class="summary-value">{{ regole_attive }}</div>

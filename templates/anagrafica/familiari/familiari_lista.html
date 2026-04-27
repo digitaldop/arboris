@@ -59,7 +59,14 @@
                             >
                                 <td>{{ familiare.cognome }}</td>
                                 <td>{{ familiare.nome }}</td>
-                                <td>{{ familiare.famiglia }}</td>
+                                <td class="family-label-cell">
+                                    <div class="table-main-text">{{ familiare.famiglia.cognome_famiglia }}</div>
+                                    {% with famiglia_context=familiare.famiglia.label_disambiguazione %}
+                                        {% if famiglia_context %}
+                                            <div class="table-subtext">{{ famiglia_context }}</div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
                                 <td>{{ familiare.relazione_familiare }}</td>
                                 <td>{{ familiare.formatted_telefono|default:"" }}</td>
                                 <td>{{ familiare.email|default:"" }}</td>

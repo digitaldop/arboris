@@ -3,7 +3,8 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Sum
+from django.utils import timezone
 
 
 def next_order_value(model_cls):
@@ -99,6 +100,280 @@ class CategoriaFinanziaria(models.Model):
             parti.append(parent.nome)
             parent = parent.parent
         return " / ".join(reversed(parti))
+
+
+# =========================================================================
+#  Categorie spesa e fornitori
+# =========================================================================
+
+
+class CategoriaSpesa(models.Model):
+    """
+    Categoria trasversale per classificare fornitori, documenti passivi e,
+    in futuro, voci di budget previsionale.
+    """
+
+    nome = models.CharField(max_length=140, unique=True)
+    descrizione = models.TextField(blank=True)
+    ordine = models.IntegerField(blank=True, null=True)
+    attiva = models.BooleanField(default=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_categoria_spesa"
+        ordering = ["ordine", "nome"]
+        verbose_name = "Categoria spesa"
+        verbose_name_plural = "Categorie spesa"
+
+    def __str__(self):
+        return self.nome
+
+    def save(self, *args, **kwargs):
+        if self.ordine is None:
+            self.ordine = next_order_value(CategoriaSpesa)
+        super().save(*args, **kwargs)
+
+
+class TipoSoggettoFornitore(models.TextChoices):
+    AZIENDA = "azienda", "Azienda"
+    PROFESSIONISTA = "professionista", "Professionista"
+    ASSOCIAZIONE = "associazione", "Associazione"
+    PERSONA_FISICA = "persona_fisica", "Persona fisica"
+    ALTRO = "altro", "Altro"
+
+
+class Fornitore(models.Model):
+    denominazione = models.CharField(max_length=220)
+    tipo_soggetto = models.CharField(
+        max_length=30,
+        choices=TipoSoggettoFornitore.choices,
+        default=TipoSoggettoFornitore.AZIENDA,
+    )
+    categoria_spesa = models.ForeignKey(
+        CategoriaSpesa,
+        on_delete=models.PROTECT,
+        related_name="fornitori",
+        blank=True,
+        null=True,
+        help_text="Categoria prevalente usata come default sui documenti del fornitore.",
+    )
+    codice_fiscale = models.CharField(max_length=16, blank=True)
+    partita_iva = models.CharField(max_length=11, blank=True)
+    indirizzo = models.CharField(max_length=255, blank=True)
+    telefono = models.CharField(max_length=40, blank=True)
+    email = models.EmailField(blank=True)
+    pec = models.EmailField(blank=True)
+    codice_sdi = models.CharField(max_length=7, blank=True)
+    referente = models.CharField(max_length=160, blank=True)
+    iban = models.CharField(max_length=34, blank=True)
+    banca = models.CharField(max_length=160, blank=True)
+    note = models.TextField(blank=True)
+    attivo = models.BooleanField(default=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_fornitore"
+        ordering = ["denominazione"]
+        verbose_name = "Fornitore"
+        verbose_name_plural = "Fornitori"
+
+    def __str__(self):
+        return self.denominazione
+
+
+class TipoDocumentoFornitore(models.TextChoices):
+    FATTURA = "fattura", "Fattura"
+    PROFORMA = "proforma", "Proforma"
+    PARCELLA = "parcella", "Parcella"
+    RICEVUTA = "ricevuta", "Ricevuta"
+    NOTA_CREDITO = "nota_credito", "Nota di credito"
+    ALTRO = "altro", "Altro"
+
+
+class StatoDocumentoFornitore(models.TextChoices):
+    DA_PAGARE = "da_pagare", "Da pagare"
+    PARZIALMENTE_PAGATO = "parzialmente_pagato", "Parzialmente pagato"
+    PAGATO = "pagato", "Pagato"
+    ANNULLATO = "annullato", "Annullato"
+
+
+def documento_fornitore_upload_to(_instance, filename):
+    return f"documenti_fornitori/{timezone.localdate():%Y/%m}/{filename}"
+
+
+class DocumentoFornitore(models.Model):
+    fornitore = models.ForeignKey(
+        Fornitore,
+        on_delete=models.PROTECT,
+        related_name="documenti",
+    )
+    categoria_spesa = models.ForeignKey(
+        CategoriaSpesa,
+        on_delete=models.PROTECT,
+        related_name="documenti_fornitori",
+        blank=True,
+        null=True,
+    )
+    tipo_documento = models.CharField(
+        max_length=30,
+        choices=TipoDocumentoFornitore.choices,
+        default=TipoDocumentoFornitore.FATTURA,
+    )
+    numero_documento = models.CharField(max_length=80)
+    data_documento = models.DateField(db_index=True)
+    data_ricezione = models.DateField(blank=True, null=True)
+    anno_competenza = models.PositiveIntegerField(blank=True, null=True)
+    mese_competenza = models.PositiveSmallIntegerField(blank=True, null=True)
+    descrizione = models.CharField(max_length=255, blank=True)
+    imponibile = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    aliquota_iva = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("22.00"))
+    iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    totale = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    stato = models.CharField(
+        max_length=30,
+        choices=StatoDocumentoFornitore.choices,
+        default=StatoDocumentoFornitore.DA_PAGARE,
+    )
+    allegato = models.FileField(
+        upload_to=documento_fornitore_upload_to,
+        blank=True,
+    )
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_documento_fornitore"
+        ordering = ["-data_documento", "-id"]
+        verbose_name = "Documento fornitore"
+        verbose_name_plural = "Documenti fornitori"
+        indexes = [
+            models.Index(fields=["fornitore", "data_documento"], name="gf_doc_forn_data_idx"),
+            models.Index(fields=["categoria_spesa", "data_documento"], name="gf_doc_catsp_data_idx"),
+            models.Index(fields=["stato"], name="gf_doc_forn_stato_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fornitore", "tipo_documento", "numero_documento", "data_documento"],
+                name="gf_doc_forn_unique_numero_data",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_tipo_documento_display()} {self.numero_documento} - {self.fornitore}"
+
+    def clean(self):
+        super().clean()
+        if self.mese_competenza is not None and not 1 <= self.mese_competenza <= 12:
+            raise ValidationError({"mese_competenza": "Il mese di competenza deve essere compreso tra 1 e 12."})
+
+    def save(self, *args, **kwargs):
+        if not self.categoria_spesa_id and self.fornitore_id:
+            self.categoria_spesa = self.fornitore.categoria_spesa
+        if not self.anno_competenza and self.data_documento:
+            self.anno_competenza = self.data_documento.year
+        if not self.mese_competenza and self.data_documento:
+            self.mese_competenza = self.data_documento.month
+        super().save(*args, **kwargs)
+
+    @property
+    def importo_pagato(self):
+        totale = self.scadenze.aggregate(totale=Sum("importo_pagato"))["totale"]
+        return totale or Decimal("0.00")
+
+    @property
+    def residuo_da_pagare(self):
+        residuo = (self.totale or Decimal("0.00")) - self.importo_pagato
+        return max(residuo, Decimal("0.00"))
+
+
+class StatoScadenzaFornitore(models.TextChoices):
+    PREVISTA = "prevista", "Prevista"
+    SCADUTA = "scaduta", "Scaduta"
+    PARZIALMENTE_PAGATA = "parzialmente_pagata", "Parzialmente pagata"
+    PAGATA = "pagata", "Pagata"
+    ANNULLATA = "annullata", "Annullata"
+
+
+class ScadenzaPagamentoFornitore(models.Model):
+    documento = models.ForeignKey(
+        DocumentoFornitore,
+        on_delete=models.CASCADE,
+        related_name="scadenze",
+    )
+    data_scadenza = models.DateField(db_index=True)
+    importo_previsto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    importo_pagato = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    data_pagamento = models.DateField(blank=True, null=True)
+    stato = models.CharField(
+        max_length=30,
+        choices=StatoScadenzaFornitore.choices,
+        default=StatoScadenzaFornitore.PREVISTA,
+    )
+    conto_bancario = models.ForeignKey(
+        "ContoBancario",
+        on_delete=models.SET_NULL,
+        related_name="scadenze_fornitori",
+        blank=True,
+        null=True,
+    )
+    movimento_finanziario = models.ForeignKey(
+        "MovimentoFinanziario",
+        on_delete=models.SET_NULL,
+        related_name="scadenze_fornitori",
+        blank=True,
+        null=True,
+    )
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_scadenza_fornitore"
+        ordering = ["data_scadenza", "id"]
+        verbose_name = "Scadenza pagamento fornitore"
+        verbose_name_plural = "Scadenze pagamento fornitori"
+        indexes = [
+            models.Index(fields=["data_scadenza", "stato"], name="gf_scad_forn_data_stato_idx"),
+            models.Index(fields=["documento", "data_scadenza"], name="gf_scad_doc_data_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.documento} - {self.data_scadenza:%d/%m/%Y}"
+
+    @property
+    def importo_residuo(self):
+        residuo = (self.importo_previsto or Decimal("0.00")) - (self.importo_pagato or Decimal("0.00"))
+        return max(residuo, Decimal("0.00"))
+
+    def calcola_stato_automatico(self):
+        if self.stato == StatoScadenzaFornitore.ANNULLATA:
+            return self.stato
+
+        previsto = self.importo_previsto or Decimal("0.00")
+        pagato = self.importo_pagato or Decimal("0.00")
+        if previsto > Decimal("0.00") and pagato >= previsto:
+            return StatoScadenzaFornitore.PAGATA
+        if pagato > Decimal("0.00"):
+            return StatoScadenzaFornitore.PARZIALMENTE_PAGATA
+        if self.data_scadenza and self.data_scadenza < timezone.localdate():
+            return StatoScadenzaFornitore.SCADUTA
+        return StatoScadenzaFornitore.PREVISTA
+
+    @property
+    def e_scaduta(self):
+        return (
+            self.stato in {StatoScadenzaFornitore.PREVISTA, StatoScadenzaFornitore.PARZIALMENTE_PAGATA}
+            and self.data_scadenza
+            and self.data_scadenza < timezone.localdate()
+        )
+
+    def save(self, *args, **kwargs):
+        if not getattr(self, "_preserve_manual_stato", False):
+            self.stato = self.calcola_stato_automatico()
+        super().save(*args, **kwargs)
 
 
 # =========================================================================

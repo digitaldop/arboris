@@ -1,6 +1,59 @@
 window.ArborisCurrencyFields = (function () {
     const FIELD_SELECTOR = "input[data-currency]";
     const IGNORED_INPUT_TYPES = new Set(["hidden", "checkbox", "radio", "file", "submit", "button", "reset"]);
+    const itFormatter = new Intl.NumberFormat("it-IT", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
+    function parseNumber(value) {
+        const raw = String(value || "").trim().replace(/\s/g, "");
+        if (!raw) {
+            return null;
+        }
+
+        let normalized = raw;
+        const hasComma = normalized.includes(",");
+        const hasDot = normalized.includes(".");
+
+        if (hasComma) {
+            normalized = normalized.replace(/\./g, "").replace(",", ".");
+        } else if (hasDot) {
+            const parts = normalized.split(".");
+            const lastPart = parts[parts.length - 1] || "";
+            if (parts.length > 2 || lastPart.length === 3) {
+                normalized = normalized.replace(/\./g, "");
+            }
+        }
+
+        const parsed = Number.parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function formatValue(value) {
+        const parsed = typeof value === "number" ? value : parseNumber(value);
+        if (!Number.isFinite(parsed)) {
+            return "";
+        }
+        const intlValue = itFormatter.format(parsed);
+        if (intlValue.includes(".") || Math.abs(parsed) < 1000) {
+            return intlValue;
+        }
+
+        const negative = parsed < 0;
+        const fixed = Math.abs(parsed).toFixed(2);
+        const parts = fixed.split(".");
+        const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        return `${negative ? "-" : ""}${integerPart},${parts[1] || "00"}`;
+    }
+
+    function normalizeValue(value) {
+        const parsed = parseNumber(value);
+        if (!Number.isFinite(parsed)) {
+            return "";
+        }
+        return parsed.toFixed(2);
+    }
 
     function shouldEnhance(input) {
         if (!input || input.dataset.currencyEnhanced === "1") {
@@ -26,8 +79,15 @@ window.ArborisCurrencyFields = (function () {
             return;
         }
 
+        input.type = "text";
         const currencyCode = (input.dataset.currency || "").trim();
         const existingGroup = input.closest(".currency-input-group");
+        input.addEventListener("blur", function () {
+            input.value = formatValue(input.value);
+        });
+        if ((input.value || "").trim()) {
+            input.value = formatValue(input.value);
+        }
 
         if (existingGroup) {
             if (input.classList.contains("currency-field-compact")) {
@@ -57,9 +117,32 @@ window.ArborisCurrencyFields = (function () {
         input.dataset.currencyEnhanced = "1";
     }
 
+    function normalizeFormFields(form) {
+        if (!form) {
+            return;
+        }
+        form.querySelectorAll(FIELD_SELECTOR).forEach(function (input) {
+            input.value = normalizeValue(input.value);
+        });
+    }
+
+    function bindFormSubmit(form) {
+        if (!form || form.dataset.currencyNormalizeBound === "1") {
+            return;
+        }
+        form.dataset.currencyNormalizeBound = "1";
+        form.addEventListener("submit", function () {
+            normalizeFormFields(form);
+        });
+    }
+
     function init(root) {
         const scope = root && root.querySelectorAll ? root : document;
         scope.querySelectorAll(FIELD_SELECTOR).forEach(enhanceInput);
+        scope.querySelectorAll("form").forEach(bindFormSubmit);
+        if (scope.tagName && scope.tagName.toLowerCase() === "form") {
+            bindFormSubmit(scope);
+        }
     }
 
     function observe() {
@@ -90,5 +173,9 @@ window.ArborisCurrencyFields = (function () {
                 observe();
             }
         },
+        parseNumber,
+        formatValue,
+        normalizeValue,
+        normalizeFormFields,
     };
 })();

@@ -1,13 +1,17 @@
 from django.contrib import admin
 
 from .models import (
+    CategoriaSpesa,
     CategoriaFinanziaria,
     ConnessioneBancaria,
     ContoBancario,
+    DocumentoFornitore,
+    Fornitore,
     MovimentoFinanziario,
     ProviderBancario,
     RegolaCategorizzazione,
     SaldoConto,
+    ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
 )
 
@@ -18,6 +22,46 @@ class CategoriaFinanziariaAdmin(admin.ModelAdmin):
     list_filter = ("tipo", "attiva")
     search_fields = ("nome",)
     autocomplete_fields = ("parent",)
+
+
+@admin.register(CategoriaSpesa)
+class CategoriaSpesaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ordine", "attiva")
+    list_filter = ("attiva",)
+    search_fields = ("nome", "descrizione")
+
+
+@admin.register(Fornitore)
+class FornitoreAdmin(admin.ModelAdmin):
+    list_display = ("denominazione", "tipo_soggetto", "categoria_spesa", "email", "telefono", "attivo")
+    list_filter = ("tipo_soggetto", "categoria_spesa", "attivo")
+    search_fields = ("denominazione", "codice_fiscale", "partita_iva", "email", "pec", "referente")
+    autocomplete_fields = ("categoria_spesa",)
+
+
+class ScadenzaPagamentoFornitoreInline(admin.TabularInline):
+    model = ScadenzaPagamentoFornitore
+    extra = 0
+    autocomplete_fields = ("conto_bancario", "movimento_finanziario")
+
+
+@admin.register(DocumentoFornitore)
+class DocumentoFornitoreAdmin(admin.ModelAdmin):
+    list_display = ("numero_documento", "tipo_documento", "fornitore", "data_documento", "totale", "stato")
+    list_filter = ("tipo_documento", "stato", "categoria_spesa")
+    search_fields = ("numero_documento", "descrizione", "fornitore__denominazione")
+    date_hierarchy = "data_documento"
+    autocomplete_fields = ("fornitore", "categoria_spesa")
+    inlines = [ScadenzaPagamentoFornitoreInline]
+
+
+@admin.register(ScadenzaPagamentoFornitore)
+class ScadenzaPagamentoFornitoreAdmin(admin.ModelAdmin):
+    list_display = ("documento", "data_scadenza", "importo_previsto", "importo_pagato", "stato")
+    list_filter = ("stato", "data_scadenza")
+    search_fields = ("documento__numero_documento", "documento__fornitore__denominazione")
+    date_hierarchy = "data_scadenza"
+    autocomplete_fields = ("documento", "conto_bancario", "movimento_finanziario")
 
 
 @admin.register(ProviderBancario)

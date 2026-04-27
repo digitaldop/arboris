@@ -54,7 +54,14 @@
                                 class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == famiglia.pk|stringformat:'s' %}highlight-row{% endif %}"
                                 data-row-href="{% url 'modifica_famiglia' famiglia.pk %}"
                             >
-                                <td>{{ famiglia.cognome_famiglia }}</td>
+                                <td class="family-label-cell">
+                                    <div class="table-main-text">{{ famiglia.cognome_famiglia }}</div>
+                                    {% with famiglia_context=famiglia.label_contesto_anagrafica %}
+                                        {% if famiglia_context %}
+                                            <div class="table-subtext">{{ famiglia_context }}</div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
                                 <td>{{ famiglia.stato_relazione_famiglia }}</td>
                                 <td>
                                     {% if famiglia.indirizzo_principale %}

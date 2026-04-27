@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina categoria spesa - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_categorie_spesa' %}">Categorie spesa</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina categoria spesa</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare la categoria spesa <strong>{{ categoria.nome }}</strong>.</p>
+        {% if ha_vincoli %}
+            <p class="message message-error">
+                Non puo essere eliminata: e' collegata a {{ count_fornitori }} fornitori e {{ count_documenti }} documenti.
+            </p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger" {% if ha_vincoli %}disabled{% endif %}>Elimina</button>
+                <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

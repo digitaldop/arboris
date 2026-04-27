@@ -269,6 +269,73 @@ class Famiglia(models.Model):
 
     def __str__(self):
         return self.cognome_famiglia
+
+    @staticmethod
+    def _format_person_name(person):
+        return " ".join(part for part in [person.nome, person.cognome] if part).strip()
+
+    @staticmethod
+    def _join_limited(items, limit=2):
+        values = [item for item in items if item]
+        if not values:
+            return ""
+
+        visible = values[:limit]
+        label = ", ".join(visible)
+        remaining = len(values) - len(visible)
+        if remaining > 0:
+            label = f"{label} +{remaining}"
+        return label
+
+    def referenti_label(self):
+        familiari = list(self.familiari.all())
+        referenti = [familiare for familiare in familiari if familiare.referente_principale]
+        if not referenti:
+            referenti = familiari
+
+        return self._join_limited(
+            [self._format_person_name(familiare) for familiare in referenti],
+        )
+
+    def studenti_label(self):
+        return self._join_limited(
+            [self._format_person_name(studente) for studente in self.studenti.all()],
+        )
+
+    def label_disambiguazione(self):
+        dettagli = []
+
+        referenti = self.referenti_label()
+        if referenti:
+            dettagli.append(f"Referenti: {referenti}")
+
+        studenti = self.studenti_label()
+        if studenti:
+            dettagli.append(f"Studenti: {studenti}")
+
+        if self.indirizzo_principale:
+            dettagli.append(f"Indirizzo: {self.indirizzo_principale.label_select()}")
+
+        return " | ".join(dettagli)
+
+    def label_contesto_anagrafica(self):
+        dettagli = []
+
+        referenti = self.referenti_label()
+        if referenti:
+            dettagli.append(f"Referenti: {referenti}")
+
+        studenti = self.studenti_label()
+        if studenti:
+            dettagli.append(f"Studenti: {studenti}")
+
+        return " | ".join(dettagli)
+
+    def label_select(self):
+        dettagli = self.label_disambiguazione()
+        if dettagli:
+            return f"{self.cognome_famiglia} - {dettagli}"
+        return self.cognome_famiglia
     
 #FINE MODELLI PER LE FAMIGLIE
 

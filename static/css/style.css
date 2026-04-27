@@ -508,6 +508,28 @@ a:hover {
     background: rgba(255, 255, 255, 0.92);
 }
 
+.sidebar-subsection-nested {
+    margin: 8px 8px 4px;
+    border-left-width: 2px;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-subsection-nested .sidebar-collapsible {
+    padding: 10px 12px;
+    font-size: 10px;
+    letter-spacing: 0.6px;
+}
+
+.sidebar-subsection-nested .sidebar-subnav a {
+    padding-left: 58px;
+}
+
+.sidebar-subsection-nested .sidebar-subnav a::before {
+    left: 42px;
+    width: 5px;
+    height: 5px;
+}
+
 .sidebar-subnav a {
     padding-left: 28px;
 }
@@ -1769,6 +1791,21 @@ select:focus {
     color: #666;
 }
 
+.table-main-text {
+    font-weight: 500;
+}
+
+.table-subtext {
+    margin-top: 2px;
+    color: rgba(73, 85, 94, 0.62);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.family-label-cell {
+    min-width: 220px;
+}
+
 .form-subtitle {
     margin: 0 0 18px;
     font-size: 13px;
@@ -1935,6 +1972,37 @@ select:focus {
     flex: 0 0 auto;
     gap: 4px;
 }
+
+.popup-related-field.fornitore-category-related {
+    max-width: 560px;
+    justify-content: flex-start;
+}
+
+.popup-related-field.fornitore-category-related .related-field-stack {
+    flex: 0 1 460px;
+    width: 460px;
+}
+
+.popup-related-field.fornitore-category-related select {
+    width: 100%;
+    max-width: 460px;
+}
+
+.popup-related-field.documento-fornitore-related {
+    max-width: 560px;
+    justify-content: flex-start;
+}
+
+.popup-related-field.documento-fornitore-related .related-field-stack {
+    flex: 0 1 460px;
+    width: 460px;
+}
+
+.popup-related-field.documento-fornitore-related select,
+.popup-related-field.documento-fornitore-related .searchable-select {
+    width: 100%;
+    max-width: 460px;
+}
 /* FINE STILE DEI PULSANTI PER LA GESTIONE DEI CAMPI RELAZIONATI */
 
 /* INIZIO STILE DELL'ADMIN */
@@ -2002,6 +2070,14 @@ select:focus {
     border-color: rgba(255, 255, 255, 0.7);
     color: #fff;
     transform: translateY(-1px);
+}
+
+.admin-section-title-icon-btn {
+    width: 28px;
+    min-height: 28px;
+    padding: 0;
+    font-size: 14px;
+    text-decoration: none;
 }
 
 .inline-help-trigger {
@@ -2270,16 +2346,26 @@ select:focus {
 }
 
 .inline-add-btn {
-    border: none;
-    background: transparent;
-    color: #2f7d32;
-    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 7px 14px;
+    border: 1px solid #2f7d32;
+    border-radius: 4px;
+    background: #f2faf2;
+    color: #256c2a;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
     cursor: pointer;
-    padding: 0;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .inline-add-btn:hover {
-    text-decoration: underline;
+    background: #e4f4e4;
+    border-color: #256c2a;
+    text-decoration: none;
 }
 
 .inline-checkbox-cell {
@@ -2498,6 +2584,63 @@ select:focus {
     border-color: #bc3838;
 }
 
+.supplier-deadlines-table {
+    table-layout: auto;
+}
+
+.supplier-deadlines-table th,
+.supplier-deadlines-table td {
+    vertical-align: top;
+}
+
+.supplier-deadlines-table .supplier-deadline-main-row td {
+    border-bottom: 0;
+}
+
+.supplier-deadlines-table .supplier-deadline-note-row td {
+    padding-top: 0;
+    border-top: 0;
+    border-bottom: 1px solid #eee;
+}
+
+.supplier-deadlines-table .supplier-deadline-note-row label {
+    display: block;
+    margin: 0 0 4px;
+    color: #5f7180;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.supplier-deadlines-table .supplier-deadline-note-row textarea {
+    width: 100%;
+    max-width: none;
+    min-height: 58px;
+}
+
+.supplier-deadlines-table .supplier-deadline-related {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+    min-width: 220px;
+}
+
+.supplier-deadlines-table .supplier-deadline-related select,
+.supplier-deadlines-table .supplier-deadline-related .searchable-select {
+    flex: 1 1 180px;
+    min-width: 150px;
+    max-width: 260px;
+}
+
+.supplier-deadline-delete-field {
+    display: none;
+}
+
+.supplier-deadline-add-row {
+    margin: 12px 0 0;
+}
+
 .inline-add-row {
     padding: 10px 12px;
     border-top: 1px solid #eee;
@@ -2505,17 +2648,26 @@ select:focus {
 }
 
 .inline-add-btn {
-    border: none;
-    background: transparent;
-    color: #2f7d32;
-    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 7px 14px;
+    border: 1px solid #2f7d32;
+    border-radius: 4px;
+    background: #f2faf2;
+    color: #256c2a;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
     cursor: pointer;
-    padding: 0;
-    font-weight: 600;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .inline-add-btn:hover {
-    text-decoration: underline;
+    background: #e4f4e4;
+    border-color: #256c2a;
+    text-decoration: none;
 }
 
 .detail-form:not(.is-view-mode) .inline-form-row td {
@@ -6496,11 +6648,13 @@ select:focus {
 .calendar-week-events-layer {
     position: absolute;
     inset: 0;
+    pointer-events: none;
 }
 
 .calendar-week-event-block {
     position: absolute;
     box-shadow: 0 8px 18px rgba(36, 64, 81, 0.14);
+    pointer-events: auto;
 }
 
 .calendar-day-all-day-row,
@@ -6568,11 +6722,13 @@ select:focus {
 .calendar-day-events-layer {
     position: absolute;
     inset: 0;
+    pointer-events: none;
 }
 
 .calendar-day-event-block {
     position: absolute;
     box-shadow: 0 8px 18px rgba(36, 64, 81, 0.14);
+    pointer-events: auto;
 }
 
 .calendar-year-card {

@@ -1431,8 +1431,16 @@ def lista_famiglie(request):
 
     famiglie = (
         Famiglia.objects
-        .select_related("stato_relazione_famiglia", "indirizzo_principale", "indirizzo_principale__citta")
-        .order_by("cognome_famiglia")
+        .select_related(
+            "stato_relazione_famiglia",
+            "indirizzo_principale",
+            "indirizzo_principale__citta",
+            "indirizzo_principale__provincia",
+            "indirizzo_principale__regione",
+            "indirizzo_principale__cap_scelto",
+        )
+        .prefetch_related("familiari", "studenti")
+        .order_by("cognome_famiglia", "id")
     )
 
     if q:
@@ -1444,7 +1452,9 @@ def lista_famiglie(request):
             Q(familiari__telefono__icontains=q) |
             Q(studenti__nome__icontains=q) |
             Q(studenti__cognome__icontains=q) |
-            Q(studenti__codice_fiscale__icontains=q)
+            Q(studenti__codice_fiscale__icontains=q) |
+            Q(indirizzo_principale__via__icontains=q) |
+            Q(indirizzo_principale__citta__nome__icontains=q)
         ).distinct()
 
     evidenzia_id = request.GET.get("highlight")
@@ -2029,7 +2039,11 @@ def lista_familiari(request):
             "luogo_nascita__provincia",
             "famiglia__indirizzo_principale",
             "famiglia__indirizzo_principale__citta",
+            "famiglia__indirizzo_principale__provincia",
+            "famiglia__indirizzo_principale__regione",
+            "famiglia__indirizzo_principale__cap_scelto",
         )
+        .prefetch_related("famiglia__familiari", "famiglia__studenti")
         .order_by("cognome", "nome")
     )
 
@@ -2131,7 +2145,12 @@ def modifica_familiare(request, pk):
             "luogo_nascita",
             "luogo_nascita__provincia",
             "famiglia__indirizzo_principale",
-        ),
+            "famiglia__indirizzo_principale__citta",
+            "famiglia__indirizzo_principale__provincia",
+            "famiglia__indirizzo_principale__regione",
+            "famiglia__indirizzo_principale__cap_scelto",
+        )
+        .prefetch_related("famiglia__familiari", "famiglia__studenti"),
         pk=pk,
     )
     today = timezone.localdate()
@@ -2447,6 +2466,7 @@ def lista_studenti(request):
             "luogo_nascita",
             "luogo_nascita__provincia",
         )
+        .prefetch_related("famiglia__familiari", "famiglia__studenti")
         .order_by("cognome", "nome")
     )
 
@@ -2619,7 +2639,8 @@ def modifica_studente(request, pk):
             "indirizzo__citta__provincia",
             "luogo_nascita",
             "luogo_nascita__provincia",
-        ),
+        )
+        .prefetch_related("famiglia__familiari", "famiglia__studenti"),
         pk=pk,
     )
     today = timezone.localdate()

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo fornitore{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_fornitori' %}">Fornitori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo fornitore{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if fornitore %}
+                <a href="{% url 'crea_documento_fornitore' %}?fornitore={{ fornitore.pk }}" class="btn btn-primary">Nuovo documento</a>
+                <a href="{% url 'elimina_fornitore' fornitore.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="admin-section">
+            <div class="admin-section-title">Dati principali</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="form-table">
+                        <tr><th>{{ form.denominazione.label_tag }}</th><td>{{ form.denominazione }} {{ form.denominazione.errors }}</td></tr>
+                        <tr><th>{{ form.tipo_soggetto.label_tag }}</th><td>{{ form.tipo_soggetto }} {{ form.tipo_soggetto.errors }}</td></tr>
+                        <tr>
+                            <th>{{ form.categoria_spesa.label_tag }}</th>
+                            <td>
+                                <div class="related-field-row popup-related-field fornitore-category-related">
+                                    <div class="related-field-stack">
+                                        {{ form.categoria_spesa }}
+                                    </div>
+                                    <div class="related-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-categoria-spesa-btn">+</button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-categoria-spesa-btn">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-categoria-spesa-btn">&#10006;</button>
+                                    </div>
+                                </div>
+                                {{ form.categoria_spesa.errors }}
+                            </td>
+                        </tr>
+                        <tr><th>{{ form.codice_fiscale.label_tag }}</th><td>{{ form.codice_fiscale }} {{ form.codice_fiscale.errors }}</td></tr>
+                        <tr><th>{{ form.partita_iva.label_tag }}</th><td>{{ form.partita_iva }} {{ form.partita_iva.errors }}</td></tr>
+                        <tr><th>{{ form.indirizzo.label_tag }}</th><td>{{ form.indirizzo }} {{ form.indirizzo.errors }}</td></tr>
+                        <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">Contatti e pagamenti</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="form-table">
+                        <tr><th>{{ form.referente.label_tag }}</th><td>{{ form.referente }} {{ form.referente.errors }}</td></tr>
+                        <tr><th>{{ form.telefono.label_tag }}</th><td>{{ form.telefono }} {{ form.telefono.errors }}</td></tr>
+                        <tr><th>{{ form.email.label_tag }}</th><td>{{ form.email }} {{ form.email.errors }}</td></tr>
+                        <tr><th>{{ form.pec.label_tag }}</th><td>{{ form.pec }} {{ form.pec.errors }}</td></tr>
+                        <tr><th>{{ form.codice_sdi.label_tag }}</th><td>{{ form.codice_sdi }} {{ form.codice_sdi.errors }}</td></tr>
+                        <tr><th>{{ form.iban.label_tag }}</th><td>{{ form.iban }} {{ form.iban.errors }}</td></tr>
+                        <tr><th>{{ form.banca.label_tag }}</th><td>{{ form.banca }} {{ form.banca.errors }}</td></tr>
+                        <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            <button type="submit" class="btn btn-primary">Salva</button>
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </form>
+
+    {% if fornitore %}
+        <div class="admin-section">
+            <div class="admin-section-title">Documenti recenti</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Documento</th>
+                                <th>Data</th>
+                                <th>Categoria</th>
+                                <th class="column-right">Totale</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for documento in documenti %}
+                                <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}">
+                                    <td>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</td>
+                                    <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                                    <td>{{ documento.categoria_spesa|default:"-" }}</td>
+                                    <td class="column-right">{{ documento.totale|euro }} &euro;</td>
+                                    <td>{{ documento.get_stato_display }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5"><div class="empty-state">Nessun documento registrato per questo fornitore.</div></td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">Scadenze aperte</div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Scadenza</th>
+                                <th>Documento</th>
+                                <th class="column-right">Previsto</th>
+                                <th class="column-right">Pagato</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scadenza in scadenze_aperte %}
+                                <tr>
+                                    <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
+                                    <td><a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="table-link">{{ scadenza.documento.numero_documento }}</a></td>
+                                    <td class="column-right">{{ scadenza.importo_previsto|euro }} &euro;</td>
+                                    <td class="column-right">{{ scadenza.importo_pagato|euro }} &euro;</td>
+                                    <td>{{ scadenza.get_stato_display }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5"><div class="empty-state">Nessuna scadenza aperta.</div></td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <script src="{% static 'js/core/related-popups.js' %}"></script>
+    <script src="{% static 'js/pages/fornitore-form.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisFornitoreForm) {
+                ArborisFornitoreForm.init();
+            }
+        });
+    </script>
+{% endblock %}
