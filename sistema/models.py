@@ -975,12 +975,24 @@ class SistemaUtentePermessi(models.Model):
         return self.get_module_level_display_value("economia")
 
     @property
+    def permesso_gestione_finanziaria_effettivo_display(self):
+        return self.get_module_level_display_value("gestione_finanziaria")
+
+    @property
     def permesso_sistema_effettivo_display(self):
         return self.get_module_level_display_value("sistema")
 
     @property
     def permesso_calendario_effettivo_display(self):
         return self.get_module_level_display_value("calendario")
+
+    @property
+    def permesso_gestione_amministrativa_effettivo_display(self):
+        return self.get_module_level_display_value("gestione_amministrativa")
+
+    @property
+    def permesso_servizi_extra_effettivo_display(self):
+        return self.get_module_level_display_value("servizi_extra")
 
     @property
     def role_theme_variables(self):

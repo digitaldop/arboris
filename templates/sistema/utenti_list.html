@@ -36,6 +36,7 @@
                                 <th>Controllo completo</th>
                                 <th>Anagrafica</th>
                                 <th>Economia</th>
+                                <th>Gestione finanziaria</th>
                                 <th>Sistema</th>
                                 <th>Calendario</th>
                                 <th>Stato</th>
@@ -53,6 +54,7 @@
                                     <td>{% if utente.profilo_permessi_safe.controllo_completo_effettivo %}Si{% else %}No{% endif %}</td>
                                     <td>{{ utente.profilo_permessi_safe.permesso_anagrafica_effettivo_display }}</td>
                                     <td>{{ utente.profilo_permessi_safe.permesso_economia_effettivo_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.permesso_gestione_finanziaria_effettivo_display }}</td>
                                     <td>{{ utente.profilo_permessi_safe.permesso_sistema_effettivo_display }}</td>
                                     <td>{{ utente.profilo_permessi_safe.permesso_calendario_effettivo_display }}</td>
                                     <td>{% if utente.is_active %}Attivo{% else %}Disattivo{% endif %}</td>

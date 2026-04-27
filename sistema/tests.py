@@ -265,7 +265,19 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(response, "Permessi ereditati dal ruolo")
         self.assertContains(response, "Per cambiare i permessi modifica il ruolo collegato")
         self.assertContains(response, "Utente attivo")
+        self.assertContains(response, "Gestione finanziaria")
         self.assertNotContains(response, "Modulo anagrafica")
+
+    def test_user_permission_lists_include_financial_management_module(self):
+        self.client.force_login(self.user)
+
+        users_response = self.client.get(reverse("lista_utenti"))
+        roles_response = self.client.get(reverse("lista_ruoli_utenti"))
+
+        self.assertEqual(users_response.status_code, 200)
+        self.assertEqual(roles_response.status_code, 200)
+        self.assertContains(users_response, "Gestione finanziaria")
+        self.assertContains(roles_response, "Gestione finanziaria")
 
     def test_header_settings_dropdown_renders_system_links(self):
         self.client.force_login(self.user)
