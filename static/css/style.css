@@ -3881,6 +3881,147 @@ select:focus {
     min-height: 0;
 }
 
+.osservazioni-studente-summary {
+    margin-bottom: 16px;
+}
+
+.osservazioni-studente-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 20px;
+}
+
+.osservazioni-studente-table {
+    margin: 0;
+}
+
+.osservazioni-summary-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    color: #345064;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.osservazioni-summary-link:hover,
+.osservazioni-summary-link:focus-visible {
+    color: #2f6f88;
+    background: #eef6f9;
+    text-decoration: none;
+    outline: none;
+}
+
+.osservazioni-create-section,
+.osservazioni-list-section {
+    margin-top: 16px;
+}
+
+.osservazioni-form .rich-note-field {
+    max-width: none;
+}
+
+.osservazioni-form .rich-note-editor,
+.osservazioni-form .rich-note-preview {
+    min-height: 180px;
+}
+
+.osservazioni-list-panel {
+    padding: 0;
+}
+
+.osservazione-card {
+    position: relative;
+    padding: 18px 20px;
+    border-bottom: 1px solid #e7edf1;
+    background: #fff;
+}
+
+.osservazione-card:last-child {
+    border-bottom: 0;
+}
+
+.osservazione-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.osservazione-card-heading h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #22313d;
+}
+
+.osservazione-card-date {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #687986;
+}
+
+.osservazione-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.observation-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d7e1e8;
+    border-radius: 4px;
+    background: #fff;
+    color: #3c7992;
+    font-size: 15px;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.observation-icon-btn:hover,
+.observation-icon-btn:focus-visible {
+    border-color: #3c7992;
+    background: #eef6f9;
+    color: #2d6277;
+    text-decoration: none;
+}
+
+.observation-icon-btn-danger {
+    color: #d9534f;
+}
+
+.observation-icon-btn-danger:hover,
+.observation-icon-btn-danger:focus-visible {
+    border-color: #d9534f;
+    background: #fff3f3;
+    color: #c9302c;
+}
+
+.osservazione-card-text {
+    color: #33424d;
+    line-height: 1.55;
+}
+
+.rich-note-toolbar-btn.is-active {
+    border-color: #3c7992;
+    background: #3c7992;
+    color: #fff;
+}
+
+@media (max-width: 900px) {
+    .osservazioni-studente-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .tab-btn {
     position: relative;
 }

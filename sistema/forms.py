@@ -163,6 +163,8 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
         fields = [
             "terminologia_studente",
             "mostra_dashboard_prossimo_anno_scolastico",
+            "osservazioni_solo_autori_visualizzazione",
+            "osservazioni_solo_autori_modifica",
             "formato_visualizzazione_telefono",
             "font_principale",
             "font_titoli",
@@ -170,6 +172,8 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
         labels = {
             "terminologia_studente": "Dicitura visualizzata per gli studenti",
             "mostra_dashboard_prossimo_anno_scolastico": "Mostra in Dashboard i riepiloghi del prossimo anno scolastico",
+            "osservazioni_solo_autori_visualizzazione": "Solo gli autori possono vedere le loro osservazioni",
+            "osservazioni_solo_autori_modifica": "Solo gli autori possono modificare o cancellare",
             "formato_visualizzazione_telefono": "Formato numeri di telefono (solo visualizzazione)",
             "font_principale": "Font principale",
             "font_titoli": "Titoli",

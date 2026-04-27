@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load static rich_notes currency %}
+
+{% block title %}Anamnesi e Osservazioni - {{ studente.nome }} {{ studente.cognome }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_studenti' %}">Studenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'modifica_studente' studente.pk %}">{{ studente.nome }} {{ studente.cognome }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Anamnesi e Osservazioni</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Anamnesi e Osservazioni</h1>
+        <div class="page-head-actions">
+            {% if can_manage_osservazioni %}
+                <button
+                    type="button"
+                    class="btn {% if show_create_form %}btn-save-soft{% else %}btn-primary{% endif %}"
+                    id="osservazioni-create-toggle"
+                    data-add-label="AGGIUNGI UN'OSSERVAZIONE"
+                    data-save-label="SALVA LE MODIFICHE"
+                    data-active="{% if show_create_form %}1{% else %}0{% endif %}"
+                >
+                    {% if show_create_form %}SALVA LE MODIFICHE{% else %}AGGIUNGI UN'OSSERVAZIONE{% endif %}
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-secondary{% if not show_create_form %} is-hidden{% endif %}"
+                    id="osservazioni-create-cancel"
+                >
+                    ANNULLA INSERIMENTO
+                </button>
+            {% endif %}
+            <a href="{% url 'modifica_studente' studente.pk %}" class="btn btn-secondary">Indietro</a>
+            <a href="{% url 'modifica_studente' studente.pk %}" class="btn btn-secondary">Torna alla scheda studente</a>
+        </div>
+    </div>
+
+    <div class="admin-section compact osservazioni-studente-summary">
+        <div class="admin-section-title">{{ student_general_data_title }}</div>
+        <div class="panel">
+            <div class="panel-body">
+                <div class="osservazioni-studente-grid">
+                    <table class="form-table compact-form-table osservazioni-studente-table">
+                        <tr>
+                            <th>Nome</th>
+                            <td>
+                                <a href="{% url 'modifica_studente' studente.pk %}" class="osservazioni-summary-link">
+                                    {{ studente.nome }} {{ studente.cognome }}
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Famiglia</th>
+                            <td>
+                                {% if studente.famiglia %}
+                                    <a href="{% url 'modifica_famiglia' studente.famiglia.pk %}" class="osservazioni-summary-link">
+                                        {{ studente.famiglia }}
+                                    </a>
+                                {% else %}
+                                    <span class="table-muted">Non indicata</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                    <table class="form-table compact-form-table osservazioni-studente-table">
+                        <tr>
+                            <th>Data nascita</th>
+                            <td>
+                                {% if studente.data_nascita %}
+                                    {{ studente.data_nascita|it_date_with_age }}
+                                {% else %}
+                                    <span class="table-muted">Non indicata</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Classe</th>
+                            <td>
+                                {% if classe_corrente_label %}
+                                    {{ classe_corrente_label }}
+                                {% else %}
+                                    <span class="table-muted">Ancora non assegnata</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if can_manage_osservazioni %}
+        <div
+            class="admin-section compact osservazioni-create-section{% if not show_create_form %} is-hidden{% endif %}"
+            id="osservazioni-create-section"
+        >
+            <div class="admin-section-title">Nuova osservazione</div>
+            <div class="panel" id="section-nuova-osservazione">
+                <div class="panel-body">
+                    <form method="post" class="detail-form osservazioni-form" id="osservazione-create-form">
+                        {% csrf_token %}
+                        <table class="form-table">
+                            <tr>
+                                <th>{{ form.titolo.label_tag }}</th>
+                                <td>{{ form.titolo }} {{ form.titolo.errors }}</td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.data_inserimento.label_tag }}</th>
+                                <td>{{ form.data_inserimento }} {{ form.data_inserimento.errors }}</td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.testo.label_tag }}</th>
+                                <td>{{ form.testo }} {{ form.testo.errors }}</td>
+                            </tr>
+                        </table>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="admin-section osservazioni-list-section">
+        <div class="admin-section-title admin-section-title-actionbar">
+            <span class="admin-section-title-label">Osservazioni ({{ osservazioni|length }})</span>
+            <div class="admin-section-title-actions">
+                <a class="admin-section-title-btn" href="?ordine={{ toggle_ordine }}">
+                    {% if ordine == "asc" %}Recenti prima{% else %}Vecchie prima{% endif %}
+                </a>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-body osservazioni-list-panel">
+                {% for osservazione in osservazioni %}
+                    <article class="osservazione-card">
+                        <div class="osservazione-card-header">
+                            <div class="osservazione-card-heading">
+                                {% if osservazione.titolo %}
+                                    <h2>{{ osservazione.titolo }}</h2>
+                                {% endif %}
+                                <div class="osservazione-card-date">
+                                    {{ osservazione.data_inserimento|date:"d / m / Y" }} - CREATA DA {{ osservazione.creato_da_label }}
+                                </div>
+                            </div>
+                            {% if osservazione.can_change_for_current_user %}
+                                <div class="osservazione-card-actions">
+                                    <a href="{% url 'modifica_osservazione_studente' osservazione.pk %}?ordine={{ ordine }}" class="observation-icon-btn" title="Modifica" aria-label="Modifica osservazione">&#9998;</a>
+                                    <a href="{% url 'elimina_osservazione_studente' osservazione.pk %}?ordine={{ ordine }}" class="observation-icon-btn observation-icon-btn-danger" title="Elimina" aria-label="Elimina osservazione">&#10006;</a>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="osservazione-card-text">
+                            {{ osservazione.testo|render_rich_notes }}
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="empty-state">Nessuna osservazione registrata per questo studente.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/pages/osservazioni-studente.js' %}?v=1"></script>
+{% endblock %}

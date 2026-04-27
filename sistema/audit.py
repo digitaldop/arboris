@@ -11,6 +11,7 @@ _audit_disabled_depth = ContextVar("audit_disabled_depth", default=0)
 
 TRACKED_APP_LABELS = {
     "anagrafica",
+    "osservazioni",
     "sistema",
     "scuola",
     "calendario",
@@ -107,6 +108,8 @@ def get_audit_module_for_model(model):
     app_label = model._meta.app_label
     if app_label == "auth":
         return "sistema"
+    if app_label == "osservazioni":
+        return "anagrafica"
     return app_label
 
 

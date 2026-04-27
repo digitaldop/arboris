@@ -346,6 +346,20 @@ class SistemaImpostazioniGenerali(models.Model):
             "del prossimo anno scolastico configurato."
         ),
     )
+    osservazioni_solo_autori_visualizzazione = models.BooleanField(
+        default=False,
+        help_text=(
+            "Quando attiva, le osservazioni collegate agli studenti sono visibili solo "
+            "all'autore, salvo amministratori e superuser."
+        ),
+    )
+    osservazioni_solo_autori_modifica = models.BooleanField(
+        default=True,
+        help_text=(
+            "Quando attiva, solo l'autore puo modificare o cancellare le proprie osservazioni, "
+            "salvo amministratori e superuser."
+        ),
+    )
     font_principale = models.CharField(
         max_length=40,
         choices=GoogleFontChoice.choices,

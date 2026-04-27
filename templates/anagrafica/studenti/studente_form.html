@@ -24,6 +24,7 @@
             <button type="button" class="btn btn-secondary js-page-back-btn" id="back-studente-btn"
                     data-fallback-url="{% url 'lista_studenti' %}">Indietro</button>
             {% if studente %}
+                <a href="{% url 'osservazioni_studente' studente.pk %}" class="btn btn-primary">Anamnesi e Osservazioni</a>
                 <a href="{% url 'elimina_studente' studente.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Torna all'elenco</a>
@@ -224,7 +225,7 @@
             <div class="family-side-column">
                 <div class="admin-section compact">
                     <button type="button" class="admin-section-title collapsible-title" data-target="section-note" data-default-open="false">
-                        <span>Note</span>
+                        <span>Note Generali e Intolleranze Alimentari</span>
                     </button>
                     <div class="panel collapsible-panel" id="section-note">
                         <div class="panel-body">

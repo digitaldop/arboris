@@ -1,0 +1,69 @@
+import django.db.models.deletion
+import django.utils.timezone
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        ("anagrafica", "0008_citta_codice_catastale_familiare_sesso_and_more"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="OsservazioneStudente",
+            fields=[
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("titolo", models.CharField(blank=True, max_length=255, null=True, verbose_name="Titolo")),
+                ("data_inserimento", models.DateField(default=django.utils.timezone.localdate, verbose_name="Data inserimento")),
+                ("testo", models.TextField(verbose_name="Testo")),
+                ("data_creazione", models.DateTimeField(auto_now_add=True)),
+                ("data_aggiornamento", models.DateTimeField(auto_now=True)),
+                (
+                    "aggiornato_da",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="osservazioni_studenti_update",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Aggiornato da",
+                    ),
+                ),
+                (
+                    "creato_da",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="osservazioni_studenti_create",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Creato da",
+                    ),
+                ),
+                (
+                    "studente",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="osservazioni",
+                        to="anagrafica.studente",
+                        verbose_name="Studente",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "Osservazione studente",
+                "verbose_name_plural": "Osservazioni studenti",
+                "db_table": "osservazioni_osservazione_studente",
+                "ordering": ["data_inserimento", "id"],
+            },
+        ),
+        migrations.AddIndex(
+            model_name="osservazionestudente",
+            index=models.Index(fields=["studente", "data_inserimento", "id"], name="osservazioni_stud_data_idx"),
+        ),
+    ]

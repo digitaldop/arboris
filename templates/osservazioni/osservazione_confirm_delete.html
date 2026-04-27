@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina osservazione - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_studenti' %}">Studenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'modifica_studente' studente.pk %}">{{ studente.nome }} {{ studente.cognome }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'osservazioni_studente' studente.pk %}?ordine={{ ordine }}">Anamnesi e Osservazioni</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina osservazione</h1>
+    </div>
+
+    <div class="content-card">
+        <p>Stai per eliminare questa osservazione collegata a <strong>{{ studente.nome }} {{ studente.cognome }}</strong>.</p>
+        {% if osservazione.titolo %}
+            <p><strong>{{ osservazione.titolo }}</strong></p>
+        {% endif %}
+        <p class="table-muted">
+            {{ osservazione.data_inserimento|date:"d / m / Y" }} - CREATA DA {{ osservazione.creato_da_label }}
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Elimina</button>
+                <a href="{% url 'osservazioni_studente' studente.pk %}?ordine={{ ordine }}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

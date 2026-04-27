@@ -49,6 +49,10 @@ window.ArborisRichNotes = (function () {
             return false;
         }
 
+        if (textarea.dataset.richNotes === "1") {
+            return true;
+        }
+
         const source = `${textarea.name || ""} ${textarea.id || ""}`.toLowerCase();
         return source.includes("note");
     }
@@ -225,6 +229,42 @@ window.ArborisRichNotes = (function () {
         }
     }
 
+    function updateToolbarState(wrapper) {
+        if (!wrapper) {
+            return;
+        }
+
+        wrapper.querySelectorAll(".rich-note-toolbar-btn").forEach(button => {
+            const command = button.dataset.command || "";
+            let active = false;
+            if (command && typeof document.queryCommandState === "function") {
+                try {
+                    active = document.queryCommandState(command);
+                } catch (error) {
+                    active = false;
+                }
+            }
+            button.classList.toggle("is-active", active);
+        });
+    }
+
+    function updateActiveToolbarState() {
+        const selection = window.getSelection();
+        if (!selection || !selection.anchorNode) {
+            return;
+        }
+
+        const anchorElement = selection.anchorNode.nodeType === Node.ELEMENT_NODE
+            ? selection.anchorNode
+            : selection.anchorNode.parentElement;
+        const wrapper = anchorElement ? anchorElement.closest(".rich-note-field") : null;
+        const editor = wrapper ? wrapper.querySelector(".rich-note-editor") : null;
+
+        if (editor && document.activeElement === editor) {
+            updateToolbarState(wrapper);
+        }
+    }
+
     function buildField(textarea) {
         const wrapper = document.createElement("div");
         wrapper.className = "rich-note-field";
@@ -259,6 +299,7 @@ window.ArborisRichNotes = (function () {
 
             applyCommand(editor, button.dataset.command || "");
             syncTextareaFromEditor(textarea);
+            updateToolbarState(wrapper);
         });
 
         toolbar.addEventListener("mousedown", function (event) {
@@ -269,10 +310,24 @@ window.ArborisRichNotes = (function () {
 
         editor.addEventListener("input", function () {
             syncTextareaFromEditor(textarea);
+            updateToolbarState(wrapper);
+        });
+
+        editor.addEventListener("keyup", function () {
+            updateToolbarState(wrapper);
+        });
+
+        editor.addEventListener("mouseup", function () {
+            updateToolbarState(wrapper);
+        });
+
+        editor.addEventListener("focus", function () {
+            updateToolbarState(wrapper);
         });
 
         editor.addEventListener("blur", function () {
             syncTextareaFromEditor(textarea);
+            updateToolbarState(wrapper);
         });
 
         editor.addEventListener("paste", function (event) {
@@ -291,6 +346,7 @@ window.ArborisRichNotes = (function () {
             }
 
             syncTextareaFromEditor(textarea);
+            updateToolbarState(wrapper);
         });
 
         textarea.addEventListener("input", function () {
@@ -301,6 +357,7 @@ window.ArborisRichNotes = (function () {
         textarea.dataset.richNotesBound = "1";
         textarea.dataset.richNotesLastValue = textarea.value || "";
         setEditorHtml(editor, textarea.value || "");
+        updateToolbarState(wrapper);
     }
 
     function enhanceTextarea(textarea) {
@@ -386,6 +443,8 @@ window.ArborisRichNotes = (function () {
         enhance(root || document);
         refresh(root || document);
         startObserver();
+        document.removeEventListener("selectionchange", updateActiveToolbarState);
+        document.addEventListener("selectionchange", updateActiveToolbarState);
     }
 
     return {
