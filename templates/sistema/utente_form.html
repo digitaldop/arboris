@@ -21,6 +21,9 @@
             {% if can_manage_sistema %}
                 <button type="submit" form="utente-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
             {% endif %}
+            {% if not is_new and can_manage_sistema and utente_obj.pk != request.user.pk %}
+                <a href="{% url 'elimina_utente' utente_obj.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
             <a href="{% url 'lista_utenti' %}" class="btn btn-secondary">Torna all'elenco</a>
         </div>
     </div>
@@ -48,13 +51,17 @@
                                     <td>{{ form.email }} {{ form.email.errors }}</td>
                                 </tr>
                                 <tr>
-                                    <th>{{ form.ruolo.label_tag }}</th>
+                                    <th>{{ form.ruolo_permessi.label_tag }}</th>
                                     <td>
-                                        {{ form.ruolo }} {{ form.ruolo.errors }}
-                                        {% if form.ruolo.help_text %}
-                                            <div class="help-text">{{ form.ruolo.help_text }}</div>
+                                        {{ form.ruolo_permessi }} {{ form.ruolo_permessi.errors }}
+                                        {% if form.ruolo_permessi.help_text %}
+                                            <div class="help-text">{{ form.ruolo_permessi.help_text }}</div>
                                         {% endif %}
                                     </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.is_active.label_tag }}</th>
+                                    <td>{{ form.is_active }} {{ form.is_active.errors }}</td>
                                 </tr>
                                 <tr>
                                     <th>{{ form.password.label_tag }}</th>
@@ -74,48 +81,22 @@
 
             <div class="family-side-column">
                 <div class="admin-section compact">
-                    <div class="admin-section-title">Permessi</div>
+                    <div class="admin-section-title">Permessi ereditati dal ruolo</div>
                     <div class="panel">
                         <div class="panel-body">
-                            <table class="form-table compact-form-table">
-                                <tr>
-                                    <th>{{ form.controllo_completo.label_tag }}</th>
-                                    <td>
-                                        {{ form.controllo_completo }} {{ form.controllo_completo.errors }}
-                                        {% if form.controllo_completo.help_text %}
-                                            <div class="help-text">{{ form.controllo_completo.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_anagrafica.label_tag }}</th>
-                                    <td>{{ form.permesso_anagrafica }} {{ form.permesso_anagrafica.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_economia.label_tag }}</th>
-                                    <td>{{ form.permesso_economia }} {{ form.permesso_economia.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_sistema.label_tag }}</th>
-                                    <td>{{ form.permesso_sistema }} {{ form.permesso_sistema.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_calendario.label_tag }}</th>
-                                    <td>{{ form.permesso_calendario }} {{ form.permesso_calendario.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_gestione_finanziaria.label_tag }}</th>
-                                    <td>{{ form.permesso_gestione_finanziaria }} {{ form.permesso_gestione_finanziaria.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_gestione_amministrativa.label_tag }}</th>
-                                    <td>{{ form.permesso_gestione_amministrativa }} {{ form.permesso_gestione_amministrativa.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.permesso_servizi_extra.label_tag }}</th>
-                                    <td>{{ form.permesso_servizi_extra }} {{ form.permesso_servizi_extra.errors }}</td>
-                                </tr>
-                            </table>
+                            {% if utente_obj and utente_obj.profilo_permessi.ruolo_permessi %}
+                                <table class="form-table compact-form-table">
+                                    <tr><th>Ruolo</th><td>{{ utente_obj.profilo_permessi.ruolo_display }}</td></tr>
+                                    <tr><th>Controllo completo</th><td>{% if utente_obj.profilo_permessi.controllo_completo_effettivo %}Si{% else %}No{% endif %}</td></tr>
+                                    <tr><th>Anagrafica</th><td>{{ utente_obj.profilo_permessi.permesso_anagrafica_effettivo_display }}</td></tr>
+                                    <tr><th>Economia</th><td>{{ utente_obj.profilo_permessi.permesso_economia_effettivo_display }}</td></tr>
+                                    <tr><th>Sistema</th><td>{{ utente_obj.profilo_permessi.permesso_sistema_effettivo_display }}</td></tr>
+                                    <tr><th>Calendario</th><td>{{ utente_obj.profilo_permessi.permesso_calendario_effettivo_display }}</td></tr>
+                                </table>
+                                <div class="help-text">Per cambiare i permessi modifica il ruolo collegato, non il singolo utente.</div>
+                            {% else %}
+                                <div class="empty-state">Seleziona e salva un ruolo per vedere il riepilogo dei permessi ereditati.</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -127,22 +108,22 @@
                             <div class="panel-body summary-panel-body">
                                 <div class="summary-grid">
                                     <div class="summary-item">
-                                        <div class="summary-value">{% if utente_obj.is_active %}Sì{% else %}No{% endif %}</div>
+                                        <div class="summary-value">{% if utente_obj.is_active %}Si{% else %}No{% endif %}</div>
                                         <div class="summary-label">Utente attivo</div>
                                     </div>
                                     <div class="summary-item">
-                                        <div class="summary-value">{% if utente_obj.last_login %}Sì{% else %}No{% endif %}</div>
+                                        <div class="summary-value">{% if utente_obj.last_login %}Si{% else %}No{% endif %}</div>
                                         <div class="summary-label">Ha effettuato accesso</div>
                                     </div>
-                                    {% if utente_obj.profilo_permessi.ruolo %}
+                                    {% if utente_obj.profilo_permessi.ruolo_display %}
                                         <div class="summary-item">
-                                            <div class="summary-value">{{ utente_obj.profilo_permessi.get_ruolo_display }}</div>
+                                            <div class="summary-value">{{ utente_obj.profilo_permessi.ruolo_display }}</div>
                                             <div class="summary-label">Ruolo</div>
                                         </div>
                                     {% endif %}
-                                    {% if utente_obj.profilo_permessi.controllo_completo %}
+                                    {% if utente_obj.profilo_permessi.controllo_completo_effettivo %}
                                         <div class="summary-item">
-                                            <div class="summary-value">Sì</div>
+                                            <div class="summary-value">Si</div>
                                             <div class="summary-label">Controllo completo</div>
                                         </div>
                                     {% endif %}

@@ -666,11 +666,182 @@ class RuoloUtente(models.TextChoices):
     VISUALIZZATORE = "visualizzatore", "Visualizzatore"
 
 
+PERMISSION_MODULE_FIELDS = {
+    "anagrafica": "permesso_anagrafica",
+    "economia": "permesso_economia",
+    "sistema": "permesso_sistema",
+    "calendario": "permesso_calendario",
+    "gestione_finanziaria": "permesso_gestione_finanziaria",
+    "gestione_amministrativa": "permesso_gestione_amministrativa",
+    "servizi_extra": "permesso_servizi_extra",
+}
+
+
+def normalize_hex_color(value, fallback="#417690"):
+    color = (value or "").strip()
+    if len(color) != 7 or not color.startswith("#"):
+        return fallback
+    try:
+        int(color[1:], 16)
+    except ValueError:
+        return fallback
+    return color.lower()
+
+
+def mix_hex_colors(first, second, second_weight):
+    first = normalize_hex_color(first)
+    second = normalize_hex_color(second, "#ffffff")
+    first_weight = 1 - second_weight
+    channels = []
+    for index in (1, 3, 5):
+        first_value = int(first[index : index + 2], 16)
+        second_value = int(second[index : index + 2], 16)
+        channels.append(round(first_value * first_weight + second_value * second_weight))
+    return "#{:02x}{:02x}{:02x}".format(*channels)
+
+
+def readable_text_color(background_color):
+    color = normalize_hex_color(background_color)
+    red = int(color[1:3], 16)
+    green = int(color[3:5], 16)
+    blue = int(color[5:7], 16)
+    luminance = (red * 0.299 + green * 0.587 + blue * 0.114) / 255
+    return "#203642" if luminance > 0.62 else "#ffffff"
+
+
+class SistemaRuoloPermessi(models.Model):
+    nome = models.CharField(max_length=120, unique=True)
+    descrizione = models.TextField(blank=True)
+    chiave_legacy = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True,
+        unique=True,
+        choices=RuoloUtente.choices,
+    )
+    colore_principale = models.CharField(max_length=7, default="#417690")
+    attivo = models.BooleanField(default=True)
+    amministratore_operativo = models.BooleanField(
+        default=False,
+        help_text="Consente l'accesso alle funzioni amministrative operative del sistema.",
+    )
+    accesso_backup_database = models.BooleanField(
+        default=False,
+        help_text="Consente l'accesso alla pagina Backup Database.",
+    )
+    controllo_completo = models.BooleanField(
+        default=False,
+        help_text="Permette agli utenti con questo ruolo di accedere e gestire tutte le sezioni del software.",
+    )
+    permesso_anagrafica = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_economia = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_sistema = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_calendario = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_gestione_finanziaria = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_gestione_amministrativa = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_servizi_extra = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sistema_ruolo_permessi"
+        ordering = ["nome"]
+        verbose_name = "Ruolo e permessi"
+        verbose_name_plural = "Ruoli e permessi"
+
+    def __str__(self):
+        return self.nome
+
+    def clean(self):
+        super().clean()
+        color = (self.colore_principale or "").strip()
+        if len(color) != 7 or not color.startswith("#"):
+            raise ValidationError("Il colore deve essere nel formato esadecimale #RRGGBB.")
+        try:
+            int(color[1:], 16)
+        except ValueError as exc:
+            raise ValidationError("Il colore deve essere nel formato esadecimale #RRGGBB.") from exc
+        self.colore_principale = color.lower()
+
+    def get_module_level(self, module_name):
+        field_name = PERMISSION_MODULE_FIELDS.get(module_name)
+        if not field_name:
+            return LivelloPermesso.NESSUNO
+        return getattr(self, field_name, LivelloPermesso.NESSUNO)
+
+    def has_module_permission(self, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
+        if not self.attivo:
+            return False
+        if self.controllo_completo:
+            return True
+
+        current_level = self.get_module_level(module_name)
+        if level == LivelloPermesso.VISUALIZZAZIONE:
+            return current_level in {
+                LivelloPermesso.VISUALIZZAZIONE,
+                LivelloPermesso.GESTIONE,
+            }
+        return current_level == LivelloPermesso.GESTIONE
+
+    def get_module_level_display_value(self, module_name):
+        return LivelloPermesso(self.get_module_level(module_name)).label
+
+    @property
+    def theme_variables(self):
+        primary = normalize_hex_color(self.colore_principale)
+        return {
+            "primary": primary,
+            "primary_dark": mix_hex_colors(primary, "#000000", 0.24),
+            "primary_soft": mix_hex_colors(primary, "#ffffff", 0.86),
+            "primary_muted": mix_hex_colors(primary, "#ffffff", 0.70),
+            "primary_hover": mix_hex_colors(primary, "#ffffff", 0.78),
+            "primary_text": readable_text_color(primary),
+            "sidebar_bg": mix_hex_colors(primary, "#ffffff", 0.90),
+            "sidebar_module_bg": mix_hex_colors(primary, "#ffffff", 0.82),
+            "sidebar_module_border": mix_hex_colors(primary, "#ffffff", 0.68),
+        }
+
+
 class SistemaUtentePermessi(models.Model):
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
         related_name="profilo_permessi",
+    )
+    ruolo_permessi = models.ForeignKey(
+        SistemaRuoloPermessi,
+        on_delete=models.PROTECT,
+        related_name="utenti",
+        blank=True,
+        null=True,
     )
     ruolo = models.CharField(
         max_length=120,
@@ -731,6 +902,9 @@ class SistemaUtentePermessi(models.Model):
         return nome or self.user.email or self.user.username
 
     def get_module_level(self, module_name):
+        if self.ruolo_permessi_id and self.ruolo_permessi and self.ruolo_permessi.attivo:
+            return self.ruolo_permessi.get_module_level(module_name)
+
         mapping = {
             "anagrafica": self.permesso_anagrafica,
             "economia": self.permesso_economia,
@@ -743,6 +917,9 @@ class SistemaUtentePermessi(models.Model):
         return mapping.get(module_name, LivelloPermesso.NESSUNO)
 
     def has_module_permission(self, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
+        if self.ruolo_permessi_id and self.ruolo_permessi:
+            return self.ruolo_permessi.has_module_permission(module_name, level=level)
+
         if self.controllo_completo:
             return True
 
@@ -753,3 +930,60 @@ class SistemaUtentePermessi(models.Model):
                 LivelloPermesso.GESTIONE,
             }
         return current_level == LivelloPermesso.GESTIONE
+
+    @property
+    def ruolo_display(self):
+        if self.ruolo_permessi_id:
+            return self.ruolo_permessi.nome
+        if self.ruolo:
+            return self.get_ruolo_display()
+        return ""
+
+    @property
+    def controllo_completo_effettivo(self):
+        if self.ruolo_permessi_id and self.ruolo_permessi and self.ruolo_permessi.attivo:
+            return self.ruolo_permessi.controllo_completo
+        if self.ruolo_permessi_id:
+            return False
+        return self.controllo_completo
+
+    @property
+    def amministratore_operativo_effettivo(self):
+        if self.ruolo_permessi_id and self.ruolo_permessi and self.ruolo_permessi.attivo:
+            return self.ruolo_permessi.amministratore_operativo
+        if self.ruolo_permessi_id:
+            return False
+        return self.ruolo == RuoloUtente.AMMINISTRATORE
+
+    @property
+    def accesso_backup_database_effettivo(self):
+        if self.ruolo_permessi_id and self.ruolo_permessi and self.ruolo_permessi.attivo:
+            return self.ruolo_permessi.accesso_backup_database
+        if self.ruolo_permessi_id:
+            return False
+        return self.ruolo == RuoloUtente.AMMINISTRATORE
+
+    def get_module_level_display_value(self, module_name):
+        return LivelloPermesso(self.get_module_level(module_name)).label
+
+    @property
+    def permesso_anagrafica_effettivo_display(self):
+        return self.get_module_level_display_value("anagrafica")
+
+    @property
+    def permesso_economia_effettivo_display(self):
+        return self.get_module_level_display_value("economia")
+
+    @property
+    def permesso_sistema_effettivo_display(self):
+        return self.get_module_level_display_value("sistema")
+
+    @property
+    def permesso_calendario_effettivo_display(self):
+        return self.get_module_level_display_value("calendario")
+
+    @property
+    def role_theme_variables(self):
+        if self.ruolo_permessi_id and self.ruolo_permessi and self.ruolo_permessi.attivo:
+            return self.ruolo_permessi.theme_variables
+        return None

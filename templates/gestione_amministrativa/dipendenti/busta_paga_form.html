@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load currency %}
 
-{% block title %}{% if busta %}Busta paga {{ busta.periodo_label }}{% else %}Nuova busta paga{% endif %} - Gestione amministrativa{% endblock %}
+{% block title %}{% if busta %}Busta paga {{ busta.periodo_label }}{% else %}Nuova busta paga{% endif %} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'lista_buste_paga_dipendenti' %}">Buste paga</a>
         <span class="breadcrumb-sep">&gt;</span>

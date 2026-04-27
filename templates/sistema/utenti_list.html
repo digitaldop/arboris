@@ -18,6 +18,7 @@
             {% if can_manage_sistema %}
                 <a href="{% url 'crea_utente' %}" class="btn btn-primary">Nuovo utente</a>
             {% endif %}
+            <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary">Ruoli</a>
         </div>
     </div>
 
@@ -38,20 +39,36 @@
                                 <th>Sistema</th>
                                 <th>Calendario</th>
                                 <th>Stato</th>
+                                {% if can_manage_sistema %}
+                                    <th>Azioni</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for utente in utenti %}
-                                <tr class="list-row-link" data-row-href="{% url 'modifica_utente' utente.pk %}">
+                                <tr{% if can_manage_sistema and utente.gestibile_da_request %} class="list-row-link" data-row-href="{% url 'modifica_utente' utente.pk %}"{% endif %}>
                                     <td>{{ utente.get_full_name|default:utente.username }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.get_ruolo_display|default:"-" }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.ruolo_display|default:"-" }}</td>
                                     <td>{{ utente.email|default:"-" }}</td>
-                                    <td>{% if utente.profilo_permessi_safe.controllo_completo %}Sì{% else %}No{% endif %}</td>
-                                    <td>{{ utente.profilo_permessi_safe.get_permesso_anagrafica_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.get_permesso_economia_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.get_permesso_sistema_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.get_permesso_calendario_display }}</td>
+                                    <td>{% if utente.profilo_permessi_safe.controllo_completo_effettivo %}Si{% else %}No{% endif %}</td>
+                                    <td>{{ utente.profilo_permessi_safe.permesso_anagrafica_effettivo_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.permesso_economia_effettivo_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.permesso_sistema_effettivo_display }}</td>
+                                    <td>{{ utente.profilo_permessi_safe.permesso_calendario_effettivo_display }}</td>
                                     <td>{% if utente.is_active %}Attivo{% else %}Disattivo{% endif %}</td>
+                                    {% if can_manage_sistema %}
+                                        <td class="actions-cell">
+                                            {% if utente.gestibile_da_request %}
+                                                <a href="{% url 'modifica_utente' utente.pk %}" class="table-link">Modifica</a>
+                                                {% if utente.pk != request.user.pk %}
+                                                    <span class="table-action-separator">|</span>
+                                                    <a href="{% url 'elimina_utente' utente.pk %}" class="table-link table-link-danger">Elimina</a>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="table-muted">Protetto</span>
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
                                 </tr>
                             {% endfor %}
                         </tbody>

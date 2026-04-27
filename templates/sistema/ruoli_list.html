@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ruoli - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_utenti' %}">Utenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Ruoli</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Ruoli</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_utenti' %}" class="btn btn-secondary">Utenti</a>
+            {% if can_manage_sistema %}
+                <a href="{% url 'crea_ruolo_utente' %}" class="btn btn-primary">Nuovo ruolo</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <div class="admin-section-title">Ruoli e permessi</div>
+        <div class="panel">
+            <div class="panel-body">
+                {% if ruoli %}
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Ruolo</th>
+                                <th>Colore</th>
+                                <th>Utenti</th>
+                                <th>Controllo completo</th>
+                                <th>Anagrafica</th>
+                                <th>Economia</th>
+                                <th>Sistema</th>
+                                <th>Calendario</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ruolo in ruoli %}
+                                <tr class="list-row-link" data-row-href="{% url 'modifica_ruolo_utente' ruolo.pk %}">
+                                    <td>
+                                        {{ ruolo.nome }}
+                                        {% if ruolo.descrizione %}
+                                            <div class="table-muted">{{ ruolo.descrizione|truncatechars:90 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="role-color-swatch" style="background: {{ ruolo.colore_principale }};"></span>
+                                        {{ ruolo.colore_principale }}
+                                    </td>
+                                    <td>{{ ruolo.count_utenti }}</td>
+                                    <td>{% if ruolo.controllo_completo %}Si{% else %}No{% endif %}</td>
+                                    <td>{{ ruolo.get_permesso_anagrafica_display }}</td>
+                                    <td>{{ ruolo.get_permesso_economia_display }}</td>
+                                    <td>{{ ruolo.get_permesso_sistema_display }}</td>
+                                    <td>{{ ruolo.get_permesso_calendario_display }}</td>
+                                    <td>{% if ruolo.attivo %}Attivo{% else %}Disattivo{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">Ancora nessun ruolo configurato.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+{% endblock %}

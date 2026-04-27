@@ -53,6 +53,10 @@ urlpatterns = [
         name="cronologia_operazioni_sistema",
     ),
     path("sistema/utenti/", sistema_view(views.lista_utenti), name="lista_utenti"),
+    path("sistema/utenti/ruoli/", sistema_view(views.lista_ruoli_utenti), name="lista_ruoli_utenti"),
+    path("sistema/utenti/ruoli/nuovo/", sistema_manage(views.crea_ruolo_utente), name="crea_ruolo_utente"),
+    path("sistema/utenti/ruoli/<int:pk>/", sistema_edit(views.modifica_ruolo_utente), name="modifica_ruolo_utente"),
     path("sistema/utenti/nuovo/", sistema_manage(views.crea_utente), name="crea_utente"),
-    path("sistema/utenti/<int:pk>/", sistema_edit(views.modifica_utente), name="modifica_utente"),
+    path("sistema/utenti/<int:pk>/elimina/", sistema_manage(views.elimina_utente), name="elimina_utente"),
+    path("sistema/utenti/<int:pk>/", sistema_manage(views.modifica_utente), name="modifica_utente"),
 ]

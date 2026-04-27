@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %} - Gestione amministrativa{% endblock %}
+{% block title %}{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Gestione amministrativa</a>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
         <span class="breadcrumb-sep">&gt;</span>
         {% if dipendente %}
             <a href="{% url 'modifica_dipendente' dipendente.pk %}">{{ dipendente }}</a>

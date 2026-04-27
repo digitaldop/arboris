@@ -21,6 +21,7 @@ from .forms import (
     ScuolaSocialFormSet,
     ScuolaTelefonoFormSet,
     ScuolaEmailFormSet,
+    SistemaRuoloPermessiForm,
     SistemaUtenteForm,
 )
 from .database_backups import (
@@ -42,6 +43,7 @@ from .models import (
     SistemaDatabaseRestoreJob,
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
+    SistemaRuoloPermessi,
     SistemaUtentePermessi,
     StatoRipristinoDatabase,
 )
@@ -53,6 +55,20 @@ from .permissions import operational_admin_required
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
 PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
 CRONOLOGIA_RESULT_LIMIT = 250
+
+
+def sync_user_profiles_for_role(ruolo):
+    SistemaUtentePermessi.objects.filter(ruolo_permessi=ruolo).update(
+        ruolo=ruolo.chiave_legacy or "",
+        controllo_completo=ruolo.controllo_completo,
+        permesso_anagrafica=ruolo.permesso_anagrafica,
+        permesso_economia=ruolo.permesso_economia,
+        permesso_sistema=ruolo.permesso_sistema,
+        permesso_calendario=ruolo.permesso_calendario,
+        permesso_gestione_finanziaria=ruolo.permesso_gestione_finanziaria,
+        permesso_gestione_amministrativa=ruolo.permesso_gestione_amministrativa,
+        permesso_servizi_extra=ruolo.permesso_servizi_extra,
+    )
 
 
 def resolve_safe_next_url(request, fallback_url_name="home"):
@@ -475,18 +491,78 @@ def cronologia_operazioni_sistema(request):
 
 def lista_utenti(request):
     utenti = list(
-        User.objects.order_by("last_name", "first_name", "email")
+        User.objects.select_related("profilo_permessi__ruolo_permessi").order_by("last_name", "first_name", "email")
     )
 
     for utente in utenti:
         profilo, _ = SistemaUtentePermessi.objects.get_or_create(user=utente)
         utente.profilo_permessi_safe = profilo
+        utente.gestibile_da_request = request.user.is_superuser or not utente.is_superuser
 
     return render(
         request,
         "sistema/utenti_list.html",
         {
             "utenti": utenti,
+        },
+    )
+
+
+def lista_ruoli_utenti(request):
+    ruoli = SistemaRuoloPermessi.objects.annotate(count_utenti=Count("utenti")).order_by("nome")
+
+    return render(
+        request,
+        "sistema/ruoli_list.html",
+        {
+            "ruoli": ruoli,
+        },
+    )
+
+
+def crea_ruolo_utente(request):
+    if request.method == "POST":
+        form = SistemaRuoloPermessiForm(request.POST)
+        if form.is_valid():
+            ruolo = form.save()
+            sync_user_profiles_for_role(ruolo)
+            messages.success(request, f"Ruolo {ruolo.nome} creato correttamente.")
+            return redirect("modifica_ruolo_utente", pk=ruolo.pk)
+    else:
+        form = SistemaRuoloPermessiForm()
+
+    return render(
+        request,
+        "sistema/ruolo_form.html",
+        {
+            "form": form,
+            "ruolo_obj": None,
+            "is_new": True,
+        },
+    )
+
+
+def modifica_ruolo_utente(request, pk):
+    ruolo = get_object_or_404(SistemaRuoloPermessi, pk=pk)
+
+    if request.method == "POST":
+        form = SistemaRuoloPermessiForm(request.POST, instance=ruolo)
+        if form.is_valid():
+            ruolo = form.save()
+            sync_user_profiles_for_role(ruolo)
+            messages.success(request, f"Ruolo {ruolo.nome} aggiornato correttamente.")
+            return redirect("modifica_ruolo_utente", pk=ruolo.pk)
+    else:
+        form = SistemaRuoloPermessiForm(instance=ruolo)
+
+    return render(
+        request,
+        "sistema/ruolo_form.html",
+        {
+            "form": form,
+            "ruolo_obj": ruolo,
+            "is_new": False,
+            "count_utenti": ruolo.utenti.count(),
         },
     )
 
@@ -513,7 +589,11 @@ def crea_utente(request):
 
 
 def modifica_utente(request, pk):
-    utente = get_object_or_404(User.objects.all(), pk=pk)
+    utente = get_object_or_404(User.objects.select_related("profilo_permessi__ruolo_permessi"), pk=pk)
+
+    if utente.is_superuser and not request.user.is_superuser:
+        messages.error(request, "Solo un superuser puo modificare un altro superuser.")
+        return redirect("lista_utenti")
 
     if request.method == "POST":
         form = SistemaUtenteForm(request.POST, instance=utente)
@@ -531,6 +611,32 @@ def modifica_utente(request, pk):
             "form": form,
             "utente_obj": utente,
             "is_new": False,
+        },
+    )
+
+
+def elimina_utente(request, pk):
+    utente = get_object_or_404(User.objects.select_related("profilo_permessi__ruolo_permessi"), pk=pk)
+
+    if utente.pk == request.user.pk:
+        messages.error(request, "Non puoi eliminare l'account con cui hai effettuato l'accesso.")
+        return redirect("modifica_utente", pk=utente.pk)
+
+    if utente.is_superuser and not request.user.is_superuser:
+        messages.error(request, "Solo un superuser puo eliminare un altro superuser.")
+        return redirect("modifica_utente", pk=utente.pk)
+
+    if request.method == "POST":
+        user_label = utente.get_full_name() or utente.email or utente.username
+        utente.delete()
+        messages.success(request, f"Utente {user_label} eliminato correttamente.")
+        return redirect("lista_utenti")
+
+    return render(
+        request,
+        "sistema/utente_confirm_delete.html",
+        {
+            "utente_obj": utente,
         },
     )
 

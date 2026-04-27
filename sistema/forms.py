@@ -1,20 +1,20 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
 from anagrafica.models import Indirizzo
 from anagrafica.forms import make_searchable_select
 from anagrafica.utils import validate_and_normalize_phone_number
 from .models import (
-    LivelloPermesso,
-    RuoloUtente,
     Scuola,
     ScuolaSocial,
     ScuolaTelefono,
     ScuolaEmail,
     SistemaImpostazioniGenerali,
     SistemaBackupDatabaseConfigurazione,
+    SistemaRuoloPermessi,
     SistemaUtentePermessi,
 )
 
@@ -230,13 +230,59 @@ class SistemaBackupDatabaseRestoreConfirmForm(forms.Form):
         return value
 
 
+class SistemaRuoloPermessiForm(forms.ModelForm):
+    class Meta:
+        model = SistemaRuoloPermessi
+        fields = [
+            "nome",
+            "descrizione",
+            "colore_principale",
+            "attivo",
+            "amministratore_operativo",
+            "accesso_backup_database",
+            "controllo_completo",
+            "permesso_anagrafica",
+            "permesso_economia",
+            "permesso_sistema",
+            "permesso_calendario",
+            "permesso_gestione_finanziaria",
+            "permesso_gestione_amministrativa",
+            "permesso_servizi_extra",
+        ]
+        labels = {
+            "nome": "Nome ruolo",
+            "descrizione": "Descrizione",
+            "colore_principale": "Colore principale",
+            "attivo": "Ruolo attivo",
+            "amministratore_operativo": "Amministratore operativo",
+            "accesso_backup_database": "Accesso Backup Database",
+            "controllo_completo": "Controllo completo",
+            "permesso_anagrafica": "Modulo anagrafica",
+            "permesso_economia": "Modulo economia",
+            "permesso_sistema": "Modulo sistema",
+            "permesso_calendario": "Modulo calendario",
+            "permesso_gestione_finanziaria": "Modulo gestione finanziaria",
+            "permesso_gestione_amministrativa": "Modulo dipendenti e collaboratori",
+            "permesso_servizi_extra": "Modulo servizi extra",
+        }
+        widgets = {
+            "descrizione": forms.Textarea(attrs={"rows": 3}),
+            "colore_principale": forms.TextInput(attrs={"type": "color"}),
+        }
+        help_texts = {
+            "colore_principale": "Il colore personalizza header, label delle tabelle e tinte della sidebar per gli utenti con questo ruolo.",
+            "controllo_completo": "Concede pieno accesso applicativo senza rendere l'utente superuser Django.",
+        }
+
+
 class SistemaUtenteForm(forms.ModelForm):
     email = forms.EmailField(label="Email")
-    ruolo = forms.ChoiceField(
+    ruolo_permessi = forms.ModelChoiceField(
         label="Ruolo",
-        required=False,
-        choices=[("", "---------"), *RuoloUtente.choices],
-        help_text="Definisce il ruolo della persona che possiede l'account.",
+        queryset=SistemaRuoloPermessi.objects.none(),
+        empty_label="---------",
+        required=True,
+        help_text="I permessi dell'account vengono ereditati dal ruolo selezionato.",
     )
     password = forms.CharField(
         label="Password",
@@ -244,53 +290,14 @@ class SistemaUtenteForm(forms.ModelForm):
         required=False,
         help_text="Obbligatoria in creazione. In modifica, lascia vuoto per non cambiarla.",
     )
-    controllo_completo = forms.BooleanField(
-        label="Controllo completo",
-        required=False,
-        help_text="Concede pieno accesso applicativo senza rendere l'utente superuser Django.",
-    )
-    permesso_anagrafica = forms.ChoiceField(
-        label="Modulo anagrafica",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_economia = forms.ChoiceField(
-        label="Modulo economia",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_sistema = forms.ChoiceField(
-        label="Modulo sistema",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_calendario = forms.ChoiceField(
-        label="Modulo calendario",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_gestione_finanziaria = forms.ChoiceField(
-        label="Modulo gestione finanziaria",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_gestione_amministrativa = forms.ChoiceField(
-        label="Modulo gestione amministrativa",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
-    permesso_servizi_extra = forms.ChoiceField(
-        label="Modulo servizi extra",
-        choices=LivelloPermesso.choices,
-        initial=LivelloPermesso.NESSUNO,
-    )
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email", "password"]
+        fields = ["first_name", "last_name", "email", "is_active", "password"]
         labels = {
             "first_name": "Nome",
             "last_name": "Cognome",
+            "is_active": "Utente attivo",
         }
 
     def __init__(self, *args, **kwargs):
@@ -299,22 +306,22 @@ class SistemaUtenteForm(forms.ModelForm):
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
         self.fields["email"].required = True
+        self.fields["is_active"].required = False
+        role_queryset = SistemaRuoloPermessi.objects.filter(attivo=True).order_by("nome")
 
         if self.instance and self.instance.pk:
             self.fields["email"].initial = self.instance.email or self.instance.username
             profilo = getattr(self.instance, "profilo_permessi", None)
             if profilo:
-                self.fields["ruolo"].initial = profilo.ruolo
-                self.fields["controllo_completo"].initial = profilo.controllo_completo
-                self.fields["permesso_anagrafica"].initial = profilo.permesso_anagrafica
-                self.fields["permesso_economia"].initial = profilo.permesso_economia
-                self.fields["permesso_sistema"].initial = profilo.permesso_sistema
-                self.fields["permesso_calendario"].initial = profilo.permesso_calendario
-                self.fields["permesso_gestione_finanziaria"].initial = profilo.permesso_gestione_finanziaria
-                self.fields["permesso_gestione_amministrativa"].initial = profilo.permesso_gestione_amministrativa
-                self.fields["permesso_servizi_extra"].initial = profilo.permesso_servizi_extra
+                if profilo.ruolo_permessi_id:
+                    role_queryset = SistemaRuoloPermessi.objects.filter(
+                        Q(attivo=True) | Q(pk=profilo.ruolo_permessi_id)
+                    ).order_by("nome")
+                self.fields["ruolo_permessi"].initial = profilo.ruolo_permessi
         else:
             self.fields["password"].required = True
+            self.fields["is_active"].initial = True
+        self.fields["ruolo_permessi"].queryset = role_queryset
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -326,14 +333,14 @@ class SistemaUtenteForm(forms.ModelForm):
             existing_email = existing_email.exclude(pk=self.instance.pk)
 
         if existing_username.exists() or existing_email.exists():
-            raise forms.ValidationError("Esiste giÃ  un utente con questa email.")
+            raise forms.ValidationError("Esiste gia un utente con questa email.")
 
         return email
 
     def clean_password(self):
         password = self.cleaned_data.get("password", "")
         if not self.instance.pk and not password:
-            raise forms.ValidationError("La password Ã¨ obbligatoria.")
+            raise forms.ValidationError("La password e obbligatoria.")
         return password
 
     def save(self, commit=True):
@@ -349,18 +356,20 @@ class SistemaUtenteForm(forms.ModelForm):
 
         if commit:
             user.save()
+            ruolo_permessi = self.cleaned_data["ruolo_permessi"]
             SistemaUtentePermessi.objects.update_or_create(
                 user=user,
                 defaults={
-                    "ruolo": self.cleaned_data["ruolo"],
-                    "controllo_completo": self.cleaned_data["controllo_completo"],
-                    "permesso_anagrafica": self.cleaned_data["permesso_anagrafica"],
-                    "permesso_economia": self.cleaned_data["permesso_economia"],
-                    "permesso_sistema": self.cleaned_data["permesso_sistema"],
-                    "permesso_calendario": self.cleaned_data["permesso_calendario"],
-                    "permesso_gestione_finanziaria": self.cleaned_data["permesso_gestione_finanziaria"],
-                    "permesso_gestione_amministrativa": self.cleaned_data["permesso_gestione_amministrativa"],
-                    "permesso_servizi_extra": self.cleaned_data["permesso_servizi_extra"],
+                    "ruolo_permessi": ruolo_permessi,
+                    "ruolo": ruolo_permessi.chiave_legacy or "",
+                    "controllo_completo": ruolo_permessi.controllo_completo,
+                    "permesso_anagrafica": ruolo_permessi.permesso_anagrafica,
+                    "permesso_economia": ruolo_permessi.permesso_economia,
+                    "permesso_sistema": ruolo_permessi.permesso_sistema,
+                    "permesso_calendario": ruolo_permessi.permesso_calendario,
+                    "permesso_gestione_finanziaria": ruolo_permessi.permesso_gestione_finanziaria,
+                    "permesso_gestione_amministrativa": ruolo_permessi.permesso_gestione_amministrativa,
+                    "permesso_servizi_extra": ruolo_permessi.permesso_servizi_extra,
                 },
             )
 

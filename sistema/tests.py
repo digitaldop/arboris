@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
-from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaUtentePermessi
+from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaRuoloPermessi, SistemaUtentePermessi
 from .popup_manifest import build_popup_manifest
 from anagrafica.models import Citta, Provincia, Regione
 from anagrafica.models import Indirizzo
@@ -207,6 +207,10 @@ class SidebarSistemaTests(TestCase):
         sistema_section = content[start:]
 
         labels_in_order = [
+            "Impostazioni generali",
+            "<span>Gestione Account</span>",
+            "Utenti",
+            "Ruoli",
             "<span>Impostazioni Scuola</span>",
             "Dati Generali Scuola",
             "Anni scolastici",
@@ -218,6 +222,93 @@ class SidebarSistemaTests(TestCase):
             current_index = sistema_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+
+
+class RuoliUtenteTests(TestCase):
+    def setUp(self):
+        self.admin_role = SistemaRuoloPermessi.objects.create(
+            nome="Amministratore operativo",
+            colore_principale="#f2c94c",
+            controllo_completo=True,
+            amministratore_operativo=True,
+            accesso_backup_database=True,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+        self.user = User.objects.create_user(
+            username="ruoli@example.com",
+            email="ruoli@example.com",
+            password="Password123!",
+            first_name="Ada",
+            last_name="Lovelace",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            ruolo_permessi=self.admin_role,
+        )
+
+    def test_role_drives_permissions_and_theme(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_ruoli_utenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Amministratore operativo")
+        self.assertContains(response, "--primary: #f2c94c")
+        self.assertContains(response, reverse("crea_ruolo_utente"))
+
+    def test_user_form_uses_role_instead_of_user_level_permissions(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("modifica_utente", args=[self.user.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Permessi ereditati dal ruolo")
+        self.assertContains(response, "Per cambiare i permessi modifica il ruolo collegato")
+        self.assertContains(response, "Utente attivo")
+        self.assertNotContains(response, "Modulo anagrafica")
+
+    def test_header_settings_dropdown_renders_system_links(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_utenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "header-settings-dropdown")
+        self.assertContains(response, "header-settings-icon")
+        self.assertNotContains(response, "<span>IMPOSTAZIONI</span>", html=True)
+        self.assertNotContains(response, "Admin tecnico")
+        self.assertContains(response, "Gestione Account")
+        self.assertContains(response, "Backup e Cronologia")
+        self.assertContains(response, "Impostazioni Scuola")
+        self.assertContains(response, reverse("lista_utenti"))
+        self.assertContains(response, reverse("lista_ruoli_utenti"))
+
+    def test_admin_can_delete_other_user(self):
+        self.client.force_login(self.user)
+        target = User.objects.create_user(
+            username="da-eliminare@example.com",
+            email="da-eliminare@example.com",
+            password="Password123!",
+            first_name="Grace",
+            last_name="Hopper",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=target,
+            ruolo_permessi=self.admin_role,
+        )
+
+        response = self.client.post(reverse("elimina_utente", args=[target.pk]))
+
+        self.assertRedirects(response, reverse("lista_utenti"))
+        self.assertFalse(User.objects.filter(pk=target.pk).exists())
+
+    def test_admin_cannot_delete_current_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("elimina_utente", args=[self.user.pk]))
+
+        self.assertRedirects(response, reverse("modifica_utente", args=[self.user.pk]))
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
 
 
 class PopupManifestTests(TestCase):

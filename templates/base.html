@@ -16,7 +16,23 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=78">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=82">
+    {% if role_theme %}
+        <style>
+            :root {
+                --primary: {{ role_theme.primary }};
+                --primary-dark: {{ role_theme.primary_dark }};
+                --role-primary-text: {{ role_theme.primary_text }};
+                --role-header-bg: linear-gradient(90deg, {{ role_theme.primary_dark }}, {{ role_theme.primary }});
+                --sidebar-bg: {{ role_theme.sidebar_bg }};
+                --sidebar-link-hover: {{ role_theme.primary_soft }};
+                --sidebar-link-active-bg: {{ role_theme.primary }};
+                --sidebar-link-active-text: {{ role_theme.primary_text }};
+                --sidebar-module-bg: {{ role_theme.sidebar_module_bg }};
+                --sidebar-module-border: {{ role_theme.sidebar_module_border }};
+            }
+        </style>
+    {% endif %}
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=2"></script>
 </head>
@@ -65,13 +81,49 @@
 
             <div class="header-right">
                 {% if request.user.is_authenticated %}
+                    <details class="header-settings-dropdown">
+                        <summary class="header-settings-trigger" aria-label="Apri impostazioni">
+                            <span class="header-settings-icon" aria-hidden="true">&#9881;</span>
+                        </summary>
+                        <div class="header-settings-menu">
+                            {% if can_view_sistema %}
+                                <div class="header-settings-group">
+                                    <a href="{% url 'impostazioni_generali_sistema' %}" class="header-settings-primary-link">Impostazioni generali</a>
+                                </div>
+                                <div class="header-settings-group">
+                                    <div class="header-settings-heading">Gestione Account</div>
+                                    <a href="{% url 'lista_utenti' %}">Utenti</a>
+                                    <a href="{% url 'lista_ruoli_utenti' %}">Ruoli</a>
+                                </div>
+                            {% endif %}
+                            {% if can_access_database_backups or can_view_operation_history %}
+                                <div class="header-settings-group">
+                                    <div class="header-settings-heading">Backup e Cronologia</div>
+                                    {% if can_access_database_backups %}
+                                        <a href="{% url 'backup_database_sistema' %}">Backup Database</a>
+                                    {% endif %}
+                                    {% if can_view_operation_history %}
+                                        <a href="{% url 'cronologia_operazioni_sistema' %}">Cronologia Operazioni</a>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            <div class="header-settings-group">
+                                <div class="header-settings-heading">Impostazioni Scuola</div>
+                                {% if can_manage_sistema %}
+                                    <a href="{% url 'scuola_sistema' %}">Dati Generali Scuola</a>
+                                {% endif %}
+                                <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
+                                <a href="{% url 'lista_classi' %}">Classi</a>
+                            </div>
+                        </div>
+                    </details>
                     <div class="header-user-summary">
                         <div class="header-user-name">
                             {{ request.user.get_full_name|default:request.user.email|default:request.user.username }}
                         </div>
                         <div class="header-user-role">
-                            {% if user_permission_profile and user_permission_profile.ruolo %}
-                                {{ user_permission_profile.get_ruolo_display }}
+                            {% if user_permission_profile and user_permission_profile.ruolo_display %}
+                                {{ user_permission_profile.ruolo_display }}
                             {% elif request.user.is_superuser %}
                                 Superuser
                             {% elif request.user.is_staff %}
@@ -82,9 +134,6 @@
                         </div>
                     </div>
                     <a href="{% url 'logout' %}" class="header-link header-link-button">Esci</a>
-                {% endif %}
-                {% if request.user.is_staff or request.user.is_superuser %}
-                    <a href="/admin/" class="header-link">Admin Tecnico</a>
                 {% endif %}
             </div>
         </div>
@@ -298,7 +347,7 @@
                                 data-storage-key="arboris-sidebar-gestione-amministrativa"
                                 data-default-open="true"
                             >
-                                <span>Gestione amministrativa</span>
+                                <span>Dipendenti e collaboratori</span>
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-amministrativa-panel">
                                 <nav class="sidebar-nav sidebar-subnav">
@@ -470,9 +519,67 @@
                                 data-storage-key="arboris-sidebar-sistema"
                                 data-default-open="true"
                             >
-                                <span>Sistema</span>
+                                <span>Impostazioni</span>
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-panel">
+                                {% if can_view_sistema %}
+                                    <nav class="sidebar-nav sidebar-subnav">
+                                        <a href="{% url 'impostazioni_generali_sistema' %}" class="{% if request.resolver_match.url_name == 'impostazioni_generali_sistema' %}active{% endif %}">
+                                            Impostazioni generali
+                                        </a>
+                                    </nav>
+
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-sistema-account-panel"
+                                            data-storage-key="arboris-sidebar-sistema-account"
+                                            data-default-open="true"
+                                        >
+                                            <span>Gestione Account</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-account-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                <a href="{% url 'lista_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_utenti' or request.resolver_match.url_name == 'crea_utente' or request.resolver_match.url_name == 'modifica_utente' or request.resolver_match.url_name == 'elimina_utente' %}active{% endif %}">
+                                                    Utenti
+                                                </a>
+                                                <a href="{% url 'lista_ruoli_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_ruoli_utenti' or request.resolver_match.url_name == 'crea_ruolo_utente' or request.resolver_match.url_name == 'modifica_ruolo_utente' %}active{% endif %}">
+                                                    Ruoli
+                                                </a>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% if can_access_database_backups or can_view_operation_history %}
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-sistema-backup-panel"
+                                            data-storage-key="arboris-sidebar-sistema-backup"
+                                            data-default-open="true"
+                                        >
+                                            <span>Backup e Cronologia</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-backup-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                {% if can_access_database_backups %}
+                                                    <a href="{% url 'backup_database_sistema' %}" class="{% if request.resolver_match.url_name == 'backup_database_sistema' %}active{% endif %}">
+                                                        Backup Database
+                                                    </a>
+                                                {% endif %}
+                                                {% if can_view_operation_history %}
+                                                    <a href="{% url 'cronologia_operazioni_sistema' %}" class="{% if request.resolver_match.url_name == 'cronologia_operazioni_sistema' %}active{% endif %}">
+                                                        Cronologia Operazioni
+                                                    </a>
+                                                {% endif %}
+                                            </nav>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
                                 <div class="sidebar-subsection">
                                     <button
                                         type="button"
@@ -499,27 +606,6 @@
                                         </nav>
                                     </div>
                                 </div>
-                                {% if can_view_sistema %}
-                                    <nav class="sidebar-nav sidebar-subnav">
-                                        <a href="{% url 'impostazioni_generali_sistema' %}" class="{% if request.resolver_match.url_name == 'impostazioni_generali_sistema' %}active{% endif %}">
-                                            Impostazioni generali
-                                        </a>
-                                        {% if can_access_database_backups %}
-                                            <a href="{% url 'backup_database_sistema' %}" class="{% if request.resolver_match.url_name == 'backup_database_sistema' %}active{% endif %}">
-                                                Backup database
-                                            </a>
-                                        {% endif %}
-                                        {% if can_view_operation_history %}
-                                            <a href="{% url 'cronologia_operazioni_sistema' %}" class="{% if request.resolver_match.url_name == 'cronologia_operazioni_sistema' %}active{% endif %}">
-                                                Cronologia operazioni
-                                            </a>
-                                        {% endif %}
-                                        <a href="{% url 'lista_utenti' %}" class="{% if request.resolver_match.url_name == 'lista_utenti' or request.resolver_match.url_name == 'crea_utente' or request.resolver_match.url_name == 'modifica_utente' %}active{% endif %}">
-                                            Utenti
-                                        </a>
-                                        <a href="/admin/">Admin tecnico</a>
-                                    </nav>
-                                {% endif %}
                             </div>
                         </div>
                     {% endif %}

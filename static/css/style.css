@@ -73,8 +73,8 @@ a:hover {
 
 .site-header {
     /* background: var(--primary); BACKUP 18/04/2026 ore 12:40 */
-    background: linear-gradient(90deg,#3f748d,#467c99);
-    color: #fff;
+    background: var(--role-header-bg, linear-gradient(90deg,#3f748d,#467c99));
+    color: var(--role-primary-text, #fff);
     border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
@@ -112,6 +112,90 @@ a:hover {
     padding: 0 24px;
 }
 
+.header-settings-dropdown {
+    position: relative;
+}
+
+.header-settings-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    width: 38px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--role-primary-text, #e8f1f5);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    list-style: none;
+}
+
+.header-settings-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.header-settings-trigger:hover,
+.header-settings-dropdown[open] .header-settings-trigger {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.header-settings-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.header-settings-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 5000;
+    min-width: 270px;
+    padding: 10px;
+    border: 1px solid rgba(65, 118, 144, 0.22);
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 14px 32px rgba(24, 49, 64, 0.22);
+    color: #203642;
+}
+
+.header-settings-group + .header-settings-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #edf2f5;
+}
+
+.header-settings-heading {
+    margin: 0 0 6px;
+    color: #67808d;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.header-settings-menu a {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 4px;
+    color: #24485b;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.header-settings-menu a:hover {
+    background: var(--sidebar-link-hover, #eaf2f6);
+    color: #183542;
+    text-decoration: none;
+}
+
+.header-settings-primary-link {
+    font-weight: 700;
+}
+
 .header-user-summary {
     display: flex;
     flex-direction: column;
@@ -121,7 +205,7 @@ a:hover {
 
 .header-user-name {
     max-width: 240px;
-    color: #fff;
+    color: var(--role-primary-text, #fff);
     font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
@@ -131,7 +215,7 @@ a:hover {
 }
 
 .header-user-role {
-    color: #dceaf1;
+    color: var(--role-primary-text, #dceaf1);
     font-size: 12px;
     line-height: 1.2;
 }
@@ -147,7 +231,7 @@ a:hover {
 }
 
 .header-school-name {
-    color: #fff;
+    color: var(--role-primary-text, #fff);
     font-size: 28px;
     font-weight: 600;
     line-height: 1.15;
@@ -159,7 +243,7 @@ a:hover {
 
 .header-school-meta {
     margin-top: 4px;
-    color: #dceaf1;
+    color: var(--role-primary-text, #dceaf1);
     font-size: 12px;
     line-height: 1.2;
     white-space: nowrap;
@@ -169,17 +253,17 @@ a:hover {
 }
 
 .header-meta-link {
-    color: #f4fbff;
+    color: var(--role-primary-text, #f4fbff);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 
 .header-meta-link:hover {
-    color: #ffffff;
+    color: var(--role-primary-text, #ffffff);
 }
 
 .header-link {
-    color: #e8f1f5;
+    color: var(--role-primary-text, #e8f1f5);
     font-size: 13px;
     text-decoration: none;
 }
@@ -196,7 +280,7 @@ a:hover {
 }
 
 .header-link:hover {
-    color: #fff;
+    color: var(--role-primary-text, #fff);
     text-decoration: none;
 }
 
@@ -419,7 +503,7 @@ a:hover {
 .sidebar-collapsible {
     width: 100%;
     padding: 18px 16px;
-    background: #dfeaf0;
+    background: var(--sidebar-module-bg);
     color: #2f4c5c;
     border: none;
     border-top: 1px solid var(--sidebar-module-border);
@@ -432,7 +516,7 @@ a:hover {
 }
 
 .sidebar-collapsible:hover {
-    background: #d6e4ec;
+    background: var(--sidebar-link-hover);
 }
 
 .sidebar-collapsible::before {
@@ -443,6 +527,18 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.sidebar-section > .sidebar-collapsible span {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.25;
+}
+
+.sidebar-subsection .sidebar-collapsible span {
+    justify-content: flex-start;
+    text-align: left;
 }
 
 .sidebar-module-panel {
@@ -1769,6 +1865,11 @@ select:focus {
     font-size: 13px;
 }
 
+.table-action-separator {
+    margin: 0 4px;
+    color: #b5c0c6;
+}
+
 .inline-form {
     display: inline;
 }
@@ -2011,8 +2112,8 @@ select:focus {
 }
 
 .admin-section-title {
-    background: #417690;
-    color: #fff;
+    background: var(--primary);
+    color: var(--role-primary-text, #fff);
     font-size: 14px;
     font-weight: 600;
     padding: 9px 12px;
@@ -2055,7 +2156,7 @@ select:focus {
     border: 1px solid rgba(255, 255, 255, 0.4);
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.14);
-    color: #fff;
+    color: var(--role-primary-text, #fff);
     font-size: 12px;
     font-weight: 700;
     line-height: 1.2;
@@ -2068,7 +2169,7 @@ select:focus {
 .admin-section-title-btn:focus-visible {
     background: rgba(255, 255, 255, 0.24);
     border-color: rgba(255, 255, 255, 0.7);
-    color: #fff;
+    color: var(--role-primary-text, #fff);
     transform: translateY(-1px);
 }
 
@@ -2078,6 +2179,16 @@ select:focus {
     padding: 0;
     font-size: 14px;
     text-decoration: none;
+}
+
+.role-color-swatch {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    vertical-align: middle;
 }
 
 .inline-help-trigger {

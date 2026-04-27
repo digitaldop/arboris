@@ -16,7 +16,23 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=78">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=82">
+    {% if role_theme %}
+        <style>
+            :root {
+                --primary: {{ role_theme.primary }};
+                --primary-dark: {{ role_theme.primary_dark }};
+                --role-primary-text: {{ role_theme.primary_text }};
+                --role-header-bg: linear-gradient(90deg, {{ role_theme.primary_dark }}, {{ role_theme.primary }});
+                --sidebar-bg: {{ role_theme.sidebar_bg }};
+                --sidebar-link-hover: {{ role_theme.primary_soft }};
+                --sidebar-link-active-bg: {{ role_theme.primary }};
+                --sidebar-link-active-text: {{ role_theme.primary_text }};
+                --sidebar-module-bg: {{ role_theme.sidebar_module_bg }};
+                --sidebar-module-border: {{ role_theme.sidebar_module_border }};
+            }
+        </style>
+    {% endif %}
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
 </head>
 <body class="popup-page">

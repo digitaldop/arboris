@@ -5,7 +5,7 @@ from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
-from .models import LivelloPermesso, RuoloUtente, SistemaUtentePermessi
+from .models import LivelloPermesso, SistemaUtentePermessi
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -40,7 +40,7 @@ def get_user_permission_profile(user):
     if cached is not None:
         return cached
 
-    profilo, _ = SistemaUtentePermessi.objects.get_or_create(user=user)
+    profilo, _ = SistemaUtentePermessi.objects.select_related("ruolo_permessi").get_or_create(user=user)
     user._arboris_permission_profile_cache = profilo
     return profilo
 
@@ -74,8 +74,8 @@ def user_is_operational_admin(user):
         return False
 
     return bool(
-        profilo.controllo_completo
-        or profilo.ruolo == RuoloUtente.AMMINISTRATORE
+        profilo.controllo_completo_effettivo
+        or profilo.amministratore_operativo_effettivo
     )
 
 
@@ -90,7 +90,7 @@ def user_can_access_database_backups(user):
     if not profilo:
         return False
 
-    return profilo.ruolo == RuoloUtente.AMMINISTRATORE
+    return profilo.accesso_backup_database_effettivo
 
 
 def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZIONE):

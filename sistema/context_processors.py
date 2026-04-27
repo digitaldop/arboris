@@ -211,9 +211,11 @@ def sistema_permissions_context(request):
             servizi_extra_sidebar_items = []
 
     can_view_system_tables = user_is_operational_admin(user)
+    role_theme = profilo.role_theme_variables if profilo else None
 
     return {
         "user_permission_profile": profilo,
+        "role_theme": role_theme,
         "current_permission_module": current_module,
         "current_module_view_only": bool(current_module) and not can_manage_current_module,
         "can_view_anagrafica": can_view_anagrafica,

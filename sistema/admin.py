@@ -10,6 +10,7 @@ from .models import (
     ScuolaTelefono,
     ScuolaEmail,
     SistemaImpostazioniGenerali,
+    SistemaRuoloPermessi,
     SistemaUtentePermessi,
 )
 
@@ -45,10 +46,25 @@ class ScuolaAdmin(admin.ModelAdmin):
     autocomplete_fields = ("indirizzo_sede_legale", "indirizzo_operativo")
 
 
+@admin.register(SistemaRuoloPermessi)
+class SistemaRuoloPermessiAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome",
+        "colore_principale",
+        "attivo",
+        "controllo_completo",
+        "amministratore_operativo",
+        "accesso_backup_database",
+    )
+    list_filter = ("attivo", "controllo_completo", "amministratore_operativo", "accesso_backup_database")
+    search_fields = ("nome", "descrizione")
+
+
 @admin.register(SistemaUtentePermessi)
 class SistemaUtentePermessiAdmin(admin.ModelAdmin):
     list_display = (
         "user",
+        "ruolo_permessi",
         "ruolo",
         "controllo_completo",
         "permesso_anagrafica",

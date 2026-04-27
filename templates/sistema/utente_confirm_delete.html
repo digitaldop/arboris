@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina utente - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_utenti' %}">Utenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'modifica_utente' utente_obj.pk %}">{{ utente_obj.get_full_name|default:utente_obj.email|default:utente_obj.username }}</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina utente</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'modifica_utente' utente_obj.pk %}" class="btn btn-secondary">Annulla</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare l'utente <strong>{{ utente_obj.get_full_name|default:utente_obj.email|default:utente_obj.username }}</strong>.</p>
+            <p>Email: <strong>{{ utente_obj.email|default:"-" }}</strong></p>
+            <p>Ruolo: <strong>{{ utente_obj.profilo_permessi.ruolo_display|default:"-" }}</strong></p>
+            <p>L'operazione elimina anche il profilo permessi collegato all'account.</p>
+        </div>
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Conferma eliminazione</button>
+            <a href="{% url 'modifica_utente' utente_obj.pk %}" class="btn btn-secondary">Annulla</a>
+        </form>
+    </div>
+{% endblock %}
