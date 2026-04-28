@@ -1657,8 +1657,8 @@ def crea_famiglia(request):
                     messages.success(request, "Famiglia creata correttamente. Puoi inserirne un'altra.")
                     return redirect("crea_famiglia")
 
-                messages.success(request, "Famiglia creata correttamente.")
-                return redirect(f"{reverse('lista_famiglie')}?highlight={famiglia.pk}")
+                messages.success(request, "Famiglia creata correttamente. Ora puoi continuare a inserire i dati.")
+                return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
 
         if familiari_formset is None:
             familiari_formset = build_familiari_formset(prefix="familiari")
