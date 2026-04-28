@@ -1,12 +1,13 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 
 
 class AnnoScolastico(models.Model):
     nome_anno_scolastico = models.CharField(max_length=50, unique=True)
     data_inizio = models.DateField()
     data_fine = models.DateField()
-    corrente = models.BooleanField(default=False)
     attivo = models.BooleanField(default=True)
     note = models.TextField(blank=True)
 
@@ -15,18 +16,45 @@ class AnnoScolastico(models.Model):
         ordering = ["-data_inizio", "-id"]
         verbose_name = "Anno scolastico"
         verbose_name_plural = "Anni scolastici"
+        constraints = [
+            models.CheckConstraint(
+                check=Q(data_fine__gte=models.F("data_inizio")),
+                name="scuola_anno_data_fine_gte_data_inizio",
+            )
+        ]
 
     def __str__(self):
         return self.nome_anno_scolastico
 
+    @property
+    def is_corrente(self):
+        oggi = timezone.localdate()
+        return bool(self.data_inizio and self.data_fine and self.data_inizio <= oggi <= self.data_fine)
+
+    @property
+    def corrente(self):
+        return self.is_corrente
+
     def clean(self):
         super().clean()
 
-        if self.data_fine < self.data_inizio:
-            raise ValidationError("La data di fine non puo essere precedente alla data di inizio.")
+        if not self.data_inizio or not self.data_fine:
+            return
 
-        if self.corrente and AnnoScolastico.objects.exclude(pk=self.pk).filter(corrente=True).exists():
-            raise ValidationError("E possibile impostare come corrente un solo anno scolastico.")
+        if self.data_fine < self.data_inizio:
+            raise ValidationError("La data di fine non può essere precedente alla data di inizio.")
+
+        if self.attivo:
+            overlapping_qs = AnnoScolastico.objects.exclude(pk=self.pk).filter(
+                attivo=True,
+                data_inizio__lte=self.data_fine,
+                data_fine__gte=self.data_inizio,
+            )
+            if overlapping_qs.exists():
+                raise ValidationError(
+                    "Esiste già un anno scolastico attivo con date sovrapposte. "
+                    "Modifica le date o disattiva uno dei due anni scolastici."
+                )
 
 
 class Classe(models.Model):

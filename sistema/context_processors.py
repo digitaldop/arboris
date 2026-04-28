@@ -29,6 +29,8 @@ def get_current_permission_module(request):
         return "gestione_finanziaria"
     if view_module.startswith("gestione_amministrativa."):
         return "gestione_amministrativa"
+    if view_module.startswith("archivio_storico."):
+        return "sistema"
     if view_module.startswith("sistema."):
         return "sistema"
     if getattr(request, "path", "").startswith(("/scuola/calendario/", "/calendario/")):

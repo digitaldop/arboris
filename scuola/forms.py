@@ -15,7 +15,6 @@ class AnnoScolasticoForm(forms.ModelForm):
             "nome_anno_scolastico",
             "data_inizio",
             "data_fine",
-            "corrente",
             "attivo",
             "note",
         ]

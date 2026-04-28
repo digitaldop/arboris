@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=82">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=84">
     {% if role_theme %}
         <style>
             :root {
@@ -181,6 +181,27 @@
 
                                     <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' %}active{% endif %}">
                                         Studenti
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_sistema %}
+                        <div class="sidebar-section" data-sidebar-section-key="archivio-storico">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-archivio-storico-panel"
+                                data-storage-key="arboris-sidebar-archivio-storico"
+                                data-default-open="true"
+                            >
+                                <span>Archivio storico</span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-archivio-storico-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'lista_archivio_storico' %}" class="{% if request.resolver_match.url_name == 'lista_archivio_storico' or request.resolver_match.url_name == 'anteprima_archiviazione_anno' or request.resolver_match.url_name == 'dettaglio_archivio_storico' %}active{% endif %}">
+                                        Anni archiviati
                                     </a>
                                 </nav>
                             </div>

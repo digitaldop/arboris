@@ -21,6 +21,9 @@
         .verifica-rette-anno-form select.form-control {
             min-width: 240px;
         }
+        .verifica-rette-batch-form {
+            margin: 0;
+        }
 
         .verifica-rette-legenda-card {
             padding: 0.75rem 1rem;
@@ -219,7 +222,7 @@
                             value="{{ anno.pk }}"
                             {% if anno_scolastico and anno.pk == anno_scolastico.pk %}selected{% endif %}
                         >
-                            {{ anno.nome_anno_scolastico }}{% if anno.corrente %} (corrente){% endif %}
+                            {{ anno.nome_anno_scolastico }}{% if anno.is_corrente %} (corrente){% endif %}
                         </option>
                     {% empty %}
                         <option value="">Nessun anno scolastico disponibile</option>
@@ -229,6 +232,30 @@
                     <button type="submit" class="btn btn-secondary">Aggiorna</button>
                 </noscript>
             </form>
+            {% if can_manage_economia and anno_scolastico %}
+                <form
+                    method="post"
+                    action="{% url 'ricalcola_rate_anno_scolastico' %}"
+                    class="verifica-rette-batch-form"
+                    onsubmit="return confirm('Ricalcolare le rate di tutte le iscrizioni attive per l anno scolastico selezionato? Le rate con pagamenti o movimenti non verranno rigenerate.');"
+                >
+                    {% csrf_token %}
+                    <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-secondary">Ricalcola rate anno</button>
+                </form>
+                <form
+                    method="post"
+                    action="{% url 'riconcilia_pagamenti_rate_anno_scolastico' %}"
+                    class="verifica-rette-batch-form"
+                    onsubmit="return confirm('Avviare la riconciliazione automatica dei pagamenti per l anno scolastico selezionato? I casi ambigui resteranno da riconciliare manualmente.');"
+                >
+                    {% csrf_token %}
+                    <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn btn-primary">Riconcilia pagamenti anno</button>
+                </form>
+            {% endif %}
         </div>
     </div>
 

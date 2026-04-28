@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'anagrafica',
     'osservazioni.apps.OsservazioniConfig',
+    'archivio_storico.apps.ArchivioStoricoConfig',
     'sistema',
     'scuola',
     'calendario',

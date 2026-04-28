@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Archivio {{ archivio.nome_anno_scolastico }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_archivio_storico' %}">Archivio storico</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{{ archivio.nome_anno_scolastico }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Archivio {{ archivio.nome_anno_scolastico }}</h1>
+        <div class="page-head-actions">
+            <a href="{{ back_url }}" class="btn btn-secondary">Indietro</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="form-table">
+            <tr><th>Periodo archiviato</th><td>{{ archivio.data_inizio|it_date }} - {{ archivio.data_fine|it_date }}</td></tr>
+            <tr><th>Data archiviazione</th><td>{{ archivio.data_archiviazione|date:"d/m/Y H:i" }}</td></tr>
+            <tr><th>Archiviato da</th><td>{{ archivio.archiviato_da.get_full_name|default:archivio.archiviato_da.email|default:archivio.archiviato_da.username|default:"-" }}</td></tr>
+            {% if archivio.note %}
+                <tr><th>Note archivio</th><td>{{ archivio.note }}</td></tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_snapshot }}</div><div class="summary-label">Snapshot</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_famiglie }}</div><div class="summary-label">Famiglie</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_studenti }}</div><div class="summary-label">Studenti</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_iscrizioni }}</div><div class="summary-label">Iscrizioni</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_rate }}</div><div class="summary-label">Rate</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_osservazioni }}</div><div class="summary-label">Osservazioni</div></div>
+        <div class="summary-card"><div class="summary-value">{{ archivio.totale_documenti }}</div><div class="summary-label">Documenti</div></div>
+    </div>
+
+    {% for section in sections %}
+        <div class="admin-section">
+            <button
+                type="button"
+                class="admin-section-title collapsible-title is-open"
+                data-target="archive-section-{{ section.tipo }}"
+                data-storage-key="arboris-archive-section-{{ section.tipo }}"
+                data-default-open="true"
+            >
+                <span class="admin-section-title-label">{{ section.label }} ({{ section.count }})</span>
+                <span class="collapsible-indicator" aria-hidden="true">▾</span>
+            </button>
+            <div class="panel collapsible-panel is-open" id="archive-section-{{ section.tipo }}">
+                <div class="panel-body">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Record</th>
+                                <th>Dati congelati</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for snapshot in section.records %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ snapshot.titolo }}</strong>
+                                        <div class="table-subtext">{{ snapshot.source_model }} #{{ snapshot.source_pk }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="archive-data-grid">
+                                            {% for key, value in snapshot.dati.items %}
+                                                {% if value %}
+                                                    <div class="archive-data-item">
+                                                        <span class="archive-data-label">{{ key|capfirst|cut:"_" }}</span>
+                                                        <span class="archive-data-value">{{ value }}</span>
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="content-card">
+            <div class="empty-state">Nessuno snapshot disponibile per questo archivio.</div>
+        </div>
+    {% endfor %}
+{% endblock %}

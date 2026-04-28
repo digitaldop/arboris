@@ -2816,6 +2816,128 @@ def modifica_studente(request, pk):
     return render(request, "anagrafica/studenti/studente_form.html", ctx)
 
 
+def get_studente_print_osservazioni(request, studente):
+    try:
+        from osservazioni.views import get_osservazioni_policy, user_can_manage_osservazioni
+        from sistema.permissions import user_is_operational_admin
+    except ImportError:
+        return [], False
+
+    if not user_can_manage_osservazioni(request.user):
+        return [], False
+
+    osservazioni_policy = get_osservazioni_policy()
+    osservazioni_qs = studente.osservazioni.select_related("creato_da", "aggiornato_da").order_by(
+        "data_inserimento",
+        "id",
+    )
+    if osservazioni_policy["solo_autori_visualizzazione"] and not user_is_operational_admin(request.user):
+        osservazioni_qs = osservazioni_qs.filter(creato_da=request.user)
+
+    return list(osservazioni_qs), True
+
+
+def get_studente_print_payload(request, studente, *, include_rate=False, include_osservazioni=False):
+    anno_corrente = resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
+    iscrizioni_correnti = []
+    rate_overview = []
+
+    if include_rate and anno_corrente:
+        iscrizioni_correnti = list(
+            studente_iscrizioni_inline_queryset(studente).filter(anno_scolastico=anno_corrente)
+        )
+        rate_overview = build_studente_rate_overview(studente, iscrizioni_correnti)
+
+    osservazioni = []
+    can_print_osservazioni = False
+    if include_osservazioni:
+        osservazioni, can_print_osservazioni = get_studente_print_osservazioni(request, studente)
+    else:
+        _, can_print_osservazioni = get_studente_print_osservazioni(request, studente)
+
+    classe_corrente_label = ""
+    iscrizione_corrente = next((item for item in iscrizioni_correnti if item.classe_id), None)
+    if iscrizione_corrente and iscrizione_corrente.classe:
+        classe_corrente_label = str(iscrizione_corrente.classe)
+    elif anno_corrente:
+        iscrizione_corrente = (
+            studente.iscrizioni.select_related("classe", "anno_scolastico")
+            .filter(anno_scolastico=anno_corrente, classe__isnull=False)
+            .order_by("-attiva", "-pk")
+            .first()
+        )
+        if iscrizione_corrente and iscrizione_corrente.classe:
+            classe_corrente_label = str(iscrizione_corrente.classe)
+
+    return {
+        "anno_corrente": anno_corrente,
+        "classe_corrente_label": classe_corrente_label,
+        "rate_overview": rate_overview,
+        "osservazioni": osservazioni,
+        "can_print_osservazioni": can_print_osservazioni,
+    }
+
+
+def stampa_studente_opzioni(request, pk):
+    studente = get_object_or_404(
+        Studente.objects.select_related("famiglia"),
+        pk=pk,
+    )
+    _, can_print_osservazioni = get_studente_print_osservazioni(request, studente)
+    anno_corrente = resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
+
+    return render(
+        request,
+        "anagrafica/studenti/studente_print_options.html",
+        {
+            "studente": studente,
+            "anno_corrente": anno_corrente,
+            "can_print_osservazioni": can_print_osservazioni,
+        },
+    )
+
+
+def stampa_studente(request, pk):
+    studente = get_object_or_404(
+        Studente.objects.select_related(
+            "famiglia",
+            "famiglia__indirizzo_principale",
+            "famiglia__indirizzo_principale__citta",
+            "indirizzo",
+            "indirizzo__citta",
+            "luogo_nascita",
+            "luogo_nascita__provincia",
+        ),
+        pk=pk,
+    )
+
+    include_dati_generali = request.GET.get("dati_generali") == "1"
+    include_rate = request.GET.get("piano_rate") == "1"
+    include_osservazioni = request.GET.get("osservazioni") == "1"
+    if not any([include_dati_generali, include_rate, include_osservazioni]):
+        include_dati_generali = True
+
+    payload = get_studente_print_payload(
+        request,
+        studente,
+        include_rate=include_rate,
+        include_osservazioni=include_osservazioni,
+    )
+
+    return render(
+        request,
+        "anagrafica/studenti/studente_print.html",
+        {
+            "studente": studente,
+            "print_date": timezone.localdate(),
+            "include_dati_generali": include_dati_generali,
+            "include_rate": include_rate,
+            "include_osservazioni": include_osservazioni and payload["can_print_osservazioni"],
+            **payload,
+        },
+    )
+
+
 def elimina_studente(request, pk):
     studente = get_object_or_404(Studente, pk=pk)
     impact = get_record_documents_impact(studente)

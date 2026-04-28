@@ -50,6 +50,7 @@ from economia.models import (
     TariffaScambioRetta,
     TariffaCondizioneIscrizione,
 )
+from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import AzioneOperazioneCronologia, SistemaOperazioneCronologia
 
@@ -514,13 +515,11 @@ class FamigliaInlineDefaultsTests(TestCase):
             nome_anno_scolastico="2024/2025",
             data_inizio=date(2024, 9, 1),
             data_fine=date(2025, 8, 31),
-            corrente=False,
         )
         anno_corrente = AnnoScolastico.objects.create(
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
         )
 
         form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
@@ -602,7 +601,6 @@ class FamiliareScambioRettaInlineTests(TestCase):
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
             attivo=True,
         )
         self.tariffa = TariffaScambioRetta.objects.create(
@@ -1022,7 +1020,6 @@ class StudenteDetailPerformanceTests(TestCase):
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
         )
         self.classe = Classe.objects.create(
             anno_scolastico=self.anno,
@@ -1207,3 +1204,102 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertNotIn('class="inline-form-row inline-empty-row is-hidden">\n                                        <input type="hidden" name="iscrizioni-0-id"', html)
         self.assertNotIn('class="inline-details-row inline-economic-row inline-empty-row is-hidden"', html)
         self.assertNotIn('class="inline-details-row inline-notes-row inline-empty-row is-hidden"', html)
+
+
+class StudentePrintTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="print-admin@example.com",
+            email="print-admin@example.com",
+            password="Password123!",
+            first_name="Anna",
+            last_name="Admin",
+        )
+        self.client.force_login(self.user)
+        stato_famiglia = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=stato_famiglia,
+        )
+        self.studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Bianchi",
+            data_nascita=date(2020, 5, 10),
+            codice_fiscale="BNCLCU20E10A944X",
+            note="Nessuna intolleranza nota.",
+        )
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            attivo=True,
+        )
+        self.stato_iscrizione = StatoIscrizione.objects.create(
+            stato_iscrizione="Attiva",
+            ordine=1,
+            attiva=True,
+        )
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("1000.00"),
+            preiscrizione=Decimal("100.00"),
+        )
+        self.iscrizione = Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+            attiva=True,
+        )
+        self.iscrizione.sync_rate_schedule()
+        OsservazioneStudente.objects.create(
+            studente=self.studente,
+            titolo="Colloquio iniziale",
+            data_inserimento=date(2026, 1, 10),
+            testo="Osservazione di prova.",
+            creato_da=self.user,
+        )
+
+    def test_student_detail_has_print_popup_button(self):
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Stampa")
+        self.assertContains(response, reverse("stampa_studente_opzioni", kwargs={"pk": self.studente.pk}))
+        self.assertContains(response, 'data-window-popup="1"')
+
+    def test_print_options_popup_renders_section_checkboxes(self):
+        response = self.client.get(reverse("stampa_studente_opzioni", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="dati_generali"')
+        self.assertContains(response, 'name="piano_rate"')
+        self.assertContains(response, 'name="osservazioni"')
+
+    def test_print_sheet_composes_selected_sections(self):
+        response = self.client.get(
+            reverse("stampa_studente", kwargs={"pk": self.studente.pk}),
+            {
+                "dati_generali": "1",
+                "piano_rate": "1",
+                "osservazioni": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dati generali dello studente")
+        self.assertContains(response, "Piano rate - 2025/2026")
+        self.assertContains(response, "Retta standard")
+        self.assertContains(response, "Osservazioni")
+        self.assertContains(response, "Colloquio iniziale")

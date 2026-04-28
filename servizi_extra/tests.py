@@ -12,13 +12,11 @@ class ServiziExtraCurrentSchoolYearDefaultsTests(TestCase):
             nome_anno_scolastico="2024/2025",
             data_inizio=date(2024, 9, 1),
             data_fine=date(2025, 8, 31),
-            corrente=False,
         )
         anno_corrente = AnnoScolastico.objects.create(
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
         )
 
         form = ServizioExtraForm()

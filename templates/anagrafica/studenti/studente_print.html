@@ -1,0 +1,379 @@
+{% load currency rich_notes %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheda studente {{ studente.nome }} {{ studente.cognome }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 14mm;
+        }
+
+        :root {
+            --font-body: {{ site_fonts.body_css_stack|safe }};
+            --font-headings: {{ site_fonts.heading_css_stack|safe }};
+            --text: #1f2933;
+            --muted: #5b6770;
+            --line: #d9e2e8;
+            --panel: #f7fafc;
+            --accent: #2f5f78;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: var(--font-body);
+            font-size: 11.5pt;
+            line-height: 1.35;
+            background: #fff;
+        }
+
+        .sheet {
+            width: 100%;
+        }
+
+        .sheet-header {
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .sheet-title {
+            margin: 0;
+            font-size: 21pt;
+            font-weight: 600;
+            color: var(--accent);
+            font-family: var(--font-headings);
+        }
+
+        .sheet-meta {
+            margin-top: 6px;
+            font-size: 9.5pt;
+            color: var(--muted);
+        }
+
+        .section {
+            margin-top: 18px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 12pt;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-family: var(--font-headings);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 18px;
+        }
+
+        .info-item,
+        .notes-box,
+        .observation-card {
+            padding: 9px 10px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 8px;
+        }
+
+        .info-label,
+        .observation-meta {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .info-value {
+            margin-top: 4px;
+            font-size: 11pt;
+        }
+
+        .notes-box,
+        .observation-text {
+            white-space: pre-wrap;
+        }
+
+        .observation-card + .observation-card {
+            margin-top: 10px;
+        }
+
+        .observation-title {
+            margin: 4px 0 6px;
+            font-size: 12pt;
+            font-weight: 700;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 7px 8px;
+            border: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: var(--panel);
+            font-size: 8.8pt;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .table-muted {
+            color: var(--muted);
+        }
+
+        .empty-block {
+            padding: 12px 14px;
+            border: 1px dashed var(--line);
+            border-radius: 8px;
+            color: var(--muted);
+        }
+
+        .print-toolbar {
+            display: none;
+        }
+
+        @media screen {
+            body {
+                background: #eef3f6;
+                padding: 20px;
+            }
+
+            .sheet {
+                max-width: 210mm;
+                margin: 0 auto;
+                padding: 14mm;
+                background: #fff;
+                box-shadow: 0 10px 30px rgba(31, 41, 51, 0.12);
+            }
+
+            .print-toolbar {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                margin: 0 auto 14px;
+                max-width: 210mm;
+            }
+
+            .print-btn {
+                padding: 9px 14px;
+                border: 1px solid #c9d5dd;
+                border-radius: 6px;
+                background: #fff;
+                color: var(--text);
+                font: inherit;
+                cursor: pointer;
+            }
+
+            .print-btn:hover {
+                background: #f7fafc;
+            }
+        }
+
+        @media print {
+            .sheet {
+                padding: 0;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar">
+        <button type="button" class="print-btn" onclick="window.print()">Stampa</button>
+        <button type="button" class="print-btn" onclick="window.location.href='{% url 'stampa_studente_opzioni' studente.pk %}'">Modifica sezioni</button>
+    </div>
+
+    <main class="sheet">
+        <header class="sheet-header">
+            <h1 class="sheet-title">{{ studente.nome }} {{ studente.cognome }}</h1>
+            <div class="sheet-meta">Scheda studente stampata il {{ print_date|it_date }}</div>
+        </header>
+
+        {% if include_dati_generali %}
+            <section class="section">
+                <h2 class="section-title">Dati generali dello studente</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Famiglia</div>
+                        <div class="info-value">{{ studente.famiglia.cognome_famiglia }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Classe corrente</div>
+                        <div class="info-value">
+                            {% if classe_corrente_label %}
+                                {{ classe_corrente_label }}
+                            {% else %}
+                                <span class="table-muted">Ancora non assegnata</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Nome</div>
+                        <div class="info-value">{{ studente.nome }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Cognome</div>
+                        <div class="info-value">{{ studente.cognome }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Data nascita</div>
+                        <div class="info-value">
+                            {% if studente.data_nascita %}
+                                {{ studente.data_nascita|it_date_with_age }}
+                            {% else %}
+                                <span class="table-muted">Non indicata</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Luogo nascita</div>
+                        <div class="info-value">
+                            {% if studente.luogo_nascita %}
+                                {{ studente.luogo_nascita }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Sesso</div>
+                        <div class="info-value">
+                            {% if studente.sesso %}
+                                {{ studente.get_sesso_display }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Codice fiscale</div>
+                        <div class="info-value">
+                            {% if studente.codice_fiscale %}
+                                {{ studente.codice_fiscale }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Indirizzo</div>
+                        <div class="info-value">
+                            {% if studente.indirizzo_effettivo %}
+                                {{ studente.indirizzo_effettivo.label_full }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% if studente.note %}
+                    <section class="section">
+                        <h2 class="section-title">Note generali e intolleranze alimentari</h2>
+                        <div class="notes-box">{{ studente.note|render_rich_notes }}</div>
+                    </section>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        {% if include_rate %}
+            <section class="section">
+                <h2 class="section-title">
+                    Piano rate{% if anno_corrente %} - {{ anno_corrente.nome_anno_scolastico }}{% endif %}
+                </h2>
+                {% if rate_overview %}
+                    {% for item in rate_overview %}
+                        <div class="sheet-meta">
+                            {{ item.anno_label }}{% if item.classe_label %} - {{ item.classe_label }}{% endif %}
+                            - {{ item.condizione_label }}
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rata</th>
+                                    <th>Scadenza</th>
+                                    <th>Dovuto</th>
+                                    <th>Finale</th>
+                                    <th>Pagato</th>
+                                    <th>Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month in item.months %}
+                                    <tr>
+                                        <td>{{ month.label }}</td>
+                                        <td>
+                                            {% if month.data_scadenza %}
+                                                {{ month.data_scadenza|it_date }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>EUR {{ month.importo_dovuto|euro }}</td>
+                                        <td>EUR {{ month.importo_finale|euro }}</td>
+                                        <td>
+                                            {% if month.importo_pagato %}
+                                                EUR {{ month.importo_pagato|euro }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td>{% if month.pagata %}Pagata{% else %}Da pagare{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-block">Nessun piano rate disponibile per l'anno corrente.</div>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        {% if include_osservazioni %}
+            <section class="section">
+                <h2 class="section-title">Osservazioni</h2>
+                {% if osservazioni %}
+                    {% for osservazione in osservazioni %}
+                        <article class="observation-card">
+                            <div class="observation-meta">
+                                {{ osservazione.data_inserimento|it_date }} - Creata da {{ osservazione.creato_da_label }}
+                            </div>
+                            {% if osservazione.titolo %}
+                                <h3 class="observation-title">{{ osservazione.titolo }}</h3>
+                            {% endif %}
+                            <div class="observation-text">{{ osservazione.testo|render_rich_notes }}</div>
+                        </article>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-block">Nessuna osservazione disponibile.</div>
+                {% endif %}
+            </section>
+        {% endif %}
+    </main>
+</body>
+</html>

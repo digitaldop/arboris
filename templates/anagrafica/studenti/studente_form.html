@@ -25,6 +25,18 @@
                     data-fallback-url="{% url 'lista_studenti' %}">Indietro</button>
             {% if studente %}
                 <a href="{% url 'osservazioni_studente' studente.pk %}" class="btn btn-primary">Anamnesi e Osservazioni</a>
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-icon-text"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'stampa_studente_opzioni' studente.pk %}"
+                    data-popup-window-name="stampa-studente-{{ studente.pk }}"
+                    data-popup-window-features="width=720,height=620,resizable=yes,scrollbars=yes"
+                    title="Stampa scheda studente"
+                >
+                    <span class="btn-icon" aria-hidden="true">&#128424;</span>
+                    Stampa
+                </button>
                 <a href="{% url 'elimina_studente' studente.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Torna all'elenco</a>

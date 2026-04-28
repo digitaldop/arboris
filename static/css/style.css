@@ -805,6 +805,40 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     font-size: 13px;
 }
 
+.btn-icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.btn-icon-text .btn-icon {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.archive-data-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px 14px;
+}
+
+.archive-data-item {
+    min-width: 0;
+}
+
+.archive-data-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #6d7a84;
+    text-transform: uppercase;
+}
+
+.archive-data-value {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
 /* PANEL */
 
 .panel {

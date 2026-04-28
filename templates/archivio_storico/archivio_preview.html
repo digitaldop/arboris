@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Archivia {{ anno.nome_anno_scolastico }} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_archivio_storico' %}">Archivio storico</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Archivia {{ anno.nome_anno_scolastico }}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Archivia {{ anno.nome_anno_scolastico }}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_archivio_storico' %}" class="btn btn-secondary">Indietro</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="form-table">
+            <tr><th>Periodo</th><td>{{ anno.data_inizio|it_date }} - {{ anno.data_fine|it_date }}</td></tr>
+            <tr><th>Anno corrente</th><td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td></tr>
+            <tr>
+                <th>Stato archiviazione</th>
+                <td>
+                    {% if can_archive %}
+                        Archiviabile
+                    {% else %}
+                        Non archiviabile: {{ motivi_blocco|join:", " }}
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">{{ preview.classi }}</div><div class="summary-label">Classi</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.famiglie }}</div><div class="summary-label">Famiglie</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.familiari }}</div><div class="summary-label">Familiari</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.studenti }}</div><div class="summary-label">Studenti</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.iscrizioni }}</div><div class="summary-label">Iscrizioni</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.rate }}</div><div class="summary-label">Rate</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.osservazioni }}</div><div class="summary-label">Osservazioni</div></div>
+        <div class="summary-card"><div class="summary-value">{{ preview.documenti }}</div><div class="summary-label">Documenti</div></div>
+    </div>
+
+    {% if can_archive %}
+        <div class="admin-section">
+            <div class="admin-section-title">
+                <span class="admin-section-title-label">Conferma archiviazione</span>
+            </div>
+            <div class="panel">
+                <div class="panel-body">
+                    <form method="post" action="{% url 'archivia_anno_scolastico' anno.pk %}">
+                        {% csrf_token %}
+                        <table class="form-table">
+                            <tr>
+                                <th>Nota archivio</th>
+                                <td>
+                                    <textarea name="note" class="form-control" rows="3"></textarea>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Primo controllo</th>
+                                <td>
+                                    <label>
+                                        <input type="checkbox" name="conferma_archiviazione" value="1">
+                                        Confermo di voler creare uno snapshot storico read-only per questo anno scolastico.
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Secondo controllo</th>
+                                <td>
+                                    <input type="text" name="conferma_testo" class="form-control" placeholder="Scrivi ARCHIVIA">
+                                    <div class="help-text">L'archiviazione non modifica i dati operativi, ma non può essere ripetuta per lo stesso anno.</div>
+                                </td>
+                            </tr>
+                        </table>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-danger">Archivia anno scolastico</button>
+                            <a href="{% url 'lista_archivio_storico' %}" class="btn btn-secondary">Annulla</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

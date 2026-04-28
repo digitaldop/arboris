@@ -1,0 +1,101 @@
+{% extends "popup_base.html" %}
+
+{% block title %}Stampa scheda studente - Arboris School Management{% endblock %}
+
+{% block content %}
+    <style>
+        .print-options-card {
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        .print-options-list {
+            display: grid;
+            gap: 12px;
+            margin: 18px 0;
+        }
+
+        .print-option {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px 14px;
+            border: 1px solid #dbe3ea;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .print-option input {
+            margin-top: 3px;
+        }
+
+        .print-option.is-disabled {
+            opacity: 0.62;
+        }
+
+        .print-option-title {
+            font-weight: 600;
+            color: #243746;
+        }
+
+        .print-option-help {
+            margin-top: 3px;
+            font-size: 13px;
+            color: #6b7780;
+        }
+    </style>
+
+    <div class="page-head">
+        <h1 class="page-title">Stampa scheda</h1>
+        <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+        </div>
+    </div>
+
+    <div class="content-card print-options-card">
+        <form method="get" action="{% url 'stampa_studente' studente.pk %}">
+            <div class="print-options-list">
+                <label class="print-option">
+                    <input type="checkbox" name="dati_generali" value="1" checked>
+                    <span>
+                        <span class="print-option-title">Dati generali dello studente</span>
+                        <span class="print-option-help">Scheda anagrafica con famiglia, nascita, codice fiscale, indirizzo e note.</span>
+                    </span>
+                </label>
+
+                <label class="print-option">
+                    <input type="checkbox" name="piano_rate" value="1">
+                    <span>
+                        <span class="print-option-title">Piano rate dell'anno corrente</span>
+                        <span class="print-option-help">
+                            {% if anno_corrente %}
+                                Aggiunge il riepilogo rate per {{ anno_corrente.nome_anno_scolastico }}.
+                            {% else %}
+                                Nessun anno scolastico corrente disponibile.
+                            {% endif %}
+                        </span>
+                    </span>
+                </label>
+
+                <label class="print-option{% if not can_print_osservazioni %} is-disabled{% endif %}">
+                    <input type="checkbox" name="osservazioni" value="1" {% if not can_print_osservazioni %}disabled{% endif %}>
+                    <span>
+                        <span class="print-option-title">Osservazioni</span>
+                        <span class="print-option-help">
+                            {% if can_print_osservazioni %}
+                                Aggiunge anamnesi e osservazioni consultabili dal tuo account.
+                            {% else %}
+                                Non hai i permessi per includere le osservazioni nella stampa.
+                            {% endif %}
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Componi scheda stampabile</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

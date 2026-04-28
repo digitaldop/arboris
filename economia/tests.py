@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.test import TestCase
 
@@ -10,7 +11,13 @@ from economia.forms import (
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
-from economia.models import StatoIscrizione, TariffaScambioRetta
+from economia.models import CondizioneIscrizione, Iscrizione, StatoIscrizione, TariffaCondizioneIscrizione, TariffaScambioRetta
+from economia.services import (
+    ricalcola_rate_anno_scolastico,
+    riconcilia_pagamenti_iscrizione,
+    riconcilia_pagamenti_rate_anno_scolastico,
+)
+from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
 from scuola.models import AnnoScolastico
 
 
@@ -20,13 +27,11 @@ class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
             nome_anno_scolastico="2024/2025",
             data_inizio=date(2024, 9, 1),
             data_fine=date(2025, 8, 31),
-            corrente=False,
         )
         self.anno_corrente = AnnoScolastico.objects.create(
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
         )
         self.stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
 
@@ -87,7 +92,6 @@ class ScambioRettaFormFamilySyncTests(TestCase):
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 8, 31),
-            corrente=True,
         )
         self.tariffa = TariffaScambioRetta.objects.create(valore_orario="10.00", definizione="Standard")
 
@@ -124,3 +128,91 @@ class ScambioRettaFormFamilySyncTests(TestCase):
 
         self.assertIn(self.studente, form.fields["studente"].queryset)
         self.assertNotIn(self.altro_studente, form.fields["studente"].queryset)
+
+
+class EconomiaBatchRateTests(TestCase):
+    def setUp(self):
+        stato_famiglia = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=stato_famiglia,
+        )
+        self.studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Bianchi",
+        )
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.stato_iscrizione = StatoIscrizione.objects.create(
+            stato_iscrizione="Attiva",
+            ordine=1,
+            attiva=True,
+        )
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("1000.00"),
+            preiscrizione=Decimal("100.00"),
+        )
+        self.iscrizione = Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+        )
+
+    def test_batch_recalculation_creates_rates_for_school_year(self):
+        risultato = ricalcola_rate_anno_scolastico(self.anno)
+
+        self.assertEqual(risultato["summary"]["created"], 1)
+        self.assertEqual(self.iscrizione.rate.count(), 11)
+
+    def test_batch_reconciliation_links_single_confident_payment(self):
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=self.iscrizione.rate.model.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta",
+            controparte="Bianchi Luca",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        risultato = riconcilia_pagamenti_rate_anno_scolastico(self.anno)
+
+        movimento.refresh_from_db()
+        rata.refresh_from_db()
+        self.assertEqual(risultato["stats"]["riconciliati"], 1)
+        self.assertEqual(movimento.rata_iscrizione, rata)
+        self.assertTrue(rata.pagata)
+        self.assertEqual(rata.importo_pagato, rata.importo_finale)
+
+    def test_single_enrollment_reconciliation_links_only_that_enrollment(self):
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=self.iscrizione.rate.model.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta",
+            controparte="Bianchi Luca",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        risultato = riconcilia_pagamenti_iscrizione(self.iscrizione)
+
+        movimento.refresh_from_db()
+        self.assertEqual(risultato["stats"]["riconciliati"], 1)
+        self.assertEqual(movimento.rata_iscrizione, rata)

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Archivio storico - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Archivio storico</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Archivio storico</h1>
+    </div>
+
+    <div class="admin-section">
+        <div class="admin-section-title">
+            <span class="admin-section-title-label">Anni scolastici archiviati</span>
+        </div>
+        <div class="panel">
+            <div class="panel-body">
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>Anno scolastico</th>
+                            <th>Periodo</th>
+                            <th>Archiviato il</th>
+                            <th>Studenti</th>
+                            <th>Iscrizioni</th>
+                            <th>Rate</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for archivio in archivi %}
+                            <tr>
+                                <td>{{ archivio.nome_anno_scolastico }}</td>
+                                <td>{{ archivio.data_inizio|it_date }} - {{ archivio.data_fine|it_date }}</td>
+                                <td>{{ archivio.data_archiviazione|date:"d/m/Y H:i" }}</td>
+                                <td>{{ archivio.totale_studenti }}</td>
+                                <td>{{ archivio.totale_iscrizioni }}</td>
+                                <td>{{ archivio.totale_rate }}</td>
+                                <td>
+                                    <a href="{% url 'dettaglio_archivio_storico' archivio.pk %}" class="table-link">Consulta</a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">Nessun anno scolastico archiviato.</div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if can_manage_sistema %}
+        <div class="admin-section">
+            <div class="admin-section-title">
+                <span class="admin-section-title-label">Anni scolastici archiviabili</span>
+            </div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Anno scolastico</th>
+                                <th>Periodo</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in anni_archiviabili %}
+                                <tr>
+                                    <td>{{ item.anno.nome_anno_scolastico }}</td>
+                                    <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
+                                    <td>
+                                        <a href="{% url 'anteprima_archiviazione_anno' item.anno.pk %}" class="table-link">Archivia</a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3">
+                                        <div class="empty-state">Nessun anno scolastico archiviabile in questo momento.</div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">
+                <span class="admin-section-title-label">Anni non archiviabili</span>
+            </div>
+            <div class="panel">
+                <div class="panel-body">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Anno scolastico</th>
+                                <th>Periodo</th>
+                                <th>Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in anni_non_archiviabili %}
+                                <tr>
+                                    <td>{{ item.anno.nome_anno_scolastico }}</td>
+                                    <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
+                                    <td>
+                                        {% if item.motivi %}
+                                            {{ item.motivi|join:", " }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3">
+                                        <div class="empty-state">Nessun blocco da mostrare.</div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

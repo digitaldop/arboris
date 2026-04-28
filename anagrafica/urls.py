@@ -44,6 +44,8 @@ urlpatterns = [
     path("studenti/", anagrafica_view(views.lista_studenti), name="lista_studenti"),
     path("studenti/nuovo/", anagrafica_manage(views.crea_studente), name="crea_studente"),
     path("studenti/<int:pk>/modifica/", anagrafica_edit(views.modifica_studente), name="modifica_studente"),
+    path("studenti/<int:pk>/stampa/opzioni/", anagrafica_view(views.stampa_studente_opzioni), name="stampa_studente_opzioni"),
+    path("studenti/<int:pk>/stampa/", anagrafica_view(views.stampa_studente), name="stampa_studente"),
     path("studenti/<int:pk>/elimina/", anagrafica_manage(views.elimina_studente), name="elimina_studente"),
 
     #URLS DEI FAMILIARI

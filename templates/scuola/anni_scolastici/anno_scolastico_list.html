@@ -39,7 +39,7 @@
                             <td>{{ anno.nome_anno_scolastico }}</td>
                             <td>{{ anno.data_inizio }}</td>
                             <td>{{ anno.data_fine }}</td>
-                            <td>{% if anno.corrente %}Si{% else %}No{% endif %}</td>
+                            <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
                             <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
                             <td class="actions-cell">
                                 <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
@@ -79,7 +79,7 @@
                             <td>{{ anno.nome_anno_scolastico }}</td>
                             <td>{{ anno.data_inizio }}</td>
                             <td>{{ anno.data_fine }}</td>
-                            <td>{% if anno.corrente %}Si{% else %}No{% endif %}</td>
+                            <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
                             <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
                             <td class="actions-cell">
                                 <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>

@@ -26,6 +26,13 @@ from economia.models import (
     Iscrizione,
     RataIscrizione,
 )
+from economia.services import (
+    build_rate_batch_feedback,
+    build_riconciliazione_batch_feedback,
+    ricalcola_rate_anno_scolastico as ricalcola_rate_anno_scolastico_service,
+    riconcilia_pagamenti_iscrizione as riconcilia_pagamenti_iscrizione_service,
+    riconcilia_pagamenti_rate_anno_scolastico as riconcilia_pagamenti_rate_anno_scolastico_service,
+)
 from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
 
@@ -582,6 +589,57 @@ def ricalcola_rate_iscrizione(request, pk):
         return redirect(next_url)
 
     return redirect("modifica_iscrizione", pk=iscrizione.pk)
+
+
+@require_POST
+def ricalcola_rate_anno_scolastico(request):
+    anno = get_object_or_404(AnnoScolastico, pk=request.POST.get("anno_scolastico"), attivo=True)
+    risultato = ricalcola_rate_anno_scolastico_service(anno)
+    summary = risultato["summary"]
+    feedback = build_rate_batch_feedback(summary)
+
+    if summary.get("error"):
+        messages.warning(request, f"Ricalcolo completato con errori: {feedback}.")
+    else:
+        messages.success(request, f"Ricalcolo rate {anno} completato: {feedback}.")
+
+    fallback_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico={anno.pk}"
+    return redirect(get_safe_next_url(request, fallback_url))
+
+
+@require_POST
+def riconcilia_pagamenti_rate_anno_scolastico(request):
+    anno = get_object_or_404(AnnoScolastico, pk=request.POST.get("anno_scolastico"), attivo=True)
+    risultato = riconcilia_pagamenti_rate_anno_scolastico_service(anno, utente=request.user)
+    stats = risultato["stats"]
+    feedback = build_riconciliazione_batch_feedback(stats)
+
+    if stats.get("riconciliati"):
+        messages.success(request, f"Riconciliazione pagamenti {anno} completata: {feedback}")
+    else:
+        messages.info(request, f"Riconciliazione pagamenti {anno}: {feedback}")
+
+    fallback_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico={anno.pk}"
+    return redirect(get_safe_next_url(request, fallback_url))
+
+
+@require_POST
+def riconcilia_pagamenti_iscrizione(request, pk):
+    iscrizione = get_object_or_404(
+        Iscrizione.objects.select_related("studente", "anno_scolastico"),
+        pk=pk,
+    )
+    risultato = riconcilia_pagamenti_iscrizione_service(iscrizione, utente=request.user)
+    stats = risultato["stats"]
+    feedback = build_riconciliazione_batch_feedback(stats)
+
+    if stats.get("riconciliati"):
+        messages.success(request, f"Riconciliazione pagamenti iscrizione completata: {feedback}")
+    else:
+        messages.info(request, f"Riconciliazione pagamenti iscrizione: {feedback}")
+
+    fallback_url = reverse("modifica_iscrizione", kwargs={"pk": iscrizione.pk})
+    return redirect(get_safe_next_url(request, fallback_url))
 
 
 def ritiro_anticipato_iscrizione(request, pk):
