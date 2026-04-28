@@ -15,4 +15,4 @@ from .camt053 import (  # noqa: F401
     estrai_iban_da_camt053,
     estrai_saldo_da_camt053,
 )
-from .csv_importer import CsvImporter, CsvImporterConfig  # noqa: F401
+from .csv_importer import CsvImporter, CsvImporterConfig, CsvImportDetection, detect_csv_import_config  # noqa: F401

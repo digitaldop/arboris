@@ -17,6 +17,7 @@
         <div class="page-head-actions">
             <a href="{% url 'lista_dipendenti' %}" class="btn btn-primary">Dipendenti</a>
             <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Contratti</a>
+            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Simulazioni costo</a>
             <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Buste paga</a>
             <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Parametri calcolo</a>
         </div>
@@ -35,6 +36,10 @@
             <div class="summary-item">
                 <div class="summary-value">{{ contratti_attivi }}</div>
                 <div class="summary-label">Contratti attivi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ simulazioni_attive }}</div>
+                <div class="summary-label">Simulazioni attive</div>
             </div>
             <div class="summary-item">
                 <div class="summary-value">{{ buste_periodo_count }}</div>

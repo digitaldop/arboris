@@ -10,6 +10,7 @@ from .models import (
     ContrattoDipendente,
     Dipendente,
     ParametroCalcoloStipendio,
+    SimulazioneCostoDipendente,
     TipoContrattoDipendente,
 )
 
@@ -359,6 +360,123 @@ class ParametroCalcoloStipendioForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["valido_al"].required = False
         self.fields["note"].required = False
+
+
+class SimulazioneCostoDipendenteForm(forms.ModelForm):
+    class Meta:
+        model = SimulazioneCostoDipendente
+        fields = [
+            "contratto",
+            "titolo",
+            "data_elaborazione",
+            "valido_dal",
+            "valido_al",
+            "netto_mensile",
+            "lordo_mensile",
+            "costo_azienda_mensile",
+            "contributi_previdenziali_azienda",
+            "contributi_assicurativi_azienda",
+            "contributi_previdenza_complementare_azienda",
+            "contributi_previdenziali_dipendente",
+            "contributi_assicurativi_dipendente",
+            "contributi_previdenza_complementare_dipendente",
+            "irpef_lorda",
+            "irpef_netto",
+            "addizionale_regionale",
+            "addizionale_comunale",
+            "bonus_fiscali",
+            "trattamento_fine_rapporto",
+            "costo_mensilita_aggiuntive",
+            "costo_rateo_ferie",
+            "costo_rateo_permessi",
+            "costo_rateo_rol",
+            "costo_rateo_ex_festivita",
+            "mensilita_annue",
+            "ore_mensili",
+            "giorni_mensili",
+            "percentuale_part_time",
+            "tasso_inail_per_mille",
+            "livello",
+            "qualifica",
+            "valuta",
+            "file_simulazione",
+            "attiva",
+            "note",
+        ]
+        labels = {
+            "contratto": "Contratto",
+            "titolo": "Titolo simulazione",
+            "data_elaborazione": "Data elaborazione consulente",
+            "valido_dal": "Valida dal",
+            "valido_al": "Valida al",
+            "netto_mensile": "Netto mensile previsto",
+            "lordo_mensile": "Lordo mensile previsto",
+            "costo_azienda_mensile": "Costo azienda mensile previsto",
+            "contributi_previdenziali_azienda": "Contributi previdenziali azienda",
+            "contributi_assicurativi_azienda": "Contributi assicurativi azienda",
+            "contributi_previdenza_complementare_azienda": "Previdenza complementare azienda",
+            "contributi_previdenziali_dipendente": "Contributi previdenziali dipendente",
+            "contributi_assicurativi_dipendente": "Contributi assicurativi dipendente",
+            "contributi_previdenza_complementare_dipendente": "Previdenza complementare dipendente",
+            "irpef_lorda": "IRPEF lorda",
+            "irpef_netto": "IRPEF netta",
+            "addizionale_regionale": "Addizionale regionale",
+            "addizionale_comunale": "Addizionale comunale",
+            "bonus_fiscali": "Bonus fiscali erogati",
+            "trattamento_fine_rapporto": "TFR previsto",
+            "costo_mensilita_aggiuntive": "Costo mensilita aggiuntive",
+            "costo_rateo_ferie": "Costo rateo ferie",
+            "costo_rateo_permessi": "Costo rateo permessi",
+            "costo_rateo_rol": "Costo rateo ROL",
+            "costo_rateo_ex_festivita": "Costo rateo ex festivita",
+            "mensilita_annue": "Mensilita annue",
+            "ore_mensili": "Ore mensili",
+            "giorni_mensili": "Giorni mensili",
+            "percentuale_part_time": "Percentuale part-time",
+            "tasso_inail_per_mille": "Tasso INAIL per mille",
+            "livello": "Livello",
+            "qualifica": "Qualifica",
+            "valuta": "Valuta",
+            "file_simulazione": "PDF simulazione consulente",
+            "attiva": "Attiva",
+            "note": "Note",
+        }
+        widgets = {
+            "data_elaborazione": html5_date_input(),
+            "valido_dal": html5_date_input(),
+            "valido_al": html5_date_input(),
+            "note": forms.Textarea(attrs={"rows": 4}),
+            "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        contratto_id = self.data.get(self.add_prefix("contratto")) if self.is_bound else self.initial.get(
+            "contratto",
+            getattr(self.instance, "contratto_id", None),
+        )
+        qs_filter = Q(dipendente__isnull=False)
+        if contratto_id:
+            qs_filter |= Q(pk=contratto_id)
+        self.fields["contratto"].queryset = (
+            ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto")
+            .filter(qs_filter)
+            .order_by("dipendente__cognome", "dipendente__nome", "-data_inizio", "-id")
+        )
+        self.fields["contratto"].label_from_instance = lambda obj: obj.label_select(include_dipendente=True)
+        make_searchable_select(self.fields["contratto"], "Cerca un contratto...")
+
+        optional_fields = [
+            "titolo",
+            "data_elaborazione",
+            "valido_al",
+            "file_simulazione",
+            "livello",
+            "qualifica",
+            "note",
+        ]
+        for field_name in optional_fields:
+            self.fields[field_name].required = False
 
 
 class BustaPagaDipendenteForm(forms.ModelForm):

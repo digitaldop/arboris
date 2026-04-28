@@ -11,7 +11,7 @@ from economia.forms import (
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
-from economia.models import CondizioneIscrizione, Iscrizione, StatoIscrizione, TariffaCondizioneIscrizione, TariffaScambioRetta
+from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione, TariffaScambioRetta
 from economia.services import (
     ricalcola_rate_anno_scolastico,
     riconcilia_pagamenti_iscrizione,
@@ -179,6 +179,22 @@ class EconomiaBatchRateTests(TestCase):
 
         self.assertEqual(risultato["summary"]["created"], 1)
         self.assertEqual(self.iscrizione.rate.count(), 11)
+
+    def test_single_payment_plan_creates_one_annual_rate_with_discount(self):
+        self.iscrizione.modalita_pagamento_retta = Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE
+        self.iscrizione.sconto_unica_soluzione_tipo = Iscrizione.SCONTO_UNICA_PERCENTUALE
+        self.iscrizione.sconto_unica_soluzione_valore = Decimal("10.00")
+        self.iscrizione.full_clean()
+        self.iscrizione.save()
+
+        risultato = self.iscrizione.sync_rate_schedule()
+
+        self.assertEqual(risultato, "created")
+        self.assertEqual(self.iscrizione.rate.count(), 2)
+        rata_unica = self.iscrizione.rate.get(tipo_rata=RataIscrizione.TIPO_UNICA_SOLUZIONE)
+        self.assertEqual(rata_unica.importo_dovuto, Decimal("900.00"))
+        self.assertEqual(rata_unica.importo_finale, Decimal("900.00"))
+        self.assertEqual(rata_unica.data_scadenza, date(2025, 9, 10))
 
     def test_batch_reconciliation_links_single_confident_payment(self):
         self.iscrizione.sync_rate_schedule()

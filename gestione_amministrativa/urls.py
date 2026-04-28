@@ -37,6 +37,26 @@ urlpatterns = [
         name="crea_contratto_dipendente_generico",
     ),
     path(
+        "gestione-amministrativa/dipendenti/simulazioni-costo/",
+        ga_view(views.lista_simulazioni_costo_dipendenti),
+        name="lista_simulazioni_costo_dipendenti",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/simulazioni-costo/nuova/",
+        ga_manage(views.crea_simulazione_costo_dipendente),
+        name="crea_simulazione_costo_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/simulazioni-costo/<int:pk>/modifica/",
+        ga_edit(views.modifica_simulazione_costo_dipendente),
+        name="modifica_simulazione_costo_dipendente",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/simulazioni-costo/<int:pk>/elimina/",
+        ga_manage(views.elimina_simulazione_costo_dipendente),
+        name="elimina_simulazione_costo_dipendente",
+    ),
+    path(
         "gestione-amministrativa/dipendenti/tipi-contratto/nuovo/",
         ga_manage(views.crea_tipo_contratto_dipendente),
         name="crea_tipo_contratto_dipendente",

@@ -3,12 +3,14 @@ from django.db import DatabaseError
 from django.forms import HiddenInput
 from django.forms.models import BaseInlineFormSet
 from django.forms.utils import ErrorDict
+from decimal import Decimal
 import re
 from .utils import citta_choice_label, validate_and_normalize_phone_number
 from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 from scuola.utils import resolve_default_anno_scolastico
 from scuola.models import AnnoScolastico, Classe
+from arboris.form_widgets import italian_decimal_to_python, merge_widget_classes
 
 from django.forms import inlineformset_factory
 from .models import (
@@ -1171,6 +1173,10 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             "riduzione_speciale",
             "importo_riduzione_speciale",
             "non_pagante",
+            "modalita_pagamento_retta",
+            "sconto_unica_soluzione_tipo",
+            "sconto_unica_soluzione_valore",
+            "scadenza_pagamento_unica",
             "attiva",
             "note_amministrative",
             "note",
@@ -1181,6 +1187,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             "condizione_iscrizione": CondizioneIscrizioneInlineSelect(),
             "data_iscrizione": html5_date_input(),
             "data_fine_iscrizione": html5_date_input(),
+            "scadenza_pagamento_unica": html5_date_input(),
             "note_amministrative": forms.TextInput(),
             "note": forms.TextInput(),
         }
@@ -1235,6 +1242,30 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 "maxlength": "12",
             }
         )
+        self.fields["modalita_pagamento_retta"].label = "Modalita pagamento retta"
+        self.fields["sconto_unica_soluzione_tipo"].label = "Sconto unica soluzione"
+        self.fields["sconto_unica_soluzione_valore"].label = "Valore sconto"
+        self.fields["sconto_unica_soluzione_valore"].required = False
+        self.fields["sconto_unica_soluzione_valore"].localize = True
+        self.fields["sconto_unica_soluzione_valore"].to_python = (
+            lambda value, _field=self.fields["sconto_unica_soluzione_valore"]: italian_decimal_to_python(_field, value)
+        )
+        self.fields["sconto_unica_soluzione_valore"].widget = forms.TextInput()
+        merge_widget_classes(
+            self.fields["sconto_unica_soluzione_valore"].widget,
+            "currency-field",
+            "currency-field-compact",
+        )
+        self.fields["sconto_unica_soluzione_valore"].widget.attrs.update(
+            {
+                "autocomplete": "off",
+                "inputmode": "decimal",
+                "placeholder": "0,00",
+                "maxlength": "12",
+            }
+        )
+        self.fields["scadenza_pagamento_unica"].label = "Scadenza pagamento unico"
+        self.fields["scadenza_pagamento_unica"].required = False
         self.fields["agevolazione"].required = False
         agevolazione_qs = shared_lookups.get("agevolazione_queryset")
         if agevolazione_qs is None:
@@ -1255,6 +1286,12 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
 
         if not getattr(self.instance, "pk", None):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("sconto_unica_soluzione_valore") is None:
+            cleaned_data["sconto_unica_soluzione_valore"] = Decimal("0.00")
+        return cleaned_data
 
 
 class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):

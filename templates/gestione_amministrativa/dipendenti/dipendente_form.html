@@ -164,6 +164,45 @@
                 </div>
 
                 <div class="admin-section compact">
+                    <div class="admin-section-title">Simulazioni costo</div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {% if dipendente and can_manage_gestione_amministrativa %}
+                                <div class="form-actions form-actions-compact">
+                                    <a href="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}" class="btn btn-secondary">Nuova simulazione</a>
+                                </div>
+                            {% endif %}
+                            <table class="list-table">
+                                <thead>
+                                    <tr>
+                                        <th>Validita</th>
+                                        <th class="column-right">Netto</th>
+                                        <th class="column-right">Costo azienda</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for simulazione in simulazioni_costo %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">
+                                                    {{ simulazione.valido_dal|date:"d/m/Y" }} -
+                                                    {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                                </a>
+                                                {% if not simulazione.attiva %}<br><span class="table-muted">non attiva</span>{% endif %}
+                                            </td>
+                                            <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
+                                            <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr><td colspan="3"><div class="empty-state">Nessuna simulazione costo.</div></td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section compact">
                     <div class="admin-section-title">Buste paga recenti</div>
                     <div class="panel">
                         <div class="panel-body">

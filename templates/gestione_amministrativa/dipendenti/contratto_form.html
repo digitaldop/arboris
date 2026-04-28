@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load currency %}
 
 {% block title %}{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %} - Dipendenti e collaboratori{% endblock %}
 
@@ -69,4 +70,51 @@
             </div>
         </div>
     </form>
+
+    {% if contratto %}
+        <div class="content-card">
+            <div class="page-head">
+                <h2 class="section-title">Simulazioni costo collegate</h2>
+                <div class="page-head-actions">
+                    {% if can_manage_gestione_amministrativa %}
+                        <a href="{% url 'crea_simulazione_costo_dipendente' %}?contratto={{ contratto.pk }}" class="btn btn-secondary">Nuova simulazione</a>
+                    {% endif %}
+                </div>
+            </div>
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th>Validita</th>
+                        <th class="column-right">Netto</th>
+                        <th class="column-right">Lordo</th>
+                        <th class="column-right">Costo azienda</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for simulazione in simulazioni_costo %}
+                        <tr>
+                            <td>
+                                {{ simulazione.valido_dal|date:"d/m/Y" }} -
+                                {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                {% if not simulazione.attiva %}<br><span class="table-muted">non attiva</span>{% endif %}
+                            </td>
+                            <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
+                            <td class="column-right">{{ simulazione.lordo_mensile|euro }} &euro;</td>
+                            <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
+                            <td class="actions-cell">
+                                <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">Modifica</a>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <span class="table-muted">|</span>
+                                    <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="table-link table-link-danger">Elimina</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5"><div class="empty-state">Nessuna simulazione costo collegata.</div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
 {% endblock %}

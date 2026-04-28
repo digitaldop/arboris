@@ -799,6 +799,59 @@ class StudenteListTests(TestCase):
         self.assertNotContains(response, "Eredita famiglia")
 
 
+class RicercheAnagraficaTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="ricerche-anagrafica@example.com",
+            email="ricerche-anagrafica@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Genitore", ordine=1)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+        self.familiare_con_documento = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione,
+            nome="Completo",
+            cognome="Bianchi",
+        )
+        self.familiare_senza_documento = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione,
+            nome="Mancante",
+            cognome="Bianchi",
+        )
+
+    def test_ricerca_familiari_senza_tipo_documento(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                Documento.objects.create(
+                    familiare=self.familiare_con_documento,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("documento.pdf", b"test", content_type="application/pdf"),
+                )
+
+                response = self.client.get(
+                    reverse("ricerche_anagrafica"),
+                    {
+                        "query": "documenti_mancanti",
+                        "target": "familiari",
+                        "tipo_documento": self.tipo_documento.pk,
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Familiari senza Carta identita")
+        self.assertContains(response, "Bianchi Mancante")
+        self.assertNotContains(response, "Bianchi Completo")
+
+
 class DocumentoStorageTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser(
@@ -1099,6 +1152,10 @@ class StudenteDetailPerformanceTests(TestCase):
             "riduzione_speciale",
             "importo_riduzione_speciale",
             "non_pagante",
+            "modalita_pagamento_retta",
+            "sconto_unica_soluzione_tipo",
+            "sconto_unica_soluzione_valore",
+            "scadenza_pagamento_unica",
             "attiva",
         ]:
             self.assertEqual(html.count(f'id="id_iscrizioni-0-{field_name}"'), 1)
@@ -1183,6 +1240,10 @@ class StudenteDetailPerformanceTests(TestCase):
                 "iscrizioni-0-riduzione_speciale": "",
                 "iscrizioni-0-importo_riduzione_speciale": "",
                 "iscrizioni-0-non_pagante": "",
+                "iscrizioni-0-modalita_pagamento_retta": Iscrizione.MODALITA_PAGAMENTO_RATEALE,
+                "iscrizioni-0-sconto_unica_soluzione_tipo": Iscrizione.SCONTO_UNICA_NESSUNO,
+                "iscrizioni-0-sconto_unica_soluzione_valore": "",
+                "iscrizioni-0-scadenza_pagamento_unica": "",
                 "iscrizioni-0-attiva": "on",
                 "iscrizioni-0-note_amministrative": "",
                 "iscrizioni-0-note": "",
@@ -1201,6 +1262,9 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertIn('id="id_iscrizioni-0-condizione_iscrizione"', html)
         self.assertIn('id="id_iscrizioni-0-agevolazione"', html)
         self.assertIn('id="id_iscrizioni-0-importo_riduzione_speciale"', html)
+        self.assertIn('id="id_iscrizioni-0-modalita_pagamento_retta"', html)
+        self.assertIn('id="id_iscrizioni-0-sconto_unica_soluzione_tipo"', html)
+        self.assertIn('id="id_iscrizioni-0-sconto_unica_soluzione_valore"', html)
         self.assertNotIn('class="inline-form-row inline-empty-row is-hidden">\n                                        <input type="hidden" name="iscrizioni-0-id"', html)
         self.assertNotIn('class="inline-details-row inline-economic-row inline-empty-row is-hidden"', html)
         self.assertNotIn('class="inline-details-row inline-notes-row inline-empty-row is-hidden"', html)

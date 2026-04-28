@@ -894,6 +894,70 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     cursor: pointer;
 }
 
+.finance-movement-row-incoming {
+    background: #e8f6ec;
+}
+
+.finance-movement-row-outgoing {
+    background: #fff6f5;
+}
+
+.list-table tbody tr.finance-movement-row-incoming:hover {
+    background: #d8efd8;
+}
+
+.list-table tbody tr.finance-movement-row-outgoing:hover {
+    background: #fdebea;
+}
+
+.finance-movement-filters,
+.finance-report-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.finance-movement-filters label,
+.finance-report-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+}
+
+.finance-movement-filters select,
+.finance-report-filters select {
+    min-width: 0;
+}
+
+.finance-filter-field-conto select {
+    width: 190px;
+}
+
+.finance-filter-field-categoria select {
+    width: 240px;
+}
+
+.finance-filter-field-origine select {
+    width: 165px;
+}
+
+@media (max-width: 900px) {
+    .finance-movement-filters,
+    .finance-report-filters {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .finance-movement-filters select,
+    .finance-report-filters select,
+    .finance-movement-filters .btn,
+    .finance-report-filters .btn {
+        width: 100%;
+    }
+}
+
 .is-muted-row {
     opacity: 0.6;
 }
@@ -1939,6 +2003,44 @@ select:focus {
 
 .family-label-cell {
     min-width: 220px;
+}
+
+.anagrafica-query-panel {
+    margin-bottom: 16px;
+}
+
+.anagrafica-query-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+
+.anagrafica-query-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #dde6ea;
+    border-radius: 4px;
+    background: #fbfdfe;
+}
+
+.anagrafica-query-title {
+    font-weight: 700;
+    color: #263842;
+}
+
+.anagrafica-query-form {
+    align-items: end;
+}
+
+.anagrafica-query-form select {
+    min-width: 240px;
+}
+
+.anagrafica-query-results {
+    margin-top: 12px;
 }
 
 .form-subtitle {
@@ -5186,6 +5288,16 @@ select:focus {
 }
 
 .detail-form #iscrizioni-table .inline-details-field-importo input[name$="-importo_riduzione_speciale"] {
+    max-width: 12ch;
+    min-width: 12ch;
+}
+
+.detail-form #iscrizioni-table .inline-details-field-sconto-unico .currency-input-group {
+    width: auto;
+    max-width: 120px;
+}
+
+.detail-form #iscrizioni-table .inline-details-field-sconto-unico input[name$="-sconto_unica_soluzione_valore"] {
     max-width: 12ch;
     min-width: 12ch;
 }

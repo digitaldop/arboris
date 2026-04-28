@@ -23,8 +23,8 @@
     </div>
 
     <div class="content-card">
-        <form method="get" class="filter-bar">
-            <label>
+        <form method="get" class="filter-bar finance-movement-filters">
+            <label class="finance-filter-field finance-filter-field-conto">
                 Conto:
                 <select name="conto">
                     <option value="">Tutti</option>
@@ -33,7 +33,7 @@
                     {% endfor %}
                 </select>
             </label>
-            <label>
+            <label class="finance-filter-field finance-filter-field-categoria">
                 Categoria:
                 <select name="categoria">
                     <option value="">Tutte</option>
@@ -43,7 +43,7 @@
                     {% endfor %}
                 </select>
             </label>
-            <label>
+            <label class="finance-filter-field finance-filter-field-origine">
                 Origine:
                 <select name="origine">
                     <option value="">Tutte</option>
@@ -74,7 +74,7 @@
             </thead>
             <tbody>
                 {% for movimento in movimenti %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_movimento_finanziario' movimento.pk %}">
+                    <tr class="list-row-link {% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}" data-row-href="{% url 'modifica_movimento_finanziario' movimento.pk %}">
                         <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
                         <td>{{ movimento.conto|default:"-" }}</td>
                         <td>{{ movimento.get_origine_display }}</td>

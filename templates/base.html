@@ -182,6 +182,10 @@
                                     <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' %}active{% endif %}">
                                         Studenti
                                     </a>
+
+                                    <a href="{% url 'ricerche_anagrafica' %}" class="{% if request.resolver_match.url_name == 'ricerche_anagrafica' %}active{% endif %}">
+                                        Ricerche
+                                    </a>
                                 </nav>
                             </div>
                         </div>
@@ -381,6 +385,9 @@
                                     <a href="{% url 'lista_contratti_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_contratti_dipendenti' or request.resolver_match.url_name == 'modifica_contratto_dipendente' or request.resolver_match.url_name == 'elimina_contratto_dipendente' %}active{% endif %}">
                                         Contratti
                                     </a>
+                                    <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_simulazioni_costo_dipendenti' or request.resolver_match.url_name == 'crea_simulazione_costo_dipendente' or request.resolver_match.url_name == 'modifica_simulazione_costo_dipendente' or request.resolver_match.url_name == 'elimina_simulazione_costo_dipendente' %}active{% endif %}">
+                                        Simulazioni costo
+                                    </a>
                                     <a href="{% url 'lista_buste_paga_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_buste_paga_dipendenti' or request.resolver_match.url_name == 'crea_busta_paga_dipendente' or request.resolver_match.url_name == 'modifica_busta_paga_dipendente' or request.resolver_match.url_name == 'elimina_busta_paga_dipendente' %}active{% endif %}">
                                         Buste paga
                                     </a>
@@ -447,9 +454,6 @@
                                         </button>
                                         <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-conti-panel">
                                             <nav class="sidebar-nav sidebar-subnav">
-                                                <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
-                                                    Conti bancari
-                                                </a>
                                                 <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
                                                     Movimenti
                                                 </a>
@@ -479,6 +483,9 @@
                                                     </button>
                                                     <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-conti-impostazioni-panel">
                                                         <nav class="sidebar-nav sidebar-subnav">
+                                                            <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
+                                                                Conti bancari
+                                                            </a>
                                                             <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
                                                                 Regole categorizzazione
                                                             </a>

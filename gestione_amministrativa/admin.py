@@ -6,6 +6,7 @@ from .models import (
     Dipendente,
     DocumentoDipendente,
     ParametroCalcoloStipendio,
+    SimulazioneCostoDipendente,
     TipoContrattoDipendente,
     VoceBustaPaga,
 )
@@ -26,6 +27,20 @@ class ContrattoDipendenteInline(admin.TabularInline):
         "tariffa_oraria",
         "mensilita_annue",
         "attivo",
+    )
+
+
+class SimulazioneCostoDipendenteInline(admin.TabularInline):
+    model = SimulazioneCostoDipendente
+    extra = 0
+    fields = (
+        "titolo",
+        "valido_dal",
+        "valido_al",
+        "netto_mensile",
+        "lordo_mensile",
+        "costo_azienda_mensile",
+        "attiva",
     )
 
 
@@ -71,6 +86,31 @@ class ContrattoDipendenteAdmin(admin.ModelAdmin):
     search_fields = ("dipendente__nome", "dipendente__cognome", "ccnl", "livello", "mansione")
     autocomplete_fields = ("dipendente", "tipo_contratto", "parametro_calcolo")
     date_hierarchy = "data_inizio"
+    inlines = [SimulazioneCostoDipendenteInline]
+
+
+@admin.register(SimulazioneCostoDipendente)
+class SimulazioneCostoDipendenteAdmin(admin.ModelAdmin):
+    list_display = (
+        "contratto",
+        "valido_dal",
+        "valido_al",
+        "netto_mensile",
+        "lordo_mensile",
+        "costo_azienda_mensile",
+        "attiva",
+    )
+    list_filter = ("attiva", "valido_dal")
+    search_fields = (
+        "titolo",
+        "contratto__dipendente__nome",
+        "contratto__dipendente__cognome",
+        "contratto__dipendente__codice_fiscale",
+        "livello",
+        "qualifica",
+    )
+    autocomplete_fields = ("contratto",)
+    date_hierarchy = "valido_dal"
 
 
 @admin.register(ParametroCalcoloStipendio)

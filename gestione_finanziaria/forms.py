@@ -555,7 +555,7 @@ class RegolaCategorizzazioneForm(forms.ModelForm):
             "nome": "Nome regola",
             "priorita": "Priorita'",
             "condizione_tipo": "Condizione principale",
-            "pattern": "Valore da confrontare",
+            "pattern": "Condizioni testo",
             "importo_min": "Importo minimo",
             "importo_max": "Importo massimo",
             "segno_filtro": "Solo movimenti",
@@ -565,7 +565,12 @@ class RegolaCategorizzazioneForm(forms.ModelForm):
         }
         widgets = {
             "note": forms.Textarea(attrs={"rows": 3}),
-            "pattern": forms.TextInput(attrs={"placeholder": "es. ENEL, oppure IT60X0542811101000000123456"}),
+            "pattern": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "es. COMM.SU BONIFICI | COMMISSIONI oppure quota + maggio | iscrizione",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -582,6 +587,10 @@ class RegolaCategorizzazioneForm(forms.ModelForm):
         self.fields["priorita"].help_text = (
             "A parita' di match si applica la regola con priorita' numerica piu' bassa."
         )
+        self.fields["pattern"].help_text = (
+            "Per le condizioni testuali puoi usare | oppure una nuova riga come OR; "
+            "usa + per richiedere piu' parole insieme. Esempio: quota + maggio | iscrizione."
+        )
 
 
 # =========================================================================
@@ -590,8 +599,9 @@ class RegolaCategorizzazioneForm(forms.ModelForm):
 
 
 FORMATO_IMPORT_CHOICES = [
+    ("auto", "Rilevamento automatico"),
     ("camt053", "CAMT.053 (ISO 20022 XML)"),
-    ("csv", "CSV (mappatura colonne personalizzabile)"),
+    ("csv", "CSV con mappatura manuale"),
 ]
 
 
@@ -608,10 +618,13 @@ class ImportEstrattoContoForm(forms.Form):
     conto = forms.ModelChoiceField(
         queryset=ContoBancario.objects.none(),
         label="Conto bancario",
+        required=False,
+        help_text="Se possibile viene rilevato automaticamente dal file. In caso contrario selezionalo in anteprima.",
     )
     formato = forms.ChoiceField(
         choices=FORMATO_IMPORT_CHOICES,
         label="Formato file",
+        initial="auto",
     )
     file = forms.FileField(label="File da importare")
 

@@ -1,6 +1,10 @@
+import secrets
+from datetime import date
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.contrib import messages
+from django.core.cache import cache
 from django.db.models import Count, Q, Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -8,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
+from scuola.models import AnnoScolastico
 
 from .forms import (
     CategoriaSpesaForm,
@@ -24,7 +29,7 @@ from .forms import (
     RegolaCategorizzazioneForm,
     ScadenzaPagamentoFornitoreFormSet,
 )
-from .importers import Camt053Parser, CsvImporter, CsvImporterConfig
+from .importers import Camt053Parser, CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
 from .models import (
     CategoriaSpesa,
@@ -72,6 +77,7 @@ from .scheduler import (
 from .services import (
     annulla_riconciliazione,
     applica_regole_a_movimento,
+    calcola_hash_deduplica_movimento,
     ricalcola_saldo_corrente_conto,
     riconcilia_movimento_con_rata,
     sincronizza_conto_psd2,
@@ -1231,52 +1237,182 @@ _CSV_COL_FIELDS = [
 ]
 
 
+def _build_manual_csv_config(form):
+    cfg = CsvImporterConfig(
+        delimiter=form.cleaned_data.get("csv_delimiter") or "",
+        encoding=form.cleaned_data.get("csv_encoding") or "utf-8-sig",
+        ha_intestazione=form.cleaned_data.get("csv_ha_intestazione") or False,
+        formato_data=form.cleaned_data.get("csv_formato_data") or "%d/%m/%Y",
+        separatore_decimale=form.cleaned_data.get("csv_sep_decimale") or ",",
+        separatore_migliaia=form.cleaned_data.get("csv_sep_migliaia") or ".",
+    )
+    for form_field, cfg_field in _CSV_COL_FIELDS:
+        setattr(
+            cfg,
+            cfg_field,
+            ImportEstrattoContoForm.parse_column_ref(form.cleaned_data.get(form_field)),
+        )
+    return cfg
+
+
+def _csv_config_to_dict(config):
+    return {
+        "delimiter": config.delimiter,
+        "encoding": config.encoding,
+        "ha_intestazione": config.ha_intestazione,
+        "colonna_data_contabile": config.colonna_data_contabile,
+        "colonna_data_valuta": config.colonna_data_valuta,
+        "colonna_importo": config.colonna_importo,
+        "colonna_entrate": config.colonna_entrate,
+        "colonna_uscite": config.colonna_uscite,
+        "colonna_valuta": config.colonna_valuta,
+        "colonna_descrizione": config.colonna_descrizione,
+        "colonne_descrizione_extra": list(config.colonne_descrizione_extra or []),
+        "colonna_controparte": config.colonna_controparte,
+        "colonna_iban_controparte": config.colonna_iban_controparte,
+        "colonna_transaction_id": config.colonna_transaction_id,
+        "formato_data": config.formato_data,
+        "separatore_decimale": config.separatore_decimale,
+        "separatore_migliaia": config.separatore_migliaia,
+        "valuta_default": config.valuta_default,
+    }
+
+
+def _csv_config_from_dict(data):
+    return CsvImporterConfig(**(data or {}))
+
+
+def _build_import_parser(parser_type, csv_config=None):
+    if parser_type == "camt053":
+        return Camt053Parser()
+    return CsvImporter(_csv_config_from_dict(csv_config))
+
+
+def _is_probable_xml(raw_bytes, filename=""):
+    if filename.lower().endswith((".xml", ".camt", ".camt053")):
+        return True
+    return raw_bytes.lstrip().startswith(b"<")
+
+
+def _clean_account_piece(value):
+    return "".join(ch for ch in (value or "") if ch.isalnum()).upper()
+
+
+def _find_conto_from_cbi_metadata(detection):
+    conti = list(ContoBancario.objects.filter(attivo=True).select_related("provider"))
+    if len(conti) == 1 and not getattr(detection, "numero_conto", ""):
+        return conti[0]
+
+    abi = _clean_account_piece(getattr(detection, "abi", ""))
+    cab = _clean_account_piece(getattr(detection, "cab", ""))
+    numero = _clean_account_piece(getattr(detection, "numero_conto", ""))
+    if not numero:
+        return None
+
+    numero_padded = numero.zfill(12)
+    for conto in conti:
+        iban = _clean_account_piece(conto.iban)
+        if iban.startswith("IT") and len(iban) >= 27:
+            iban_abi = iban[5:10]
+            iban_cab = iban[10:15]
+            iban_numero = iban[15:27]
+            if iban_numero == numero_padded and (not abi or iban_abi == abi) and (not cab or iban_cab == cab):
+                return conto
+        if numero in _clean_account_piece(conto.external_account_id) or numero in _clean_account_piece(conto.nome_conto):
+            return conto
+    return None
+
+
+def _build_import_preview(parser, raw_bytes, conto):
+    parsed = list(parser.parse(raw_bytes))
+    entrate = Decimal("0.00")
+    uscite = Decimal("0.00")
+    duplicati = 0
+    esempi = []
+    date = []
+
+    for movimento in parsed:
+        date.append(movimento.data_contabile)
+        if movimento.importo > 0:
+            entrate += movimento.importo
+        elif movimento.importo < 0:
+            uscite += abs(movimento.importo)
+
+        is_duplicate = False
+        if conto:
+            hash_dedup = calcola_hash_deduplica_movimento(
+                conto_id=conto.id,
+                data_contabile=movimento.data_contabile,
+                importo=movimento.importo,
+                descrizione=movimento.descrizione,
+                controparte=movimento.controparte,
+                iban_controparte=movimento.iban_controparte,
+            )
+            duplicate_filter = Q(conto=conto, hash_deduplica=hash_dedup)
+            if movimento.provider_transaction_id:
+                duplicate_filter |= Q(conto=conto, provider_transaction_id=movimento.provider_transaction_id)
+            is_duplicate = MovimentoFinanziario.objects.filter(duplicate_filter).exists()
+            if is_duplicate:
+                duplicati += 1
+
+        if len(esempi) < 8:
+            esempi.append(
+                {
+                    "data": movimento.data_contabile,
+                    "data_valuta": movimento.data_valuta,
+                    "importo": movimento.importo,
+                    "descrizione": movimento.descrizione,
+                    "duplicato": is_duplicate,
+                }
+            )
+
+    return {
+        "totale_letti": len(parsed),
+        "nuovi_stimati": max(len(parsed) - duplicati, 0),
+        "duplicati_stimati": duplicati,
+        "entrate": entrate,
+        "uscite": uscite,
+        "data_da": min(date) if date else None,
+        "data_a": max(date) if date else None,
+        "esempi": esempi,
+    }
+
+
 def import_estratto_conto(request):
     risultato = None
-    form = ImportEstrattoContoForm(
-        request.POST or None,
-        request.FILES or None,
-    )
+    preview = None
+    import_token = ""
+    detection = None
+    detected_conto = None
+    selected_conto = None
 
-    if request.method == "POST" and form.is_valid():
-        conto = form.cleaned_data["conto"]
-        formato = form.cleaned_data["formato"]
-        uploaded = form.cleaned_data["file"]
-        raw_bytes = uploaded.read()
+    if request.method == "POST" and request.POST.get("import_action") == "confirm":
+        import_token = (request.POST.get("import_token") or "").strip()
+        payload = cache.get(f"gf-import-estratto:{import_token}") if import_token else None
+        conto = ContoBancario.objects.filter(pk=request.POST.get("conto"), attivo=True).select_related("provider").first()
+        if not payload:
+            messages.error(request, "Anteprima scaduta. Ricarica il file e ripeti l'import.")
+            return redirect("import_estratto_conto")
+        if not conto:
+            messages.error(request, "Seleziona il conto bancario su cui importare i movimenti.")
+            return redirect("import_estratto_conto")
 
         try:
-            if formato == "camt053":
-                parser = Camt053Parser()
-            else:
-                cfg = CsvImporterConfig(
-                    delimiter=form.cleaned_data.get("csv_delimiter") or "",
-                    encoding=form.cleaned_data.get("csv_encoding") or "utf-8-sig",
-                    ha_intestazione=form.cleaned_data.get("csv_ha_intestazione") or False,
-                    formato_data=form.cleaned_data.get("csv_formato_data") or "%d/%m/%Y",
-                    separatore_decimale=form.cleaned_data.get("csv_sep_decimale") or ",",
-                    separatore_migliaia=form.cleaned_data.get("csv_sep_migliaia") or ".",
-                )
-                for form_field, cfg_field in _CSV_COL_FIELDS:
-                    setattr(
-                        cfg,
-                        cfg_field,
-                        ImportEstrattoContoForm.parse_column_ref(form.cleaned_data.get(form_field)),
-                    )
-                parser = CsvImporter(cfg)
-
+            parser = _build_import_parser(payload["parser_type"], payload.get("csv_config"))
             risultato = importa_movimenti_da_file(
                 parser=parser,
-                raw_bytes=raw_bytes,
+                raw_bytes=payload["raw_bytes"],
                 conto=conto,
                 provider=conto.provider,
-                nome_file=getattr(uploaded, "name", ""),
+                nome_file=payload.get("nome_file", ""),
             )
+            cache.delete(f"gf-import-estratto:{import_token}")
 
             if risultato.inseriti:
                 messages.success(
                     request,
                     f"Import completato: {risultato.inseriti} movimenti inseriti "
-                    f"(duplicati scartati: {risultato.duplicati}).",
+                    f"(riconciliati: {risultato.riconciliati}, duplicati scartati: {risultato.duplicati}).",
                 )
             elif risultato.errori:
                 messages.error(
@@ -1292,12 +1428,69 @@ def import_estratto_conto(request):
         except Exception as exc:
             messages.error(request, f"Import fallito: {exc}")
 
+    is_preview_post = request.method == "POST" and request.POST.get("import_action") != "confirm"
+    form = ImportEstrattoContoForm(
+        request.POST if is_preview_post else None,
+        request.FILES if is_preview_post else None,
+    )
+
+    if is_preview_post and form.is_valid():
+        conto = form.cleaned_data["conto"]
+        formato = form.cleaned_data["formato"]
+        uploaded = form.cleaned_data["file"]
+        raw_bytes = uploaded.read()
+
+        try:
+            if formato == "auto":
+                if _is_probable_xml(raw_bytes, getattr(uploaded, "name", "")):
+                    parser_type = "camt053"
+                    parser = Camt053Parser()
+                else:
+                    detection = detect_csv_import_config(raw_bytes)
+                    parser_type = "csv"
+                    parser = CsvImporter(detection.config)
+                    detected_conto = _find_conto_from_cbi_metadata(detection)
+            elif formato == "camt053":
+                parser_type = "camt053"
+                parser = Camt053Parser()
+            else:
+                parser_type = "csv"
+                parser = CsvImporter(_build_manual_csv_config(form))
+
+            selected_conto = conto or detected_conto
+            preview = _build_import_preview(parser, raw_bytes, selected_conto)
+            if not preview["totale_letti"]:
+                messages.error(request, "Non ho trovato movimenti importabili nel file caricato.")
+            else:
+                import_token = secrets.token_urlsafe(24)
+                csv_config = _csv_config_to_dict(parser.config) if isinstance(parser, CsvImporter) else None
+                cache.set(
+                    f"gf-import-estratto:{import_token}",
+                    {
+                        "raw_bytes": raw_bytes,
+                        "nome_file": getattr(uploaded, "name", ""),
+                        "parser_type": parser_type,
+                        "csv_config": csv_config,
+                    },
+                    30 * 60,
+                )
+                if selected_conto:
+                    form.initial["conto"] = selected_conto.pk
+        except Exception as exc:
+            messages.error(request, f"Anteprima import fallita: {exc}")
+
     return render(
         request,
         "gestione_finanziaria/import_estratto_conto.html",
         {
             "form": form,
             "risultato": risultato,
+            "preview": preview,
+            "import_token": import_token,
+            "detection": detection,
+            "detected_conto": detected_conto,
+            "selected_conto": selected_conto,
+            "conti_import": ContoBancario.objects.filter(attivo=True).order_by("nome_conto"),
         },
     )
 
@@ -1986,6 +2179,106 @@ def _anni_disponibili():
     return [a for a in anni if a]
 
 
+def _anni_scolastici_report():
+    return AnnoScolastico.objects.order_by("-data_inizio", "-id")
+
+
+def _resolve_anno_report(anni, raw_value):
+    try:
+        return int(raw_value) if raw_value else (anni[0] if anni else timezone.now().year)
+    except ValueError:
+        return anni[0] if anni else timezone.now().year
+
+
+def _report_periodo_context(request, anni):
+    anni_scolastici = list(_anni_scolastici_report())
+    periodo_tipo = request.GET.get("periodo") or "solare"
+    anno = _resolve_anno_report(anni, request.GET.get("anno"))
+    anno_scolastico = None
+    anno_scolastico_id = request.GET.get("anno_scolastico") or ""
+
+    if periodo_tipo == "scolastico":
+        if anno_scolastico_id.isdigit():
+            anno_scolastico = next(
+                (item for item in anni_scolastici if item.pk == int(anno_scolastico_id)),
+                None,
+            )
+        if anno_scolastico is None and anni_scolastici:
+            oggi = timezone.localdate()
+            anno_scolastico = next(
+                (
+                    item
+                    for item in anni_scolastici
+                    if item.data_inizio <= oggi <= item.data_fine
+                ),
+                anni_scolastici[0],
+            )
+        if anno_scolastico is not None:
+            anno_scolastico_id = str(anno_scolastico.pk)
+            data_inizio = anno_scolastico.data_inizio
+            data_fine = anno_scolastico.data_fine
+            periodo_label = f"anno scolastico {anno_scolastico.nome_anno_scolastico}"
+        else:
+            periodo_tipo = "solare"
+            data_inizio = date(anno, 1, 1)
+            data_fine = date(anno, 12, 31)
+            periodo_label = f"anno {anno}"
+    else:
+        periodo_tipo = "solare"
+        data_inizio = date(anno, 1, 1)
+        data_fine = date(anno, 12, 31)
+        periodo_label = f"anno {anno}"
+
+    query_params = {
+        "periodo": periodo_tipo,
+        "anno": anno,
+    }
+    if anno_scolastico_id:
+        query_params["anno_scolastico"] = anno_scolastico_id
+
+    return {
+        "periodo_tipo": periodo_tipo,
+        "anno": anno,
+        "anni_scolastici": anni_scolastici,
+        "anno_scolastico": anno_scolastico,
+        "anno_scolastico_selezionato": anno_scolastico_id,
+        "data_inizio": data_inizio,
+        "data_fine": data_fine,
+        "periodo_label": periodo_label,
+        "query_params": query_params,
+    }
+
+
+def _build_report_query(periodo_context, conto_id):
+    params = dict(periodo_context["query_params"])
+    if conto_id:
+        params["conto"] = conto_id
+    return urlencode(params)
+
+
+def _mesi_report_periodo(data_inizio, data_fine):
+    mesi_label = [
+        "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
+        "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
+    ]
+    mesi = []
+    anno = data_inizio.year
+    mese = data_inizio.month
+    while (anno, mese) <= (data_fine.year, data_fine.month):
+        mesi.append(
+            {
+                "anno": anno,
+                "mese": mese,
+                "label": f"{mesi_label[mese - 1]} {anno}",
+            }
+        )
+        mese += 1
+        if mese > 12:
+            mese = 1
+            anno += 1
+    return mesi
+
+
 def _filtra_movimenti_report(request, queryset):
     conto_id = request.GET.get("conto") or ""
     if conto_id.isdigit():
@@ -2008,7 +2301,7 @@ def _espandi_categoria_root(categoria):
 
 def report_categorie_mensile(request):
     """
-    Report entrate/uscite per categoria, pivot mesi (1..12) su anno scelto.
+    Report entrate/uscite per categoria, pivot mensile su anno solare o scolastico.
 
     Rollup gerarchico: per ogni categoria radice il totale mostrato
     include i movimenti delle sottocategorie.
@@ -2016,28 +2309,30 @@ def report_categorie_mensile(request):
     from django.db.models.functions import ExtractMonth, ExtractYear
 
     anni = _anni_disponibili()
-    anno_sel = request.GET.get("anno")
-    try:
-        anno = int(anno_sel) if anno_sel else (anni[0] if anni else timezone.now().year)
-    except ValueError:
-        anno = anni[0] if anni else timezone.now().year
+    periodo_context = _report_periodo_context(request, anni)
 
-    queryset = MovimentoFinanziario.objects.filter(data_contabile__year=anno).exclude(
+    queryset = MovimentoFinanziario.objects.filter(
+        data_contabile__gte=periodo_context["data_inizio"],
+        data_contabile__lte=periodo_context["data_fine"],
+    ).exclude(
         categoria__isnull=True
     )
     queryset, conto_id = _filtra_movimenti_report(request, queryset)
 
     aggregato = (
-        queryset.annotate(mese=ExtractMonth("data_contabile"))
-        .values("categoria_id", "mese")
+        queryset.annotate(anno_movimento=ExtractYear("data_contabile"), mese=ExtractMonth("data_contabile"))
+        .values("categoria_id", "anno_movimento", "mese")
         .annotate(totale=Sum("importo"))
     )
 
     mappa = {}
     for riga in aggregato:
         cat_id = riga["categoria_id"]
+        anno_movimento = riga["anno_movimento"]
         mese = riga["mese"]
-        mappa.setdefault(cat_id, {})[mese] = riga["totale"] or Decimal("0")
+        if anno_movimento is None or mese is None:
+            continue
+        mappa.setdefault(cat_id, {})[(int(anno_movimento), int(mese))] = riga["totale"] or Decimal("0")
 
     categorie_root = list(
         CategoriaFinanziaria.objects.filter(parent__isnull=True, attiva=True).order_by(
@@ -2045,18 +2340,18 @@ def report_categorie_mensile(request):
         )
     )
 
+    mesi_periodo = _mesi_report_periodo(periodo_context["data_inizio"], periodo_context["data_fine"])
     righe_report = []
-    totali_mensili = {m: Decimal("0") for m in range(1, 13)}
+    totali_mensili = {(m["anno"], m["mese"]): Decimal("0") for m in mesi_periodo}
     totale_generale = Decimal("0")
 
     for root in categorie_root:
         ids_inclusi = _espandi_categoria_root(root)
-        valori_mese = {m: Decimal("0") for m in range(1, 13)}
+        valori_mese = {(m["anno"], m["mese"]): Decimal("0") for m in mesi_periodo}
         for cid in ids_inclusi:
-            for mese, importo in (mappa.get(cid) or {}).items():
-                if mese is None:
-                    continue
-                valori_mese[int(mese)] += importo or Decimal("0")
+            for key, importo in (mappa.get(cid) or {}).items():
+                if key in valori_mese:
+                    valori_mese[key] += importo or Decimal("0")
 
         totale_riga = sum(valori_mese.values(), Decimal("0"))
         if totale_riga == 0:
@@ -2065,32 +2360,35 @@ def report_categorie_mensile(request):
         righe_report.append(
             {
                 "categoria": root,
-                "valori_mese": [valori_mese[m] for m in range(1, 13)],
+                "valori_mese": [valori_mese[(m["anno"], m["mese"])] for m in mesi_periodo],
                 "totale": totale_riga,
             }
         )
-        for m in range(1, 13):
-            totali_mensili[m] += valori_mese[m]
+        for m in mesi_periodo:
+            key = (m["anno"], m["mese"])
+            totali_mensili[key] += valori_mese[key]
         totale_generale += totale_riga
 
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
-    mesi = [
-        "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
-        "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
-    ]
+    report_querystring = _build_report_query(periodo_context, conto_id)
 
     return render(
         request,
         "gestione_finanziaria/report_categorie_mensile.html",
         {
-            "anno": anno,
+            "anno": periodo_context["anno"],
             "anni_disponibili": anni,
+            "anni_scolastici": periodo_context["anni_scolastici"],
+            "periodo_tipo": periodo_context["periodo_tipo"],
+            "periodo_label": periodo_context["periodo_label"],
+            "anno_scolastico_selezionato": periodo_context["anno_scolastico_selezionato"],
             "righe": righe_report,
-            "totali_mensili": [totali_mensili[m] for m in range(1, 13)],
+            "totali_mensili": [totali_mensili[(m["anno"], m["mese"])] for m in mesi_periodo],
             "totale_generale": totale_generale,
-            "mesi": mesi,
+            "mesi": [m["label"] for m in mesi_periodo],
             "conti": conti,
             "conto_selezionato": conto_id,
+            "report_querystring": report_querystring,
         },
     )
 
@@ -2101,13 +2399,12 @@ def report_categorie_annuale(request):
     e peso % sul totale; rollup gerarchico su categorie radice.
     """
     anni = _anni_disponibili()
-    anno_sel = request.GET.get("anno")
-    try:
-        anno = int(anno_sel) if anno_sel else (anni[0] if anni else timezone.now().year)
-    except ValueError:
-        anno = anni[0] if anni else timezone.now().year
+    periodo_context = _report_periodo_context(request, anni)
 
-    queryset = MovimentoFinanziario.objects.filter(data_contabile__year=anno).exclude(
+    queryset = MovimentoFinanziario.objects.filter(
+        data_contabile__gte=periodo_context["data_inizio"],
+        data_contabile__lte=periodo_context["data_fine"],
+    ).exclude(
         categoria__isnull=True
     )
     queryset, conto_id = _filtra_movimenti_report(request, queryset)
@@ -2192,13 +2489,18 @@ def report_categorie_annuale(request):
     righe_uscite.sort(key=lambda r: r["uscite"])  # piu' negativo prima
 
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+    report_querystring = _build_report_query(periodo_context, conto_id)
 
     return render(
         request,
         "gestione_finanziaria/report_categorie_annuale.html",
         {
-            "anno": anno,
+            "anno": periodo_context["anno"],
             "anni_disponibili": anni,
+            "anni_scolastici": periodo_context["anni_scolastici"],
+            "periodo_tipo": periodo_context["periodo_tipo"],
+            "periodo_label": periodo_context["periodo_label"],
+            "anno_scolastico_selezionato": periodo_context["anno_scolastico_selezionato"],
             "righe_entrate": righe_entrate,
             "righe_uscite": righe_uscite,
             "totale_entrate": tot_entrate,
@@ -2206,6 +2508,7 @@ def report_categorie_annuale(request):
             "saldo_netto": tot_entrate + tot_uscite,
             "conti": conti,
             "conto_selezionato": conto_id,
+            "report_querystring": report_querystring,
         },
     )
 

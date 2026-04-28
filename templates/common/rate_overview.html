@@ -15,12 +15,25 @@
                                     <div class="student-rate-year-title">{{ item.anno_label }}</div>
                                     <div class="student-rate-year-head-right">
                                         <div class="student-rate-year-meta">
-                                            <span>{{ item.condizione_label }}{% if item.has_tariffa %} - EUR {{ item.retta_annuale_base|euro }} - {{ item.numero_mensilita }} rate mensili da EUR {{ item.rata_standard|euro }} - Preiscrizione: EUR {{ item.preiscrizione|euro }}{% endif %}</span>
+                                            <span>
+                                                {{ item.condizione_label }}{% if item.has_tariffa %}
+                                                    - EUR {{ item.retta_annuale_base|euro }}
+                                                    {% if item.pagamento_unica_soluzione %}
+                                                        - unica soluzione da EUR {{ item.rata_standard|euro }}
+                                                    {% else %}
+                                                        - {{ item.numero_mensilita }} rate mensili da EUR {{ item.rata_standard|euro }}
+                                                    {% endif %}
+                                                    - Preiscrizione: EUR {{ item.preiscrizione|euro }}
+                                                {% endif %}
+                                            </span>
                                             {% if item.agevolazione_label %}
                                                 <span>Agevolazioni: {{ item.agevolazione_label }}</span>
                                             {% endif %}
                                             {% if item.riduzione_retta_speciale %}
                                                 <span>Riduzione retta speciale: EUR {{ item.riduzione_retta_speciale|euro }}</span>
+                                            {% endif %}
+                                            {% if item.sconto_unica_soluzione %}
+                                                <span>Sconto unica soluzione: EUR {{ item.sconto_unica_soluzione|euro }}</span>
                                             {% endif %}
                                             <span>Stato: {{ item.stato_label }}</span>
                                             {% if item.classe_label %}
@@ -64,12 +77,14 @@
                                     {% for month_row in item.month_rows %}
                                         <div class="student-rate-timeline-row" style="--student-rate-row-items: {{ month_row|length }};">
                                             {% for month in month_row %}
-                                                <div class="student-rate-card{% if month.pagata %} is-paid{% endif %}{% if month.is_projected %} is-projected{% endif %}{% if month.is_preiscrizione %} is-preiscrizione{% endif %}">
+                                                <div class="student-rate-card{% if month.pagata %} is-paid{% endif %}{% if month.is_projected %} is-projected{% endif %}{% if month.is_preiscrizione %} is-preiscrizione{% endif %}{% if month.is_unica_soluzione %} is-unica-soluzione{% endif %}">
                                                     {% if month.is_preiscrizione %}
                                                         <div class="student-rate-card-badge">Preiscrizione</div>
+                                                    {% elif month.is_unica_soluzione %}
+                                                        <div class="student-rate-card-badge">Unica soluzione</div>
                                                     {% endif %}
                                                     <div class="student-rate-card-month">{{ month.label }}</div>
-                                                    {% if not month.is_preiscrizione %}
+                                                    {% if not month.is_preiscrizione and not month.is_unica_soluzione %}
                                                         <div class="student-rate-card-number">Rata {{ month.numero_rata }}</div>
                                                     {% endif %}
                                                     <div class="student-rate-card-amount">Dovuto: EUR {{ month.importo_dovuto|euro }}</div>

@@ -1,4 +1,5 @@
 import mimetypes
+import unicodedata
 
 from django.contrib import messages
 from django.conf import settings
@@ -37,7 +38,6 @@ from .models import (
     Familiare,
 )
 from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione, TariffaCondizioneIscrizione
-from economia.models.iscrizioni import add_months_safe
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from calendario.data import build_dashboard_calendar_data
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
@@ -53,7 +53,7 @@ from scuola.utils import resolve_default_anno_scolastico
 from django.forms import modelform_factory
 
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Prefetch, Q, Sum, Value, When
+from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
 from django.utils.http import url_has_allowed_host_and_scheme
 
 MONTH_LABELS = {
@@ -70,6 +70,48 @@ MONTH_LABELS = {
     11: "Novembre",
     12: "Dicembre",
 }
+
+ANAGRAFICA_DOCUMENT_QUERY_TARGETS = {
+    "familiari": "Familiari",
+    "studenti": "Studenti",
+    "famiglie": "Famiglie",
+}
+
+ANAGRAFICA_DOCUMENT_QUERY_PRESETS = [
+    {
+        "key": "familiari_senza_documento_identita",
+        "title": "Familiari senza documento di identita",
+        "target": "familiari",
+        "aliases": ["documento identita", "documento d identita", "carta identita", "identita"],
+    },
+    {
+        "key": "studenti_senza_contratto",
+        "title": "Studenti senza contratto",
+        "target": "studenti",
+        "aliases": ["contratto", "scheda contratto"],
+    },
+    {
+        "key": "studenti_senza_carta_identita",
+        "title": "Studenti senza carta di identita",
+        "target": "studenti",
+        "aliases": ["carta identita", "documento identita", "documento d identita", "identita"],
+    },
+]
+
+
+def normalize_query_text(value):
+    normalized = unicodedata.normalize("NFKD", value or "")
+    without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
+    return " ".join(without_accents.lower().replace("'", " ").split())
+
+
+def find_tipo_documento_by_aliases(tipi_documento, aliases):
+    normalized_aliases = [normalize_query_text(alias) for alias in aliases]
+    for tipo_documento in tipi_documento:
+        normalized_name = normalize_query_text(tipo_documento.tipo_documento)
+        if any(alias and alias in normalized_name for alias in normalized_aliases):
+            return tipo_documento
+    return None
 
 
 def resolve_current_school_year():
@@ -582,6 +624,8 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
         importo_incassato = rate_row["importo_incassato"] or Decimal("0.00")
         if rate_row["tipo_rata"] == RataIscrizione.TIPO_PREISCRIZIONE:
             importo_totale = importo_preiscrizione
+        elif rate_row["tipo_rata"] == RataIscrizione.TIPO_UNICA_SOLUZIONE:
+            importo_totale = totale_lordo_annuo
         else:
             importo_totale = (
                 importi_lordi_mensili[indice_mensile]
@@ -604,85 +648,7 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
 
 
 def build_studente_projected_rate_plan(iscrizione, tariffa, importo_preiscrizione):
-    if not iscrizione.condizione_iscrizione_id or not iscrizione.studente_id or not iscrizione.studente.famiglia_id:
-        return []
-
-    prima_scadenza = iscrizione.get_prima_scadenza_rate()
-    if not prima_scadenza:
-        return []
-
-    data_fine_effettiva = iscrizione.data_fine_effettiva
-    mese_fine_effettiva = data_fine_effettiva.replace(day=1) if data_fine_effettiva else None
-    if not iscrizione.non_pagante and not tariffa:
-        return []
-
-    numero_rate = max(iscrizione.condizione_iscrizione.numero_mensilita_default or 0, 1)
-    if iscrizione.non_pagante:
-        importo_annuo = Decimal("0.00")
-    else:
-        importo_annuo = (
-            (tariffa.retta_annuale or Decimal("0.00"))
-            - iscrizione.get_importo_agevolazione_applicata()
-            - iscrizione.get_importo_riduzione_applicata()
-        )
-        importo_annuo = max(importo_annuo, Decimal("0.00"))
-
-    importo_base = (importo_annuo / numero_rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-    importo_residuo = importo_annuo - (importo_base * numero_rate)
-    piano = []
-
-    if importo_preiscrizione > 0:
-        anno_scolastico_label = iscrizione.anno_scolastico.nome_anno_scolastico if iscrizione.anno_scolastico_id and iscrizione.anno_scolastico else ""
-        anno_riferimento = (
-            iscrizione.anno_scolastico.data_inizio.year
-            if iscrizione.anno_scolastico_id and iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio
-            else date.today().year
-        )
-        descrizione = (
-            f"Preiscrizione AS {anno_scolastico_label}"
-            if anno_scolastico_label
-            else "Preiscrizione"
-        )
-        piano.append(
-            {
-                "famiglia_id": iscrizione.studente.famiglia_id,
-                "tipo_rata": RataIscrizione.TIPO_PREISCRIZIONE,
-                "numero_rata": 0,
-                "mese_riferimento": 1,
-                "anno_riferimento": anno_riferimento,
-                "descrizione": descrizione,
-                "importo_dovuto": importo_preiscrizione,
-                "data_scadenza": None,
-                "credito_applicato": Decimal("0.00"),
-                "altri_sgravi": Decimal("0.00"),
-                "importo_finale": importo_preiscrizione,
-            }
-        )
-
-    giorno_scadenza = iscrizione.get_giorno_scadenza_rate()
-
-    for indice in range(numero_rate):
-        data_scadenza = add_months_safe(prima_scadenza, indice, target_day=giorno_scadenza)
-        if mese_fine_effettiva and data_scadenza.replace(day=1) > mese_fine_effettiva:
-            break
-        importo_rata = importo_base + (importo_residuo if indice == numero_rate - 1 else Decimal("0.00"))
-        piano.append(
-            {
-                "famiglia_id": iscrizione.studente.famiglia_id,
-                "tipo_rata": RataIscrizione.TIPO_MENSILE,
-                "numero_rata": indice + 1,
-                "mese_riferimento": data_scadenza.month,
-                "anno_riferimento": data_scadenza.year,
-                "descrizione": f"Rata {indice + 1}/{numero_rate} - {data_scadenza.strftime('%m/%Y')}",
-                "importo_dovuto": importo_rata,
-                "data_scadenza": data_scadenza,
-                "credito_applicato": Decimal("0.00"),
-                "altri_sgravi": Decimal("0.00"),
-                "importo_finale": importo_rata,
-            }
-        )
-
-    return piano
+    return iscrizione.build_rate_plan()
 
 
 def build_economia_dashboard_data(anno_corrente):
@@ -925,6 +891,7 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                     "label": rata.display_period_label,
                     "display_label": rata.display_label,
                     "is_preiscrizione": rata.is_preiscrizione,
+                    "is_unica_soluzione": rata.is_unica_soluzione,
                     "numero_rata": rata.numero_rata,
                     "importo_dovuto": rata.importo_dovuto,
                     "importo_finale": rata.importo_finale,
@@ -950,15 +917,16 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                 {
                     "label": (
                         item["descrizione"]
-                        if item.get("tipo_rata") == RataIscrizione.TIPO_PREISCRIZIONE
+                        if item.get("tipo_rata") in {RataIscrizione.TIPO_PREISCRIZIONE, RataIscrizione.TIPO_UNICA_SOLUZIONE}
                         else f"{MONTH_LABELS.get(item['mese_riferimento'], item['mese_riferimento'])} {item['anno_riferimento']}"
                     ),
                     "display_label": (
                         item["descrizione"]
-                        if item.get("tipo_rata") == RataIscrizione.TIPO_PREISCRIZIONE
+                        if item.get("tipo_rata") in {RataIscrizione.TIPO_PREISCRIZIONE, RataIscrizione.TIPO_UNICA_SOLUZIONE}
                         else f"Rata {item['numero_rata']}"
                     ),
                     "is_preiscrizione": item.get("tipo_rata") == RataIscrizione.TIPO_PREISCRIZIONE,
+                    "is_unica_soluzione": item.get("tipo_rata") == RataIscrizione.TIPO_UNICA_SOLUZIONE,
                     "numero_rata": item["numero_rata"],
                     "importo_dovuto": item["importo_dovuto"],
                     "importo_finale": item["importo_finale"],
@@ -975,7 +943,13 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                 for item in piano
             ]
 
-        monthly_months = [month for month in months if not month["is_preiscrizione"]]
+        monthly_months = [
+            month
+            for month in months
+            if not month["is_preiscrizione"] and not month.get("is_unica_soluzione")
+        ]
+        single_payment_month = next((month for month in months if month.get("is_unica_soluzione")), None)
+        is_pagamento_unica_soluzione = iscrizione.is_pagamento_unica_soluzione
 
         overview.append(
             {
@@ -987,8 +961,15 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                 "has_tariffa": bool(tariffa),
                 "retta_annuale_base": tariffa.retta_annuale if tariffa else None,
                 "preiscrizione": importo_preiscrizione,
-                "numero_mensilita": max(iscrizione.condizione_iscrizione.numero_mensilita_default or 0, 1),
-                "rata_standard": monthly_months[0]["importo_dovuto"] if monthly_months else None,
+                "numero_mensilita": 1
+                if is_pagamento_unica_soluzione
+                else max(iscrizione.condizione_iscrizione.numero_mensilita_default or 0, 1),
+                "rata_standard": single_payment_month["importo_dovuto"]
+                if single_payment_month
+                else (monthly_months[0]["importo_dovuto"] if monthly_months else None),
+                "pagamento_unica_soluzione": is_pagamento_unica_soluzione,
+                "modalita_pagamento_label": iscrizione.get_modalita_pagamento_retta_display(),
+                "sconto_unica_soluzione": iscrizione.get_importo_sconto_unica_soluzione_applicato(),
                 "agevolazione_label": str(iscrizione.agevolazione) if iscrizione.agevolazione_id else "",
                 "riduzione_retta_speciale": (
                     iscrizione.importo_riduzione_speciale
@@ -1424,6 +1405,163 @@ def ajax_cerca_citta(request):
     return JsonResponse({"results": results})
 
 #FINE VIEWS DEGLI INDIRIZZI
+
+
+def anagrafica_document_missing_queryset(target, tipo_documento):
+    documento_filter = Documento.objects.filter(tipo_documento=tipo_documento)
+
+    if target == "familiari":
+        return (
+            Familiare.objects.annotate(
+                has_required_document=Exists(documento_filter.filter(familiare=OuterRef("pk")))
+            )
+            .filter(has_required_document=False)
+            .select_related(
+                "famiglia",
+                "relazione_familiare",
+                "indirizzo__citta__provincia",
+                "famiglia__indirizzo_principale__citta__provincia",
+            )
+            .prefetch_related("famiglia__familiari", "famiglia__studenti")
+            .order_by("cognome", "nome", "id")
+        )
+
+    if target == "studenti":
+        return (
+            Studente.objects.annotate(
+                has_required_document=Exists(documento_filter.filter(studente=OuterRef("pk")))
+            )
+            .filter(has_required_document=False)
+            .select_related(
+                "famiglia",
+                "indirizzo__citta__provincia",
+                "famiglia__indirizzo_principale__citta__provincia",
+            )
+            .prefetch_related("famiglia__familiari", "famiglia__studenti")
+            .order_by("cognome", "nome", "id")
+        )
+
+    if target == "famiglie":
+        return (
+            Famiglia.objects.annotate(
+                has_required_document=Exists(documento_filter.filter(famiglia=OuterRef("pk")))
+            )
+            .filter(has_required_document=False)
+            .select_related(
+                "stato_relazione_famiglia",
+                "indirizzo_principale__citta__provincia",
+            )
+            .prefetch_related("familiari", "studenti")
+            .order_by("cognome_famiglia", "id")
+        )
+
+    return []
+
+
+def build_anagrafica_query_rows(target, records):
+    rows = []
+    for record in records:
+        if target == "familiari":
+            details = []
+            if record.relazione_familiare_id:
+                details.append(str(record.relazione_familiare))
+            if record.email:
+                details.append(record.email)
+            if record.formatted_telefono:
+                details.append(record.formatted_telefono)
+            rows.append(
+                {
+                    "label": str(record),
+                    "context": f"Famiglia: {record.famiglia.cognome_famiglia}",
+                    "details": " | ".join(details),
+                    "url": reverse("modifica_familiare", kwargs={"pk": record.pk}),
+                }
+            )
+        elif target == "studenti":
+            details = []
+            if record.codice_fiscale:
+                details.append(f"CF: {record.codice_fiscale}")
+            if record.data_nascita:
+                details.append(f"Nato/a il {record.data_nascita:%d/%m/%Y}")
+            rows.append(
+                {
+                    "label": str(record),
+                    "context": f"Famiglia: {record.famiglia.cognome_famiglia}",
+                    "details": " | ".join(details),
+                    "url": reverse("modifica_studente", kwargs={"pk": record.pk}),
+                }
+            )
+        elif target == "famiglie":
+            details = []
+            if record.stato_relazione_famiglia_id:
+                details.append(str(record.stato_relazione_famiglia))
+            rows.append(
+                {
+                    "label": record.cognome_famiglia,
+                    "context": record.label_contesto_anagrafica(),
+                    "details": " | ".join(details),
+                    "url": reverse("modifica_famiglia", kwargs={"pk": record.pk}),
+                }
+            )
+    return rows
+
+
+def ricerche_anagrafica(request):
+    query_key = (request.GET.get("query") or "").strip()
+    target = (request.GET.get("target") or "").strip()
+    tipo_documento_id = (request.GET.get("tipo_documento") or "").strip()
+    tipi_documento = list(TipoDocumento.objects.filter(attivo=True).order_by("ordine", "tipo_documento"))
+    base_url = reverse("ricerche_anagrafica")
+
+    preset_cards = []
+    for preset in ANAGRAFICA_DOCUMENT_QUERY_PRESETS:
+        tipo_documento = find_tipo_documento_by_aliases(tipi_documento, preset["aliases"])
+        url = ""
+        if tipo_documento:
+            url = (
+                f"{base_url}?query=documenti_mancanti"
+                f"&target={preset['target']}"
+                f"&tipo_documento={tipo_documento.pk}"
+            )
+        preset_cards.append({**preset, "tipo_documento": tipo_documento, "url": url})
+
+    selected_tipo_documento = None
+    if tipo_documento_id.isdigit():
+        selected_tipo_documento = next(
+            (tipo for tipo in tipi_documento if tipo.pk == int(tipo_documento_id)),
+            None,
+        )
+
+    rows = []
+    result_title = ""
+    result_message = ""
+    if query_key == "documenti_mancanti":
+        target_label = ANAGRAFICA_DOCUMENT_QUERY_TARGETS.get(target)
+        if not target_label:
+            result_message = "Seleziona un gruppo valido tra studenti, familiari e famiglie."
+        elif not selected_tipo_documento:
+            result_message = "Seleziona il tipo documento da verificare."
+        else:
+            records = anagrafica_document_missing_queryset(target, selected_tipo_documento)
+            rows = build_anagrafica_query_rows(target, records)
+            result_title = f"{target_label} senza {selected_tipo_documento.tipo_documento}"
+
+    return render(
+        request,
+        "anagrafica/ricerche_anagrafica.html",
+        {
+            "query_key": query_key,
+            "target": target,
+            "tipo_documento_id": tipo_documento_id,
+            "tipi_documento": tipi_documento,
+            "target_choices": ANAGRAFICA_DOCUMENT_QUERY_TARGETS.items(),
+            "preset_cards": preset_cards,
+            "rows": rows,
+            "result_title": result_title,
+            "result_message": result_message,
+        },
+    )
+
 
 #INIZIO VIEWS DELLE FAMIGLIE
 def lista_famiglie(request):

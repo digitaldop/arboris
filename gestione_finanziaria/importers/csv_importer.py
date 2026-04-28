@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -48,6 +49,7 @@ class CsvImporterConfig:
     colonna_uscite: Optional[ColonnaRef] = None
     colonna_valuta: Optional[ColonnaRef] = None
     colonna_descrizione: Optional[ColonnaRef] = None
+    colonne_descrizione_extra: List[ColonnaRef] = field(default_factory=list)
     colonna_controparte: Optional[ColonnaRef] = None
     colonna_iban_controparte: Optional[ColonnaRef] = None
     colonna_transaction_id: Optional[ColonnaRef] = None
@@ -70,6 +72,30 @@ class CsvImporterConfig:
         return mancanti
 
 
+@dataclass
+class CsvImportDetection:
+    config: CsvImporterConfig
+    formato_rilevato: str = "CSV"
+    confidenza: int = 0
+    colonne_rilevate: Dict[str, ColonnaRef] = field(default_factory=dict)
+    avvisi: List[str] = field(default_factory=list)
+    abi: str = ""
+    cab: str = ""
+    numero_conto: str = ""
+    intestatario: str = ""
+
+    @property
+    def conto_label(self) -> str:
+        parti = []
+        if self.abi:
+            parti.append(f"ABI {self.abi}")
+        if self.cab:
+            parti.append(f"CAB {self.cab}")
+        if self.numero_conto:
+            parti.append(f"Conto {self.numero_conto}")
+        return " - ".join(parti)
+
+
 def _autodetect_delimiter(sample: str) -> str:
     candidates = [";", ",", "\t", "|"]
     counts = {delim: sample.count(delim) for delim in candidates}
@@ -77,6 +103,58 @@ def _autodetect_delimiter(sample: str) -> str:
     if counts[best] == 0:
         return ","
     return best
+
+
+def _decode_csv_bytes(raw_bytes: bytes, preferred_encoding: str = "utf-8-sig") -> str:
+    encodings_fallback = [preferred_encoding, "utf-8-sig", "utf-8", "cp1252", "latin-1"]
+    for enc in dict.fromkeys(filter(None, encodings_fallback)):
+        try:
+            return raw_bytes.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("Impossibile decodificare il file CSV con gli encoding noti.")
+
+
+def _normalize_header(value: str) -> str:
+    normalized = (value or "").strip().strip('"').lower()
+    replacements = {
+        "à": "a",
+        "è": "e",
+        "é": "e",
+        "ì": "i",
+        "ò": "o",
+        "ù": "u",
+    }
+    for source, target in replacements.items():
+        normalized = normalized.replace(source, target)
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    return " ".join(normalized.split())
+
+
+def _build_header_map(header: List[str]) -> Dict[str, int]:
+    header_map: Dict[str, int] = {}
+    for idx, nome in enumerate(header):
+        pulito = (nome or "").strip()
+        normalizzato = _normalize_header(pulito)
+        if pulito:
+            header_map[pulito] = idx
+            header_map[pulito.lower()] = idx
+        if normalizzato:
+            header_map[normalizzato] = idx
+    return header_map
+
+
+def _find_column(header_map: Dict[str, int], candidates: List[str]) -> Optional[str]:
+    for candidate in candidates:
+        normalized = _normalize_header(candidate)
+        if normalized in header_map:
+            return normalized
+        if candidate in header_map:
+            return candidate
+        lowered = candidate.lower()
+        if lowered in header_map:
+            return lowered
+    return None
 
 
 def _parse_decimal(raw: str, *, sep_decimale: str, sep_migliaia: str) -> Optional[Decimal]:
@@ -111,10 +189,104 @@ def _column_value(row: List[str], ref: Optional[ColonnaRef], header_map: Dict[st
         idx = header_map.get(ref)
         if idx is None:
             idx = header_map.get(ref.strip().lower())
+        if idx is None:
+            idx = header_map.get(_normalize_header(ref))
         if idx is not None and 0 <= idx < len(row):
             return (row[idx] or "").strip()
         return ""
     return ""
+
+
+def detect_csv_import_config(raw_bytes: bytes) -> CsvImportDetection:
+    testo = _decode_csv_bytes(raw_bytes)
+    delimiter = _autodetect_delimiter(testo[:4096])
+    rows = list(csv.reader(io.StringIO(testo), delimiter=delimiter))
+    if not rows:
+        raise ValueError("Il file CSV non contiene righe leggibili.")
+
+    header = rows[0]
+    header_map = _build_header_map(header)
+    has_header = any(
+        item in header_map
+        for item in {
+            "operazione",
+            "data operazione",
+            "data contabile",
+            "importo",
+            "descrizione",
+            "causale",
+        }
+    )
+
+    config = CsvImporterConfig(
+        delimiter=delimiter,
+        encoding="utf-8-sig",
+        ha_intestazione=has_header,
+        formato_data="%d/%m/%Y",
+        separatore_decimale=",",
+        separatore_migliaia=".",
+    )
+    detection = CsvImportDetection(config=config, confidenza=30 if has_header else 10)
+
+    if not has_header:
+        detection.avvisi.append("Intestazione non riconosciuta: potrebbe essere necessario usare le opzioni avanzate.")
+        return detection
+
+    field_candidates = {
+        "colonna_data_contabile": ["Operazione", "Data operazione", "Data contabile", "Data contabilizzazione", "Data"],
+        "colonna_data_valuta": ["Data valuta", "Valuta"],
+        "colonna_importo": ["Importo", "Importo movimento", "Amount"],
+        "colonna_controparte": ["Controparte", "Beneficiario", "Ordinante"],
+        "colonna_iban_controparte": ["IBAN controparte", "Iban ordinante", "Iban beneficiario"],
+        "colonna_transaction_id": ["Identificativo End to End", "End To End Id", "ID transazione", "Transaction ID"],
+    }
+
+    for config_field, candidates in field_candidates.items():
+        column = _find_column(header_map, candidates)
+        if column:
+            setattr(config, config_field, column)
+            detection.colonne_rilevate[config_field] = column
+            detection.confidenza += 10
+
+    description_columns = []
+    primary_description_candidates = [
+        "Informazioni di riconciliazione",
+        "Descrizione",
+        "Causale descrizione",
+        "Descrizione operazione",
+    ]
+    for candidate in primary_description_candidates:
+        column = _find_column(header_map, [candidate])
+        if column and column not in description_columns:
+            description_columns.append(column)
+    if not description_columns:
+        column = _find_column(header_map, ["Causale"])
+        if column:
+            description_columns.append(column)
+
+    if description_columns:
+        config.colonna_descrizione = description_columns[0]
+        config.colonne_descrizione_extra = description_columns[1:]
+        detection.colonne_rilevate["colonna_descrizione"] = ", ".join(description_columns)
+        detection.confidenza += 10
+
+    if all(_find_column(header_map, [col]) for col in ["Rag. Soc./ Intestatario", "ABI", "CAB", "Conto"]):
+        detection.formato_rilevato = "CSV CBI"
+        detection.confidenza += 20
+
+    metadata_row = rows[1] if len(rows) > 1 else []
+    detection.abi = _column_value(metadata_row, _find_column(header_map, ["ABI"]), header_map)
+    detection.cab = _column_value(metadata_row, _find_column(header_map, ["CAB"]), header_map)
+    detection.numero_conto = _column_value(metadata_row, _find_column(header_map, ["Conto"]), header_map)
+    detection.intestatario = _column_value(metadata_row, _find_column(header_map, ["Rag. Soc./ Intestatario"]), header_map)
+
+    mancanti = config.descrizione_campi_richiesti()
+    if mancanti:
+        detection.avvisi.append(
+            "Non sono riuscito a rilevare automaticamente: " + ", ".join(mancanti) + "."
+        )
+    detection.confidenza = min(detection.confidenza, 100)
+    return detection
 
 
 class CsvImporter(BaseParser):
@@ -127,18 +299,7 @@ class CsvImporter(BaseParser):
         if not raw_bytes:
             return iter(())
 
-        encodings_fallback = [self.config.encoding, "utf-8", "cp1252", "latin-1"]
-        testo: Optional[str] = None
-        for enc in encodings_fallback:
-            if not enc:
-                continue
-            try:
-                testo = raw_bytes.decode(enc)
-                break
-            except UnicodeDecodeError:
-                continue
-        if testo is None:
-            raise ValueError("Impossibile decodificare il file CSV con gli encoding noti.")
+        testo = _decode_csv_bytes(raw_bytes, self.config.encoding)
 
         delimiter = self.config.delimiter
         if not delimiter:
@@ -154,11 +315,7 @@ class CsvImporter(BaseParser):
         if self.config.ha_intestazione:
             header = rows[0]
             data_rows = rows[1:]
-            for idx, nome in enumerate(header):
-                pulito = (nome or "").strip()
-                if pulito:
-                    header_map[pulito] = idx
-                    header_map[pulito.lower()] = idx
+            header_map = _build_header_map(header)
 
         movimenti: List[ParsedMovimento] = []
         for row in data_rows:
@@ -218,7 +375,12 @@ class CsvImporter(BaseParser):
             return None
 
         valuta = _column_value(row, cfg.colonna_valuta, header_map) or cfg.valuta_default
-        descrizione = _column_value(row, cfg.colonna_descrizione, header_map)
+        descrizione_parti = []
+        for ref in [cfg.colonna_descrizione, *cfg.colonne_descrizione_extra]:
+            value = _column_value(row, ref, header_map)
+            if value and value.upper() not in {"NOTPROVIDED", "N/D", "ND"} and value not in descrizione_parti:
+                descrizione_parti.append(value)
+        descrizione = " - ".join(descrizione_parti)
         controparte = _column_value(row, cfg.colonna_controparte, header_map)
         iban_controparte = _column_value(row, cfg.colonna_iban_controparte, header_map)
         tx_id = _column_value(row, cfg.colonna_transaction_id, header_map)

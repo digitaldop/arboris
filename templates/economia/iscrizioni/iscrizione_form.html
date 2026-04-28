@@ -255,6 +255,63 @@
                         </div>
                     </td>
                 </tr>
+                <tr class="iscrizione-modalita-pagamento-row">
+                    <th>{{ form.modalita_pagamento_retta.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione %}
+                                {{ iscrizione.get_modalita_pagamento_retta_display }}
+                            {% else %}
+                                Rateale
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            {{ form.modalita_pagamento_retta }} {{ form.modalita_pagamento_retta.errors }}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="iscrizione-sconto-unico-row">
+                    <th>{{ form.sconto_unica_soluzione_tipo.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.is_pagamento_unica_soluzione %}
+                                {{ iscrizione.get_sconto_unica_soluzione_tipo_display }}
+                                {% if iscrizione.sconto_unica_soluzione_valore and iscrizione.sconto_unica_soluzione_tipo != "nessuno" %}
+                                    - {{ iscrizione.sconto_unica_soluzione_valore|euro }}{% if iscrizione.sconto_unica_soluzione_tipo == "percentuale" %}%{% else %} EUR{% endif %}
+                                {% endif %}
+                            {% else %}
+                                <span class="table-muted">Nessuno</span>
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            <div class="related-field-row">
+                                {{ form.sconto_unica_soluzione_tipo }}
+                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                    {{ form.sconto_unica_soluzione_valore }}
+                                    <span class="currency-suffix" data-single-payment-discount-suffix>EUR</span>
+                                </div>
+                            </div>
+                            <div class="help-text">{{ form.sconto_unica_soluzione_valore.help_text }}</div>
+                            {{ form.sconto_unica_soluzione_tipo.errors }}
+                            {{ form.sconto_unica_soluzione_valore.errors }}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="iscrizione-scadenza-unico-row">
+                    <th>{{ form.scadenza_pagamento_unica.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if riepilogo_economico.scadenza_pagamento_unica %}
+                                {{ riepilogo_economico.scadenza_pagamento_unica|it_date }}
+                            {% else %}
+                                <span class="table-muted">Non indicata</span>
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field">
+                            {{ form.scadenza_pagamento_unica }} {{ form.scadenza_pagamento_unica.errors }}
+                        </div>
+                    </td>
+                </tr>
                 <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
             </table>
             <div class="help-text iscrizione-rate-help">
@@ -277,6 +334,10 @@
                             <div class="economia-summary-value">EUR {{ riepilogo_economico.importo_riduzione_speciale|euro }}</div>
                         </div>
                         <div class="economia-summary-item">
+                            <div class="economia-summary-label">Sconto unica soluzione</div>
+                            <div class="economia-summary-value">EUR {{ riepilogo_economico.sconto_unica_soluzione|euro }}</div>
+                        </div>
+                        <div class="economia-summary-item">
                             <div class="economia-summary-label">Preiscrizione</div>
                             <div class="economia-summary-value">EUR {{ riepilogo_economico.importo_preiscrizione|euro }}</div>
                         </div>
@@ -289,18 +350,29 @@
                             <div class="economia-summary-value">EUR {{ riepilogo_economico.totale_complessivo|euro }}</div>
                         </div>
                         <div class="economia-summary-item">
-                            <div class="economia-summary-label">Mensilita</div>
-                            <div class="economia-summary-value">{{ riepilogo_economico.numero_mensilita }}</div>
+                            <div class="economia-summary-label">Modalita pagamento</div>
+                            <div class="economia-summary-value">{{ riepilogo_economico.modalita_pagamento }}</div>
                         </div>
-                        <div class="economia-summary-item">
-                            <div class="economia-summary-label">Rata mensile standard</div>
-                            <div class="economia-summary-value">EUR {{ riepilogo_economico.rata_standard|euro }}</div>
-                        </div>
-                        {% if riepilogo_economico.ultima_rata_diversa %}
+                        {% if riepilogo_economico.pagamento_unica_soluzione %}
                             <div class="economia-summary-item">
-                                <div class="economia-summary-label">Ultima rata</div>
-                                <div class="economia-summary-value">EUR {{ riepilogo_economico.rata_finale|euro }}</div>
+                                <div class="economia-summary-label">Pagamento unico</div>
+                                <div class="economia-summary-value">EUR {{ riepilogo_economico.rata_unica|euro }}</div>
                             </div>
+                        {% else %}
+                            <div class="economia-summary-item">
+                                <div class="economia-summary-label">Mensilita</div>
+                                <div class="economia-summary-value">{{ riepilogo_economico.numero_mensilita }}</div>
+                            </div>
+                            <div class="economia-summary-item">
+                                <div class="economia-summary-label">Rata mensile standard</div>
+                                <div class="economia-summary-value">EUR {{ riepilogo_economico.rata_standard|euro }}</div>
+                            </div>
+                            {% if riepilogo_economico.ultima_rata_diversa %}
+                                <div class="economia-summary-item">
+                                    <div class="economia-summary-label">Ultima rata</div>
+                                    <div class="economia-summary-value">EUR {{ riepilogo_economico.rata_finale|euro }}</div>
+                                </div>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </div>
@@ -340,7 +412,7 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=6"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

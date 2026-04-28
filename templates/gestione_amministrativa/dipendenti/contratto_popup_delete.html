@@ -11,9 +11,13 @@
 
     <div class="panel">
         <div class="panel-body" style="padding: 20px;">
-            {% if blocked or count_buste %}
+            {% if blocked or count_buste or count_simulazioni %}
                 <div class="message message-warning">
-                    Questo contratto ha {{ count_buste }} buste paga collegate. Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
+                    Questo contratto ha
+                    {% if count_buste %}{{ count_buste }} buste paga collegate{% endif %}
+                    {% if count_buste and count_simulazioni %} e {% endif %}
+                    {% if count_simulazioni %}{{ count_simulazioni }} simulazioni costo collegate{% endif %}.
+                    Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
                 </div>
             {% endif %}
 
@@ -26,7 +30,7 @@
                 <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" {% if count_buste %}disabled{% endif %}>Si', elimina</button>
+                    <button type="submit" class="btn btn-primary" {% if count_buste or count_simulazioni %}disabled{% endif %}>Si', elimina</button>
                     <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
                 </div>
             </form>

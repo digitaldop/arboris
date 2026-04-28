@@ -612,7 +612,7 @@ class RegolaCategorizzazione(models.Model):
         max_length=30,
         choices=CondizioneRegolaCategorizzazione.choices,
     )
-    pattern = models.CharField(max_length=255, blank=True)
+    pattern = models.TextField(blank=True)
     importo_min = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     importo_max = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     segno_filtro = models.CharField(max_length=10, choices=SegnoMovimento.choices, blank=True)

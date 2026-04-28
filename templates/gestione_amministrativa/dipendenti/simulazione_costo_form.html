@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{% if simulazione %}Modifica simulazione costo{% else %}Nuova simulazione costo{% endif %} - Dipendenti e collaboratori{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_simulazioni_costo_dipendenti' %}">Simulazioni costo</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if simulazione %}Modifica{% else %}Nuova{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if simulazione %}Modifica simulazione costo{% else %}Nuova simulazione costo{% endif %}</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Tutte le simulazioni</a>
+            {% if simulazione and simulazione.contratto.dipendente_id %}
+                <a href="{% url 'modifica_dipendente' simulazione.contratto.dipendente_id %}" class="btn btn-secondary">Torna al dipendente</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="detail-form">
+        {% csrf_token %}
+
+        <div class="content-card">
+            <h2 class="section-title">Riferimenti</h2>
+            <table class="form-table">
+                <tr><th>{{ form.contratto.label_tag }}</th><td>{{ form.contratto }} {{ form.contratto.errors }}</td></tr>
+                <tr><th>{{ form.titolo.label_tag }}</th><td>{{ form.titolo }} {{ form.titolo.errors }}</td></tr>
+                <tr><th>{{ form.data_elaborazione.label_tag }}</th><td>{{ form.data_elaborazione }} {{ form.data_elaborazione.errors }}</td></tr>
+                <tr><th>{{ form.valido_dal.label_tag }}</th><td>{{ form.valido_dal }} {{ form.valido_dal.errors }}</td></tr>
+                <tr><th>{{ form.valido_al.label_tag }}</th><td>{{ form.valido_al }} {{ form.valido_al.errors }}</td></tr>
+                <tr><th>{{ form.file_simulazione.label_tag }}</th><td>{{ form.file_simulazione }} {{ form.file_simulazione.errors }}</td></tr>
+                <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
+            </table>
+        </div>
+
+        <div class="content-card">
+            <h2 class="section-title">Valori principali</h2>
+            <table class="form-table">
+                <tr><th>{{ form.netto_mensile.label_tag }}</th><td>{{ form.netto_mensile }} {{ form.netto_mensile.errors }}</td></tr>
+                <tr><th>{{ form.lordo_mensile.label_tag }}</th><td>{{ form.lordo_mensile }} {{ form.lordo_mensile.errors }}</td></tr>
+                <tr><th>{{ form.costo_azienda_mensile.label_tag }}</th><td>{{ form.costo_azienda_mensile }} {{ form.costo_azienda_mensile.errors }}</td></tr>
+                <tr><th>{{ form.mensilita_annue.label_tag }}</th><td>{{ form.mensilita_annue }} {{ form.mensilita_annue.errors }}</td></tr>
+                <tr><th>{{ form.valuta.label_tag }}</th><td>{{ form.valuta }} {{ form.valuta.errors }}</td></tr>
+            </table>
+        </div>
+
+        <div class="content-card">
+            <h2 class="section-title">Contributi e imposte</h2>
+            <table class="form-table">
+                <tr><th>{{ form.contributi_previdenziali_azienda.label_tag }}</th><td>{{ form.contributi_previdenziali_azienda }} {{ form.contributi_previdenziali_azienda.errors }}</td></tr>
+                <tr><th>{{ form.contributi_assicurativi_azienda.label_tag }}</th><td>{{ form.contributi_assicurativi_azienda }} {{ form.contributi_assicurativi_azienda.errors }}</td></tr>
+                <tr><th>{{ form.contributi_previdenza_complementare_azienda.label_tag }}</th><td>{{ form.contributi_previdenza_complementare_azienda }} {{ form.contributi_previdenza_complementare_azienda.errors }}</td></tr>
+                <tr><th>{{ form.contributi_previdenziali_dipendente.label_tag }}</th><td>{{ form.contributi_previdenziali_dipendente }} {{ form.contributi_previdenziali_dipendente.errors }}</td></tr>
+                <tr><th>{{ form.contributi_assicurativi_dipendente.label_tag }}</th><td>{{ form.contributi_assicurativi_dipendente }} {{ form.contributi_assicurativi_dipendente.errors }}</td></tr>
+                <tr><th>{{ form.contributi_previdenza_complementare_dipendente.label_tag }}</th><td>{{ form.contributi_previdenza_complementare_dipendente }} {{ form.contributi_previdenza_complementare_dipendente.errors }}</td></tr>
+                <tr><th>{{ form.irpef_lorda.label_tag }}</th><td>{{ form.irpef_lorda }} {{ form.irpef_lorda.errors }}</td></tr>
+                <tr><th>{{ form.irpef_netto.label_tag }}</th><td>{{ form.irpef_netto }} {{ form.irpef_netto.errors }}</td></tr>
+                <tr><th>{{ form.addizionale_regionale.label_tag }}</th><td>{{ form.addizionale_regionale }} {{ form.addizionale_regionale.errors }}</td></tr>
+                <tr><th>{{ form.addizionale_comunale.label_tag }}</th><td>{{ form.addizionale_comunale }} {{ form.addizionale_comunale.errors }}</td></tr>
+                <tr><th>{{ form.bonus_fiscali.label_tag }}</th><td>{{ form.bonus_fiscali }} {{ form.bonus_fiscali.errors }}</td></tr>
+            </table>
+        </div>
+
+        <div class="content-card">
+            <h2 class="section-title">Ratei e parametri contrattuali</h2>
+            <table class="form-table">
+                <tr><th>{{ form.trattamento_fine_rapporto.label_tag }}</th><td>{{ form.trattamento_fine_rapporto }} {{ form.trattamento_fine_rapporto.errors }}</td></tr>
+                <tr><th>{{ form.costo_mensilita_aggiuntive.label_tag }}</th><td>{{ form.costo_mensilita_aggiuntive }} {{ form.costo_mensilita_aggiuntive.errors }}</td></tr>
+                <tr><th>{{ form.costo_rateo_ferie.label_tag }}</th><td>{{ form.costo_rateo_ferie }} {{ form.costo_rateo_ferie.errors }}</td></tr>
+                <tr><th>{{ form.costo_rateo_permessi.label_tag }}</th><td>{{ form.costo_rateo_permessi }} {{ form.costo_rateo_permessi.errors }}</td></tr>
+                <tr><th>{{ form.costo_rateo_rol.label_tag }}</th><td>{{ form.costo_rateo_rol }} {{ form.costo_rateo_rol.errors }}</td></tr>
+                <tr><th>{{ form.costo_rateo_ex_festivita.label_tag }}</th><td>{{ form.costo_rateo_ex_festivita }} {{ form.costo_rateo_ex_festivita.errors }}</td></tr>
+                <tr><th>{{ form.ore_mensili.label_tag }}</th><td>{{ form.ore_mensili }} {{ form.ore_mensili.errors }}</td></tr>
+                <tr><th>{{ form.giorni_mensili.label_tag }}</th><td>{{ form.giorni_mensili }} {{ form.giorni_mensili.errors }}</td></tr>
+                <tr><th>{{ form.percentuale_part_time.label_tag }}</th><td>{{ form.percentuale_part_time }} {{ form.percentuale_part_time.errors }}</td></tr>
+                <tr><th>{{ form.tasso_inail_per_mille.label_tag }}</th><td>{{ form.tasso_inail_per_mille }} {{ form.tasso_inail_per_mille.errors }}</td></tr>
+                <tr><th>{{ form.livello.label_tag }}</th><td>{{ form.livello }} {{ form.livello.errors }}</td></tr>
+                <tr><th>{{ form.qualifica.label_tag }}</th><td>{{ form.qualifica }} {{ form.qualifica.errors }}</td></tr>
+                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
+            </table>
+        </div>
+
+        <div class="form-actions sticky-form-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <button type="submit" class="btn btn-primary">Salva</button>
+            {% endif %}
+            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Annulla</a>
+            {% if simulazione and can_manage_gestione_amministrativa %}
+                <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="btn btn-danger">Elimina</a>
+            {% endif %}
+        </div>
+    </form>
+{% endblock %}

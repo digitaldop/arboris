@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Simulazioni costo - Dipendenti e collaboratori{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Simulazioni costo</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Simulazioni costo dipendenti</h1>
+        <div class="page-head-actions">
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url 'crea_simulazione_costo_dipendente' %}" class="btn btn-primary">Nuova simulazione</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar">
+            <label>
+                Dipendente
+                <select name="dipendente">
+                    <option value="">Tutti</option>
+                    {% for dipendente in dipendenti %}
+                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Contratto
+                <select name="contratto">
+                    <option value="">Tutti</option>
+                    {% for contratto in contratti %}
+                        <option value="{{ contratto.pk }}" {% if contratto_id == contratto.pk|stringformat:"s" %}selected{% endif %}>{{ contratto.label_select }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Stato
+                <select name="attiva">
+                    <option value="">Tutte</option>
+                    <option value="1" {% if attiva == "1" %}selected{% endif %}>Attive</option>
+                    <option value="0" {% if attiva == "0" %}selected{% endif %}>Non attive</option>
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Dipendente</th>
+                    <th>Validita</th>
+                    <th class="column-right">Netto</th>
+                    <th class="column-right">Lordo</th>
+                    <th class="column-right">Costo azienda</th>
+                    <th>PDF</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for simulazione in simulazioni %}
+                    <tr>
+                        <td>
+                            {% if simulazione.contratto.dipendente_id %}
+                                <a href="{% url 'modifica_dipendente' simulazione.contratto.dipendente_id %}" class="table-link">{{ simulazione.contratto.dipendente }}</a>
+                            {% else %}
+                                <span class="table-muted">Contratto non assegnato</span>
+                            {% endif %}
+                            {% if simulazione.titolo %}
+                                <br><strong>{{ simulazione.titolo }}</strong>
+                            {% endif %}
+                            <br><span class="table-muted">{{ simulazione.contratto.label_select }}</span>
+                        </td>
+                        <td>
+                            {{ simulazione.valido_dal|date:"d/m/Y" }} -
+                            {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                        </td>
+                        <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
+                        <td class="column-right">{{ simulazione.lordo_mensile|euro }} &euro;</td>
+                        <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
+                        <td>
+                            {% if simulazione.file_simulazione %}
+                                <a href="{{ simulazione.file_simulazione.url }}" class="table-link" target="_blank" rel="noopener">Apri</a>
+                            {% else %}
+                                <span class="table-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">Modifica</a>
+                            {% if can_manage_gestione_amministrativa %}
+                                <span class="table-muted">|</span>
+                                <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="table-link table-link-danger">Elimina</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8"><div class="empty-state">Nessuna simulazione costo registrata.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

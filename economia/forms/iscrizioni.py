@@ -4,7 +4,7 @@ from django import forms
 from django.forms import HiddenInput
 from django.db import DatabaseError
 from django.utils import timezone
-from arboris.form_widgets import apply_eur_currency_widget
+from arboris.form_widgets import apply_eur_currency_widget, italian_decimal_to_python, merge_widget_classes
 from scuola.utils import resolve_default_anno_scolastico
 
 from economia.models import (
@@ -144,6 +144,10 @@ class IscrizioneForm(forms.ModelForm):
             "riduzione_speciale",
             "importo_riduzione_speciale",
             "non_pagante",
+            "modalita_pagamento_retta",
+            "sconto_unica_soluzione_tipo",
+            "sconto_unica_soluzione_valore",
+            "scadenza_pagamento_unica",
             "attiva",
             "note_amministrative",
             "note",
@@ -152,6 +156,7 @@ class IscrizioneForm(forms.ModelForm):
             "data_iscrizione": DateInput(),
             "data_fine_iscrizione": DateInput(),
             "condizione_iscrizione": CondizioneIscrizioneSelect(),
+            "scadenza_pagamento_unica": DateInput(),
             "note_amministrative": forms.Textarea(attrs={"rows": 3}),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
@@ -168,6 +173,30 @@ class IscrizioneForm(forms.ModelForm):
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].help_text = "Importo in euro."
         apply_eur_currency_widget(self.fields["importo_riduzione_speciale"])
+        self.fields["modalita_pagamento_retta"].label = "Modalita pagamento retta"
+        self.fields["sconto_unica_soluzione_tipo"].label = "Sconto unica soluzione"
+        self.fields["sconto_unica_soluzione_valore"].label = "Valore sconto"
+        self.fields["sconto_unica_soluzione_valore"].help_text = "Inserisci una percentuale o un importo in base al tipo di sconto selezionato."
+        self.fields["sconto_unica_soluzione_valore"].required = False
+        self.fields["sconto_unica_soluzione_valore"].localize = True
+        self.fields["sconto_unica_soluzione_valore"].to_python = (
+            lambda value, _field=self.fields["sconto_unica_soluzione_valore"]: italian_decimal_to_python(_field, value)
+        )
+        self.fields["sconto_unica_soluzione_valore"].widget = forms.TextInput()
+        merge_widget_classes(
+            self.fields["sconto_unica_soluzione_valore"].widget,
+            "currency-field",
+            "currency-field-compact",
+        )
+        self.fields["sconto_unica_soluzione_valore"].widget.attrs.update(
+            {
+                "autocomplete": "off",
+                "inputmode": "decimal",
+                "placeholder": "0,00",
+            }
+        )
+        self.fields["scadenza_pagamento_unica"].label = "Scadenza pagamento unico"
+        self.fields["scadenza_pagamento_unica"].required = False
         self.fields["agevolazione"].required = False
         try:
             self.fields["agevolazione"].queryset = self.fields["agevolazione"].queryset.filter(attiva=True).order_by("nome_agevolazione")
@@ -249,6 +278,8 @@ class IscrizioneForm(forms.ModelForm):
                 cleaned_data["data_iscrizione"] = anno_scolastico.data_inizio
             if not cleaned_data.get("data_fine_iscrizione"):
                 cleaned_data["data_fine_iscrizione"] = anno_scolastico.data_fine
+        if cleaned_data.get("sconto_unica_soluzione_valore") is None:
+            cleaned_data["sconto_unica_soluzione_valore"] = Decimal("0.00")
         return cleaned_data
 
 

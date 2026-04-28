@@ -12,6 +12,7 @@ from .forms import (
     ContrattoDipendenteForm,
     DipendenteForm,
     ParametroCalcoloStipendioForm,
+    SimulazioneCostoDipendenteForm,
     TipoContrattoDipendenteForm,
 )
 from .models import (
@@ -19,6 +20,7 @@ from .models import (
     ContrattoDipendente,
     Dipendente,
     ParametroCalcoloStipendio,
+    SimulazioneCostoDipendente,
     StatoDipendente,
     TipoContrattoDipendente,
 )
@@ -56,6 +58,7 @@ def dashboard_gestione_amministrativa(request):
             "dipendenti_attivi": Dipendente.objects.filter(stato=StatoDipendente.ATTIVO).count(),
             "dipendenti_totali": Dipendente.objects.count(),
             "contratti_attivi": ContrattoDipendente.objects.filter(attivo=True).count(),
+            "simulazioni_attive": SimulazioneCostoDipendente.objects.filter(attiva=True).count(),
             "buste_periodo_count": buste_periodo.count(),
             "costo_previsto": aggregates["costo_previsto"] or ZERO,
             "costo_effettivo": aggregates["costo_effettivo"] or ZERO,
@@ -98,7 +101,8 @@ def lista_dipendenti(request):
 
 def lista_contratti_dipendenti(request):
     contratti = ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto").annotate(
-        numero_buste=Count("buste_paga")
+        numero_buste=Count("buste_paga"),
+        numero_simulazioni=Count("simulazioni_costo"),
     )
     dipendente_id = (request.GET.get("dipendente") or "").strip()
     attivo = (request.GET.get("attivo") or "").strip()
@@ -119,6 +123,39 @@ def lista_contratti_dipendenti(request):
     )
 
 
+def lista_simulazioni_costo_dipendenti(request):
+    simulazioni = SimulazioneCostoDipendente.objects.select_related(
+        "contratto",
+        "contratto__dipendente",
+        "contratto__tipo_contratto",
+    )
+    dipendente_id = (request.GET.get("dipendente") or "").strip()
+    contratto_id = (request.GET.get("contratto") or "").strip()
+    attiva = (request.GET.get("attiva") or "").strip()
+
+    if dipendente_id.isdigit():
+        simulazioni = simulazioni.filter(contratto__dipendente_id=int(dipendente_id))
+    if contratto_id.isdigit():
+        simulazioni = simulazioni.filter(contratto_id=int(contratto_id))
+    if attiva in {"1", "0"}:
+        simulazioni = simulazioni.filter(attiva=(attiva == "1"))
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/simulazione_costo_list.html",
+        {
+            "simulazioni": simulazioni,
+            "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
+            "contratti": ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto").order_by(
+                "dipendente__cognome", "dipendente__nome", "-data_inizio"
+            ),
+            "dipendente_id": dipendente_id,
+            "contratto_id": contratto_id,
+            "attiva": attiva,
+        },
+    )
+
+
 def crea_dipendente(request):
     if request.method == "POST":
         form = DipendenteForm(request.POST)
@@ -132,7 +169,7 @@ def crea_dipendente(request):
     return render(
         request,
         "gestione_amministrativa/dipendenti/dipendente_form.html",
-        {"form": form, "dipendente": None, "contratti": [], "buste_paga": []},
+        {"form": form, "dipendente": None, "contratti": [], "buste_paga": [], "simulazioni_costo": []},
     )
 
 
@@ -149,6 +186,11 @@ def modifica_dipendente(request, pk):
 
     contratti = dipendente.contratti.all()
     buste_paga = dipendente.buste_paga.select_related("contratto").order_by("-anno", "-mese")[:12]
+    simulazioni_costo = (
+        SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__tipo_contratto")
+        .filter(contratto__dipendente=dipendente)
+        .order_by("-valido_dal", "-id")[:12]
+    )
     return render(
         request,
         "gestione_amministrativa/dipendenti/dipendente_form.html",
@@ -157,6 +199,7 @@ def modifica_dipendente(request, pk):
             "dipendente": dipendente,
             "contratti": contratti,
             "buste_paga": buste_paga,
+            "simulazioni_costo": simulazioni_costo,
         },
     )
 
@@ -245,10 +288,17 @@ def modifica_contratto_dipendente(request, pk):
     else:
         form = ContrattoDipendenteForm(instance=contratto)
 
+    simulazioni_costo = contratto.simulazioni_costo.order_by("-valido_dal", "-id")
     return render(
         request,
         "gestione_amministrativa/dipendenti/contratto_popup_form.html" if popup else "gestione_amministrativa/dipendenti/contratto_form.html",
-        {"form": form, "dipendente": contratto.dipendente, "contratto": contratto, "popup": popup},
+        {
+            "form": form,
+            "dipendente": contratto.dipendente,
+            "contratto": contratto,
+            "popup": popup,
+            "simulazioni_costo": simulazioni_costo,
+        },
     )
 
 
@@ -259,17 +309,24 @@ def elimina_contratto_dipendente(request, pk):
     )
     popup = is_popup_request(request)
     count_buste = contratto.buste_paga.count()
+    count_simulazioni = contratto.simulazioni_costo.count()
     if request.method == "POST":
-        if count_buste:
+        if count_buste or count_simulazioni:
             if popup:
                 return render(
                     request,
                     "gestione_amministrativa/dipendenti/contratto_popup_delete.html",
-                    {"contratto": contratto, "count_buste": count_buste, "popup": popup, "blocked": True},
+                    {
+                        "contratto": contratto,
+                        "count_buste": count_buste,
+                        "count_simulazioni": count_simulazioni,
+                        "popup": popup,
+                        "blocked": True,
+                    },
                 )
             messages.error(
                 request,
-                "Impossibile eliminare il contratto: ci sono buste paga collegate. Puoi disattivarlo o chiuderlo con una data fine.",
+                "Impossibile eliminare il contratto: ci sono buste paga o simulazioni costo collegate. Puoi disattivarlo o chiuderlo con una data fine.",
             )
             return redirect("modifica_contratto_dipendente", pk=contratto.pk)
 
@@ -290,7 +347,83 @@ def elimina_contratto_dipendente(request, pk):
     return render(
         request,
         "gestione_amministrativa/dipendenti/contratto_popup_delete.html" if popup else "gestione_amministrativa/dipendenti/contratto_confirm_delete.html",
-        {"contratto": contratto, "count_buste": count_buste, "popup": popup, "blocked": False},
+        {
+            "contratto": contratto,
+            "count_buste": count_buste,
+            "count_simulazioni": count_simulazioni,
+            "popup": popup,
+            "blocked": False,
+        },
+    )
+
+
+def crea_simulazione_costo_dipendente(request):
+    initial = {}
+    contratto_id = (request.GET.get("contratto") or request.POST.get("contratto") or "").strip()
+    if contratto_id.isdigit():
+        initial["contratto"] = int(contratto_id)
+    else:
+        dipendente_id = (request.GET.get("dipendente") or "").strip()
+        if dipendente_id.isdigit():
+            dipendente = get_object_or_404(Dipendente, pk=int(dipendente_id))
+            contratto_corrente = dipendente.contratto_corrente
+            if contratto_corrente:
+                initial["contratto"] = contratto_corrente.pk
+
+    if request.method == "POST":
+        form = SimulazioneCostoDipendenteForm(request.POST, request.FILES)
+        if form.is_valid():
+            simulazione = form.save()
+            messages.success(request, "Simulazione costo dipendente salvata correttamente.")
+            return redirect("modifica_simulazione_costo_dipendente", pk=simulazione.pk)
+    else:
+        form = SimulazioneCostoDipendenteForm(initial=initial)
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/simulazione_costo_form.html",
+        {"form": form, "simulazione": None},
+    )
+
+
+def modifica_simulazione_costo_dipendente(request, pk):
+    simulazione = get_object_or_404(
+        SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente", "contratto__tipo_contratto"),
+        pk=pk,
+    )
+    if request.method == "POST":
+        form = SimulazioneCostoDipendenteForm(request.POST, request.FILES, instance=simulazione)
+        if form.is_valid():
+            simulazione = form.save()
+            messages.success(request, "Simulazione costo dipendente aggiornata correttamente.")
+            return redirect("modifica_simulazione_costo_dipendente", pk=simulazione.pk)
+    else:
+        form = SimulazioneCostoDipendenteForm(instance=simulazione)
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/simulazione_costo_form.html",
+        {"form": form, "simulazione": simulazione},
+    )
+
+
+def elimina_simulazione_costo_dipendente(request, pk):
+    simulazione = get_object_or_404(
+        SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente"),
+        pk=pk,
+    )
+    if request.method == "POST":
+        contratto = simulazione.contratto
+        simulazione.delete()
+        messages.success(request, "Simulazione costo dipendente eliminata correttamente.")
+        if contratto and contratto.dipendente_id:
+            return redirect("modifica_dipendente", pk=contratto.dipendente_id)
+        return redirect("lista_simulazioni_costo_dipendenti")
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/simulazione_costo_confirm_delete.html",
+        {"simulazione": simulazione},
     )
 
 

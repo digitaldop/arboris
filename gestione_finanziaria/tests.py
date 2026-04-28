@@ -8,16 +8,43 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from anagrafica.models import Famiglia, StatoRelazioneFamiglia, Studente
+from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione
+from scuola.models import AnnoScolastico, Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
 from .models import (
+    CategoriaFinanziaria,
     CategoriaSpesa,
+    CondizioneRegolaCategorizzazione,
+    ContoBancario,
     DocumentoFornitore,
     Fornitore,
+    MovimentoFinanziario,
+    ProviderBancario,
+    RegolaCategorizzazione,
     ScadenzaPagamentoFornitore,
+    SegnoMovimento,
+    StatoRiconciliazione,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
+    TipoCategoriaFinanziaria,
+    TipoProviderBancario,
     TipoDocumentoFornitore,
+)
+from .importers import CsvImporter, CsvImporterConfig, detect_csv_import_config
+from .importers.service import importa_movimenti_da_file
+from .services import applica_regole_a_movimento
+
+
+CBI_CSV_SAMPLE = (
+    '"Rag. Soc./ Intestatario";"ABI";"CAB";"Conto";"Operazione";"Valuta";"Importo";"Causale";'
+    '"Causale Interna";"Descrizione";"Identificativo End to End";"Informazioni di riconciliazione"\n'
+    '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034";"37060";"000000003228";"24/04/2026";'
+    '"24/04/2026";"300,00";"48";"0";"BONIF. VS. FAVORE - YYY24042026 GHEDUZZI";"NOTPROVIDED ";'
+    '"Iscrizione 4 classe 2026-2027 Gheduzzi Sofia "\n'
+    '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034";"37060";"000000003228";"24/04/2026";'
+    '"24/04/2026";"-24,40";"50";"C";"ADDEBITO DIRETTO SDD - PayPal Europe";"";""\n'
 )
 
 
@@ -370,3 +397,277 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         for url in urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, url)
+
+    def test_cbi_csv_autodetect_parses_movements(self):
+        detection = detect_csv_import_config(CBI_CSV_SAMPLE.encode("utf-8"))
+
+        self.assertEqual(detection.formato_rilevato, "CSV CBI")
+        self.assertEqual(detection.config.delimiter, ";")
+        self.assertEqual(detection.abi, "05034")
+        self.assertEqual(detection.cab, "37060")
+        self.assertEqual(detection.numero_conto, "000000003228")
+
+        movimenti = list(CsvImporter(detection.config).parse(CBI_CSV_SAMPLE.encode("utf-8")))
+
+        self.assertEqual(len(movimenti), 2)
+        self.assertEqual(movimenti[0].data_contabile, date(2026, 4, 24))
+        self.assertEqual(movimenti[0].importo, Decimal("300.00"))
+        self.assertIn("Gheduzzi Sofia", movimenti[0].descrizione)
+        self.assertIn("BONIF. VS. FAVORE", movimenti[0].descrizione)
+        self.assertEqual(movimenti[0].provider_transaction_id, "")
+        self.assertEqual(movimenti[1].importo, Decimal("-24.40"))
+
+    def test_import_estratto_conto_preview_and_confirm_with_cbi_csv(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import file test",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto CBI",
+            iban="IT00X0503437060000000003228",
+            provider=provider,
+            attivo=True,
+        )
+        uploaded = SimpleUploadedFile(
+            "movimenti_cbi.csv",
+            CBI_CSV_SAMPLE.encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        preview_response = self.client.post(
+            reverse("import_estratto_conto"),
+            {
+                "import_action": "preview",
+                "formato": "auto",
+                "conto": "",
+                "file": uploaded,
+            },
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertContains(preview_response, "Anteprima import")
+        self.assertContains(preview_response, "CSV CBI")
+        self.assertEqual(preview_response.context["selected_conto"], conto)
+        token = preview_response.context["import_token"]
+        self.assertTrue(token)
+
+        confirm_response = self.client.post(
+            reverse("import_estratto_conto"),
+            {
+                "import_action": "confirm",
+                "import_token": token,
+                "conto": str(conto.pk),
+            },
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 2)
+        movimento = MovimentoFinanziario.objects.get(importo=Decimal("300.00"))
+        self.assertIn("Gheduzzi Sofia", movimento.descrizione)
+
+    def test_regole_categorizzazione_supportano_condizioni_testuali_avanzate(self):
+        categoria = CategoriaFinanziaria.objects.create(nome="Incassi rette")
+        RegolaCategorizzazione.objects.create(
+            nome="Quote e commissioni",
+            condizione_tipo=CondizioneRegolaCategorizzazione.DESCRIZIONE_CONTIENE,
+            pattern="COMM. SU BONIFICI | quota + maggio",
+            categoria_da_assegnare=categoria,
+        )
+
+        movimento_or = MovimentoFinanziario(
+            data_contabile=date(2026, 4, 24),
+            importo=Decimal("-2.00"),
+            descrizione="COMM.SU BONIFICI AREA SEPA",
+        )
+        regola_or = applica_regole_a_movimento(movimento_or)
+
+        self.assertIsNotNone(regola_or)
+        self.assertEqual(movimento_or.categoria_id, categoria.pk)
+
+        movimento_and = MovimentoFinanziario(
+            data_contabile=date(2026, 5, 10),
+            importo=Decimal("100.00"),
+            descrizione="Versamento quota retta mese di maggio",
+        )
+        regola_and = applica_regole_a_movimento(movimento_and)
+
+        self.assertIsNotNone(regola_and)
+        self.assertEqual(movimento_and.categoria_id, categoria.pk)
+
+        movimento_no_match = MovimentoFinanziario(
+            data_contabile=date(2026, 5, 11),
+            importo=Decimal("100.00"),
+            descrizione="Versamento quota generica",
+        )
+        self.assertIsNone(applica_regole_a_movimento(movimento_no_match))
+
+    def test_import_movimenti_riconcilia_automaticamente_retta_studente(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import rette test",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto rette",
+            iban="IT00X0000000000000000000000",
+            provider=provider,
+            attivo=True,
+        )
+        stato_relazione = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=stato_relazione,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Luca",
+            cognome="Bianchi",
+            data_nascita=date(2020, 5, 5),
+        )
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        classe = Classe.objects.create(
+            nome_classe="Materna",
+            ordine_classe=1,
+            anno_scolastico=anno,
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto")
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1000.00"),
+            preiscrizione=Decimal("0.00"),
+        )
+        iscrizione = Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno,
+            classe=classe,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            data_iscrizione=date(2025, 9, 1),
+            data_fine_iscrizione=date(2026, 6, 30),
+        )
+        self.assertEqual(iscrizione.sync_rate_schedule(), "created")
+        rata = RataIscrizione.objects.get(iscrizione=iscrizione, numero_rata=1)
+        self.assertEqual(rata.importo_finale, Decimal("100.00"))
+
+        raw_csv = (
+            "Data;Importo;Descrizione\n"
+            "10/09/2025;100,00;Bonifico retta settembre Luca Bianchi\n"
+        ).encode("utf-8")
+        config = CsvImporterConfig(
+            delimiter=";",
+            ha_intestazione=True,
+            colonna_data_contabile="Data",
+            colonna_importo="Importo",
+            colonna_descrizione="Descrizione",
+        )
+
+        risultato = importa_movimenti_da_file(
+            parser=CsvImporter(config),
+            raw_bytes=raw_csv,
+            conto=conto,
+            provider=provider,
+            nome_file="rette.csv",
+        )
+
+        self.assertEqual(risultato.inseriti, 1)
+        self.assertEqual(risultato.riconciliati, 1)
+
+        movimento = MovimentoFinanziario.objects.get(conto=conto)
+        rata.refresh_from_db()
+        self.assertEqual(movimento.rata_iscrizione_id, rata.pk)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertTrue(rata.pagata)
+        self.assertEqual(rata.importo_pagato, Decimal("100.00"))
+        self.assertEqual(rata.data_pagamento, date(2025, 9, 10))
+
+    def test_lista_movimenti_colora_entrate_e_uscite(self):
+        categoria = CategoriaFinanziaria.objects.create(
+            nome="Rette",
+            tipo=TipoCategoriaFinanziaria.ENTRATA,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 1),
+            importo=Decimal("100.00"),
+            descrizione="Incasso retta",
+            categoria=categoria,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-25.00"),
+            descrizione="Spesa bancaria",
+            categoria=categoria,
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "finance-movement-filters")
+        self.assertContains(response, "finance-movement-row-incoming")
+        self.assertContains(response, "finance-movement-row-outgoing")
+
+    def test_report_categorie_filtra_per_anno_scolastico(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        categoria = CategoriaFinanziaria.objects.create(
+            nome="Rette",
+            tipo=TipoCategoriaFinanziaria.ENTRATA,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 8, 31),
+            importo=Decimal("999.00"),
+            descrizione="Fuori anno scolastico",
+            categoria=categoria,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 1),
+            importo=Decimal("100.00"),
+            descrizione="Inizio anno scolastico",
+            categoria=categoria,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 6, 30),
+            importo=Decimal("50.00"),
+            descrizione="Fine anno scolastico",
+            categoria=categoria,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 7, 1),
+            importo=Decimal("999.00"),
+            descrizione="Dopo anno scolastico",
+            categoria=categoria,
+        )
+
+        response = self.client.get(
+            reverse("report_categorie_annuale"),
+            {"periodo": "scolastico", "anno_scolastico": str(anno.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["periodo_tipo"], "scolastico")
+        self.assertEqual(response.context["periodo_label"], "anno scolastico 2025/2026")
+        self.assertEqual(response.context["totale_entrate"], Decimal("150.00"))
+
+        response = self.client.get(
+            reverse("report_categorie_mensile"),
+            {"periodo": "scolastico", "anno_scolastico": str(anno.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["periodo_tipo"], "scolastico")
+        self.assertEqual(response.context["mesi"][0], "Set 2025")
+        self.assertEqual(response.context["mesi"][-1], "Giu 2026")
+        self.assertEqual(response.context["totale_generale"], Decimal("150.00"))

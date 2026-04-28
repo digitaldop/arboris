@@ -62,6 +62,12 @@ window.ArborisIscrizioneForm = (function () {
         const agevolazioneRow = document.querySelector(".iscrizione-agevolazione-row");
         const riduzioneRow = document.querySelector(".iscrizione-riduzione-row");
         const importoRow = document.querySelector(".iscrizione-importo-riduzione-row");
+        const modalitaPagamentoSelect = document.getElementById("id_modalita_pagamento_retta");
+        const scontoUnicoTipoSelect = document.getElementById("id_sconto_unica_soluzione_tipo");
+        const scontoUnicoValoreInput = document.getElementById("id_sconto_unica_soluzione_valore");
+        const scontoUnicoRow = document.querySelector(".iscrizione-sconto-unico-row");
+        const scadenzaUnicoRow = document.querySelector(".iscrizione-scadenza-unico-row");
+        const scontoUnicoSuffix = document.querySelector("[data-single-payment-discount-suffix]");
         const detailForm = document.getElementById("iscrizione-detail-form");
 
         if (condizioneSelect && riduzioneCheckbox && importoInput) {
@@ -116,6 +122,49 @@ window.ArborisIscrizioneForm = (function () {
                 }
             });
             syncRiduzioneSpeciale();
+        }
+
+        if (modalitaPagamentoSelect && scontoUnicoTipoSelect && scontoUnicoValoreInput) {
+            function syncPagamentoUnico() {
+                const isViewMode = detailForm && detailForm.classList.contains("is-view-mode");
+                const pagamentoUnico = modalitaPagamentoSelect.value === "unica_soluzione";
+                const scontoTipo = scontoUnicoTipoSelect.value || "nessuno";
+                const scontoAttivo = pagamentoUnico && scontoTipo !== "nessuno";
+                const currencyGroup = scontoUnicoValoreInput.closest(".currency-input-group");
+
+                if (isViewMode) {
+                    if (scontoUnicoRow) scontoUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
+                    if (scadenzaUnicoRow) scadenzaUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
+                    return;
+                }
+
+                if (scontoUnicoRow) scontoUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
+                if (scadenzaUnicoRow) scadenzaUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
+                scontoUnicoTipoSelect.disabled = !pagamentoUnico;
+                scontoUnicoValoreInput.readOnly = !scontoAttivo;
+                scontoUnicoValoreInput.classList.toggle("is-readonly", !scontoAttivo);
+                if (currencyGroup) {
+                    currencyGroup.classList.toggle("is-disabled", !scontoAttivo);
+                }
+                if (scontoUnicoSuffix) {
+                    scontoUnicoSuffix.textContent = scontoTipo === "percentuale" ? "%" : "EUR";
+                }
+                if (!scontoAttivo) {
+                    scontoUnicoValoreInput.value = "0,00";
+                }
+            }
+
+            modalitaPagamentoSelect.addEventListener("change", syncPagamentoUnico);
+            scontoUnicoTipoSelect.addEventListener("change", syncPagamentoUnico);
+            ["enable-edit-iscrizione-btn", "cancel-edit-iscrizione-btn"].forEach(function (buttonId) {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener("click", function () {
+                        window.setTimeout(syncPagamentoUnico, 0);
+                    });
+                }
+            });
+            syncPagamentoUnico();
         }
     }
 

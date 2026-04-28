@@ -10,7 +10,9 @@ Concentrati qui per non sparpagliare logica nei form o nelle viste:
 from __future__ import annotations
 
 import hashlib
+import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -24,6 +26,56 @@ from django.utils import timezone
 # =========================================================================
 #  Regole di categorizzazione
 # =========================================================================
+
+
+def _normalizza_testo_match_legacy(value: str) -> str:
+    testo = (value or "").lower()
+    replacements = {
+        "à": "a",
+        "è": "e",
+        "é": "e",
+        "ì": "i",
+        "ò": "o",
+        "ù": "u",
+    }
+    for source, target in replacements.items():
+        testo = testo.replace(source, target)
+    testo = re.sub(r"[^a-z0-9]+", " ", testo)
+    return " ".join(testo.split())
+
+
+def _normalizza_testo_match(value: str) -> str:
+    testo = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii").lower()
+    testo = re.sub(r"[^a-z0-9]+", " ", testo)
+    return " ".join(testo.split())
+
+
+def _split_pattern_or_groups(pattern: str) -> list[str]:
+    parti = []
+    for line in (pattern or "").splitlines():
+        parti.extend(re.split(r"\s*(?:\||\bOR\b|\bOPPURE\b|\bO\b)\s*", line, flags=re.IGNORECASE))
+    return [parte.strip() for parte in parti if parte and parte.strip()]
+
+
+def _split_pattern_and_terms(group: str) -> list[str]:
+    return [
+        termine.strip()
+        for termine in re.split(r"\s*(?:\+|&&|\bAND\b|\bE\b)\s*", group, flags=re.IGNORECASE)
+        if termine and termine.strip()
+    ]
+
+
+def _pattern_testuale_match(pattern: str, testo: str) -> bool:
+    testo_normalizzato = _normalizza_testo_match(testo)
+    if not testo_normalizzato:
+        return False
+
+    for group in _split_pattern_or_groups(pattern):
+        termini = [_normalizza_testo_match(termine) for termine in _split_pattern_and_terms(group)]
+        termini = [termine for termine in termini if termine]
+        if termini and all(termine in testo_normalizzato for termine in termini):
+            return True
+    return False
 
 
 def _regola_matcha_movimento(regola, movimento) -> bool:
@@ -41,17 +93,17 @@ def _regola_matcha_movimento(regola, movimento) -> bool:
     condizione = regola.condizione_tipo
     pattern = (regola.pattern or "").strip()
 
-    descrizione = (movimento.descrizione or "").lower()
-    controparte = (movimento.controparte or "").lower()
+    descrizione = movimento.descrizione or ""
+    controparte = movimento.controparte or ""
     iban_controparte = (movimento.iban_controparte or "").strip().upper()
     importo = movimento.importo if movimento.importo is not None else Decimal("0")
 
     match = False
 
     if condizione == CondizioneRegolaCategorizzazione.DESCRIZIONE_CONTIENE:
-        match = bool(pattern) and pattern.lower() in descrizione
+        match = _pattern_testuale_match(pattern, descrizione)
     elif condizione == CondizioneRegolaCategorizzazione.CONTROPARTE_CONTIENE:
-        match = bool(pattern) and pattern.lower() in controparte
+        match = _pattern_testuale_match(pattern, controparte)
     elif condizione == CondizioneRegolaCategorizzazione.IBAN_CONTROPARTE_UGUALE:
         match = bool(pattern) and pattern.strip().upper() == iban_controparte
     elif condizione == CondizioneRegolaCategorizzazione.IMPORTO_RANGE:
@@ -444,7 +496,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
     )
 
     data_mov = movimento.data_contabile
-    controparte = (movimento.controparte or "").lower()
+    testo_movimento = _normalizza_testo_match(f"{movimento.descrizione or ''} {movimento.controparte or ''}")
     iban_mov = (movimento.iban_controparte or "").upper()
 
     candidati = []
@@ -479,17 +531,20 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
         try:
             studente = rata.iscrizione.studente
             famiglia = rata.iscrizione.studente.famiglia
-            nome_famiglia = (
-                f"{getattr(studente, 'cognome', '') or ''} "
-                f"{getattr(studente, 'nome', '') or ''}"
-            ).strip().lower()
-            if controparte and nome_famiglia and any(
-                tok and tok in controparte
-                for tok in nome_famiglia.split()
-                if len(tok) >= 3
-            ):
-                score += 10
-                motivazioni.append("Controparte compatibile con studente/famiglia")
+            nome = _normalizza_testo_match(getattr(studente, "nome", "") or "")
+            cognome = _normalizza_testo_match(getattr(studente, "cognome", "") or "")
+            cognome_famiglia = _normalizza_testo_match(getattr(famiglia, "cognome_famiglia", "") or "")
+
+            nome_presente = bool(nome and len(nome) >= 3 and nome in testo_movimento)
+            cognome_presente = bool(cognome and len(cognome) >= 3 and cognome in testo_movimento)
+            famiglia_presente = bool(cognome_famiglia and len(cognome_famiglia) >= 3 and cognome_famiglia in testo_movimento)
+
+            if nome_presente and cognome_presente:
+                score += 30
+                motivazioni.append("Nome e cognome studente presenti nella causale")
+            elif cognome_presente or famiglia_presente:
+                score += 15
+                motivazioni.append("Cognome studente/famiglia presente nella causale")
         except Exception:
             famiglia = None
 
@@ -499,6 +554,40 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
 
     candidati.sort(key=lambda c: c.score, reverse=True)
     return candidati[:limite]
+
+
+def riconcilia_movimento_automaticamente(
+    movimento,
+    *,
+    utente=None,
+    punteggio_minimo: int = 85,
+):
+    if movimento is None or movimento.importo is None or movimento.importo <= 0:
+        return None
+    if movimento.rata_iscrizione_id:
+        return None
+
+    candidati = [
+        candidato
+        for candidato in trova_rate_candidate(movimento, limite=10)
+        if not candidato.rata.pagata and not candidato.rata.movimenti_finanziari.exists()
+    ]
+    if not candidati:
+        return None
+
+    top_score = candidati[0].score
+    migliori = [candidato for candidato in candidati if candidato.score == top_score]
+    if top_score < punteggio_minimo or len(migliori) != 1:
+        return None
+
+    candidato = migliori[0]
+    riconcilia_movimento_con_rata(
+        movimento,
+        candidato.rata,
+        utente=utente,
+        marca_rata_pagata=True,
+    )
+    return candidato
 
 
 @transaction.atomic

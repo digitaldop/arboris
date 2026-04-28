@@ -40,6 +40,7 @@ from ..services import (
     applica_regole_a_movimento,
     calcola_hash_deduplica_movimento,
     ricalcola_saldo_corrente_conto,
+    riconcilia_movimento_automaticamente,
 )
 from .base import BaseParser, ParsedMovimento, RisultatoImport
 
@@ -105,6 +106,9 @@ def importa_movimenti_da_file(
 
         applica_regole_a_movimento(movimento)
         movimento.save()
+        candidato_riconciliazione = riconcilia_movimento_automaticamente(movimento)
+        if candidato_riconciliazione is not None:
+            risultato.riconciliati += 1
 
         risultato.inseriti += 1
         risultato.movimenti_ids.append(movimento.id)
@@ -165,7 +169,7 @@ def _crea_log_import(
     pezzi = []
     pezzi.append(
         f"Letti: {risultato.totale_letti}, inseriti: {risultato.inseriti}, "
-        f"duplicati: {risultato.duplicati}, errori: {risultato.errori}"
+        f"riconciliati: {risultato.riconciliati}, duplicati: {risultato.duplicati}, errori: {risultato.errori}"
     )
     if messaggio_extra:
         pezzi.append(messaggio_extra)

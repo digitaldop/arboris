@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ricerche anagrafica - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Ricerche anagrafica</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Ricerche anagrafica</h1>
+    </div>
+
+    <div class="content-card anagrafica-query-panel">
+        <h2 class="section-title">Ricerche rapide</h2>
+        <div class="anagrafica-query-grid">
+            {% for preset in preset_cards %}
+                <div class="anagrafica-query-item">
+                    <div>
+                        <div class="anagrafica-query-title">{{ preset.title }}</div>
+                        {% if preset.tipo_documento %}
+                            <div class="table-muted">Tipo documento: {{ preset.tipo_documento }}</div>
+                        {% else %}
+                            <div class="table-muted">Crea prima un tipo documento compatibile.</div>
+                        {% endif %}
+                    </div>
+                    {% if preset.url %}
+                        <a href="{{ preset.url }}" class="btn btn-secondary">Esegui</a>
+                    {% else %}
+                        <button type="button" class="btn btn-secondary" disabled>Esegui</button>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h2 class="section-title">Verifica documenti mancanti</h2>
+        <form method="get" class="filter-bar anagrafica-query-form">
+            <input type="hidden" name="query" value="documenti_mancanti">
+            <label>
+                Gruppo
+                <select name="target" required>
+                    <option value="">-----</option>
+                    {% for key, label in target_choices %}
+                        <option value="{{ key }}" {% if target == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Tipo documento richiesto
+                <select name="tipo_documento" required>
+                    <option value="">-----</option>
+                    {% for tipo_documento in tipi_documento %}
+                        <option value="{{ tipo_documento.pk }}" {% if tipo_documento_id == tipo_documento.pk|stringformat:"s" %}selected{% endif %}>{{ tipo_documento }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-primary">Cerca mancanti</button>
+            <a href="{% url 'ricerche_anagrafica' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    {% if query_key %}
+        <div class="content-card">
+            {% if result_title %}
+                <div class="admin-section-title admin-section-title-with-help">
+                    <span>{{ result_title }}</span>
+                    <span>{{ rows|length }} risultati</span>
+                </div>
+            {% endif %}
+
+            {% if result_message %}
+                <div class="message message-warning">{{ result_message }}</div>
+            {% elif rows %}
+                <table class="list-table anagrafica-query-results">
+                    <thead>
+                        <tr>
+                            <th>Nominativo / record</th>
+                            <th>Contesto</th>
+                            <th>Dettagli</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr class="list-row-link" data-row-href="{{ row.url }}">
+                                <td>{{ row.label }}</td>
+                                <td>{{ row.context|default:"-" }}</td>
+                                <td>{{ row.details|default:"-" }}</td>
+                                <td class="actions-cell">
+                                    <a href="{{ row.url }}" class="table-link">Apri scheda</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessun record trovato per questa ricerca.</div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

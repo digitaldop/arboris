@@ -453,6 +453,26 @@
                                                     </div>
                                                 </div>
                                                 <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
+                                                    <label>Pagamento retta</label>
+                                                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                        {% if f.instance.pk %}
+                                                            {{ f.instance.get_modalita_pagamento_retta_display }}
+                                                        {% else %}
+                                                            <span class="table-muted">Rateale</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
+                                                    <label>Sconto unica soluzione</label>
+                                                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                        {% if f.instance.pk and f.instance.is_pagamento_unica_soluzione and f.instance.get_importo_sconto_unica_soluzione_applicato > 0 %}
+                                                            EUR {{ f.instance.get_importo_sconto_unica_soluzione_applicato|euro }}
+                                                        {% else %}
+                                                            <span class="table-muted">Nessuno</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
                                                     <label>Iscrizione attiva</label>
                                                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                         {{ f.instance.attiva|si_no }}
@@ -556,6 +576,48 @@
                                                             </div>
                                                             <div class="mode-edit-field">
                                                                 {{ f.non_pagante }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-modalita-pagamento">
+                                                            <label>Pagamento retta</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk %}
+                                                                    {{ f.instance.get_modalita_pagamento_retta_display }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Rateale</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.modalita_pagamento_retta }}
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-sconto-unico">
+                                                            <label>Sconto unica soluzione</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.is_pagamento_unica_soluzione and f.instance.get_importo_sconto_unica_soluzione_applicato > 0 %}
+                                                                    EUR {{ f.instance.get_importo_sconto_unica_soluzione_applicato|euro }}
+                                                                {% else %}
+                                                                    <span class="table-muted">Nessuno</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field inline-related-field">
+                                                                {{ f.sconto_unica_soluzione_tipo }}
+                                                                <div class="currency-input-group currency-input-group-inline">
+                                                                    {{ f.sconto_unica_soluzione_valore }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="inline-details-field inline-details-field-scadenza-unica">
+                                                            <label>Scadenza pagamento unico</label>
+                                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                                {% if f.instance.pk and f.instance.scadenza_pagamento_unica %}
+                                                                    {{ f.instance.scadenza_pagamento_unica|it_date }}
+                                                                {% else %}
+                                                                    <span class="table-muted">-</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="mode-edit-field">
+                                                                {{ f.scadenza_pagamento_unica }}
                                                             </div>
                                                         </div>
                                                         <div class="inline-details-field inline-details-field-attiva">
@@ -905,6 +967,18 @@
                         </div>
                     </div>
                     <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
+                        <label>Pagamento retta</label>
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            <span class="table-muted">Rateale</span>
+                        </div>
+                    </div>
+                    <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
+                        <label>Sconto unica soluzione</label>
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            <span class="table-muted">Nessuno</span>
+                        </div>
+                    </div>
+                    <div class="iscrizioni-inline-field iscrizioni-inline-view-summary">
                         <label>Iscrizione attiva</label>
                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                             <span class="table-muted">-</span>
@@ -992,6 +1066,36 @@
                             </div>
                             <div class="mode-edit-field">
                                 {{ iscrizioni_formset.empty_form.non_pagante }}
+                            </div>
+                        </div>
+                        <div class="inline-details-field inline-details-field-modalita-pagamento">
+                            <label>Pagamento retta</label>
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Rateale</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.modalita_pagamento_retta }}
+                            </div>
+                        </div>
+                        <div class="inline-details-field inline-details-field-sconto-unico">
+                            <label>Sconto unica soluzione</label>
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">Nessuno</span>
+                            </div>
+                            <div class="mode-edit-field inline-related-field">
+                                {{ iscrizioni_formset.empty_form.sconto_unica_soluzione_tipo }}
+                                <div class="currency-input-group currency-input-group-inline">
+                                    {{ iscrizioni_formset.empty_form.sconto_unica_soluzione_valore }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="inline-details-field inline-details-field-scadenza-unica">
+                            <label>Scadenza pagamento unico</label>
+                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                <span class="table-muted">-</span>
+                            </div>
+                            <div class="mode-edit-field">
+                                {{ iscrizioni_formset.empty_form.scadenza_pagamento_unica }}
                             </div>
                         </div>
                         <div class="inline-details-field inline-details-field-attiva">

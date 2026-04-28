@@ -10,6 +10,7 @@ anagrafica_edit = module_edit_permission_required("anagrafica")
 
 urlpatterns = [
     path("", app_auth(views.home), name="home"),
+    path("ricerche-anagrafica/", anagrafica_view(views.ricerche_anagrafica), name="ricerche_anagrafica"),
     #URLS DEGLI INDIRIZZI
     path("indirizzi/", anagrafica_view(views.lista_indirizzi), name="lista_indirizzi"),
     path("indirizzi/nuovo/", anagrafica_manage(views.crea_indirizzo), name="crea_indirizzo"),

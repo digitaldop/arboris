@@ -10,6 +10,7 @@ from .models import (
     Dipendente,
     ParametroCalcoloStipendio,
     ScenarioValorePayroll,
+    SimulazioneCostoDipendente,
     StatoBustaPaga,
     TipoVocePayroll,
     VoceBustaPaga,
@@ -55,10 +56,43 @@ def parametro_applicabile(anno, mese):
     )
 
 
+def simulazione_costo_applicabile(contratto, anno, mese):
+    if not contratto:
+        return None
+    inizio_periodo, fine_periodo = periodo_bounds(anno, mese)
+    return (
+        SimulazioneCostoDipendente.objects.filter(contratto=contratto, attiva=True)
+        .filter(valido_dal__lte=fine_periodo)
+        .filter(Q(valido_al__isnull=True) | Q(valido_al__gte=inizio_periodo))
+        .order_by("-valido_dal", "-id")
+        .first()
+    )
+
+
+def _previsione_da_simulazione(contratto, simulazione):
+    return {
+        "contratto": contratto,
+        "parametro": None,
+        "simulazione": simulazione,
+        "lordo_previsto": money(simulazione.lordo_mensile),
+        "contributi_datore_previsti": money(simulazione.contributi_datore_totali),
+        "contributi_dipendente_previsti": money(simulazione.contributi_dipendente_totali),
+        "rateo_tredicesima_previsto": money(simulazione.costo_mensilita_aggiuntive),
+        "rateo_tfr_previsto": money(simulazione.trattamento_fine_rapporto),
+        "altri_oneri_previsti": money(simulazione.altri_oneri_previsti_totali),
+        "netto_previsto": money(simulazione.netto_mensile),
+        "costo_azienda_previsto": money(simulazione.costo_azienda_mensile),
+    }
+
+
 def calcola_previsione_busta_paga(dipendente, anno, mese, contratto=None, parametro=None):
     contratto = contratto or contratto_applicabile(dipendente, anno, mese)
     if not contratto:
         raise ValueError("Non esiste un contratto attivo applicabile al periodo selezionato.")
+
+    simulazione = simulazione_costo_applicabile(contratto, anno, mese)
+    if simulazione:
+        return _previsione_da_simulazione(contratto, simulazione)
 
     parametro = parametro or contratto.parametro_calcolo or parametro_applicabile(anno, mese)
 
@@ -114,11 +148,14 @@ def crea_o_aggiorna_previsione_busta_paga(dipendente, anno, mese):
     busta.stato = StatoBustaPaga.EFFETTIVA if busta.ha_effettivo else StatoBustaPaga.PREVISTA
     busta.valuta = previsione["contratto"].valuta
     for field_name, value in previsione.items():
-        if field_name in {"contratto", "parametro"}:
+        if field_name in {"contratto", "parametro", "simulazione"}:
             continue
         setattr(busta, field_name, value)
+    simulazione = previsione.get("simulazione")
     parametro = previsione.get("parametro")
-    if parametro:
+    if simulazione:
+        busta.note_previsione = f"Previsione generata dalla simulazione costo: {simulazione}."
+    elif parametro:
         busta.note_previsione = f"Previsione calcolata con parametro: {parametro}."
     busta.save()
 
@@ -132,6 +169,8 @@ def crea_o_aggiorna_previsione_busta_paga(dipendente, anno, mese):
             "RATEO_MENS",
             "RATEO_TFR",
             "ALTRI_ONERI",
+            "NETTO_SIM",
+            "COSTO_SIM",
         ],
     ).delete()
     voci = [
@@ -142,6 +181,25 @@ def crea_o_aggiorna_previsione_busta_paga(dipendente, anno, mese):
         ("RATEO_TFR", TipoVocePayroll.TFR, "Rateo TFR previsto", previsione["rateo_tfr_previsto"], 50),
         ("ALTRI_ONERI", TipoVocePayroll.ONERE, "Altri oneri previsti", previsione["altri_oneri_previsti"], 60),
     ]
+    if simulazione:
+        voci.extend(
+            [
+                (
+                    "NETTO_SIM",
+                    TipoVocePayroll.RETRIBUZIONE,
+                    "Retribuzione netta prevista da simulazione",
+                    previsione["netto_previsto"],
+                    70,
+                ),
+                (
+                    "COSTO_SIM",
+                    TipoVocePayroll.ONERE,
+                    "Totale costo azienda previsto da simulazione",
+                    previsione["costo_azienda_previsto"],
+                    80,
+                ),
+            ]
+        )
     VoceBustaPaga.objects.bulk_create(
         [
             VoceBustaPaga(

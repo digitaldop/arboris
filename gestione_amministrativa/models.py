@@ -280,6 +280,111 @@ class ContrattoDipendente(models.Model):
         )
 
 
+class SimulazioneCostoDipendente(models.Model):
+    contratto = models.ForeignKey(
+        ContrattoDipendente,
+        on_delete=models.CASCADE,
+        related_name="simulazioni_costo",
+    )
+    titolo = models.CharField(max_length=180, blank=True)
+    data_elaborazione = models.DateField(blank=True, null=True)
+    valido_dal = models.DateField()
+    valido_al = models.DateField(blank=True, null=True)
+
+    netto_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    lordo_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_azienda_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_previdenziali_azienda = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_assicurativi_azienda = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_previdenza_complementare_azienda = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_previdenziali_dipendente = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_assicurativi_dipendente = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    contributi_previdenza_complementare_dipendente = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    irpef_lorda = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    irpef_netto = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    addizionale_regionale = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    addizionale_comunale = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    bonus_fiscali = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    trattamento_fine_rapporto = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_mensilita_aggiuntive = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_rateo_ferie = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_rateo_permessi = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_rateo_rol = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+    costo_rateo_ex_festivita = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
+
+    mensilita_annue = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("13.00"),
+        validators=[MinValueValidator(Decimal("1.00"))],
+    )
+    ore_mensili = models.DecimalField(max_digits=7, decimal_places=2, default=ZERO)
+    giorni_mensili = models.DecimalField(max_digits=7, decimal_places=2, default=ZERO)
+    percentuale_part_time = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=ONE_HUNDRED,
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(ONE_HUNDRED)],
+    )
+    tasso_inail_per_mille = models.DecimalField(max_digits=7, decimal_places=2, default=ZERO)
+    livello = models.CharField(max_length=60, blank=True)
+    qualifica = models.CharField(max_length=120, blank=True)
+    valuta = models.CharField(max_length=3, default="EUR")
+    file_simulazione = models.FileField(
+        upload_to="gestione_amministrativa/simulazioni_costo/%Y/%m",
+        blank=True,
+    )
+    attiva = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_amministrativa_simulazione_costo_dipendente"
+        ordering = ["contratto", "-valido_dal", "-id"]
+        verbose_name = "Simulazione costo dipendente"
+        verbose_name_plural = "Simulazioni costo dipendenti"
+        indexes = [
+            models.Index(fields=["contratto", "valido_dal"], name="ga_sim_costo_contr_idx"),
+            models.Index(fields=["attiva"], name="ga_sim_costo_attiva_idx"),
+        ]
+
+    def __str__(self):
+        if self.titolo:
+            return self.titolo
+        return f"Simulazione costo dal {self.valido_dal:%d/%m/%Y}"
+
+    def clean(self):
+        super().clean()
+        if self.valido_al and self.valido_al < self.valido_dal:
+            raise ValidationError({"valido_al": "La data fine validita non puo' precedere la data iniziale."})
+
+    @property
+    def contributi_datore_totali(self):
+        return (
+            (self.contributi_previdenziali_azienda or ZERO)
+            + (self.contributi_assicurativi_azienda or ZERO)
+            + (self.contributi_previdenza_complementare_azienda or ZERO)
+        )
+
+    @property
+    def contributi_dipendente_totali(self):
+        return (
+            (self.contributi_previdenziali_dipendente or ZERO)
+            + (self.contributi_assicurativi_dipendente or ZERO)
+            + (self.contributi_previdenza_complementare_dipendente or ZERO)
+        )
+
+    @property
+    def altri_oneri_previsti_totali(self):
+        return (
+            (self.costo_rateo_ferie or ZERO)
+            + (self.costo_rateo_permessi or ZERO)
+            + (self.costo_rateo_rol or ZERO)
+            + (self.costo_rateo_ex_festivita or ZERO)
+        )
+
+
 class ParametroCalcoloStipendio(models.Model):
     nome = models.CharField(max_length=140)
     valido_dal = models.DateField()

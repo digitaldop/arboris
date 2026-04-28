@@ -1,6 +1,6 @@
 from calendar import monthrange
 from datetime import date
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -42,9 +42,27 @@ MONTH_NUMBER_CHOICES = (
 
 RATE_TYPE_MENSILE = "mensile"
 RATE_TYPE_PREISCRIZIONE = "preiscrizione"
+RATE_TYPE_UNICA_SOLUZIONE = "unica_soluzione"
 RATE_TYPE_CHOICES = (
     (RATE_TYPE_MENSILE, "Mensile"),
     (RATE_TYPE_PREISCRIZIONE, "Preiscrizione"),
+    (RATE_TYPE_UNICA_SOLUZIONE, "Unica soluzione"),
+)
+
+PAYMENT_MODE_RATEALE = "rateale"
+PAYMENT_MODE_UNICA_SOLUZIONE = "unica_soluzione"
+PAYMENT_MODE_CHOICES = (
+    (PAYMENT_MODE_RATEALE, "Rateale"),
+    (PAYMENT_MODE_UNICA_SOLUZIONE, "Unica soluzione"),
+)
+
+DISCOUNT_TYPE_NONE = "nessuno"
+DISCOUNT_TYPE_PERCENT = "percentuale"
+DISCOUNT_TYPE_AMOUNT = "importo"
+DISCOUNT_TYPE_CHOICES = (
+    (DISCOUNT_TYPE_NONE, "Nessuno"),
+    (DISCOUNT_TYPE_PERCENT, "Percentuale"),
+    (DISCOUNT_TYPE_AMOUNT, "Importo fisso"),
 )
 
 
@@ -221,6 +239,14 @@ class Agevolazione(models.Model):
 
 
 class Iscrizione(models.Model):
+    MODALITA_PAGAMENTO_RATEALE = PAYMENT_MODE_RATEALE
+    MODALITA_PAGAMENTO_UNICA_SOLUZIONE = PAYMENT_MODE_UNICA_SOLUZIONE
+    MODALITA_PAGAMENTO_CHOICES = PAYMENT_MODE_CHOICES
+    SCONTO_UNICA_NESSUNO = DISCOUNT_TYPE_NONE
+    SCONTO_UNICA_PERCENTUALE = DISCOUNT_TYPE_PERCENT
+    SCONTO_UNICA_IMPORTO = DISCOUNT_TYPE_AMOUNT
+    SCONTO_UNICA_CHOICES = DISCOUNT_TYPE_CHOICES
+
     studente = models.ForeignKey(
         Studente,
         on_delete=models.CASCADE,
@@ -260,6 +286,18 @@ class Iscrizione(models.Model):
     riduzione_speciale = models.BooleanField(default=False)
     importo_riduzione_speciale = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     non_pagante = models.BooleanField(default=False)
+    modalita_pagamento_retta = models.CharField(
+        max_length=20,
+        choices=PAYMENT_MODE_CHOICES,
+        default=PAYMENT_MODE_RATEALE,
+    )
+    sconto_unica_soluzione_tipo = models.CharField(
+        max_length=20,
+        choices=DISCOUNT_TYPE_CHOICES,
+        default=DISCOUNT_TYPE_NONE,
+    )
+    sconto_unica_soluzione_valore = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    scadenza_pagamento_unica = models.DateField(blank=True, null=True)
     attiva = models.BooleanField(default=True)
     note_amministrative = models.TextField(blank=True)
     note = models.TextField(blank=True)
@@ -333,7 +371,11 @@ class Iscrizione(models.Model):
             return Decimal("0.00")
         return self.importo_riduzione_speciale or Decimal("0.00")
 
-    def get_importo_annuo_dovuto(self):
+    @property
+    def is_pagamento_unica_soluzione(self):
+        return self.modalita_pagamento_retta == PAYMENT_MODE_UNICA_SOLUZIONE
+
+    def get_importo_annuo_base_dovuto(self):
         if self.non_pagante:
             return Decimal("0.00")
 
@@ -346,6 +388,34 @@ class Iscrizione(models.Model):
         importo -= self.get_importo_agevolazione_applicata()
         importo -= self.get_importo_riduzione_applicata()
 
+        return max(importo, Decimal("0.00"))
+
+    def get_importo_sconto_unica_soluzione_applicato(self):
+        if self.non_pagante or not self.is_pagamento_unica_soluzione:
+            return Decimal("0.00")
+
+        tipo_sconto = self.sconto_unica_soluzione_tipo or DISCOUNT_TYPE_NONE
+        valore_sconto = self.sconto_unica_soluzione_valore or Decimal("0.00")
+        if tipo_sconto == DISCOUNT_TYPE_NONE or valore_sconto <= 0:
+            return Decimal("0.00")
+
+        importo_base = self.get_importo_annuo_base_dovuto()
+        if importo_base <= 0:
+            return Decimal("0.00")
+
+        if tipo_sconto == DISCOUNT_TYPE_PERCENT:
+            sconto = (importo_base * valore_sconto / Decimal("100")).quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP,
+            )
+        else:
+            sconto = valore_sconto
+
+        return min(max(sconto, Decimal("0.00")), importo_base)
+
+    def get_importo_annuo_dovuto(self):
+        importo = self.get_importo_annuo_base_dovuto()
+        importo -= self.get_importo_sconto_unica_soluzione_applicato()
         return max(importo, Decimal("0.00"))
 
     def get_importo_preiscrizione_dovuto(self):
@@ -404,6 +474,9 @@ class Iscrizione(models.Model):
 
         return prima_scadenza
 
+    def get_scadenza_pagamento_unica_soluzione(self):
+        return self.scadenza_pagamento_unica or self.get_prima_scadenza_rate()
+
     def build_preiscrizione_rate_entry(self):
         importo_preiscrizione = self.get_importo_preiscrizione_dovuto()
         if importo_preiscrizione <= 0:
@@ -437,6 +510,38 @@ class Iscrizione(models.Model):
             "importo_finale": importo_preiscrizione,
         }
 
+    def build_unica_soluzione_rate_entry(self, importo_annuo):
+        data_scadenza = self.get_scadenza_pagamento_unica_soluzione()
+        if not data_scadenza:
+            data_scadenza = (
+                self.anno_scolastico.data_inizio
+                if self.anno_scolastico_id and self.anno_scolastico and self.anno_scolastico.data_inizio
+                else date.today()
+            )
+
+        anno_scolastico_label = ""
+        if self.anno_scolastico_id and self.anno_scolastico:
+            anno_scolastico_label = self.anno_scolastico.nome_anno_scolastico or str(self.anno_scolastico)
+        descrizione = (
+            f"Retta annuale in unica soluzione - AS {anno_scolastico_label}"
+            if anno_scolastico_label
+            else "Retta annuale in unica soluzione"
+        )
+
+        return {
+            "famiglia_id": self.studente.famiglia_id,
+            "tipo_rata": RATE_TYPE_UNICA_SOLUZIONE,
+            "numero_rata": 1,
+            "mese_riferimento": data_scadenza.month,
+            "anno_riferimento": data_scadenza.year,
+            "descrizione": descrizione,
+            "importo_dovuto": importo_annuo,
+            "data_scadenza": data_scadenza,
+            "credito_applicato": Decimal("0.00"),
+            "altri_sgravi": Decimal("0.00"),
+            "importo_finale": importo_annuo,
+        }
+
     def build_rate_plan(self):
         if not self.condizione_iscrizione_id or not self.studente_id or not self.studente.famiglia_id:
             return []
@@ -460,6 +565,10 @@ class Iscrizione(models.Model):
 
         if rata_preiscrizione:
             piano.append(rata_preiscrizione)
+
+        if self.is_pagamento_unica_soluzione:
+            piano.append(self.build_unica_soluzione_rate_entry(importo_annuo))
+            return piano
 
         giorno_scadenza = self.get_giorno_scadenza_rate()
 
@@ -589,27 +698,37 @@ class Iscrizione(models.Model):
         tariffa = self.get_tariffa_applicabile()
         piano = self.build_rate_plan()
         piano_mensile = [item for item in piano if item.get("tipo_rata") == RATE_TYPE_MENSILE]
+        piano_unica_soluzione = [item for item in piano if item.get("tipo_rata") == RATE_TYPE_UNICA_SOLUZIONE]
         importo_base = tariffa.retta_annuale if tariffa else Decimal("0.00")
         importo_preiscrizione = self.get_importo_preiscrizione_dovuto()
         agevolazione = self.get_importo_agevolazione_applicata()
         riduzione = self.get_importo_riduzione_applicata()
+        sconto_unica_soluzione = self.get_importo_sconto_unica_soluzione_applicato()
         importo_annuo = self.get_importo_annuo_dovuto()
 
         rata_standard = piano_mensile[0]["importo_dovuto"] if piano_mensile else Decimal("0.00")
         rata_finale = piano_mensile[-1]["importo_dovuto"] if piano_mensile else Decimal("0.00")
+        rata_unica = piano_unica_soluzione[0]["importo_dovuto"] if piano_unica_soluzione else Decimal("0.00")
 
         return {
             "retta_annuale_base": importo_base,
             "importo_preiscrizione": importo_preiscrizione,
             "importo_agevolazione": agevolazione,
             "importo_riduzione_speciale": riduzione,
+            "sconto_unica_soluzione": sconto_unica_soluzione,
             "totale_annuo_netto": importo_annuo,
             "totale_complessivo": importo_annuo + importo_preiscrizione,
+            "modalita_pagamento": self.get_modalita_pagamento_retta_display(),
+            "pagamento_unica_soluzione": self.is_pagamento_unica_soluzione,
+            "scadenza_pagamento_unica": self.get_scadenza_pagamento_unica_soluzione()
+            if self.is_pagamento_unica_soluzione
+            else None,
             "numero_mensilita": max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
             if self.condizione_iscrizione_id
             else 0,
             "rata_standard": rata_standard,
             "rata_finale": rata_finale,
+            "rata_unica": rata_unica,
             "ultima_rata_diversa": bool(piano_mensile) and rata_finale != rata_standard,
         }
 
@@ -631,6 +750,23 @@ class Iscrizione(models.Model):
 
         if not self.riduzione_speciale and self.importo_riduzione_speciale:
             raise ValidationError("L'importo della riduzione speciale puo essere valorizzato solo se la riduzione speciale e attiva.")
+
+        if self.non_pagante:
+            self.sconto_unica_soluzione_tipo = DISCOUNT_TYPE_NONE
+            self.sconto_unica_soluzione_valore = Decimal("0.00")
+            self.scadenza_pagamento_unica = None
+        elif not self.is_pagamento_unica_soluzione:
+            self.sconto_unica_soluzione_tipo = DISCOUNT_TYPE_NONE
+            self.sconto_unica_soluzione_valore = Decimal("0.00")
+            self.scadenza_pagamento_unica = None
+        else:
+            valore_sconto = self.sconto_unica_soluzione_valore or Decimal("0.00")
+            if valore_sconto < 0:
+                raise ValidationError("Lo sconto per unica soluzione non puo essere negativo.")
+            if self.sconto_unica_soluzione_tipo == DISCOUNT_TYPE_NONE:
+                self.sconto_unica_soluzione_valore = Decimal("0.00")
+            if self.sconto_unica_soluzione_tipo == DISCOUNT_TYPE_PERCENT and valore_sconto > 100:
+                raise ValidationError("Lo sconto percentuale per unica soluzione non puo superare il 100%.")
 
         if (
             self.riduzione_speciale
@@ -656,6 +792,7 @@ class Iscrizione(models.Model):
 class RataIscrizione(models.Model):
     TIPO_MENSILE = RATE_TYPE_MENSILE
     TIPO_PREISCRIZIONE = RATE_TYPE_PREISCRIZIONE
+    TIPO_UNICA_SOLUZIONE = RATE_TYPE_UNICA_SOLUZIONE
 
     iscrizione = models.ForeignKey(
         Iscrizione,
@@ -703,14 +840,20 @@ class RataIscrizione(models.Model):
         return self.tipo_rata == self.TIPO_PREISCRIZIONE
 
     @property
+    def is_unica_soluzione(self):
+        return self.tipo_rata == self.TIPO_UNICA_SOLUZIONE
+
+    @property
     def display_label(self):
         if self.is_preiscrizione:
             return (self.descrizione or "").strip() or f"Preiscrizione AS {self.iscrizione.anno_scolastico}"
+        if self.is_unica_soluzione:
+            return (self.descrizione or "").strip() or "Retta annuale in unica soluzione"
         return f"Rata {self.numero_rata}"
 
     @property
     def display_period_label(self):
-        if self.is_preiscrizione:
+        if self.is_preiscrizione or self.is_unica_soluzione:
             return self.display_label
         month_label = dict(MONTH_NUMBER_CHOICES).get(self.mese_riferimento, self.mese_riferimento)
         return f"{month_label} {self.anno_riferimento}"

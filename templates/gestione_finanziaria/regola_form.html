@@ -35,7 +35,13 @@
                     </td>
                 </tr>
                 <tr><th>{{ form.condizione_tipo.label_tag }}</th><td>{{ form.condizione_tipo }} {{ form.condizione_tipo.errors }}</td></tr>
-                <tr><th>{{ form.pattern.label_tag }}</th><td>{{ form.pattern }} {{ form.pattern.errors }}</td></tr>
+                <tr>
+                    <th>{{ form.pattern.label_tag }}</th>
+                    <td>
+                        {{ form.pattern }} {{ form.pattern.errors }}
+                        {% if form.pattern.help_text %}<div class="help-text">{{ form.pattern.help_text }}</div>{% endif %}
+                    </td>
+                </tr>
                 <tr><th>{{ form.importo_min.label_tag }}</th><td>{{ form.importo_min }} {{ form.importo_min.errors }}</td></tr>
                 <tr><th>{{ form.importo_max.label_tag }}</th><td>{{ form.importo_max }} {{ form.importo_max.errors }}</td></tr>
                 <tr><th>{{ form.segno_filtro.label_tag }}</th><td>{{ form.segno_filtro }} {{ form.segno_filtro.errors }}</td></tr>

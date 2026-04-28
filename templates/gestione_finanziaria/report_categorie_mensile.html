@@ -14,16 +14,23 @@
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Report categorie - vista mensile {{ anno }}</h1>
+        <h1 class="page-title">Report categorie - vista mensile {{ periodo_label }}</h1>
         <div class="page-head-actions">
-            <a href="{% url 'report_categorie_annuale' %}?anno={{ anno }}" class="btn btn-secondary">Vista annuale</a>
+            <a href="{% url 'report_categorie_annuale' %}?{{ report_querystring }}" class="btn btn-secondary">Vista annuale</a>
         </div>
     </div>
 
     <div class="content-card">
-        <form method="get" class="filter-bar">
+        <form method="get" class="filter-bar finance-report-filters">
             <label>
-                Anno
+                Periodo
+                <select name="periodo">
+                    <option value="solare" {% if periodo_tipo == "solare" %}selected{% endif %}>Anno solare</option>
+                    <option value="scolastico" {% if periodo_tipo == "scolastico" %}selected{% endif %}>Anno scolastico</option>
+                </select>
+            </label>
+            <label>
+                Anno solare
                 <select name="anno">
                     {% for a in anni_disponibili %}
                         <option value="{{ a }}" {% if a == anno %}selected{% endif %}>{{ a }}</option>
@@ -31,6 +38,16 @@
                     {% if not anni_disponibili %}
                         <option value="{{ anno }}" selected>{{ anno }}</option>
                     {% endif %}
+                </select>
+            </label>
+            <label>
+                Anno scolastico
+                <select name="anno_scolastico">
+                    {% for anno_scolastico in anni_scolastici %}
+                        <option value="{{ anno_scolastico.pk }}" {% if anno_scolastico_selezionato == anno_scolastico.pk|stringformat:"s" %}selected{% endif %}>{{ anno_scolastico.nome_anno_scolastico }}</option>
+                    {% empty %}
+                        <option value="">Nessun anno scolastico</option>
+                    {% endfor %}
                 </select>
             </label>
             <label>
@@ -81,8 +98,8 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="14">
-                            <div class="empty-state">Nessun movimento categorizzato per l'anno {{ anno }}.</div>
+                        <td colspan="{{ mesi|length|add:2 }}">
+                            <div class="empty-state">Nessun movimento categorizzato per {{ periodo_label }}.</div>
                         </td>
                     </tr>
                 {% endfor %}

@@ -34,6 +34,8 @@ class ParsedMovimento:
         self.controparte = (self.controparte or "").strip()
         self.iban_controparte = (self.iban_controparte or "").replace(" ", "").upper()
         self.provider_transaction_id = (self.provider_transaction_id or "").strip()
+        if self.provider_transaction_id.upper() in {"NOTPROVIDED", "NONFORNITO", "N/D", "ND"}:
+            self.provider_transaction_id = ""
         if not isinstance(self.importo, Decimal):
             self.importo = Decimal(str(self.importo))
         return self
@@ -47,6 +49,7 @@ class RisultatoImport:
     inseriti: int = 0
     duplicati: int = 0
     aggiornati: int = 0
+    riconciliati: int = 0
     errori: int = 0
     messaggi: List[str] = field(default_factory=list)
     movimenti_ids: List[int] = field(default_factory=list)
