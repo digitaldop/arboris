@@ -3,6 +3,7 @@ from urllib.parse import quote, quote_plus
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Max
@@ -287,6 +288,12 @@ class PhoneDisplayFormat(models.TextChoices):
     )
 
 
+class GestioneIscrizioneCorsoAnno(models.TextChoices):
+    MESE_ISCRIZIONE_INTERO = "mese_iscrizione_intero", "Mese di iscrizione incluso per intero"
+    MESE_SUCCESSIVO_DOPO_SOGLIA = "mese_successivo_dopo_soglia", "Mese successivo dopo soglia"
+    PRO_RATA_GIORNALIERO = "pro_rata_giornaliero", "Pro-rata giornaliero"
+
+
 def get_google_font_config(font_key):
     return GOOGLE_FONT_LIBRARY.get(font_key, GOOGLE_FONT_LIBRARY[DEFAULT_SITE_BODY_FONT])
 
@@ -377,6 +384,23 @@ class SistemaImpostazioniGenerali(models.Model):
         choices=PhoneDisplayFormat.choices,
         default=PhoneDisplayFormat.IT_PLUS_N3_2_2_3,
         help_text="Come mostrare i numeri di telefono in elenchi e schede (in archivio restano senza spazi).",
+    )
+    gestione_iscrizione_corso_anno = models.CharField(
+        max_length=40,
+        choices=GestioneIscrizioneCorsoAnno.choices,
+        default=GestioneIscrizioneCorsoAnno.MESE_ISCRIZIONE_INTERO,
+        help_text=(
+            "Definisce come calcolare le rette quando lo studente viene iscritto dopo "
+            "il mese iniziale previsto dalla condizione di iscrizione."
+        ),
+    )
+    giorno_soglia_iscrizione_corso_anno = models.PositiveSmallIntegerField(
+        default=15,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        help_text=(
+            "Usato solo con la regola 'mese successivo dopo soglia': se l'iscrizione "
+            "avviene dopo questo giorno, la prima retta parte dal mese successivo."
+        ),
     )
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)

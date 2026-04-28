@@ -842,6 +842,9 @@ class DocumentoBaseForm(forms.ModelForm):
 
 
 class DocumentoInlineForm(DocumentoBaseForm):
+    def _has_uploaded_file(self):
+        return bool(self.files.get(self.add_prefix("file")))
+
     def has_changed(self):
         changed = super().has_changed()
         if not changed:
@@ -851,14 +854,12 @@ class DocumentoInlineForm(DocumentoBaseForm):
             return True
 
         meaningful_values = [
-            self.data.get(self.add_prefix("tipo_documento"), ""),
             self.data.get(self.add_prefix("descrizione"), ""),
-            self.data.get(self.add_prefix("file"), ""),
             self.data.get(self.add_prefix("scadenza"), ""),
             self.data.get(self.add_prefix("note"), ""),
         ]
 
-        if not any((value or "").strip() for value in meaningful_values):
+        if not self._has_uploaded_file() and not any((value or "").strip() for value in meaningful_values):
             return False
 
         return True
@@ -866,12 +867,13 @@ class DocumentoInlineForm(DocumentoBaseForm):
 
 class DocumentoInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
     meaningful_field_names = (
-        "tipo_documento",
         "descrizione",
-        "file",
         "scadenza",
         "note",
     )
+
+    def _is_meaningfully_filled(self, form):
+        return bool(form.files.get(form.add_prefix("file"))) or super()._is_meaningfully_filled(form)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

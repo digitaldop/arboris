@@ -19,6 +19,7 @@ from economia.services import (
 )
 from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
 from scuola.models import AnnoScolastico
+from sistema.models import GestioneIscrizioneCorsoAnno, SistemaImpostazioniGenerali
 
 
 class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
@@ -195,6 +196,74 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(rata_unica.importo_dovuto, Decimal("900.00"))
         self.assertEqual(rata_unica.importo_finale, Decimal("900.00"))
         self.assertEqual(rata_unica.data_scadenza, date(2025, 9, 10))
+
+    def test_mid_year_enrollment_default_starts_from_enrollment_month(self):
+        self.iscrizione.data_iscrizione = date(2025, 11, 12)
+        self.iscrizione.save()
+
+        piano = self.iscrizione.build_rate_plan()
+        rate_mensili = [item for item in piano if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE]
+
+        self.assertEqual(len(rate_mensili), 8)
+        self.assertEqual(rate_mensili[0]["mese_riferimento"], 11)
+        self.assertEqual(rate_mensili[0]["anno_riferimento"], 2025)
+        self.assertEqual(rate_mensili[0]["data_scadenza"], date(2025, 11, 12))
+        self.assertEqual(rate_mensili[-1]["mese_riferimento"], 6)
+        self.assertEqual(rate_mensili[-1]["anno_riferimento"], 2026)
+        self.assertEqual(sum(item["importo_dovuto"] for item in rate_mensili), Decimal("800.00"))
+
+    def test_mid_year_enrollment_can_start_from_next_month_after_threshold(self):
+        SistemaImpostazioniGenerali.objects.create(
+            gestione_iscrizione_corso_anno=GestioneIscrizioneCorsoAnno.MESE_SUCCESSIVO_DOPO_SOGLIA,
+            giorno_soglia_iscrizione_corso_anno=15,
+        )
+        self.iscrizione.data_iscrizione = date(2025, 11, 20)
+        self.iscrizione.save()
+
+        rate_mensili = [
+            item
+            for item in self.iscrizione.build_rate_plan()
+            if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE
+        ]
+
+        self.assertEqual(len(rate_mensili), 7)
+        self.assertEqual(rate_mensili[0]["mese_riferimento"], 12)
+        self.assertEqual(rate_mensili[0]["anno_riferimento"], 2025)
+        self.assertEqual(rate_mensili[0]["data_scadenza"], date(2025, 12, 10))
+        self.assertEqual(sum(item["importo_dovuto"] for item in rate_mensili), Decimal("700.00"))
+
+    def test_mid_year_enrollment_can_prorate_first_month(self):
+        SistemaImpostazioniGenerali.objects.create(
+            gestione_iscrizione_corso_anno=GestioneIscrizioneCorsoAnno.PRO_RATA_GIORNALIERO,
+        )
+        self.iscrizione.data_iscrizione = date(2025, 11, 16)
+        self.iscrizione.save()
+
+        rate_mensili = [
+            item
+            for item in self.iscrizione.build_rate_plan()
+            if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE
+        ]
+
+        self.assertEqual(len(rate_mensili), 8)
+        self.assertEqual(rate_mensili[0]["mese_riferimento"], 11)
+        self.assertEqual(rate_mensili[0]["data_scadenza"], date(2025, 11, 16))
+        self.assertEqual(rate_mensili[0]["importo_dovuto"], Decimal("50.00"))
+        self.assertEqual(sum(item["importo_dovuto"] for item in rate_mensili), Decimal("750.00"))
+
+    def test_single_payment_mid_year_uses_only_due_months_before_discount(self):
+        self.iscrizione.data_iscrizione = date(2025, 11, 12)
+        self.iscrizione.modalita_pagamento_retta = Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE
+        self.iscrizione.sconto_unica_soluzione_tipo = Iscrizione.SCONTO_UNICA_PERCENTUALE
+        self.iscrizione.sconto_unica_soluzione_valore = Decimal("10.00")
+        self.iscrizione.full_clean()
+        self.iscrizione.save()
+
+        piano = self.iscrizione.build_rate_plan()
+        rata_unica = next(item for item in piano if item["tipo_rata"] == RataIscrizione.TIPO_UNICA_SOLUZIONE)
+
+        self.assertEqual(rata_unica["importo_dovuto"], Decimal("720.00"))
+        self.assertEqual(rata_unica["data_scadenza"], date(2025, 11, 12))
 
     def test_batch_reconciliation_links_single_confident_payment(self):
         self.iscrizione.sync_rate_schedule()

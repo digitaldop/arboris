@@ -1011,6 +1011,30 @@ class DocumentoInlineFormTests(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn("Seleziona un tipo documento.", formset.forms[0].errors["tipo_documento"])
 
+    def test_documento_famiglia_formset_ignores_blank_extra_row_with_default_tipo(self):
+        formset = DocumentoFamigliaFormSet(
+            data={
+                "documenti-TOTAL_FORMS": "1",
+                "documenti-INITIAL_FORMS": "0",
+                "documenti-MIN_NUM_FORMS": "0",
+                "documenti-MAX_NUM_FORMS": "1000",
+                "documenti-0-id": "",
+                "documenti-0-tipo_documento": str(self.tipo_documento.pk),
+                "documenti-0-descrizione": "",
+                "documenti-0-scadenza": "",
+                "documenti-0-note": "",
+                "documenti-0-visibile": "on",
+            },
+            files={},
+            instance=self.famiglia,
+            prefix="documenti",
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        self.assertEqual(formset.forms[0].errors, {})
+        formset.save()
+        self.assertFalse(Documento.objects.filter(famiglia=self.famiglia).exists())
+
     def test_popup_delete_document_succeeds_even_if_storage_file_is_missing(self):
         with TemporaryDirectory() as tmpdir:
             with override_settings(MEDIA_ROOT=tmpdir):

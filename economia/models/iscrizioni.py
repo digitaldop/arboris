@@ -65,6 +65,34 @@ DISCOUNT_TYPE_CHOICES = (
     (DISCOUNT_TYPE_AMOUNT, "Importo fisso"),
 )
 
+MID_YEAR_RULE_MONTH_INCLUDED = "mese_iscrizione_intero"
+MID_YEAR_RULE_NEXT_MONTH_AFTER_THRESHOLD = "mese_successivo_dopo_soglia"
+MID_YEAR_RULE_DAILY_PRORATA = "pro_rata_giornaliero"
+MID_YEAR_DEFAULT_THRESHOLD_DAY = 15
+
+
+def get_mid_year_enrollment_settings():
+    try:
+        from sistema.models import SistemaImpostazioniGenerali
+    except ImportError:  # pragma: no cover
+        return MID_YEAR_RULE_MONTH_INCLUDED, MID_YEAR_DEFAULT_THRESHOLD_DAY
+
+    impostazioni = (
+        SistemaImpostazioniGenerali.objects.only(
+            "gestione_iscrizione_corso_anno",
+            "giorno_soglia_iscrizione_corso_anno",
+        )
+        .order_by("id")
+        .first()
+    )
+    if not impostazioni:
+        return MID_YEAR_RULE_MONTH_INCLUDED, MID_YEAR_DEFAULT_THRESHOLD_DAY
+
+    return (
+        impostazioni.gestione_iscrizione_corso_anno or MID_YEAR_RULE_MONTH_INCLUDED,
+        impostazioni.giorno_soglia_iscrizione_corso_anno or MID_YEAR_DEFAULT_THRESHOLD_DAY,
+    )
+
 
 class StatoIscrizione(models.Model):
     stato_iscrizione = models.CharField(max_length=100, unique=True)
@@ -390,7 +418,7 @@ class Iscrizione(models.Model):
 
         return max(importo, Decimal("0.00"))
 
-    def get_importo_sconto_unica_soluzione_applicato(self):
+    def get_importo_sconto_unica_soluzione_applicato(self, importo_base=None):
         if self.non_pagante or not self.is_pagamento_unica_soluzione:
             return Decimal("0.00")
 
@@ -399,7 +427,7 @@ class Iscrizione(models.Model):
         if tipo_sconto == DISCOUNT_TYPE_NONE or valore_sconto <= 0:
             return Decimal("0.00")
 
-        importo_base = self.get_importo_annuo_base_dovuto()
+        importo_base = importo_base if importo_base is not None else self.get_importo_periodo_base_dovuto()
         if importo_base <= 0:
             return Decimal("0.00")
 
@@ -414,8 +442,8 @@ class Iscrizione(models.Model):
         return min(max(sconto, Decimal("0.00")), importo_base)
 
     def get_importo_annuo_dovuto(self):
-        importo = self.get_importo_annuo_base_dovuto()
-        importo -= self.get_importo_sconto_unica_soluzione_applicato()
+        importo = self.get_importo_periodo_base_dovuto()
+        importo -= self.get_importo_sconto_unica_soluzione_applicato(importo)
         return max(importo, Decimal("0.00"))
 
     def get_importo_preiscrizione_dovuto(self):
@@ -474,8 +502,109 @@ class Iscrizione(models.Model):
 
         return prima_scadenza
 
+    def get_mese_partenza_effettivo_rate(self, prima_scadenza):
+        if not prima_scadenza:
+            return None, False
+
+        mese_partenza_standard = prima_scadenza.replace(day=1)
+        if not self.data_iscrizione:
+            return mese_partenza_standard, False
+
+        mese_iscrizione = self.data_iscrizione.replace(day=1)
+        if mese_iscrizione < mese_partenza_standard:
+            return mese_partenza_standard, False
+
+        regola, giorno_soglia = get_mid_year_enrollment_settings()
+        if regola == MID_YEAR_RULE_NEXT_MONTH_AFTER_THRESHOLD and self.data_iscrizione.day > giorno_soglia:
+            return add_months_safe(mese_iscrizione, 1, target_day=1).replace(day=1), False
+
+        return mese_iscrizione, regola == MID_YEAR_RULE_DAILY_PRORATA
+
+    def build_rate_mensili_entries_for_importo(self, importo_annuo):
+        if not self.condizione_iscrizione_id or not self.studente_id or not self.studente.famiglia_id:
+            return []
+
+        prima_scadenza = self.get_prima_scadenza_rate()
+        if not prima_scadenza:
+            return []
+
+        tariffa = self.get_tariffa_applicabile()
+        if not self.non_pagante and not tariffa:
+            return []
+
+        numero_rate = max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
+        importo_annuo_base = importo_annuo or Decimal("0.00")
+        importo_base = (importo_annuo_base / numero_rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        importo_residuo = importo_annuo_base - (importo_base * numero_rate)
+
+        mese_partenza_effettivo, applica_pro_rata = self.get_mese_partenza_effettivo_rate(prima_scadenza)
+        data_fine_effettiva = self.data_fine_effettiva
+        mese_fine_effettiva = data_fine_effettiva.replace(day=1) if data_fine_effettiva else None
+        giorno_scadenza = self.get_giorno_scadenza_rate()
+        piano = []
+
+        for indice in range(numero_rate):
+            data_scadenza = add_months_safe(prima_scadenza, indice, target_day=giorno_scadenza)
+            mese_rata = data_scadenza.replace(day=1)
+            if mese_partenza_effettivo and mese_rata < mese_partenza_effettivo:
+                continue
+            if mese_fine_effettiva and mese_rata > mese_fine_effettiva:
+                break
+
+            importo_rata = importo_base + (importo_residuo if indice == numero_rate - 1 else Decimal("0.00"))
+            descrizione_extra = ""
+
+            if (
+                applica_pro_rata
+                and self.data_iscrizione
+                and mese_rata == self.data_iscrizione.replace(day=1)
+            ):
+                giorni_mese = monthrange(mese_rata.year, mese_rata.month)[1]
+                giorni_da_pagare = giorni_mese - self.data_iscrizione.day + 1
+                importo_rata = (importo_rata * Decimal(giorni_da_pagare) / Decimal(giorni_mese)).quantize(
+                    Decimal("0.01"),
+                    rounding=ROUND_HALF_UP,
+                )
+                descrizione_extra = " (pro-rata)"
+
+            if self.data_iscrizione and mese_rata == self.data_iscrizione.replace(day=1) and data_scadenza < self.data_iscrizione:
+                data_scadenza = self.data_iscrizione
+
+            piano.append(
+                {
+                    "famiglia_id": self.studente.famiglia_id,
+                    "tipo_rata": RATE_TYPE_MENSILE,
+                    "numero_rata": indice + 1,
+                    "mese_riferimento": mese_rata.month,
+                    "anno_riferimento": mese_rata.year,
+                    "descrizione": f"Rata {indice + 1}/{numero_rate} - {mese_rata.strftime('%m/%Y')}{descrizione_extra}",
+                    "importo_dovuto": importo_rata,
+                    "data_scadenza": data_scadenza,
+                    "credito_applicato": Decimal("0.00"),
+                    "altri_sgravi": Decimal("0.00"),
+                    "importo_finale": importo_rata,
+                }
+            )
+
+        return piano
+
+    def build_rate_mensili_base_entries(self):
+        return self.build_rate_mensili_entries_for_importo(self.get_importo_annuo_base_dovuto())
+
+    def get_importo_periodo_base_dovuto(self):
+        return sum(
+            (item.get("importo_dovuto") or Decimal("0.00"))
+            for item in self.build_rate_mensili_base_entries()
+        )
+
+    def get_prima_scadenza_rate_effettiva(self):
+        piano = self.build_rate_mensili_base_entries()
+        if piano:
+            return piano[0]["data_scadenza"]
+        return self.get_prima_scadenza_rate()
+
     def get_scadenza_pagamento_unica_soluzione(self):
-        return self.scadenza_pagamento_unica or self.get_prima_scadenza_rate()
+        return self.scadenza_pagamento_unica or self.get_prima_scadenza_rate_effettiva()
 
     def build_preiscrizione_rate_entry(self):
         importo_preiscrizione = self.get_importo_preiscrizione_dovuto()
@@ -546,20 +675,10 @@ class Iscrizione(models.Model):
         if not self.condizione_iscrizione_id or not self.studente_id or not self.studente.famiglia_id:
             return []
 
-        prima_scadenza = self.get_prima_scadenza_rate()
-        if not prima_scadenza:
+        piano_mensile = self.build_rate_mensili_base_entries()
+        if not piano_mensile:
             return []
 
-        data_fine_effettiva = self.data_fine_effettiva
-        mese_fine_effettiva = data_fine_effettiva.replace(day=1) if data_fine_effettiva else None
-        tariffa = self.get_tariffa_applicabile()
-        if not self.non_pagante and not tariffa:
-            return []
-
-        numero_rate = max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
-        importo_annuo = self.get_importo_annuo_dovuto()
-        importo_base = (importo_annuo / numero_rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-        importo_residuo = importo_annuo - (importo_base * numero_rate)
         piano = []
         rata_preiscrizione = self.build_preiscrizione_rate_entry()
 
@@ -567,32 +686,15 @@ class Iscrizione(models.Model):
             piano.append(rata_preiscrizione)
 
         if self.is_pagamento_unica_soluzione:
+            importo_periodo_base = sum(item["importo_dovuto"] for item in piano_mensile)
+            importo_annuo = max(
+                importo_periodo_base - self.get_importo_sconto_unica_soluzione_applicato(importo_periodo_base),
+                Decimal("0.00"),
+            )
             piano.append(self.build_unica_soluzione_rate_entry(importo_annuo))
             return piano
 
-        giorno_scadenza = self.get_giorno_scadenza_rate()
-
-        for indice in range(numero_rate):
-            data_scadenza = add_months_safe(prima_scadenza, indice, target_day=giorno_scadenza)
-            if mese_fine_effettiva and data_scadenza.replace(day=1) > mese_fine_effettiva:
-                break
-            importo_rata = importo_base + (importo_residuo if indice == numero_rate - 1 else Decimal("0.00"))
-            piano.append(
-                {
-                    "famiglia_id": self.studente.famiglia_id,
-                    "tipo_rata": RATE_TYPE_MENSILE,
-                    "numero_rata": indice + 1,
-                    "mese_riferimento": data_scadenza.month,
-                    "anno_riferimento": data_scadenza.year,
-                    "descrizione": f"Rata {indice + 1}/{numero_rate} - {data_scadenza.strftime('%m/%Y')}",
-                    "importo_dovuto": importo_rata,
-                    "data_scadenza": data_scadenza,
-                    "credito_applicato": Decimal("0.00"),
-                    "altri_sgravi": Decimal("0.00"),
-                    "importo_finale": importo_rata,
-                }
-            )
-
+        piano.extend(piano_mensile)
         return piano
 
     def rate_have_payment_activity(self):

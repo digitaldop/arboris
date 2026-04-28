@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from collections import defaultdict
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP
 from django.utils import timezone
 
 from .utils import citta_choice_label
@@ -561,22 +561,6 @@ def build_school_year_months(anno_scolastico):
     return months
 
 
-def distribute_dashboard_amount(total_amount, parts):
-    total_amount = total_amount or Decimal("0.00")
-
-    if parts <= 0:
-        return []
-
-    if total_amount <= 0:
-        return [Decimal("0.00") for _ in range(parts)]
-
-    importo_base = (total_amount / parts).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-    importo_residuo = total_amount - (importo_base * parts)
-    importi = [importo_base for _ in range(parts)]
-    importi[-1] += importo_residuo
-    return importi
-
-
 def build_iscrizione_dashboard_rate_rows(iscrizione):
     rate_iscrizione = sorted(
         iscrizione.rate.all(),
@@ -594,6 +578,7 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
                 "year": rata.anno_riferimento,
                 "month": rata.mese_riferimento,
                 "tipo_rata": rata.tipo_rata or RataIscrizione.TIPO_MENSILE,
+                "numero_rata": rata.numero_rata,
                 "importo_finale": rata.importo_finale or Decimal("0.00"),
                 "importo_incassato": rata.importo_pagato or Decimal("0.00"),
             }
@@ -605,6 +590,7 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
                 "year": item["anno_riferimento"],
                 "month": item["mese_riferimento"],
                 "tipo_rata": item.get("tipo_rata", RataIscrizione.TIPO_MENSILE),
+                "numero_rata": item["numero_rata"],
                 "importo_finale": item["importo_finale"] or Decimal("0.00"),
                 "importo_incassato": Decimal("0.00"),
             }
@@ -614,25 +600,23 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
     tariffa = iscrizione.get_tariffa_applicabile() if not iscrizione.non_pagante else None
     totale_lordo_annuo = tariffa.retta_annuale if tariffa else Decimal("0.00")
     importo_preiscrizione = iscrizione.get_importo_preiscrizione_dovuto()
-    righe_mensili = [row for row in rate_rows if row["tipo_rata"] == RataIscrizione.TIPO_MENSILE]
-    importi_lordi_mensili = distribute_dashboard_amount(totale_lordo_annuo, len(righe_mensili))
+    piano_lordo_mensile = iscrizione.build_rate_mensili_entries_for_importo(totale_lordo_annuo)
+    importi_lordi_per_numero_rata = {
+        item["numero_rata"]: item["importo_dovuto"]
+        for item in piano_lordo_mensile
+    }
+    totale_lordo_periodo = sum(importi_lordi_per_numero_rata.values(), Decimal("0.00"))
 
     dashboard_rows = []
-    indice_mensile = 0
     for index, rate_row in enumerate(rate_rows):
         importo_finale = rate_row["importo_finale"] or Decimal("0.00")
         importo_incassato = rate_row["importo_incassato"] or Decimal("0.00")
         if rate_row["tipo_rata"] == RataIscrizione.TIPO_PREISCRIZIONE:
             importo_totale = importo_preiscrizione
         elif rate_row["tipo_rata"] == RataIscrizione.TIPO_UNICA_SOLUZIONE:
-            importo_totale = totale_lordo_annuo
+            importo_totale = totale_lordo_periodo
         else:
-            importo_totale = (
-                importi_lordi_mensili[indice_mensile]
-                if indice_mensile < len(importi_lordi_mensili)
-                else Decimal("0.00")
-            )
-            indice_mensile += 1
+            importo_totale = importi_lordi_per_numero_rata.get(rate_row["numero_rata"], Decimal("0.00"))
         dashboard_rows.append(
             {
                 "year": rate_row["year"],

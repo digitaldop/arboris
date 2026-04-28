@@ -166,6 +166,8 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "osservazioni_solo_autori_visualizzazione",
             "osservazioni_solo_autori_modifica",
             "formato_visualizzazione_telefono",
+            "gestione_iscrizione_corso_anno",
+            "giorno_soglia_iscrizione_corso_anno",
             "font_principale",
             "font_titoli",
         ]
@@ -175,9 +177,21 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "osservazioni_solo_autori_visualizzazione": "Solo gli autori possono vedere le loro osservazioni",
             "osservazioni_solo_autori_modifica": "Solo gli autori possono modificare o cancellare",
             "formato_visualizzazione_telefono": "Formato numeri di telefono (solo visualizzazione)",
+            "gestione_iscrizione_corso_anno": "Iscrizioni in corso d'anno",
+            "giorno_soglia_iscrizione_corso_anno": "Giorno soglia",
             "font_principale": "Font principale",
             "font_titoli": "Titoli",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["giorno_soglia_iscrizione_corso_anno"].widget.attrs.update(
+            {
+                "min": "1",
+                "max": "31",
+                "inputmode": "numeric",
+            }
+        )
 
 
 class SistemaBackupDatabaseConfigurazioneForm(forms.ModelForm):

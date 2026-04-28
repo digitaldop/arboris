@@ -103,6 +103,36 @@
                     </div>
 
                     <div class="admin-section">
+                        <div class="admin-section-title">Modulo Economia</div>
+                        <div class="panel">
+                            <div class="panel-body" data-terminology-skip="true">
+                                <table class="form-table">
+                                    <tr>
+                                        <th>{{ form.gestione_iscrizione_corso_anno.label_tag }}</th>
+                                        <td>
+                                            {{ form.gestione_iscrizione_corso_anno }}
+                                            {{ form.gestione_iscrizione_corso_anno.errors }}
+                                            {% if form.gestione_iscrizione_corso_anno.help_text %}
+                                                <div class="help-text">{{ form.gestione_iscrizione_corso_anno.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>{{ form.giorno_soglia_iscrizione_corso_anno.label_tag }}</th>
+                                        <td>
+                                            {{ form.giorno_soglia_iscrizione_corso_anno }}
+                                            {{ form.giorno_soglia_iscrizione_corso_anno.errors }}
+                                            {% if form.giorno_soglia_iscrizione_corso_anno.help_text %}
+                                                <div class="help-text">{{ form.giorno_soglia_iscrizione_corso_anno.help_text }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-section">
                         <div class="admin-section-title">Dati anagrafici di base</div>
                         <div class="panel">
                             <div
@@ -212,6 +242,12 @@
                                             {% if impostazioni.mostra_dashboard_prossimo_anno_scolastico %}Attivo{% else %}No{% endif %}
                                         </div>
                                         <div class="summary-label">Dashboard anno successivo</div>
+                                    </div>
+                                    <div class="summary-item">
+                                        <div class="summary-value">
+                                            {{ impostazioni.get_gestione_iscrizione_corso_anno_display|default:"Mese intero" }}
+                                        </div>
+                                        <div class="summary-label">Iscrizioni in corso d'anno</div>
                                     </div>
                                     <div class="summary-item">
                                         <div class="summary-value">
