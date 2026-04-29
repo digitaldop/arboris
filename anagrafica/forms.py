@@ -74,12 +74,7 @@ def configure_famiglia_choice_field(field):
 
 class ClasseInlineSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
-        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
-
-        if value and hasattr(value, "instance"):
-            option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
-
-        return option
+        return super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
 
 class GruppoClasseInlineSelect(forms.Select):
@@ -88,6 +83,9 @@ class GruppoClasseInlineSelect(forms.Select):
 
         if value and hasattr(value, "instance"):
             option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
+            option["attrs"]["data-class-ids"] = ",".join(
+                str(classe.pk) for classe in value.instance.classi.all()
+            )
 
         return option
 
@@ -1220,8 +1218,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         classe_qs = shared_lookups.get("classe_queryset")
         if classe_qs is None:
             classe_qs = prime_queryset(
-                self.fields["classe"].queryset.select_related("anno_scolastico").order_by(
-                    "-anno_scolastico__data_inizio",
+                self.fields["classe"].queryset.order_by(
                     "ordine_classe",
                     "nome_classe",
                     "sezione_classe",
@@ -1232,14 +1229,17 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         gruppo_classe_qs = shared_lookups.get("gruppo_classe_queryset")
         if gruppo_classe_qs is None:
             gruppo_classe_qs = prime_queryset(
-                GruppoClasse.objects.select_related("anno_scolastico").order_by(
+                GruppoClasse.objects.select_related("anno_scolastico").prefetch_related("classi").order_by(
                     "-anno_scolastico__data_inizio",
                     "nome_gruppo_classe",
                     "id",
                 )
             )
         bind_primed_queryset(self.fields["gruppo_classe"], gruppo_classe_qs)
-        self.fields["gruppo_classe"].label = "Gruppo classe"
+        self.fields["gruppo_classe"].label = "Pluriclasse"
+        self.fields["gruppo_classe"].help_text = (
+            "Compila solo se lo studente frequenta una Pluriclasse; la Classe resta l'assegnazione standard."
+        )
         self.fields["gruppo_classe"].required = False
 
         stato_iscrizione_qs = shared_lookups.get("stato_iscrizione_queryset")
@@ -1329,15 +1329,14 @@ class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
             AnnoScolastico.objects.order_by("-data_inizio", "-id")
         )
         classe_queryset = prime_queryset(
-            Classe.objects.select_related("anno_scolastico").order_by(
-                "-anno_scolastico__data_inizio",
+            Classe.objects.order_by(
                 "ordine_classe",
                 "nome_classe",
                 "sezione_classe",
             )
         )
         gruppo_classe_queryset = prime_queryset(
-            GruppoClasse.objects.select_related("anno_scolastico").order_by(
+            GruppoClasse.objects.select_related("anno_scolastico").prefetch_related("classi").order_by(
                 "-anno_scolastico__data_inizio",
                 "nome_gruppo_classe",
                 "id",

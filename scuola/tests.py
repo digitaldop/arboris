@@ -9,77 +9,22 @@ from .forms import AnnoScolasticoForm, ClasseForm, GruppoClasseForm
 from .models import AnnoScolastico, Classe, GruppoClasse
 
 
-class ClasseFormDefaultAnnoScolasticoTests(TestCase):
-    def test_prefers_anno_matching_current_date_for_new_class(self):
-        anno_passato = AnnoScolastico.objects.create(
-            nome_anno_scolastico="2024/2025",
-            data_inizio=date(2024, 9, 1),
-            data_fine=date(2025, 8, 31),
-        )
-        anno_corrente = AnnoScolastico.objects.create(
-            nome_anno_scolastico="2025/2026",
-            data_inizio=date(2025, 9, 1),
-            data_fine=date(2026, 8, 31),
-        )
-
-        with patch("scuola.utils.timezone.localdate", return_value=date(2026, 4, 24)):
-            form = ClasseForm()
-
-        self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
-        self.assertNotEqual(form.initial["anno_scolastico"], anno_passato.pk)
-
-    def test_uses_anno_matching_current_date(self):
-        AnnoScolastico.objects.create(
-            nome_anno_scolastico="2024/2025",
-            data_inizio=date(2024, 9, 1),
-            data_fine=date(2025, 8, 31),
-        )
-        anno_per_data = AnnoScolastico.objects.create(
-            nome_anno_scolastico="2025/2026",
-            data_inizio=date(2025, 9, 1),
-            data_fine=date(2026, 8, 31),
+class ClasseFormCatalogTests(TestCase):
+    def test_class_form_creates_global_catalog_entry(self):
+        form = ClasseForm(
+            data={
+                "nome_classe": "Prima Elementare",
+                "sezione_classe": "",
+                "ordine_classe": "1",
+                "attiva": "on",
+                "note": "",
+            }
         )
 
-        with patch("scuola.utils.timezone.localdate", return_value=date(2026, 4, 24)):
-            form = ClasseForm()
-
-        self.assertEqual(form.initial["anno_scolastico"], anno_per_data.pk)
-
-    def test_falls_back_to_most_recent_anno_when_no_current_year_matches_today(self):
-        AnnoScolastico.objects.create(
-            nome_anno_scolastico="2023/2024",
-            data_inizio=date(2023, 9, 1),
-            data_fine=date(2024, 8, 31),
-        )
-        anno_piu_recente = AnnoScolastico.objects.create(
-            nome_anno_scolastico="2024/2025",
-            data_inizio=date(2024, 9, 1),
-            data_fine=date(2025, 8, 31),
-        )
-
-        with patch("scuola.utils.timezone.localdate", return_value=date(2026, 4, 24)):
-            form = ClasseForm()
-
-        self.assertEqual(form.initial["anno_scolastico"], anno_piu_recente.pk)
-
-    def test_ignores_inactive_anno_matching_current_date(self):
-        AnnoScolastico.objects.create(
-            nome_anno_scolastico="2025/2026",
-            data_inizio=date(2025, 9, 1),
-            data_fine=date(2026, 8, 31),
-            attivo=False,
-        )
-        anno_attivo = AnnoScolastico.objects.create(
-            nome_anno_scolastico="2024/2025",
-            data_inizio=date(2024, 9, 1),
-            data_fine=date(2025, 8, 31),
-            attivo=True,
-        )
-
-        with patch("scuola.utils.timezone.localdate", return_value=date(2026, 4, 24)):
-            form = ClasseForm()
-
-        self.assertEqual(form.initial["anno_scolastico"], anno_attivo.pk)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn("anno_scolastico", form.fields)
+        classe = form.save()
+        self.assertEqual(str(classe), "Prima Elementare")
 
 
 class AnnoScolasticoFormValidationTests(TestCase):
@@ -138,17 +83,14 @@ class GruppoClasseFormTests(TestCase):
         self.quarta = Classe.objects.create(
             nome_classe="Quarta Elementare",
             ordine_classe=4,
-            anno_scolastico=self.anno,
         )
         self.quinta = Classe.objects.create(
             nome_classe="Quinta Elementare",
             ordine_classe=5,
-            anno_scolastico=self.anno,
         )
         self.prima_futura = Classe.objects.create(
             nome_classe="Prima Elementare",
             ordine_classe=1,
-            anno_scolastico=self.altro_anno,
         )
 
     def test_creates_group_with_multiple_classes(self):
@@ -169,12 +111,12 @@ class GruppoClasseFormTests(TestCase):
         self.assertIn(self.quarta, gruppo.classi.all())
         self.assertIn(self.quinta, gruppo.classi.all())
 
-    def test_rejects_classes_from_a_different_school_year(self):
+    def test_rejects_single_class_pluriclasse(self):
         form = GruppoClasseForm(
             data={
-                "nome_gruppo_classe": "Gruppo incoerente",
+                "nome_gruppo_classe": "Gruppo incompleto",
                 "anno_scolastico": self.anno.pk,
-                "classi": [self.quarta.pk, self.prima_futura.pk],
+                "classi": [self.quarta.pk],
                 "attivo": "on",
                 "note": "",
             }

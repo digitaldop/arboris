@@ -1,14 +1,14 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
-{% block title %}{% if gruppo_classe %}Gruppo classe {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo gruppo classe{% endif %} - Arboris School Management{% endblock %}
+{% block title %}{% if gruppo_classe %}Pluriclasse {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuova Pluriclasse{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
 {% if not popup %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
+        <a href="{% url 'lista_gruppi_classe' %}">Pluriclassi</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>{% if gruppo_classe %}{{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo{% endif %}</span>
     </div>
@@ -17,7 +17,7 @@
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">{% if gruppo_classe %}Gruppo classe {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo gruppo classe{% endif %}</h1>
+        <h1 class="page-title">{% if gruppo_classe %}Pluriclasse {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuova Pluriclasse{% endif %}</h1>
         <div class="page-head-actions">
             {% if popup %}
                 <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
@@ -45,7 +45,7 @@
                     <th>{{ form.anno_scolastico.label_tag }}</th>
                     <td>
                         {{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}
-                        <div class="help-text">Il gruppo deve usare classi appartenenti allo stesso anno scolastico.</div>
+                        <div class="help-text">La Pluriclasse e' valida solo per l'anno scolastico indicato.</div>
                     </td>
                 </tr>
                 <tr>

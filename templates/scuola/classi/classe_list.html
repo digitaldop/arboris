@@ -24,9 +24,19 @@
             <thead>
                 <tr>
                     <th>Nome classe</th>
-                    <th>Sezione</th>
+                    <th>
+                        <span class="field-label-with-help">
+                            <span>Sezione</span>
+                            <span
+                                class="inline-help-trigger"
+                                data-floating-text="Specificare la sezione solo se la classe &egrave; divisa in pi&ugrave; di una sezione. In caso di sezione singola, non &egrave; necessario inserire questo dato."
+                                role="button"
+                                tabindex="0"
+                                aria-label="Informazioni sulla sezione"
+                            >?</span>
+                        </span>
+                    </th>
                     <th>Ordine</th>
-                    <th>Anno scolastico</th>
                     <th>Attiva</th>
                     <th>Azioni</th>
                 </tr>
@@ -37,7 +47,6 @@
                         <td>{{ classe.nome_classe }}</td>
                         <td>{{ classe.sezione_classe|default:"—" }}</td>
                         <td>{{ classe.ordine_classe }}</td>
-                        <td>{{ classe.anno_scolastico.nome_anno_scolastico }}</td>
                         <td>{% if classe.attiva %}Sì{% else %}No{% endif %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_classe' classe.pk %}" class="table-link">Modifica</a>
@@ -47,7 +56,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6">
+                        <td colspan="5">
                             <div class="empty-state">Nessuna classe inserita.</div>
                         </td>
                     </tr>

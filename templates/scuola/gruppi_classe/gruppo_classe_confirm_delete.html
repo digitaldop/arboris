@@ -1,13 +1,13 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
 
-{% block title %}Elimina gruppo classe - Arboris School Management{% endblock %}
+{% block title %}Elimina Pluriclasse - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
 {% if not popup %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
+        <a href="{% url 'lista_gruppi_classe' %}">Pluriclassi</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>Elimina</span>
     </div>
@@ -16,12 +16,12 @@
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Elimina gruppo classe</h1>
+        <h1 class="page-title">Elimina Pluriclasse</h1>
     </div>
 
     <div class="content-card">
         <div class="empty-state">
-            <p>Stai per eliminare il gruppo classe <strong>{{ gruppo_classe.nome_gruppo_classe }}</strong>.</p>
+            <p>Stai per eliminare la Pluriclasse <strong>{{ gruppo_classe.nome_gruppo_classe }}</strong>.</p>
             <p>Classi incluse: <strong>{{ gruppo_classe.classi_label|default:"-" }}</strong></p>
         </div>
         <form method="post" class="form-actions">

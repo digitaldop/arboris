@@ -70,10 +70,10 @@ def get_classe_corrente_label(studente):
         .order_by("-attiva", "-anno_scolastico__data_inizio", "-pk")
         .first()
     )
-    if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
-        return iscrizione_corrente.gruppo_classe.nome_gruppo_classe
     if iscrizione_corrente and iscrizione_corrente.classe:
         return str(iscrizione_corrente.classe)
+    if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+        return iscrizione_corrente.gruppo_classe.nome_gruppo_classe
     return ""
 
 

@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Gruppi classe - Arboris School Management{% endblock %}
+{% block title %}Pluriclassi - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <span>Gruppi classe</span>
+        <span>Pluriclassi</span>
     </div>
 {% endblock %}
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Gruppi classe</h1>
+        <h1 class="page-title">Pluriclassi</h1>
         <div class="page-head-actions">
-            <a href="{% url 'crea_gruppo_classe' %}" class="btn btn-primary">Nuovo gruppo classe</a>
+            <a href="{% url 'crea_gruppo_classe' %}" class="btn btn-primary">Nuova Pluriclasse</a>
         </div>
     </div>
 
@@ -23,7 +23,7 @@
         <table class="list-table">
             <thead>
                 <tr>
-                    <th>Nome gruppo classe</th>
+                    <th>Nome Pluriclasse</th>
                     <th>Anno scolastico</th>
                     <th>Classi incluse</th>
                     <th>Attivo</th>
@@ -46,7 +46,7 @@
                 {% empty %}
                     <tr>
                         <td colspan="5">
-                            <div class="empty-state">Nessun gruppo classe inserito.</div>
+                            <div class="empty-state">Nessuna Pluriclasse inserita.</div>
                         </td>
                     </tr>
                 {% endfor %}

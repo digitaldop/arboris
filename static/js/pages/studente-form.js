@@ -560,10 +560,14 @@ window.ArborisStudenteForm = (function () {
 
             function refreshDependentChoices() {
                 const annoScolasticoId = annoSelect.value;
+                const classeId = classeSelect.value;
 
-                syncDependentSelect(classeSelect, option => option.dataset.annoScolastico === annoScolasticoId);
                 if (gruppoClasseSelect) {
-                    syncDependentSelect(gruppoClasseSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                    syncDependentSelect(gruppoClasseSelect, function (option) {
+                        const sameYear = option.dataset.annoScolastico === annoScolasticoId;
+                        const classIds = (option.dataset.classIds || "").split(",").filter(Boolean);
+                        return sameYear && (!classeId || classIds.includes(classeId));
+                    });
                 }
                 syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
             }
@@ -590,6 +594,7 @@ window.ArborisStudenteForm = (function () {
                 refreshDependentChoices();
                 syncDataFineIscrizione();
             });
+            classeSelect.addEventListener("change", refreshDependentChoices);
 
             function syncRiduzioneSpecialeState() {
                 if (!riduzioneCheckbox || !importoRiduzioneInput) {

@@ -16,8 +16,8 @@ class AnnoScolasticoAdmin(admin.ModelAdmin):
 
 @admin.register(Classe)
 class ClasseAdmin(admin.ModelAdmin):
-    list_display = ("nome_classe", "sezione_classe", "ordine_classe", "anno_scolastico", "attiva")
-    list_filter = ("anno_scolastico", "attiva")
+    list_display = ("nome_classe", "sezione_classe", "ordine_classe", "attiva")
+    list_filter = ("attiva",)
     search_fields = ("nome_classe", "sezione_classe")
 
 

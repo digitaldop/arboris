@@ -61,7 +61,6 @@ class ArchivioStoricoTests(TestCase):
             note="Note studente da congelare.",
         )
         self.classe = Classe.objects.create(
-            anno_scolastico=self.anno_passato,
             nome_classe="Primavera",
             sezione_classe="A",
             ordine_classe=1,

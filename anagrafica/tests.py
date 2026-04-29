@@ -1174,7 +1174,6 @@ class StudenteDetailPerformanceTests(TestCase):
             data_fine=date(2026, 8, 31),
         )
         self.classe = Classe.objects.create(
-            anno_scolastico=self.anno,
             nome_classe="Infanzia",
             sezione_classe="A",
             ordine_classe=1,

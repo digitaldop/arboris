@@ -531,7 +531,6 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         classe = Classe.objects.create(
             nome_classe="Materna",
             ordine_classe=1,
-            anno_scolastico=anno,
         )
         stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto")
         condizione = CondizioneIscrizione.objects.create(

@@ -360,7 +360,7 @@
                                                     </div>
                                                 </div>
                                                 <div class="iscrizioni-inline-field">
-                                                    <label>Gruppo classe</label>
+                                                    <label title="Compila solo se lo studente frequenta una Pluriclasse; la Classe resta l'assegnazione standard.">Pluriclasse</label>
                                                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                         {% if f.instance.pk and f.instance.gruppo_classe %}
                                                             {{ f.instance.gruppo_classe.nome_gruppo_classe }}
@@ -920,7 +920,7 @@
                         </div>
                     </div>
                     <div class="iscrizioni-inline-field">
-                        <label>Gruppo classe</label>
+                        <label title="Compila solo se lo studente frequenta una Pluriclasse; la Classe resta l'assegnazione standard.">Pluriclasse</label>
                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                             <span class="table-muted">-</span>
                         </div>
@@ -1241,7 +1241,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=45"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=46"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

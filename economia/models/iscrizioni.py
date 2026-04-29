@@ -289,6 +289,7 @@ class Iscrizione(models.Model):
     )
     gruppo_classe = models.ForeignKey(
         GruppoClasse,
+        verbose_name="Pluriclasse",
         on_delete=models.SET_NULL,
         related_name="iscrizioni",
         blank=True,
@@ -844,19 +845,21 @@ class Iscrizione(models.Model):
     def clean(self):
         super().clean()
 
-        if self.classe_id and self.classe and self.classe.anno_scolastico_id != self.anno_scolastico_id:
-            raise ValidationError("La classe selezionata non appartiene all'anno scolastico scelto.")
-
         if (
             self.gruppo_classe_id
             and self.gruppo_classe
             and self.gruppo_classe.anno_scolastico_id != self.anno_scolastico_id
         ):
-            raise ValidationError("Il gruppo classe selezionato non appartiene all'anno scolastico scelto.")
+            raise ValidationError("La Pluriclasse selezionata non appartiene all'anno scolastico scelto.")
+
+        if self.gruppo_classe_id and not self.classe_id:
+            raise ValidationError(
+                "Per assegnare una Pluriclasse seleziona anche la Classe standard dello studente."
+            )
 
         if self.gruppo_classe_id and self.classe_id and self.gruppo_classe:
             if not self.gruppo_classe.classi.filter(pk=self.classe_id).exists():
-                raise ValidationError("La classe selezionata deve essere inclusa nel gruppo classe scelto.")
+                raise ValidationError("La classe selezionata deve essere inclusa nella Pluriclasse scelta.")
 
         if (
             self.condizione_iscrizione_id

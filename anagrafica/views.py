@@ -1004,11 +1004,11 @@ def build_dashboard_school_year_statistics(anno_scolastico):
     data["count_famiglie_iscritte"] = iscrizioni_anno.values("studente__famiglia_id").distinct().count()
 
     classi_anno = (
-        Classe.objects.filter(anno_scolastico=anno_scolastico)
+        Classe.objects.filter(attiva=True)
         .annotate(
             count_studenti=Count(
-                "iscrizioni",
-                filter=Q(iscrizioni__attiva=True),
+                "iscrizioni__studente",
+                filter=Q(iscrizioni__anno_scolastico=anno_scolastico, iscrizioni__attiva=True),
                 distinct=True,
             )
         )
@@ -2923,10 +2923,10 @@ def modifica_studente(request, pk):
     )
     classe_corrente_label = ""
     if iscrizione_corrente:
-        if iscrizione_corrente.gruppo_classe_id:
-            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
-        elif iscrizione_corrente.classe:
+        if iscrizione_corrente.classe:
             classe_corrente_label = str(iscrizione_corrente.classe)
+        elif iscrizione_corrente.gruppo_classe_id:
+            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
     document_counts = build_studente_document_counts(studente, today)
     studente_audit_info = last_update_audit_info(studente)
 
@@ -2998,10 +2998,10 @@ def get_studente_print_payload(request, studente, *, include_rate=False, include
 
     classe_corrente_label = ""
     iscrizione_corrente = next((item for item in iscrizioni_correnti if item.classe_id or item.gruppo_classe_id), None)
-    if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
-        classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
-    elif iscrizione_corrente and iscrizione_corrente.classe:
+    if iscrizione_corrente and iscrizione_corrente.classe:
         classe_corrente_label = str(iscrizione_corrente.classe)
+    elif iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+        classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
     elif anno_corrente:
         iscrizione_corrente = (
             studente.iscrizioni.select_related("classe", "gruppo_classe", "anno_scolastico")
@@ -3010,10 +3010,10 @@ def get_studente_print_payload(request, studente, *, include_rate=False, include
             .order_by("-attiva", "-pk")
             .first()
         )
-        if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
-            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
-        elif iscrizione_corrente and iscrizione_corrente.classe:
+        if iscrizione_corrente and iscrizione_corrente.classe:
             classe_corrente_label = str(iscrizione_corrente.classe)
+        elif iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
 
     return {
         "anno_corrente": anno_corrente,

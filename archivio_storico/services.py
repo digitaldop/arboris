@@ -76,7 +76,7 @@ def get_archiviazione_preview(anno_scolastico):
     )
 
     return {
-        "classi": Classe.objects.filter(anno_scolastico=anno_scolastico).count(),
+        "classi": iscrizioni_qs.exclude(classe_id__isnull=True).values("classe_id").distinct().count(),
         "famiglie": len(famiglie_ids),
         "familiari": len(familiari_ids),
         "studenti": len(studenti_ids),
@@ -111,7 +111,13 @@ def build_archivio_snapshots(archivio):
     snapshots = []
     ordine = 0
 
-    classi = Classe.objects.filter(anno_scolastico=anno).order_by("ordine_classe", "nome_classe", "sezione_classe", "id")
+    classi_ids = (
+        Iscrizione.objects.filter(anno_scolastico=anno)
+        .exclude(classe_id__isnull=True)
+        .values_list("classe_id", flat=True)
+        .distinct()
+    )
+    classi = Classe.objects.filter(pk__in=classi_ids).order_by("ordine_classe", "nome_classe", "sezione_classe", "id")
     for classe in classi:
         ordine += 1
         snapshots.append(
@@ -143,6 +149,7 @@ def build_archivio_snapshots(archivio):
             "studente__famiglia__indirizzo_principale__citta__provincia",
             "studente__famiglia__indirizzo_principale__provincia",
             "classe",
+            "gruppo_classe",
             "stato_iscrizione",
             "condizione_iscrizione",
             "agevolazione",
@@ -253,6 +260,9 @@ def build_archivio_snapshots(archivio):
                     "studente": str(iscrizione.studente),
                     "famiglia": iscrizione.studente.famiglia.cognome_famiglia if iscrizione.studente.famiglia_id else "",
                     "classe": str(iscrizione.classe) if iscrizione.classe_id else "",
+                    "pluriclasse": (
+                        iscrizione.gruppo_classe.nome_gruppo_classe if iscrizione.gruppo_classe_id else ""
+                    ),
                     "data_iscrizione": iscrizione.data_iscrizione,
                     "data_fine_iscrizione": iscrizione.data_fine_iscrizione,
                     "stato": str(iscrizione.stato_iscrizione) if iscrizione.stato_iscrizione_id else "",

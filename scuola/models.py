@@ -61,25 +61,14 @@ class Classe(models.Model):
     nome_classe = models.CharField(max_length=100)
     sezione_classe = models.CharField(max_length=20, blank=True)
     ordine_classe = models.PositiveIntegerField()
-    anno_scolastico = models.ForeignKey(
-        AnnoScolastico,
-        on_delete=models.PROTECT,
-        related_name="classi",
-    )
     attiva = models.BooleanField(default=True)
     note = models.TextField(blank=True)
 
     class Meta:
         db_table = "scuola_classe"
-        ordering = ["anno_scolastico__data_inizio", "ordine_classe", "nome_classe", "sezione_classe"]
+        ordering = ["ordine_classe", "nome_classe", "sezione_classe"]
         verbose_name = "Classe"
         verbose_name_plural = "Classi"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["anno_scolastico", "nome_classe", "sezione_classe"],
-                name="unique_scuola_classe_per_anno",
-            )
-        ]
 
     def __str__(self):
         if self.sezione_classe:
@@ -105,8 +94,8 @@ class GruppoClasse(models.Model):
     class Meta:
         db_table = "scuola_gruppo_classe"
         ordering = ["anno_scolastico__data_inizio", "nome_gruppo_classe", "id"]
-        verbose_name = "Gruppo classe"
-        verbose_name_plural = "Gruppi classe"
+        verbose_name = "Pluriclasse"
+        verbose_name_plural = "Pluriclassi"
         constraints = [
             models.UniqueConstraint(
                 fields=["anno_scolastico", "nome_gruppo_classe"],

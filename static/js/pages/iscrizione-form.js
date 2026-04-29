@@ -109,12 +109,19 @@ window.ArborisIscrizioneForm = (function () {
         if (annoSelect) {
             function refreshDependentChoices() {
                 const annoScolasticoId = annoSelect.value;
-                syncDependentSelect(classeSelect, option => option.dataset.annoScolastico === annoScolasticoId);
-                syncDependentSelect(gruppoClasseSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                const classeId = classeSelect ? classeSelect.value : "";
+                syncDependentSelect(gruppoClasseSelect, function (option) {
+                    const sameYear = option.dataset.annoScolastico === annoScolasticoId;
+                    const classIds = (option.dataset.classIds || "").split(",").filter(Boolean);
+                    return sameYear && (!classeId || classIds.includes(classeId));
+                });
                 syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
             }
 
             annoSelect.addEventListener("change", refreshDependentChoices);
+            if (classeSelect) {
+                classeSelect.addEventListener("change", refreshDependentChoices);
+            }
             refreshDependentChoices();
         }
 

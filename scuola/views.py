@@ -118,7 +118,6 @@ def elimina_anno_scolastico(request, pk):
         "scuola/anni_scolastici/anno_scolastico_confirm_delete.html",
         {
             "anno": anno,
-            "count_classi": anno.classi.count(),
             "count_gruppi_classe": anno.gruppi_classe.count(),
             "popup": popup,
         },
@@ -126,7 +125,7 @@ def elimina_anno_scolastico(request, pk):
 
 
 def lista_classi(request):
-    classi = Classe.objects.select_related("anno_scolastico").all()
+    classi = Classe.objects.all()
     return render(request, "scuola/classi/classe_list.html", {"classi": classi})
 
 
@@ -222,7 +221,7 @@ def crea_gruppo_classe(request):
             if popup:
                 return popup_select_response(request, "gruppo_classe", gruppo_classe.pk, str(gruppo_classe))
 
-            messages.success(request, "Gruppo classe creato correttamente.")
+            messages.success(request, "Pluriclasse creata correttamente.")
             return redirect("lista_gruppi_classe")
     else:
         form = GruppoClasseForm()
@@ -246,7 +245,7 @@ def modifica_gruppo_classe(request, pk):
             if popup:
                 return popup_select_response(request, "gruppo_classe", gruppo_classe.pk, str(gruppo_classe))
 
-            messages.success(request, "Gruppo classe aggiornato correttamente.")
+            messages.success(request, "Pluriclasse aggiornata correttamente.")
             return redirect("lista_gruppi_classe")
     else:
         form = GruppoClasseForm(instance=gruppo_classe)
@@ -269,7 +268,7 @@ def elimina_gruppo_classe(request, pk):
         if popup:
             return popup_delete_response(request, "gruppo_classe", object_id)
 
-        messages.success(request, "Gruppo classe eliminato correttamente.")
+        messages.success(request, "Pluriclasse eliminata correttamente.")
         return redirect("lista_gruppi_classe")
 
     return render(

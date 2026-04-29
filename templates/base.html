@@ -114,7 +114,7 @@
                                 {% endif %}
                                 <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
                                 <a href="{% url 'lista_classi' %}">Classi</a>
-                                <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
+                                <a href="{% url 'lista_gruppi_classe' %}">Pluriclassi</a>
                             </div>
                         </div>
                     </details>
@@ -633,7 +633,7 @@
                                                 Classi
                                             </a>
                                             <a href="{% url 'lista_gruppi_classe' %}" class="{% if request.resolver_match.url_name == 'lista_gruppi_classe' or request.resolver_match.url_name == 'crea_gruppo_classe' or request.resolver_match.url_name == 'modifica_gruppo_classe' or request.resolver_match.url_name == 'elimina_gruppo_classe' %}active{% endif %}">
-                                                Gruppi classe
+                                                Pluriclassi
                                             </a>
                                         </nav>
                                     </div>
@@ -696,6 +696,7 @@
     <script src="{% static 'js/core/person-rules.js' %}?v=2"></script>
     <script src="{% static 'js/core/family-linked-address.js' %}?v=4"></script>
     <script src="{% static 'js/core/browser-autofill.js' %}?v=1"></script>
+    <script src="{% static 'js/core/document-type-autoselect.js' %}?v=1"></script>
     <script src="{% static 'js/core/currency-fields.js' %}?v=2"></script>
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>

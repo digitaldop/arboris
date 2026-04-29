@@ -32,24 +32,15 @@ class ClasseForm(forms.ModelForm):
             "nome_classe",
             "sezione_classe",
             "ordine_classe",
-            "anno_scolastico",
             "attiva",
             "note",
         ]
+        labels = {
+            "sezione_classe": "Sezione",
+        }
         widgets = {
             "note": forms.Textarea(attrs={"rows": 4}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
-        self.fields["anno_scolastico"].empty_label = None
-
-        if not self.instance.pk and not self.is_bound and not self.initial.get("anno_scolastico"):
-            anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
-            if anno_predefinito:
-                self.initial["anno_scolastico"] = anno_predefinito.pk
 
 
 class GruppoClasseForm(forms.ModelForm):
@@ -72,8 +63,11 @@ class GruppoClasseForm(forms.ModelForm):
 
         self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
         self.fields["anno_scolastico"].empty_label = None
-        self.fields["classi"].help_text = "Seleziona una o piu classi/livelli che compongono il gruppo operativo."
-        self.fields["classi"].label_from_instance = lambda classe: f"{classe} - {classe.anno_scolastico}"
+        self.fields["nome_gruppo_classe"].label = "Nome Pluriclasse"
+        self.fields["classi"].help_text = (
+            "Seleziona le classi standard che compongono questa Pluriclasse per l'anno scolastico indicato. "
+            "Se non esiste una Pluriclasse, lo studente resta assegnato solo alla sua Classe."
+        )
 
         anno_scolastico_id = self.initial.get("anno_scolastico") or getattr(self.instance, "anno_scolastico_id", None)
 
@@ -82,8 +76,7 @@ class GruppoClasseForm(forms.ModelForm):
             if anno_predefinito:
                 self.initial["anno_scolastico"] = anno_predefinito.pk
 
-        classi_queryset = Classe.objects.select_related("anno_scolastico").order_by(
-            "-anno_scolastico__data_inizio",
+        classi_queryset = Classe.objects.order_by(
             "ordine_classe",
             "nome_classe",
             "sezione_classe",
@@ -92,17 +85,12 @@ class GruppoClasseForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        anno_scolastico = cleaned_data.get("anno_scolastico")
         classi = cleaned_data.get("classi")
 
-        if not anno_scolastico or not classi:
-            return cleaned_data
-
-        classi_fuori_anno = [classe for classe in classi if classe.anno_scolastico_id != anno_scolastico.pk]
-        if classi_fuori_anno:
+        if classi and classi.count() < 2:
             self.add_error(
                 "classi",
-                "Tutte le classi incluse nel gruppo devono appartenere allo stesso anno scolastico del gruppo.",
+                "Una Pluriclasse dovrebbe includere almeno due classi standard.",
             )
 
         return cleaned_data

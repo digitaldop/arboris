@@ -123,7 +123,7 @@
                             {% if iscrizione and iscrizione.gruppo_classe %}
                                 {{ iscrizione.gruppo_classe.nome_gruppo_classe }}
                             {% else %}
-                                <span class="table-muted">Nessun gruppo classe</span>
+                                <span class="table-muted">Nessuna Pluriclasse</span>
                             {% endif %}
                         </div>
                         <div class="related-field-row mode-edit-field">
@@ -135,7 +135,7 @@
                             </div>
                         </div>
                         {{ form.gruppo_classe.errors }}
-                        <div class="help-text">Usalo per indicare una pluriclasse o un gruppo operativo composto da piu classi.</div>
+                        <div class="help-text">Compila solo se lo studente frequenta una Pluriclasse; la Classe resta l'assegnazione standard.</div>
                     </td>
                 </tr>
                 <tr>
@@ -434,7 +434,7 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=7"></script>
+    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=8"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

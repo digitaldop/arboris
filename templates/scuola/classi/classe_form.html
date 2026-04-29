@@ -42,16 +42,23 @@
                     <td>{{ form.nome_classe }} {{ form.nome_classe.errors }}</td>
                 </tr>
                 <tr>
-                    <th>{{ form.sezione_classe.label_tag }}</th>
+                    <th>
+                        <span class="field-label-with-help">
+                            {{ form.sezione_classe.label_tag }}
+                            <span
+                                class="inline-help-trigger"
+                                data-floating-text="Specificare la sezione solo se la classe &egrave; divisa in pi&ugrave; di una sezione. In caso di sezione singola, non &egrave; necessario inserire questo dato."
+                                role="button"
+                                tabindex="0"
+                                aria-label="Informazioni sulla sezione"
+                            >?</span>
+                        </span>
+                    </th>
                     <td>{{ form.sezione_classe }} {{ form.sezione_classe.errors }}</td>
                 </tr>
                 <tr>
                     <th>{{ form.ordine_classe.label_tag }}</th>
                     <td>{{ form.ordine_classe }} {{ form.ordine_classe.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.anno_scolastico.label_tag }}</th>
-                    <td>{{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}</td>
                 </tr>
                 <tr>
                     <th>{{ form.attiva.label_tag }}</th>

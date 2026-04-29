@@ -41,7 +41,13 @@ class AnnoScopedSelect(forms.Select):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
         if value and hasattr(value, "instance"):
-            option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
+            anno_scolastico_id = getattr(value.instance, "anno_scolastico_id", None)
+            if anno_scolastico_id:
+                option["attrs"]["data-anno-scolastico"] = anno_scolastico_id
+            if hasattr(value.instance, "classi"):
+                option["attrs"]["data-class-ids"] = ",".join(
+                    str(classe.pk) for classe in value.instance.classi.all()
+                )
 
         return option
 
@@ -186,7 +192,11 @@ class IscrizioneForm(forms.ModelForm):
         self.fields["anno_scolastico"].empty_label = None
         self.fields["stato_iscrizione"].empty_label = None
         self.fields["condizione_iscrizione"].empty_label = None
-        self.fields["gruppo_classe"].label = "Gruppo classe"
+        self.fields["gruppo_classe"].label = "Pluriclasse"
+        self.fields["gruppo_classe"].help_text = (
+            "Compila solo se lo studente frequenta una Pluriclasse. "
+            "La Classe resta l'assegnazione standard dell'iscrizione."
+        )
         self.fields["gruppo_classe"].required = False
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].help_text = "Importo in euro."
@@ -221,23 +231,24 @@ class IscrizioneForm(forms.ModelForm):
         except DatabaseError:
             self.fields["agevolazione"].queryset = self.fields["agevolazione"].queryset.none()
 
-        classi_queryset = self.fields["classe"].queryset.none()
+        classi_queryset = self.fields["classe"].queryset.filter(
+            Q(attiva=True) | Q(pk=getattr(self.instance, "classe_id", None))
+        ).order_by(
+            "ordine_classe",
+            "nome_classe",
+            "sezione_classe",
+        )
         gruppi_classe_queryset = GruppoClasse.objects.none()
         condizioni_queryset = self.fields["condizione_iscrizione"].queryset.none()
 
         anno_scolastico_id = self.data.get("anno_scolastico") if self.is_bound else getattr(self.instance, "anno_scolastico_id", None)
 
         if anno_scolastico_id:
-            classi_queryset = self.fields["classe"].queryset.filter(anno_scolastico_id=anno_scolastico_id).order_by(
-                "ordine_classe",
-                "nome_classe",
-                "sezione_classe",
-            )
             gruppi_classe_queryset = GruppoClasse.objects.filter(
                 anno_scolastico_id=anno_scolastico_id,
             ).filter(
                 Q(attivo=True) | Q(pk=getattr(self.instance, "gruppo_classe_id", None))
-            ).order_by("nome_gruppo_classe", "id")
+            ).prefetch_related("classi").order_by("nome_gruppo_classe", "id")
             condizioni_queryset = self.fields["condizione_iscrizione"].queryset.filter(
                 anno_scolastico_id=anno_scolastico_id
             ).order_by("nome_condizione_iscrizione")
@@ -253,13 +264,10 @@ class IscrizioneForm(forms.ModelForm):
                 if anno_predefinito:
                     self.initial["anno_scolastico"] = anno_predefinito.pk
                     anno_scolastico_id = anno_predefinito.pk
-                    self.fields["classe"].queryset = self.fields["classe"].queryset.model.objects.filter(
-                        anno_scolastico_id=anno_scolastico_id
-                    ).order_by("ordine_classe", "nome_classe", "sezione_classe")
                     self.fields["gruppo_classe"].queryset = GruppoClasse.objects.filter(
                         anno_scolastico_id=anno_scolastico_id,
                         attivo=True,
-                    ).order_by("nome_gruppo_classe", "id")
+                    ).prefetch_related("classi").order_by("nome_gruppo_classe", "id")
                     self.fields["condizione_iscrizione"].queryset = self.fields["condizione_iscrizione"].queryset.model.objects.filter(
                         anno_scolastico_id=anno_scolastico_id
                     ).order_by("nome_condizione_iscrizione")

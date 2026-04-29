@@ -22,8 +22,7 @@
     <div class="content-card">
         <div class="empty-state">
             <p>Stai per eliminare l'anno scolastico <strong>{{ anno.nome_anno_scolastico }}</strong>.</p>
-            <p>Classi collegate: <strong>{{ count_classi }}</strong></p>
-            <p>Gruppi classe collegati: <strong>{{ count_gruppi_classe }}</strong></p>
+            <p>Pluriclassi collegate: <strong>{{ count_gruppi_classe }}</strong></p>
         </div>
         <form method="post" class="form-actions">
             {% csrf_token %}
