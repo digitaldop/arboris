@@ -97,23 +97,68 @@
                 return;
             }
 
+            const fallback = button.dataset.fallbackUrl || "/";
+            const stableBackUrl = resolveStableBackUrl(button, fallback);
+            button.dataset.stableBackUrl = stableBackUrl;
             button.dataset.backBound = "1";
+
             button.addEventListener("click", function () {
-                const fallback = button.dataset.fallbackUrl || "/";
-
-                if (window.history.length > 1 && document.referrer) {
-                    try {
-                        const refUrl = new URL(document.referrer, window.location.origin);
-                        if (refUrl.origin === window.location.origin) {
-                            window.history.back();
-                            return;
-                        }
-                    } catch (e) {}
-                }
-
-                window.location.assign(fallback);
+                window.location.assign(button.dataset.stableBackUrl || fallback);
             });
         });
+    }
+
+    function getStableBackStorage() {
+        try {
+            return window.sessionStorage || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function normalizeInternalUrl(value) {
+        if (!value) {
+            return null;
+        }
+
+        try {
+            const url = new URL(value, window.location.origin);
+            if (url.origin !== window.location.origin) {
+                return null;
+            }
+            return url;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function buildStableBackKey() {
+        return "arboris:stable-page-back:" + window.location.pathname;
+    }
+
+    function resolveStableBackUrl(button, fallback) {
+        const currentUrl = new URL(window.location.href);
+        const fallbackUrl = normalizeInternalUrl(fallback) || new URL("/", window.location.origin);
+        const storage = getStableBackStorage();
+        const storageKey = button.dataset.backStorageKey || buildStableBackKey();
+        const refUrl = normalizeInternalUrl(document.referrer);
+
+        if (refUrl && refUrl.pathname !== currentUrl.pathname) {
+            const stableRef = refUrl.pathname + refUrl.search + refUrl.hash;
+            if (storage) {
+                storage.setItem(storageKey, stableRef);
+            }
+            return stableRef;
+        }
+
+        if (storage) {
+            const storedUrl = normalizeInternalUrl(storage.getItem(storageKey));
+            if (storedUrl && storedUrl.pathname !== currentUrl.pathname) {
+                return storedUrl.pathname + storedUrl.search + storedUrl.hash;
+            }
+        }
+
+        return fallbackUrl.pathname + fallbackUrl.search + fallbackUrl.hash;
     }
 
     document.addEventListener("DOMContentLoaded", function () {
