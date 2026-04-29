@@ -54,7 +54,13 @@ class GruppoClasseForm(forms.ModelForm):
             "note",
         ]
         widgets = {
-            "classi": forms.SelectMultiple(attrs={"size": 8}),
+            "classi": forms.SelectMultiple(
+                attrs={
+                    "size": 8,
+                    "class": "click-toggle-multiselect",
+                    "data-click-toggle-multiple": "1",
+                }
+            ),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -66,6 +72,7 @@ class GruppoClasseForm(forms.ModelForm):
         self.fields["nome_gruppo_classe"].label = "Nome Pluriclasse"
         self.fields["classi"].help_text = (
             "Seleziona le classi standard che compongono questa Pluriclasse per l'anno scolastico indicato. "
+            "Clicca su una classe per selezionarla, clicca di nuovo per deselezionarla. "
             "Se non esiste una Pluriclasse, lo studente resta assegnato solo alla sua Classe."
         )
 

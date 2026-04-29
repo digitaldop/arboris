@@ -892,7 +892,7 @@ def _calcola_stato_cella_rata(rata):
     if rata is None:
         return "assente"
 
-    dovuto = rata.importo_finale or rata.importo_dovuto or Decimal("0.00")
+    dovuto = _rata_importo_dovuto(rata)
     pagato = rata.importo_pagato or Decimal("0.00")
 
     if dovuto <= 0:
@@ -902,6 +902,54 @@ def _calcola_stato_cella_rata(rata):
     if pagato >= dovuto:
         return "pagata"
     return "parziale"
+
+
+def _empty_verifica_rette_totale():
+    return {
+        "dovuto": Decimal("0.00"),
+        "pagato": Decimal("0.00"),
+    }
+
+
+def _empty_verifica_rette_riepilogo():
+    return {
+        "dovuto_con_preiscrizioni": Decimal("0.00"),
+        "pagato_con_preiscrizioni": Decimal("0.00"),
+        "dovuto_senza_preiscrizioni": Decimal("0.00"),
+        "pagato_senza_preiscrizioni": Decimal("0.00"),
+    }
+
+
+def _rata_importo_dovuto(rata):
+    if not rata:
+        return Decimal("0.00")
+    if rata.importo_finale is not None:
+        return rata.importo_finale
+    return rata.importo_dovuto or Decimal("0.00")
+
+
+def _rata_importo_pagato(rata):
+    if not rata:
+        return Decimal("0.00")
+    return rata.importo_pagato or Decimal("0.00")
+
+
+def _rata_rientra_nel_dovuto_a_oggi(rata, today):
+    if not rata:
+        return False
+    if rata.is_preiscrizione:
+        return True
+    if rata.data_scadenza:
+        return rata.data_scadenza <= today
+    return False
+
+
+def _rata_rientra_nell_incassato_a_oggi(rata, today):
+    if not rata or _rata_importo_pagato(rata) <= 0:
+        return False
+    if rata.data_pagamento:
+        return rata.data_pagamento <= today
+    return True
 
 
 def _classe_sort_key(iscrizione):
@@ -944,8 +992,11 @@ def verifica_situazione_rette(request):
         anno_scolastico = resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
 
     colonne = []
+    totali_colonne = []
     righe_per_classe = []
     ha_preiscrizione = False
+    riepilogo_totali = _empty_verifica_rette_riepilogo()
+    today = timezone.localdate()
 
     if anno_scolastico is not None:
         iscrizioni_qs = (
@@ -1006,6 +1057,11 @@ def verifica_situazione_rette(request):
                 }
             )
 
+        totali_per_chiave = {
+            colonna["key"]: _empty_verifica_rette_totale()
+            for colonna in colonne
+        }
+
         # Raggruppiamo le iscrizioni per classe preservando l'ordinamento.
         gruppi = {}
         for iscrizione in iscrizioni:
@@ -1035,6 +1091,23 @@ def verifica_situazione_rette(request):
                 for colonna in colonne:
                     rata = rate_per_chiave.get(colonna["key"])
                     stato = _calcola_stato_cella_rata(rata)
+                    if rata:
+                        importo_dovuto = _rata_importo_dovuto(rata)
+                        importo_pagato = _rata_importo_pagato(rata)
+                        totale_colonna = totali_per_chiave[colonna["key"]]
+                        totale_colonna["dovuto"] += importo_dovuto
+                        totale_colonna["pagato"] += importo_pagato
+
+                        if _rata_rientra_nel_dovuto_a_oggi(rata, today):
+                            riepilogo_totali["dovuto_con_preiscrizioni"] += importo_dovuto
+                            if not rata.is_preiscrizione:
+                                riepilogo_totali["dovuto_senza_preiscrizioni"] += importo_dovuto
+
+                        if _rata_rientra_nell_incassato_a_oggi(rata, today):
+                            riepilogo_totali["pagato_con_preiscrizioni"] += importo_pagato
+                            if not rata.is_preiscrizione:
+                                riepilogo_totali["pagato_senza_preiscrizioni"] += importo_pagato
+
                     celle.append(
                         {
                             "colonna": colonna,
@@ -1064,6 +1137,15 @@ def verifica_situazione_rette(request):
                 }
             )
 
+        totali_colonne = [
+            {
+                "colonna": colonna,
+                "dovuto": totali_per_chiave[colonna["key"]]["dovuto"],
+                "pagato": totali_per_chiave[colonna["key"]]["pagato"],
+            }
+            for colonna in colonne
+        ]
+
     return render(
         request,
         "economia/iscrizioni/verifica_situazione_rette.html",
@@ -1071,6 +1153,8 @@ def verifica_situazione_rette(request):
             "anni_scolastici": anni_scolastici,
             "anno_scolastico": anno_scolastico,
             "colonne": colonne,
+            "totali_colonne": totali_colonne,
+            "riepilogo_totali": riepilogo_totali,
             "righe_per_classe": righe_per_classe,
             "num_colonne": len(colonne) + 1,  # +1 per la prima colonna "Studente"
         },

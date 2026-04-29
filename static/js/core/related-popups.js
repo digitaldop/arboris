@@ -1,7 +1,26 @@
 window.ArborisRelatedPopups = (function () {
+    function getPopupSize(url) {
+        const normalizedUrl = String(url || "").toLowerCase();
+        const viewportHeight = window.screen && window.screen.availHeight ? window.screen.availHeight : window.screen.height;
+        const isAddressPopup = normalizedUrl.indexOf("/indirizzi/") !== -1;
+
+        if (isAddressPopup) {
+            return {
+                width: 900,
+                height: Math.max(760, Math.min(900, viewportHeight - 40)),
+            };
+        }
+
+        return {
+            width: 900,
+            height: 700,
+        };
+    }
+
     function openRelatedPopup(url) {
-        const width = 900;
-        const height = 700;
+        const size = getPopupSize(url);
+        const width = size.width;
+        const height = size.height;
         const left = Math.max(0, (window.screen.width - width) / 2);
         const top = Math.max(0, (window.screen.height - height) / 2);
 

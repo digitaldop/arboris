@@ -4,6 +4,7 @@ import os
 from django.db import models
 from django.db.models import Max
 from django.urls import reverse
+from django.utils.text import get_valid_filename
 from .utils import format_phone_number, whatsapp_url_from_phone
 
 
@@ -466,8 +467,24 @@ class Studente(models.Model):
 
 # INIZIO MODELLI PER I DOCUMENTI
 
+def anno_scolastico_documenti_folder():
+    from scuola.utils import resolve_default_anno_scolastico
+
+    anno = resolve_default_anno_scolastico()
+    if not anno:
+        return "senza-anno-scolastico"
+
+    raw_label = anno.nome_anno_scolastico
+    if not raw_label and anno.data_inizio and anno.data_fine:
+        raw_label = f"{anno.data_inizio.year}-{anno.data_fine.year}"
+
+    normalized = (raw_label or "senza-anno-scolastico").replace("/", "-").replace("\\", "-")
+    return get_valid_filename(normalized).strip("._-") or "senza-anno-scolastico"
+
+
 def documento_upload_to(instance, filename):
     filename = os.path.basename(filename)
+    anno_folder = anno_scolastico_documenti_folder()
     if getattr(instance, "studente_id", None):
         owner_folder = "studenti"
     elif getattr(instance, "familiare_id", None):
@@ -477,7 +494,7 @@ def documento_upload_to(instance, filename):
     else:
         owner_folder = "non_associati"
 
-    return f"documenti/{owner_folder}/{filename}"
+    return f"{anno_folder}/documenti/{owner_folder}/{filename}"
 
 
 class TipoDocumento(models.Model):
@@ -528,7 +545,7 @@ class Documento(models.Model):
         related_name="documenti",
     )
     descrizione = models.TextField(blank=True)
-    file = models.FileField(upload_to=documento_upload_to)
+    file = models.FileField(upload_to=documento_upload_to, max_length=255)
     data_caricamento = models.DateField(auto_now_add=True)
     scadenza = models.DateField(blank=True, null=True)
     visibile = models.BooleanField(default=True)

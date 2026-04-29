@@ -12,6 +12,7 @@ from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from anagrafica.dati_base_import import run_import_dati_base
 from anagrafica.forms import (
@@ -917,6 +918,13 @@ class DocumentoStorageTests(TestCase):
             attivo=True,
         )
         self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+        today = timezone.localdate()
+        self.anno_scolastico = AnnoScolastico.objects.create(
+            nome_anno_scolastico=f"{today.year}/{today.year + 1}",
+            data_inizio=date(today.year, 1, 1),
+            data_fine=date(today.year, 12, 31),
+            attivo=True,
+        )
 
     def test_uploaded_documents_are_partitioned_by_owner_type(self):
         with TemporaryDirectory() as tmpdir:
@@ -937,9 +945,10 @@ class DocumentoStorageTests(TestCase):
                     file=SimpleUploadedFile("studente.pdf", b"studente", content_type="application/pdf"),
                 )
 
-                self.assertTrue(documento_famiglia.file.name.startswith("documenti/famiglie/"))
-                self.assertTrue(documento_familiare.file.name.startswith("documenti/familiari/"))
-                self.assertTrue(documento_studente.file.name.startswith("documenti/studenti/"))
+                expected_prefix = f"{self.anno_scolastico.nome_anno_scolastico.replace('/', '-')}/documenti"
+                self.assertTrue(documento_famiglia.file.name.startswith(f"{expected_prefix}/famiglie/"))
+                self.assertTrue(documento_familiare.file.name.startswith(f"{expected_prefix}/familiari/"))
+                self.assertTrue(documento_studente.file.name.startswith(f"{expected_prefix}/studenti/"))
 
     def test_document_download_view_streams_uploaded_file(self):
         with TemporaryDirectory() as tmpdir:

@@ -1,7 +1,10 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from anagrafica.models import Famiglia, Familiare, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
 from economia.forms import (
@@ -180,6 +183,52 @@ class EconomiaBatchRateTests(TestCase):
 
         self.assertEqual(risultato["summary"]["created"], 1)
         self.assertEqual(self.iscrizione.rate.count(), 11)
+
+    def test_verifica_situazione_rette_exposes_column_and_summary_totals(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+
+        preiscrizione = self.iscrizione.rate.get(tipo_rata=RataIscrizione.TIPO_PREISCRIZIONE)
+        preiscrizione.importo_pagato = Decimal("100.00")
+        preiscrizione.pagata = True
+        preiscrizione.data_pagamento = date(2025, 8, 1)
+        preiscrizione.save()
+
+        settembre = self.iscrizione.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            anno_riferimento=2025,
+            mese_riferimento=9,
+        )
+        settembre.importo_pagato = Decimal("50.00")
+        settembre.data_pagamento = date(2025, 9, 20)
+        settembre.save()
+
+        with patch("economia.views.iscrizioni.timezone.localdate", return_value=date(2025, 9, 30)):
+            response = self.client.get(
+                reverse("verifica_situazione_rette"),
+                {"anno_scolastico": self.anno.pk},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        totali_colonne = response.context["totali_colonne"]
+        riepilogo_totali = response.context["riepilogo_totali"]
+
+        totale_preiscrizione = totali_colonne[0]
+        totale_settembre = next(
+            totale
+            for totale in totali_colonne
+            if totale["colonna"]["key"] == (2025, 9)
+        )
+
+        self.assertEqual(totale_preiscrizione["dovuto"], Decimal("100.00"))
+        self.assertEqual(totale_preiscrizione["pagato"], Decimal("100.00"))
+        self.assertEqual(totale_settembre["dovuto"], Decimal("100.00"))
+        self.assertEqual(totale_settembre["pagato"], Decimal("50.00"))
+        self.assertEqual(riepilogo_totali["dovuto_con_preiscrizioni"], Decimal("200.00"))
+        self.assertEqual(riepilogo_totali["pagato_con_preiscrizioni"], Decimal("150.00"))
+        self.assertEqual(riepilogo_totali["dovuto_senza_preiscrizioni"], Decimal("100.00"))
+        self.assertEqual(riepilogo_totali["pagato_senza_preiscrizioni"], Decimal("50.00"))
 
     def test_single_payment_plan_creates_one_annual_rate_with_discount(self):
         self.iscrizione.modalita_pagamento_retta = Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE

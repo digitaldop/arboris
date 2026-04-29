@@ -28,6 +28,85 @@
         .verifica-rette-legenda-card {
             padding: 0.75rem 1rem;
         }
+        .verifica-rette-summary-card {
+            padding: 0;
+        }
+        .verifica-rette-summary-title {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #dfe5ea;
+            font-weight: 700;
+            color: #223846;
+        }
+        .verifica-rette-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(260px, 1fr));
+            gap: 0;
+        }
+        .verifica-rette-summary-block {
+            padding: 0.9rem 1rem;
+            border-right: 1px solid #e5ebef;
+            cursor: grab;
+            transition: background 0.15s ease, opacity 0.15s ease;
+        }
+        .verifica-rette-summary-block:last-child {
+            border-right: 0;
+        }
+        .verifica-rette-summary-block.is-dragging {
+            opacity: 0.55;
+            background: #f3f8fa;
+        }
+        .verifica-rette-summary-block:active {
+            cursor: grabbing;
+        }
+        .verifica-rette-summary-label-row {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-bottom: 0.55rem;
+        }
+        .verifica-rette-summary-handle {
+            width: 18px;
+            height: 22px;
+            padding: 0;
+            border: 1px solid #d6e0e6;
+            border-radius: 4px;
+            background-color: #fff;
+            background-image: radial-gradient(circle, #607280 1.3px, transparent 1.5px);
+            background-position: 3px 3px;
+            background-size: 6px 6px;
+            cursor: grab;
+        }
+        .verifica-rette-summary-handle:active {
+            cursor: grabbing;
+        }
+        .verifica-rette-summary-label {
+            margin: 0;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #607280;
+            text-transform: uppercase;
+        }
+        .verifica-rette-summary-values {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+        .verifica-rette-summary-metric {
+            padding: 0.7rem 0.8rem;
+            border: 1px solid #e4ebef;
+            border-radius: 6px;
+            background: #f8fbfc;
+        }
+        .verifica-rette-summary-metric-label {
+            margin-bottom: 0.35rem;
+            font-size: 0.76rem;
+            color: #667985;
+        }
+        .verifica-rette-summary-metric-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #1f3543;
+        }
         .verifica-rette-legenda {
             display: flex;
             flex-wrap: wrap;
@@ -108,6 +187,38 @@
         .verifica-rette-table .studente-nome {
             font-weight: 600;
             color: #1f2937;
+        }
+
+        .verifica-rette-table .verifica-rette-total-row td {
+            background: #f8fafc;
+            padding: 0.45rem 0.55rem;
+            border-top: 2px solid #b9c8d2;
+            border-bottom: 2px solid #b9c8d2;
+        }
+        .verifica-rette-table .verifica-rette-total-row .sticky-col {
+            background: #edf4f7;
+            color: #223846;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .verifica-rette-table .verifica-rette-total-row-bottom td {
+            border-top-width: 2px;
+        }
+        .verifica-rette-total-cell {
+            min-width: 130px;
+            max-width: 160px;
+            color: #223846;
+            font-size: 0.8rem;
+            line-height: 1.25;
+        }
+        .verifica-rette-total-cell .cell-amount .label {
+            color: #5f7280;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .verifica-rette-total-cell .cell-amount .value {
+            font-weight: 700;
         }
 
         .verifica-rette-table .classe-separator td {
@@ -260,6 +371,44 @@
     </div>
 
     {% if anno_scolastico %}
+        <div class="content-card verifica-rette-summary-card">
+            <div class="verifica-rette-summary-title">Riepilogo generale a oggi</div>
+            <div class="verifica-rette-summary-grid" data-summary-grid>
+                <div class="verifica-rette-summary-block" data-summary-card data-summary-key="senza-preiscrizioni" draggable="true">
+                    <div class="verifica-rette-summary-label-row">
+                        <button type="button" class="verifica-rette-summary-handle" aria-label="Sposta riquadro senza preiscrizioni" title="Trascina per riordinare"></button>
+                        <div class="verifica-rette-summary-label">Senza preiscrizioni</div>
+                    </div>
+                    <div class="verifica-rette-summary-values">
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Dovuto a oggi</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.dovuto_senza_preiscrizioni|euro }}</div>
+                        </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Incassato a oggi</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.pagato_senza_preiscrizioni|euro }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="verifica-rette-summary-block" data-summary-card data-summary-key="con-preiscrizioni" draggable="true">
+                    <div class="verifica-rette-summary-label-row">
+                        <button type="button" class="verifica-rette-summary-handle" aria-label="Sposta riquadro con preiscrizioni" title="Trascina per riordinare"></button>
+                        <div class="verifica-rette-summary-label">Con preiscrizioni</div>
+                    </div>
+                    <div class="verifica-rette-summary-values">
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Dovuto a oggi</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.dovuto_con_preiscrizioni|euro }}</div>
+                        </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Incassato a oggi</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.pagato_con_preiscrizioni|euro }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="content-card verifica-rette-legenda-card">
             <div class="verifica-rette-legenda">
                 <span class="legenda-item">
@@ -297,6 +446,23 @@
                         </tr>
                     </thead>
                     <tbody>
+                        {% if totali_colonne %}
+                            <tr class="verifica-rette-total-row verifica-rette-total-row-top">
+                                <td class="sticky-col studente-col">Totali</td>
+                                {% for totale in totali_colonne %}
+                                    <td class="verifica-rette-total-cell">
+                                        <div class="cell-amount">
+                                            <span class="label">Dovuto</span>
+                                            <span class="value">&euro; {{ totale.dovuto|euro }}</span>
+                                        </div>
+                                        <div class="cell-amount">
+                                            <span class="label">Incassato</span>
+                                            <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endif %}
                         {% for gruppo in righe_per_classe %}
                             <tr class="classe-separator">
                                 <td colspan="{{ num_colonne }}" class="classe-separator-cell">
@@ -349,6 +515,25 @@
                             </tr>
                         {% endfor %}
                     </tbody>
+                    {% if totali_colonne %}
+                        <tfoot>
+                            <tr class="verifica-rette-total-row verifica-rette-total-row-bottom">
+                                <td class="sticky-col studente-col">Totali</td>
+                                {% for totale in totali_colonne %}
+                                    <td class="verifica-rette-total-cell">
+                                        <div class="cell-amount">
+                                            <span class="label">Dovuto</span>
+                                            <span class="value">&euro; {{ totale.dovuto|euro }}</span>
+                                        </div>
+                                        <div class="cell-amount">
+                                            <span class="label">Incassato</span>
+                                            <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>
@@ -359,4 +544,85 @@
             </div>
         </div>
     {% endif %}
+
+    <script>
+        (function () {
+            var storageKey = "arboris.verificaRette.summaryOrder";
+            var grid = document.querySelector("[data-summary-grid]");
+            if (!grid) {
+                return;
+            }
+
+            function getCards() {
+                return Array.prototype.slice.call(grid.querySelectorAll("[data-summary-card]"));
+            }
+
+            function readSavedOrder() {
+                try {
+                    return JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+                } catch (error) {
+                    return [];
+                }
+            }
+
+            function saveOrder() {
+                try {
+                    window.localStorage.setItem(
+                        storageKey,
+                        JSON.stringify(getCards().map(function (card) {
+                            return card.dataset.summaryKey;
+                        }))
+                    );
+                } catch (error) {
+                    return;
+                }
+            }
+
+            readSavedOrder().forEach(function (key) {
+                var card = grid.querySelector('[data-summary-key="' + key + '"]');
+                if (card) {
+                    grid.appendChild(card);
+                }
+            });
+
+            var draggedCard = null;
+            getCards().forEach(function (card) {
+                card.addEventListener("dragstart", function (event) {
+                    draggedCard = card;
+                    card.classList.add("is-dragging");
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", card.dataset.summaryKey || "");
+                });
+
+                card.addEventListener("dragend", function () {
+                    card.classList.remove("is-dragging");
+                    draggedCard = null;
+                });
+
+                card.addEventListener("dragover", function (event) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                });
+
+                card.addEventListener("drop", function (event) {
+                    event.preventDefault();
+                    if (!draggedCard || draggedCard === card) {
+                        return;
+                    }
+
+                    var cards = getCards();
+                    var draggedIndex = cards.indexOf(draggedCard);
+                    var targetIndex = cards.indexOf(card);
+
+                    if (draggedIndex < targetIndex) {
+                        card.after(draggedCard);
+                    } else {
+                        card.before(draggedCard);
+                    }
+
+                    saveOrder();
+                });
+            });
+        })();
+    </script>
 {% endblock %}

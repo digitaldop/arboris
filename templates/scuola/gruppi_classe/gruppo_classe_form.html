@@ -49,7 +49,18 @@
                     </td>
                 </tr>
                 <tr>
-                    <th>{{ form.classi.label_tag }}</th>
+                    <th>
+                        <span class="field-label-with-help">
+                            {{ form.classi.label_tag }}
+                            <span
+                                class="inline-help-trigger"
+                                data-floating-text="Puoi selezionare pi&ugrave; classi senza tenere premuto CTRL: clicca su una classe per selezionarla, clicca di nuovo sulla stessa classe per deselezionarla."
+                                role="button"
+                                tabindex="0"
+                                aria-label="Informazioni sulla selezione delle classi"
+                            >?</span>
+                        </span>
+                    </th>
                     <td>
                         {{ form.classi }} {{ form.classi.errors }}
                         <div class="help-text">{{ form.classi.help_text }}</div>
@@ -75,6 +86,14 @@
         </div>
         </fieldset>
     </form>
+    <script src="{% static 'js/core/click-toggle-multiselect.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisClickToggleMultiselect) {
+                ArborisClickToggleMultiselect.init(document);
+            }
+        });
+    </script>
     {% if not popup %}
         <script src="{% static 'js/core/view-mode.js' %}"></script>
         <script>
