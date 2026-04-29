@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -63,11 +64,14 @@ def student_general_data_title():
 
 def get_classe_corrente_label(studente):
     iscrizione_corrente = (
-        Iscrizione.objects.select_related("classe", "anno_scolastico")
-        .filter(studente=studente, classe__isnull=False)
+        Iscrizione.objects.select_related("classe", "gruppo_classe", "anno_scolastico")
+        .filter(studente=studente)
+        .filter(Q(classe__isnull=False) | Q(gruppo_classe__isnull=False))
         .order_by("-attiva", "-anno_scolastico__data_inizio", "-pk")
         .first()
     )
+    if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+        return iscrizione_corrente.gruppo_classe.nome_gruppo_classe
     if iscrizione_corrente and iscrizione_corrente.classe:
         return str(iscrizione_corrente.classe)
     return ""

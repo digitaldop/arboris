@@ -23,6 +23,16 @@
         <div class="page-head-actions">
             <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">Indietro</button>
             {% if famiglia %}
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-icon-text"
+                    id="print-famiglia-btn"
+                    data-print-url="{% url 'stampa_famiglia' famiglia.pk %}"
+                    title="Stampa scheda famiglia"
+                >
+                    <span class="btn-icon" aria-hidden="true">&#128424;</span>
+                    Stampa
+                </button>
                 <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger">Elimina</a>
             {% endif %}
             <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Torna all'elenco</a>
@@ -44,7 +54,6 @@
                         {% if famiglia %}
                             <div class="admin-section-title-actions">
                                 <button type="button" class="admin-section-title-btn" id="enable-edit-famiglia-btn">Modifica dati principali</button>
-                                <button type="button" class="admin-section-title-btn" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">Stampa scheda</button>
                             </div>
                         {% endif %}
                     </div>
@@ -314,9 +323,10 @@
                             </thead>
                             <tbody>
                                 {% for f in familiari_formset %}
+                                    {% if f.instance.pk %}
                                     <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
-                                        {{ f.id }}
                                         <td>
+                                            {{ f.id }}
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                 {% if f.instance.pk and f.instance.cognome %}
                                                     {{ f.instance.cognome }}
@@ -511,13 +521,125 @@
                                             </div>
                                         </td>
                                     </tr>
+                                    {% else %}
+                                    <tr class="inline-form-row inline-family-editor-row{% if famiglia and not f.errors and not f.has_changed %} inline-empty-row is-hidden{% endif %}">
+                                        <td colspan="14">
+                                            {{ f.id }}
+                                            <div class="inline-family-editor-grid">
+                                                <div class="inline-family-editor-field">
+                                                    <label>Cognome</label>
+                                                    {{ f.cognome }}
+                                                    {{ f.cognome.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-field">
+                                                    <label>Nome</label>
+                                                    {{ f.nome }}
+                                                    {{ f.nome.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-field">
+                                                    <label>Parentela</label>
+                                                    <div class="inline-related-field mode-edit-field">
+                                                        {{ f.relazione_familiare }}
+                                                        <div class="related-actions inline-related-actions">
+                                                            <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                                                        </div>
+                                                    </div>
+                                                    {{ f.relazione_familiare.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-field inline-family-editor-address">
+                                                    <label>Indirizzo</label>
+                                                    <div class="inline-related-field mode-edit-field">
+                                                        <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                            {{ f.indirizzo }}
+                                                        </div>
+                                                        <div class="related-actions inline-related-actions">
+                                                            <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="inline-address-help" data-role="address-help">
+                                                        {% if famiglia and famiglia.indirizzo_principale %}
+                                                            Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                                        {% else %}
+                                                            Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                                        {% endif %}
+                                                    </div>
+                                                    {{ f.indirizzo.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-field inline-family-editor-phone">
+                                                    <label>Telefono</label>
+                                                    {{ f.telefono }}
+                                                    {{ f.telefono.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-field inline-family-editor-email">
+                                                    <label>Email</label>
+                                                    {{ f.email }}
+                                                    {{ f.email.errors }}
+                                                </div>
+                                                <div class="inline-family-editor-checks">
+                                                    <div class="inline-family-editor-check">
+                                                        <label>Convivente</label>
+                                                        {{ f.convivente }}
+                                                    </div>
+                                                    <div class="inline-family-editor-check">
+                                                        <label>Referente principale</label>
+                                                        {{ f.referente_principale }}
+                                                    </div>
+                                                    <div class="inline-family-editor-check">
+                                                        <label>Scambio retta</label>
+                                                        {{ f.abilitato_scambio_retta }}
+                                                    </div>
+                                                </div>
+                                                <div class="inline-family-editor-actions">
+                                                    <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
+                                                </div>
+                                                <div class="inline-family-editor-hidden">
+                                                    {{ f.attivo }}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="inline-subform-row inline-family-editor-details-row{% if famiglia and not f.errors and not f.has_changed %} inline-empty-row is-hidden{% endif %}">
+                                        <td colspan="14">
+                                            <div class="inline-subform-grid">
+                                                <div class="inline-subform-field">
+                                                    <label>Data nascita</label>
+                                                    {{ f.data_nascita }}
+                                                    {{ f.data_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Sesso</label>
+                                                    {{ f.sesso }}
+                                                    {{ f.sesso.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Luogo nascita</label>
+                                                    <div class="autocomplete-wrapper citta-autocomplete">
+                                                        {{ f.luogo_nascita_search }}
+                                                        {{ f.luogo_nascita }}
+                                                    </div>
+                                                    {{ f.luogo_nascita_search.errors }}
+                                                    {{ f.luogo_nascita.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Codice fiscale</label>
+                                                    {{ f.codice_fiscale }}
+                                                    {{ f.codice_fiscale.errors }}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
                                     {% if f.non_field_errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="11">{{ f.non_field_errors }}</td>
+                                            <td colspan="14">{{ f.non_field_errors }}</td>
                                         </tr>
                                     {% elif f.errors %}
                                         <tr class="inline-errors-row">
-                                            <td colspan="11">{{ f.errors }}</td>
+                                            <td colspan="14">{{ f.errors }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -741,54 +863,81 @@
 
     <!-- TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
     <template id="familiari-empty-form-template">
-        <tr class="inline-form-row">
-            {{ familiari_formset.empty_form.id }}
-            <td>{{ familiari_formset.empty_form.cognome }}</td>
-            <td>{{ familiari_formset.empty_form.nome }}</td>
-            <td>
-                <div class="inline-related-field">
-                    {{ familiari_formset.empty_form.relazione_familiare }}
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+        <tr class="inline-form-row inline-family-editor-row">
+            <td colspan="14">
+                {{ familiari_formset.empty_form.id }}
+                <div class="inline-family-editor-grid">
+                    <div class="inline-family-editor-field">
+                        <label>Cognome</label>
+                        {{ familiari_formset.empty_form.cognome }}
+                    </div>
+                    <div class="inline-family-editor-field">
+                        <label>Nome</label>
+                        {{ familiari_formset.empty_form.nome }}
+                    </div>
+                    <div class="inline-family-editor-field">
+                        <label>Parentela</label>
+                        <div class="inline-related-field mode-edit-field">
+                            {{ familiari_formset.empty_form.relazione_familiare }}
+                            <div class="related-actions inline-related-actions">
+                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="inline-family-editor-field inline-family-editor-address">
+                        <label>Indirizzo</label>
+                        <div class="inline-related-field mode-edit-field">
+                            <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                {{ familiari_formset.empty_form.indirizzo }}
+                            </div>
+                            <div class="related-actions inline-related-actions">
+                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                            </div>
+                        </div>
+                        <div class="inline-address-help" data-role="address-help">
+                            {% if famiglia and famiglia.indirizzo_principale %}
+                                Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                            {% else %}
+                                Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="inline-family-editor-field inline-family-editor-phone">
+                        <label>Telefono</label>
+                        {{ familiari_formset.empty_form.telefono }}
+                    </div>
+                    <div class="inline-family-editor-field inline-family-editor-email">
+                        <label>Email</label>
+                        {{ familiari_formset.empty_form.email }}
+                    </div>
+                    <div class="inline-family-editor-checks">
+                        <div class="inline-family-editor-check">
+                            <label>Convivente</label>
+                            {{ familiari_formset.empty_form.convivente }}
+                        </div>
+                        <div class="inline-family-editor-check">
+                            <label>Referente principale</label>
+                            {{ familiari_formset.empty_form.referente_principale }}
+                        </div>
+                        <div class="inline-family-editor-check">
+                            <label>Scambio retta</label>
+                            {{ familiari_formset.empty_form.abilitato_scambio_retta }}
+                        </div>
+                    </div>
+                    <div class="inline-family-editor-actions">
+                        <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
+                    </div>
+                    <div class="inline-family-editor-hidden">
+                        {{ familiari_formset.empty_form.attivo }}
                     </div>
                 </div>
-            </td>
-            <td class="inline-address-cell inline-family-address-cell">
-                <div class="inline-related-field mode-edit-field">
-                    <div class="autocomplete-wrapper indirizzo-autocomplete">
-                        {{ familiari_formset.empty_form.indirizzo }}
-                    </div>
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
-                    </div>
-                </div>
-
-                <div class="inline-address-help" data-role="address-help">
-                    {% if famiglia and famiglia.indirizzo_principale %}
-                        Erediterà: {{ famiglia.indirizzo_principale.label_select }}
-                    {% else %}
-                        Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
-                    {% endif %}
-                </div>
-            </td>
-            <td class="inline-phone-cell inline-family-phone-cell">{{ familiari_formset.empty_form.telefono }}</td>
-            <td>{{ familiari_formset.empty_form.email }}</td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-view-only-table-cell"></td>
-            <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.convivente }}</td>
-            <td class="inline-checkbox-cell">{{ familiari_formset.empty_form.referente_principale }}</td>
-            <td class="inline-checkbox-cell inline-scambio-retta-col">{{ familiari_formset.empty_form.abilitato_scambio_retta }}</td>
-            <td class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-cell">{{ familiari_formset.empty_form.attivo }}</td>
-            <td class="inline-delete-cell mode-edit-only-table-cell">
-                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
             </td>
         </tr>
-        <tr class="inline-subform-row">
+        <tr class="inline-subform-row inline-family-editor-details-row">
             <td colspan="14">
                 <div class="inline-subform-grid">
                     <div class="inline-subform-field">

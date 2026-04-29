@@ -425,6 +425,7 @@ def lista_iscrizioni(request):
         "studente",
         "anno_scolastico",
         "classe",
+        "gruppo_classe",
         "stato_iscrizione",
         "condizione_iscrizione",
         "agevolazione",
@@ -505,6 +506,7 @@ def modifica_iscrizione(request, pk):
             "studente__famiglia",
             "anno_scolastico",
             "classe",
+            "gruppo_classe",
             "stato_iscrizione",
             "condizione_iscrizione",
             "agevolazione",
@@ -951,6 +953,7 @@ def verifica_situazione_rette(request):
             .select_related(
                 "studente",
                 "classe",
+                "gruppo_classe",
                 "anno_scolastico",
             )
             .prefetch_related("rate")

@@ -117,6 +117,28 @@
                     </td>
                 </tr>
                 <tr>
+                    <th>{{ form.gruppo_classe.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.gruppo_classe %}
+                                {{ iscrizione.gruppo_classe.nome_gruppo_classe }}
+                            {% else %}
+                                <span class="table-muted">Nessun gruppo classe</span>
+                            {% endif %}
+                        </div>
+                        <div class="related-field-row mode-edit-field">
+                            {{ form.gruppo_classe }}
+                            <div class="related-actions mode-edit-only">
+                                <button type="button" class="related-btn related-btn-add" id="add-gruppo-classe-btn">+</button>
+                                <button type="button" class="related-btn related-btn-edit" id="edit-gruppo-classe-btn">&#9998;</button>
+                                <button type="button" class="related-btn related-btn-delete" id="delete-gruppo-classe-btn">&#10006;</button>
+                            </div>
+                        </div>
+                        {{ form.gruppo_classe.errors }}
+                        <div class="help-text">Usalo per indicare una pluriclasse o un gruppo operativo composto da piu classi.</div>
+                    </td>
+                </tr>
+                <tr>
                     <th>{{ form.data_iscrizione.label_tag }}</th>
                     <td>
                         <div class="mode-view-only readonly-display readonly-display-plain">
@@ -412,7 +434,7 @@
     <script src="{% static 'js/core/related-popups.js' %}"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=6"></script>
+    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=7"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

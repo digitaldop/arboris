@@ -223,6 +223,18 @@ class AjaxCercaCittaTests(TestCase):
         self.assertContains(response, "Studenti: Luca Rossi")
         self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
 
+        response = self.client.get(reverse("lista_familiari"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Referenti: Mario Rossi")
+        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
+
+        response = self.client.get(reverse("lista_studenti"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Referenti: Mario Rossi")
+        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
+
         form = StudenteStandaloneForm()
         self.assertIn("Rossi - Referenti: Mario Rossi", str(form["famiglia"]))
 
@@ -864,7 +876,44 @@ class DocumentoStorageTests(TestCase):
         self.citta = Citta.objects.create(nome="Roma", provincia=self.provincia, codice_catastale="H501", ordine=1, attiva=True)
         self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
         self.famiglia = Famiglia.objects.create(cognome_famiglia="Neri", stato_relazione_famiglia=self.stato, attiva=True)
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione,
+            nome="Anna",
+            cognome="Neri",
+            attivo=True,
+        )
+        self.studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Neri",
+            attivo=True,
+        )
         self.tipo_documento = TipoDocumento.objects.create(tipo_documento="Carta identita", ordine=1, attivo=True)
+
+    def test_uploaded_documents_are_partitioned_by_owner_type(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                documento_famiglia = Documento.objects.create(
+                    famiglia=self.famiglia,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("famiglia.pdf", b"famiglia", content_type="application/pdf"),
+                )
+                documento_familiare = Documento.objects.create(
+                    familiare=self.familiare,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("familiare.pdf", b"familiare", content_type="application/pdf"),
+                )
+                documento_studente = Documento.objects.create(
+                    studente=self.studente,
+                    tipo_documento=self.tipo_documento,
+                    file=SimpleUploadedFile("studente.pdf", b"studente", content_type="application/pdf"),
+                )
+
+                self.assertTrue(documento_famiglia.file.name.startswith("documenti/famiglie/"))
+                self.assertTrue(documento_familiare.file.name.startswith("documenti/familiari/"))
+                self.assertTrue(documento_studente.file.name.startswith("documenti/studenti/"))
 
     def test_document_download_view_streams_uploaded_file(self):
         with TemporaryDirectory() as tmpdir:

@@ -545,6 +545,7 @@ window.ArborisStudenteForm = (function () {
 
             const annoSelect = findInBundle('select[name$="-anno_scolastico"]');
             const classeSelect = findInBundle('select[name$="-classe"]');
+            const gruppoClasseSelect = findInBundle('select[name$="-gruppo_classe"]');
             const condizioneSelect = findInBundle('select[name$="-condizione_iscrizione"]');
             const agevolazioneSelect = findInBundle('select[name$="-agevolazione"]');
             const riduzioneCheckbox = findInBundle('input[type="checkbox"][name$="-riduzione_speciale"]');
@@ -561,6 +562,9 @@ window.ArborisStudenteForm = (function () {
                 const annoScolasticoId = annoSelect.value;
 
                 syncDependentSelect(classeSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                if (gruppoClasseSelect) {
+                    syncDependentSelect(gruppoClasseSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                }
                 syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
             }
 

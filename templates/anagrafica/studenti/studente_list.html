@@ -59,7 +59,7 @@
                                 <td>{{ studente.nome }}</td>
                                 <td class="family-label-cell">
                                     <div class="table-main-text">{{ studente.famiglia.cognome_famiglia }}</div>
-                                    {% with famiglia_context=studente.famiglia.label_disambiguazione %}
+                                    {% with famiglia_context=studente.famiglia.label_contesto_anagrafica %}
                                         {% if famiglia_context %}
                                             <div class="table-subtext">{{ famiglia_context }}</div>
                                         {% endif %}
@@ -76,9 +76,20 @@
                                 </td>
                                 <td>{% if studente.attivo %}Sì{% else %}No{% endif %}</td>
                                 <td class="actions-cell">
-                                    <a class="table-link" href="{% url 'modifica_studente' studente.pk %}">Modifica</a>
-                                    |
-                                    <a class="table-link table-link-danger" href="{% url 'elimina_studente' studente.pk %}">Elimina</a>
+                                    <div class="table-icon-actions">
+                                        <a
+                                            class="table-icon-link"
+                                            href="{% url 'modifica_studente' studente.pk %}"
+                                            title="Modifica"
+                                            aria-label="Modifica {{ studente.nome }} {{ studente.cognome }}"
+                                        >&#9998;</a>
+                                        <a
+                                            class="table-icon-link table-icon-link-danger"
+                                            href="{% url 'elimina_studente' studente.pk %}"
+                                            title="Elimina"
+                                            aria-label="Elimina {{ studente.nome }} {{ studente.cognome }}"
+                                        >&#10006;</a>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}

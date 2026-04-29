@@ -26,6 +26,7 @@
                     <th>Studente</th>
                     <th>Anno scolastico</th>
                     <th>Classe</th>
+                    <th>Gruppo classe</th>
                     <th>Stato</th>
                     <th>Condizione</th>
                     <th>Agevolazione</th>
@@ -41,6 +42,7 @@
                         <td>{{ iscrizione.studente }}</td>
                         <td>{{ iscrizione.anno_scolastico.nome_anno_scolastico }}</td>
                         <td>{{ iscrizione.classe|default:"-" }}</td>
+                        <td>{% if iscrizione.gruppo_classe %}{{ iscrizione.gruppo_classe.nome_gruppo_classe }}{% else %}-{% endif %}</td>
                         <td>{{ iscrizione.stato_iscrizione }}</td>
                         <td>{{ iscrizione.condizione_iscrizione.nome_condizione_iscrizione }}</td>
                         <td>{{ iscrizione.agevolazione|default:"-" }}</td>
@@ -57,7 +59,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="10"><div class="empty-state">Nessuna iscrizione inserita.</div></td>
+                        <td colspan="11"><div class="empty-state">Nessuna iscrizione inserita.</div></td>
                     </tr>
                 {% endfor %}
             </tbody>

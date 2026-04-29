@@ -360,6 +360,24 @@
                                                     </div>
                                                 </div>
                                                 <div class="iscrizioni-inline-field">
+                                                    <label>Gruppo classe</label>
+                                                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                        {% if f.instance.pk and f.instance.gruppo_classe %}
+                                                            {{ f.instance.gruppo_classe.nome_gruppo_classe }}
+                                                        {% else %}
+                                                            <span class="table-muted">-</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="inline-related-field mode-edit-field">
+                                                        {{ f.gruppo_classe }}
+                                                        <div class="related-actions inline-related-actions">
+                                                            <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="gruppo_classe">+</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="gruppo_classe">&#9998;</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="gruppo_classe">&#10006;</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="iscrizioni-inline-field">
                                                     <label>Data iscrizione</label>
                                                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                                                         {% if f.instance.pk and f.instance.data_iscrizione %}
@@ -902,6 +920,20 @@
                         </div>
                     </div>
                     <div class="iscrizioni-inline-field">
+                        <label>Gruppo classe</label>
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            <span class="table-muted">-</span>
+                        </div>
+                        <div class="inline-related-field mode-edit-field">
+                            {{ iscrizioni_formset.empty_form.gruppo_classe }}
+                            <div class="related-actions inline-related-actions">
+                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="gruppo_classe">+</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="gruppo_classe">&#9998;</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="gruppo_classe">&#10006;</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="iscrizioni-inline-field">
                         <label>Data iscrizione</label>
                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                             <span class="table-muted">-</span>
@@ -1209,7 +1241,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=44"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=45"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

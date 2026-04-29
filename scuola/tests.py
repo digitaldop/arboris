@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .forms import AnnoScolasticoForm, ClasseForm
-from .models import AnnoScolastico
+from .forms import AnnoScolasticoForm, ClasseForm, GruppoClasseForm
+from .models import AnnoScolastico, Classe, GruppoClasse
 
 
 class ClasseFormDefaultAnnoScolasticoTests(TestCase):
@@ -121,6 +121,67 @@ class AnnoScolasticoFormValidationTests(TestCase):
         )
 
         self.assertTrue(form.is_valid(), form.errors)
+
+
+class GruppoClasseFormTests(TestCase):
+    def setUp(self):
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.altro_anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=date(2026, 9, 1),
+            data_fine=date(2027, 8, 31),
+        )
+        self.quarta = Classe.objects.create(
+            nome_classe="Quarta Elementare",
+            ordine_classe=4,
+            anno_scolastico=self.anno,
+        )
+        self.quinta = Classe.objects.create(
+            nome_classe="Quinta Elementare",
+            ordine_classe=5,
+            anno_scolastico=self.anno,
+        )
+        self.prima_futura = Classe.objects.create(
+            nome_classe="Prima Elementare",
+            ordine_classe=1,
+            anno_scolastico=self.altro_anno,
+        )
+
+    def test_creates_group_with_multiple_classes(self):
+        form = GruppoClasseForm(
+            data={
+                "nome_gruppo_classe": "Quarta - Quinta Elementare",
+                "anno_scolastico": self.anno.pk,
+                "classi": [self.quarta.pk, self.quinta.pk],
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        gruppo = form.save()
+
+        self.assertEqual(gruppo.classi.count(), 2)
+        self.assertIn(self.quarta, gruppo.classi.all())
+        self.assertIn(self.quinta, gruppo.classi.all())
+
+    def test_rejects_classes_from_a_different_school_year(self):
+        form = GruppoClasseForm(
+            data={
+                "nome_gruppo_classe": "Gruppo incoerente",
+                "anno_scolastico": self.anno.pk,
+                "classi": [self.quarta.pk, self.prima_futura.pk],
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("classi", form.errors)
 
 
 class ListaAnniScolasticiTests(TestCase):

@@ -17,8 +17,8 @@
     <tbody>
         {% for f in studenti_formset %}
             <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
-                {{ f.id }}
                 <td>
+                    {{ f.id }}
                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
                         {% if f.instance.pk and f.instance.nome %}
                             {{ f.instance.nome }}
@@ -67,42 +67,48 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="inline-view-only-table-cell">
-                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                        {% if f.instance.pk and f.instance.data_nascita %}
-                            {{ f.instance.data_nascita|it_date_with_age }}
-                        {% else %}
-                            <span class="table-muted">Non indicata</span>
-                        {% endif %}
-                    </div>
-                </td>
-                <td class="inline-view-only-table-cell">
-                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                        {% if f.instance.pk and f.instance.luogo_nascita %}
-                            {{ f.instance.luogo_nascita }}
-                        {% else %}
-                            <span class="table-muted">Non indicato</span>
-                        {% endif %}
-                    </div>
-                </td>
-                <td class="inline-view-only-table-cell">
-                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                        {% if f.instance.pk and f.instance.codice_fiscale %}
-                            <div class="readonly-action-group">
-                                <span>{{ f.instance.codice_fiscale }}</span>
-                                <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
-                                    <span class="copy-inline-icon" aria-hidden="true">
-                                        <span class="copy-inline-icon-back"></span>
-                                        <span class="copy-inline-icon-front"></span>
-                                    </span>
-                                    <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                </button>
-                            </div>
-                        {% else %}
-                            <span class="table-muted">Non indicato</span>
-                        {% endif %}
-                    </div>
-                </td>
+                {% if f.instance.pk %}
+                    <td class="inline-view-only-table-cell">
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            {% if f.instance.data_nascita %}
+                                {{ f.instance.data_nascita|it_date_with_age }}
+                            {% else %}
+                                <span class="table-muted">Non indicata</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="inline-view-only-table-cell">
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            {% if f.instance.luogo_nascita %}
+                                {{ f.instance.luogo_nascita }}
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="inline-view-only-table-cell">
+                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                            {% if f.instance.codice_fiscale %}
+                                <div class="readonly-action-group">
+                                    <span>{{ f.instance.codice_fiscale }}</span>
+                                    <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                        <span class="copy-inline-icon" aria-hidden="true">
+                                            <span class="copy-inline-icon-back"></span>
+                                            <span class="copy-inline-icon-front"></span>
+                                        </span>
+                                        <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                    </button>
+                                </div>
+                            {% else %}
+                                <span class="table-muted">Non indicato</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                {% else %}
+                    <td class="inline-view-only-table-cell"></td>
+                    <td class="inline-view-only-table-cell"></td>
+                    <td class="inline-view-only-table-cell"></td>
+                {% endif %}
                 <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
                 <td class="inline-delete-cell mode-edit-only-table-cell">
                     {% if f.instance.pk %}

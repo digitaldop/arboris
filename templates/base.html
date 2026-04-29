@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=84">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=93">
     {% if role_theme %}
         <style>
             :root {
@@ -114,6 +114,7 @@
                                 {% endif %}
                                 <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
                                 <a href="{% url 'lista_classi' %}">Classi</a>
+                                <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
                             </div>
                         </div>
                     </details>
@@ -630,6 +631,9 @@
                                             </a>
                                             <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' or request.resolver_match.url_name == 'crea_classe' or request.resolver_match.url_name == 'modifica_classe' or request.resolver_match.url_name == 'elimina_classe' %}active{% endif %}">
                                                 Classi
+                                            </a>
+                                            <a href="{% url 'lista_gruppi_classe' %}" class="{% if request.resolver_match.url_name == 'lista_gruppi_classe' or request.resolver_match.url_name == 'crea_gruppo_classe' or request.resolver_match.url_name == 'modifica_gruppo_classe' or request.resolver_match.url_name == 'elimina_gruppo_classe' %}active{% endif %}">
+                                                Gruppi classe
                                             </a>
                                         </nav>
                                     </div>

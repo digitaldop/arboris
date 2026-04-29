@@ -9,7 +9,7 @@ from .utils import citta_choice_label, validate_and_normalize_phone_number
 from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 from scuola.utils import resolve_default_anno_scolastico
-from scuola.models import AnnoScolastico, Classe
+from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from arboris.form_widgets import italian_decimal_to_python, merge_widget_classes
 
 from django.forms import inlineformset_factory
@@ -73,6 +73,16 @@ def configure_famiglia_choice_field(field):
 
 
 class ClasseInlineSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+
+        if value and hasattr(value, "instance"):
+            option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
+
+        return option
+
+
+class GruppoClasseInlineSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
@@ -1167,6 +1177,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         fields = [
             "anno_scolastico",
             "classe",
+            "gruppo_classe",
             "data_iscrizione",
             "data_fine_iscrizione",
             "stato_iscrizione",
@@ -1186,6 +1197,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         widgets = {
             "anno_scolastico": AnnoScolasticoInlineSelect(),
             "classe": ClasseInlineSelect(),
+            "gruppo_classe": GruppoClasseInlineSelect(),
             "condizione_iscrizione": CondizioneIscrizioneInlineSelect(),
             "data_iscrizione": html5_date_input(),
             "data_fine_iscrizione": html5_date_input(),
@@ -1216,6 +1228,19 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 )
             )
         bind_primed_queryset(self.fields["classe"], classe_qs)
+
+        gruppo_classe_qs = shared_lookups.get("gruppo_classe_queryset")
+        if gruppo_classe_qs is None:
+            gruppo_classe_qs = prime_queryset(
+                GruppoClasse.objects.select_related("anno_scolastico").order_by(
+                    "-anno_scolastico__data_inizio",
+                    "nome_gruppo_classe",
+                    "id",
+                )
+            )
+        bind_primed_queryset(self.fields["gruppo_classe"], gruppo_classe_qs)
+        self.fields["gruppo_classe"].label = "Gruppo classe"
+        self.fields["gruppo_classe"].required = False
 
         stato_iscrizione_qs = shared_lookups.get("stato_iscrizione_queryset")
         if stato_iscrizione_qs is None:
@@ -1311,6 +1336,13 @@ class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
                 "sezione_classe",
             )
         )
+        gruppo_classe_queryset = prime_queryset(
+            GruppoClasse.objects.select_related("anno_scolastico").order_by(
+                "-anno_scolastico__data_inizio",
+                "nome_gruppo_classe",
+                "id",
+            )
+        )
         stato_iscrizione_queryset = prime_queryset(
             StatoIscrizione.objects.filter(attiva=True).order_by("ordine", "stato_iscrizione")
         )
@@ -1330,6 +1362,7 @@ class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
         self.shared_lookups = {
             "anno_scolastico_queryset": anno_scolastico_queryset,
             "classe_queryset": classe_queryset,
+            "gruppo_classe_queryset": gruppo_classe_queryset,
             "stato_iscrizione_queryset": stato_iscrizione_queryset,
             "condizione_queryset": condizione_queryset,
             "agevolazione_queryset": agevolazione_queryset,

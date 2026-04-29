@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gruppi classe - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Gruppi classe</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Gruppi classe</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'crea_gruppo_classe' %}" class="btn btn-primary">Nuovo gruppo classe</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Nome gruppo classe</th>
+                    <th>Anno scolastico</th>
+                    <th>Classi incluse</th>
+                    <th>Attivo</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gruppo in gruppi_classe %}
+                    <tr class="list-row-link" data-row-href="{% url 'modifica_gruppo_classe' gruppo.pk %}">
+                        <td>{{ gruppo.nome_gruppo_classe }}</td>
+                        <td>{{ gruppo.anno_scolastico.nome_anno_scolastico }}</td>
+                        <td>{{ gruppo.classi_label|default:"-" }}</td>
+                        <td>{% if gruppo.attivo %}Si{% else %}No{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_gruppo_classe' gruppo.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_gruppo_classe' gruppo.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">Nessun gruppo classe inserito.</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

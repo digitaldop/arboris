@@ -2,8 +2,8 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import AnnoScolasticoForm, ClasseForm
-from .models import AnnoScolastico, Classe
+from .forms import AnnoScolasticoForm, ClasseForm, GruppoClasseForm
+from .models import AnnoScolastico, Classe, GruppoClasse
 
 
 def is_popup_request(request):
@@ -119,6 +119,7 @@ def elimina_anno_scolastico(request, pk):
         {
             "anno": anno,
             "count_classi": anno.classi.count(),
+            "count_gruppi_classe": anno.gruppi_classe.count(),
             "popup": popup,
         },
     )
@@ -194,4 +195,85 @@ def elimina_classe(request, pk):
         request,
         "scuola/classi/classe_confirm_delete.html",
         {"classe": classe, "popup": popup},
+    )
+
+
+def lista_gruppi_classe(request):
+    gruppi_classe = (
+        GruppoClasse.objects.select_related("anno_scolastico")
+        .prefetch_related("classi")
+        .all()
+    )
+    return render(
+        request,
+        "scuola/gruppi_classe/gruppo_classe_list.html",
+        {"gruppi_classe": gruppi_classe},
+    )
+
+
+def crea_gruppo_classe(request):
+    popup = is_popup_request(request)
+
+    if request.method == "POST":
+        form = GruppoClasseForm(request.POST)
+        if form.is_valid():
+            gruppo_classe = form.save()
+
+            if popup:
+                return popup_select_response(request, "gruppo_classe", gruppo_classe.pk, str(gruppo_classe))
+
+            messages.success(request, "Gruppo classe creato correttamente.")
+            return redirect("lista_gruppi_classe")
+    else:
+        form = GruppoClasseForm()
+
+    return render(
+        request,
+        "scuola/gruppi_classe/gruppo_classe_form.html",
+        {"form": form, "gruppo_classe": None, "popup": popup},
+    )
+
+
+def modifica_gruppo_classe(request, pk):
+    gruppo_classe = get_object_or_404(GruppoClasse.objects.prefetch_related("classi"), pk=pk)
+    popup = is_popup_request(request)
+
+    if request.method == "POST":
+        form = GruppoClasseForm(request.POST, instance=gruppo_classe)
+        if form.is_valid():
+            gruppo_classe = form.save()
+
+            if popup:
+                return popup_select_response(request, "gruppo_classe", gruppo_classe.pk, str(gruppo_classe))
+
+            messages.success(request, "Gruppo classe aggiornato correttamente.")
+            return redirect("lista_gruppi_classe")
+    else:
+        form = GruppoClasseForm(instance=gruppo_classe)
+
+    return render(
+        request,
+        "scuola/gruppi_classe/gruppo_classe_form.html",
+        {"form": form, "gruppo_classe": gruppo_classe, "popup": popup},
+    )
+
+
+def elimina_gruppo_classe(request, pk):
+    gruppo_classe = get_object_or_404(GruppoClasse.objects.prefetch_related("classi"), pk=pk)
+    popup = is_popup_request(request)
+
+    if request.method == "POST":
+        object_id = gruppo_classe.pk
+        gruppo_classe.delete()
+
+        if popup:
+            return popup_delete_response(request, "gruppo_classe", object_id)
+
+        messages.success(request, "Gruppo classe eliminato correttamente.")
+        return redirect("lista_gruppi_classe")
+
+    return render(
+        request,
+        "scuola/gruppi_classe/gruppo_classe_confirm_delete.html",
+        {"gruppo_classe": gruppo_classe, "popup": popup},
     )

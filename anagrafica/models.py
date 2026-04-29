@@ -466,6 +466,20 @@ class Studente(models.Model):
 
 # INIZIO MODELLI PER I DOCUMENTI
 
+def documento_upload_to(instance, filename):
+    filename = os.path.basename(filename)
+    if getattr(instance, "studente_id", None):
+        owner_folder = "studenti"
+    elif getattr(instance, "familiare_id", None):
+        owner_folder = "familiari"
+    elif getattr(instance, "famiglia_id", None):
+        owner_folder = "famiglie"
+    else:
+        owner_folder = "non_associati"
+
+    return f"documenti/{owner_folder}/{filename}"
+
+
 class TipoDocumento(models.Model):
     tipo_documento = models.CharField(max_length=100, unique=True)
     ordine = models.IntegerField(blank=True, null=True)
@@ -514,7 +528,7 @@ class Documento(models.Model):
         related_name="documenti",
     )
     descrizione = models.TextField(blank=True)
-    file = models.FileField(upload_to="documenti/")
+    file = models.FileField(upload_to=documento_upload_to)
     data_caricamento = models.DateField(auto_now_add=True)
     scadenza = models.DateField(blank=True, null=True)
     visibile = models.BooleanField(default=True)

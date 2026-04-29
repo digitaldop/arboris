@@ -61,7 +61,7 @@
                                 <td>{{ familiare.nome }}</td>
                                 <td class="family-label-cell">
                                     <div class="table-main-text">{{ familiare.famiglia.cognome_famiglia }}</div>
-                                    {% with famiglia_context=familiare.famiglia.label_disambiguazione %}
+                                    {% with famiglia_context=familiare.famiglia.label_contesto_anagrafica %}
                                         {% if famiglia_context %}
                                             <div class="table-subtext">{{ famiglia_context }}</div>
                                         {% endif %}

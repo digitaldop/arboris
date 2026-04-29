@@ -72,6 +72,7 @@ class IscrizioneAdmin(admin.ModelAdmin):
         "studente",
         "anno_scolastico",
         "classe",
+        "gruppo_classe",
         "stato_iscrizione",
         "condizione_iscrizione",
         "agevolazione",
@@ -79,7 +80,7 @@ class IscrizioneAdmin(admin.ModelAdmin):
         "riduzione_speciale",
         "attiva",
     )
-    list_filter = ("anno_scolastico", "stato_iscrizione", "non_pagante", "riduzione_speciale", "attiva")
+    list_filter = ("anno_scolastico", "classe", "gruppo_classe", "stato_iscrizione", "non_pagante", "riduzione_speciale", "attiva")
     search_fields = ("studente__cognome", "studente__nome")
 
 

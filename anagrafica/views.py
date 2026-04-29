@@ -453,6 +453,7 @@ def studente_iscrizioni_inline_queryset(studente=None):
             "studente__famiglia",
             "anno_scolastico",
             "classe",
+            "gruppo_classe",
             "stato_iscrizione",
             "condizione_iscrizione",
             "agevolazione",
@@ -2896,7 +2897,7 @@ def modifica_studente(request, pk):
         next(
             (
                 item for item in sorted(
-                    (iscrizione for iscrizione in iscrizioni_correnti_list if iscrizione.classe_id),
+                    (iscrizione for iscrizione in iscrizioni_correnti_list if iscrizione.classe_id or iscrizione.gruppo_classe_id),
                     key=lambda iscrizione: (
                         0 if iscrizione.attiva else 1,
                         -(iscrizione.anno_scolastico.data_inizio.toordinal() if iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio else 0),
@@ -2907,7 +2908,12 @@ def modifica_studente(request, pk):
             None,
         )
     )
-    classe_corrente_label = str(iscrizione_corrente.classe) if iscrizione_corrente and iscrizione_corrente.classe else ""
+    classe_corrente_label = ""
+    if iscrizione_corrente:
+        if iscrizione_corrente.gruppo_classe_id:
+            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
+        elif iscrizione_corrente.classe:
+            classe_corrente_label = str(iscrizione_corrente.classe)
     document_counts = build_studente_document_counts(studente, today)
     studente_audit_info = last_update_audit_info(studente)
 
@@ -2978,17 +2984,22 @@ def get_studente_print_payload(request, studente, *, include_rate=False, include
         _, can_print_osservazioni = get_studente_print_osservazioni(request, studente)
 
     classe_corrente_label = ""
-    iscrizione_corrente = next((item for item in iscrizioni_correnti if item.classe_id), None)
-    if iscrizione_corrente and iscrizione_corrente.classe:
+    iscrizione_corrente = next((item for item in iscrizioni_correnti if item.classe_id or item.gruppo_classe_id), None)
+    if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+        classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
+    elif iscrizione_corrente and iscrizione_corrente.classe:
         classe_corrente_label = str(iscrizione_corrente.classe)
     elif anno_corrente:
         iscrizione_corrente = (
-            studente.iscrizioni.select_related("classe", "anno_scolastico")
-            .filter(anno_scolastico=anno_corrente, classe__isnull=False)
+            studente.iscrizioni.select_related("classe", "gruppo_classe", "anno_scolastico")
+            .filter(anno_scolastico=anno_corrente)
+            .filter(Q(classe__isnull=False) | Q(gruppo_classe__isnull=False))
             .order_by("-attiva", "-pk")
             .first()
         )
-        if iscrizione_corrente and iscrizione_corrente.classe:
+        if iscrizione_corrente and iscrizione_corrente.gruppo_classe_id:
+            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
+        elif iscrizione_corrente and iscrizione_corrente.classe:
             classe_corrente_label = str(iscrizione_corrente.classe)
 
     return {

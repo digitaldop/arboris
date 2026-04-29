@@ -8,7 +8,7 @@ from django.db import models
 from django.db.models import Max
 
 from anagrafica.models import Famiglia, Studente
-from scuola.models import AnnoScolastico, Classe
+from scuola.models import AnnoScolastico, Classe, GruppoClasse
 
 
 def next_order_value(model_cls, field_name="ordine", **filters):
@@ -282,6 +282,13 @@ class Iscrizione(models.Model):
     )
     classe = models.ForeignKey(
         Classe,
+        on_delete=models.SET_NULL,
+        related_name="iscrizioni",
+        blank=True,
+        null=True,
+    )
+    gruppo_classe = models.ForeignKey(
+        GruppoClasse,
         on_delete=models.SET_NULL,
         related_name="iscrizioni",
         blank=True,
@@ -839,6 +846,17 @@ class Iscrizione(models.Model):
 
         if self.classe_id and self.classe and self.classe.anno_scolastico_id != self.anno_scolastico_id:
             raise ValidationError("La classe selezionata non appartiene all'anno scolastico scelto.")
+
+        if (
+            self.gruppo_classe_id
+            and self.gruppo_classe
+            and self.gruppo_classe.anno_scolastico_id != self.anno_scolastico_id
+        ):
+            raise ValidationError("Il gruppo classe selezionato non appartiene all'anno scolastico scelto.")
+
+        if self.gruppo_classe_id and self.classe_id and self.gruppo_classe:
+            if not self.gruppo_classe.classi.filter(pk=self.classe_id).exists():
+                raise ValidationError("La classe selezionata deve essere inclusa nel gruppo classe scelto.")
 
         if (
             self.condizione_iscrizione_id

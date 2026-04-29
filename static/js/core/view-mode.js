@@ -99,6 +99,7 @@ window.ArborisViewMode = (function () {
         if (!form) return;
 
         form.classList.remove("is-inline-add-only-mode");
+        form.classList.remove("is-inline-first-student-add-mode");
         form.querySelectorAll(".is-inline-active-edit-row").forEach(row => {
             row.classList.remove("is-inline-active-edit-row");
         });

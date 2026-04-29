@@ -260,7 +260,10 @@ window.ArborisInlineFormsets = (function () {
         const tableId = cfg.tableId || prefix + "-table";
         const revealOptions = Object.assign({}, cfg, { tableId: tableId });
         const appendOptions = Object.assign({}, cfg, { tableId: tableId });
-        const revealedState = revealHiddenEmptyRow(tableId, revealOptions);
+        const appendOnly = typeof cfg.appendOnly === "function"
+            ? Boolean(cfg.appendOnly({ prefix: prefix, tableId: tableId }))
+            : Boolean(cfg.appendOnly);
+        const revealedState = appendOnly ? null : revealHiddenEmptyRow(tableId, revealOptions);
         const state = revealedState || appendInlineForm(prefix, appendOptions);
 
         if (!state) {

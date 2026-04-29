@@ -3,9 +3,11 @@ from decimal import Decimal
 from django import forms
 from django.forms import HiddenInput
 from django.db import DatabaseError
+from django.db.models import Q
 from django.utils import timezone
 from arboris.form_widgets import apply_eur_currency_widget, italian_decimal_to_python, merge_widget_classes
 from scuola.utils import resolve_default_anno_scolastico
+from scuola.models import GruppoClasse
 
 from economia.models import (
     MetodoPagamento,
@@ -28,7 +30,18 @@ class CondizioneIscrizioneSelect(forms.Select):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
         if value and hasattr(value, "instance"):
+            option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
             option["attrs"]["data-riduzione-speciale-ammessa"] = "1" if value.instance.riduzione_speciale_ammessa else "0"
+
+        return option
+
+
+class AnnoScopedSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+
+        if value and hasattr(value, "instance"):
+            option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
 
         return option
 
@@ -138,6 +151,7 @@ class IscrizioneForm(forms.ModelForm):
             "classe",
             "data_iscrizione",
             "data_fine_iscrizione",
+            "gruppo_classe",
             "stato_iscrizione",
             "condizione_iscrizione",
             "agevolazione",
@@ -155,6 +169,8 @@ class IscrizioneForm(forms.ModelForm):
         widgets = {
             "data_iscrizione": DateInput(),
             "data_fine_iscrizione": DateInput(),
+            "classe": AnnoScopedSelect(),
+            "gruppo_classe": AnnoScopedSelect(),
             "condizione_iscrizione": CondizioneIscrizioneSelect(),
             "scadenza_pagamento_unica": DateInput(),
             "note_amministrative": forms.Textarea(attrs={"rows": 3}),
@@ -170,6 +186,8 @@ class IscrizioneForm(forms.ModelForm):
         self.fields["anno_scolastico"].empty_label = None
         self.fields["stato_iscrizione"].empty_label = None
         self.fields["condizione_iscrizione"].empty_label = None
+        self.fields["gruppo_classe"].label = "Gruppo classe"
+        self.fields["gruppo_classe"].required = False
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].help_text = "Importo in euro."
         apply_eur_currency_widget(self.fields["importo_riduzione_speciale"])
@@ -204,6 +222,7 @@ class IscrizioneForm(forms.ModelForm):
             self.fields["agevolazione"].queryset = self.fields["agevolazione"].queryset.none()
 
         classi_queryset = self.fields["classe"].queryset.none()
+        gruppi_classe_queryset = GruppoClasse.objects.none()
         condizioni_queryset = self.fields["condizione_iscrizione"].queryset.none()
 
         anno_scolastico_id = self.data.get("anno_scolastico") if self.is_bound else getattr(self.instance, "anno_scolastico_id", None)
@@ -214,11 +233,17 @@ class IscrizioneForm(forms.ModelForm):
                 "nome_classe",
                 "sezione_classe",
             )
+            gruppi_classe_queryset = GruppoClasse.objects.filter(
+                anno_scolastico_id=anno_scolastico_id,
+            ).filter(
+                Q(attivo=True) | Q(pk=getattr(self.instance, "gruppo_classe_id", None))
+            ).order_by("nome_gruppo_classe", "id")
             condizioni_queryset = self.fields["condizione_iscrizione"].queryset.filter(
                 anno_scolastico_id=anno_scolastico_id
             ).order_by("nome_condizione_iscrizione")
 
         self.fields["classe"].queryset = classi_queryset
+        self.fields["gruppo_classe"].queryset = gruppi_classe_queryset
         self.fields["condizione_iscrizione"].queryset = condizioni_queryset
 
         if not self.instance.pk and not self.is_bound:
@@ -231,6 +256,10 @@ class IscrizioneForm(forms.ModelForm):
                     self.fields["classe"].queryset = self.fields["classe"].queryset.model.objects.filter(
                         anno_scolastico_id=anno_scolastico_id
                     ).order_by("ordine_classe", "nome_classe", "sezione_classe")
+                    self.fields["gruppo_classe"].queryset = GruppoClasse.objects.filter(
+                        anno_scolastico_id=anno_scolastico_id,
+                        attivo=True,
+                    ).order_by("nome_gruppo_classe", "id")
                     self.fields["condizione_iscrizione"].queryset = self.fields["condizione_iscrizione"].queryset.model.objects.filter(
                         anno_scolastico_id=anno_scolastico_id
                     ).order_by("nome_condizione_iscrizione")

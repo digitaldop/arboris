@@ -1,8 +1,10 @@
 {# Template nuova riga studenti (clone JS). Richiede: studenti_formset, famiglia #}
 <template id="studenti-empty-form-template">
     <tr class="inline-form-row">
-        {{ studenti_formset.empty_form.id }}
-        <td>{{ studenti_formset.empty_form.nome }}</td>
+        <td>
+            {{ studenti_formset.empty_form.id }}
+            {{ studenti_formset.empty_form.nome }}
+        </td>
         <td>{{ studenti_formset.empty_form.cognome }}</td>
         <td class="inline-address-cell inline-address-cell-wide inline-studente-address-cell">
             <div class="inline-related-field mode-edit-field">

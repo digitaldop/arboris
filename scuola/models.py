@@ -85,3 +85,38 @@ class Classe(models.Model):
         if self.sezione_classe:
             return f"{self.nome_classe} {self.sezione_classe}"
         return self.nome_classe
+
+
+class GruppoClasse(models.Model):
+    nome_gruppo_classe = models.CharField(max_length=150)
+    anno_scolastico = models.ForeignKey(
+        AnnoScolastico,
+        on_delete=models.PROTECT,
+        related_name="gruppi_classe",
+    )
+    classi = models.ManyToManyField(
+        Classe,
+        related_name="gruppi_classe",
+        verbose_name="Classi incluse",
+    )
+    attivo = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "scuola_gruppo_classe"
+        ordering = ["anno_scolastico__data_inizio", "nome_gruppo_classe", "id"]
+        verbose_name = "Gruppo classe"
+        verbose_name_plural = "Gruppi classe"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["anno_scolastico", "nome_gruppo_classe"],
+                name="unique_scuola_gruppo_classe_per_anno",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.nome_gruppo_classe} - {self.anno_scolastico}"
+
+    @property
+    def classi_label(self):
+        return ", ".join(str(classe) for classe in self.classi.all())

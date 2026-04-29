@@ -284,6 +284,32 @@ window.ArborisFamigliaForm = (function () {
             });
         }
 
+        function refreshFirstStudentAddMode() {
+            const form = document.getElementById("famiglia-detail-form");
+            if (!form) {
+                return;
+            }
+
+            form.classList.toggle(
+                "is-inline-first-student-add-mode",
+                Boolean(document.querySelector("#studenti-table .is-inline-first-student-add-row"))
+            );
+        }
+
+        function markFirstStudentAddRows(mounted, enabled) {
+            if (!mounted || !mounted.state || !mounted.state.bundle) {
+                refreshFirstStudentAddMode();
+                return;
+            }
+
+            mounted.state.bundle.forEach(function (node) {
+                if (node) {
+                    node.classList.toggle("is-inline-first-student-add-row", Boolean(enabled));
+                }
+            });
+            refreshFirstStudentAddMode();
+        }
+
         function hideInlineState(state) {
             [state.row].concat(state.companionRows).forEach(function (node) {
                 clearRowData(node);
@@ -301,6 +327,9 @@ window.ArborisFamigliaForm = (function () {
                 },
                 mountOptions: {
                     companionClasses: ["inline-subform-row"],
+                    appendOnly: function () {
+                        return countPersistedRows("studenti-table") > 0;
+                    },
                     enableInputs: true,
                     onReady: function (state) {
                         const row = state.row;
@@ -331,6 +360,7 @@ window.ArborisFamigliaForm = (function () {
                 },
                 mountOptions: {
                     companionClasses: ["inline-subform-row"],
+                    appendOnly: true,
                     enableInputs: true,
                     onReady: function (state) {
                         const row = state.row;
@@ -373,6 +403,7 @@ window.ArborisFamigliaForm = (function () {
             const removed = manager ? manager.remove(button) : null;
 
             if (removed) {
+                refreshFirstStudentAddMode();
                 refreshTabCounts();
             }
         }
@@ -436,12 +467,98 @@ window.ArborisFamigliaForm = (function () {
 
         function bindFamiliareInlineSex(row) {
             const subformRow = getFamiliareSubformRow(row);
-            personRules.bindSexFromRelation({
-                root: row,
-                relationSelector: 'select[name$="-relazione_familiare"]',
-                sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
-                bindFlag: "sexBound",
-            });
+            const nameInput = row ? row.querySelector('input[name$="-nome"]') : null;
+            const relationSelect = row ? row.querySelector('select[name$="-relazione_familiare"]') : null;
+            const sexSelect = subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null;
+
+            if (!sexSelect) {
+                return;
+            }
+
+            if (sexSelect.dataset.familiareInlineSexManualBound !== "1") {
+                sexSelect.dataset.familiareInlineSexManualBound = "1";
+                sexSelect.addEventListener("change", function () {
+                    if (sexSelect.dataset.familiareInlineSexSyncing === "1") {
+                        return;
+                    }
+                    sexSelect.dataset.familiareInlineSexManual = "1";
+                    delete sexSelect.dataset.familiareInlineSexSource;
+                });
+            }
+
+            function selectedRelationLabel() {
+                if (!relationSelect) {
+                    return "";
+                }
+                const option = relationSelect.options[relationSelect.selectedIndex];
+                return option ? option.textContent : "";
+            }
+
+            function inferFromName() {
+                return personRules.inferSexFromFirstName(nameInput ? nameInput.value : "");
+            }
+
+            function inferFromRelation() {
+                return personRules.inferSexFromRelationLabel(selectedRelationLabel());
+            }
+
+            function setAutoSex(value, source, force) {
+                if (!value || sexSelect.dataset.familiareInlineSexManual === "1") {
+                    return false;
+                }
+
+                const currentValue = sexSelect.value || "";
+                const currentSource = sexSelect.dataset.familiareInlineSexSource || "";
+                const canOverwrite = force || !currentValue || currentSource === "relation" || currentSource === "name";
+
+                if (currentValue && currentValue !== value && !canOverwrite) {
+                    return false;
+                }
+
+                if (currentValue === value) {
+                    sexSelect.dataset.familiareInlineSexSource = source;
+                    return false;
+                }
+
+                sexSelect.dataset.familiareInlineSexSyncing = "1";
+                sexSelect.value = value;
+                sexSelect.dispatchEvent(new Event("change", { bubbles: true }));
+                delete sexSelect.dataset.familiareInlineSexSyncing;
+                sexSelect.dataset.familiareInlineSexSource = source;
+                return true;
+            }
+
+            function syncFromName() {
+                const currentSource = sexSelect.dataset.familiareInlineSexSource || "";
+                return setAutoSex(
+                    inferFromName(),
+                    "name",
+                    !sexSelect.value || currentSource === "relation" || currentSource === "name"
+                );
+            }
+
+            function syncFromRelation() {
+                if (inferFromName()) {
+                    return syncFromName();
+                }
+                return setAutoSex(inferFromRelation(), "relation", false);
+            }
+
+            if (nameInput && nameInput.dataset.familiareInlineSexNameBound !== "1") {
+                nameInput.dataset.familiareInlineSexNameBound = "1";
+                ["input", "change"].forEach(function (eventName) {
+                    nameInput.addEventListener(eventName, syncFromName);
+                });
+            }
+
+            if (relationSelect && relationSelect.dataset.familiareInlineSexRelationBound !== "1") {
+                relationSelect.dataset.familiareInlineSexRelationBound = "1";
+                relationSelect.addEventListener("change", syncFromRelation);
+            }
+
+            if (!syncFromName()) {
+                syncFromRelation();
+            }
         }
 
         function bindAllFamiliareInlineSex() {
@@ -581,6 +698,7 @@ window.ArborisFamigliaForm = (function () {
             if (!manager) {
                 return null;
             }
+            const isFirstStudentAdd = prefix === "studenti" && countPersistedRows("studenti-table") === 0;
 
             const mounted = manager.add();
 
@@ -594,6 +712,7 @@ window.ArborisFamigliaForm = (function () {
             if (prefix === "familiari") {
                 familiariInlineAddressDefaults.syncRows();
             } else if (prefix === "studenti") {
+                markFirstStudentAddRows(mounted, isFirstStudentAdd && mounted.revealed);
                 studentiInlineAddressDefaults.syncRows();
                 sortStudentiInlineRows();
             }
@@ -620,6 +739,7 @@ window.ArborisFamigliaForm = (function () {
                 inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
                     form: "famiglia-detail-form",
                 });
+                refreshFirstStudentAddMode();
             }
         }
 

@@ -1,13 +1,13 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
 
-{% block title %}Elimina anno scolastico - Arboris School Management{% endblock %}
+{% block title %}Elimina gruppo classe - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
 {% if not popup %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
+        <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>Elimina</span>
     </div>
@@ -16,14 +16,13 @@
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Elimina anno scolastico</h1>
+        <h1 class="page-title">Elimina gruppo classe</h1>
     </div>
 
     <div class="content-card">
         <div class="empty-state">
-            <p>Stai per eliminare l'anno scolastico <strong>{{ anno.nome_anno_scolastico }}</strong>.</p>
-            <p>Classi collegate: <strong>{{ count_classi }}</strong></p>
-            <p>Gruppi classe collegati: <strong>{{ count_gruppi_classe }}</strong></p>
+            <p>Stai per eliminare il gruppo classe <strong>{{ gruppo_classe.nome_gruppo_classe }}</strong>.</p>
+            <p>Classi incluse: <strong>{{ gruppo_classe.classi_label|default:"-" }}</strong></p>
         </div>
         <form method="post" class="form-actions">
             {% csrf_token %}
@@ -31,7 +30,7 @@
             {% if popup %}
                 <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
             {% else %}
-                <a href="{% url 'lista_anni_scolastici' %}" class="btn btn-secondary">Annulla</a>
+                <a href="{% url 'lista_gruppi_classe' %}" class="btn btn-secondary">Annulla</a>
             {% endif %}
         </form>
     </div>

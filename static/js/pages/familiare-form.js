@@ -205,6 +205,32 @@ window.ArborisFamiliareForm = (function () {
             });
         }
 
+        function refreshFirstStudentAddMode() {
+            const form = document.getElementById("familiare-detail-form");
+            if (!form) {
+                return;
+            }
+
+            form.classList.toggle(
+                "is-inline-first-student-add-mode",
+                Boolean(document.querySelector("#studenti-table .is-inline-first-student-add-row"))
+            );
+        }
+
+        function markFirstStudentAddRows(mounted, enabled) {
+            if (!mounted || !mounted.state || !mounted.state.bundle) {
+                refreshFirstStudentAddMode();
+                return;
+            }
+
+            mounted.state.bundle.forEach(function (node) {
+                if (node) {
+                    node.classList.toggle("is-inline-first-student-add-row", Boolean(enabled));
+                }
+            });
+            refreshFirstStudentAddMode();
+        }
+
         const inlineManagers = {
             studenti: createInlineManager("studenti", {
                 prepareOptions: {
@@ -214,6 +240,9 @@ window.ArborisFamiliareForm = (function () {
                 },
                 mountOptions: {
                     companionClasses: ["inline-subform-row"],
+                    appendOnly: function () {
+                        return countPersistedRows("studenti-table") > 0;
+                    },
                     enableInputs: true,
                     onReady: function (state) {
                         const row = state.row;
@@ -253,6 +282,7 @@ window.ArborisFamiliareForm = (function () {
             const removed = manager ? manager.remove(button) : null;
 
             if (removed) {
+                refreshFirstStudentAddMode();
                 refreshTabCounts();
             }
         }
@@ -265,6 +295,7 @@ window.ArborisFamiliareForm = (function () {
 
             const form = document.getElementById("familiare-detail-form");
             const isAlreadyAddOnlyMode = Boolean(form && form.classList.contains("is-inline-add-only-mode"));
+            const isFirstStudentAdd = prefix === "studenti" && countPersistedRows("studenti-table") === 0;
             const shouldUseAddOnlyMode = Boolean(
                 window.familiareViewMode &&
                 (!window.familiareViewMode.isEditing() || isAlreadyAddOnlyMode)
@@ -287,6 +318,10 @@ window.ArborisFamiliareForm = (function () {
                 inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
                     form: "familiare-detail-form",
                 });
+            }
+
+            if (prefix === "studenti") {
+                markFirstStudentAddRows(mounted, isFirstStudentAdd && mounted.revealed);
             }
 
             refreshTabCounts();

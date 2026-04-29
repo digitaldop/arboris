@@ -45,6 +45,11 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "modifica_classe",
             "elimina_classe",
         ),
+        "gruppo_classe": _crud_triplet(
+            "crea_gruppo_classe",
+            "modifica_gruppo_classe",
+            "elimina_gruppo_classe",
+        ),
         "stato_iscrizione": _crud_triplet(
             "crea_stato_iscrizione",
             "modifica_stato_iscrizione",

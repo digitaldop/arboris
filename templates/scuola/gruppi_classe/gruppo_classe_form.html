@@ -1,0 +1,95 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
+
+{% block title %}{% if gruppo_classe %}Gruppo classe {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo gruppo classe{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+{% if not popup %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_gruppi_classe' %}">Gruppi classe</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if gruppo_classe %}{{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo{% endif %}</span>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">{% if gruppo_classe %}Gruppo classe {{ gruppo_classe.nome_gruppo_classe }}{% else %}Nuovo gruppo classe{% endif %}</h1>
+        <div class="page-head-actions">
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% else %}
+                {% if gruppo_classe %}
+                    <button type="button" class="btn btn-primary" id="enable-edit-gruppo-classe-btn">Modifica</button>
+                    <a href="{% url 'elimina_gruppo_classe' gruppo_classe.pk %}" class="btn btn-danger">Elimina</a>
+                    <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-gruppo-classe-btn">Annulla modifiche</button>
+                {% endif %}
+                <a href="{% url 'lista_gruppi_classe' %}" class="btn btn-secondary">Torna all'elenco</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" id="gruppo-classe-detail-form" class="detail-form{% if gruppo_classe and not popup %} is-view-mode{% endif %}">
+        {% csrf_token %}
+        <fieldset id="gruppo-classe-lock-container" class="mode-lock-container" {% if gruppo_classe and not popup %}disabled{% endif %}>
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.nome_gruppo_classe.label_tag }}</th>
+                    <td>{{ form.nome_gruppo_classe }} {{ form.nome_gruppo_classe.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.anno_scolastico.label_tag }}</th>
+                    <td>
+                        {{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}
+                        <div class="help-text">Il gruppo deve usare classi appartenenti allo stesso anno scolastico.</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.classi.label_tag }}</th>
+                    <td>
+                        {{ form.classi }} {{ form.classi.errors }}
+                        <div class="help-text">{{ form.classi.help_text }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.attivo.label_tag }}</th>
+                    <td>{{ form.attivo }} {{ form.attivo.errors }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.note.label_tag }}</th>
+                    <td>{{ form.note }} {{ form.note.errors }}</td>
+                </tr>
+            </table>
+            <div class="form-actions{% if not popup %} mode-edit-only{% endif %}">
+                <button type="submit" class="btn btn-primary">Salva</button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% else %}
+                    <a href="{% url 'lista_gruppi_classe' %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </div>
+        </fieldset>
+    </form>
+    {% if not popup %}
+        <script src="{% static 'js/core/view-mode.js' %}"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                if (window.ArborisViewMode) {
+                    ArborisViewMode.init({
+                        formId: "gruppo-classe-detail-form",
+                        lockContainerId: "gruppo-classe-lock-container",
+                        editButtonId: "enable-edit-gruppo-classe-btn",
+                        cancelButtonId: "cancel-edit-gruppo-classe-btn",
+                        startInEditMode: {% if gruppo_classe %}false{% else %}true{% endif %},
+                        reloadOnCancel: true
+                    });
+                }
+            });
+        </script>
+    {% endif %}
+{% endblock %}

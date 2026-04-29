@@ -29,6 +29,13 @@ window.ArborisIscrizioneForm = (function () {
                 deleteBtnId: "delete-classe-btn",
             },
             {
+                relatedType: "gruppo_classe",
+                selectId: "id_gruppo_classe",
+                addBtnId: "add-gruppo-classe-btn",
+                editBtnId: "edit-gruppo-classe-btn",
+                deleteBtnId: "delete-gruppo-classe-btn",
+            },
+            {
                 relatedType: "stato_iscrizione",
                 selectId: "id_stato_iscrizione",
                 addBtnId: "add-stato-iscrizione-btn",
@@ -55,6 +62,35 @@ window.ArborisIscrizioneForm = (function () {
             openRelatedPopup: relatedPopups.openRelatedPopup,
         });
 
+        function syncDependentSelect(select, predicate) {
+            if (!select) {
+                return;
+            }
+
+            let hasSelectedVisibleOption = false;
+            Array.from(select.options).forEach(function (option) {
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                const visible = predicate(option);
+                option.hidden = !visible;
+                option.disabled = !visible;
+                if (visible && option.selected) {
+                    hasSelectedVisibleOption = true;
+                }
+            });
+
+            if (select.value && !hasSelectedVisibleOption) {
+                select.value = "";
+            }
+        }
+
+        const annoSelect = document.getElementById("id_anno_scolastico");
+        const classeSelect = document.getElementById("id_classe");
+        const gruppoClasseSelect = document.getElementById("id_gruppo_classe");
         const condizioneSelect = document.getElementById("id_condizione_iscrizione");
         const agevolazioneSelect = document.getElementById("id_agevolazione");
         const riduzioneCheckbox = document.getElementById("id_riduzione_speciale");
@@ -69,6 +105,18 @@ window.ArborisIscrizioneForm = (function () {
         const scadenzaUnicoRow = document.querySelector(".iscrizione-scadenza-unico-row");
         const scontoUnicoSuffix = document.querySelector("[data-single-payment-discount-suffix]");
         const detailForm = document.getElementById("iscrizione-detail-form");
+
+        if (annoSelect) {
+            function refreshDependentChoices() {
+                const annoScolasticoId = annoSelect.value;
+                syncDependentSelect(classeSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                syncDependentSelect(gruppoClasseSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+            }
+
+            annoSelect.addEventListener("change", refreshDependentChoices);
+            refreshDependentChoices();
+        }
 
         if (condizioneSelect && riduzioneCheckbox && importoInput) {
             function condizioneAmmetteRiduzioni() {
