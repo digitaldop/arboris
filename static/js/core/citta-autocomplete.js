@@ -24,8 +24,9 @@
             resultsBox = document.createElement("div");
             resultsBox.className = "citta-results";
             resultsBox.setAttribute("aria-hidden", "true");
-            container.appendChild(resultsBox);
         }
+        resultsBox.classList.add("citta-results-floating");
+        document.body.appendChild(resultsBox);
 
         container.dataset.autocompleteReady = "1";
         let selectedLabel = (input.value || "").trim();
@@ -37,12 +38,24 @@
             const availableAbove = Math.max(0, inputRect.top - 12);
             const openUpward = availableBelow < Math.min(160, desiredHeight) && availableAbove > availableBelow;
             container.classList.toggle("is-open-upward", openUpward);
+            resultsBox.classList.toggle("is-open-upward", openUpward);
+            resultsBox.style.left = `${inputRect.left}px`;
+            resultsBox.style.width = `${inputRect.width}px`;
+            if (openUpward) {
+                resultsBox.style.top = "auto";
+                resultsBox.style.bottom = `${window.innerHeight - inputRect.top + 4}px`;
+            } else {
+                resultsBox.style.top = `${inputRect.bottom + 4}px`;
+                resultsBox.style.bottom = "auto";
+            }
         }
 
         function hideResults() {
             resultsBox.style.display = "none";
             resultsBox.innerHTML = "";
             container.classList.remove("is-open-upward");
+            resultsBox.classList.remove("is-open-upward");
+            resultsBox.setAttribute("aria-hidden", "true");
         }
 
         function selectItem(item) {
@@ -76,6 +89,7 @@
 
             updateDropdownPosition();
             resultsBox.style.display = "block";
+            resultsBox.setAttribute("aria-hidden", "false");
         }
 
         const fetchResults = debounce(function () {
@@ -109,14 +123,27 @@
             if (input.value.trim().length >= 2 && resultsBox.children.length) {
                 updateDropdownPosition();
                 resultsBox.style.display = "block";
+                resultsBox.setAttribute("aria-hidden", "false");
             }
         });
 
         document.addEventListener("click", function (event) {
-            if (!container.contains(event.target)) {
+            if (!container.contains(event.target) && !resultsBox.contains(event.target)) {
                 hideResults();
             }
         });
+
+        window.addEventListener("resize", function () {
+            if (resultsBox.style.display === "block") {
+                updateDropdownPosition();
+            }
+        });
+
+        window.addEventListener("scroll", function () {
+            if (resultsBox.style.display === "block") {
+                updateDropdownPosition();
+            }
+        }, true);
     }
 
     function init(root) {

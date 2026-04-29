@@ -1363,9 +1363,22 @@ def ajax_cerca_citta(request):
         except (TypeError, ValueError):
             return JsonResponse({"results": []})
     elif q:
-        qs = qs.filter(nome__icontains=q)
+        qs = (
+            qs.filter(nome__icontains=q)
+            .annotate(
+                search_rank=Case(
+                    When(nome__iexact=q, then=Value(0)),
+                    When(nome__istartswith=q, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("search_rank", "nome", "provincia__sigla")
+        )
+    else:
+        qs = qs.order_by("nome", "provincia__sigla")
 
-    qs = qs.order_by("nome")[:20]
+    qs = qs[:20]
 
     results = []
     for c in qs:

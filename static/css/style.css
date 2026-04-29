@@ -1649,6 +1649,12 @@ select:focus {
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
 }
 
+.citta-results.citta-results-floating {
+    position: fixed;
+    right: auto;
+    z-index: 12000;
+}
+
 .autocomplete-wrapper.is-open-upward .citta-results,
 .autocomplete-wrapper.is-open-upward .famiglia-results,
 .autocomplete-wrapper.is-open-upward #citta-results {

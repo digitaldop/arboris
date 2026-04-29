@@ -173,6 +173,32 @@ class AjaxCercaCittaTests(TestCase):
             ],
         )
 
+    def test_ajax_cerca_citta_prioritizes_exact_city_match(self):
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(
+            nome="Roma",
+            provincia=provincia,
+            codice_istat="058091",
+            codice_catastale="H501",
+            ordine=100,
+            attiva=True,
+        )
+        for index in range(25):
+            Citta.objects.create(
+                nome=f"Aroma {index:02d}",
+                provincia=provincia,
+                ordine=index,
+                attiva=True,
+            )
+
+        response = self.client.get(reverse("ajax_cerca_citta"), {"q": "Roma"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["results"][0]["id"], roma.pk)
+        self.assertEqual(payload["results"][0]["label"], "Roma (RM)")
+
     def test_crea_indirizzo_page_renders(self):
         response = self.client.get(reverse("crea_indirizzo"))
 
