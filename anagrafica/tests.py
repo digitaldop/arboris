@@ -53,7 +53,12 @@ from economia.models import (
 )
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe
-from sistema.models import AzioneOperazioneCronologia, SistemaOperazioneCronologia
+from sistema.models import (
+    AzioneOperazioneCronologia,
+    SistemaOperazioneCronologia,
+    SistemaRuoloPermessi,
+    SistemaUtentePermessi,
+)
 
 
 class ImportDatiBaseTests(TestCase):
@@ -362,6 +367,10 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             first_name="Marco",
             last_name="Bianchi",
         )
+        ruolo_creatore = SistemaRuoloPermessi.objects.create(nome="Direzione")
+        ruolo_operatore = SistemaRuoloPermessi.objects.create(nome="Segreteria")
+        SistemaUtentePermessi.objects.create(user=user, ruolo_permessi=ruolo_creatore)
+        SistemaUtentePermessi.objects.create(user=updater, ruolo_permessi=ruolo_operatore)
         self.client.force_login(user)
 
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
@@ -393,10 +402,12 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["famiglia_creata_da_label"], "Giulia Rossi (Direzione)")
+        self.assertEqual(response.context["famiglia_aggiornata_da_label"], "Marco Bianchi (Segreteria)")
         self.assertContains(response, "Creato da")
-        self.assertContains(response, "Giulia Rossi")
+        self.assertContains(response, "Giulia Rossi (Direzione)")
         self.assertContains(response, "Aggiornato da")
-        self.assertContains(response, "Marco Bianchi")
+        self.assertContains(response, "Marco Bianchi (Segreteria)")
 
 
 class FamigliaInlineDefaultsTests(TestCase):

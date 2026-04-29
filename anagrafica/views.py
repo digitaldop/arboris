@@ -256,31 +256,47 @@ def build_familiare_redirect_url(pk, active_inline_tab=None, default_tab="studen
     return url
 
 
+def pick_audit_entry(entries, action, order_by):
+    action_entries = entries.filter(azione=action)
+    user_entry = action_entries.filter(utente__isnull=False).order_by(*order_by).first()
+    if user_entry:
+        return user_entry
+
+    labeled_entry = (
+        action_entries
+        .exclude(utente_label="")
+        .exclude(utente_label__iexact="Sistema")
+        .order_by(*order_by)
+        .first()
+    )
+    return labeled_entry or action_entries.order_by(*order_by).first()
+
+
 def famiglia_audit_labels(famiglia):
     if not famiglia or not famiglia.pk:
         return "-", "-"
 
-    entries = SistemaOperazioneCronologia.objects.filter(
+    entries = SistemaOperazioneCronologia.objects.select_related(
+        "utente",
+        "utente__profilo_permessi",
+        "utente__profilo_permessi__ruolo_permessi",
+    ).filter(
         app_label="anagrafica",
         model_name="famiglia",
         oggetto_id=str(famiglia.pk),
     )
-    created_entry = (
-        entries
-        .filter(azione=AzioneOperazioneCronologia.CREAZIONE)
-        .order_by("data_operazione", "id")
-        .first()
+    created_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.CREAZIONE,
+        ["data_operazione", "id"],
     )
-    updated_entry = (
-        entries
-        .filter(azione=AzioneOperazioneCronologia.MODIFICA)
-        .order_by("-data_operazione", "-id")
-        .first()
+    updated_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.MODIFICA,
+        ["-data_operazione", "-id"],
     ) or created_entry
 
-    created_by = created_entry.utente_display if created_entry else "-"
-    updated_by = updated_entry.utente_display if updated_entry else "-"
-    return created_by, updated_by
+    return audit_user_label_with_role(created_entry), audit_user_label_with_role(updated_entry)
 
 
 def audit_user_label_with_role(entry):
@@ -292,9 +308,9 @@ def audit_user_label_with_role(entry):
     user = entry.utente
     if user:
         profilo = getattr(user, "profilo_permessi", None)
-        if profilo and profilo.ruolo:
-            ruolo_label = profilo.get_ruolo_display()
-        elif user.is_superuser:
+        if profilo:
+            ruolo_label = getattr(profilo, "ruolo_display", "") or ""
+        if not ruolo_label and user.is_superuser:
             ruolo_label = "Superuser"
 
     return f"{label} ({ruolo_label})" if ruolo_label else label
@@ -312,6 +328,7 @@ def last_update_audit_entry(instance):
     entries = SistemaOperazioneCronologia.objects.select_related(
         "utente",
         "utente__profilo_permessi",
+        "utente__profilo_permessi__ruolo_permessi",
     ).filter(
         app_label=instance._meta.app_label,
         model_name=instance._meta.model_name,

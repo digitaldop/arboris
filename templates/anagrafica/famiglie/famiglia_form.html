@@ -685,7 +685,7 @@
                                     <th>SCADENZA</th>
                                     <th>VISIBILE</th>
                                     <th>NOTE</th>
-                                    <th>ELIMINA</th>
+                                    <th class="mode-edit-only-table-cell">ELIMINA</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -693,7 +693,14 @@
                                     <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         {{ f.id }}
                                         <td>
-                                            <div class="inline-related-field">
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.tipo_documento %}
+                                                    {{ f.instance.tipo_documento }}
+                                                {% else %}
+                                                    <span class="table-muted">Non indicato</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inline-related-field mode-edit-field">
                                                 {{ f.tipo_documento }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
@@ -702,29 +709,67 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{{ f.descrizione }}</td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.descrizione %}
+                                                    {{ f.instance.descrizione }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna descrizione</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.descrizione }}</div>
+                                        </td>
                                         <td class="document-file-cell">
-                                            {{ f.file }}
-                                            {% if f.instance.pk and f.instance.file %}
-                                                <div class="help-text">
-                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale</a>
-                                                </div>
-                                            {% endif %}
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
+                                                {% if f.instance.pk and f.instance.file %}
+                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.filename }}</a>
+                                                {% else %}
+                                                    <span class="table-muted">Nessun file</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">
+                                                {{ f.file }}
+                                                {% if f.instance.pk and f.instance.file %}
+                                                    <div class="help-text">
+                                                        <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale: {{ f.instance.filename }}</a>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
                                         </td>
                                         <td class="inline-view-only-table-cell">
-                                            {% if f.instance.pk and f.instance.data_caricamento %}
-                                                {{ f.instance.data_caricamento|it_date }}
-                                            {% else %}
-                                                <span class="table-muted">-</span>
-                                            {% endif %}
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.data_caricamento %}
+                                                    {{ f.instance.data_caricamento|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </div>
                                         </td>
-                                        <td>{{ f.scadenza }}</td>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.scadenza %}
+                                                    {{ f.instance.scadenza|it_date }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna scadenza</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.scadenza }}</div>
+                                        </td>
                                         <td class="inline-checkbox-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
                                             <div class="mode-edit-field">{{ f.visibile }}</div>
                                         </td>
-                                        <td>{{ f.note }}</td>
-                                        <td class="inline-delete-cell">
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                                                {% if f.instance.pk and f.instance.note %}
+                                                    {{ f.instance.note }}
+                                                {% else %}
+                                                    <span class="table-muted">Nessuna nota</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mode-edit-field">{{ f.note }}</div>
+                                        </td>
+                                        <td class="inline-delete-cell mode-edit-only-table-cell">
                                             {% if f.instance.pk %}
                                                 <button
                                                     type="button"
