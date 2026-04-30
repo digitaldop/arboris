@@ -458,17 +458,6 @@
                                                 <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
                                                     Movimenti
                                                 </a>
-                                                <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
-                                                    Categorie movimenti
-                                                </a>
-                                                {% if can_manage_gestione_finanziaria %}
-                                                    <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
-                                                        Import estratto conto
-                                                    </a>
-                                                {% endif %}
-                                                <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
-                                                    Riconciliazione
-                                                </a>
                                                 <a href="{% url 'report_categorie_mensile' %}" class="{% if request.resolver_match.url_name == 'report_categorie_mensile' or request.resolver_match.url_name == 'report_categorie_annuale' %}active{% endif %}">
                                                     Report categorie
                                                 </a>
@@ -489,6 +478,17 @@
                                                             </a>
                                                             <a href="{% url 'lista_saldi_conti' %}" class="{% if request.resolver_match.url_name == 'lista_saldi_conti' or request.resolver_match.url_name == 'crea_saldo_conto' or request.resolver_match.url_name == 'modifica_saldo_conto' or request.resolver_match.url_name == 'elimina_saldo_conto' or request.resolver_match.url_name == 'import_saldi_conti' %}active{% endif %}">
                                                                 Saldi conti
+                                                            </a>
+                                                            {% if can_manage_gestione_finanziaria %}
+                                                                <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
+                                                                    Import estratto conto
+                                                                </a>
+                                                            {% endif %}
+                                                            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
+                                                                Riconciliazione
+                                                            </a>
+                                                            <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
+                                                                Categorie movimenti
                                                             </a>
                                                             <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
                                                                 Regole categorizzazione

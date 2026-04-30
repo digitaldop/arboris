@@ -372,7 +372,7 @@
 
     {% if anno_scolastico %}
         <div class="content-card verifica-rette-summary-card">
-            <div class="verifica-rette-summary-title">Riepilogo generale a oggi</div>
+            <div class="verifica-rette-summary-title">Riepilogo generale</div>
             <div class="verifica-rette-summary-grid" data-summary-grid>
                 <div class="verifica-rette-summary-block" data-summary-card data-summary-key="senza-preiscrizioni" draggable="true">
                     <div class="verifica-rette-summary-label-row">
@@ -387,6 +387,10 @@
                         <div class="verifica-rette-summary-metric">
                             <div class="verifica-rette-summary-metric-label">Incassato a oggi</div>
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.pagato_senza_preiscrizioni|euro }}</div>
+                        </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Totale anno scolastico</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_senza_preiscrizioni|euro }}</div>
                         </div>
                     </div>
                 </div>
@@ -403,6 +407,10 @@
                         <div class="verifica-rette-summary-metric">
                             <div class="verifica-rette-summary-metric-label">Incassato a oggi</div>
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.pagato_con_preiscrizioni|euro }}</div>
+                        </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Totale anno scolastico</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_con_preiscrizioni|euro }}</div>
                         </div>
                     </div>
                 </div>

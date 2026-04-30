@@ -240,6 +240,8 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(riepilogo_totali["pagato_con_preiscrizioni"], Decimal("150.00"))
         self.assertEqual(riepilogo_totali["dovuto_senza_preiscrizioni"], Decimal("100.00"))
         self.assertEqual(riepilogo_totali["pagato_senza_preiscrizioni"], Decimal("50.00"))
+        self.assertEqual(riepilogo_totali["totale_anno_con_preiscrizioni"], Decimal("1100.00"))
+        self.assertEqual(riepilogo_totali["totale_anno_senza_preiscrizioni"], Decimal("1000.00"))
 
     def test_single_payment_plan_creates_one_annual_rate_with_discount(self):
         self.iscrizione.modalita_pagamento_retta = Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE

@@ -917,6 +917,8 @@ def _empty_verifica_rette_riepilogo():
         "pagato_con_preiscrizioni": Decimal("0.00"),
         "dovuto_senza_preiscrizioni": Decimal("0.00"),
         "pagato_senza_preiscrizioni": Decimal("0.00"),
+        "totale_anno_con_preiscrizioni": Decimal("0.00"),
+        "totale_anno_senza_preiscrizioni": Decimal("0.00"),
     }
 
 
@@ -1097,6 +1099,9 @@ def verifica_situazione_rette(request):
                         totale_colonna = totali_per_chiave[colonna["key"]]
                         totale_colonna["dovuto"] += importo_dovuto
                         totale_colonna["pagato"] += importo_pagato
+                        riepilogo_totali["totale_anno_con_preiscrizioni"] += importo_dovuto
+                        if not rata.is_preiscrizione:
+                            riepilogo_totali["totale_anno_senza_preiscrizioni"] += importo_dovuto
 
                         if _rata_rientra_nel_dovuto_a_oggi(rata, today):
                             riepilogo_totali["dovuto_con_preiscrizioni"] += importo_dovuto
