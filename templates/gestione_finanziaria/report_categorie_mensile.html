@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static currency %}
 
 {% block title %}Report categorie mensile - Arboris School Management{% endblock %}
 
@@ -61,11 +62,25 @@
             </label>
             <button type="submit" class="btn btn-secondary">Aggiorna</button>
         </form>
+    </div>
 
+    <div class="content-card">
+        <h2 class="section-title">Sintesi</h2>
+        <table class="list-table">
+            <tbody>
+                <tr><th>Totale entrate</th><td class="column-right"><strong>EUR {{ totale_entrate|euro }}</strong></td></tr>
+                <tr><th>Totale uscite</th><td class="column-right"><strong>EUR {{ totale_uscite|euro }}</strong></td></tr>
+                <tr><th>Saldo netto</th><td class="column-right"><strong>EUR {{ saldo_netto|euro }}</strong></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="content-card">
         <p class="help-text">
             Per ogni categoria radice vengono sommati i movimenti propri e delle sottocategorie
             (rollup gerarchico). Valori positivi = entrate, negativi = uscite.
-            Le categorie senza movimenti nell'anno sono nascoste.
+            Le categorie padre sono espandibili quando hanno sottocategorie con movimenti.
+            Le categorie senza movimenti nel periodo sono nascoste.
         </p>
 
         <table class="list-table report-table">
@@ -79,42 +94,28 @@
                 </tr>
             </thead>
             <tbody>
-                {% for riga in righe %}
-                    <tr>
-                        <td>
-                            <strong>{{ riga.categoria.nome }}</strong>
-                            <span class="table-muted">({{ riga.categoria.get_tipo_display }})</span>
-                        </td>
-                        {% for valore in riga.valori_mese %}
-                            <td class="column-right">
-                                {% if valore == 0 %}
-                                    <span class="table-muted">-</span>
-                                {% else %}
-                                    {{ valore }}
-                                {% endif %}
-                            </td>
-                        {% endfor %}
-                        <td class="column-right"><strong>{{ riga.totale }}</strong></td>
-                    </tr>
-                {% empty %}
+                {% if righe %}
+                    {% include "gestione_finanziaria/includes/report_categoria_mensile_rows.html" with righe=righe parent_id="" only %}
+                {% else %}
                     <tr>
                         <td colspan="{{ mesi|length|add:2 }}">
                             <div class="empty-state">Nessun movimento categorizzato per {{ periodo_label }}.</div>
                         </td>
                     </tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
             {% if righe %}
                 <tfoot>
                     <tr>
                         <th>Totale generale</th>
                         {% for t in totali_mensili %}
-                            <th class="column-right">{{ t }}</th>
+                            <th class="column-right">{{ t|euro }}</th>
                         {% endfor %}
-                        <th class="column-right">{{ totale_generale }}</th>
+                        <th class="column-right">{{ totale_generale|euro }}</th>
                     </tr>
                 </tfoot>
             {% endif %}
         </table>
     </div>
+    <script src="{% static 'js/pages/report-categorie.js' %}?v=1"></script>
 {% endblock %}

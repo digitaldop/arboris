@@ -13,14 +13,156 @@ import hashlib
 import re
 import time
 import unicodedata
+from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Optional
 
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
+
+
+MONTH_SHORT_LABELS = {
+    1: "Gen",
+    2: "Feb",
+    3: "Mar",
+    4: "Apr",
+    5: "Mag",
+    6: "Giu",
+    7: "Lug",
+    8: "Ago",
+    9: "Set",
+    10: "Ott",
+    11: "Nov",
+    12: "Dic",
+}
+
+MONTH_FULL_LABELS = {
+    1: "Gennaio",
+    2: "Febbraio",
+    3: "Marzo",
+    4: "Aprile",
+    5: "Maggio",
+    6: "Giugno",
+    7: "Luglio",
+    8: "Agosto",
+    9: "Settembre",
+    10: "Ottobre",
+    11: "Novembre",
+    12: "Dicembre",
+}
+
+
+def _empty_financial_series(labels):
+    return {
+        "labels": list(labels),
+        "entrate": [0.0 for _ in labels],
+        "uscite": [0.0 for _ in labels],
+        "totale_entrate": Decimal("0.00"),
+        "totale_uscite": Decimal("0.00"),
+        "saldo": Decimal("0.00"),
+        "movimenti": 0,
+    }
+
+
+def _serializable_financial_series(series, period_label):
+    return {
+        "periodLabel": period_label,
+        "labels": series["labels"],
+        "entrate": series["entrate"],
+        "uscite": series["uscite"],
+        "totaleEntrate": float(series["totale_entrate"]),
+        "totaleUscite": float(series["totale_uscite"]),
+        "saldo": float(series["saldo"]),
+        "movimenti": series["movimenti"],
+    }
+
+
+def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
+    from .models import MovimentoFinanziario
+
+    series = _empty_financial_series(labels)
+    movimenti = MovimentoFinanziario.objects.filter(
+        data_contabile__gte=start_date,
+        data_contabile__lte=end_date,
+    ).values("data_contabile", "importo")
+
+    for movimento in movimenti:
+        importo = movimento["importo"] or Decimal("0.00")
+        bucket_index = bucket_for_date(movimento["data_contabile"])
+        if bucket_index is None or bucket_index < 0 or bucket_index >= len(labels):
+            continue
+
+        if importo >= 0:
+            series["entrate"][bucket_index] += float(importo)
+            series["totale_entrate"] += importo
+        else:
+            valore_uscita = abs(importo)
+            series["uscite"][bucket_index] += float(valore_uscita)
+            series["totale_uscite"] += valore_uscita
+        series["movimenti"] += 1
+
+    series["saldo"] = series["totale_entrate"] - series["totale_uscite"]
+    return series
+
+
+def build_home_financial_dashboard_data(today=None):
+    """
+    Riepilogo sintetico per la dashboard generale.
+
+    La dashboard completa del modulo resta separata; qui prepariamo solo
+    dati leggeri per una lettura mensile/annuale dei movimenti.
+    """
+
+    from .models import ContoBancario, MovimentoFinanziario, StatoRiconciliazione
+
+    today = today or timezone.localdate()
+    monthly_start = today.replace(day=1)
+    monthly_end = today.replace(day=monthrange(today.year, today.month)[1])
+    annual_start = date(today.year, 1, 1)
+    annual_end = date(today.year, 12, 31)
+
+    monthly_labels = [str(day) for day in range(1, monthly_end.day + 1)]
+    annual_labels = [MONTH_SHORT_LABELS[month] for month in range(1, 13)]
+
+    monthly = _build_movimenti_series(
+        monthly_start,
+        monthly_end,
+        monthly_labels,
+        lambda movement_date: movement_date.day - 1,
+    )
+    annual = _build_movimenti_series(
+        annual_start,
+        annual_end,
+        annual_labels,
+        lambda movement_date: movement_date.month - 1,
+    )
+
+    conti_attivi = ContoBancario.objects.filter(attivo=True)
+    saldo_totale = conti_attivi.aggregate(totale=Sum("saldo_corrente"))["totale"] or Decimal("0.00")
+    movimenti_senza_categoria = MovimentoFinanziario.objects.filter(categoria__isnull=True).count()
+    movimenti_da_riconciliare = MovimentoFinanziario.objects.filter(
+        stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO
+    ).count()
+    current_month_label = f"{MONTH_FULL_LABELS[today.month]} {today.year}"
+    current_year_label = str(today.year)
+
+    return {
+        "current_month_label": current_month_label,
+        "current_year_label": current_year_label,
+        "saldo_totale": saldo_totale,
+        "conti_attivi": conti_attivi.count(),
+        "movimenti_senza_categoria": movimenti_senza_categoria,
+        "movimenti_da_riconciliare": movimenti_da_riconciliare,
+        "monthly": monthly,
+        "annual": annual,
+        "chart_data": {
+            "monthly": _serializable_financial_series(monthly, current_month_label),
+            "annual": _serializable_financial_series(annual, current_year_label),
+        },
+    }
 
 
 # =========================================================================
@@ -210,10 +352,51 @@ def calcola_hash_deduplica_movimento(
 # =========================================================================
 
 
+def calcola_saldo_conto_alla_data(conto, data_riferimento=None) -> Decimal:
+    """
+    Ricostruisce il saldo di un conto a una certa data.
+
+    Se esiste uno snapshot in `SaldoConto`, parte dall'ultimo saldo noto
+    precedente o uguale alla data e somma solo i movimenti successivi che
+    incidono sul saldo. In assenza di snapshot, somma i movimenti da zero.
+    """
+
+    from .models import MovimentoFinanziario, SaldoConto
+
+    target_date = data_riferimento or timezone.localdate()
+    if isinstance(target_date, datetime):
+        target_dt = target_date
+        if timezone.is_naive(target_dt):
+            target_dt = timezone.make_aware(target_dt)
+        target_day = timezone.localtime(target_dt).date()
+    else:
+        target_day = target_date
+        target_dt = timezone.make_aware(datetime.combine(target_day, time.max.replace(microsecond=0)))
+
+    ultimo_saldo = (
+        SaldoConto.objects.filter(conto=conto, data_riferimento__lte=target_dt)
+        .order_by("-data_riferimento", "-id")
+        .first()
+    )
+
+    movimenti = MovimentoFinanziario.objects.filter(
+        conto=conto,
+        incide_su_saldo_banca=True,
+        data_contabile__lte=target_day,
+    )
+    saldo_base = Decimal("0")
+    if ultimo_saldo:
+        saldo_base = ultimo_saldo.saldo_contabile or Decimal("0")
+        movimenti = movimenti.filter(data_contabile__gt=ultimo_saldo.data_riferimento.date())
+
+    totale_movimenti = movimenti.aggregate(totale=Sum("importo"))["totale"] or Decimal("0")
+    return saldo_base + totale_movimenti
+
+
 def ricalcola_saldo_corrente_conto(conto, salva: bool = True) -> Decimal:
     """
-    Ricalcola il saldo corrente denormalizzato a partire dalla somma
-    dei movimenti che incidono sul saldo bancario.
+    Ricalcola il saldo corrente denormalizzato a partire dall'ultimo snapshot
+    di saldo e dai movimenti successivi che incidono sul conto.
 
     Nota: in presenza di un provider PSD2 che fornisce direttamente il saldo,
     quella sara' la fonte di verita'; questa funzione serve per i conti
@@ -221,13 +404,7 @@ def ricalcola_saldo_corrente_conto(conto, salva: bool = True) -> Decimal:
     ricostruito dai movimenti.
     """
 
-    from .models import MovimentoFinanziario
-
-    totale = (
-        MovimentoFinanziario.objects.filter(conto=conto, incide_su_saldo_banca=True)
-        .aggregate(totale=Sum("importo"))["totale"]
-        or Decimal("0")
-    )
+    totale = calcola_saldo_conto_alla_data(conto)
 
     conto.saldo_corrente = totale
     conto.saldo_corrente_aggiornato_al = timezone.now()

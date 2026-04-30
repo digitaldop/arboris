@@ -1320,6 +1320,61 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             cleaned_data["sconto_unica_soluzione_valore"] = Decimal("0.00")
         return cleaned_data
 
+    def has_changed(self):
+        if getattr(self.instance, "pk", None) or not self.is_bound:
+            return super().has_changed()
+
+        return self._has_meaningful_bound_data()
+
+    def _has_meaningful_bound_data(self):
+        def raw_value(field_name):
+            value = self.data.get(self.add_prefix(field_name), "")
+            return str(value or "").strip()
+
+        meaningful_text_fields = [
+            "classe",
+            "gruppo_classe",
+            "data_iscrizione",
+            "data_fine_iscrizione",
+            "stato_iscrizione",
+            "condizione_iscrizione",
+            "agevolazione",
+            "scadenza_pagamento_unica",
+            "note_amministrative",
+            "note",
+        ]
+        if any(raw_value(field_name) for field_name in meaningful_text_fields):
+            return True
+
+        if raw_value("modalita_pagamento_retta") == Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE:
+            return True
+        if raw_value("sconto_unica_soluzione_tipo") not in {"", Iscrizione.SCONTO_UNICA_NESSUNO}:
+            return True
+        for field_name in ("riduzione_speciale", "non_pagante"):
+            if raw_value(field_name).lower() not in {"", "0", "false"}:
+                return True
+
+        for field_name in ("importo_riduzione_speciale", "sconto_unica_soluzione_valore"):
+            if self._decimal_bound_value_is_nonzero(raw_value(field_name)):
+                return True
+
+        return False
+
+    @staticmethod
+    def _decimal_bound_value_is_nonzero(value):
+        value = str(value or "").strip()
+        if not value:
+            return False
+
+        normalized = value.replace("EUR", "").replace(" ", "")
+        if "," in normalized:
+            normalized = normalized.replace(".", "").replace(",", ".")
+
+        try:
+            return Decimal(normalized) != Decimal("0")
+        except Exception:
+            return True
+
 
 class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
     def __init__(self, *args, **kwargs):

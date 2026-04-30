@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=94">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=102">
     {% if role_theme %}
         <style>
             :root {
@@ -486,6 +486,9 @@
                                                         <nav class="sidebar-nav sidebar-subnav">
                                                             <a href="{% url 'lista_conti_bancari' %}" class="{% if request.resolver_match.url_name == 'lista_conti_bancari' or request.resolver_match.url_name == 'crea_conto_bancario' or request.resolver_match.url_name == 'modifica_conto_bancario' or request.resolver_match.url_name == 'elimina_conto_bancario' %}active{% endif %}">
                                                                 Conti bancari
+                                                            </a>
+                                                            <a href="{% url 'lista_saldi_conti' %}" class="{% if request.resolver_match.url_name == 'lista_saldi_conti' or request.resolver_match.url_name == 'crea_saldo_conto' or request.resolver_match.url_name == 'modifica_saldo_conto' or request.resolver_match.url_name == 'elimina_saldo_conto' or request.resolver_match.url_name == 'import_saldi_conti' %}active{% endif %}">
+                                                                Saldi conti
                                                             </a>
                                                             <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
                                                                 Regole categorizzazione

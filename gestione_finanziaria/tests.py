@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from anagrafica.models import Famiglia, StatoRelazioneFamiglia, Studente
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione
@@ -16,19 +17,24 @@ from sistema.models import LivelloPermesso, SistemaUtentePermessi
 from .models import (
     CategoriaFinanziaria,
     CategoriaSpesa,
+    CanaleMovimento,
     CondizioneRegolaCategorizzazione,
     ContoBancario,
     DocumentoFornitore,
     Fornitore,
+    FonteSaldo,
     MovimentoFinanziario,
+    OrigineMovimento,
     ProviderBancario,
     RegolaCategorizzazione,
+    SaldoConto,
     ScadenzaPagamentoFornitore,
     SegnoMovimento,
     StatoRiconciliazione,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
     TipoCategoriaFinanziaria,
+    TipoContoFinanziario,
     TipoProviderBancario,
     TipoDocumentoFornitore,
 )
@@ -615,11 +621,292 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "finance-movement-row-incoming")
         self.assertContains(response, "finance-movement-row-outgoing")
 
+        response = self.client.get(reverse("dashboard_gestione_finanziaria"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "finance-movement-row-incoming")
+        self.assertContains(response, "finance-movement-row-outgoing")
+
+    def test_saldo_conto_manuale_alimenta_saldo_corrente_con_movimenti_successivi(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Cassa contanti",
+            tipo_conto=TipoContoFinanziario.CASSA_CONTANTI,
+            attivo=True,
+        )
+
+        response = self.client.post(
+            reverse("crea_saldo_conto"),
+            {
+                "conto": str(conto.pk),
+                "data_riferimento": "2026-04-01T23:59",
+                "saldo_contabile": "1000.00",
+                "saldo_disponibile": "",
+                "valuta": "EUR",
+                "fonte": FonteSaldo.MANUALE,
+                "note": "Saldo iniziale cassa",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_saldi_conti"))
+        self.assertEqual(SaldoConto.objects.filter(conto=conto).count(), 1)
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("1000.00"))
+
+        response = self.client.post(
+            reverse("crea_movimento_manuale"),
+            {
+                "conto": str(conto.pk),
+                "canale": CanaleMovimento.CONTANTI,
+                "data_contabile": "2026-04-02",
+                "data_valuta": "",
+                "importo": "-100.00",
+                "valuta": "EUR",
+                "descrizione": "Acquisto contanti",
+                "controparte": "",
+                "iban_controparte": "",
+                "categoria": "",
+                "incide_su_saldo_banca": "on",
+                "sostenuta_da_terzi": "",
+                "rimborsabile": "",
+                "sostenitore": "",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"))
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("900.00"))
+
+    def test_saldo_manuale_e_accessibile_dalle_impostazioni_con_conto_preselezionato(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("lista_conti_bancari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Inserisci saldo manuale")
+        self.assertContains(response, f"{reverse('crea_saldo_conto')}?conto={conto.pk}")
+
+        response = self.client.get(f"{reverse('crea_saldo_conto')}?conto={conto.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Inserisci qui il saldo rilevato")
+        self.assertContains(response, f'<option value="{conto.pk}" selected>{conto.nome_conto}</option>', html=True)
+
+    def test_movimento_personale_usa_badge_e_non_incide_sul_saldo(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            saldo_corrente=Decimal("500.00"),
+            saldo_corrente_aggiornato_al=timezone.now(),
+            attivo=True,
+        )
+
+        response = self.client.post(
+            reverse("crea_movimento_manuale"),
+            {
+                "conto": str(conto.pk),
+                "canale": CanaleMovimento.PERSONALE,
+                "data_contabile": "2026-04-03",
+                "data_valuta": "",
+                "importo": "-35.00",
+                "valuta": "EUR",
+                "descrizione": "Materiale pagato da genitore",
+                "controparte": "Genitore",
+                "iban_controparte": "",
+                "categoria": "",
+                "incide_su_saldo_banca": "",
+                "sostenuta_da_terzi": "",
+                "rimborsabile": "",
+                "sostenitore": "Genitore",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"))
+        movimento = MovimentoFinanziario.objects.get(descrizione="Materiale pagato da genitore")
+        self.assertTrue(movimento.sostenuta_da_terzi)
+        self.assertFalse(movimento.incide_su_saldo_banca)
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+        self.assertContains(response, "finance-channel-badge-personale")
+        self.assertContains(response, "senza rimborso")
+
+        response = self.client.get(reverse("crea_movimento_manuale"))
+        self.assertContains(response, "movimento-finanziario-form.js")
+
+    def test_dashboard_mostra_saldi_per_tipo_conto(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Cassa",
+            tipo_conto=TipoContoFinanziario.CASSA_CONTANTI,
+            attivo=True,
+        )
+        SaldoConto.objects.create(
+            conto=conto,
+            data_riferimento=timezone.now(),
+            saldo_contabile=Decimal("250.00"),
+            fonte=FonteSaldo.MANUALE,
+        )
+
+        response = self.client.get(reverse("dashboard_gestione_finanziaria"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Saldi per tipo")
+        self.assertContains(response, "Cassa contanti")
+        self.assertContains(response, "250,00")
+
+    def test_template_import_saldi_conti_csv(self):
+        response = self.client.get(reverse("scarica_template_saldi_conti_csv"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertContains(response, "nome_conto;data_riferimento;saldo_contabile")
+
+    def test_import_saldi_banco_bpm_cbi_usa_iban_e_colonne_banca(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto Banco BPM",
+            iban="IT67C0503437060000000003228",
+            attivo=True,
+        )
+        raw_csv = (
+            '"Ragione sociale";"Banca";"Rapporto";"IBAN";"Data";"Saldo divisa";"Saldo liquido";"Div."\n'
+            '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034 - BANCO BPM S.P.A.";'
+            '"37060 - 000000003228";"IT67C0503437060000000003228";"28/04/2026";'
+            '"980,89";"980,89";"EUR"\n'
+        )
+        uploaded = SimpleUploadedFile(
+            "RiepilogoSaldiCBI_30_04_2026_01.24.53.csv",
+            raw_csv.encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(reverse("import_saldi_conti"), {"file": uploaded})
+
+        self.assertRedirects(response, reverse("lista_saldi_conti"))
+        saldo = SaldoConto.objects.get(conto=conto)
+        self.assertEqual(saldo.data_riferimento.date(), date(2026, 4, 28))
+        self.assertEqual(saldo.saldo_contabile, Decimal("980.89"))
+        self.assertEqual(saldo.saldo_disponibile, Decimal("980.89"))
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("980.89"))
+
+    def test_import_saldi_banco_bpm_online_deduce_data_da_nome_file_e_crea_conto(self):
+        raw_csv = (
+            '"Ragione sociale";"Banca";"Rapporto";"IBAN";"Saldo finale";"Saldo disponibile";"Div."\n'
+            '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034 - BANCO BPM S.P.A.";'
+            '"37060 - 056300003228";"IT67C0503437060000000003228";"980,89";"980,89";"EUR"\n'
+        )
+        uploaded = SimpleUploadedFile(
+            "SaldiCC_OnLine_30_04_2026_01.24.38.csv",
+            raw_csv.encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(reverse("import_saldi_conti"), {"file": uploaded})
+
+        self.assertRedirects(response, reverse("lista_saldi_conti"))
+        conto = ContoBancario.objects.get(iban="IT67C0503437060000000003228")
+        saldo = SaldoConto.objects.get(conto=conto)
+        self.assertEqual(timezone.localtime(saldo.data_riferimento).date(), date(2026, 4, 30))
+        self.assertEqual(saldo.saldo_contabile, Decimal("980.89"))
+        self.assertEqual(conto.banca, "05034 - BANCO BPM S.P.A.")
+
+    def test_pulizia_movimenti_automatici_elimina_import_non_manuali(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import test",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            iban="IT00X0000000000000000000000",
+            provider=provider,
+            attivo=True,
+            saldo_corrente=Decimal("75.00"),
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 4, 1),
+            importo=Decimal("100.00"),
+            descrizione="Import file",
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-25.00"),
+            descrizione="Sync banca",
+            incide_su_saldo_banca=True,
+        )
+        manuale = MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.MANUALE,
+            data_contabile=date(2026, 4, 3),
+            importo=Decimal("50.00"),
+            descrizione="Manuale",
+            incide_su_saldo_banca=False,
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+        self.assertContains(response, reverse("pulizia_movimenti_finanziari"))
+
+        response = self.client.get(reverse("pulizia_movimenti_finanziari"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ripulisci movimenti")
+        self.assertEqual(response.context["statistiche"]["totale"], 3)
+        self.assertEqual(response.context["statistiche"]["automatici"], 2)
+        self.assertEqual(response.context["statistiche"]["manuali"], 1)
+
+        response = self.client.post(
+            reverse("pulizia_movimenti_finanziari"),
+            {
+                "ambito": "automatici",
+                "conferma": "ELIMINA",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"))
+        self.assertEqual(MovimentoFinanziario.objects.count(), 1)
+        self.assertTrue(MovimentoFinanziario.objects.filter(pk=manuale.pk).exists())
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("0"))
+
+    def test_pulizia_movimenti_richiede_conferma_testuale(self):
+        MovimentoFinanziario.objects.create(
+            origine=OrigineMovimento.MANUALE,
+            data_contabile=date(2026, 4, 1),
+            importo=Decimal("10.00"),
+            descrizione="Manuale",
+        )
+
+        response = self.client.post(
+            reverse("pulizia_movimenti_finanziari"),
+            {
+                "ambito": "manuali",
+                "conferma": "elimina tutto",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(MovimentoFinanziario.objects.count(), 1)
+        self.assertContains(response, "Per confermare devi digitare")
+
     def test_report_categorie_filtra_per_anno_scolastico(self):
         anno = AnnoScolastico.objects.create(
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
-            data_fine=date(2026, 6, 30),
+            data_fine=date(2026, 8, 31),
+        )
+        CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
         )
         categoria = CategoriaFinanziaria.objects.create(
             nome="Rette",
@@ -670,3 +957,38 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.context["mesi"][0], "Set 2025")
         self.assertEqual(response.context["mesi"][-1], "Giu 2026")
         self.assertEqual(response.context["totale_generale"], Decimal("150.00"))
+        self.assertContains(response, "Sintesi")
+        self.assertContains(response, "EUR 150,00")
+        self.assertContains(response, "report-category-entrata")
+
+    def test_report_categorie_annuale_mostra_categorie_figlie(self):
+        categoria_padre = CategoriaFinanziaria.objects.create(
+            nome="Utenze",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        categoria_figlia = CategoriaFinanziaria.objects.create(
+            nome="Energia elettrica",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            parent=categoria_padre,
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 1, 10),
+            importo=Decimal("-1000.00"),
+            descrizione="Bolletta luce",
+            categoria=categoria_figlia,
+        )
+
+        response = self.client.get(
+            reverse("report_categorie_annuale"),
+            {"periodo": "solare", "anno": "2026"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Utenze")
+        self.assertContains(response, "Energia elettrica")
+        self.assertContains(response, "2026")
+        self.assertNotContains(response, "2.026")
+        self.assertContains(response, 'data-report-category-toggle="categoria-')
+        self.assertContains(response, "report-category-spesa")
+        self.assertContains(response, "-1.000,00")
+        self.assertEqual(response.context["totale_uscite"], Decimal("-1000.00"))

@@ -1,0 +1,11 @@
+{% if studente.ha_iscrizione_attiva_corrente %}
+    <span
+        class="status-chip status-chip-success student-enrollment-status"
+        title="Iscrizione attiva per l'anno scolastico corrente"
+    >Iscritto</span>
+{% else %}
+    <span
+        class="status-chip status-chip-danger student-enrollment-status"
+        title="Nessuna iscrizione attiva per l'anno scolastico corrente"
+    >Non iscritto</span>
+{% endif %}

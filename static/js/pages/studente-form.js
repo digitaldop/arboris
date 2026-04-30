@@ -78,7 +78,6 @@ window.ArborisStudenteForm = (function () {
         const inlineLockContainerId = "studente-inline-lock-container";
         const inlineEditButtonId = "enable-inline-edit-studente-btn";
         let inlineManagers = null;
-        let suppressAutoEmptyInlineMount = false;
 
         function setInlineTarget(prefixOrTabId) {
             inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
@@ -123,9 +122,6 @@ window.ArborisStudenteForm = (function () {
                     form.classList.toggle("is-inline-iscrizioni-layout", isInlineEditing && target === "iscrizioni");
                 }
 
-                if (isInlineEditing && target === "iscrizioni") {
-                    ensureVisibleInlineRow("iscrizioni");
-                }
                 syncIscrizioniInlineDetails();
             },
         });
@@ -425,28 +421,6 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
-        function hasVisibleInlineRows(prefix) {
-            const table = document.getElementById(prefix + "-table");
-            if (!table) {
-                return false;
-            }
-
-            return Array.from(table.querySelectorAll("tbody .inline-form-row")).some(function (row) {
-                return !row.classList.contains("is-hidden");
-            });
-        }
-
-        function ensureVisibleInlineRow(prefix) {
-            if (suppressAutoEmptyInlineMount || !inlineManagers || !inlineManagers[prefix] || hasVisibleInlineRows(prefix)) {
-                return;
-            }
-
-            const mounted = inlineManagers[prefix].add();
-            if (mounted) {
-                refreshTabCounts();
-            }
-        }
-
         inlineManagers = {
             iscrizioni: createInlineManager("iscrizioni", {
                 prepareOptions: {
@@ -660,28 +634,23 @@ window.ArborisStudenteForm = (function () {
             setInlineTarget(prefix);
             tabs.activateTab(`tab-${prefix}`, getStudenteTabStorageKey());
 
-            suppressAutoEmptyInlineMount = true;
-            try {
-                if (window.studenteViewMode && !window.studenteViewMode.isEditing()) {
-                    window.studenteViewMode.setInlineEditing(true);
-                }
+            if (window.studenteViewMode && !window.studenteViewMode.isEditing()) {
+                window.studenteViewMode.setInlineEditing(true);
+            }
 
-                refreshInlineEditScope();
-                updateInlineEditButtonLabel(`tab-${prefix}`);
+            refreshInlineEditScope();
+            updateInlineEditButtonLabel(`tab-${prefix}`);
 
-                mounted = manager.add();
+            mounted = manager.add();
 
-                if (!mounted) {
-                    return;
-                }
+            if (!mounted) {
+                return;
+            }
 
-                if (shouldUseAddOnlyMode && mounted.state) {
-                    inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
-                        form: "studente-detail-form",
-                    });
-                }
-            } finally {
-                suppressAutoEmptyInlineMount = false;
+            if (shouldUseAddOnlyMode && mounted.state) {
+                inlineFormsets.markBundleForAddOnlyEdit(mounted.state, {
+                    form: "studente-detail-form",
+                });
             }
 
             refreshInlineEditScope();

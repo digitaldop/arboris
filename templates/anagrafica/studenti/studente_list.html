@@ -45,6 +45,7 @@
                             <th>Data nascita</th>
                             <th>Codice fiscale</th>
                             <th>Indirizzo</th>
+                            <th>Iscrizione</th>
                             <th>Attivo</th>
                             <th>Azioni</th>
                         </tr>
@@ -74,6 +75,7 @@
                                         <span class="table-muted">—</span>
                                     {% endif %}
                                 </td>
+                                <td>{% include "common/badges/student_iscrizione_status.html" with studente=studente only %}</td>
                                 <td>{% if studente.attivo %}Sì{% else %}No{% endif %}</td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions">

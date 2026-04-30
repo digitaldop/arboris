@@ -18,6 +18,7 @@
     <div class="page-head">
         <h1 class="page-title">Movimenti finanziari</h1>
         <div class="page-head-actions">
+            <a href="{% url 'pulizia_movimenti_finanziari' %}" class="btn btn-secondary">Ripulisci movimenti</a>
             <a href="{% url 'crea_movimento_manuale' %}" class="btn btn-primary">Nuovo movimento manuale</a>
         </div>
     </div>
@@ -52,6 +53,15 @@
                     {% endfor %}
                 </select>
             </label>
+            <label class="finance-filter-field finance-filter-field-canale">
+                Canale:
+                <select name="canale">
+                    <option value="">Tutti</option>
+                    {% for value, label in canali_disponibili %}
+                        <option value="{{ value }}" {% if canale_selezionato == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
             <button type="submit" class="btn btn-secondary">Filtra</button>
             <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Reset</a>
         </form>
@@ -64,6 +74,7 @@
                     <th>Data contabile</th>
                     <th>Conto</th>
                     <th>Origine</th>
+                    <th>Canale</th>
                     <th>Descrizione</th>
                     <th>Controparte</th>
                     <th>Categoria</th>
@@ -78,6 +89,14 @@
                         <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
                         <td>{{ movimento.conto|default:"-" }}</td>
                         <td>{{ movimento.get_origine_display }}</td>
+                        <td>
+                            <span class="finance-channel-badge finance-channel-badge-{{ movimento.canale }}">
+                                {{ movimento.get_canale_display }}
+                            </span>
+                            {% if movimento.sostenuta_da_terzi %}
+                                <br><small class="table-muted">{% if movimento.rimborsabile %}da rimborsare{% else %}senza rimborso{% endif %}</small>
+                            {% endif %}
+                        </td>
                         <td>{{ movimento.descrizione|truncatechars:80|default:"-" }}</td>
                         <td>{{ movimento.controparte|default:"-" }}</td>
                         <td>
@@ -100,7 +119,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="empty-state">
                                 Nessun movimento trovato con i filtri correnti.
                             </div>

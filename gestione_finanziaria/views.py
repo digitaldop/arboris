@@ -1,15 +1,22 @@
+import csv
+import io
+import re
 import secrets
-from datetime import date
+import unicodedata
+from calendar import monthrange
+from datetime import date, datetime, time
 from decimal import Decimal
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from scuola.models import AnnoScolastico
@@ -21,12 +28,15 @@ from .forms import (
     DocumentoFornitoreForm,
     FornitoreForm,
     ImportEstrattoContoForm,
+    ImportSaldiContoCsvForm,
     MovimentoFinanziarioForm,
     NuovaConnessioneBancariaForm,
     PianificazioneSincronizzazioneForm,
+    PuliziaMovimentiFinanziariForm,
     ProviderBancarioForm,
     ProviderPsd2ConfigForm,
     RegolaCategorizzazioneForm,
+    SaldoContoForm,
     ScadenzaPagamentoFornitoreFormSet,
 )
 from .importers import Camt053Parser, CsvImporter, CsvImporterConfig, detect_csv_import_config
@@ -34,14 +44,17 @@ from .importers.service import importa_movimenti_da_file
 from .models import (
     CategoriaSpesa,
     CategoriaFinanziaria,
+    CanaleMovimento,
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    FonteSaldo,
     Fornitore,
     MovimentoFinanziario,
     OrigineMovimento,
     ProviderBancario,
     RegolaCategorizzazione,
+    SaldoConto,
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
     StatoConnessioneBancaria,
@@ -77,6 +90,7 @@ from .scheduler import (
 from .services import (
     annulla_riconciliazione,
     applica_regole_a_movimento,
+    calcola_saldo_conto_alla_data,
     calcola_hash_deduplica_movimento,
     ricalcola_saldo_corrente_conto,
     riconcilia_movimento_con_rata,
@@ -110,8 +124,19 @@ def _oauth_redirect_uri(request, provider):
 
 
 def dashboard_gestione_finanziaria(request):
-    conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
-    saldo_totale = conti.aggregate(totale=Sum("saldo_corrente"))["totale"] or Decimal("0")
+    conti = list(ContoBancario.objects.filter(attivo=True).order_by("nome_conto"))
+    saldo_totale = Decimal("0")
+    saldo_per_tipo_map = {}
+    for conto in conti:
+        conto.saldo_calcolato = calcola_saldo_conto_alla_data(conto)
+        saldo_totale += conto.saldo_calcolato
+        tipo_label = conto.get_tipo_conto_display()
+        saldo_per_tipo_map[tipo_label] = saldo_per_tipo_map.get(tipo_label, Decimal("0")) + conto.saldo_calcolato
+
+    saldo_per_tipo = [
+        {"tipo": tipo, "saldo": saldo}
+        for tipo, saldo in sorted(saldo_per_tipo_map.items(), key=lambda item: item[0])
+    ]
 
     ultimi_movimenti = (
         MovimentoFinanziario.objects.select_related("conto", "categoria")
@@ -131,6 +156,7 @@ def dashboard_gestione_finanziaria(request):
         {
             "conti": conti,
             "saldo_totale": saldo_totale,
+            "saldo_per_tipo": saldo_per_tipo,
             "ultimi_movimenti": ultimi_movimenti,
             "movimenti_senza_categoria": movimenti_senza_categoria,
             "categorie_attive": categorie_attive,
@@ -727,14 +753,24 @@ def elimina_provider_bancario(request, pk):
 
 
 def lista_conti_bancari(request):
-    conti = (
+    conti = list(
         ContoBancario.objects.select_related("provider", "connessione")
         .order_by("nome_conto")
     )
+    saldo_totale = Decimal("0")
+    for conto in conti:
+        ultimo_saldo = conto.storico_saldi.order_by("-data_riferimento", "-id").first()
+        conto.ultimo_saldo_registrato = ultimo_saldo
+        conto.saldo_calcolato = calcola_saldo_conto_alla_data(conto)
+        saldo_totale += conto.saldo_calcolato
+
     return render(
         request,
         "gestione_finanziaria/conti_bancari_list.html",
-        {"conti": conti},
+        {
+            "conti": conti,
+            "saldo_totale": saldo_totale,
+        },
     )
 
 
@@ -868,6 +904,398 @@ def ricalcola_saldo_conto_bancario(request, pk):
 
 
 # =========================================================================
+#  Saldi conti - CRUD + import CSV
+# =========================================================================
+
+
+def _normalizza_header_csv(value):
+    text = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_")
+
+
+def _csv_get(row, *keys):
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return ""
+
+
+def _parse_decimal_locale(value):
+    raw = str(value or "").strip().replace("€", "").replace("EUR", "").replace("eur", "").replace(" ", "")
+    if not raw:
+        raise ValueError("valore vuoto")
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    return Decimal(raw)
+
+
+def _parse_saldo_datetime(value):
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("data vuota")
+    parsed_datetime = parse_datetime(raw)
+    if parsed_datetime is not None:
+        return timezone.make_aware(parsed_datetime) if timezone.is_naive(parsed_datetime) else parsed_datetime
+    parsed_date = parse_date(raw)
+    if parsed_date is not None:
+        return timezone.make_aware(datetime.combine(parsed_date, time.max.replace(microsecond=0)))
+
+    for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y", "%d-%m-%Y %H:%M", "%d-%m-%Y"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+        if fmt in ("%d/%m/%Y", "%d-%m-%Y"):
+            parsed = datetime.combine(parsed.date(), time.max.replace(microsecond=0))
+        return timezone.make_aware(parsed)
+    raise ValueError(f"data non riconosciuta: {raw}")
+
+
+def _parse_saldo_datetime_from_filename(filename):
+    match = re.search(
+        r"(?P<day>\d{2})_(?P<month>\d{2})_(?P<year>\d{4})(?:_(?P<hour>\d{2})\.(?P<minute>\d{2})\.(?P<second>\d{2}))?",
+        filename or "",
+    )
+    if not match:
+        return None
+    parts = match.groupdict()
+    parsed = datetime(
+        int(parts["year"]),
+        int(parts["month"]),
+        int(parts["day"]),
+        int(parts.get("hour") or 23),
+        int(parts.get("minute") or 59),
+        int(parts.get("second") or 59),
+    )
+    return timezone.make_aware(parsed)
+
+
+def _conto_da_iban(iban):
+    iban_clean = _clean_account_piece(iban)
+    if not iban_clean:
+        return None
+    for conto in ContoBancario.objects.filter(attivo=True):
+        if _clean_account_piece(conto.iban) == iban_clean:
+            return conto
+    return None
+
+
+def _conto_da_rapporto(rapporto):
+    numero = _clean_account_piece(rapporto)
+    if not numero:
+        return None
+    for conto in ContoBancario.objects.filter(attivo=True):
+        iban = _clean_account_piece(conto.iban)
+        if iban and numero[-12:] and iban.endswith(numero[-12:]):
+            return conto
+        if numero in _clean_account_piece(conto.external_account_id) or numero in _clean_account_piece(conto.nome_conto):
+            return conto
+    return None
+
+
+def _crea_conto_da_import_saldo(row):
+    iban = (_csv_get(row, "iban") or "").strip().replace(" ", "")
+    rapporto = (_csv_get(row, "rapporto", "numero_conto", "account") or "").strip()
+    banca = (_csv_get(row, "banca", "istituto") or "").strip()
+    intestatario = (_csv_get(row, "ragione_sociale", "intestatario") or "").strip()
+    if not iban and not rapporto:
+        return None
+
+    numero = rapporto.split("-")[-1].strip() if rapporto else ""
+    if banca and numero:
+        nome_conto = f"{banca} - {numero}"
+    elif banca:
+        nome_conto = banca
+    elif iban:
+        nome_conto = f"Conto {iban[-4:]}"
+    else:
+        nome_conto = f"Conto {numero}"
+
+    original_name = nome_conto
+    suffix = 2
+    while ContoBancario.objects.filter(nome_conto=nome_conto).exists():
+        nome_conto = f"{original_name} ({suffix})"
+        suffix += 1
+
+    return ContoBancario.objects.create(
+        nome_conto=nome_conto,
+        iban=iban,
+        banca=banca,
+        intestatario=intestatario,
+        attivo=True,
+    )
+
+
+def _trova_conto_per_import_saldo(row):
+    conto_id = _csv_get(row, "conto_id", "id_conto", "id")
+    if conto_id and str(conto_id).strip().isdigit():
+        conto = ContoBancario.objects.filter(pk=str(conto_id).strip()).first()
+        if conto:
+            return conto
+
+    nome_conto = _csv_get(row, "nome_conto", "conto", "account", "nome")
+    if nome_conto:
+        conto = ContoBancario.objects.filter(nome_conto__iexact=str(nome_conto).strip()).first()
+        if conto:
+            return conto
+
+    conto = _conto_da_iban(_csv_get(row, "iban"))
+    if conto:
+        return conto
+
+    conto = _conto_da_rapporto(_csv_get(row, "rapporto", "numero_conto"))
+    if conto:
+        return conto
+
+    return _crea_conto_da_import_saldo(row)
+
+
+def _aggiorna_saldo_corrente_da_snapshot(conto):
+    nuovo_saldo = ricalcola_saldo_corrente_conto(conto)
+    return nuovo_saldo
+
+
+def lista_saldi_conti(request):
+    saldi = (
+        SaldoConto.objects.select_related("conto", "creato_da", "aggiornato_da")
+        .order_by("-data_riferimento", "-id")
+    )
+    conto_filter = request.GET.get("conto")
+    if conto_filter:
+        saldi = saldi.filter(conto_id=conto_filter)
+
+    conti = list(ContoBancario.objects.filter(attivo=True).order_by("nome_conto"))
+    saldo_totale = Decimal("0")
+    for conto in conti:
+        conto.saldo_calcolato = calcola_saldo_conto_alla_data(conto)
+        saldo_totale += conto.saldo_calcolato
+
+    return render(
+        request,
+        "gestione_finanziaria/saldi_conti_list.html",
+        {
+            "saldi": saldi,
+            "conti": conti,
+            "saldo_totale": saldo_totale,
+            "conto_selezionato": conto_filter or "",
+        },
+    )
+
+
+def crea_saldo_conto(request):
+    popup = is_popup_request(request)
+    if request.method == "POST":
+        form = SaldoContoForm(request.POST)
+        if form.is_valid():
+            saldo = form.save(commit=False)
+            if request.user.is_authenticated:
+                saldo.creato_da = request.user
+                saldo.aggiornato_da = request.user
+            saldo.save()
+            _aggiorna_saldo_corrente_da_snapshot(saldo.conto)
+            if popup:
+                return popup_select_response(request, "saldo_conto", saldo.pk, str(saldo))
+            messages.success(request, "Saldo registrato correttamente.")
+            return redirect("lista_saldi_conti")
+    else:
+        conto_iniziale = ContoBancario.objects.filter(
+            pk=request.GET.get("conto"),
+            attivo=True,
+        ).first()
+        form = SaldoContoForm(
+            initial={
+                "conto": conto_iniziale.pk if conto_iniziale else None,
+                "data_riferimento": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+                "valuta": "EUR",
+                "fonte": FonteSaldo.MANUALE,
+            }
+        )
+
+    if popup:
+        return render(
+            request,
+            "gestione_finanziaria/entity_popup_form.html",
+            _generic_popup_form_context(request, form, "Nuovo saldo conto"),
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/saldo_conto_form.html",
+        {"form": form, "saldo": None},
+    )
+
+
+def modifica_saldo_conto(request, pk):
+    popup = is_popup_request(request)
+    saldo = get_object_or_404(SaldoConto, pk=pk)
+    conto_precedente = saldo.conto
+    if request.method == "POST":
+        form = SaldoContoForm(request.POST, instance=saldo)
+        if form.is_valid():
+            saldo = form.save(commit=False)
+            if request.user.is_authenticated:
+                saldo.aggiornato_da = request.user
+            saldo.save()
+            _aggiorna_saldo_corrente_da_snapshot(saldo.conto)
+            if conto_precedente != saldo.conto:
+                _aggiorna_saldo_corrente_da_snapshot(conto_precedente)
+            if popup:
+                return popup_select_response(request, "saldo_conto", saldo.pk, str(saldo))
+            messages.success(request, "Saldo aggiornato correttamente.")
+            return redirect("lista_saldi_conti")
+    else:
+        form = SaldoContoForm(instance=saldo)
+
+    if popup:
+        return render(
+            request,
+            "gestione_finanziaria/entity_popup_form.html",
+            _generic_popup_form_context(request, form, "Modifica saldo conto"),
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/saldo_conto_form.html",
+        {"form": form, "saldo": saldo},
+    )
+
+
+def elimina_saldo_conto(request, pk):
+    saldo = get_object_or_404(SaldoConto, pk=pk)
+    conto = saldo.conto
+    if request.method == "POST":
+        saldo.delete()
+        _aggiorna_saldo_corrente_da_snapshot(conto)
+        messages.success(request, "Saldo eliminato correttamente.")
+        return redirect("lista_saldi_conti")
+    return render(
+        request,
+        "gestione_finanziaria/saldo_conto_confirm_delete.html",
+        {"saldo": saldo},
+    )
+
+
+def import_saldi_conti(request):
+    if request.method == "POST":
+        form = ImportSaldiContoCsvForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded = form.cleaned_data["file"]
+            raw_bytes = uploaded.read()
+            try:
+                text = raw_bytes.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = raw_bytes.decode("cp1252")
+
+            sample = text[:2048]
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=";,")
+            except csv.Error:
+                class FallbackDialect(csv.excel):
+                    delimiter = ";"
+
+                dialect = FallbackDialect
+
+            reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+            if not reader.fieldnames:
+                messages.error(request, "Il file CSV non contiene intestazioni leggibili.")
+                return redirect("import_saldi_conti")
+
+            reader.fieldnames = [_normalizza_header_csv(field) for field in reader.fieldnames]
+            creati = 0
+            aggiornati = 0
+            errori = []
+            conti_aggiornati = set()
+            data_da_nome_file = _parse_saldo_datetime_from_filename(getattr(uploaded, "name", ""))
+            for index, row in enumerate(reader, start=2):
+                try:
+                    conto = _trova_conto_per_import_saldo(row)
+                    if not conto:
+                        raise ValueError("conto non trovato")
+                    data_raw = _csv_get(row, "data_riferimento", "data", "data_saldo", "riferimento")
+                    data_riferimento = (
+                        _parse_saldo_datetime(data_raw)
+                        if data_raw
+                        else data_da_nome_file or timezone.now()
+                    )
+                    saldo_contabile = _parse_decimal_locale(
+                        _csv_get(
+                            row,
+                            "saldo_contabile",
+                            "saldo",
+                            "saldo_conto",
+                            "saldo_divisa",
+                            "saldo_finale",
+                        )
+                    )
+                    saldo_disponibile_raw = _csv_get(
+                        row,
+                        "saldo_disponibile",
+                        "disponibile",
+                        "saldo_liquido",
+                    )
+                    saldo_disponibile = (
+                        _parse_decimal_locale(saldo_disponibile_raw) if saldo_disponibile_raw else None
+                    )
+                    valuta = (_csv_get(row, "valuta", "currency", "div", "divisa") or conto.valuta or "EUR").strip().upper()[:3]
+                except Exception as exc:
+                    errori.append(f"Riga {index}: {exc}")
+                    continue
+
+                _saldo, created = SaldoConto.objects.update_or_create(
+                    conto=conto,
+                    data_riferimento=data_riferimento,
+                    fonte=FonteSaldo.IMPORT_FILE,
+                    defaults={
+                        "saldo_contabile": saldo_contabile,
+                        "saldo_disponibile": saldo_disponibile,
+                        "valuta": valuta,
+                        "note": f"Import file: {getattr(uploaded, 'name', '')}".strip(),
+                        "aggiornato_da": request.user if request.user.is_authenticated else None,
+                    },
+                )
+                if created:
+                    if request.user.is_authenticated:
+                        _saldo.creato_da = request.user
+                        _saldo.save(update_fields=["creato_da"])
+                    creati += 1
+                else:
+                    aggiornati += 1
+                conti_aggiornati.add(conto.pk)
+
+            for conto in ContoBancario.objects.filter(pk__in=conti_aggiornati):
+                _aggiorna_saldo_corrente_da_snapshot(conto)
+
+            if creati:
+                messages.success(request, f"Import completato: {creati} saldi registrati, {aggiornati} aggiornati.")
+            elif aggiornati:
+                messages.success(request, f"Import completato: {aggiornati} saldi aggiornati.")
+            if errori:
+                messages.warning(request, "Alcune righe non sono state importate: " + " | ".join(errori[:5]))
+            return redirect("lista_saldi_conti")
+    else:
+        form = ImportSaldiContoCsvForm()
+
+    return render(
+        request,
+        "gestione_finanziaria/saldi_conti_import.html",
+        {"form": form},
+    )
+
+
+def scarica_template_saldi_conti_csv(_request):
+    content = (
+        "nome_conto;data_riferimento;saldo_contabile;saldo_disponibile;valuta\n"
+        "Conto operativo;30/04/2026 23:59;10000,00;10000,00;EUR\n"
+        "Cassa contanti;30/04/2026 23:59;250,00;;EUR\n"
+    )
+    response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="template_saldi_conti.csv"'
+    return response
+
+
+# =========================================================================
 #  Movimenti finanziari - lista + CRUD manuale
 # =========================================================================
 
@@ -881,6 +1309,7 @@ def lista_movimenti_finanziari(request):
     conti_filter = request.GET.get("conto")
     categoria_filter = request.GET.get("categoria")
     origine_filter = request.GET.get("origine")
+    canale_filter = request.GET.get("canale")
 
     if conti_filter:
         movimenti = movimenti.filter(conto_id=conti_filter)
@@ -890,6 +1319,8 @@ def lista_movimenti_finanziari(request):
         movimenti = movimenti.filter(categoria_id=categoria_filter)
     if origine_filter:
         movimenti = movimenti.filter(origine=origine_filter)
+    if canale_filter:
+        movimenti = movimenti.filter(canale=canale_filter)
 
     return render(
         request,
@@ -901,9 +1332,78 @@ def lista_movimenti_finanziari(request):
                 "parent__nome", "nome"
             ),
             "origini_disponibili": OrigineMovimento.choices,
+            "canali_disponibili": CanaleMovimento.choices,
             "conto_selezionato": conti_filter or "",
             "categoria_selezionata": categoria_filter or "",
             "origine_selezionata": origine_filter or "",
+            "canale_selezionato": canale_filter or "",
+        },
+    )
+
+
+def _movimenti_da_pulire_queryset(ambito):
+    queryset = MovimentoFinanziario.objects.all()
+    if ambito == PuliziaMovimentiFinanziariForm.AMBITO_AUTOMATICI:
+        return queryset.filter(origine__in=[OrigineMovimento.IMPORT_FILE, OrigineMovimento.BANCA])
+    if ambito == PuliziaMovimentiFinanziariForm.AMBITO_MANUALI:
+        return queryset.filter(origine=OrigineMovimento.MANUALE)
+    return queryset
+
+
+def _statistiche_pulizia_movimenti(queryset):
+    return {
+        "totale": queryset.count(),
+        "automatici": queryset.filter(origine__in=[OrigineMovimento.IMPORT_FILE, OrigineMovimento.BANCA]).count(),
+        "import_file": queryset.filter(origine=OrigineMovimento.IMPORT_FILE).count(),
+        "banca": queryset.filter(origine=OrigineMovimento.BANCA).count(),
+        "manuali": queryset.filter(origine=OrigineMovimento.MANUALE).count(),
+        "riconciliati_rate": queryset.filter(rata_iscrizione__isnull=False).count(),
+        "collegati_scadenze": ScadenzaPagamentoFornitore.objects.filter(movimento_finanziario__in=queryset).count(),
+    }
+
+
+def pulizia_movimenti_finanziari(request):
+    if request.method == "POST":
+        form = PuliziaMovimentiFinanziariForm(request.POST)
+        if form.is_valid():
+            ambito = form.cleaned_data["ambito"]
+            queryset = _movimenti_da_pulire_queryset(ambito)
+            statistiche = _statistiche_pulizia_movimenti(queryset)
+            conti_da_ricalcolare_ids = list(
+                queryset.filter(conto__isnull=False, incide_su_saldo_banca=True)
+                .values_list("conto_id", flat=True)
+                .distinct()
+            )
+
+            if statistiche["totale"] == 0:
+                messages.info(request, "Nessun movimento da eliminare per l'ambito selezionato.")
+                return redirect("pulizia_movimenti_finanziari")
+
+            with transaction.atomic():
+                eliminati, _ = queryset.delete()
+
+            for conto in ContoBancario.objects.filter(pk__in=conti_da_ricalcolare_ids):
+                ricalcola_saldo_corrente_conto(conto)
+
+            messaggio = f"Pulizia completata: eliminati {eliminati} movimenti."
+            if statistiche["riconciliati_rate"] or statistiche["collegati_scadenze"]:
+                messaggio += (
+                    f" Rimosso anche il riferimento a {statistiche['riconciliati_rate']} movimenti "
+                    f"riconciliati con rate e {statistiche['collegati_scadenze']} collegati a scadenze fornitori."
+                )
+            messages.success(request, messaggio)
+            return redirect("lista_movimenti_finanziari")
+    else:
+        form = PuliziaMovimentiFinanziariForm()
+
+    statistiche = _statistiche_pulizia_movimenti(MovimentoFinanziario.objects.all())
+
+    return render(
+        request,
+        "gestione_finanziaria/movimenti_pulizia.html",
+        {
+            "form": form,
+            "statistiche": statistiche,
         },
     )
 
@@ -915,6 +1415,9 @@ def crea_movimento_manuale(request):
         if form.is_valid():
             movimento = form.save(commit=False)
             movimento.origine = OrigineMovimento.MANUALE
+            if movimento.canale == CanaleMovimento.PERSONALE:
+                movimento.sostenuta_da_terzi = True
+                movimento.incide_su_saldo_banca = False
 
             if not movimento.categoria_id:
                 applica_regole_a_movimento(movimento)
@@ -933,6 +1436,7 @@ def crea_movimento_manuale(request):
             initial={
                 "data_contabile": timezone.now().date(),
                 "valuta": "EUR",
+                "canale": CanaleMovimento.BANCA,
             }
         )
 
@@ -960,6 +1464,9 @@ def modifica_movimento_finanziario(request, pk):
         form = MovimentoFinanziarioForm(request.POST, instance=movimento)
         if form.is_valid():
             movimento = form.save(commit=False)
+            if movimento.canale == CanaleMovimento.PERSONALE:
+                movimento.sostenuta_da_terzi = True
+                movimento.incide_su_saldo_banca = False
 
             if "categoria" in form.changed_data and movimento.categoria_id:
                 movimento.categorizzazione_automatica = False
@@ -2190,6 +2697,48 @@ def _resolve_anno_report(anni, raw_value):
         return anni[0] if anni else timezone.now().year
 
 
+def _add_months_start(data_inizio, mesi):
+    mese_index = (data_inizio.year * 12 + data_inizio.month - 1) + mesi
+    return date(mese_index // 12, mese_index % 12 + 1, 1)
+
+
+def _fine_mese(data_mese):
+    return data_mese.replace(day=monthrange(data_mese.year, data_mese.month)[1])
+
+
+def _periodo_rate_anno_scolastico(anno_scolastico):
+    """
+    Per i report finanziari scolastici usiamo il periodo economico delle rate,
+    non per forza l'intero intervallo amministrativo dell'anno scolastico.
+    """
+    from economia.models.iscrizioni import CondizioneIscrizione
+
+    condizioni = list(
+        CondizioneIscrizione.objects.filter(
+            anno_scolastico=anno_scolastico,
+            attiva=True,
+        )
+    )
+    if not condizioni:
+        condizioni = list(
+            CondizioneIscrizione.objects.filter(anno_scolastico=anno_scolastico)
+        )
+
+    periodi = []
+    for condizione in condizioni:
+        inizio = condizione.resolve_mese_prima_retta_date()
+        if not inizio:
+            continue
+        numero_rate = max(condizione.numero_mensilita_default or 0, 1)
+        fine = _fine_mese(_add_months_start(inizio, numero_rate - 1))
+        periodi.append((inizio, fine))
+
+    if periodi:
+        return min(p[0] for p in periodi), max(p[1] for p in periodi)
+
+    return anno_scolastico.data_inizio, anno_scolastico.data_fine
+
+
 def _report_periodo_context(request, anni):
     anni_scolastici = list(_anni_scolastici_report())
     periodo_tipo = request.GET.get("periodo") or "solare"
@@ -2215,8 +2764,7 @@ def _report_periodo_context(request, anni):
             )
         if anno_scolastico is not None:
             anno_scolastico_id = str(anno_scolastico.pk)
-            data_inizio = anno_scolastico.data_inizio
-            data_fine = anno_scolastico.data_fine
+            data_inizio, data_fine = _periodo_rate_anno_scolastico(anno_scolastico)
             periodo_label = f"anno scolastico {anno_scolastico.nome_anno_scolastico}"
         else:
             periodo_tipo = "solare"
@@ -2286,17 +2834,107 @@ def _filtra_movimenti_report(request, queryset):
     return queryset, conto_id
 
 
-def _espandi_categoria_root(categoria):
-    """Ritorna la lista di id delle categorie (self + tutti i discendenti)."""
+def _categorie_report_tree():
+    categorie = list(
+        CategoriaFinanziaria.objects.filter(attiva=True)
+        .select_related("parent")
+        .order_by("tipo", "ordine", "nome")
+    )
+    figli_by_parent = {}
+    for categoria in categorie:
+        figli_by_parent.setdefault(categoria.parent_id, []).append(categoria)
+    return figli_by_parent.get(None, []), figli_by_parent
+
+
+def _categoria_discendant_ids(categoria, figli_by_parent):
     ids = [categoria.pk]
-    stack = [categoria]
-    while stack:
-        corrente = stack.pop()
-        figli = list(CategoriaFinanziaria.objects.filter(parent=corrente).only("id"))
-        for f in figli:
-            ids.append(f.pk)
-            stack.append(f)
+    for figlia in figli_by_parent.get(categoria.pk, []):
+        ids.extend(_categoria_discendant_ids(figlia, figli_by_parent))
     return ids
+
+
+def _report_category_tone(categoria, netto):
+    if categoria.tipo == TipoCategoriaFinanziaria.ENTRATA:
+        return "entrata"
+    if categoria.tipo == TipoCategoriaFinanziaria.SPESA:
+        return "spesa"
+    return "entrata" if netto >= 0 else "spesa"
+
+
+def _build_report_mensile_riga(categoria, livello, mappa, mesi_periodo, figli_by_parent):
+    valori_mese = {(m["anno"], m["mese"]): Decimal("0") for m in mesi_periodo}
+    for cid in _categoria_discendant_ids(categoria, figli_by_parent):
+        for key, importo in (mappa.get(cid) or {}).items():
+            if key in valori_mese:
+                valori_mese[key] += importo or Decimal("0")
+
+    figli = []
+    for figlia in figli_by_parent.get(categoria.pk, []):
+        riga_figlia = _build_report_mensile_riga(
+            figlia,
+            livello + 1,
+            mappa,
+            mesi_periodo,
+            figli_by_parent,
+        )
+        if riga_figlia:
+            figli.append(riga_figlia)
+
+    totale_riga = sum(valori_mese.values(), Decimal("0"))
+    if totale_riga == 0 and not figli:
+        return None
+
+    return {
+        "categoria": categoria,
+        "valori_mese": [valori_mese[(m["anno"], m["mese"])] for m in mesi_periodo],
+        "valori_mese_map": valori_mese,
+        "totale": totale_riga,
+        "figli": figli,
+        "livello": livello,
+        "row_id": f"categoria-{categoria.pk}",
+        "row_tone": _report_category_tone(categoria, totale_riga),
+    }
+
+
+def _build_report_annuale_riga(categoria, livello, per_categoria, figli_by_parent):
+    entrate = Decimal("0")
+    uscite = Decimal("0")
+    for cid in _categoria_discendant_ids(categoria, figli_by_parent):
+        blocco = per_categoria.get(cid)
+        if blocco:
+            entrate += blocco["entrate"]
+            uscite += blocco["uscite"]
+
+    figli = []
+    for figlia in figli_by_parent.get(categoria.pk, []):
+        riga_figlia = _build_report_annuale_riga(
+            figlia,
+            livello + 1,
+            per_categoria,
+            figli_by_parent,
+        )
+        if riga_figlia:
+            figli.append(riga_figlia)
+
+    if entrate == 0 and uscite == 0 and not figli:
+        return None
+
+    return {
+        "categoria": categoria,
+        "entrate": entrate,
+        "uscite": uscite,
+        "netto": entrate + uscite,
+        "figli": figli,
+        "livello": livello,
+        "row_id": f"categoria-{categoria.pk}",
+        "row_tone": _report_category_tone(categoria, entrate + uscite),
+    }
+
+
+def _sort_report_rows(righe, key):
+    righe.sort(key=key)
+    for riga in righe:
+        _sort_report_rows(riga.get("figli", []), key)
 
 
 def report_categorie_mensile(request):
@@ -2324,6 +2962,12 @@ def report_categorie_mensile(request):
         .values("categoria_id", "anno_movimento", "mese")
         .annotate(totale=Sum("importo"))
     )
+    sintesi = queryset.aggregate(
+        totale_entrate=Sum("importo", filter=Q(importo__gt=0)),
+        totale_uscite=Sum("importo", filter=Q(importo__lt=0)),
+    )
+    totale_entrate = sintesi["totale_entrate"] or Decimal("0")
+    totale_uscite = sintesi["totale_uscite"] or Decimal("0")
 
     mappa = {}
     for riga in aggregato:
@@ -2334,11 +2978,7 @@ def report_categorie_mensile(request):
             continue
         mappa.setdefault(cat_id, {})[(int(anno_movimento), int(mese))] = riga["totale"] or Decimal("0")
 
-    categorie_root = list(
-        CategoriaFinanziaria.objects.filter(parent__isnull=True, attiva=True).order_by(
-            "tipo", "ordine", "nome"
-        )
-    )
+    categorie_root, figli_by_parent = _categorie_report_tree()
 
     mesi_periodo = _mesi_report_periodo(periodo_context["data_inizio"], periodo_context["data_fine"])
     righe_report = []
@@ -2346,28 +2986,14 @@ def report_categorie_mensile(request):
     totale_generale = Decimal("0")
 
     for root in categorie_root:
-        ids_inclusi = _espandi_categoria_root(root)
-        valori_mese = {(m["anno"], m["mese"]): Decimal("0") for m in mesi_periodo}
-        for cid in ids_inclusi:
-            for key, importo in (mappa.get(cid) or {}).items():
-                if key in valori_mese:
-                    valori_mese[key] += importo or Decimal("0")
-
-        totale_riga = sum(valori_mese.values(), Decimal("0"))
-        if totale_riga == 0:
-            # nascondiamo le categorie senza movimenti per mantenere il report leggibile
+        riga = _build_report_mensile_riga(root, 0, mappa, mesi_periodo, figli_by_parent)
+        if not riga:
             continue
-        righe_report.append(
-            {
-                "categoria": root,
-                "valori_mese": [valori_mese[(m["anno"], m["mese"])] for m in mesi_periodo],
-                "totale": totale_riga,
-            }
-        )
+        righe_report.append(riga)
         for m in mesi_periodo:
             key = (m["anno"], m["mese"])
-            totali_mensili[key] += valori_mese[key]
-        totale_generale += totale_riga
+            totali_mensili[key] += riga["valori_mese_map"][key]
+        totale_generale += riga["totale"]
 
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
     report_querystring = _build_report_query(periodo_context, conto_id)
@@ -2385,6 +3011,9 @@ def report_categorie_mensile(request):
             "righe": righe_report,
             "totali_mensili": [totali_mensili[(m["anno"], m["mese"])] for m in mesi_periodo],
             "totale_generale": totale_generale,
+            "totale_entrate": totale_entrate,
+            "totale_uscite": totale_uscite,
+            "saldo_netto": totale_entrate + totale_uscite,
             "mesi": [m["label"] for m in mesi_periodo],
             "conti": conti,
             "conto_selezionato": conto_id,
@@ -2424,11 +3053,7 @@ def report_categorie_annuale(request):
         for r in aggregato
     }
 
-    categorie_root = list(
-        CategoriaFinanziaria.objects.filter(parent__isnull=True, attiva=True).order_by(
-            "tipo", "ordine", "nome"
-        )
-    )
+    categorie_root, figli_by_parent = _categorie_report_tree()
 
     righe_entrate = []
     righe_uscite = []
@@ -2436,43 +3061,30 @@ def report_categorie_annuale(request):
     tot_uscite = Decimal("0")
 
     for root in categorie_root:
-        ids_inclusi = _espandi_categoria_root(root)
-        entrate = Decimal("0")
-        uscite = Decimal("0")
-        for cid in ids_inclusi:
-            blocco = per_categoria.get(cid)
-            if blocco:
-                entrate += blocco["entrate"]
-                uscite += blocco["uscite"]
-
-        if entrate == 0 and uscite == 0:
+        riga = _build_report_annuale_riga(root, 0, per_categoria, figli_by_parent)
+        if not riga:
             continue
 
-        riga = {
-            "categoria": root,
-            "entrate": entrate,
-            "uscite": uscite,
-            "netto": entrate + uscite,
-        }
         if root.tipo == TipoCategoriaFinanziaria.ENTRATA:
             righe_entrate.append(riga)
-            tot_entrate += entrate
-        elif root.tipo == TipoCategoriaFinanziaria.USCITA:
+            tot_entrate += riga["entrate"]
+        elif root.tipo == TipoCategoriaFinanziaria.SPESA:
             righe_uscite.append(riga)
-            tot_uscite += uscite
+            tot_uscite += riga["uscite"]
         else:
             # trasferimenti / misti: li collochiamo dove prevalgono
-            if entrate + uscite >= 0:
+            if riga["netto"] >= 0:
                 righe_entrate.append(riga)
-                tot_entrate += entrate
+                tot_entrate += riga["entrate"]
             else:
                 righe_uscite.append(riga)
-                tot_uscite += uscite
+                tot_uscite += riga["uscite"]
 
     def _aggiungi_percentuali(righe, totale):
         if totale == 0:
             for r in righe:
                 r["percentuale"] = Decimal("0")
+                _aggiungi_percentuali(r.get("figli", []), totale)
             return
         for r in righe:
             delta = r["entrate"] if r["entrate"] else (r["uscite"].copy_abs() if r["uscite"] else Decimal("0"))
@@ -2481,12 +3093,13 @@ def report_categorie_annuale(request):
                 r["percentuale"] = Decimal("0")
             else:
                 r["percentuale"] = (delta / totale_abs * Decimal("100")).quantize(Decimal("0.1"))
+            _aggiungi_percentuali(r.get("figli", []), totale)
 
     _aggiungi_percentuali(righe_entrate, tot_entrate)
     _aggiungi_percentuali(righe_uscite, tot_uscite)
 
-    righe_entrate.sort(key=lambda r: r["entrate"], reverse=True)
-    righe_uscite.sort(key=lambda r: r["uscite"])  # piu' negativo prima
+    _sort_report_rows(righe_entrate, key=lambda r: r["entrate"] * Decimal("-1"))
+    _sort_report_rows(righe_uscite, key=lambda r: r["uscite"])  # piu' negativo prima
 
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
     report_querystring = _build_report_query(periodo_context, conto_id)

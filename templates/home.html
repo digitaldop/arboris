@@ -224,6 +224,83 @@
             </div>
         {% endif %}
 
+        {% if can_view_gestione_finanziaria and gestione_finanziaria_dashboard %}
+            <div class="admin-section dashboard-section" data-dashboard-section-id="gestione-finanziaria">
+                <button
+                    type="button"
+                    class="admin-section-title collapsible-title is-open dashboard-section-title"
+                    data-target="dashboard-riepilogo-gestione-finanziaria"
+                    data-storage-key="arboris-dashboard-riepilogo-gestione-finanziaria"
+                    data-default-open="true"
+                >
+                    <span class="dashboard-section-label">GESTIONE FINANZIARIA</span>
+                    <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
+                </button>
+                <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-gestione-finanziaria">
+                    <div class="panel-body dashboard-panel-body">
+                        <div class="dashboard-finance-widget js-financial-dashboard">
+                            <div class="dashboard-finance-toolbar">
+                                <div class="dashboard-finance-switch-group" aria-label="Periodo del grafico finanziario">
+                                    <button type="button" class="dashboard-finance-switch is-active" data-finance-period="monthly">Mensile</button>
+                                    <button type="button" class="dashboard-finance-switch" data-finance-period="annual">Annuale</button>
+                                </div>
+                                <div class="dashboard-finance-switch-group" aria-label="Tipologia movimenti">
+                                    <button type="button" class="dashboard-finance-switch is-active" data-finance-kind="all">Tutti</button>
+                                    <button type="button" class="dashboard-finance-switch" data-finance-kind="income">Entrate</button>
+                                    <button type="button" class="dashboard-finance-switch" data-finance-kind="expense">Uscite</button>
+                                </div>
+                                <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-sm">Apri dashboard finanziaria</a>
+                            </div>
+
+                            <div class="dashboard-finance-summary">
+                                <div class="dashboard-finance-summary-item dashboard-finance-summary-item-balance">
+                                    <div class="dashboard-finance-summary-label">Saldo conti attivi</div>
+                                    <div class="dashboard-finance-summary-value">EUR {{ gestione_finanziaria_dashboard.saldo_totale|euro }}</div>
+                                    <div class="dashboard-finance-summary-meta">{{ gestione_finanziaria_dashboard.conti_attivi }} conti attivi</div>
+                                </div>
+                                <div class="dashboard-finance-summary-item">
+                                    <div class="dashboard-finance-legend dashboard-finance-legend-income"></div>
+                                    <div>
+                                        <div class="dashboard-finance-summary-label">Entrate <span data-finance-active-period-label>{{ gestione_finanziaria_dashboard.current_month_label }}</span></div>
+                                        <div class="dashboard-finance-summary-value" data-finance-total-income>EUR {{ gestione_finanziaria_dashboard.monthly.totale_entrate|euro }}</div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-finance-summary-item">
+                                    <div class="dashboard-finance-legend dashboard-finance-legend-expense"></div>
+                                    <div>
+                                        <div class="dashboard-finance-summary-label">Uscite <span data-finance-active-period-label>{{ gestione_finanziaria_dashboard.current_month_label }}</span></div>
+                                        <div class="dashboard-finance-summary-value" data-finance-total-expense>EUR {{ gestione_finanziaria_dashboard.monthly.totale_uscite|euro }}</div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-finance-summary-item">
+                                    <div class="dashboard-finance-summary-label">Saldo periodo</div>
+                                    <div class="dashboard-finance-summary-value" data-finance-period-balance>EUR {{ gestione_finanziaria_dashboard.monthly.saldo|euro }}</div>
+                                    <div class="dashboard-finance-summary-meta" data-finance-movement-count>{{ gestione_finanziaria_dashboard.monthly.movimenti }} movimenti</div>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-finance-chart-card">
+                                <canvas class="dashboard-finance-chart" data-finance-chart aria-label="Grafico entrate e uscite"></canvas>
+                            </div>
+
+                            <div class="dashboard-finance-footer">
+                                <div>
+                                    <strong>{{ gestione_finanziaria_dashboard.movimenti_senza_categoria }}</strong>
+                                    <span>movimenti da categorizzare</span>
+                                </div>
+                                <div>
+                                    <strong>{{ gestione_finanziaria_dashboard.movimenti_da_riconciliare }}</strong>
+                                    <span>movimenti da riconciliare</span>
+                                </div>
+                                <div class="dashboard-finance-footer-note">Il grafico include tutti i movimenti registrati nel periodo selezionato.</div>
+                            </div>
+                        </div>
+                        {{ gestione_finanziaria_dashboard.chart_data|json_script:"dashboard-finance-chart-data" }}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         {% if mostra_dashboard_prossimo_anno %}
             <div class="admin-section dashboard-section" data-dashboard-section-id="statistiche-generali-prossimo-anno">
                 <button
@@ -528,6 +605,7 @@
 
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/pages/dashboard-layout.js' %}?v=1"></script>
+    <script src="{% static 'js/pages/dashboard-finanziaria.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisCollapsible) {
@@ -535,6 +613,9 @@
             }
             if (window.ArborisDashboardLayout) {
                 ArborisDashboardLayout.init(document);
+            }
+            if (window.ArborisDashboardFinanziaria) {
+                ArborisDashboardFinanziaria.init(document);
             }
         });
     </script>

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load currency %}
+
+{% block title %}Saldi conti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Saldi conti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Saldi conti</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'import_saldi_conti' %}" class="btn btn-primary">Import saldi CSV</a>
+            <a href="{% url 'crea_saldo_conto' %}" class="btn btn-secondary">Inserisci saldo manuale</a>
+            <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary">Conti bancari</a>
+        </div>
+    </div>
+
+    <div class="content-card finance-balance-summary">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ saldo_totale|euro }} &euro;</div>
+                <div class="summary-label">Saldo totale calcolato a oggi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ conti|length }}</div>
+                <div class="summary-label">Conti attivi</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="get" class="filter-bar finance-report-filters">
+            <label class="finance-filter-field finance-filter-field-conto">
+                Conto:
+                <select name="conto">
+                    <option value="">Tutti</option>
+                    {% for conto in conti %}
+                        <option value="{{ conto.pk }}" {% if conto_selezionato == conto.pk|stringformat:"s" %}selected{% endif %}>{{ conto.nome_conto }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary">Filtra</button>
+            <a href="{% url 'lista_saldi_conti' %}" class="btn btn-secondary">Reset</a>
+        </form>
+    </div>
+
+    <div class="content-card">
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Data riferimento</th>
+                    <th>Conto</th>
+                    <th class="column-right">Saldo contabile</th>
+                    <th class="column-right">Saldo disponibile</th>
+                    <th>Fonte</th>
+                    <th>Creato da</th>
+                    <th>Aggiornato da</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for saldo in saldi %}
+                    <tr>
+                        <td>{{ saldo.data_riferimento|date:"d/m/Y H:i" }}</td>
+                        <td>{{ saldo.conto }}</td>
+                        <td class="column-right">{{ saldo.saldo_contabile|euro }} &euro;</td>
+                        <td class="column-right">
+                            {% if saldo.saldo_disponibile is not None %}
+                                {{ saldo.saldo_disponibile|euro }} &euro;
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ saldo.get_fonte_display }}</td>
+                        <td>{% if saldo.creato_da %}{{ saldo.creato_da.get_full_name|default:saldo.creato_da.username }}{% else %}-{% endif %}</td>
+                        <td>{% if saldo.aggiornato_da %}{{ saldo.aggiornato_da.get_full_name|default:saldo.aggiornato_da.username }}{% else %}-{% endif %}</td>
+                        <td class="actions-cell">
+                            <a href="{% url 'modifica_saldo_conto' saldo.pk %}" class="table-link">Modifica</a>
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'elimina_saldo_conto' saldo.pk %}" class="table-link table-link-danger">Elimina</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                Nessun saldo registrato. Inserisci un saldo manuale o importalo da CSV.
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

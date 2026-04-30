@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static currency %}
 
 {% block title %}Report categorie annuale - Arboris School Management{% endblock %}
 
@@ -67,9 +68,9 @@
         <h2 class="section-title">Sintesi</h2>
         <table class="list-table">
             <tbody>
-                <tr><th>Totale entrate</th><td class="column-right"><strong>{{ totale_entrate }} EUR</strong></td></tr>
-                <tr><th>Totale uscite</th><td class="column-right"><strong>{{ totale_uscite }} EUR</strong></td></tr>
-                <tr><th>Saldo netto</th><td class="column-right"><strong>{{ saldo_netto }} EUR</strong></td></tr>
+                <tr><th>Totale entrate</th><td class="column-right"><strong>EUR {{ totale_entrate|euro }}</strong></td></tr>
+                <tr><th>Totale uscite</th><td class="column-right"><strong>EUR {{ totale_uscite|euro }}</strong></td></tr>
+                <tr><th>Saldo netto</th><td class="column-right"><strong>EUR {{ saldo_netto|euro }}</strong></td></tr>
             </tbody>
         </table>
     </div>
@@ -87,17 +88,11 @@
                 </tr>
             </thead>
             <tbody>
-                {% for riga in righe_entrate %}
-                    <tr>
-                        <td>{{ riga.categoria.nome }}</td>
-                        <td class="column-right">{{ riga.entrate }}</td>
-                        <td class="column-right">{{ riga.uscite }}</td>
-                        <td class="column-right"><strong>{{ riga.netto }}</strong></td>
-                        <td class="column-right">{{ riga.percentuale }}%</td>
-                    </tr>
-                {% empty %}
+                {% if righe_entrate %}
+                    {% include "gestione_finanziaria/includes/report_categoria_annuale_rows.html" with righe=righe_entrate parent_id="" only %}
+                {% else %}
                     <tr><td colspan="5"><div class="empty-state">Nessuna entrata registrata.</div></td></tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
@@ -115,18 +110,13 @@
                 </tr>
             </thead>
             <tbody>
-                {% for riga in righe_uscite %}
-                    <tr>
-                        <td>{{ riga.categoria.nome }}</td>
-                        <td class="column-right">{{ riga.entrate }}</td>
-                        <td class="column-right">{{ riga.uscite }}</td>
-                        <td class="column-right"><strong>{{ riga.netto }}</strong></td>
-                        <td class="column-right">{{ riga.percentuale }}%</td>
-                    </tr>
-                {% empty %}
+                {% if righe_uscite %}
+                    {% include "gestione_finanziaria/includes/report_categoria_annuale_rows.html" with righe=righe_uscite parent_id="" only %}
+                {% else %}
                     <tr><td colspan="5"><div class="empty-state">Nessuna uscita registrata.</div></td></tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
+    <script src="{% static 'js/pages/report-categorie.js' %}?v=1"></script>
 {% endblock %}

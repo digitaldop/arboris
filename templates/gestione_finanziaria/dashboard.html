@@ -38,7 +38,7 @@
                 <div class="summary-label">Saldo complessivo conti attivi</div>
             </div>
             <div class="summary-item">
-                <div class="summary-value">{{ conti.count }}</div>
+                <div class="summary-value">{{ conti|length }}</div>
                 <div class="summary-label">Conti attivi</div>
             </div>
             <div class="summary-item">
@@ -64,12 +64,27 @@
         </div>
     </div>
 
+    {% if saldo_per_tipo %}
+        <div class="content-card">
+            <h2 class="section-title">Saldi per tipo</h2>
+            <div class="finance-balance-type-grid">
+                {% for item in saldo_per_tipo %}
+                    <div class="finance-balance-type-item">
+                        <div class="finance-balance-type-label">{{ item.tipo }}</div>
+                        <div class="finance-balance-type-value">{{ item.saldo|euro }} &euro;</div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <div class="content-card">
         <h2 class="section-title">Conti attivi</h2>
         <table class="list-table">
             <thead>
                 <tr>
                     <th>Nome conto</th>
+                    <th>Tipo</th>
                     <th>Banca</th>
                     <th>IBAN</th>
                     <th>Saldo corrente</th>
@@ -80,14 +95,15 @@
                 {% for conto in conti %}
                     <tr>
                         <td>{{ conto.nome_conto }}</td>
+                        <td>{{ conto.get_tipo_conto_display }}</td>
                         <td>{{ conto.banca|default:"-" }}</td>
                         <td>{{ conto.iban|default:"-" }}</td>
-                        <td>{{ conto.saldo_corrente|euro }} &euro;</td>
+                        <td>{{ conto.saldo_calcolato|euro }} &euro;</td>
                         <td>{% if conto.saldo_corrente_aggiornato_al %}{{ conto.saldo_corrente_aggiornato_al|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="empty-state">
                                 Nessun conto bancario collegato. I conti e le loro sincronizzazioni saranno configurabili nelle prossime iterazioni.
                             </div>
@@ -105,6 +121,7 @@
                 <tr>
                     <th>Data</th>
                     <th>Conto</th>
+                    <th>Canale</th>
                     <th>Descrizione</th>
                     <th>Categoria</th>
                     <th class="column-right">Importo</th>
@@ -112,16 +129,21 @@
             </thead>
             <tbody>
                 {% for movimento in ultimi_movimenti %}
-                    <tr>
+                    <tr class="{% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}">
                         <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
                         <td>{{ movimento.conto|default:"-" }}</td>
+                        <td>
+                            <span class="finance-channel-badge finance-channel-badge-{{ movimento.canale }}">
+                                {{ movimento.get_canale_display }}
+                            </span>
+                        </td>
                         <td>{{ movimento.descrizione|truncatechars:80 }}</td>
                         <td>{% if movimento.categoria %}{{ movimento.categoria }}{% else %}<span class="table-muted">non categorizzato</span>{% endif %}</td>
                         <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="empty-state">Nessun movimento registrato.</div>
                         </td>
                     </tr>

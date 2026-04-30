@@ -19,6 +19,7 @@ from .models import (
     PianificazioneSincronizzazione,
     ProviderBancario,
     RegolaCategorizzazione,
+    SaldoConto,
     ScadenzaPagamentoFornitore,
     StatoScadenzaFornitore,
 )
@@ -402,6 +403,7 @@ class ContoBancarioForm(forms.ModelForm):
         model = ContoBancario
         fields = [
             "nome_conto",
+            "tipo_conto",
             "banca",
             "iban",
             "bic",
@@ -414,6 +416,7 @@ class ContoBancarioForm(forms.ModelForm):
         ]
         labels = {
             "nome_conto": "Nome conto",
+            "tipo_conto": "Tipo conto",
             "banca": "Banca",
             "iban": "IBAN",
             "bic": "BIC",
@@ -433,18 +436,76 @@ class ContoBancarioForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["tipo_conto"].required = True
         self.fields["banca"].required = False
         self.fields["iban"].required = False
         self.fields["bic"].required = False
         self.fields["intestatario"].required = False
+        self.fields["provider"].required = False
         self.fields["connessione"].required = False
         self.fields["note"].required = False
 
         self.fields["provider"].queryset = ProviderBancario.objects.filter(attivo=True).order_by("nome")
+        self.fields["provider"].empty_label = "--- nessuno ---"
         self.fields["connessione"].queryset = ConnessioneBancaria.objects.select_related("provider").order_by(
             "provider__nome", "etichetta"
         )
         self.fields["connessione"].empty_label = "--- nessuna ---"
+
+
+# =========================================================================
+#  Saldi conti
+# =========================================================================
+
+
+class SaldoContoForm(forms.ModelForm):
+    class Meta:
+        model = SaldoConto
+        fields = [
+            "conto",
+            "data_riferimento",
+            "saldo_contabile",
+            "saldo_disponibile",
+            "valuta",
+            "fonte",
+            "note",
+        ]
+        labels = {
+            "conto": "Conto",
+            "data_riferimento": "Data riferimento",
+            "saldo_contabile": "Saldo contabile",
+            "saldo_disponibile": "Saldo disponibile",
+            "valuta": "Valuta",
+            "fonte": "Fonte",
+            "note": "Note",
+        }
+        widgets = {
+            "data_riferimento": forms.DateTimeInput(
+                attrs={"type": "datetime-local"},
+                format="%Y-%m-%dT%H:%M",
+            ),
+            "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["conto"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+        self.fields["saldo_disponibile"].required = False
+        self.fields["note"].required = False
+        self.fields["data_riferimento"].input_formats = ["%Y-%m-%dT%H:%M", "%d/%m/%Y %H:%M", "%d/%m/%Y"]
+        for field_name in ("saldo_contabile", "saldo_disponibile"):
+            apply_eur_currency_widget(self.fields[field_name], compact=False)
+
+
+class ImportSaldiContoCsvForm(forms.Form):
+    file = forms.FileField(
+        label="File CSV",
+        help_text=(
+            "Colonne riconosciute: conto_id oppure nome_conto/conto, data_riferimento oppure data, "
+            "saldo_contabile oppure saldo, saldo_disponibile e valuta opzionali."
+        ),
+    )
 
 
 # =========================================================================
@@ -463,6 +524,7 @@ class MovimentoFinanziarioForm(forms.ModelForm):
         model = MovimentoFinanziario
         fields = [
             "conto",
+            "canale",
             "data_contabile",
             "data_valuta",
             "importo",
@@ -472,10 +534,14 @@ class MovimentoFinanziarioForm(forms.ModelForm):
             "iban_controparte",
             "categoria",
             "incide_su_saldo_banca",
+            "sostenuta_da_terzi",
+            "rimborsabile",
+            "sostenitore",
             "note",
         ]
         labels = {
             "conto": "Conto",
+            "canale": "Canale",
             "data_contabile": "Data contabile",
             "data_valuta": "Data valuta",
             "importo": "Importo (negativo per uscite)",
@@ -485,6 +551,9 @@ class MovimentoFinanziarioForm(forms.ModelForm):
             "iban_controparte": "IBAN controparte",
             "categoria": "Categoria",
             "incide_su_saldo_banca": "Incide sul saldo del conto",
+            "sostenuta_da_terzi": "Sostenuta da terzi",
+            "rimborsabile": "Da rimborsare",
+            "sostenitore": "Sostenitore",
             "note": "Note",
         }
         widgets = {
@@ -503,6 +572,7 @@ class MovimentoFinanziarioForm(forms.ModelForm):
         self.fields["controparte"].required = False
         self.fields["iban_controparte"].required = False
         self.fields["categoria"].required = False
+        self.fields["sostenitore"].required = False
         self.fields["note"].required = False
 
         self.fields["conto"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
@@ -518,17 +588,63 @@ class MovimentoFinanziarioForm(forms.ModelForm):
             "Attiva per movimenti di cassa reali (es. cassa contanti tracciata in un conto interno). "
             "Lascia disattivo per voci puramente gestionali di previsione o controllo."
         )
+        self.fields["sostenuta_da_terzi"].help_text = (
+            "Usa questa opzione per spese pagate da soci/genitori senza uscita dal conto della scuola."
+        )
 
     def clean(self):
         cleaned_data = super().clean()
         incide = cleaned_data.get("incide_su_saldo_banca")
         conto = cleaned_data.get("conto")
+        canale = cleaned_data.get("canale")
+        sostenuta_da_terzi = cleaned_data.get("sostenuta_da_terzi")
+        if canale == "personale":
+            cleaned_data["sostenuta_da_terzi"] = True
+            sostenuta_da_terzi = True
+        if sostenuta_da_terzi and incide:
+            self.add_error(
+                "incide_su_saldo_banca",
+                "Una spesa sostenuta da terzi non deve incidere sul saldo del conto della scuola.",
+            )
         if incide and not conto:
             self.add_error(
                 "conto",
                 "Per un movimento che incide sul saldo e' necessario specificare il conto.",
             )
         return cleaned_data
+
+
+class PuliziaMovimentiFinanziariForm(forms.Form):
+    AMBITO_TUTTI = "tutti"
+    AMBITO_AUTOMATICI = "automatici"
+    AMBITO_MANUALI = "manuali"
+
+    AMBITO_CHOICES = [
+        (AMBITO_TUTTI, "Tutti i movimenti"),
+        (AMBITO_AUTOMATICI, "Solo import automatici (file/PSD2)"),
+        (AMBITO_MANUALI, "Solo inserimenti manuali"),
+    ]
+
+    ambito = forms.ChoiceField(
+        choices=AMBITO_CHOICES,
+        label="Movimenti da eliminare",
+        initial=AMBITO_AUTOMATICI,
+        help_text=(
+            "Gli import automatici includono i movimenti importati da file estratto conto "
+            "e quelli sincronizzati tramite provider bancario/PSD2."
+        ),
+    )
+    conferma = forms.CharField(
+        label='Conferma digitando "ELIMINA"',
+        required=True,
+        max_length=20,
+    )
+
+    def clean_conferma(self):
+        value = (self.cleaned_data.get("conferma") or "").strip().upper()
+        if value != "ELIMINA":
+            raise forms.ValidationError('Per confermare devi digitare esattamente "ELIMINA".')
+        return value
 
 
 # =========================================================================

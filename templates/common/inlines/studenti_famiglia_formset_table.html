@@ -12,6 +12,7 @@
             <th class="inline-view-only-table-cell">CODICE FISCALE</th>
             <th class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
             <th class="mode-edit-only-table-cell">ELIMINA</th>
+            <th class="inline-view-only-table-cell student-enrollment-col">ISCRIZIONE</th>
         </tr>
     </thead>
     <tbody>
@@ -116,6 +117,15 @@
                     {% else %}
                         <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                     {% endif %}
+                </td>
+                <td class="inline-view-only-table-cell student-enrollment-cell">
+                    <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
+                        {% if f.instance.pk %}
+                            {% include "common/badges/student_iscrizione_status.html" with studente=f.instance only %}
+                        {% else %}
+                            <span class="table-muted">-</span>
+                        {% endif %}
+                    </div>
                 </td>
             </tr>
             <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>

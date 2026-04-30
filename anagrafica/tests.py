@@ -611,6 +611,53 @@ class FamigliaInlineDefaultsTests(TestCase):
             [studente_piu_vecchio.pk, studente_piu_giovane.pk, studente_senza_data.pk],
         )
 
+    def test_studenti_inline_queryset_annotates_current_active_enrollment(self):
+        today = timezone.localdate()
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            attiva=True,
+        )
+        studente_iscritto = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Agnese",
+            cognome="Verdi",
+            data_nascita="2020-09-14",
+            attivo=True,
+        )
+        studente_non_iscritto = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Aurelia",
+            cognome="Verdi",
+            data_nascita="2022-08-28",
+            attivo=True,
+        )
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico=f"{today.year}/{today.year + 1}",
+            data_inizio=date(today.year, 1, 1),
+            data_fine=date(today.year, 12, 31),
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_iscritto,
+            anno_scolastico=anno_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            attiva=True,
+        )
+
+        studenti = {studente.pk: studente for studente in famiglia_studenti_inline_queryset(famiglia)}
+
+        self.assertTrue(studenti[studente_iscritto.pk].ha_iscrizione_attiva_corrente)
+        self.assertFalse(studenti[studente_non_iscritto.pk].ha_iscrizione_attiva_corrente)
+
 
 class FamiliareScambioRettaInlineTests(TestCase):
     def setUp(self):
@@ -847,6 +894,43 @@ class StudenteListTests(TestCase):
         self.assertContains(response, "Via Don Lorenzo Milani 70 - Crevalcore (BO) - 40014")
         self.assertContains(response, "Via Specifica 12 - Crevalcore (BO) - 40014")
         self.assertNotContains(response, "Eredita famiglia")
+
+    def test_lista_studenti_shows_current_enrollment_status_badges(self):
+        today = timezone.localdate()
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico=f"{today.year}/{today.year + 1}",
+            data_inizio=date(today.year, 1, 1),
+            data_fine=date(today.year, 12, 31),
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bersani",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        studente_iscritto = Studente.objects.create(famiglia=famiglia, cognome="Bersani", nome="Agnese", attivo=True)
+        Studente.objects.create(famiglia=famiglia, cognome="Bersani", nome="Teresa", attivo=True)
+        Iscrizione.objects.create(
+            studente=studente_iscritto,
+            anno_scolastico=anno_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("lista_studenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Iscritto")
+        self.assertContains(response, "Non iscritto")
+        self.assertContains(response, "status-chip-success student-enrollment-status")
+        self.assertContains(response, "status-chip-danger student-enrollment-status")
 
 
 class RicercheAnagraficaTests(TestCase):
@@ -1318,7 +1402,7 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertContains(response, 'id="iscrizioni-empty-form-template"')
         self.assertContains(response, 'data-inline-action="add" data-inline-prefix="iscrizioni"')
 
-    def test_modifica_studente_inline_iscrizioni_rerenders_complete_visible_editor(self):
+    def test_modifica_studente_inline_iscrizioni_ignores_default_empty_extra_row(self):
         studente_senza_iscrizioni = Studente.objects.create(
             famiglia=self.famiglia,
             nome="Agnese",
@@ -1334,7 +1418,7 @@ class StudenteDetailPerformanceTests(TestCase):
                 "_inline_target": "iscrizioni",
                 "famiglia": self.famiglia.pk,
                 "cognome": "Bersani",
-                "nome": "",
+                "nome": "Agnese",
                 "sesso": "F",
                 "data_nascita": "2020-09-14",
                 "luogo_nascita": self.citta.pk,
@@ -1348,7 +1432,7 @@ class StudenteDetailPerformanceTests(TestCase):
                 "iscrizioni-MIN_NUM_FORMS": "0",
                 "iscrizioni-MAX_NUM_FORMS": "1000",
                 "iscrizioni-0-id": "",
-                "iscrizioni-0-anno_scolastico": "",
+                "iscrizioni-0-anno_scolastico": self.anno.pk,
                 "iscrizioni-0-classe": "",
                 "iscrizioni-0-data_iscrizione": "",
                 "iscrizioni-0-data_fine_iscrizione": "",
@@ -1368,24 +1452,8 @@ class StudenteDetailPerformanceTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        html = response.content.decode()
-        self.assertIn("is-inline-edit-mode", html)
-        self.assertIn("is-inline-iscrizioni-layout", html)
-        self.assertIn("iscrizioni-inline-economic-grid", html)
-        self.assertIn("iscrizioni-inline-notes-edit-grid", html)
-        self.assertIn("inline-economic-row", html)
-        self.assertIn("inline-notes-row", html)
-        self.assertIn("Mostra dettagli", html)
-        self.assertIn('id="id_iscrizioni-0-condizione_iscrizione"', html)
-        self.assertIn('id="id_iscrizioni-0-agevolazione"', html)
-        self.assertIn('id="id_iscrizioni-0-importo_riduzione_speciale"', html)
-        self.assertIn('id="id_iscrizioni-0-modalita_pagamento_retta"', html)
-        self.assertIn('id="id_iscrizioni-0-sconto_unica_soluzione_tipo"', html)
-        self.assertIn('id="id_iscrizioni-0-sconto_unica_soluzione_valore"', html)
-        self.assertNotIn('class="inline-form-row inline-empty-row is-hidden">\n                                        <input type="hidden" name="iscrizioni-0-id"', html)
-        self.assertNotIn('class="inline-details-row inline-economic-row inline-empty-row is-hidden"', html)
-        self.assertNotIn('class="inline-details-row inline-notes-row inline-empty-row is-hidden"', html)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Iscrizione.objects.filter(studente=studente_senza_iscrizioni).exists())
 
 
 class StudentePrintTests(TestCase):

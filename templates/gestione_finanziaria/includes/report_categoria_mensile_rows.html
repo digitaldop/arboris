@@ -1,0 +1,35 @@
+{% load currency %}
+{% for riga in righe %}
+    <tr class="report-category-row report-category-{{ riga.row_tone }}{% if parent_id %} report-category-child is-hidden{% endif %}"
+        data-report-category-row="{{ riga.row_id }}"
+        {% if parent_id %}data-report-category-parent="{{ parent_id }}"{% endif %}>
+        <td class="report-category-name report-category-level-{{ riga.livello }}">
+            <div class="report-category-name-inner">
+                {% if riga.figli %}
+                    <button type="button"
+                            class="report-category-toggle"
+                            data-report-category-toggle="{{ riga.row_id }}"
+                            aria-expanded="false"
+                            aria-label="Espandi categoria {{ riga.categoria.nome }}">&#9656;</button>
+                {% else %}
+                    <span class="report-category-toggle-spacer"></span>
+                {% endif %}
+                <span class="{% if not parent_id %}report-category-root-label{% endif %}">{{ riga.categoria.nome }}</span>
+                <span class="table-muted">({{ riga.categoria.get_tipo_display }})</span>
+            </div>
+        </td>
+        {% for valore in riga.valori_mese %}
+            <td class="column-right">
+                {% if valore == 0 %}
+                    <span class="table-muted">-</span>
+                {% else %}
+                    {{ valore|euro }}
+                {% endif %}
+            </td>
+        {% endfor %}
+        <td class="column-right"><strong>{{ riga.totale|euro }}</strong></td>
+    </tr>
+    {% if riga.figli %}
+        {% include "gestione_finanziaria/includes/report_categoria_mensile_rows.html" with righe=riga.figli parent_id=riga.row_id only %}
+    {% endif %}
+{% endfor %}

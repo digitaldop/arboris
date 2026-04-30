@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Ripulisci movimenti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Ripulisci</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Ripulisci movimenti</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Indietro</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <div class="message message-error">
+            Questa operazione elimina definitivamente i movimenti finanziari selezionati.
+            I saldi dei conti interessati verranno ricalcolati dopo la cancellazione.
+        </div>
+        <p class="help-text">
+            Se i movimenti eliminati erano collegati a rate o scadenze fornitori, il collegamento
+            al movimento non sara' piu' disponibile. I dati economici delle rate e delle scadenze
+            gia' registrate non vengono modificati automaticamente.
+        </p>
+
+        <div class="dashboard-summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ statistiche.totale }}</div>
+                <div class="summary-label">Totale movimenti</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ statistiche.automatici }}</div>
+                <div class="summary-label">Import automatici file/PSD2</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ statistiche.manuali }}</div>
+                <div class="summary-label">Inserimenti manuali</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ statistiche.riconciliati_rate }}</div>
+                <div class="summary-label">Collegati a rate</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <form method="post" class="detail-form">
+            {% csrf_token %}
+            <table class="detail-table">
+                <tr>
+                    <th>{{ form.ambito.label_tag }}</th>
+                    <td>
+                        {{ form.ambito }}
+                        {{ form.ambito.errors }}
+                        <div class="help-text">{{ form.ambito.help_text }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>{{ form.conferma.label_tag }}</th>
+                    <td>
+                        {{ form.conferma }}
+                        {{ form.conferma.errors }}
+                        <div class="help-text">Scrivi ELIMINA per abilitare la cancellazione.</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Elimina movimenti selezionati</button>
+                <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

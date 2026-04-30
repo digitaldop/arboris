@@ -43,13 +43,16 @@ from calendario.data import build_dashboard_calendar_data
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
 from sistema.models import (
     AzioneOperazioneCronologia,
+    LivelloPermesso,
     Scuola,
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
 )
+from sistema.permissions import user_has_module_permission
 from sistema.terminology import get_student_terminology
 from scuola.models import AnnoScolastico, Classe
 from scuola.utils import resolve_default_anno_scolastico
+from gestione_finanziaria.services import build_home_financial_dashboard_data
 from django.forms import modelform_factory
 
 from django.db import transaction
@@ -380,7 +383,7 @@ def famiglia_studenti_inline_queryset(famiglia=None):
         return Studente.objects.none()
 
     return (
-        Studente.objects.filter(famiglia=famiglia)
+        annotate_studenti_current_iscrizione_status(Studente.objects.filter(famiglia=famiglia))
         .annotate(
             data_nascita_vuota=Case(
                 When(data_nascita__isnull=True, then=Value(1)),
@@ -396,6 +399,19 @@ def famiglia_studenti_inline_queryset(famiglia=None):
             "famiglia__indirizzo_principale__provincia",
         )
         .order_by("data_nascita_vuota", "data_nascita", "cognome", "nome", "id")
+    )
+
+
+def annotate_studenti_current_iscrizione_status(queryset, today=None):
+    today = today or timezone.localdate()
+    iscrizione_corrente = Iscrizione.objects.filter(
+        studente=OuterRef("pk"),
+        attiva=True,
+        anno_scolastico__data_inizio__lte=today,
+        anno_scolastico__data_fine__gte=today,
+    )
+    return queryset.annotate(
+        ha_iscrizione_attiva_corrente=Exists(iscrizione_corrente),
     )
 
 
@@ -1051,6 +1067,11 @@ def build_dashboard_school_year_statistics(anno_scolastico):
 def home(request):
     anno_corrente, anno_scolastico_corrente = resolve_current_school_year()
     impostazioni_generali = SistemaImpostazioniGenerali.objects.first()
+    can_view_gestione_finanziaria = user_has_module_permission(
+        request.user,
+        "gestione_finanziaria",
+        LivelloPermesso.VISUALIZZAZIONE,
+    )
     mostra_dashboard_prossimo_anno = bool(
         impostazioni_generali and impostazioni_generali.mostra_dashboard_prossimo_anno_scolastico
     )
@@ -1070,6 +1091,11 @@ def home(request):
         else build_economia_dashboard_data(None)
     )
     calendario_dashboard = build_dashboard_calendar_data()
+    gestione_finanziaria_dashboard = (
+        build_home_financial_dashboard_data()
+        if can_view_gestione_finanziaria
+        else None
+    )
 
     context = {
         "anno_scolastico_corrente": anno_scolastico_corrente,
@@ -1081,6 +1107,7 @@ def home(request):
         "dashboard_prossimo_anno": dashboard_prossimo_anno,
         "economia_dashboard_prossimo_anno": economia_dashboard_prossimo_anno,
         "calendario_dashboard": calendario_dashboard,
+        "gestione_finanziaria_dashboard": gestione_finanziaria_dashboard,
     }
 
     return render(request, "home.html", context)
@@ -2603,7 +2630,7 @@ def lista_studenti(request):
     q = request.GET.get("q", "").strip()
 
     studenti = (
-        Studente.objects
+        annotate_studenti_current_iscrizione_status(Studente.objects.all())
         .select_related(
             "famiglia",
             "famiglia__indirizzo_principale",

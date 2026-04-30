@@ -319,7 +319,7 @@
                         <table class="inline-table" id="iscrizioni-table">
                             <tbody>
                                 {% for f in iscrizioni_formset %}
-                                    <tr class="inline-form-row{% if f.instance.pk %} list-row-link{% endif %}{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_iscrizione' f.instance.pk %}"{% endif %}>
+                                    <tr class="inline-form-row{% if f.instance.pk %} list-row-link{% endif %}{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_iscrizione' f.instance.pk %}"{% endif %}>
                                         <td class="iscrizioni-row-cell">
                                             {{ f.id }}
                                             <div class="iscrizioni-inline-main-grid">
@@ -521,7 +521,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr class="inline-details-row inline-economic-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-details-row inline-economic-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         <td class="iscrizioni-row-cell">
                                             <div class="inline-details-panel iscrizioni-inline-edit-panel is-open" id="iscrizioni-note-panel-{{ forloop.counter0 }}">
                                                 <div class="iscrizioni-inline-details">
@@ -652,7 +652,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr class="inline-details-row inline-notes-row{% if not f.instance.pk and not f.errors and not show_inline_iscrizioni_editor %} inline-empty-row is-hidden{% endif %}">
+                                    <tr class="inline-details-row inline-notes-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
                                         <td class="iscrizioni-row-cell">
                                             <div class="iscrizioni-inline-view-notes mode-view-only">
                                                 <button
@@ -1241,7 +1241,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=46"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=47"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

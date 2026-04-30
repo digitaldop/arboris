@@ -488,6 +488,14 @@ class ConnessioneBancaria(models.Model):
 # =========================================================================
 
 
+class TipoContoFinanziario(models.TextChoices):
+    CONTO_CORRENTE = "conto_corrente", "Conto corrente"
+    CASSA_CONTANTI = "cassa_contanti", "Cassa contanti"
+    CARTA_PREPAGATA = "carta_prepagata", "Carta prepagata"
+    CARTA_CREDITO = "carta_credito", "Carta di credito"
+    ALTRO = "altro", "Altro"
+
+
 class ContoBancario(models.Model):
     """
     Conto corrente (reale o interno tipo 'cassa') monitorato dal software.
@@ -499,6 +507,12 @@ class ContoBancario(models.Model):
         max_length=150,
         help_text="Nome interno del conto, visibile nelle liste (es. 'Conto operativo BNL').",
     )
+    tipo_conto = models.CharField(
+        max_length=30,
+        choices=TipoContoFinanziario.choices,
+        default=TipoContoFinanziario.CONTO_CORRENTE,
+        help_text="Distingue conti bancari reali, cassa contanti, carte o altri saldi interni.",
+    )
     iban = models.CharField(max_length=34, blank=True)
     intestatario = models.CharField(max_length=200, blank=True)
     banca = models.CharField(max_length=150, blank=True)
@@ -508,6 +522,8 @@ class ContoBancario(models.Model):
         ProviderBancario,
         on_delete=models.PROTECT,
         related_name="conti",
+        blank=True,
+        null=True,
     )
     connessione = models.ForeignKey(
         ConnessioneBancaria,
@@ -563,7 +579,23 @@ class SaldoConto(models.Model):
     saldo_disponibile = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     valuta = models.CharField(max_length=3, default="EUR")
     fonte = models.CharField(max_length=20, choices=FonteSaldo.choices, default=FonteSaldo.PROVIDER)
+    note = models.TextField(blank=True)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="saldi_conto_creati",
+        blank=True,
+        null=True,
+    )
+    aggiornato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="saldi_conto_aggiornati",
+        blank=True,
+        null=True,
+    )
     data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "gestione_finanziaria_saldo_conto"
@@ -649,6 +681,15 @@ class OrigineMovimento(models.TextChoices):
     MANUALE = "manuale", "Inserimento manuale"
 
 
+class CanaleMovimento(models.TextChoices):
+    BANCA = "banca", "Banca"
+    CONTANTI = "contanti", "Contanti"
+    PERSONALE = "personale", "Spesa sostenuta da terzi"
+    CARTA = "carta", "Carta"
+    PREPAGATA = "prepagata", "Prepagata"
+    ALTRO = "altro", "Altro"
+
+
 class StatoRiconciliazione(models.TextChoices):
     NON_RICONCILIATO = "non_riconciliato", "Non riconciliato"
     RICONCILIATO = "riconciliato", "Riconciliato"
@@ -677,6 +718,13 @@ class MovimentoFinanziario(models.Model):
         max_length=20,
         choices=OrigineMovimento.choices,
         default=OrigineMovimento.MANUALE,
+    )
+    canale = models.CharField(
+        max_length=20,
+        choices=CanaleMovimento.choices,
+        default=CanaleMovimento.BANCA,
+        db_index=True,
+        help_text="Canale operativo: banca, contanti, carta/prepagata o spesa sostenuta da terzi.",
     )
     data_contabile = models.DateField(db_index=True)
     data_valuta = models.DateField(blank=True, null=True)
@@ -728,6 +776,19 @@ class MovimentoFinanziario(models.Model):
         default=False,
         help_text="True per movimenti che corrispondono al saldo reale del conto. False per voci gestionali.",
     )
+    sostenuta_da_terzi = models.BooleanField(
+        default=False,
+        help_text="True per spese sostenute da soci/genitori senza uscita dal conto della scuola.",
+    )
+    rimborsabile = models.BooleanField(
+        default=False,
+        help_text="True se la spesa sostenuta da terzi dovra' essere rimborsata.",
+    )
+    sostenitore = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="Persona o soggetto che ha sostenuto la spesa, se diversa dalla scuola.",
+    )
 
     stato_riconciliazione = models.CharField(
         max_length=25,
@@ -755,6 +816,7 @@ class MovimentoFinanziario(models.Model):
         indexes = [
             models.Index(fields=["conto", "data_contabile"], name="gf_mov_conto_data_idx"),
             models.Index(fields=["categoria", "data_contabile"], name="gf_mov_cat_data_idx"),
+            models.Index(fields=["canale", "data_contabile"], name="gf_mov_canale_data_idx"),
             models.Index(fields=["stato_riconciliazione"], name="gf_mov_stato_ric_idx"),
         ]
         constraints = [

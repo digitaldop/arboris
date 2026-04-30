@@ -132,6 +132,36 @@ urlpatterns = [
         gf_manage(views.ricalcola_saldo_conto_bancario),
         name="ricalcola_saldo_conto_bancario",
     ),
+    path(
+        "gestione-finanziaria/saldi-conti/",
+        gf_view(views.lista_saldi_conti),
+        name="lista_saldi_conti",
+    ),
+    path(
+        "gestione-finanziaria/saldi-conti/nuovo/",
+        gf_manage(views.crea_saldo_conto),
+        name="crea_saldo_conto",
+    ),
+    path(
+        "gestione-finanziaria/saldi-conti/import/",
+        gf_manage(views.import_saldi_conti),
+        name="import_saldi_conti",
+    ),
+    path(
+        "gestione-finanziaria/saldi-conti/template-csv/",
+        gf_view(views.scarica_template_saldi_conti_csv),
+        name="scarica_template_saldi_conti_csv",
+    ),
+    path(
+        "gestione-finanziaria/saldi-conti/<int:pk>/modifica/",
+        gf_edit(views.modifica_saldo_conto),
+        name="modifica_saldo_conto",
+    ),
+    path(
+        "gestione-finanziaria/saldi-conti/<int:pk>/elimina/",
+        gf_manage(views.elimina_saldo_conto),
+        name="elimina_saldo_conto",
+    ),
 
     # Movimenti finanziari
     path(
@@ -143,6 +173,11 @@ urlpatterns = [
         "gestione-finanziaria/movimenti/nuovo/",
         gf_manage(views.crea_movimento_manuale),
         name="crea_movimento_manuale",
+    ),
+    path(
+        "gestione-finanziaria/movimenti/ripulisci/",
+        gf_manage(views.pulizia_movimenti_finanziari),
+        name="pulizia_movimenti_finanziari",
     ),
     path(
         "gestione-finanziaria/movimenti/<int:pk>/modifica/",

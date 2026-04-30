@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Import saldi conti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_saldi_conti' %}">Saldi conti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Import CSV</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Import saldi conti</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'scarica_template_saldi_conti_csv' %}" class="btn btn-secondary">Scarica modello CSV</a>
+            <a href="{% url 'lista_saldi_conti' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <p class="help-text">
+            Il file puo' identificare il conto con <strong>nome_conto</strong> oppure <strong>conto_id</strong>.
+            Le date possono essere scritte come <strong>30/04/2026</strong> o <strong>30/04/2026 23:59</strong>.
+            Gli importi accettano sia il formato italiano <strong>1.000,00</strong> sia quello tecnico <strong>1000.00</strong>.
+            Sono riconosciuti anche gli export Banco BPM/CBI con colonne <strong>IBAN</strong>,
+            <strong>Saldo divisa</strong>, <strong>Saldo liquido</strong>, <strong>Saldo finale</strong> e
+            <strong>Saldo disponibile</strong>; se la data non e' nel file viene letta dal nome del CSV.
+        </p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                <tr>
+                    <th>{{ form.file.label_tag }}</th>
+                    <td>
+                        {{ form.file }} {{ form.file.errors }}
+                        {% if form.file.help_text %}<div class="help-text">{{ form.file.help_text }}</div>{% endif %}
+                    </td>
+                </tr>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Importa</button>
+                <a href="{% url 'lista_saldi_conti' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

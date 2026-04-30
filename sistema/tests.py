@@ -1,16 +1,19 @@
 from tempfile import TemporaryDirectory
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
 from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaRuoloPermessi, SistemaUtentePermessi
 from .popup_manifest import build_popup_manifest
 from anagrafica.models import Citta, Provincia, Regione
 from anagrafica.models import Indirizzo
+from gestione_finanziaria.models import MovimentoFinanziario
 
 
 class AuthenticationInterfaceTests(TestCase):
@@ -88,6 +91,7 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, f'href="{reverse("lista_famiglie")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_dipendenti")}"', html=False)
+        self.assertNotContains(response, "GESTIONE FINANZIARIA")
 
 
 class SidebarEconomiaTests(TestCase):
@@ -164,13 +168,14 @@ class SidebarGestioneFinanziariaTests(TestCase):
             "Scadenziario fornitori",
             "Categorie spesa",
             "<span>Conti correnti</span>",
-            "Conti bancari",
             "Movimenti",
             "Categorie movimenti",
             "Import estratto conto",
             "Riconciliazione",
             "Report categorie",
             "<span>Impostazioni conti correnti</span>",
+            "Conti bancari",
+            "Saldi conti",
             "Regole categorizzazione",
             "Connessioni PSD2",
             "Provider bancari",
@@ -182,6 +187,29 @@ class SidebarGestioneFinanziariaTests(TestCase):
             current_index = gestione_finanziaria_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+
+    def test_home_renders_financial_dashboard_block(self):
+        self.client.force_login(self.user)
+        today = timezone.localdate()
+        MovimentoFinanziario.objects.create(
+            data_contabile=today,
+            importo=Decimal("120.00"),
+            descrizione="Incasso test",
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=today,
+            importo=Decimal("-35.00"),
+            descrizione="Uscita test",
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-dashboard-section-id="gestione-finanziaria"', html=False)
+        self.assertContains(response, "dashboard-finance-chart-data")
+        self.assertContains(response, "dashboard-finanziaria.js")
+        self.assertContains(response, "EUR 120,00")
+        self.assertContains(response, "EUR 35,00")
 
 
 class SidebarSistemaTests(TestCase):

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{% if movimento %}Modifica movimento{% else %}Nuovo movimento manuale{% endif %} - Arboris School Management{% endblock %}
 
@@ -22,11 +23,12 @@
         </div>
     </div>
 
-    <form method="post" class="detail-form">
+    <form method="post" class="detail-form" data-movement-manual-form>
         {% csrf_token %}
         <div class="content-card">
             <table class="form-table">
                 <tr><th>{{ form.conto.label_tag }}</th><td>{{ form.conto }} {{ form.conto.errors }}</td></tr>
+                <tr><th>{{ form.canale.label_tag }}</th><td>{{ form.canale }} {{ form.canale.errors }}</td></tr>
                 <tr><th>{{ form.data_contabile.label_tag }}</th><td>{{ form.data_contabile }} {{ form.data_contabile.errors }}</td></tr>
                 <tr><th>{{ form.data_valuta.label_tag }}</th><td>{{ form.data_valuta }} {{ form.data_valuta.errors }}</td></tr>
                 <tr><th>{{ form.importo.label_tag }}</th><td>{{ form.importo }} {{ form.importo.errors }}</td></tr>
@@ -43,7 +45,7 @@
                         {% endif %}
                     </td>
                 </tr>
-                <tr>
+                <tr data-balance-impact-row>
                     <th>{{ form.incide_su_saldo_banca.label_tag }}</th>
                     <td>
                         {{ form.incide_su_saldo_banca }} {{ form.incide_su_saldo_banca.errors }}
@@ -52,6 +54,17 @@
                         {% endif %}
                     </td>
                 </tr>
+                <tr data-third-party-row>
+                    <th>{{ form.sostenuta_da_terzi.label_tag }}</th>
+                    <td>
+                        {{ form.sostenuta_da_terzi }} {{ form.sostenuta_da_terzi.errors }}
+                        {% if form.sostenuta_da_terzi.help_text %}
+                            <div class="help-text">{{ form.sostenuta_da_terzi.help_text }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr data-third-party-detail-row><th>{{ form.rimborsabile.label_tag }}</th><td>{{ form.rimborsabile }} {{ form.rimborsabile.errors }}</td></tr>
+                <tr data-third-party-detail-row><th>{{ form.sostenitore.label_tag }}</th><td>{{ form.sostenitore }} {{ form.sostenitore.errors }}</td></tr>
                 <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
             </table>
             <div class="form-actions">
@@ -60,4 +73,5 @@
             </div>
         </div>
     </form>
+    <script src="{% static 'js/pages/movimento-finanziario-form.js' %}?v=1"></script>
 {% endblock %}
