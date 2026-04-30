@@ -24,6 +24,7 @@ import time
 from typing import Iterable, Optional
 
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from ..models import (
@@ -32,15 +33,16 @@ from ..models import (
     MovimentoFinanziario,
     OrigineMovimento,
     ProviderBancario,
+    RegolaCategorizzazione,
     SincronizzazioneLog,
     StatoRiconciliazione,
     TipoOperazioneSincronizzazione,
 )
 from ..services import (
-    applica_regole_a_movimento,
     calcola_hash_deduplica_movimento,
     ricalcola_saldo_corrente_conto,
     riconcilia_movimento_automaticamente,
+    _regola_matcha_movimento,
 )
 from .base import BaseParser, ParsedMovimento, RisultatoImport
 
@@ -53,6 +55,7 @@ def importa_movimenti_da_file(
     conto: ContoBancario,
     provider: Optional[ProviderBancario] = None,
     nome_file: str = "",
+    riconcilia_automaticamente: bool = True,
 ) -> RisultatoImport:
     risultato = RisultatoImport()
     start = time.monotonic()
@@ -73,18 +76,36 @@ def importa_movimenti_da_file(
 
     movimenti_parsed = list(parsed_iter)
     risultato.totale_letti = len(movimenti_parsed)
-
-    for parsed in movimenti_parsed:
-        hash_dedup = calcola_hash_deduplica_movimento(
-            conto_id=conto.id,
-            data_contabile=parsed.data_contabile,
-            importo=parsed.importo,
-            descrizione=parsed.descrizione,
-            controparte=parsed.controparte,
-            iban_controparte=parsed.iban_controparte,
+    parsed_con_hash = [
+        (
+            parsed,
+            calcola_hash_deduplica_movimento(
+                conto_id=conto.id,
+                data_contabile=parsed.data_contabile,
+                importo=parsed.importo,
+                descrizione=parsed.descrizione,
+                controparte=parsed.controparte,
+                iban_controparte=parsed.iban_controparte,
+            ),
         )
+        for parsed in movimenti_parsed
+    ]
+    existing_hashes, existing_tx_ids = _duplicati_esistenti(conto, parsed_con_hash)
+    imported_hashes = set()
+    imported_tx_ids = set()
+    regole_categorizzazione = list(
+        RegolaCategorizzazione.objects.filter(attiva=True).order_by("priorita", "id")
+    )
+    regole_applicate = {}
 
-        if _esiste_duplicato(conto, parsed, hash_dedup):
+    for parsed, hash_dedup in parsed_con_hash:
+        provider_tx_id = parsed.provider_transaction_id or ""
+        if (
+            hash_dedup in existing_hashes
+            or hash_dedup in imported_hashes
+            or (provider_tx_id and provider_tx_id in existing_tx_ids)
+            or (provider_tx_id and provider_tx_id in imported_tx_ids)
+        ):
             risultato.duplicati += 1
             continue
 
@@ -104,16 +125,26 @@ def importa_movimenti_da_file(
             stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
         )
 
-        applica_regole_a_movimento(movimento)
+        regola_applicata = _applica_regole_precaricate(
+            movimento,
+            regole_categorizzazione,
+        )
+        if regola_applicata is not None:
+            regole_applicate[regola_applicata.pk] = regole_applicate.get(regola_applicata.pk, 0) + 1
         movimento.save()
-        candidato_riconciliazione = riconcilia_movimento_automaticamente(movimento)
-        if candidato_riconciliazione is not None:
-            risultato.riconciliati += 1
+        if riconcilia_automaticamente:
+            candidato_riconciliazione = riconcilia_movimento_automaticamente(movimento)
+            if candidato_riconciliazione is not None:
+                risultato.riconciliati += 1
 
         risultato.inseriti += 1
         risultato.movimenti_ids.append(movimento.id)
+        imported_hashes.add(hash_dedup)
+        if provider_tx_id:
+            imported_tx_ids.add(provider_tx_id)
 
     ricalcola_saldo_corrente_conto(conto)
+    _aggiorna_statistiche_regole(regole_applicate)
 
     durata_ms = int((time.monotonic() - start) * 1000)
     esito = EsitoSincronizzazione.OK
@@ -128,9 +159,13 @@ def importa_movimenti_da_file(
         durata_ms=durata_ms,
         esito=esito,
         messaggio_extra=(
-            f"File: {nome_file}; parser: {parser.nome_formato}"
+            f"File: {nome_file}; parser: {parser.nome_formato}; "
+            f"riconciliazione automatica: {'attiva' if riconcilia_automaticamente else 'disattivata'}"
             if nome_file
-            else f"Parser: {parser.nome_formato}"
+            else (
+                f"Parser: {parser.nome_formato}; "
+                f"riconciliazione automatica: {'attiva' if riconcilia_automaticamente else 'disattivata'}"
+            )
         ),
     )
 
@@ -140,22 +175,65 @@ def importa_movimenti_da_file(
     return risultato
 
 
-def _esiste_duplicato(
-    conto: ContoBancario, parsed: ParsedMovimento, hash_dedup: str
-) -> bool:
-    if parsed.provider_transaction_id:
-        esiste_tx = MovimentoFinanziario.objects.filter(
-            conto=conto,
-            provider_transaction_id=parsed.provider_transaction_id,
-        ).exists()
-        if esiste_tx:
-            return True
+def _applica_regole_precaricate(
+    movimento: MovimentoFinanziario,
+    regole: list[RegolaCategorizzazione],
+) -> Optional[RegolaCategorizzazione]:
+    if movimento.categoria_id and not movimento.categorizzazione_automatica:
+        return None
 
-    esiste_hash = MovimentoFinanziario.objects.filter(
-        conto=conto,
-        hash_deduplica=hash_dedup,
-    ).exists()
-    return esiste_hash
+    for regola in regole:
+        if _regola_matcha_movimento(regola, movimento):
+            movimento.categoria_id = regola.categoria_da_assegnare_id
+            movimento.categorizzazione_automatica = True
+            movimento.regola_categorizzazione = regola
+            movimento.categorizzato_il = timezone.now()
+            return regola
+
+    return None
+
+
+def _aggiorna_statistiche_regole(regole_applicate: dict[int, int]) -> None:
+    if not regole_applicate:
+        return
+
+    now = timezone.now()
+    for regola_id, count in regole_applicate.items():
+        RegolaCategorizzazione.objects.filter(pk=regola_id).update(
+            volte_applicata=F("volte_applicata") + count,
+            ultima_applicazione_at=now,
+        )
+
+
+def _duplicati_esistenti(
+    conto: ContoBancario, parsed_con_hash: list[tuple[ParsedMovimento, str]]
+) -> tuple[set[str], set[str]]:
+    hashes = {hash_dedup for _parsed, hash_dedup in parsed_con_hash if hash_dedup}
+    provider_tx_ids = {
+        parsed.provider_transaction_id
+        for parsed, _hash_dedup in parsed_con_hash
+        if parsed.provider_transaction_id
+    }
+
+    existing_hashes = set()
+    if hashes:
+        existing_hashes = set(
+            MovimentoFinanziario.objects.filter(
+                conto=conto,
+                hash_deduplica__in=hashes,
+            ).values_list("hash_deduplica", flat=True)
+        )
+
+    existing_tx_ids = set()
+    if provider_tx_ids:
+        existing_tx_ids = set(
+            MovimentoFinanziario.objects.filter(
+                conto=conto,
+                provider_transaction_id__in=provider_tx_ids,
+            ).values_list("provider_transaction_id", flat=True)
+        )
+
+    return existing_hashes, existing_tx_ids
 
 
 def _crea_log_import(

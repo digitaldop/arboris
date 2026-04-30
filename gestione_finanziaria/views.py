@@ -1837,16 +1837,14 @@ def _build_import_preview(parser, raw_bytes, conto):
     duplicati = 0
     esempi = []
     date = []
+    preview_hashes = []
+    existing_hashes = set()
+    existing_tx_ids = set()
 
-    for movimento in parsed:
-        date.append(movimento.data_contabile)
-        if movimento.importo > 0:
-            entrate += movimento.importo
-        elif movimento.importo < 0:
-            uscite += abs(movimento.importo)
-
-        is_duplicate = False
-        if conto:
+    if conto and parsed:
+        hash_set = set()
+        tx_set = set()
+        for movimento in parsed:
             hash_dedup = calcola_hash_deduplica_movimento(
                 conto_id=conto.id,
                 data_contabile=movimento.data_contabile,
@@ -1855,12 +1853,53 @@ def _build_import_preview(parser, raw_bytes, conto):
                 controparte=movimento.controparte,
                 iban_controparte=movimento.iban_controparte,
             )
-            duplicate_filter = Q(conto=conto, hash_deduplica=hash_dedup)
+            preview_hashes.append(hash_dedup)
+            hash_set.add(hash_dedup)
             if movimento.provider_transaction_id:
-                duplicate_filter |= Q(conto=conto, provider_transaction_id=movimento.provider_transaction_id)
-            is_duplicate = MovimentoFinanziario.objects.filter(duplicate_filter).exists()
+                tx_set.add(movimento.provider_transaction_id)
+
+        if hash_set:
+            existing_hashes = set(
+                MovimentoFinanziario.objects.filter(
+                    conto=conto,
+                    hash_deduplica__in=hash_set,
+                ).values_list("hash_deduplica", flat=True)
+            )
+        if tx_set:
+            existing_tx_ids = set(
+                MovimentoFinanziario.objects.filter(
+                    conto=conto,
+                    provider_transaction_id__in=tx_set,
+                ).values_list("provider_transaction_id", flat=True)
+            )
+    else:
+        preview_hashes = [""] * len(parsed)
+
+    seen_hashes = set()
+    seen_tx_ids = set()
+
+    for index, movimento in enumerate(parsed):
+        date.append(movimento.data_contabile)
+        if movimento.importo > 0:
+            entrate += movimento.importo
+        elif movimento.importo < 0:
+            uscite += abs(movimento.importo)
+
+        is_duplicate = False
+        if conto:
+            hash_dedup = preview_hashes[index]
+            provider_tx_id = movimento.provider_transaction_id or ""
+            is_duplicate = (
+                hash_dedup in existing_hashes
+                or hash_dedup in seen_hashes
+                or (provider_tx_id and provider_tx_id in existing_tx_ids)
+                or (provider_tx_id and provider_tx_id in seen_tx_ids)
+            )
             if is_duplicate:
                 duplicati += 1
+            seen_hashes.add(hash_dedup)
+            if provider_tx_id:
+                seen_tx_ids.add(provider_tx_id)
 
         if len(esempi) < 8:
             esempi.append(
@@ -1912,6 +1951,7 @@ def import_estratto_conto(request):
                 conto=conto,
                 provider=conto.provider,
                 nome_file=payload.get("nome_file", ""),
+                riconcilia_automaticamente=False,
             )
             cache.delete(f"gf-import-estratto:{import_token}")
 
@@ -1919,7 +1959,8 @@ def import_estratto_conto(request):
                 messages.success(
                     request,
                     f"Import completato: {risultato.inseriti} movimenti inseriti "
-                    f"(riconciliati: {risultato.riconciliati}, duplicati scartati: {risultato.duplicati}).",
+                    f"(duplicati scartati: {risultato.duplicati}). "
+                    "La riconciliazione delle rette può essere avviata dalla pagina dedicata.",
                 )
             elif risultato.errori:
                 messages.error(

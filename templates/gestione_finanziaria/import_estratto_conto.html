@@ -31,6 +31,11 @@
             Arboris prova a riconoscere automaticamente formato, colonne, date, importi e conto bancario.
             Prima dell&rsquo;import definitivo viene sempre mostrata un&rsquo;anteprima.
         </p>
+        <p>
+            Per evitare timeout sui file con molti movimenti, l&rsquo;import registra prima i movimenti bancari.
+            La riconciliazione delle rette si avvia poi dalla
+            <a href="{% url 'lista_movimenti_da_riconciliare' %}">pagina dedicata</a>.
+        </p>
     </div>
 
     <form method="post" enctype="multipart/form-data" class="detail-form">
@@ -176,6 +181,10 @@
     {% if risultato %}
         <div class="content-card">
             <h2 class="section-title">Esito dell'ultimo import</h2>
+            <p class="table-muted">
+                I movimenti sono stati importati senza avviare la riconciliazione automatica nella stessa richiesta.
+                Puoi riconciliarli dalla <a href="{% url 'lista_movimenti_da_riconciliare' %}">pagina dedicata</a>.
+            </p>
             <div class="summary-grid">
                 <div class="summary-item">
                     <div class="summary-value">{{ risultato.totale_letti }}</div>
