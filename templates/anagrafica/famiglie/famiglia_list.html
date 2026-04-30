@@ -19,23 +19,22 @@
 
     <!-- INIZIO BARRA DI RICERCA -->
     <div class="list-toolbar">
-        <form method="get" class="search-form">
+        <form method="get" class="search-form" data-live-list-form data-live-list-target="#famiglie-results">
             <input
                 type="text"
                 name="q"
                 value="{{ q|default:'' }}"
                 placeholder="Cerca per cognome famiglia, familiare, studente, email, telefono..."
                 class="search-input"
+                data-live-list-input
             >
             <button type="submit" class="btn btn-secondary">Cerca</button>
-            {% if q %}
-                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Pulisci</a>
-            {% endif %}
+            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary" data-live-list-clear{% if not q %} hidden{% endif %}>Pulisci</a>
         </form>
     </div>
     <!-- FINE BARRA DI RICERCA -->
 
-    <div class="panel panel-standalone">
+    <div class="panel panel-standalone list-live-search-results" id="famiglie-results" data-live-list-results>
         <div class="panel-body">
             {% if famiglie %}
                 <table class="list-table">

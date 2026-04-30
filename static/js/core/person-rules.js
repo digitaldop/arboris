@@ -151,6 +151,76 @@ window.ArborisPersonRules = (function () {
         return { sync: sync };
     }
 
+    function bindTrackedSexFromFirstName(options) {
+        options = options || {};
+
+        const root = options.root || document;
+        const nameInput = resolveElement(options.nameInput || options.nameSelector, root);
+        const sexSelect = resolveElement(options.sexSelect || options.sexSelector, root);
+        const bindFlag = options.bindFlag || "personRulesTrackedFirstNameBound";
+        const selectBindFlag = options.selectBindFlag || `${bindFlag}Select`;
+        const sourceKey = options.sourceKey || bindFlag;
+        const sourceDatasetKey = options.sourceDatasetKey || `${bindFlag}Source`;
+        const manualDatasetKey = options.manualDatasetKey || `${bindFlag}Manual`;
+        const syncingDatasetKey = options.syncingDatasetKey || `${bindFlag}Syncing`;
+        const events = options.events || ["input", "change", "blur"];
+
+        function sync() {
+            if (!nameInput || !sexSelect) {
+                return false;
+            }
+
+            if (sexSelect.dataset[manualDatasetKey] === "1") {
+                return false;
+            }
+
+            const inferredSex = inferSexFromFirstName(nameInput.value);
+            if (!inferredSex) {
+                return false;
+            }
+
+            const currentValue = sexSelect.value || "";
+            const currentSource = sexSelect.dataset[sourceDatasetKey] || "";
+            const canOverwrite = options.overwriteExisting || !currentValue || currentSource === sourceKey;
+
+            if (!canOverwrite || currentValue === inferredSex) {
+                return false;
+            }
+
+            sexSelect.dataset[syncingDatasetKey] = "1";
+            sexSelect.value = inferredSex;
+            sexSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            delete sexSelect.dataset[syncingDatasetKey];
+            sexSelect.dataset[sourceDatasetKey] = sourceKey;
+
+            return true;
+        }
+
+        if (!nameInput || !sexSelect) {
+            return { sync: sync };
+        }
+
+        if (sexSelect.dataset[selectBindFlag] !== "1") {
+            sexSelect.dataset[selectBindFlag] = "1";
+            sexSelect.addEventListener("change", function () {
+                if (sexSelect.dataset[syncingDatasetKey] === "1") {
+                    return;
+                }
+                sexSelect.dataset[manualDatasetKey] = "1";
+            });
+        }
+
+        if (nameInput.dataset[bindFlag] !== "1") {
+            nameInput.dataset[bindFlag] = "1";
+            events.forEach(function (eventName) {
+                nameInput.addEventListener(eventName, sync);
+            });
+        }
+
+        sync();
+        return { sync: sync };
+    }
+
     function bindSexFromRelation(options) {
         options = options || {};
 
@@ -188,6 +258,7 @@ window.ArborisPersonRules = (function () {
     return {
         applyInferredSex: applyInferredSex,
         bindSexFromFirstName: bindSexFromFirstName,
+        bindTrackedSexFromFirstName: bindTrackedSexFromFirstName,
         bindSexFromRelation: bindSexFromRelation,
         normalizeText: normalizeText,
         inferSexFromFirstName: inferSexFromFirstName,

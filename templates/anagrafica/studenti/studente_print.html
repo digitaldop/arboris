@@ -253,8 +253,8 @@
                     <div class="info-item">
                         <div class="info-label">Luogo nascita</div>
                         <div class="info-value">
-                            {% if studente.luogo_nascita %}
-                                {{ studente.luogo_nascita }}
+                            {% if studente.luogo_nascita_display %}
+                                {{ studente.luogo_nascita_display }}
                             {% else %}
                                 <span class="table-muted">Non indicato</span>
                             {% endif %}

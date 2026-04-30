@@ -128,17 +128,21 @@
         const dataNascita = resolveField("[data-cf-data-nascita]");
         const sesso = resolveField("[data-cf-sesso]");
         const luogoId = resolveField("[data-cf-luogo-id]");
+        const nazioneId = resolveField("[data-cf-nazione-id]");
         const output = resolveField("[data-cf-output]");
 
-        if (!nome || !cognome || !dataNascita || !sesso || !luogoId || !output) return;
+        if (!nome || !cognome || !dataNascita || !sesso || (!luogoId && !nazioneId) || !output) return;
 
         container.dataset.cfReady = "1";
 
         function refresh() {
-            const selectedLuogoOption = luogoId.options ? luogoId.options[luogoId.selectedIndex] : null;
+            const selectedLuogoOption = luogoId && luogoId.options ? luogoId.options[luogoId.selectedIndex] : null;
+            const selectedNazioneOption = nazioneId && nazioneId.options ? nazioneId.options[nazioneId.selectedIndex] : null;
             const codiceCatastale = (
-                luogoId.dataset.codiceCatastale ||
+                (luogoId ? luogoId.dataset.codiceCatastale : "") ||
                 (selectedLuogoOption ? selectedLuogoOption.dataset.codiceCatastale : "") ||
+                (nazioneId ? nazioneId.dataset.codiceCatastale : "") ||
+                (selectedNazioneOption ? selectedNazioneOption.dataset.codiceCatastale : "") ||
                 ""
             );
             const nextValue = generateCodiceFiscale({
@@ -166,7 +170,8 @@
             }
         }
 
-        [nome, cognome, dataNascita, sesso, luogoId].forEach((field) => {
+        [nome, cognome, dataNascita, sesso, luogoId, nazioneId].forEach((field) => {
+            if (!field) return;
             field.addEventListener("change", refresh);
             field.addEventListener("input", refresh);
         });

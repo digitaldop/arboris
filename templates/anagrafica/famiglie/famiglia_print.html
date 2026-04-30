@@ -261,7 +261,7 @@
                                 <td>{{ familiare.nome }}</td>
                                 <td>{{ familiare.relazione_familiare }}</td>
                                     <td>{{ familiare.data_nascita|it_date|default:"-" }}</td>
-                                <td>{{ familiare.luogo_nascita|default:"-" }}</td>
+                                <td>{{ familiare.luogo_nascita_display|default:"-" }}</td>
                                 <td>{{ familiare.codice_fiscale|default:"-" }}</td>
                                 <td>{{ familiare.formatted_telefono|default:"-" }}</td>
                                 <td>{{ familiare.email|default:"-" }}</td>
@@ -301,7 +301,7 @@
                                 <td>{{ studente.cognome }}</td>
                                 <td>{{ studente.nome }}</td>
                                         <td>{{ studente.data_nascita|it_date|default:"-" }}</td>
-                                <td>{{ studente.luogo_nascita|default:"-" }}</td>
+                                <td>{{ studente.luogo_nascita_display|default:"-" }}</td>
                                 <td>
                                     {% if studente.indirizzo_effettivo %}
                                         {{ studente.indirizzo_effettivo.label_full }}

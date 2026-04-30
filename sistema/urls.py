@@ -38,6 +38,11 @@ urlpatterns = [
         name="importa_dati_base_anagrafica",
     ),
     path(
+        "sistema/impostazioni-generali/importa-nazioni-belfiore/",
+        sistema_manage(views.importa_nazioni_belfiore_anagrafica),
+        name="importa_nazioni_belfiore_anagrafica",
+    ),
+    path(
         "sistema/backup-database/",
         database_backup_access_required(views.backup_database_sistema),
         name="backup_database_sistema",

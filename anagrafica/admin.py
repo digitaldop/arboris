@@ -3,6 +3,7 @@ from .models import (
     Regione,
     Provincia,
     Citta,
+    Nazione,
     CAP,
     StatoRelazioneFamiglia,
     RelazioneFamiliare,
@@ -121,6 +122,14 @@ class CAPAdmin(admin.ModelAdmin):
     ordering = ("ordine", "codice")
 
 
+@admin.register(Nazione)
+class NazioneAdmin(admin.ModelAdmin):
+    list_display = ("nome", "nome_nazionalita", "codice_iso2", "codice_iso3", "codice_belfiore", "ordine", "attiva")
+    list_filter = ("attiva",)
+    search_fields = ("nome", "nome_nazionalita", "codice_iso2", "codice_iso3", "codice_belfiore")
+    ordering = ("ordine", "nome")
+
+
 #Modulo per gli indirizzi, visualizzabile dalla Home dell'Admin, per poter gestire gli indirizzi in modo centralizzato
 @admin.register(Indirizzo)
 class IndirizzoAdmin(admin.ModelAdmin):
@@ -225,6 +234,8 @@ class FamiliareAdmin(admin.ModelAdmin):
         "email",
         "codice_fiscale",
         "luogo_nascita__nome",
+        "nazione_nascita__nome",
+        "luogo_nascita_custom",
         "famiglia__cognome_famiglia",
     )
     ordering = ("cognome", "nome")
@@ -261,6 +272,9 @@ class FamiliareAdmin(admin.ModelAdmin):
                     "data_nascita",
                     "sesso",
                     "luogo_nascita",
+                    "nazione_nascita",
+                    "luogo_nascita_custom",
+                    "nazionalita",
                 )
             },
         ),
@@ -289,7 +303,7 @@ class FamiliareAdmin(admin.ModelAdmin):
         indirizzo = obj.indirizzo_effettivo
         return str(indirizzo) if indirizzo else "-"
     
-    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita")
+    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
 
 
 @admin.register(Studente)
@@ -308,6 +322,8 @@ class StudenteAdmin(admin.ModelAdmin):
         "nome",
         "codice_fiscale",
         "luogo_nascita__nome",
+        "nazione_nascita__nome",
+        "luogo_nascita_custom",
         "famiglia__cognome_famiglia",
     )
     ordering = ("cognome", "nome")
@@ -333,6 +349,9 @@ class StudenteAdmin(admin.ModelAdmin):
                     "data_nascita",
                     "sesso",
                     "luogo_nascita",
+                    "nazione_nascita",
+                    "luogo_nascita_custom",
+                    "nazionalita",
                     "codice_fiscale",
                 )
             },
@@ -352,7 +371,7 @@ class StudenteAdmin(admin.ModelAdmin):
         indirizzo = obj.indirizzo_effettivo
         return str(indirizzo) if indirizzo else "-"
     
-    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita")
+    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
 
 #Visualizzazione del modulo indirizzo dalla Home dell'Admin
 '''@admin.register(Indirizzo)

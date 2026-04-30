@@ -144,10 +144,12 @@
                                     Regione, province, città (con codice ISTAT e codice Belfiore/catastale) e collegamento CAP
                                     vengono letti dal file
                                     <code>import/gi_comuni_cap.xlsx</code> nella cartella del progetto (sul server).
+                                    Nazioni, nazionalita e codici Belfiore esteri vengono letti dal file
+                                    <code>import/nazioni_belfiore.csv</code>.
                                     L'import unisce o aggiorna i record; non cancella dati esistenti (né indirizzi collegati).
                                 </p>
                                 {% if can_manage_sistema %}
-                                    <p style="margin: 0.75rem 0 0;">
+                                    <p style="margin: 0.75rem 0 0; display:flex; gap:0.6rem; flex-wrap:wrap;">
                                         <button
                                             type="submit"
                                             class="btn btn-secondary"
@@ -157,6 +159,24 @@
                                         >
                                             Importa dati base (comuni, CAP, …)
                                         </button>
+                                        <button
+                                            type="submit"
+                                            class="btn btn-secondary"
+                                            form="import-nazioni-belfiore-form"
+                                            id="import-nazioni-belfiore-btn"
+                                            {% if not nazioni_belfiore_file_ready %}disabled title="File non presente nel deploy"{% else %}onclick="return confirm('Procedere con import da nazioni_belfiore.csv?');"{% endif %}
+                                        >
+                                            Importa nazioni e nazionalita
+                                        </button>
+                                    </p>
+                                {% endif %}
+                                {% if not nazioni_belfiore_file_ready %}
+                                    <p class="help-text" style="color: var(--color-warning-text, #8a4b00); margin-top:0.5rem;">
+                                        File nazioni assente: <code>{{ nazioni_belfiore_file_path }}</code>. Aggiungilo in repository o sul server e rideploya.
+                                    </p>
+                                {% else %}
+                                    <p class="help-text" style="margin-top:0.5rem;">
+                                        File nazioni utilizzato: <code>{{ nazioni_belfiore_file_path }}</code>
                                     </p>
                                 {% endif %}
                                 {% if not dati_base_file_ready %}
@@ -283,6 +303,15 @@
             id="import-dati-base-form"
             method="post"
             action="{% url 'importa_dati_base_anagrafica' %}"
+            style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"
+            aria-hidden="true"
+        >
+            {% csrf_token %}
+        </form>
+        <form
+            id="import-nazioni-belfiore-form"
+            method="post"
+            action="{% url 'importa_nazioni_belfiore_anagrafica' %}"
             style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"
             aria-hidden="true"
         >

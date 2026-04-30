@@ -160,8 +160,8 @@
                                     <th>{{ form.luogo_nascita.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if studente and studente.luogo_nascita %}
-                                                {{ studente.luogo_nascita }}
+                                            {% if studente and studente.luogo_nascita_display %}
+                                                {{ studente.luogo_nascita_display }}
                                             {% else %}
                                                 <span class="table-muted">Non indicato</span>
                                             {% endif %}
@@ -170,10 +170,30 @@
                                             <div class="autocomplete-wrapper citta-autocomplete">
                                                 {{ form.luogo_nascita_search }}
                                                 {{ form.luogo_nascita }}
+                                                {{ form.nazione_nascita }}
+                                                {{ form.luogo_nascita_custom }}
                                             </div>
                                         </div>
                                         {{ form.luogo_nascita_search.errors }}
                                         {{ form.luogo_nascita.errors }}
+                                        {{ form.nazione_nascita.errors }}
+                                        {{ form.luogo_nascita_custom.errors }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.nazionalita.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if studente and studente.nazionalita %}
+                                                {{ studente.nazionalita_display }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.nazionalita }}
+                                        </div>
+                                        {{ form.nazionalita.errors }}
                                     </td>
                                 </tr>
                                 <tr>

@@ -100,6 +100,83 @@ class Citta(models.Model):
         if self.ordine is None:
             self.ordine = next_order_value(Citta)
         super().save(*args, **kwargs)
+
+
+class Nazione(models.Model):
+    nome = models.CharField(max_length=120, db_index=True)
+    nome_nazionalita = models.CharField(max_length=120, blank=True)
+    codice_iso2 = models.CharField(max_length=2, blank=True)
+    codice_iso3 = models.CharField(max_length=3, blank=True)
+    codice_belfiore = models.CharField(max_length=4, blank=True, db_index=True)
+    ordine = models.IntegerField(blank=True, null=True)
+    attiva = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["ordine", "nome"]
+        verbose_name = "Nazione"
+        verbose_name_plural = "Nazioni"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["codice_belfiore"],
+                condition=~models.Q(codice_belfiore=""),
+                name="unique_nazione_codice_belfiore_non_vuoto",
+            ),
+        ]
+
+    def __str__(self):
+        return self._format_display_text(self.nome)
+
+    @property
+    def label_nazionalita(self):
+        return self._format_display_text(self.nome_nazionalita or self.nome)
+
+    @staticmethod
+    def _format_display_text(value):
+        text = (value or "").strip()
+        if not text:
+            return ""
+        if not text.isupper() and not text.islower():
+            return text
+        lowercase_words = {
+            "a",
+            "al",
+            "allo",
+            "alla",
+            "alle",
+            "agli",
+            "con",
+            "da",
+            "dal",
+            "dalla",
+            "de",
+            "dei",
+            "del",
+            "della",
+            "delle",
+            "di",
+            "e",
+            "ed",
+            "in",
+            "per",
+        }
+        parts = []
+        for index, word in enumerate(text.split(" ")):
+            title_word = word.lower().title()
+            lower_word = title_word.lower()
+            if index and lower_word in lowercase_words:
+                parts.append(lower_word)
+            else:
+                parts.append(title_word)
+        return " ".join(parts)
+
+    def save(self, *args, **kwargs):
+        self.codice_iso2 = (self.codice_iso2 or "").upper().strip()
+        self.codice_iso3 = (self.codice_iso3 or "").upper().strip()
+        self.codice_belfiore = (self.codice_belfiore or "").upper().strip()
+        self.nome_nazionalita = (self.nome_nazionalita or "").strip()
+        if self.ordine is None:
+            self.ordine = next_order_value(Nazione)
+        super().save(*args, **kwargs)
     
 
 #Classe per il CAP italiano, da utilizzare come scelta per i campi CAP degli indirizzi
@@ -393,6 +470,21 @@ class Familiare(models.Model):
         blank=True,
         null=True,
     )
+    nazione_nascita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="familiari_nati",
+        blank=True,
+        null=True,
+    )
+    luogo_nascita_custom = models.CharField(max_length=160, blank=True)
+    nazionalita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="familiari_nazionalita",
+        blank=True,
+        null=True,
+    )
     convivente = models.BooleanField(default=False)
     referente_principale = models.BooleanField(default=False)
     abilitato_scambio_retta = models.BooleanField(default=False)
@@ -418,6 +510,20 @@ class Familiare(models.Model):
     @property
     def telefono_whatsapp_url(self):
         return whatsapp_url_from_phone(self.telefono)
+
+    @property
+    def luogo_nascita_display(self):
+        if self.luogo_nascita:
+            return str(self.luogo_nascita)
+        if self.nazione_nascita:
+            return str(self.nazione_nascita)
+        return self.luogo_nascita_custom
+
+    @property
+    def nazionalita_display(self):
+        if self.nazionalita:
+            return self.nazionalita.label_nazionalita
+        return ""
 
 # FINE MODELLI PER I FAMILIARI
 
@@ -446,6 +552,21 @@ class Studente(models.Model):
         blank=True,
         null=True,
     )
+    nazione_nascita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="studenti_nati",
+        blank=True,
+        null=True,
+    )
+    luogo_nascita_custom = models.CharField(max_length=160, blank=True)
+    nazionalita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="studenti_nazionalita",
+        blank=True,
+        null=True,
+    )
     sesso = models.CharField(max_length=1, choices=SESSO_CHOICES, blank=True)
     codice_fiscale = models.CharField(max_length=16, blank=True)
     attivo = models.BooleanField(default=True)
@@ -462,6 +583,20 @@ class Studente(models.Model):
     @property
     def indirizzo_effettivo(self):
         return self.indirizzo or self.famiglia.indirizzo_principale
+
+    @property
+    def luogo_nascita_display(self):
+        if self.luogo_nascita:
+            return str(self.luogo_nascita)
+        if self.nazione_nascita:
+            return str(self.nazione_nascita)
+        return self.luogo_nascita_custom
+
+    @property
+    def nazionalita_display(self):
+        if self.nazionalita:
+            return self.nazionalita.label_nazionalita
+        return ""
     
 # FINE MODELLI PER GLI STUDENTI
 

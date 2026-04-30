@@ -241,8 +241,8 @@
                                     <th>{{ form.luogo_nascita.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if familiare and familiare.luogo_nascita %}
-                                                {{ familiare.luogo_nascita }}
+                                            {% if familiare and familiare.luogo_nascita_display %}
+                                                {{ familiare.luogo_nascita_display }}
                                             {% else %}
                                                 <span class="table-muted">Non indicato</span>
                                             {% endif %}
@@ -251,10 +251,28 @@
                                             <div class="autocomplete-wrapper citta-autocomplete">
                                                 {{ form.luogo_nascita_search }}
                                                 {{ form.luogo_nascita }}
+                                                {{ form.nazione_nascita }}
+                                                {{ form.luogo_nascita_custom }}
                                             </div>
                                         </div>
                                         {{ form.luogo_nascita_search.errors }}
                                         {{ form.luogo_nascita.errors }}
+                                        {{ form.nazione_nascita.errors }}
+                                        {{ form.luogo_nascita_custom.errors }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.nazionalita.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare and familiare.nazionalita %}
+                                                {{ familiare.nazionalita_display }}
+                                            {% else %}
+                                                <span class="table-muted">Non indicata</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.nazionalita }}</div>
+                                        {{ form.nazionalita.errors }}
                                     </td>
                                 </tr>
 
@@ -633,7 +651,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=23"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=24"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

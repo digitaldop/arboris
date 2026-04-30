@@ -47,7 +47,12 @@ from .models import (
     SistemaUtentePermessi,
     StatoRipristinoDatabase,
 )
-from anagrafica.dati_base_import import default_gi_file_path, run_import_dati_base
+from anagrafica.dati_base_import import (
+    default_gi_file_path,
+    default_nazioni_belfiore_file_path,
+    run_import_dati_base,
+    run_import_nazioni_belfiore,
+)
 
 from .permissions import operational_admin_required
 
@@ -216,6 +221,7 @@ def impostazioni_generali_sistema(request):
         form = SistemaImpostazioniGeneraliForm(instance=impostazioni)
 
     p = default_gi_file_path()
+    nazioni_path = default_nazioni_belfiore_file_path()
     return render(
         request,
         "sistema/impostazioni_generali_form.html",
@@ -224,6 +230,8 @@ def impostazioni_generali_sistema(request):
             "impostazioni": impostazioni_display,
             "dati_base_file_ready": p.is_file(),
             "dati_base_file_path": str(p),
+            "nazioni_belfiore_file_ready": nazioni_path.is_file(),
+            "nazioni_belfiore_file_path": str(nazioni_path),
         },
     )
 
@@ -257,6 +265,40 @@ def importa_dati_base_anagrafica(request):
             f"Nuove regioni: {stats['regioni_creati']}, nuove province: {stats['province_creati']}, "
             f"elaborazione città (righe): {stats['citta_righe']}, CAP creati: {stats['cap_creati']}, "
             f"CAP non importati (città mancante): {stats['cap_saltati']}, "
+            f"durata: {stats.get('durata_secondi', 0)} secondi."
+        ),
+    )
+    return redirect("impostazioni_generali_sistema")
+
+
+def importa_nazioni_belfiore_anagrafica(request):
+    """
+    Avvia l'import di nazioni, nazionalitÃ  e codici Belfiore esteri da import/nazioni_belfiore.csv.
+    Protetto a livello Sistema: solo chi ha permesso di gestione sul modulo.
+    """
+    if request.method != "POST":
+        return redirect("impostazioni_generali_sistema")
+    p = default_nazioni_belfiore_file_path()
+    if not p.is_file():
+        messages.error(
+            request,
+            f"File assente sul server: {p}. Carica o committa il file nella cartella import del progetto e ridistribuisci.",
+        )
+        return redirect("impostazioni_generali_sistema")
+    try:
+        stats = run_import_nazioni_belfiore(file_path=p)
+    except ValidationError as e:
+        messages.error(request, " ".join(e.messages) if e.messages else str(e))
+        return redirect("impostazioni_generali_sistema")
+    except Exception as e:  # noqa: BLE001 - logica operativa: mostra errore generico
+        messages.error(request, f"Errore durante l'import nazioni: {e}")
+        return redirect("impostazioni_generali_sistema")
+    messages.success(
+        request,
+        (
+            f"Import nazioni eseguito. File: {stats.get('file', p)}. "
+            f"Righe elaborate: {stats['righe']}, nuove nazioni: {stats['nazioni_create']}, "
+            f"nazioni aggiornate: {stats['nazioni_aggiornate']}, invariate: {stats['nazioni_invariate']}, "
             f"durata: {stats.get('durata_secondi', 0)} secondi."
         ),
     )

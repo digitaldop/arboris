@@ -5,6 +5,7 @@ Usato dal comando `import_dati_base` e dal pulsante in Impostazioni generali.
 """
 from __future__ import annotations
 
+import csv
 import re
 from pathlib import Path
 from time import perf_counter
@@ -15,14 +16,19 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from anagrafica.models import CAP, Citta, Provincia, Regione
+from anagrafica.models import CAP, Citta, Nazione, Provincia, Regione
 
 # Percorso predefinito (relativo a BASE_DIR) per il file unico comuni+CAP
 GI_COMUNI_CAP_REL_PATH = "import/gi_comuni_cap.xlsx"
+NAZIONI_BELFIORE_REL_PATH = "import/nazioni_belfiore.csv"
 
 
 def default_gi_file_path() -> Path:
     return Path(settings.BASE_DIR) / GI_COMUNI_CAP_REL_PATH
+
+
+def default_nazioni_belfiore_file_path() -> Path:
+    return Path(settings.BASE_DIR) / NAZIONI_BELFIORE_REL_PATH
 
 
 def normalizza_nome_colonna(nome: str) -> str:
@@ -488,6 +494,212 @@ def _try_read_and_map_excel(
 
 # Molti file (es. gi_comuni_cap) hanno riga 0 = titolo marketing, riga 1 = intestazioni reali.
 DEFAULT_HEADER_ROW_CANDIDATES = (1, 0, 2)
+
+
+def normalizza_valore_csv(valore: Any, *, uppercase: bool = False) -> str:
+    testo = str(valore or "").strip()
+    testo = re.sub(r"\s+", " ", testo)
+    if uppercase:
+        return testo.upper()
+    return testo
+
+
+PAROLE_MINUSCOLE_NOMI = {
+    "a",
+    "al",
+    "allo",
+    "alla",
+    "alle",
+    "agli",
+    "con",
+    "da",
+    "dal",
+    "dalla",
+    "de",
+    "dei",
+    "del",
+    "della",
+    "delle",
+    "di",
+    "e",
+    "ed",
+    "in",
+    "per",
+}
+
+
+def _capitalizza_parola_testo(parola: str, *, prima: bool = False) -> str:
+    if not parola:
+        return parola
+
+    prefisso = ""
+    suffisso = ""
+    while parola.startswith(("(", "[", "{")):
+        prefisso += parola[0]
+        parola = parola[1:]
+    while parola.endswith((")", "]", "}", ",", ".")):
+        suffisso = parola[-1] + suffisso
+        parola = parola[:-1]
+
+    if not parola:
+        return prefisso + suffisso
+
+    parola = parola.lower().title()
+    parti = []
+    for parte in parola.split("-"):
+        parte_lower = parte.lower()
+        if not prima and parte_lower in PAROLE_MINUSCOLE_NOMI:
+            parti.append(parte_lower)
+        else:
+            parti.append(parte)
+    return prefisso + "-".join(parti) + suffisso
+
+
+def normalizza_nome_display_csv(valore: Any) -> str:
+    testo = normalizza_valore_csv(valore)
+    if not testo:
+        return ""
+
+    parole = testo.split(" ")
+    return " ".join(
+        _capitalizza_parola_testo(parola, prima=index == 0)
+        for index, parola in enumerate(parole)
+    )
+
+
+def _validate_nazioni_rows(rows: list[dict[str, str]], path: Path) -> None:
+    if not rows:
+        raise ValidationError(f"Il file {path} non contiene righe da importare.")
+
+    required_columns = {"nome_nazione", "nazionalita", "codice_iso2", "codice_iso3", "codice_belfiore"}
+    columns = set(rows[0].keys())
+    missing_columns = sorted(required_columns - columns)
+    if missing_columns:
+        raise ValidationError(
+            "Il file nazioni non contiene tutte le colonne richieste: "
+            + ", ".join(missing_columns)
+        )
+
+    missing_required = []
+    invalid_belfiore = []
+    belfiore_seen: dict[str, list[str]] = {}
+
+    for row_number, row in enumerate(rows, start=2):
+        nome = normalizza_valore_csv(row.get("nome_nazione"), uppercase=True)
+        codice_belfiore = normalizza_valore_csv(row.get("codice_belfiore"), uppercase=True)
+
+        if not nome or not codice_belfiore:
+            missing_required.append(str(row_number))
+            continue
+
+        if not re.match(r"^Z\d{3}$", codice_belfiore):
+            invalid_belfiore.append(f"riga {row_number}: {codice_belfiore}")
+
+        belfiore_seen.setdefault(codice_belfiore, []).append(nome)
+
+    duplicate_belfiore = {
+        codice: nomi
+        for codice, nomi in belfiore_seen.items()
+        if len(nomi) > 1
+    }
+
+    errors = []
+    if missing_required:
+        errors.append(
+            "Righe con nome_nazione o codice_belfiore mancanti: "
+            + ", ".join(missing_required[:20])
+        )
+    if invalid_belfiore:
+        errors.append(
+            "Codici Belfiore non validi: "
+            + "; ".join(invalid_belfiore[:20])
+        )
+    if duplicate_belfiore:
+        errors.append(
+            "Codici Belfiore duplicati: "
+            + "; ".join(
+                f"{codice}: {', '.join(nomi)}"
+                for codice, nomi in list(duplicate_belfiore.items())[:20]
+            )
+        )
+
+    if errors:
+        raise ValidationError(" ".join(errors))
+
+
+def read_nazioni_belfiore_csv(path: Path) -> list[dict[str, str]]:
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+    except UnicodeDecodeError:
+        with path.open("r", encoding="cp1252", newline="") as csv_file:
+            rows = list(csv.DictReader(csv_file))
+
+    _validate_nazioni_rows(rows, path)
+    return rows
+
+
+def run_import_nazioni_belfiore(file_path: Path | None = None) -> dict[str, Any]:
+    """
+    Importa nazioni/nazionalitÃ  e codici Belfiore esteri da CSV.
+
+    La chiave tecnica Ã¨ ``codice_belfiore``: alcuni elenchi storici contengono piÃ¹ righe con lo stesso nome
+    nazione ma codice diverso, quindi il nome non puÃ² essere univoco.
+    """
+    started_at = perf_counter()
+    path = file_path or default_nazioni_belfiore_file_path()
+    if not path.is_file():
+        raise ValidationError(f"File non trovato: {path}")
+
+    rows = read_nazioni_belfiore_csv(path)
+
+    stats: dict[str, Any] = {
+        "file": str(path),
+        "righe": len(rows),
+        "nazioni_create": 0,
+        "nazioni_aggiornate": 0,
+        "nazioni_invariate": 0,
+    }
+
+    with transaction.atomic():
+        for index, row in enumerate(rows, start=10):
+            data = {
+                "nome": normalizza_nome_display_csv(row.get("nome_nazione")),
+                "nome_nazionalita": normalizza_nome_display_csv(row.get("nazionalita")),
+                "codice_iso2": normalizza_valore_csv(row.get("codice_iso2"), uppercase=True),
+                "codice_iso3": normalizza_valore_csv(row.get("codice_iso3"), uppercase=True),
+                "codice_belfiore": normalizza_valore_csv(row.get("codice_belfiore"), uppercase=True),
+                "ordine": index,
+                "attiva": True,
+            }
+
+            existing = Nazione.objects.filter(codice_belfiore=data["codice_belfiore"]).order_by("id")
+            if existing.count() > 1:
+                raise ValidationError(
+                    f"Nel database esistono piÃ¹ nazioni con codice Belfiore {data['codice_belfiore']}. "
+                    "Correggi i duplicati prima di importare."
+                )
+
+            obj = existing.first()
+            if obj is None:
+                Nazione.objects.create(**data)
+                stats["nazioni_create"] += 1
+                continue
+
+            changed = False
+            for field_name, value in data.items():
+                if getattr(obj, field_name) != value:
+                    setattr(obj, field_name, value)
+                    changed = True
+
+            if changed:
+                obj.save(update_fields=list(data.keys()))
+                stats["nazioni_aggiornate"] += 1
+            else:
+                stats["nazioni_invariate"] += 1
+
+    stats["durata_secondi"] = round(perf_counter() - started_at, 2)
+    return stats
 
 
 def run_import_dati_base(

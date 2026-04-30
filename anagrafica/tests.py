@@ -7,6 +7,7 @@ import re
 
 import pandas as pd
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase, override_settings
@@ -14,7 +15,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.dati_base_import import run_import_dati_base
+from anagrafica.dati_base_import import run_import_dati_base, run_import_nazioni_belfiore
 from anagrafica.forms import (
     DocumentoFamigliaFormSet,
     DocumentoStudenteForm,
@@ -26,6 +27,7 @@ from anagrafica.forms import (
     StudenteForm,
     StudenteInlineForm,
     StudenteStandaloneForm,
+    nazione_choice_queryset,
 )
 from anagrafica.views import famiglia_studenti_inline_queryset
 from anagrafica.models import (
@@ -35,6 +37,7 @@ from anagrafica.models import (
     Famiglia,
     Familiare,
     Indirizzo,
+    Nazione,
     Provincia,
     Regione,
     RelazioneFamiliare,
@@ -137,6 +140,90 @@ class ImportDatiBaseTests(TestCase):
         self.assertEqual(Citta.objects.count(), 2)
         self.assertEqual(CAP.objects.count(), 3)
 
+    def test_run_import_nazioni_belfiore_imports_by_belfiore_code(self):
+        with TemporaryDirectory() as tmpdir:
+            file_path = Path(tmpdir) / "nazioni_belfiore.csv"
+            file_path.write_text(
+                "\n".join(
+                    [
+                        "nome_nazione,nazionalita,codice_iso2,codice_iso3,codice_belfiore",
+                        "ARMENIA,armena,AM,ARM,Z252",
+                        "ARMENIA,armena,AM,ARM,Z137",
+                        "STATI UNITI,statunitense,US,USA,Z404",
+                        "ZANZIBAR,,,,Z356",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            stats = run_import_nazioni_belfiore(file_path=file_path)
+            second_stats = run_import_nazioni_belfiore(file_path=file_path)
+
+        self.assertEqual(stats["righe"], 4)
+        self.assertEqual(stats["nazioni_create"], 4)
+        self.assertEqual(stats["nazioni_aggiornate"], 0)
+        self.assertEqual(second_stats["nazioni_create"], 0)
+        self.assertEqual(second_stats["nazioni_invariate"], 4)
+        self.assertEqual(Nazione.objects.filter(nome="Armenia").count(), 2)
+        armenia = Nazione.objects.get(codice_belfiore="Z252")
+        self.assertEqual(armenia.nome_nazionalita, "Armena")
+        self.assertEqual(armenia.codice_iso2, "AM")
+        stati_uniti = Nazione.objects.get(codice_belfiore="Z404")
+        self.assertEqual(stati_uniti.nome, "Stati Uniti")
+        self.assertEqual(stati_uniti.nome_nazionalita, "Statunitense")
+        zanzibar = Nazione.objects.get(codice_belfiore="Z356")
+        self.assertEqual(zanzibar.nome, "Zanzibar")
+        self.assertEqual(zanzibar.nome_nazionalita, "")
+
+    def test_nazione_choice_queryset_shows_unique_nationality_labels(self):
+        Nazione.objects.create(
+            nome="Armenia",
+            nome_nazionalita="Armena",
+            codice_iso2="AM",
+            codice_iso3="ARM",
+            codice_belfiore="Z252",
+            ordine=1,
+            attiva=True,
+        )
+        Nazione.objects.create(
+            nome="Armenia",
+            nome_nazionalita="Armena",
+            codice_iso2="AM",
+            codice_iso3="ARM",
+            codice_belfiore="Z137",
+            ordine=2,
+            attiva=True,
+        )
+        Nazione.objects.create(
+            nome="Antille Britanniche",
+            nome_nazionalita="",
+            codice_belfiore="Z500",
+            ordine=3,
+            attiva=True,
+        )
+
+        queryset = nazione_choice_queryset()
+
+        self.assertEqual(queryset.filter(nome_nazionalita="Armena").count(), 1)
+        self.assertFalse(queryset.filter(nome_nazionalita="").exists())
+
+    def test_run_import_nazioni_belfiore_rejects_duplicate_belfiore(self):
+        with TemporaryDirectory() as tmpdir:
+            file_path = Path(tmpdir) / "nazioni_belfiore.csv"
+            file_path.write_text(
+                "\n".join(
+                    [
+                        "nome_nazione,nazionalita,codice_iso2,codice_iso3,codice_belfiore",
+                        "ALBANIA,albanese,AL,ALB,Z100",
+                        "AFGHANISTAN,afghana,AF,AFG,Z100",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValidationError):
+                run_import_nazioni_belfiore(file_path=file_path)
+
 
 class AjaxCercaCittaTests(TestCase):
     def setUp(self):
@@ -205,6 +292,30 @@ class AjaxCercaCittaTests(TestCase):
         self.assertEqual(payload["results"][0]["id"], roma.pk)
         self.assertEqual(payload["results"][0]["label"], "Roma (RM)")
 
+    def test_ajax_cerca_citta_can_include_foreign_countries(self):
+        francia, _ = Nazione.objects.update_or_create(
+            nome="Francia",
+            defaults={
+                "codice_iso2": "FR",
+                "codice_iso3": "FRA",
+                "codice_belfiore": "Z110",
+                "ordine": 1,
+                "attiva": True,
+            },
+        )
+
+        response = self.client.get(reverse("ajax_cerca_citta"), {"q": "Fra", "include_nazioni": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(any(result["type"] == "nazione" for result in payload["results"]))
+        result = next(result for result in payload["results"] if result["type"] == "nazione")
+        self.assertEqual(result["id"], francia.pk)
+        self.assertEqual(result["label"], "Francia")
+        self.assertEqual(result["codice_catastale"], "Z110")
+        self.assertEqual(result["nazionalita_id"], francia.pk)
+        self.assertEqual(result["nazionalita_label"], "Francese")
+
     def test_crea_indirizzo_page_renders(self):
         response = self.client.get(reverse("crea_indirizzo"))
 
@@ -218,7 +329,24 @@ class AjaxCercaCittaTests(TestCase):
         response = self.client.get(reverse("lista_famiglie"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="panel panel-standalone"')
+        self.assertContains(response, "panel-standalone")
+        self.assertContains(response, 'data-live-list-form')
+        self.assertContains(response, 'data-live-list-target="#famiglie-results"')
+
+    def test_anagrafica_search_lists_enable_progressive_filtering(self):
+        list_expectations = [
+            ("lista_famiglie", "#famiglie-results"),
+            ("lista_familiari", "#familiari-results"),
+            ("lista_studenti", "#studenti-results"),
+        ]
+
+        for url_name, target in list_expectations:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'data-live-list-form')
+                self.assertContains(response, f'data-live-list-target="{target}"')
+                self.assertContains(response, 'data-live-list-input')
 
     def test_famiglie_omonime_show_disambiguating_context(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
@@ -411,6 +539,24 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
 
 
 class FamigliaInlineDefaultsTests(TestCase):
+    def test_new_person_forms_default_to_italian_nationality(self):
+        italia = Nazione.objects.get(nome__iexact="Italia")
+
+        familiare_form = FamiliareForm()
+        studente_form = StudenteStandaloneForm()
+
+        self.assertEqual(familiare_form.initial["nazionalita"], italia.pk)
+        self.assertEqual(studente_form.initial["nazionalita"], italia.pk)
+
+    def test_new_familiare_forms_default_referente_principale_checked(self):
+        standalone_form = FamiliareForm()
+        inline_form = FamiliareInlineForm(prefix="familiari-0")
+
+        self.assertIs(standalone_form["referente_principale"].value(), True)
+        self.assertIn("checked", str(standalone_form["referente_principale"]))
+        self.assertIs(inline_form["referente_principale"].value(), True)
+        self.assertIn("checked", str(inline_form["referente_principale"]))
+
     def test_inline_forms_prefill_family_address(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
@@ -503,6 +649,87 @@ class FamigliaInlineDefaultsTests(TestCase):
         )
         self.assertTrue(studente_form.is_valid(), studente_form.errors)
         self.assertIsNone(studente_form.cleaned_data["indirizzo"])
+
+    def test_familiare_form_accepts_custom_foreign_birthplace(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Dubois", stato_relazione_famiglia=stato, attiva=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+
+        form = FamiliareForm(
+            data={
+                "famiglia": famiglia.pk,
+                "relazione_familiare": relazione.pk,
+                "indirizzo": "",
+                "nome": "Claire",
+                "cognome": "Dubois",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "1985-01-15",
+                "luogo_nascita": "",
+                "nazione_nascita": "",
+                "luogo_nascita_custom": "Parigi",
+                "luogo_nascita_search": "Parigi",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data["luogo_nascita"])
+        self.assertIsNone(form.cleaned_data["nazione_nascita"])
+        self.assertEqual(form.cleaned_data["luogo_nascita_custom"], "Parigi")
+
+    def test_familiare_form_accepts_selected_foreign_country_birthplace(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Dubois", stato_relazione_famiglia=stato, attiva=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        francia, _ = Nazione.objects.update_or_create(
+            nome="Francia",
+            defaults={
+                "codice_iso2": "FR",
+                "codice_iso3": "FRA",
+                "codice_belfiore": "Z110",
+                "ordine": 2,
+                "attiva": True,
+            },
+        )
+
+        form = FamiliareForm(
+            data={
+                "famiglia": famiglia.pk,
+                "relazione_familiare": relazione.pk,
+                "indirizzo": "",
+                "nome": "Claire",
+                "cognome": "Dubois",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "1985-01-15",
+                "luogo_nascita": "",
+                "nazione_nascita": francia.pk,
+                "luogo_nascita_custom": "",
+                "luogo_nascita_search": "Francia",
+                "nazionalita": francia.pk,
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data["luogo_nascita"])
+        self.assertEqual(form.cleaned_data["nazione_nascita"], francia)
+        self.assertEqual(form.cleaned_data["luogo_nascita_custom"], "")
+        self.assertEqual(form.cleaned_data["nazionalita"], francia)
 
     def test_studente_standalone_form_prefills_family_address_and_cf_binding(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)

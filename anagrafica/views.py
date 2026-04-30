@@ -28,6 +28,7 @@ from .forms import (
 )
 from .models import (
     Citta,
+    Nazione,
     Indirizzo,
     Famiglia,
     StatoRelazioneFamiglia,
@@ -371,6 +372,8 @@ def famiglia_familiari_inline_queryset(famiglia=None):
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
             "famiglia__indirizzo_principale__citta__provincia",
             "famiglia__indirizzo_principale__provincia",
         )
@@ -395,6 +398,8 @@ def famiglia_studenti_inline_queryset(famiglia=None):
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
             "famiglia__indirizzo_principale__citta__provincia",
             "famiglia__indirizzo_principale__provincia",
         )
@@ -1394,6 +1399,17 @@ def elimina_indirizzo(request, pk):
 def ajax_cerca_citta(request):
     citta_id = (request.GET.get("id") or "").strip()
     q = request.GET.get("q", "").strip()
+    include_nazioni = (request.GET.get("include_nazioni") or "").strip() == "1"
+    italia_nazionalita_id = None
+    if include_nazioni:
+        italia_nazionalita_id = (
+            Nazione.objects
+            .filter(attiva=True, nome__iexact="Italia")
+            .exclude(nome_nazionalita="")
+            .order_by("ordine", "id")
+            .values_list("pk", flat=True)
+            .first()
+        )
 
     qs = (
         Citta.objects
@@ -1434,6 +1450,7 @@ def ajax_cerca_citta(request):
 
         prov = getattr(c, "provincia", None)
         results.append({
+            "type": "citta",
             "id": c.id,
             "nome": c.nome,
             "label": citta_choice_label(c),
@@ -1441,8 +1458,55 @@ def ajax_cerca_citta(request):
             "provincia_nome": getattr(prov, "nome", "") if prov is not None else "",
             "provincia_sigla": getattr(prov, "sigla", "") if prov is not None else "",
             "regione_nome": prov.regione.nome if prov and prov.regione else "",
+            "nazionalita_id": italia_nazionalita_id or "",
+            "nazionalita_label": "Italiana" if italia_nazionalita_id else "",
             "caps": caps,
         })
+
+    if include_nazioni and not citta_id and q:
+        nazioni_qs = (
+            Nazione.objects
+            .filter(attiva=True, nome__icontains=q)
+            .annotate(
+                search_rank=Case(
+                    When(nome__iexact=q, then=Value(0)),
+                    When(nome__istartswith=q, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("search_rank", "nome")[:10]
+        )
+        for nazione in nazioni_qs:
+            nazionalita = None
+            if nazione.nome_nazionalita:
+                nazionalita = (
+                    Nazione.objects
+                    .filter(attiva=True, nome_nazionalita__iexact=nazione.nome_nazionalita)
+                    .exclude(nome_nazionalita="")
+                    .order_by("nome_nazionalita", "ordine", "id")
+                    .first()
+                )
+            has_same_name = Nazione.objects.filter(
+                attiva=True,
+                nome__iexact=nazione.nome,
+            ).exclude(pk=nazione.pk).exists()
+            label = str(nazione)
+            if has_same_name and nazione.codice_belfiore:
+                label = f"{nazione} ({nazione.codice_belfiore})"
+            results.append({
+                "type": "nazione",
+                "id": nazione.id,
+                "nome": str(nazione),
+                "label": label,
+                "codice_catastale": nazione.codice_belfiore,
+                "nazionalita_id": nazionalita.pk if nazionalita else "",
+                "nazionalita_label": nazionalita.label_nazionalita if nazionalita else "",
+                "provincia_nome": "",
+                "provincia_sigla": "",
+                "regione_nome": "",
+                "caps": [],
+            })
 
     return JsonResponse({"results": results})
 
@@ -1971,12 +2035,12 @@ def stampa_famiglia(request, pk):
 
     familiari = (
         famiglia.familiari
-        .select_related("relazione_familiare", "indirizzo", "famiglia__indirizzo_principale")
+        .select_related("relazione_familiare", "indirizzo", "famiglia__indirizzo_principale", "luogo_nascita", "nazione_nascita", "nazionalita")
         .order_by("cognome", "nome")
     )
     studenti = (
         famiglia.studenti
-        .select_related("indirizzo", "famiglia__indirizzo_principale", "luogo_nascita")
+        .select_related("indirizzo", "famiglia__indirizzo_principale", "luogo_nascita", "nazione_nascita", "nazionalita")
         .order_by("cognome", "nome")
     )
 
@@ -2217,6 +2281,8 @@ def lista_familiari(request):
             "indirizzo__citta",
             "luogo_nascita",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
             "famiglia__indirizzo_principale",
             "famiglia__indirizzo_principale__citta",
             "famiglia__indirizzo_principale__provincia",
@@ -2236,6 +2302,8 @@ def lista_familiari(request):
             Q(codice_fiscale__icontains=q) |
             Q(luogo_nascita__nome__icontains=q) |
             Q(luogo_nascita__provincia__sigla__icontains=q) |
+            Q(nazione_nascita__nome__icontains=q) |
+            Q(luogo_nascita_custom__icontains=q) |
             Q(famiglia__cognome_famiglia__icontains=q) |
             Q(relazione_familiare__relazione__icontains=q)
         )
@@ -2324,6 +2392,8 @@ def modifica_familiare(request, pk):
             "indirizzo",
             "luogo_nascita",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
             "famiglia__indirizzo_principale",
             "famiglia__indirizzo_principale__citta",
             "famiglia__indirizzo_principale__provincia",
@@ -2645,6 +2715,8 @@ def lista_studenti(request):
             "indirizzo__cap_scelto",
             "luogo_nascita",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
         )
         .prefetch_related("famiglia__familiari", "famiglia__studenti")
         .order_by("cognome", "nome")
@@ -2657,6 +2729,8 @@ def lista_studenti(request):
             Q(codice_fiscale__icontains=q) |
             Q(luogo_nascita__nome__icontains=q) |
             Q(luogo_nascita__provincia__sigla__icontains=q) |
+            Q(nazione_nascita__nome__icontains=q) |
+            Q(luogo_nascita_custom__icontains=q) |
             Q(famiglia__cognome_famiglia__icontains=q)
         )
 
@@ -3097,6 +3171,8 @@ def stampa_studente(request, pk):
             "indirizzo__citta",
             "luogo_nascita",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
         ),
         pk=pk,
     )

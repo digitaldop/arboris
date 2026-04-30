@@ -445,8 +445,8 @@
                                         </td>
                                         <td class="inline-view-only-table-cell">
                                             <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.luogo_nascita %}
-                                                    {{ f.instance.luogo_nascita }}
+                                                {% if f.instance.pk and f.instance.luogo_nascita_display %}
+                                                    {{ f.instance.luogo_nascita_display }}
                                                 {% else %}
                                                     <span class="table-muted">Non indicato</span>
                                                 {% endif %}
@@ -509,9 +509,18 @@
                                                     <div class="autocomplete-wrapper citta-autocomplete">
                                                         {{ f.luogo_nascita_search }}
                                                         {{ f.luogo_nascita }}
+                                                        {{ f.nazione_nascita }}
+                                                        {{ f.luogo_nascita_custom }}
                                                     </div>
                                                     {{ f.luogo_nascita_search.errors }}
                                                     {{ f.luogo_nascita.errors }}
+                                                    {{ f.nazione_nascita.errors }}
+                                                    {{ f.luogo_nascita_custom.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Nazionalita</label>
+                                                    {{ f.nazionalita }}
+                                                    {{ f.nazionalita.errors }}
                                                 </div>
                                                 <div class="inline-subform-field">
                                                     <label>Codice fiscale</label>
@@ -620,9 +629,18 @@
                                                     <div class="autocomplete-wrapper citta-autocomplete">
                                                         {{ f.luogo_nascita_search }}
                                                         {{ f.luogo_nascita }}
+                                                        {{ f.nazione_nascita }}
+                                                        {{ f.luogo_nascita_custom }}
                                                     </div>
                                                     {{ f.luogo_nascita_search.errors }}
                                                     {{ f.luogo_nascita.errors }}
+                                                    {{ f.nazione_nascita.errors }}
+                                                    {{ f.luogo_nascita_custom.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    <label>Nazionalita</label>
+                                                    {{ f.nazionalita }}
+                                                    {{ f.nazionalita.errors }}
                                                 </div>
                                                 <div class="inline-subform-field">
                                                     <label>Codice fiscale</label>
@@ -1000,9 +1018,18 @@
                         <div class="autocomplete-wrapper citta-autocomplete">
                             {{ familiari_formset.empty_form.luogo_nascita_search }}
                             {{ familiari_formset.empty_form.luogo_nascita }}
+                            {{ familiari_formset.empty_form.nazione_nascita }}
+                            {{ familiari_formset.empty_form.luogo_nascita_custom }}
                         </div>
                         {{ familiari_formset.empty_form.luogo_nascita_search.errors }}
                         {{ familiari_formset.empty_form.luogo_nascita.errors }}
+                        {{ familiari_formset.empty_form.nazione_nascita.errors }}
+                        {{ familiari_formset.empty_form.luogo_nascita_custom.errors }}
+                    </div>
+                    <div class="inline-subform-field">
+                        <label>Nazionalita</label>
+                        {{ familiari_formset.empty_form.nazionalita }}
+                        {{ familiari_formset.empty_form.nazionalita.errors }}
                     </div>
                     <div class="inline-subform-field">
                         <label>Codice fiscale</label>
@@ -1115,7 +1142,7 @@
                                         <td>{{ f.instance.nome }}</td>
                                         <td>{{ f.instance.relazione_familiare }}</td>
                                         <td>{{ f.instance.data_nascita|it_date|default:"-" }}</td>
-                                        <td>{{ f.instance.luogo_nascita|default:"-" }}</td>
+                                        <td>{{ f.instance.luogo_nascita_display|default:"-" }}</td>
                                         <td>{{ f.instance.codice_fiscale|default:"-" }}</td>
                                         <td>{{ f.instance.formatted_telefono|default:"-" }}</td>
                                         <td>{{ f.instance.email|default:"-" }}</td>
@@ -1148,7 +1175,7 @@
                                         <td>{{ f.instance.cognome }}</td>
                                         <td>{{ f.instance.nome }}</td>
                                         <td>{{ f.instance.data_nascita|it_date|default:"-" }}</td>
-                                        <td>{{ f.instance.luogo_nascita|default:"-" }}</td>
+                                        <td>{{ f.instance.luogo_nascita_display|default:"-" }}</td>
                                     </tr>
                                 {% endif %}
                             {% endfor %}
@@ -1171,7 +1198,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=38"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=39"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

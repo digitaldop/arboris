@@ -1,5 +1,6 @@
 from django import forms
 from django.db import DatabaseError
+from django.db.models import Case, IntegerField, When
 from django.forms import HiddenInput
 from django.forms.models import BaseInlineFormSet
 from django.forms.utils import ErrorDict
@@ -15,7 +16,7 @@ from arboris.form_widgets import italian_decimal_to_python, merge_widget_classes
 from django.forms import inlineformset_factory
 from .models import (
     CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia,
-    Familiare, Studente, Documento, RelazioneFamiliare, TipoDocumento
+    Familiare, Studente, Documento, RelazioneFamiliare, TipoDocumento, Nazione
 )
 
 
@@ -70,6 +71,49 @@ def configure_famiglia_choice_field(field):
     field.queryset = famiglia_choice_queryset()
     field.label_from_instance = famiglia_choice_label
     make_searchable_select(field, "Cerca una famiglia...")
+
+
+def nazione_choice_queryset():
+    nazioni = (
+        Nazione.objects
+        .filter(attiva=True)
+        .exclude(nome_nazionalita="")
+        .only("id", "nome_nazionalita", "ordine", "nome")
+        .order_by("nome_nazionalita", "ordine", "id")
+    )
+
+    ids = []
+    nazionalita_viste = set()
+    for nazione in nazioni:
+        chiave = nazione.nome_nazionalita.strip().casefold()
+        if chiave in nazionalita_viste:
+            continue
+        nazionalita_viste.add(chiave)
+        ids.append(nazione.pk)
+
+    if not ids:
+        return Nazione.objects.none()
+
+    ordine = Case(
+        *[When(pk=pk, then=posizione) for posizione, pk in enumerate(ids)],
+        output_field=IntegerField(),
+    )
+    return Nazione.objects.filter(pk__in=ids).order_by(ordine)
+
+
+def configure_nazionalita_field(field):
+    field.queryset = nazione_choice_queryset()
+    field.required = False
+    field.label_from_instance = lambda obj: obj.label_nazionalita
+    make_searchable_select(field, "Cerca una nazionalita...")
+
+
+def default_italia_nazione_id():
+    return (
+        Nazione.objects.filter(nome__iexact="Italia", attiva=True)
+        .values_list("pk", flat=True)
+        .first()
+    )
 
 
 class ClasseInlineSelect(forms.Select):
@@ -379,6 +423,15 @@ class LuogoNascitaCittaFkMixin:
             }
         ),
     )
+    luogo_nascita_custom = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-luogo-nascita-custom": "1"}),
+    )
+    nazione_nascita = forms.ModelChoiceField(
+        queryset=Nazione.objects.none(),
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-nazione-hidden": "1"}),
+    )
 
     def setup_luogo_nascita_autocomplete_fk(self):
         if "luogo_nascita_search" not in self.fields:
@@ -394,18 +447,39 @@ class LuogoNascitaCittaFkMixin:
                 ),
             )
 
+        if "nazione_nascita" not in self.fields:
+            self.fields["nazione_nascita"] = forms.ModelChoiceField(
+                queryset=Nazione.objects.none(),
+                required=False,
+                widget=forms.HiddenInput(attrs={"data-nazione-hidden": "1"}),
+            )
+        if "luogo_nascita_custom" not in self.fields:
+            self.fields["luogo_nascita_custom"] = forms.CharField(
+                required=False,
+                widget=forms.HiddenInput(attrs={"data-luogo-nascita-custom": "1"}),
+            )
+
         self.fields["luogo_nascita"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
         self.fields["luogo_nascita"].queryset = Citta.objects.none()
+        self.fields["nazione_nascita"].widget = forms.HiddenInput(attrs={"data-nazione-hidden": "1"})
+        self.fields["nazione_nascita"].queryset = Nazione.objects.none()
+        self.fields["luogo_nascita_custom"].widget = forms.HiddenInput(attrs={"data-luogo-nascita-custom": "1"})
         self.fields["luogo_nascita_search"].widget.attrs.update(
             {
                 "placeholder": "Cerca una città...",
                 "data-citta-search": "1",
+                "data-include-nazioni": "1",
             }
         )
 
+        self.fields["luogo_nascita_search"].widget.attrs["placeholder"] = "Cerca una città o uno stato estero..."
+
         luogo_nascita_id = None
+        nazione_nascita_id = None
         luogo_nascita_label = ""
+        luogo_nascita_custom = ""
         citta = None
+        nazione = None
 
         if self.is_bound:
             luogo_nascita_label = (
@@ -417,6 +491,15 @@ class LuogoNascitaCittaFkMixin:
                 self.data.get(self.add_prefix("luogo_nascita"))
                 or self.data.get("luogo_nascita")
             )
+            nazione_nascita_id = (
+                self.data.get(self.add_prefix("nazione_nascita"))
+                or self.data.get("nazione_nascita")
+            )
+            luogo_nascita_custom = (
+                self.data.get(self.add_prefix("luogo_nascita_custom"))
+                or self.data.get("luogo_nascita_custom")
+                or ""
+            ).strip()
         else:
             citta = self.initial.get("luogo_nascita") or getattr(self.instance, "luogo_nascita", None)
             if citta:
@@ -435,9 +518,34 @@ class LuogoNascitaCittaFkMixin:
                         luogo_nascita_label = str(citta_obj)
                     else:
                         citta = None
+            if not luogo_nascita_id:
+                nazione = self.initial.get("nazione_nascita") or getattr(self.instance, "nazione_nascita", None)
+                if nazione:
+                    if hasattr(nazione, "pk"):
+                        nazione_nascita_id = nazione.pk
+                        luogo_nascita_label = str(nazione)
+                    else:
+                        nazione_nascita_id = nazione
+                        nazione_obj = Nazione.objects.filter(pk=nazione, attiva=True).first()
+                        if nazione_obj:
+                            nazione = nazione_obj
+                            luogo_nascita_label = str(nazione_obj)
+                        else:
+                            nazione = None
+            if not luogo_nascita_id and not nazione_nascita_id:
+                luogo_nascita_custom = (
+                    self.initial.get("luogo_nascita_custom")
+                    or getattr(self.instance, "luogo_nascita_custom", "")
+                    or ""
+                ).strip()
+                luogo_nascita_label = luogo_nascita_custom
 
         if luogo_nascita_id:
             self.initial["luogo_nascita"] = luogo_nascita_id
+        if nazione_nascita_id:
+            self.initial["nazione_nascita"] = nazione_nascita_id
+        if luogo_nascita_custom:
+            self.initial["luogo_nascita_custom"] = luogo_nascita_custom
         if luogo_nascita_label:
             self.initial["luogo_nascita_search"] = luogo_nascita_label
         if luogo_nascita_id:
@@ -445,13 +553,28 @@ class LuogoNascitaCittaFkMixin:
                 Citta.objects.filter(pk=luogo_nascita_id, attiva=True)
                 .select_related("provincia")
             )
+        if nazione_nascita_id:
+            self.fields["nazione_nascita"].queryset = Nazione.objects.filter(pk=nazione_nascita_id, attiva=True)
         if not self.is_bound and luogo_nascita_id and citta:
             self.fields["luogo_nascita"].widget.attrs["data-codice-catastale"] = citta.codice_catastale or ""
+        if not self.is_bound and nazione_nascita_id and nazione:
+            self.fields["nazione_nascita"].widget.attrs["data-codice-catastale"] = nazione.codice_belfiore or ""
 
     def clean(self):
         cleaned_data = super().clean()
         luogo_nascita = cleaned_data.get("luogo_nascita")
+        nazione_nascita = cleaned_data.get("nazione_nascita")
         luogo_nascita_search = (cleaned_data.get("luogo_nascita_search") or "").strip()
+
+        if luogo_nascita:
+            cleaned_data["nazione_nascita"] = None
+            cleaned_data["luogo_nascita_custom"] = ""
+            return cleaned_data
+
+        if nazione_nascita:
+            cleaned_data["luogo_nascita"] = None
+            cleaned_data["luogo_nascita_custom"] = ""
+            return cleaned_data
 
         if luogo_nascita_search and not luogo_nascita:
             matched = re.match(r"^(?P<nome>.+?) \((?P<sigla>[A-Z]{2})\)$", luogo_nascita_search)
@@ -475,6 +598,30 @@ class LuogoNascitaCittaFkMixin:
             )
             if citta_qs.count() == 1:
                 cleaned_data["luogo_nascita"] = citta_qs.first()
+
+        if luogo_nascita_search and not cleaned_data.get("luogo_nascita"):
+            matched_nazione = re.match(r"^(?P<nome>.+?) \((?P<codice>Z\d{3})\)$", luogo_nascita_search, re.IGNORECASE)
+            if matched_nazione:
+                nazione = Nazione.objects.filter(
+                    nome__iexact=matched_nazione.group("nome").strip(),
+                    codice_belfiore__iexact=matched_nazione.group("codice").strip(),
+                    attiva=True,
+                ).first()
+                if nazione:
+                    cleaned_data["nazione_nascita"] = nazione
+                    cleaned_data["luogo_nascita_custom"] = ""
+                    cleaned_data["luogo_nascita"] = None
+                    return cleaned_data
+
+            nazione_qs = Nazione.objects.filter(nome__iexact=luogo_nascita_search, attiva=True)
+            if nazione_qs.count() == 1:
+                cleaned_data["nazione_nascita"] = nazione_qs.first()
+                cleaned_data["luogo_nascita_custom"] = ""
+            else:
+                cleaned_data["nazione_nascita"] = None
+                cleaned_data["luogo_nascita_custom"] = luogo_nascita_search
+            cleaned_data["luogo_nascita"] = None
+            return cleaned_data
 
         if luogo_nascita_search and not cleaned_data.get("luogo_nascita"):
             self.add_error("luogo_nascita_search", "Seleziona una città valida dall'elenco.")
@@ -636,6 +783,9 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
             "sesso",
             "data_nascita",
             "luogo_nascita",
+            "nazione_nascita",
+            "luogo_nascita_custom",
+            "nazionalita",
             "convivente",
             "referente_principale",
             "abilitato_scambio_retta",
@@ -688,15 +838,24 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         self.setup_famiglia_search()
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
+        configure_nazionalita_field(self.fields["nazionalita"])
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
         self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
+        self.fields["nazione_nascita"].widget.attrs["data-cf-nazione-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
 
         if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
             self.initial["attivo"] = True
+        if not self.instance.pk and not self.is_bound and "referente_principale" not in self.initial:
+            self.initial["referente_principale"] = True
+        if not self.instance.pk and not self.is_bound and not self.initial.get("nazionalita"):
+            italia_id = default_italia_nazione_id()
+            if italia_id:
+                self.initial["nazionalita"] = italia_id
+                self.fields["nazionalita"].initial = italia_id
 
         if not self.instance.pk and not self.is_bound and not self.initial.get("relazione_familiare"):
             prima_relazione = self.fields["relazione_familiare"].queryset.first()
@@ -926,6 +1085,9 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
             "sesso",
             "data_nascita",
             "luogo_nascita",
+            "nazione_nascita",
+            "luogo_nascita_custom",
+            "nazionalita",
             "codice_fiscale",
             "indirizzo",
             "attivo",
@@ -964,15 +1126,22 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
 
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
+        configure_nazionalita_field(self.fields["nazionalita"])
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
         self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
+        self.fields["nazione_nascita"].widget.attrs["data-cf-nazione-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
 
         if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
             self.initial["attivo"] = True
+        if not self.instance.pk and not self.is_bound and not self.initial.get("nazionalita"):
+            italia_id = default_italia_nazione_id()
+            if italia_id:
+                self.initial["nazionalita"] = italia_id
+                self.fields["nazionalita"].initial = italia_id
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1050,6 +1219,9 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
             "sesso",
             "data_nascita",
             "luogo_nascita",
+            "nazione_nascita",
+            "luogo_nascita_custom",
+            "nazionalita",
             "codice_fiscale",
             "indirizzo",
             "attivo",
@@ -1101,15 +1273,22 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
         self.setup_famiglia_search()
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
+        configure_nazionalita_field(self.fields["nazionalita"])
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
         self.fields["sesso"].widget.attrs["data-cf-sesso"] = "1"
         self.fields["luogo_nascita"].widget.attrs["data-cf-luogo-id"] = "1"
+        self.fields["nazione_nascita"].widget.attrs["data-cf-nazione-id"] = "1"
         self.fields["codice_fiscale"].widget.attrs["data-cf-output"] = "1"
 
         if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
             self.initial["attivo"] = True
+        if not self.instance.pk and not self.is_bound and not self.initial.get("nazionalita"):
+            italia_id = default_italia_nazione_id()
+            if italia_id:
+                self.initial["nazionalita"] = italia_id
+                self.fields["nazionalita"].initial = italia_id
 
     def clean(self):
         cleaned_data = super().clean()

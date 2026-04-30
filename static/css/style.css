@@ -6982,6 +6982,14 @@ select:focus {
     max-width: 560px;
 }
 
+.list-live-search-results {
+    transition: opacity 0.16s ease;
+}
+
+.list-live-search-results.is-loading {
+    opacity: 0.62;
+}
+
 @media (max-width: 700px) {
     .search-input {
         min-width: 100%;

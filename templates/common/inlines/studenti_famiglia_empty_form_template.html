@@ -52,9 +52,18 @@
                     <div class="autocomplete-wrapper citta-autocomplete">
                         {{ studenti_formset.empty_form.luogo_nascita_search }}
                         {{ studenti_formset.empty_form.luogo_nascita }}
+                        {{ studenti_formset.empty_form.nazione_nascita }}
+                        {{ studenti_formset.empty_form.luogo_nascita_custom }}
                     </div>
                     {{ studenti_formset.empty_form.luogo_nascita_search.errors }}
                     {{ studenti_formset.empty_form.luogo_nascita.errors }}
+                    {{ studenti_formset.empty_form.nazione_nascita.errors }}
+                    {{ studenti_formset.empty_form.luogo_nascita_custom.errors }}
+                </div>
+                <div class="inline-subform-field">
+                    <label>Nazionalita</label>
+                    {{ studenti_formset.empty_form.nazionalita }}
+                    {{ studenti_formset.empty_form.nazionalita.errors }}
                 </div>
                 <div class="inline-subform-field">
                     <label>Codice fiscale</label>

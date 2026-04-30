@@ -657,11 +657,12 @@ window.ArborisFamigliaForm = (function () {
 
         function bindStudenteInlineSex(row) {
             const subformRow = getFamiliareSubformRow(row);
-            personRules.bindSexFromFirstName({
+            personRules.bindTrackedSexFromFirstName({
                 root: row,
                 nameSelector: 'input[name$="-nome"]',
                 sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
-                bindFlag: "sexBound",
+                bindFlag: "studenteInlineSexNameBound",
+                sourceKey: "studente-inline-name",
             });
         }
 

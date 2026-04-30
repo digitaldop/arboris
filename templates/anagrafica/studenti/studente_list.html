@@ -18,22 +18,21 @@
     </div>
 
     <div class="list-toolbar">
-        <form method="get" class="search-form">
+        <form method="get" class="search-form" data-live-list-form data-live-list-target="#studenti-results">
             <input
                 type="text"
                 name="q"
                 value="{{ q|default:'' }}"
                 placeholder="Cerca per cognome, nome, codice fiscale, famiglia..."
                 class="search-input"
+                data-live-list-input
             >
             <button type="submit" class="btn btn-secondary">Cerca</button>
-            {% if q %}
-                <a href="{% url 'lista_studenti' %}" class="btn btn-secondary">Pulisci</a>
-            {% endif %}
+            <a href="{% url 'lista_studenti' %}" class="btn btn-secondary" data-live-list-clear{% if not q %} hidden{% endif %}>Pulisci</a>
         </form>
     </div>
 
-    <div class="panel">
+    <div class="panel list-live-search-results" id="studenti-results" data-live-list-results>
         <div class="panel-body">
             {% if studenti %}
                 <table class="list-table">

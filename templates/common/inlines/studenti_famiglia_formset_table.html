@@ -80,8 +80,8 @@
                     </td>
                     <td class="inline-view-only-table-cell">
                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                            {% if f.instance.luogo_nascita %}
-                                {{ f.instance.luogo_nascita }}
+                            {% if f.instance.luogo_nascita_display %}
+                                {{ f.instance.luogo_nascita_display }}
                             {% else %}
                                 <span class="table-muted">Non indicato</span>
                             {% endif %}
@@ -146,9 +146,18 @@
                             <div class="autocomplete-wrapper citta-autocomplete">
                                 {{ f.luogo_nascita_search }}
                                 {{ f.luogo_nascita }}
+                                {{ f.nazione_nascita }}
+                                {{ f.luogo_nascita_custom }}
                             </div>
                             {{ f.luogo_nascita_search.errors }}
                             {{ f.luogo_nascita.errors }}
+                            {{ f.nazione_nascita.errors }}
+                            {{ f.luogo_nascita_custom.errors }}
+                        </div>
+                        <div class="inline-subform-field">
+                            <label>Nazionalita</label>
+                            {{ f.nazionalita }}
+                            {{ f.nazionalita.errors }}
                         </div>
                         <div class="inline-subform-field">
                             <label>Codice fiscale</label>
