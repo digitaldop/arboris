@@ -802,6 +802,28 @@ class FamigliaInlineDefaultsTests(TestCase):
         form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
 
         self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
+        self.assertEqual(form.initial["data_iscrizione"], anno_corrente.data_inizio)
+
+    def test_iscrizione_inline_defaults_to_first_active_status(self):
+        StatoIscrizione.objects.create(stato_iscrizione="Secondo", ordine=2, attiva=True)
+        primo_stato = StatoIscrizione.objects.create(stato_iscrizione="Primo", ordine=1, attiva=True)
+        StatoIscrizione.objects.create(stato_iscrizione="Non attivo", ordine=0, attiva=False)
+
+        form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
+
+        self.assertEqual(form.initial["stato_iscrizione"], primo_stato.pk)
+
+    def test_iscrizione_inline_empty_extra_row_ignores_default_status(self):
+        primo_stato = StatoIscrizione.objects.create(stato_iscrizione="Primo", ordine=1, attiva=True)
+        form = IscrizioneStudenteInlineForm(
+            data={
+                "iscrizioni-0-stato_iscrizione": str(primo_stato.pk),
+                "iscrizioni-0-data_iscrizione": "2025-09-01",
+            },
+            prefix="iscrizioni-0",
+        )
+
+        self.assertFalse(form.has_changed())
 
     def test_studenti_inline_queryset_orders_students_from_oldest_to_youngest(self):
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)

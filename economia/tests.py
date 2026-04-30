@@ -49,6 +49,17 @@ class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
 
         self.assertEqual(form.initial["anno_scolastico"], self.anno_corrente.pk)
         self.assertEqual(form.initial["stato_iscrizione"], self.stato_iscrizione.pk)
+        self.assertEqual(form.initial["data_iscrizione"], self.anno_corrente.data_inizio)
+
+    def test_iscrizione_form_defaults_to_first_active_status(self):
+        self.stato_iscrizione.ordine = 5
+        self.stato_iscrizione.save(update_fields=["ordine"])
+        StatoIscrizione.objects.create(stato_iscrizione="Non attivo", ordine=0, attiva=False)
+        primo_stato = StatoIscrizione.objects.create(stato_iscrizione="Primo attivo", ordine=1, attiva=True)
+
+        form = IscrizioneForm()
+
+        self.assertEqual(form.initial["stato_iscrizione"], primo_stato.pk)
 
     def test_scambio_retta_form_defaults_to_current_school_year(self):
         form = ScambioRettaForm()

@@ -73,6 +73,24 @@ def configure_famiglia_choice_field(field):
     make_searchable_select(field, "Cerca una famiglia...")
 
 
+def indirizzo_choice_queryset():
+    return (
+        Indirizzo.objects
+        .select_related("citta", "provincia", "regione")
+        .order_by("via", "numero_civico", "id")
+    )
+
+
+def configure_indirizzo_choice_field(field, queryset=None):
+    if queryset is None:
+        field.queryset = indirizzo_choice_queryset()
+    else:
+        bind_primed_queryset(field, queryset)
+    field.required = False
+    field.label_from_instance = lambda obj: obj.label_select()
+    make_searchable_select(field, "Cerca un indirizzo...")
+
+
 def nazione_choice_queryset():
     nazioni = (
         Nazione.objects
@@ -101,8 +119,11 @@ def nazione_choice_queryset():
     return Nazione.objects.filter(pk__in=ids).order_by(ordine)
 
 
-def configure_nazionalita_field(field):
-    field.queryset = nazione_choice_queryset()
+def configure_nazionalita_field(field, queryset=None):
+    if queryset is None:
+        field.queryset = nazione_choice_queryset()
+    else:
+        bind_primed_queryset(field, queryset)
     field.required = False
     field.label_from_instance = lambda obj: obj.label_nazionalita
     make_searchable_select(field, "Cerca una nazionalita...")
@@ -138,8 +159,11 @@ class AnnoScolasticoInlineSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
-        if value and hasattr(value, "instance") and value.instance.data_fine:
-            option["attrs"]["data-data-fine"] = value.instance.data_fine.isoformat()
+        if value and hasattr(value, "instance"):
+            if value.instance.data_inizio:
+                option["attrs"]["data-data-inizio"] = value.instance.data_inizio.isoformat()
+            if value.instance.data_fine:
+                option["attrs"]["data-data-fine"] = value.instance.data_fine.isoformat()
 
         return option
 
@@ -799,30 +823,31 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         }
 
     def __init__(self, *args, **kwargs):
+        shared_lookups = kwargs.pop("shared_lookups", None) or {}
         super().__init__(*args, **kwargs)
 
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].help_text = (
             "Se lasci vuoto, verrà usato automaticamente l'indirizzo principale della famiglia."
         )
-        configure_famiglia_choice_field(self.fields["famiglia"])
-        self.fields["relazione_familiare"].queryset = (
-            RelazioneFamiliare.objects.order_by("ordine", "relazione")
-        )
+        if "famiglia" in self.fields:
+            configure_famiglia_choice_field(self.fields["famiglia"])
+        relazioni = shared_lookups.get("relazioni_familiari")
+        if relazioni is None:
+            self.fields["relazione_familiare"].queryset = (
+                RelazioneFamiliare.objects.order_by("ordine", "relazione")
+            )
+        else:
+            bind_primed_queryset(self.fields["relazione_familiare"], relazioni)
         self.fields["relazione_familiare"].empty_label = None
-        self.fields["indirizzo"].queryset = (
-            Indirizzo.objects.select_related("citta", "provincia", "regione")
-            .order_by("via", "numero_civico")
-        )
-        self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
-        make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
+        configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
 
         famiglia_id = None
-        if self.is_bound:
+        if self.is_bound and "famiglia" in self.fields:
             famiglia_id = self.data.get(self.add_prefix("famiglia")) or self.data.get("famiglia")
-        elif self.instance.pk and self.instance.famiglia_id:
+        elif getattr(self.instance, "famiglia_id", None):
             famiglia_id = self.instance.famiglia_id
-        else:
+        elif "famiglia" in self.fields:
             famiglia_id = self.initial.get("famiglia")
 
         if not self.is_bound and not self.initial.get("indirizzo") and not getattr(self.instance, "indirizzo_id", None) and famiglia_id:
@@ -835,10 +860,11 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
                 self.initial["indirizzo"] = famiglia.indirizzo_principale_id
                 self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
 
-        self.setup_famiglia_search()
+        if "famiglia" in self.fields:
+            self.setup_famiglia_search()
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
-        configure_nazionalita_field(self.fields["nazionalita"])
+        configure_nazionalita_field(self.fields["nazionalita"], shared_lookups.get("nazionalita"))
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
@@ -852,7 +878,7 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         if not self.instance.pk and not self.is_bound and "referente_principale" not in self.initial:
             self.initial["referente_principale"] = True
         if not self.instance.pk and not self.is_bound and not self.initial.get("nazionalita"):
-            italia_id = default_italia_nazione_id()
+            italia_id = shared_lookups.get("default_italia_id") or default_italia_nazione_id()
             if italia_id:
                 self.initial["nazionalita"] = italia_id
                 self.fields["nazionalita"].initial = italia_id
@@ -864,7 +890,7 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
 
     def clean(self):
         cleaned_data = super().clean()
-        famiglia = cleaned_data.get("famiglia")
+        famiglia = cleaned_data.get("famiglia") or getattr(self.instance, "famiglia", None)
         indirizzo = cleaned_data.get("indirizzo")
 
         if (
@@ -882,6 +908,9 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
 
 
 class FamiliareInlineForm(FamiliareForm):
+    class Meta(FamiliareForm.Meta):
+        fields = [field for field in FamiliareForm.Meta.fields if field != "famiglia"]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -941,6 +970,19 @@ class IgnoreBlankExtraInlineFormSet(BaseInlineFormSet):
                 form.cleaned_data = {}
 
 
+def build_person_inline_shared_lookups(*, include_relazioni=False):
+    lookups = {
+        "indirizzi": prime_queryset(indirizzo_choice_queryset()),
+        "nazionalita": prime_queryset(nazione_choice_queryset()),
+        "default_italia_id": default_italia_nazione_id(),
+    }
+    if include_relazioni:
+        lookups["relazioni_familiari"] = prime_queryset(
+            RelazioneFamiliare.objects.order_by("ordine", "relazione")
+        )
+    return lookups
+
+
 class FamiliareInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
     meaningful_field_names = (
         "cognome",
@@ -951,6 +993,15 @@ class FamiliareInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
         "data_nascita",
         "luogo_nascita_search",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shared_lookups = build_person_inline_shared_lookups(include_relazioni=True)
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["shared_lookups"] = self.shared_lookups
+        return kwargs
 
 
 FamiliareFormSet = inlineformset_factory(
@@ -1097,15 +1148,10 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
         }
 
     def __init__(self, *args, **kwargs):
+        shared_lookups = kwargs.pop("shared_lookups", None) or {}
         super().__init__(*args, **kwargs)
 
-        self.fields["indirizzo"].queryset = (
-            Indirizzo.objects.select_related("citta", "provincia", "regione")
-            .order_by("via", "numero_civico")
-        )
-        self.fields["indirizzo"].required = False
-        self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
-        make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
+        configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
 
         if (
             not self.is_bound
@@ -1126,7 +1172,7 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
 
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
-        configure_nazionalita_field(self.fields["nazionalita"])
+        configure_nazionalita_field(self.fields["nazionalita"], shared_lookups.get("nazionalita"))
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
@@ -1138,7 +1184,7 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
         if not self.instance.pk and not self.is_bound and "attivo" not in self.initial:
             self.initial["attivo"] = True
         if not self.instance.pk and not self.is_bound and not self.initial.get("nazionalita"):
-            italia_id = default_italia_nazione_id()
+            italia_id = shared_lookups.get("default_italia_id") or default_italia_nazione_id()
             if italia_id:
                 self.initial["nazionalita"] = italia_id
                 self.fields["nazionalita"].initial = italia_id
@@ -1198,6 +1244,15 @@ class StudenteInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
         "luogo_nascita_search",
         "codice_fiscale",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shared_lookups = build_person_inline_shared_lookups()
+
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs["shared_lookups"] = self.shared_lookups
+        return kwargs
 
 
 StudenteFormSet = inlineformset_factory(
@@ -1427,6 +1482,9 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 StatoIscrizione.objects.filter(attiva=True).order_by("ordine", "stato_iscrizione")
             )
         bind_primed_queryset(self.fields["stato_iscrizione"], stato_iscrizione_qs)
+        primo_stato_iscrizione = shared_lookups.get("primo_stato_iscrizione")
+        if primo_stato_iscrizione is None:
+            primo_stato_iscrizione = next(iter(stato_iscrizione_qs), None)
 
         condizione_qs = shared_lookups.get("condizione_queryset")
         if condizione_qs is None:
@@ -1489,6 +1547,21 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 anno_predefinito = resolve_default_anno_scolastico(self.fields["anno_scolastico"].queryset)
             if anno_predefinito:
                 self.initial["anno_scolastico"] = anno_predefinito.pk
+                if not self.initial.get("data_iscrizione") and anno_predefinito.data_inizio:
+                    self.initial["data_iscrizione"] = anno_predefinito.data_inizio
+                if not self.initial.get("data_fine_iscrizione") and anno_predefinito.data_fine:
+                    self.initial["data_fine_iscrizione"] = anno_predefinito.data_fine
+
+        if not self.instance.pk and not self.is_bound and not self.initial.get("data_iscrizione"):
+            anno_id = self.initial.get("anno_scolastico")
+            if anno_id:
+                anno = next((item for item in anno_scolastico_qs if str(item.pk) == str(anno_id)), None)
+                if anno and anno.data_inizio:
+                    self.initial["data_iscrizione"] = anno.data_inizio
+
+        if not self.instance.pk and not self.is_bound and not self.initial.get("stato_iscrizione"):
+            if primo_stato_iscrizione:
+                self.initial["stato_iscrizione"] = primo_stato_iscrizione.pk
 
         if not getattr(self.instance, "pk", None):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()
@@ -1497,6 +1570,12 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         cleaned_data = super().clean()
         if cleaned_data.get("sconto_unica_soluzione_valore") is None:
             cleaned_data["sconto_unica_soluzione_valore"] = Decimal("0.00")
+        anno_scolastico = cleaned_data.get("anno_scolastico")
+        if anno_scolastico:
+            if not cleaned_data.get("data_iscrizione"):
+                cleaned_data["data_iscrizione"] = anno_scolastico.data_inizio
+            if not cleaned_data.get("data_fine_iscrizione"):
+                cleaned_data["data_fine_iscrizione"] = anno_scolastico.data_fine
         return cleaned_data
 
     def has_changed(self):
@@ -1513,9 +1592,6 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         meaningful_text_fields = [
             "classe",
             "gruppo_classe",
-            "data_iscrizione",
-            "data_fine_iscrizione",
-            "stato_iscrizione",
             "condizione_iscrizione",
             "agevolazione",
             "scadenza_pagamento_unica",
@@ -1597,6 +1673,7 @@ class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
             "classe_queryset": classe_queryset,
             "gruppo_classe_queryset": gruppo_classe_queryset,
             "stato_iscrizione_queryset": stato_iscrizione_queryset,
+            "primo_stato_iscrizione": next(iter(stato_iscrizione_queryset), None),
             "condizione_queryset": condizione_queryset,
             "agevolazione_queryset": agevolazione_queryset,
             "default_anno_scolastico": resolve_default_anno_scolastico(anno_scolastico_queryset),

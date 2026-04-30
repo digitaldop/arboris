@@ -52,6 +52,19 @@ class AnnoScopedSelect(forms.Select):
         return option
 
 
+class AnnoScolasticoSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+
+        if value and hasattr(value, "instance"):
+            if value.instance.data_inizio:
+                option["attrs"]["data-data-inizio"] = value.instance.data_inizio.isoformat()
+            if value.instance.data_fine:
+                option["attrs"]["data-data-fine"] = value.instance.data_fine.isoformat()
+
+        return option
+
+
 class StatoIscrizioneForm(forms.ModelForm):
     class Meta:
         model = StatoIscrizione
@@ -173,6 +186,7 @@ class IscrizioneForm(forms.ModelForm):
             "note",
         ]
         widgets = {
+            "anno_scolastico": AnnoScolasticoSelect(),
             "data_iscrizione": DateInput(),
             "data_fine_iscrizione": DateInput(),
             "classe": AnnoScopedSelect(),
@@ -188,7 +202,11 @@ class IscrizioneForm(forms.ModelForm):
 
         self.fields["anno_scolastico"].queryset = self.fields["anno_scolastico"].queryset.order_by("-data_inizio", "-id")
         self.fields["studente"].queryset = self.fields["studente"].queryset.order_by("cognome", "nome")
-        self.fields["stato_iscrizione"].queryset = self.fields["stato_iscrizione"].queryset.order_by("ordine", "stato_iscrizione")
+        self.fields["stato_iscrizione"].queryset = (
+            self.fields["stato_iscrizione"].queryset
+            .filter(Q(attiva=True) | Q(pk=getattr(self.instance, "stato_iscrizione_id", None)))
+            .order_by("ordine", "stato_iscrizione")
+        )
         self.fields["anno_scolastico"].empty_label = None
         self.fields["stato_iscrizione"].empty_label = None
         self.fields["condizione_iscrizione"].empty_label = None

@@ -524,6 +524,7 @@ window.ArborisStudenteForm = (function () {
             const agevolazioneSelect = findInBundle('select[name$="-agevolazione"]');
             const riduzioneCheckbox = findInBundle('input[type="checkbox"][name$="-riduzione_speciale"]');
             const importoRiduzioneInput = findInBundle('input[name$="-importo_riduzione_speciale"]');
+            const dataIscrizioneInput = findInBundle('input[name$="-data_iscrizione"]');
             const dataFineInput = findInBundle('input[name$="-data_fine_iscrizione"]');
 
             if (!annoSelect || !classeSelect || !condizioneSelect) {
@@ -546,27 +547,53 @@ window.ArborisStudenteForm = (function () {
                 syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
             }
 
-            function syncDataFineIscrizione() {
-                if (!annoSelect || !dataFineInput) {
-                    return;
-                }
-
+            function selectedAnnoDate(datasetKey) {
                 const selectedAnno = annoSelect.options[annoSelect.selectedIndex];
-                const dataFineAnno = selectedAnno ? (selectedAnno.dataset.dataFine || "") : "";
+                return selectedAnno ? (selectedAnno.dataset[datasetKey] || "") : "";
+            }
 
-                if (!dataFineAnno) {
+            function bindAutoManagedDate(input, datasetKey) {
+                if (!input) {
                     return;
                 }
 
-                if (!dataFineInput.value || dataFineInput.dataset.autoManaged === "1") {
-                    dataFineInput.value = dataFineAnno;
-                    dataFineInput.dataset.autoManaged = "1";
+                const currentDefault = selectedAnnoDate(datasetKey);
+                if (!input.value || input.value === currentDefault) {
+                    input.dataset.autoManaged = "1";
+                }
+
+                input.addEventListener("input", function () {
+                    delete input.dataset.autoManaged;
+                });
+            }
+
+            function syncAutoManagedDate(input, datasetKey) {
+                if (!input) {
+                    return;
+                }
+
+                const nextDate = selectedAnnoDate(datasetKey);
+                if (!nextDate) {
+                    return;
+                }
+
+                if (!input.value || input.dataset.autoManaged === "1") {
+                    input.value = nextDate;
+                    input.dataset.autoManaged = "1";
                 }
             }
 
+            function syncIscrizioneDates() {
+                syncAutoManagedDate(dataIscrizioneInput, "dataInizio");
+                syncAutoManagedDate(dataFineInput, "dataFine");
+            }
+
+            bindAutoManagedDate(dataIscrizioneInput, "dataInizio");
+            bindAutoManagedDate(dataFineInput, "dataFine");
+
             annoSelect.addEventListener("change", function () {
                 refreshDependentChoices();
-                syncDataFineIscrizione();
+                syncIscrizioneDates();
             });
             classeSelect.addEventListener("change", refreshDependentChoices);
 
@@ -612,7 +639,7 @@ window.ArborisStudenteForm = (function () {
 
             condizioneSelect.addEventListener("change", syncRiduzioneSpecialeState);
             refreshDependentChoices();
-            syncDataFineIscrizione();
+            syncIscrizioneDates();
             syncRiduzioneSpecialeState();
             collapsible.initCollapsibleSections(row.parentElement);
         }

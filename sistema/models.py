@@ -635,6 +635,10 @@ class SistemaOperazioneCronologia(models.Model):
         indexes = [
             models.Index(fields=["azione"], name="sistema_ope_azione_aecbff_idx"),
             models.Index(fields=["modulo"], name="sistema_ope_modulo_642ec3_idx"),
+            models.Index(
+                fields=["app_label", "model_name", "oggetto_id", "azione", "data_operazione"],
+                name="sistema_ope_obj_audit_idx",
+            ),
         ]
 
     def __str__(self):

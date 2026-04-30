@@ -260,27 +260,30 @@ def build_familiare_redirect_url(pk, active_inline_tab=None, default_tab="studen
     return url
 
 
-def pick_audit_entry(entries, action, order_by):
-    action_entries = entries.filter(azione=action)
-    user_entry = action_entries.filter(utente__isnull=False).order_by(*order_by).first()
+def pick_audit_entry(entries, action, reverse=False):
+    action_entries = [entry for entry in entries if entry.azione == action]
+    if reverse:
+        action_entries = list(reversed(action_entries))
+
+    user_entry = next((entry for entry in action_entries if entry.utente_id), None)
     if user_entry:
         return user_entry
 
-    labeled_entry = (
-        action_entries
-        .exclude(utente_label="")
-        .exclude(utente_label__iexact="Sistema")
-        .order_by(*order_by)
-        .first()
+    labeled_entry = next(
+        (
+            entry for entry in action_entries
+            if entry.utente_label and entry.utente_label.casefold() != "sistema"
+        ),
+        None,
     )
-    return labeled_entry or action_entries.order_by(*order_by).first()
+    return labeled_entry or (action_entries[0] if action_entries else None)
 
 
 def famiglia_audit_labels(famiglia):
     if not famiglia or not famiglia.pk:
         return "-", "-"
 
-    entries = SistemaOperazioneCronologia.objects.select_related(
+    entries = list(SistemaOperazioneCronologia.objects.select_related(
         "utente",
         "utente__profilo_permessi",
         "utente__profilo_permessi__ruolo_permessi",
@@ -288,16 +291,15 @@ def famiglia_audit_labels(famiglia):
         app_label="anagrafica",
         model_name="famiglia",
         oggetto_id=str(famiglia.pk),
-    )
+    ).order_by("data_operazione", "id"))
     created_entry = pick_audit_entry(
         entries,
         AzioneOperazioneCronologia.CREAZIONE,
-        ["data_operazione", "id"],
     )
     updated_entry = pick_audit_entry(
         entries,
         AzioneOperazioneCronologia.MODIFICA,
-        ["-data_operazione", "-id"],
+        reverse=True,
     ) or created_entry
 
     return audit_user_label_with_role(created_entry), audit_user_label_with_role(updated_entry)
@@ -1937,8 +1939,26 @@ def modifica_famiglia(request, pk):
     )
     count_documenti_familiari = len(documenti_familiari)
     count_documenti_studenti = len(documenti_studenti)
+    famiglia_documenti_counts = famiglia.documenti.aggregate(
+        totale=Count("id"),
+        in_scadenza=Count(
+            "id",
+            filter=Q(
+                scadenza__isnull=False,
+                scadenza__gte=today,
+                scadenza__lte=today + timedelta(days=30),
+            ),
+        ),
+        scaduti=Count(
+            "id",
+            filter=Q(
+                scadenza__isnull=False,
+                scadenza__lt=today,
+            ),
+        ),
+    )
     count_documenti_totali = (
-        famiglia.documenti.count()
+        (famiglia_documenti_counts["totale"] or 0)
         + count_documenti_familiari
         + count_documenti_studenti
     )
@@ -1955,15 +1975,8 @@ def modifica_famiglia(request, pk):
         "count_familiari": famiglia.familiari.count(),
         "count_studenti": famiglia.studenti.count(),
         "count_documenti": count_documenti_totali,
-        "count_documenti_in_scadenza": famiglia.documenti.filter(
-            scadenza__isnull=False,
-            scadenza__gte=today,
-            scadenza__lte=today + timedelta(days=30),
-        ).count(),
-        "count_documenti_scaduti": famiglia.documenti.filter(
-            scadenza__isnull=False,
-            scadenza__lt=today,
-        ).count(),
+        "count_documenti_in_scadenza": famiglia_documenti_counts["in_scadenza"] or 0,
+        "count_documenti_scaduti": famiglia_documenti_counts["scaduti"] or 0,
         "documenti_familiari": documenti_familiari,
         "documenti_studenti": documenti_studenti,
         "count_documenti_familiari": count_documenti_familiari,
