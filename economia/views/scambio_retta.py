@@ -48,6 +48,10 @@ def resolve_safe_return_url(request, default_url):
     return default_url
 
 
+def is_popup_request(request):
+    return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
 def get_selected_familiare_for_prestazione_form(form):
     if form.is_bound:
         familiare_id = form.data.get("familiare")
@@ -119,6 +123,7 @@ def build_prestazione_template_context(request, form, prestazione=None):
         "return_query": urlencode({"return_to": return_url}) if return_url else "",
         "school_year_payload": build_school_year_payload(),
         "back_label": "Torna al familiare" if familiare_preview else "Torna a scambio retta",
+        "popup": is_popup_request(request),
     }
 
 
@@ -322,6 +327,7 @@ def contabilizza_scambio_retta(request, pk):
 def crea_prestazione_scambio_retta(request):
     initial = {}
     familiare_id = request.POST.get("familiare") or request.GET.get("familiare")
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         form = PrestazioneScambioRettaForm(request.POST, familiare_id=familiare_id)
@@ -333,6 +339,13 @@ def crea_prestazione_scambio_retta(request):
                 request,
                 build_default_prestazione_return_url(prestazione.familiare),
             )
+
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Prestazione scambio retta registrata correttamente."},
+                )
 
             if "_continue" in request.POST:
                 redirect_url = reverse("modifica_prestazione_scambio_retta", kwargs={"pk": prestazione.pk})
@@ -373,6 +386,7 @@ def modifica_prestazione_scambio_retta(request, pk):
         ),
         pk=pk,
     )
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         form = PrestazioneScambioRettaForm(
@@ -388,6 +402,13 @@ def modifica_prestazione_scambio_retta(request, pk):
                 request,
                 build_default_prestazione_return_url(prestazione.familiare),
             )
+
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Prestazione scambio retta aggiornata correttamente."},
+                )
 
             if "_continue" in request.POST:
                 redirect_url = reverse("modifica_prestazione_scambio_retta", kwargs={"pk": prestazione.pk})

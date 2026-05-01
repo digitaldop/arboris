@@ -22,12 +22,14 @@
     </div>
 
     <div class="content-card">
+        <p class="table-help-text">
+            Le categorie padre raccolgono le sottocategorie. Usa la freccia per espandere o comprimere i rami della gerarchia.
+        </p>
         <table class="list-table">
             <thead>
                 <tr>
-                    <th>Nome</th>
+                    <th>Categoria</th>
                     <th>Tipo</th>
-                    <th>Categoria padre</th>
                     <th>Colore</th>
                     <th>Ordine</th>
                     <th>Attiva</th>
@@ -35,40 +37,23 @@
                 </tr>
             </thead>
             <tbody>
-                {% for categoria in categorie %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_categoria_finanziaria' categoria.pk %}">
-                        <td>{{ categoria.nome }}</td>
-                        <td>{{ categoria.get_tipo_display }}</td>
-                        <td>{% if categoria.parent %}{{ categoria.parent.nome }}{% else %}-{% endif %}</td>
-                        <td>
-                            {% if categoria.colore %}
-                                <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:{{ categoria.colore }};vertical-align:middle;margin-right:6px;"></span>{{ categoria.colore }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ categoria.ordine|default:"-" }}</td>
-                        <td>{% if categoria.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_categoria_finanziaria' categoria.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_categoria_finanziaria' categoria.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
+                {% if categorie_tree %}
+                    {% include "gestione_finanziaria/includes/categorie_tree_rows.html" with nodi=categorie_tree only %}
+                {% else %}
                     <tr>
-                        <td colspan="7">
+                        <td colspan="6">
                             <div class="empty-state">
                                 Nessuna categoria finanziaria impostata. Le categorie permettono di classificare spese e entrate per produrre i report economici.
                             </div>
                         </td>
                     </tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script src="{% static 'js/pages/report-categorie.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

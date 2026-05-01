@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from typing import Optional
 
@@ -57,6 +58,28 @@ def make_searchable_select(field, placeholder):
 
 
 class CategoriaFinanziariaForm(forms.ModelForm):
+    HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+    ICON_CHOICES = [
+        {"value": "banknote", "label": "Banconota", "symbol": "€"},
+        {"value": "receipt", "label": "Ricevuta", "symbol": "▤"},
+        {"value": "wallet", "label": "Portafoglio", "symbol": "◧"},
+        {"value": "credit-card", "label": "Carta", "symbol": "▭"},
+        {"value": "bank", "label": "Banca", "symbol": "⌂"},
+        {"value": "cart", "label": "Acquisti", "symbol": "▣"},
+        {"value": "home", "label": "Casa", "symbol": "⌂"},
+        {"value": "school", "label": "Scuola", "symbol": "▦"},
+        {"value": "book", "label": "Didattica", "symbol": "▥"},
+        {"value": "users", "label": "Persone", "symbol": "●●"},
+        {"value": "heart", "label": "Cura", "symbol": "♡"},
+        {"value": "bolt", "label": "Energia", "symbol": "⚡"},
+        {"value": "droplet", "label": "Acqua", "symbol": "◌"},
+        {"value": "wifi", "label": "Connettivita", "symbol": "⌁"},
+        {"value": "tool", "label": "Manutenzione", "symbol": "⚙"},
+        {"value": "briefcase", "label": "Servizi", "symbol": "▣"},
+        {"value": "calendar", "label": "Periodo", "symbol": "◷"},
+        {"value": "transfer", "label": "Trasferimento", "symbol": "⇄"},
+    ]
+
     class Meta:
         model = CategoriaFinanziaria
         fields = [
@@ -81,7 +104,14 @@ class CategoriaFinanziariaForm(forms.ModelForm):
         }
         widgets = {
             "note": forms.Textarea(attrs={"rows": 3}),
-            "colore": forms.TextInput(attrs={"placeholder": "#336699"}),
+            "colore": forms.TextInput(
+                attrs={
+                    "placeholder": "#336699",
+                    "class": "category-color-code-input",
+                    "autocomplete": "off",
+                }
+            ),
+            "icona": forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -97,6 +127,29 @@ class CategoriaFinanziariaForm(forms.ModelForm):
             queryset = queryset.exclude(pk=self.instance.pk)
         self.fields["parent"].queryset = queryset
         self.fields["parent"].empty_label = "--- nessuna (categoria radice) ---"
+
+    @property
+    def color_picker_value(self):
+        if self.is_bound:
+            value = self.data.get(self.add_prefix("colore"), "")
+        else:
+            value = self.initial.get("colore") or getattr(self.instance, "colore", "")
+        value = (value or "").strip()
+        if value and not value.startswith("#"):
+            value = f"#{value}"
+        if self.HEX_COLOR_RE.match(value):
+            return value
+        return "#3b6f87"
+
+    def clean_colore(self):
+        value = (self.cleaned_data.get("colore") or "").strip()
+        if not value:
+            return ""
+        if not value.startswith("#"):
+            value = f"#{value}"
+        if not self.HEX_COLOR_RE.match(value):
+            raise forms.ValidationError("Inserisci un colore in formato esadecimale, ad esempio #336699.")
+        return value.upper()
 
 
 # =========================================================================

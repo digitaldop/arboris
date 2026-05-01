@@ -1,0 +1,34 @@
+{% extends "popup_base.html" %}
+
+{% block title %}Elimina familiare - Arboris{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina familiare</h1>
+    </div>
+
+    <div class="content-card">
+        <div class="empty-state">
+            <p>Stai per eliminare il familiare <strong>{{ familiare.cognome }} {{ familiare.nome }}</strong>.</p>
+        </div>
+
+        {% if impact.totale_documenti %}
+            <div class="message message-warning">
+                L'eliminazione del familiare rimuovera anche i suoi documenti collegati.
+            </div>
+            <p><strong>Documenti collegati:</strong></p>
+            <p>
+                {% for doc in impact.documenti %}
+                    {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <button type="submit" class="btn btn-danger">Conferma eliminazione</button>
+            <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+        </form>
+    </div>
+{% endblock %}

@@ -21,11 +21,16 @@ window.ArborisPopupWindowTriggers = (function () {
                 }
 
                 event.preventDefault();
-                window.open(
-                    popupUrl,
-                    element.dataset.popupWindowName || "arboris-popup-window",
-                    element.dataset.popupWindowFeatures || "width=760,height=680,resizable=yes,scrollbars=yes"
-                );
+                const windowName = element.dataset.popupWindowName || "arboris-popup-window";
+                const windowFeatures = element.dataset.popupWindowFeatures || "width=760,height=680,resizable=yes,scrollbars=yes";
+                if (window.ArborisRelatedPopups && typeof window.ArborisRelatedPopups.openManagedPopup === "function") {
+                    window.ArborisRelatedPopups.openManagedPopup(popupUrl, windowName, windowFeatures, {
+                        lockMessage: "Completa il popup aperto per continuare.",
+                    });
+                    return;
+                }
+
+                window.open(popupUrl, windowName, windowFeatures);
             });
         });
     }

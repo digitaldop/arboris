@@ -1,38 +1,108 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ titolo }}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body style="padding: 20px;">
-    <h1 class="section-title">{{ titolo }}</h1>
+{% extends "popup_base.html" %}
+{% load static %}
 
-    <div class="panel">
-        <form method="post">
-            <input type="hidden" name="popup" value="1">
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card related-config-popup-card related-status-popup-card">
+        <button type="button" class="related-status-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+
+        <form method="post" class="related-config-popup-form related-status-popup-form">
             {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
-            <div class="panel-body">
-                <table class="form-table">
-                    {% for field in form %}
-                        <tr>
-                            <th>{{ field.label_tag }}</th>
-                            <td>
-                                {{ field }}
-                                {{ field.errors }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </table>
+            <div class="related-status-popup-hero">
+                <span class="related-status-icon-tile" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#family-heart"></use></svg>
+                </span>
+                <div class="related-status-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p>Definisci lo stato e la priorit&agrave; della relazione per questa famiglia.</p>
+                </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            <div class="related-status-popup-info">
+                <span class="related-status-popup-info-icon" aria-hidden="true">i</span>
+                <div>
+                    <p>Lo stato definisce la validit&agrave; della relazione. L'ordine indica la priorit&agrave; di visualizzazione.</p>
+                </div>
+            </div>
+
+            <div class="related-config-popup-editor related-status-popup-editor">
+                <div class="related-status-popup-grid">
+                    <div class="related-status-form-field related-status-field-main">
+                        <label for="{{ form.stato.id_for_label }}">Stato <span class="required-marker">*</span></label>
+                        <div class="related-status-input-shell">
+                            <span class="related-status-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#shield"></use></svg>
+                            </span>
+                            <div class="related-status-input-control">
+                                {{ form.stato }}
+                            </div>
+                        </div>
+                        {{ form.stato.errors }}
+                    </div>
+
+                    <div class="related-status-order-row">
+                        <div class="related-status-form-field related-status-field-order">
+                            <label for="{{ form.ordine.id_for_label }}">Ordine <span class="required-marker">*</span></label>
+                            <div class="related-status-input-shell">
+                                <span class="related-status-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#arrows-up-down"></use></svg>
+                                </span>
+                                <div class="related-status-input-control">
+                                    {{ form.ordine }}
+                                </div>
+                            </div>
+                            {{ form.ordine.errors }}
+                        </div>
+                        <div class="related-status-order-help">
+                            <span>Numero che definisce la priorit&agrave; della relazione.</span>
+                            <span>1 = principale</span>
+                        </div>
+                    </div>
+
+                    <div class="related-status-form-field related-status-field-notes">
+                        <label for="{{ form.note.id_for_label }}">Note</label>
+                        <div class="related-status-note-shell">
+                            <span class="related-status-input-addon related-status-note-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#message"></use></svg>
+                            </span>
+                            <div class="related-status-note-control">
+                                {{ form.note }}
+                            </div>
+                        </div>
+                        {{ form.note.errors }}
+                    </div>
+
+                    <div class="related-status-form-field related-status-field-active">
+                        <label class="related-status-check">
+                            {{ form.attivo }}
+                            <span>Stato attivo</span>
+                        </label>
+                        {{ form.attivo.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
             </div>
         </form>
     </div>
-</body>
-</html>
+{% endblock %}

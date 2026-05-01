@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import Http404, HttpResponse
@@ -1642,15 +1643,50 @@ def applica_regole_massiva(request):
 
 
 def lista_categorie_finanziarie(request):
-    categorie = (
-        CategoriaFinanziaria.objects.select_related("parent")
-        .order_by("parent__nome", "ordine", "nome")
+    categorie = list(
+        CategoriaFinanziaria.objects.select_related("parent").order_by("ordine", "nome", "id")
     )
+    icon_symbol_by_value = {
+        icon["value"]: icon["symbol"]
+        for icon in CategoriaFinanziariaForm.ICON_CHOICES
+    }
+    figli_by_parent = {}
+    for categoria in categorie:
+        figli_by_parent.setdefault(categoria.parent_id, []).append(categoria)
+
+    def build_node(categoria, livello=0):
+        figli = [
+            build_node(figlia, livello + 1)
+            for figlia in figli_by_parent.get(categoria.pk, [])
+        ]
+        discendenti_count = sum(1 + figlia["discendenti_count"] for figlia in figli)
+        row_tone = categoria.tipo
+        if row_tone not in {
+            TipoCategoriaFinanziaria.ENTRATA,
+            TipoCategoriaFinanziaria.SPESA,
+            TipoCategoriaFinanziaria.TRASFERIMENTO,
+        }:
+            row_tone = "neutra"
+        return {
+            "categoria": categoria,
+            "figli": figli,
+            "livello": livello,
+            "row_id": f"categoria-{categoria.pk}",
+            "row_tone": row_tone,
+            "discendenti_count": discendenti_count,
+            "icon_symbol": icon_symbol_by_value.get(categoria.icona, ""),
+        }
+
+    categorie_tree = [
+        build_node(categoria)
+        for categoria in figli_by_parent.get(None, [])
+    ]
     return render(
         request,
         "gestione_finanziaria/categorie_list.html",
         {
             "categorie": categorie,
+            "categorie_tree": categorie_tree,
             "tipo_choices": TipoCategoriaFinanziaria.choices,
         },
     )
@@ -1669,7 +1705,11 @@ def crea_categoria_finanziaria(request):
     return render(
         request,
         "gestione_finanziaria/categoria_form.html",
-        {"form": form, "categoria": None},
+        {
+            "form": form,
+            "categoria": None,
+            "icon_choices": CategoriaFinanziariaForm.ICON_CHOICES,
+        },
     )
 
 
@@ -1688,7 +1728,11 @@ def modifica_categoria_finanziaria(request, pk):
     return render(
         request,
         "gestione_finanziaria/categoria_form.html",
-        {"form": form, "categoria": categoria},
+        {
+            "form": form,
+            "categoria": categoria,
+            "icon_choices": CategoriaFinanziariaForm.ICON_CHOICES,
+        },
     )
 
 
@@ -2620,6 +2664,7 @@ def lista_movimenti_da_riconciliare(request):
     queryset = (
         MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione")
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO)
         .filter(rata_iscrizione__isnull=True)
     )
 
@@ -2689,13 +2734,18 @@ def riconcilia_movimento(request, pk):
                 return redirect("riconcilia_movimento", pk=movimento.pk)
 
             marca = request.POST.get("marca_rata_pagata") == "1"
-            riconcilia_movimento_con_rata(movimento, rata, utente=request.user, marca_rata_pagata=marca)
-            messages.success(
-                request,
-                f"Movimento riconciliato con {rata}. "
-                + ("Rata marcata come pagata." if marca else "Rata non modificata."),
-            )
-            return redirect("lista_movimenti_da_riconciliare")
+            try:
+                riconcilia_movimento_con_rata(movimento, rata, utente=request.user, marca_rata_pagata=marca)
+            except ValidationError as exc:
+                for message in exc.messages:
+                    messages.error(request, message)
+            else:
+                messages.success(
+                    request,
+                    f"Movimento riconciliato con {rata}. "
+                    + ("Rata marcata come pagata." if marca else "Rata non modificata."),
+                )
+                return redirect("lista_movimenti_da_riconciliare")
 
     candidati = trova_rate_candidate(movimento)
 

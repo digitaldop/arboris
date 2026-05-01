@@ -4,9 +4,90 @@
 {% block title %}Home - Arboris School Management{% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Anno Scolastico {{ anno_scolastico_corrente }}</h1>
-    </div>
+    <div class="dashboard-shell">
+        <div class="page-head dashboard-page-head">
+            <div class="dashboard-page-title-block">
+                <div class="dashboard-page-title-line">
+                    <h1 class="page-title dashboard-page-title">Anno Scolastico {{ anno_scolastico_corrente }}</h1>
+                    {% if anno_scolastico_corrente %}
+                        <span class="family-status-pill{% if not anno_scolastico_corrente.attivo %} is-muted{% endif %}">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {% if anno_scolastico_corrente.attivo %}Attivo{% else %}Non attivo{% endif %}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if can_view_gestione_finanziaria %}
+                <div class="dashboard-page-actions">
+                    <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text dashboard-head-action">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                        <span class="btn-label">Dashboard finanziaria</span>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-overview-grid">
+            <section class="dashboard-info-card">
+                <span class="dashboard-info-icon dashboard-info-icon-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+                <div class="dashboard-info-content">
+                    <h2>Informazioni generali</h2>
+                    <dl class="dashboard-info-list">
+                        <div>
+                            <dt>Anno scolastico</dt>
+                            <dd>{{ anno_scolastico_corrente|default:"-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Periodo</dt>
+                            <dd>
+                                {% if anno_scolastico_corrente %}
+                                    {{ anno_scolastico_corrente.data_inizio|date:"d/m/Y" }} - {{ anno_scolastico_corrente.data_fine|date:"d/m/Y" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Stato</dt>
+                            <dd>
+                                {% if anno_scolastico_corrente and anno_scolastico_corrente.attivo %}
+                                    <span class="dashboard-pill dashboard-pill-success">Attivo</span>
+                                {% elif anno_scolastico_corrente %}
+                                    <span class="dashboard-pill dashboard-pill-muted">Non attivo</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+
+            <section class="dashboard-info-card">
+                <span class="dashboard-info-icon dashboard-info-icon-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+                <div class="dashboard-info-content">
+                    <h2>Calendario scolastico</h2>
+                    <dl class="dashboard-info-list">
+                        <div>
+                            <dt>Inizio periodo</dt>
+                            <dd>{% if anno_scolastico_corrente %}{{ anno_scolastico_corrente.data_inizio|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
+                        </div>
+                        <div>
+                            <dt>Fine periodo</dt>
+                            <dd>{% if anno_scolastico_corrente %}{{ anno_scolastico_corrente.data_fine|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
+                        </div>
+                        <div>
+                            <dt>Settimana corrente</dt>
+                            <dd>{{ calendario_dashboard.week_label|default:"-" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+        </div>
 
     <div id="dashboard-sections" class="dashboard-sections" data-dashboard-order-key="arboris-dashboard-section-order">
         <div class="admin-section dashboard-section" data-dashboard-section-id="statistiche-generali">
@@ -17,7 +98,7 @@
                 data-storage-key="arboris-dashboard-statistiche-generali"
                 data-default-open="true"
             >
-                <span class="dashboard-section-label">STATISTICHE GENERALI DELL'ANNO SCOLASTICO {{ anno_scolastico_corrente }}</span>
+                <span class="dashboard-section-label">RIEPILOGO E INDICATORI CHIAVE</span>
                 <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
             </button>
             <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali">
@@ -64,7 +145,7 @@
                     data-storage-key="arboris-dashboard-riepilogo-economia"
                     data-default-open="true"
                 >
-                    <span class="dashboard-section-label">RIEPILOGO ECONOMICO DELL'ANNO SCOLASTICO {{ anno_scolastico_corrente }}</span>
+                    <span class="dashboard-section-label">RIEPILOGO FINANZIARIO</span>
                     <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
                 </button>
                 <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-economia">
@@ -310,7 +391,7 @@
                     data-storage-key="arboris-dashboard-statistiche-generali-prossimo-anno"
                     data-default-open="true"
                 >
-                    <span class="dashboard-section-label">STATISTICHE GENERALI DELL'ANNO SCOLASTICO {{ dashboard_prossimo_anno.anno_label }}</span>
+                    <span class="dashboard-section-label">RIEPILOGO E INDICATORI CHIAVE - {{ dashboard_prossimo_anno.anno_label }}</span>
                     <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
                 </button>
                 <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali-prossimo-anno">
@@ -357,7 +438,7 @@
                         data-storage-key="arboris-dashboard-riepilogo-economia-prossimo-anno"
                         data-default-open="true"
                     >
-                        <span class="dashboard-section-label">RIEPILOGO ECONOMICO DELL'ANNO SCOLASTICO {{ dashboard_prossimo_anno.anno_label }}</span>
+                        <span class="dashboard-section-label">RIEPILOGO FINANZIARIO - {{ dashboard_prossimo_anno.anno_label }}</span>
                         <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
                     </button>
                     <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-economia-prossimo-anno">
@@ -525,7 +606,7 @@
                     data-storage-key="arboris-dashboard-riepilogo-calendario"
                     data-default-open="true"
                 >
-                    <span class="dashboard-section-label">CALENDARIO</span>
+                    <span class="dashboard-section-label">IMPEGNI E CALENDARIO</span>
                     <span class="dashboard-drag-handle" draggable="true" title="Trascina per riordinare" aria-label="Trascina per riordinare">::::</span>
                 </button>
                 <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-calendario">
@@ -601,6 +682,7 @@
                 </div>
             </div>
         {% endif %}
+        </div>
     </div>
 
     <script src="{% static 'js/core/collapsible.js' %}"></script>

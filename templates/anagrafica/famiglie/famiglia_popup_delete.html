@@ -1,0 +1,86 @@
+{% extends "popup_base.html" %}
+
+{% block title %}Elimina famiglia - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Elimina famiglia</h1>
+    </div>
+
+    <div class="content-card">
+        {% if double_confirm %}
+            <div class="message message-error">
+                Seconda conferma richiesta: eliminando questa famiglia perderai anche i dati correlati elencati sotto.
+            </div>
+            <p>Vuoi davvero procedere con la cancellazione completa?</p>
+        {% else %}
+            <div class="empty-state">
+                <p>Sei sicuro di voler eliminare la famiglia <strong>{{ famiglia.cognome_famiglia }}</strong>?</p>
+            </div>
+        {% endif %}
+
+        {% if impact.familiari or impact.studenti or impact.totale_documenti or impact.indirizzi_da_eliminare or impact.indirizzi_condivisi %}
+            <div class="message message-warning">
+                L'eliminazione della famiglia rimuovera anche i record collegati qui sotto.
+            </div>
+        {% endif %}
+
+        {% if impact.familiari %}
+            <p><strong>Familiari collegati:</strong> {{ impact.familiari|join:", " }}</p>
+        {% endif %}
+
+        {% if impact.studenti %}
+            <p><strong>Studenti collegati:</strong> {{ impact.studenti|join:", " }}</p>
+        {% endif %}
+
+        {% if impact.documenti_famiglia %}
+            <p><strong>Documenti della famiglia:</strong></p>
+            <p>
+                {% for doc in impact.documenti_famiglia %}
+                    {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        {% if impact.documenti_familiari %}
+            <p><strong>Documenti dei familiari:</strong></p>
+            <p>
+                {% for doc in impact.documenti_familiari %}
+                    {{ doc.familiare }} - {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        {% if impact.documenti_studenti %}
+            <p><strong>Documenti degli studenti:</strong></p>
+            <p>
+                {% for doc in impact.documenti_studenti %}
+                    {{ doc.studente }} - {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        {% if impact.indirizzi_da_eliminare %}
+            <p><strong>Indirizzi che verranno eliminati:</strong> {% for item in impact.indirizzi_da_eliminare %}{{ item.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+        {% endif %}
+
+        {% if impact.indirizzi_condivisi %}
+            <div class="message message-info">
+                Gli indirizzi condivisi con record esterni alla famiglia non verranno eliminati, ma solo scollegati dai record che stai cancellando.
+            </div>
+        {% endif %}
+
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            {% if double_confirm %}
+                <input type="hidden" name="confirm_delete_related" value="1">
+                <button type="submit" class="btn btn-danger">Si, elimina tutto</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            {% else %}
+                <button type="submit" class="btn btn-danger">Continua</button>
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

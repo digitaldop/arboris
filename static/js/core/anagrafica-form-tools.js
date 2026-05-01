@@ -54,6 +54,19 @@ window.ArborisAnagraficaFormTools = (function () {
         return "/famiglie/" + encodeURIComponent(selectedId) + "/modifica/";
     }
 
+    function addPopupQuery(url, targetInputName) {
+        if (!url) {
+            return "";
+        }
+
+        var sep = url.indexOf("?") >= 0 ? "&" : "?";
+        var popupUrl = url + sep + "popup=1";
+        if (targetInputName) {
+            popupUrl += "&target_input_name=" + encodeURIComponent(targetInputName);
+        }
+        return popupUrl;
+    }
+
     function bindFamigliaNavigation(options) {
         options = options || {};
 
@@ -73,6 +86,17 @@ window.ArborisAnagraficaFormTools = (function () {
             addBtn.dataset.familyNavBound = "1";
             addBtn.addEventListener("click", function () {
                 if (createUrl) {
+                    var relatedPopups = window.ArborisRelatedPopups;
+                    if (
+                        relatedPopups &&
+                        typeof relatedPopups.openRelatedPopup === "function"
+                    ) {
+                        relatedPopups.openRelatedPopup(
+                            addPopupQuery(createUrl, familySelect ? familySelect.name : "")
+                        );
+                        return;
+                    }
+
                     window.location.href = createUrl;
                 }
             });

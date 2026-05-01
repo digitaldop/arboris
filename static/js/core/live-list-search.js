@@ -26,10 +26,15 @@
     }
 
     function syncClearLink(form) {
-        const input = form.querySelector("[data-live-list-input]");
         const clearLink = form.querySelector("[data-live-list-clear]");
-        if (!input || !clearLink) return;
-        clearLink.hidden = !input.value.trim();
+        if (!clearLink) return;
+        const hasValue = Array.from(form.elements).some((field) => {
+            if (!field.name || field.disabled) return false;
+            if (field.type === "submit" || field.type === "button" || field.type === "reset") return false;
+            if ((field.type === "checkbox" || field.type === "radio") && !field.checked) return false;
+            return String(field.value || "").trim();
+        });
+        clearLink.hidden = !hasValue;
     }
 
     function initForm(form) {
@@ -69,6 +74,9 @@
                     if (window.ArborisListRowLinks) {
                         window.ArborisListRowLinks.init();
                     }
+                    if (window.ArborisPopupWindowTriggers) {
+                        window.ArborisPopupWindowTriggers.wire(target);
+                    }
                 })
                 .catch(() => {
                     form.submit();
@@ -87,6 +95,13 @@
             syncClearLink(form);
         });
 
+        form.querySelectorAll("[data-live-list-filter]").forEach((filter) => {
+            filter.addEventListener("change", function () {
+                refreshResults();
+                syncClearLink(form);
+            });
+        });
+
         form.addEventListener("submit", function (event) {
             event.preventDefault();
             refreshResults();
@@ -96,7 +111,15 @@
         if (clearLink) {
             clearLink.addEventListener("click", function (event) {
                 event.preventDefault();
-                input.value = "";
+                Array.from(form.elements).forEach((field) => {
+                    if (!field.name || field.disabled) return;
+                    if (field.type === "submit" || field.type === "button" || field.type === "reset") return;
+                    if (field.type === "checkbox" || field.type === "radio") {
+                        field.checked = false;
+                    } else {
+                        field.value = "";
+                    }
+                });
                 refreshResults();
                 input.focus();
             });

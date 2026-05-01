@@ -12,7 +12,8 @@
         </div>
         <form method="post" class="form-actions">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            <input type="hidden" name="popup" value="1">
+            <button type="submit" class="btn btn-danger">Conferma eliminazione</button>
             <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
         </form>
     </div>

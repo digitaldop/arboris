@@ -22,9 +22,15 @@
                                 </div>
                             </div>
                             <div class="related-actions">
-                                <button type="button" class="related-btn related-btn-add" id="popup-add-famiglia-btn">+</button>
-                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-famiglia-btn">&#9998;</button>
-                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-famiglia-btn">&#10006;</button>
+                                <button type="button" class="related-btn related-btn-add" id="popup-add-famiglia-btn" aria-label="Nuova famiglia" title="Nuova famiglia" data-floating-text="Nuova famiglia">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-famiglia-btn" aria-label="Modifica famiglia" title="Modifica famiglia" data-floating-text="Modifica famiglia">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-famiglia-btn" aria-label="Elimina famiglia" title="Elimina famiglia" data-floating-text="Elimina famiglia">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                </button>
                             </div>
                         </div>
                         {{ form.famiglia.errors }}
@@ -63,9 +69,15 @@
                                 </div>
                             </div>
                             <div class="related-actions">
-                                <button type="button" class="related-btn related-btn-add" id="popup-add-indirizzo-btn">+</button>
-                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-indirizzo-btn">&#9998;</button>
-                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-indirizzo-btn">&#10006;</button>
+                                <button type="button" class="related-btn related-btn-add" id="popup-add-indirizzo-btn" aria-label="Nuovo indirizzo" title="Nuovo indirizzo" data-floating-text="Nuovo indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-indirizzo-btn" aria-label="Modifica indirizzo" title="Modifica indirizzo" data-floating-text="Modifica indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-indirizzo-btn" aria-label="Elimina indirizzo" title="Elimina indirizzo" data-floating-text="Elimina indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                </button>
                             </div>
                         </div>
                         <div class="inline-address-help" id="popup-studente-address-help">
@@ -90,7 +102,7 @@
         <script id="popup-studente-famiglia-indirizzo-label" type="application/json">""</script>
     {% endif %}
 
-    <script src="{% static 'js/core/related-popups.js' %}?v=2"></script>
+    <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/pages/studente-popup-form.js' %}?v=6"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {

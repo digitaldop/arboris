@@ -1,6 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from collections import Counter
 import re
@@ -50,12 +50,13 @@ from economia.models import (
     CondizioneIscrizione,
     Iscrizione,
     PrestazioneScambioRetta,
+    RataIscrizione,
     StatoIscrizione,
     TariffaScambioRetta,
     TariffaCondizioneIscrizione,
 )
 from osservazioni.models import OsservazioneStudente
-from scuola.models import AnnoScolastico, Classe
+from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
     AzioneOperazioneCronologia,
     SistemaOperazioneCronologia,
@@ -325,6 +326,71 @@ class AjaxCercaCittaTests(TestCase):
         self.assertContains(response, "Via / Strada / Piazza")
         self.assertContains(response, "Città")
 
+    def test_crea_indirizzo_popup_uses_visual_address_layout(self):
+        response = self.client.get(f"{reverse('crea_indirizzo')}?popup=1&target_input_name=indirizzo")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "related-address-popup-hero")
+        self.assertContains(response, "related-address-icon-tile")
+        self.assertContains(response, "related-address-popup-info")
+        self.assertContains(response, "related-address-input-shell")
+        self.assertContains(response, "Aggiungi un nuovo indirizzo di residenza o domicilio.")
+        self.assertContains(response, '<button type="button" class="related-address-popup-close"')
+        self.assertContains(response, "Seleziona il CAP")
+
+    def test_crea_relazione_familiare_popup_uses_visual_relation_layout(self):
+        response = self.client.get(
+            f"{reverse('crea_relazione_familiare')}?popup=1&target_input_name=relazione_familiare"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "related-relation-popup-hero")
+        self.assertContains(response, "related-relation-icon-tile")
+        self.assertContains(response, "related-relation-popup-info")
+        self.assertContains(response, "related-relation-input-shell")
+        self.assertContains(response, "Definisci il tipo di relazione tra il familiare e il bambino.")
+        self.assertContains(response, '<button type="button" class="related-relation-popup-close"')
+        self.assertContains(response, 'data-rich-notes="1"')
+
+    def test_crea_stato_relazione_famiglia_popup_uses_visual_status_layout(self):
+        response = self.client.get(
+            f"{reverse('crea_stato_relazione_famiglia')}?popup=1&target_input_name=stato_relazione_famiglia"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "related-status-popup-hero")
+        self.assertContains(response, "related-status-icon-tile")
+        self.assertContains(response, "related-status-popup-info")
+        self.assertContains(response, "related-status-input-shell")
+        self.assertContains(response, "Definisci lo stato e la priorit")
+        self.assertContains(response, '<button type="button" class="related-status-popup-close"')
+        self.assertContains(response, "Es. Attiva, Interessata, Ex-Famiglia, Ritirata, etc.")
+
+    def test_crea_studente_hides_inline_actions_and_uses_cancel_back(self):
+        response = self.client.get(reverse("crea_studente"))
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        header_match = re.search(
+            r'<div class="page-head-actions family-page-actions">(.*?)</div>\s*</div>\s*<form',
+            html,
+            re.S,
+        )
+        self.assertIsNotNone(header_match)
+        header_html = header_match.group(1)
+        self.assertIn("Salva studente", header_html)
+        self.assertIn("Annulla", header_html)
+        self.assertNotIn("data-enrollment-card-action", header_html)
+        self.assertNotIn("data-relative-card-action", header_html)
+        self.assertNotIn("data-document-card-action", header_html)
+        self.assertNotIn(">Elenco<", header_html)
+        self.assertContains(response, "student-create-stat-grid is-hidden")
+        self.assertContains(response, 'id="studente-inline-lock-container"')
+        self.assertContains(response, "student-tabs-stack-card is-hidden")
+        self.assertContains(response, 'id="sticky-cancel-edit-studente-btn" data-fallback-url="%s"' % reverse("lista_studenti"))
+        self.assertContains(response, 'formEl.classList.contains("is-create-mode")')
+        self.assertContains(response, "ArborisAppNavigation.resolveBackUrl")
+
     def test_lista_famiglie_uses_standalone_panel(self):
         response = self.client.get(reverse("lista_famiglie"))
 
@@ -398,15 +464,99 @@ class AjaxCercaCittaTests(TestCase):
         form = StudenteStandaloneForm()
         self.assertIn("Rossi - Referenti: Mario Rossi", str(form["famiglia"]))
 
+        nuovo_familiare_form = FamiliareForm(detailed_famiglia_choices=True)
+        rendered_famiglia_field = str(nuovo_familiare_form["famiglia"])
+        self.assertIn("Rossi - Familiari: Mario Rossi", rendered_famiglia_field)
+        self.assertIn("Bambini: Luca Rossi", rendered_famiglia_field)
+        self.assertIn("Indirizzo: Via Roma 10 - Roma", rendered_famiglia_field)
+
     def test_indirizzo_form_uses_updated_labels_and_placeholder(self):
         form = IndirizzoForm()
 
         self.assertEqual(form.fields["via"].label, "Via / Strada / Piazza")
+        self.assertEqual(
+            form.fields["via"].widget.attrs.get("placeholder"),
+            "Via Roma, Piazza Maggiore, Viale dei Mille, etc.",
+        )
+        self.assertEqual(
+            form.fields["numero_civico"].widget.attrs.get("placeholder"),
+            "Es. 15, 3/B, interno 2, etc.",
+        )
         self.assertEqual(form.fields["citta_search"].label, "Città")
         self.assertEqual(form.fields["citta_search"].widget.attrs.get("placeholder"), "Cerca una città...")
 
 
 class LuogoNascitaAutocompletePerformanceTests(TestCase):
+    def test_crea_famiglia_uses_create_dashboard_layout(self):
+        user = User.objects.create_superuser(
+            username="nuova-famiglia@example.com",
+            email="nuova-famiglia@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("crea_famiglia"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="famiglia-detail-form" class="detail-form is-create-mode"')
+        self.assertContains(response, "family-create-dashboard")
+        self.assertContains(response, "family-general-card-editor family-create-general-editor")
+        self.assertContains(response, 'id="famiglia-lock-container" class="mode-lock-container main-fields-section family-create-main-fields"')
+        self.assertContains(response, "Dati nuova famiglia")
+        self.assertContains(response, "family-general-editor-related-control")
+        self.assertNotContains(response, 'admin-section-title-label">Dati principali')
+        self.assertContains(response, "Nuova scheda")
+        self.assertContains(response, "Salva famiglia")
+        self.assertContains(response, 'class="btn btn-intent-danger btn-icon-text js-page-back-btn"')
+        self.assertContains(response, 'id="sticky-cancel-edit-famiglia-btn" data-fallback-url="%s"' % reverse("lista_famiglie"))
+        self.assertContains(response, 'formEl.classList.contains("is-create-mode")')
+        self.assertContains(response, "ArborisAppNavigation.resolveBackUrl")
+
+    def test_crea_famiglia_popup_creates_selectable_family(self):
+        user = User.objects.create_superuser(
+            username="nuova-famiglia-popup@example.com",
+            email="nuova-famiglia-popup@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
+        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
+        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
+        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+
+        response = self.client.get(f"{reverse('crea_famiglia')}?popup=1&target_input_name=famiglia")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "related-family-popup-card")
+        self.assertContains(response, "related-family-popup-hero")
+        self.assertContains(response, "related-family-icon-tile")
+        self.assertContains(response, "related-family-popup-info")
+        self.assertContains(response, "related-family-input-shell")
+        self.assertContains(response, "dati principali")
+        self.assertContains(response, "Salva famiglia")
+        self.assertContains(response, '<button type="button" class="related-family-popup-close"')
+        self.assertContains(response, "Es. Rossi, Bianchi...")
+
+        response = self.client.post(
+            f"{reverse('crea_famiglia')}?popup=1&target_input_name=famiglia",
+            data={
+                "popup": "1",
+                "target_input_name": "famiglia",
+                "cognome_famiglia": "Popup",
+                "stato_relazione_famiglia": stato.pk,
+                "indirizzo_principale": indirizzo.pk,
+                "attiva": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        famiglia = Famiglia.objects.get(cognome_famiglia="Popup")
+        self.assertContains(response, 'const fieldName = "famiglia"')
+        self.assertContains(response, f'const objectId = "{famiglia.pk}"')
+        self.assertContains(response, 'const targetInputName = "famiglia"')
+        self.assertContains(response, "Popup \\u002D Indirizzo: Via Roma 10 \\u002D Roma")
+
     def test_inline_forms_render_selected_birth_city_without_loading_all_cities(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia_roma = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
@@ -463,7 +613,9 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             relazione_familiare=relazione,
             nome="Paolo",
             cognome="Bianchi",
+            sesso="M",
             luogo_nascita=roma,
+            referente_principale=True,
             attivo=True,
         )
         Studente.objects.create(
@@ -473,12 +625,188 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             luogo_nascita=roma,
             attivo=True,
         )
+        tipo_documento = TipoDocumento.objects.create(tipo_documento="Contratto iscrizione", ordine=1, attivo=True)
+        Documento.objects.create(
+            famiglia=famiglia,
+            tipo_documento=tipo_documento,
+            descrizione="Documento famiglia",
+            file=SimpleUploadedFile("contratto.pdf", b"contratto", content_type="application/pdf"),
+        )
 
         response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="familiari-0-luogo_nascita_search"')
         self.assertContains(response, 'name="studenti-0-luogo_nascita_search"')
+        self.assertContains(response, 'id="family-card-sticky-actions"')
+        self.assertContains(response, 'data-family-card-sticky-save="1"')
+        self.assertContains(response, 'data-family-card-sticky-cancel="1"')
+        self.assertContains(response, 'data-family-general-action="edit"')
+        self.assertContains(response, 'data-relative-card-action="add"')
+        self.assertContains(response, 'data-relative-card-action="edit"')
+        self.assertContains(response, 'data-relative-form-prefix="familiari-0"')
+        self.assertContains(response, 'data-document-card-action="add"')
+        self.assertContains(response, 'data-document-card-action="edit"')
+        self.assertContains(response, 'data-document-card-action="delete"')
+        self.assertContains(response, 'data-document-form-prefix="documenti-0"')
+        self.assertContains(response, reverse("elimina_documento", kwargs={"pk": Documento.objects.get(famiglia=famiglia).pk}))
+        self.assertContains(response, "Modifica dati generali")
+        self.assertContains(response, "family-relation-pill")
+        self.assertContains(response, "is-male")
+        self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
+        self.assertNotContains(response, 'id="enable-edit-famiglia-btn"')
+
+    def test_modifica_famiglia_student_cards_show_current_class_or_group(self):
+        user = User.objects.create_superuser(
+            username="famiglie-classi@example.com",
+            email="famiglie-classi@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        today = timezone.localdate()
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato, attiva=True)
+        studente_classe = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Anna",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        studente_pluriclasse = Studente.objects.create(
+            famiglia=famiglia,
+            nome="Luca",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno corrente test famiglia",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+        )
+        classe_infanzia = Classe.objects.create(
+            nome_classe="Infanzia",
+            sezione_classe="A",
+            ordine_classe=1,
+            attiva=True,
+        )
+        classe_seconda = Classe.objects.create(
+            nome_classe="Seconda primaria",
+            ordine_classe=2,
+            attiva=True,
+        )
+        gruppo_classe = GruppoClasse.objects.create(
+            nome_gruppo_classe="Primaria mista",
+            anno_scolastico=anno,
+            attivo=True,
+        )
+        gruppo_classe.classi.add(classe_seconda)
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_classe,
+            classe=classe_infanzia,
+            anno_scolastico=anno,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_pluriclasse,
+            classe=classe_seconda,
+            gruppo_classe=gruppo_classe,
+            anno_scolastico=anno,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Classe: Infanzia A")
+        self.assertContains(response, "Pluriclasse: Primaria mista (Seconda primaria)")
+
+    def test_modifica_famiglia_rate_card_can_switch_to_future_school_year(self):
+        user = User.objects.create_superuser(
+            username="famiglie-rette-switch@example.com",
+            email="famiglie-rette-switch@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        today = timezone.localdate()
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Verdi", stato_relazione_famiglia=stato, attiva=True)
+        anna = Studente.objects.create(famiglia=famiglia, nome="Anna", cognome="Verdi", attivo=True)
+        luca = Studente.objects.create(famiglia=famiglia, nome="Luca", cognome="Verdi", attivo=True)
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno corrente rette famiglia",
+            data_inizio=today - timedelta(days=120),
+            data_fine=today + timedelta(days=30),
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno futuro rette famiglia",
+            data_inizio=today + timedelta(days=31),
+            data_fine=today + timedelta(days=395),
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta standard corrente",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        condizione_futura = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="Retta standard futura",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione_corrente,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1200.00"),
+            attiva=True,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione_futura,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1500.00"),
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=anna,
+            anno_scolastico=anno_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_corrente,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=luca,
+            anno_scolastico=anno_futuro,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_futura,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.context["famiglia_rette_summary"]
+        self.assertTrue(summary["has_year_switch"])
+        self.assertEqual([item["anno_id"] for item in summary["years"]], [anno_corrente.pk, anno_futuro.pk])
+        self.assertContains(response, 'data-family-rate-year-tab="anno-%s"' % anno_corrente.pk)
+        self.assertContains(response, 'data-family-rate-year-tab="anno-%s"' % anno_futuro.pk)
+        self.assertContains(response, "Anno corrente rette famiglia")
+        self.assertContains(response, "Anno futuro rette famiglia")
+        self.assertContains(response, "Anna Verdi")
+        self.assertContains(response, "Luca Verdi")
 
     def test_modifica_famiglia_page_shows_system_audit_users(self):
         user = User.objects.create_superuser(
@@ -536,6 +864,10 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertContains(response, "Giulia Rossi (Direzione)")
         self.assertContains(response, "Aggiornato da")
         self.assertContains(response, "Marco Bianchi (Segreteria)")
+        self.assertContains(response, "Cronologia attivit")
+        self.assertContains(response, "Creata famiglia.")
+        self.assertContains(response, "Modificata famiglia.")
+        self.assertGreaterEqual(len(response.context["famiglia_activity_entries"]), 2)
 
 
 class FamigliaInlineDefaultsTests(TestCase):
@@ -747,7 +1079,7 @@ class FamigliaInlineDefaultsTests(TestCase):
         form = StudenteStandaloneForm(initial={"famiglia": famiglia.pk})
 
         self.assertEqual(str(form["indirizzo"].value()), str(indirizzo.pk))
-        self.assertEqual(form.initial["famiglia_search"], famiglia.label_select())
+        self.assertEqual(form.initial["famiglia_search"], famiglia.cognome_famiglia)
         self.assertEqual(form.initial["indirizzo_search"], indirizzo.label_select())
         self.assertIn('data-inherited-address="1"', str(form["indirizzo"]))
         self.assertIn('data-cf-luogo-id="1"', str(form["luogo_nascita"]))
@@ -979,8 +1311,62 @@ class FamiliareScambioRettaInlineTests(TestCase):
             self.familiare.refresh_from_db()
             self.assertTrue(self.familiare.abilitato_scambio_retta)
             self.assertContains(response, "Scambio retta")
+            self.assertContains(response, 'id="scambio-retta-inline"')
+            self.assertContains(response, "family-scambio-card")
+            self.assertContains(response, "scambio-summary-card")
+            self.assertContains(response, "scambio-primary-add")
+            self.assertContains(response, "family-dashed-add scambio-year-add")
+            self.assertContains(response, 'data-window-popup="1"')
+            self.assertContains(response, "arboris-prestazione-scambio-popup")
+            self.assertContains(response, "popup=1")
+            self.assertContains(response, f"familiare={self.familiare.pk}")
+            self.assertContains(response, "Aggiungi prestazione")
             self.assertContains(response, "Vista settimana")
             self.assertContains(response, "Vista mensile")
+
+    def test_create_prestazione_scambio_retta_popup_renders_and_closes_after_save(self):
+        url = reverse("crea_prestazione_scambio_retta")
+        return_to = reverse("modifica_familiare", kwargs={"pk": self.familiare.pk})
+
+        response = self.client.get(
+            url,
+            {
+                "popup": "1",
+                "familiare": self.familiare.pk,
+                "return_to": return_to,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="popup-page"')
+        self.assertContains(response, 'name="popup" value="1"')
+
+        response = self.client.post(
+            url,
+            {
+                "popup": "1",
+                "familiare": self.familiare.pk,
+                "data": "2026-04-21",
+                "ora_ingresso": "",
+                "ora_uscita": "",
+                "ore_lavorate": "1.50",
+                "tariffa_scambio_retta": self.tariffa.pk,
+                "descrizione": "Supporto ingresso",
+                "note": "",
+                "return_to": return_to,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertContains(response, "window.close()")
+        self.assertTrue(
+            PrestazioneScambioRetta.objects.filter(
+                familiare=self.familiare,
+                data=date(2026, 4, 21),
+                descrizione="Supporto ingresso",
+            ).exists()
+        )
 
     def test_view_mode_post_cannot_disable_scambio_retta(self):
         url = reverse("modifica_familiare", kwargs={"pk": self.familiare.pk})
@@ -1027,12 +1413,23 @@ class FamiliareDetailViewTests(TestCase):
             attiva=True,
         )
         self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.nazione = Nazione.objects.create(
+            nome="Italia",
+            nome_nazionalita="Italiana",
+            codice_iso2="IT",
+            codice_iso3="ITA",
+            codice_belfiore="Z000",
+            ordine=1,
+            attiva=True,
+        )
         self.familiare = Familiare.objects.create(
             famiglia=self.famiglia,
             relazione_familiare=self.relazione,
             nome="Ada",
             cognome="Rossi",
             sesso="F",
+            nazionalita=self.nazione,
+            referente_principale=True,
             attivo=True,
         )
 
@@ -1043,6 +1440,60 @@ class FamiliareDetailViewTests(TestCase):
         self.assertContains(response, 'id="familiare-detail-form" class="detail-form is-view-mode"')
         self.assertContains(response, 'name="documenti-0-id"')
         self.assertContains(response, 'class="inline-form-row inline-empty-row is-hidden"')
+
+    def test_crea_familiare_cancel_actions_use_wrapped_application_back(self):
+        response = self.client.get(reverse("crea_familiare"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="familiare-detail-form" class="detail-form is-create-mode is-edit-mode"')
+        self.assertContains(response, 'class="btn btn-intent-danger btn-icon-text js-page-back-btn"')
+        self.assertContains(response, 'id="sticky-cancel-edit-familiare-btn"')
+        self.assertContains(response, f'data-fallback-url="{reverse("lista_familiari")}"')
+        self.assertContains(response, '<span class="btn-label">Annulla</span>')
+        self.assertContains(response, 'formEl.classList.contains("is-create-mode")')
+        self.assertContains(response, "ArborisAppNavigation.resolveBackUrl")
+
+    def test_modifica_familiare_renders_family_style_card_tabs(self):
+        padre = RelazioneFamiliare.objects.create(relazione="Padre", ordine=2)
+        altro_familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=padre,
+            nome="Mario",
+            cognome="Rossi",
+            sesso="M",
+            referente_principale=True,
+            attivo=True,
+        )
+        studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Rossi",
+            sesso="M",
+            attivo=True,
+        )
+        tipo_documento = TipoDocumento.objects.create(tipo_documento="Documento identita", ordine=1, attivo=True)
+        Documento.objects.create(familiare=self.familiare, tipo_documento=tipo_documento)
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="tab-studenti"')
+        self.assertContains(response, 'id="tab-parenti"')
+        self.assertContains(response, 'id="tab-documenti"')
+        self.assertContains(response, f'data-student-id="{studente.pk}"')
+        self.assertContains(response, f'data-relative-id="{altro_familiare.pk}"')
+        self.assertContains(response, 'data-document-card')
+        self.assertContains(response, 'data-student-card-action="edit"')
+        self.assertContains(response, 'data-relative-card-action="edit"')
+        self.assertContains(response, 'data-document-card-action="edit"')
+        self.assertNotContains(response, "Nazionalit&agrave; non indicata")
+        self.assertContains(response, "Nazionalit&agrave;: Italiana")
+        self.assertContains(response, 'class="family-status-pill is-muted">Referente</span>')
+        self.assertContains(response, "family-relation-pill")
+        self.assertContains(response, "is-male")
+        self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
+        self.assertContains(response, 'class="family-related-list mode-view-only person-student-card-list"')
+        self.assertIn(">Rossi<", str(response.context["form"]["famiglia"]))
 
     def test_modifica_familiare_full_save_redirects_to_detail_view_with_blank_inline_rows(self):
         response = self.client.post(
@@ -1585,7 +2036,7 @@ class StudenteDetailPerformanceTests(TestCase):
         normalized = Counter(re.sub(r"\s+", " ", item["sql"]).strip()[:260] for item in queries.captured_queries)
         self.assertLess(
             len(queries),
-            65,
+            90,
             msg="\n".join(
                 [f"Total queries: {len(queries)}"]
                 + [f"{count}x {sql}" for sql, count in normalized.most_common(20)]
@@ -1613,9 +2064,80 @@ class StudenteDetailPerformanceTests(TestCase):
             self.assertEqual(html.count(f'id="id_iscrizioni-__prefix__-{field_name}"'), 1)
 
     def test_modifica_studente_view_mode_shows_iscrizione_summary_fields(self):
+        self.iscrizione.non_pagante = False
+        self.iscrizione.save(update_fields=["non_pagante"])
+        self.iscrizione.rate.all().delete()
+        RataIscrizione.objects.create(
+            iscrizione=self.iscrizione,
+            famiglia=self.famiglia,
+            tipo_rata=RataIscrizione.TIPO_PREISCRIZIONE,
+            numero_rata=0,
+            mese_riferimento=8,
+            anno_riferimento=2025,
+            importo_dovuto=Decimal("200.00"),
+            importo_finale=Decimal("200.00"),
+            importo_pagato=Decimal("200.00"),
+            pagata=True,
+        )
+        for numero_rata, importo_pagato, pagata in [
+            (1, Decimal("100.00"), True),
+            (2, Decimal("50.00"), False),
+            (3, Decimal("0.00"), False),
+        ]:
+            RataIscrizione.objects.create(
+                iscrizione=self.iscrizione,
+                famiglia=self.famiglia,
+                numero_rata=numero_rata,
+                mese_riferimento=numero_rata,
+                anno_riferimento=2026,
+                importo_dovuto=Decimal("100.00"),
+                importo_finale=Decimal("100.00"),
+                importo_pagato=importo_pagato,
+                pagata=pagata,
+            )
+
         response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="student-card-sticky-actions"')
+        self.assertContains(response, 'data-student-card-sticky-save="1"')
+        self.assertContains(response, 'id="studente-inline-lock-container"')
+        self.assertContains(response, 'data-student-main-card-reorder')
+        self.assertContains(response, 'data-student-stack-card-key="rates"')
+        self.assertContains(response, 'data-student-stack-card-key="tabs"')
+        self.assertContains(response, 'data-student-main-card-drag-handle')
+        self.assertContains(response, 'data-student-main-card-collapse-toggle')
+        self.assertContains(response, 'class="student-tabs-card-body"')
+        self.assertContains(response, 'class="student-enrollment-card-list mode-view-only"')
+        self.assertContains(response, 'id="tab-parenti"')
+        self.assertContains(response, "Classe: Infanzia A")
+        self.assertContains(response, "student-main-rate-card")
+        self.assertContains(response, "Resoconto rate iscrizione")
+        self.assertContains(response, 'data-family-rate-year-panel="student-rate-main-%s"' % self.iscrizione.pk)
+        self.assertContains(response, 'class="student-main-rate-head-controls"')
+        self.assertContains(response, 'data-family-rate-year-actions="student-rate-main-%s"' % self.iscrizione.pk)
+        self.assertContains(response, 'data-action-url="%s"' % reverse("ricalcola_rate_iscrizione", kwargs={"pk": self.iscrizione.pk}))
+        self.assertContains(response, "Chiudi iscrizione")
+        self.assertContains(response, "Riconcilia")
+        rata_da_riconciliare = RataIscrizione.objects.filter(
+            iscrizione=self.iscrizione,
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            pagata=False,
+        ).first()
+        self.assertContains(response, reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata_da_riconciliare.pk}))
+        self.assertContains(response, "Totale anno")
+        self.assertContains(response, "Totale con Preiscrizione: EUR 500,00")
+        self.assertContains(response, "Residuo EUR")
+        self.assertContains(response, "student-main-rate-month is-paid")
+        self.assertContains(response, "student-main-rate-month is-partial")
+        self.assertContains(response, "student-main-rate-month is-unpaid")
+        self.assertContains(response, "Pagata parzialmente")
+        self.assertContains(response, "Da pagare")
+        self.assertNotContains(response, 'data-student-overdue-rate-stat="1"')
+        self.assertNotContains(response, "student-rate-compact-list")
+        self.assertContains(response, "arboris-delete-studente-popup")
+        self.assertNotContains(response, "Iscrizione corrente")
+        self.assertNotContains(response, "Stato iscrizione:")
         self.assertContains(response, "Tipo di retta")
         self.assertContains(response, "Retta standard")
         self.assertContains(response, "Agevolazione")
@@ -1625,6 +2147,61 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertContains(response, "Studente non pagante")
         self.assertContains(response, "Note generali")
         self.assertContains(response, "Note amministrative")
+
+    def test_modifica_studente_view_mode_shows_overdue_rate_stat_only_when_present(self):
+        self.iscrizione.rate.all().delete()
+        today = timezone.localdate()
+        for numero_rata, data_scadenza, importo_pagato, pagata in [
+            (1, today - timedelta(days=2), Decimal("20.00"), False),
+            (2, today - timedelta(days=3), Decimal("100.00"), True),
+            (3, today + timedelta(days=5), Decimal("0.00"), False),
+        ]:
+            RataIscrizione.objects.create(
+                iscrizione=self.iscrizione,
+                famiglia=self.famiglia,
+                numero_rata=numero_rata,
+                mese_riferimento=numero_rata,
+                anno_riferimento=today.year,
+                importo_dovuto=Decimal("100.00"),
+                importo_pagato=importo_pagato,
+                data_scadenza=data_scadenza,
+                pagata=pagata,
+            )
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-student-overdue-rate-stat="1"')
+        self.assertContains(response, 'data-student-overdue-rate-count="1"')
+        self.assertContains(response, "Rate scadute")
+
+    def test_modifica_studente_parenti_tab_uses_editable_cards(self):
+        relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
+        familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=relazione,
+            nome="Simone",
+            cognome="Bersani",
+            sesso="M",
+            telefono="3293560757",
+            email="simone_bersani@example.com",
+            referente_principale=True,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'data-relative-id="{familiare.pk}"')
+        self.assertContains(response, 'data-relative-card-action="edit"')
+        self.assertContains(response, 'data-relative-card-action="add"')
+        self.assertContains(response, "Aggiungi un parente")
+        self.assertContains(response, 'id="parenti-table"')
+        self.assertContains(response, 'id="parenti-empty-form-template"')
+        self.assertContains(response, 'name="parenti-TOTAL_FORMS"')
+        self.assertContains(response, "family-relation-pill")
+        self.assertContains(response, "is-male")
+        self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
 
     def test_modifica_studente_documenti_view_shows_data_caricamento(self):
         response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))

@@ -40,8 +40,8 @@ def scuola_inline_head(*, inline_target, count_telefoni, count_email, count_soci
     }
 
 
-def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti):
-    valid = {"iscrizioni", "documenti"}
+def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti, count_parenti=0):
+    valid = {"iscrizioni", "documenti", "parenti"}
     active = inline_target if inline_target in valid else "iscrizioni"
     tabs = [
         {
@@ -49,18 +49,29 @@ def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti):
             "scope": "iscrizioni",
             "label": "Iscrizioni",
             "count": count_iscrizioni,
+            "base_label": "Iscrizioni",
+        },
+        {
+            "tab_id": "tab-parenti",
+            "scope": "parenti",
+            "label": "Parenti",
+            "count": count_parenti,
+            "base_label": "Parenti",
         },
         {
             "tab_id": "tab-documenti",
             "scope": "documenti",
             "label": "Documenti",
             "count": count_documenti,
+            "base_label": "Documenti",
         },
     ]
     for t in tabs:
         t["is_active"] = t["scope"] == active
     if active == "documenti":
         edit_label = "Modifica Documenti"
+    elif active == "parenti":
+        edit_label = "Parenti"
     else:
         edit_label = "Modifica Iscrizioni"
     return {
@@ -77,27 +88,27 @@ def famiglia_inline_head(
     count_documenti,
     related_famiglia_studenti_doc_count,
 ):
-    """Tab inline scheda famiglia (familiari / studenti / documenti)."""
+    """Tab inline scheda famiglia (studenti / familiari / documenti)."""
     valid = {"familiari", "studenti", "documenti"}
-    active = active_inline_tab if active_inline_tab in valid else "familiari"
+    active = active_inline_tab if active_inline_tab in valid else "studenti"
 
     imp = SistemaImpostazioniGenerali.objects.first()
     studenti_plural = get_student_terminology(getattr(imp, "terminologia_studente", None))["selected_plural"]
 
     tabs = [
         {
-            "tab_id": "tab-familiari",
-            "scope": "familiari",
-            "label": "Familiari",
-            "count": count_familiari,
-            "base_label": "Familiari",
-        },
-        {
             "tab_id": "tab-studenti",
             "scope": "studenti",
             "label": studenti_plural,
             "count": count_studenti,
             "base_label": studenti_plural,
+        },
+        {
+            "tab_id": "tab-familiari",
+            "scope": "familiari",
+            "label": "Familiari",
+            "count": count_familiari,
+            "base_label": "Familiari",
         },
         {
             "tab_id": "tab-documenti",

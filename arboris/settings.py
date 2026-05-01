@@ -86,6 +86,8 @@ MIDDLEWARE = [
     'gestione_finanziaria.middleware.SincronizzazionePsd2ScheduleMiddleware',
 ]
 
+X_FRAME_OPTIONS = "SAMEORIGIN"
+
 ROOT_URLCONF = 'arboris.urls'
 
 TEMPLATES = [

@@ -4,12 +4,13 @@ import shutil
 import tempfile
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.models import Famiglia, StatoRelazioneFamiglia, Studente
+from anagrafica.models import Famiglia, Familiare, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
@@ -26,6 +27,7 @@ from .models import (
     MovimentoFinanziario,
     OrigineMovimento,
     ProviderBancario,
+    RiconciliazioneRataMovimento,
     RegolaCategorizzazione,
     SaldoConto,
     ScadenzaPagamentoFornitore,
@@ -40,7 +42,12 @@ from .models import (
 )
 from .importers import CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
-from .services import applica_regole_a_movimento
+from .services import (
+    applica_regole_a_movimento,
+    riconcilia_movimento_con_rate,
+    trova_movimenti_candidati_per_rate,
+    trova_rate_candidate,
+)
 
 
 CBI_CSV_SAMPLE = (
@@ -52,6 +59,146 @@ CBI_CSV_SAMPLE = (
     '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034";"37060";"000000003228";"24/04/2026";'
     '"24/04/2026";"-24,40";"50";"C";"ADDEBITO DIRETTO SDD - PayPal Europe";"";""\n'
 )
+
+
+class RiconciliazioneRateMatchingTests(TestCase):
+    def setUp(self):
+        self.stato_relazione = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        self.relazione_genitore = RelazioneFamiliare.objects.create(relazione="Genitore")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        self.classe = Classe.objects.create(nome_classe="Primaria", ordine_classe=1)
+        self.stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto")
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1000.00"),
+        )
+
+    def _crea_rata(self, *, famiglia_cognome, studente_nome, studente_cognome, genitore_nome, genitore_cognome):
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia=famiglia_cognome,
+            stato_relazione_famiglia=self.stato_relazione,
+        )
+        Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=self.relazione_genitore,
+            nome=genitore_nome,
+            cognome=genitore_cognome,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia,
+            nome=studente_nome,
+            cognome=studente_cognome,
+            data_nascita=date(2020, 5, 5),
+        )
+        iscrizione = Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=self.anno,
+            classe=self.classe,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+            data_fine_iscrizione=date(2026, 6, 30),
+        )
+        rata = RataIscrizione.objects.create(
+            iscrizione=iscrizione,
+            famiglia=famiglia,
+            numero_rata=1,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+            importo_dovuto=Decimal("100.00"),
+            importo_finale=Decimal("100.00"),
+            data_scadenza=date(2025, 9, 10),
+        )
+        return famiglia, studente, rata
+
+    def test_rate_candidate_usa_nominativi_genitori_in_causale(self):
+        _, _, rata_corretta = self._crea_rata(
+            famiglia_cognome="Rossi",
+            studente_nome="Luca",
+            studente_cognome="Rossi",
+            genitore_nome="Simone",
+            genitore_cognome="Rossi",
+        )
+        _, _, rata_altra_famiglia = self._crea_rata(
+            famiglia_cognome="Rossi",
+            studente_nome="Anna",
+            studente_cognome="Rossi",
+            genitore_nome="Paolo",
+            genitore_cognome="Rossi",
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Bonifico retta settembre Simone Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidate_ids = [candidato.rata.pk for candidato in trova_rate_candidate(movimento)]
+
+        self.assertIn(rata_corretta.pk, candidate_ids)
+        self.assertNotIn(rata_altra_famiglia.pk, candidate_ids)
+
+    def test_movimenti_candidati_escludono_causali_di_altri_genitori(self):
+        _, _, rata = self._crea_rata(
+            famiglia_cognome="Rossi",
+            studente_nome="Luca",
+            studente_cognome="Rossi",
+            genitore_nome="Simone",
+            genitore_cognome="Rossi",
+        )
+        movimento_corretto = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Bonifico retta settembre Simone Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        movimento_altra_famiglia = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Bonifico retta settembre Paolo Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidate_ids = [
+            candidato.movimento.pk
+            for candidato in trova_movimenti_candidati_per_rate(rata, [rata])
+        ]
+
+        self.assertIn(movimento_corretto.pk, candidate_ids)
+        self.assertNotIn(movimento_altra_famiglia.pk, candidate_ids)
+
+    def test_salvataggio_riconciliazione_blocca_movimento_senza_nominativo_compatibile(self):
+        _, _, rata = self._crea_rata(
+            famiglia_cognome="Rossi",
+            studente_nome="Luca",
+            studente_cognome="Rossi",
+            genitore_nome="Simone",
+            genitore_cognome="Rossi",
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Bonifico retta settembre Paolo Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "Controllo di sicurezza"):
+            riconcilia_movimento_con_rate(movimento, [(rata, Decimal("100.00"))])
+
+        movimento.refresh_from_db()
+        rata.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertFalse(rata.pagata)
 
 
 class FornitoriGestioneFinanziariaTests(TestCase):
@@ -98,6 +245,39 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         response = self.client.get(reverse("lista_categorie_spesa"))
         self.assertContains(response, "Consulenze")
+
+    def test_categorie_finanziarie_list_renders_parent_child_tree(self):
+        categoria_padre = CategoriaFinanziaria.objects.create(
+            nome="Utenze",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            ordine=1,
+        )
+        CategoriaFinanziaria.objects.create(
+            nome="Energia elettrica",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            parent=categoria_padre,
+            ordine=1,
+        )
+
+        response = self.client.get(reverse("lista_categorie_finanziarie"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Utenze")
+        self.assertContains(response, "Energia elettrica")
+        self.assertContains(response, 'data-report-category-toggle="categoria-')
+        self.assertContains(response, 'data-report-category-parent="categoria-')
+        self.assertContains(response, "category-tree-badge-parent")
+        self.assertContains(response, "Figlia")
+
+    def test_categoria_finanziaria_form_has_color_picker_and_icon_library(self):
+        response = self.client.get(reverse("crea_categoria_finanziaria"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'type="color"')
+        self.assertContains(response, 'id="id_colore_picker"')
+        self.assertContains(response, "data-category-icon-picker")
+        self.assertContains(response, 'data-icon-value="banknote"')
+        self.assertContains(response, "js/pages/categoria-finanziaria-form.js")
 
     def test_fornitore_uses_categoria_spesa(self):
         categoria = CategoriaSpesa.objects.create(nome="Utenze")
@@ -595,6 +775,81 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertTrue(rata.pagata)
         self.assertEqual(rata.importo_pagato, Decimal("100.00"))
         self.assertEqual(rata.data_pagamento, date(2025, 9, 10))
+
+    def test_riconcilia_movimento_con_rate_supporta_pagamento_cumulativo(self):
+        stato_relazione = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=stato_relazione,
+        )
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        classe = Classe.objects.create(nome_classe="Materna", ordine_classe=1)
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto")
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1000.00"),
+        )
+        rate = []
+        for nome in ["Luca", "Marta"]:
+            studente = Studente.objects.create(
+                famiglia=famiglia,
+                nome=nome,
+                cognome="Rossi",
+                data_nascita=date(2020, 5, 5),
+            )
+            iscrizione = Iscrizione.objects.create(
+                studente=studente,
+                anno_scolastico=anno,
+                classe=classe,
+                stato_iscrizione=stato_iscrizione,
+                condizione_iscrizione=condizione,
+                data_iscrizione=date(2025, 9, 1),
+                data_fine_iscrizione=date(2026, 6, 30),
+            )
+            rate.append(
+                RataIscrizione.objects.create(
+                    iscrizione=iscrizione,
+                    famiglia=famiglia,
+                    numero_rata=1,
+                    mese_riferimento=9,
+                    anno_riferimento=2025,
+                    importo_dovuto=Decimal("100.00"),
+                    importo_finale=Decimal("100.00"),
+                    data_scadenza=date(2025, 9, 10),
+                )
+            )
+
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 11),
+            importo=Decimal("200.00"),
+            descrizione="Bonifico rette Luca e Marta Rossi",
+        )
+
+        riconcilia_movimento_con_rate(
+            movimento,
+            [(rate[0], Decimal("100.00")), (rate[1], Decimal("100.00"))],
+            utente=self.user,
+        )
+
+        movimento.refresh_from_db()
+        for rata in rate:
+            rata.refresh_from_db()
+            self.assertTrue(rata.pagata)
+            self.assertEqual(rata.importo_pagato, Decimal("100.00"))
+            self.assertEqual(rata.data_pagamento, date(2025, 9, 11))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertIsNone(movimento.rata_iscrizione_id)
+        self.assertEqual(RiconciliazioneRataMovimento.objects.filter(movimento=movimento).count(), 2)
 
     def test_lista_movimenti_colora_entrate_e_uscite(self):
         categoria = CategoriaFinanziaria.objects.create(

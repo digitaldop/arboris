@@ -1,32 +1,53 @@
-{% load currency %}
+{% load static currency %}
 {% if scambio_retta_inline_context.enabled %}
-    <div class="admin-section" id="scambio-retta-inline">
-        <div class="inline-section-head">
-            <div class="admin-section-title inline-section-title-static">
-                Scambio retta ({{ scambio_retta_inline_context.total_entries }})
-            </div>
+    <section class="admin-section family-scambio-card" id="scambio-retta-inline">
+        <div class="family-side-card-head scambio-card-head">
+            <h2>
+                Scambio retta
+                <span>({{ scambio_retta_inline_context.total_entries }})</span>
+            </h2>
             <a
                 href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&return_to={{ scambio_retta_return_to|urlencode }}"
-                class="btn btn-primary btn-sm"
+                class="btn btn-primary btn-sm btn-icon-text btn-add-action scambio-primary-add"
+                data-window-popup="1"
+                data-popup-window-name="arboris-prestazione-scambio-popup"
+                data-popup-window-features="width=860,height=760,resizable=yes,scrollbars=yes"
+                data-popup-url="{% url 'crea_prestazione_scambio_retta' %}?popup=1&familiare={{ familiare.pk }}&return_to={{ scambio_retta_return_to|urlencode }}"
             >
-                + Nuova prestazione
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Nuova prestazione</span>
             </a>
         </div>
 
-        <div class="panel">
-            <div class="panel-body scambio-inline-panel-body">
+        <div class="family-side-card-body scambio-card-body">
+            <div class="scambio-inline-panel-body">
                 <div class="scambio-inline-summary">
-                    <div class="summary-item">
-                        <div class="summary-value">{{ scambio_retta_inline_context.total_entries }}</div>
-                        <div class="summary-label">Registrazioni</div>
+                    <div class="family-stat-card scambio-summary-card">
+                        <span class="family-stat-icon family-stat-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                        </span>
+                        <span class="family-stat-content">
+                            <span class="family-stat-value">{{ scambio_retta_inline_context.total_entries }}</span>
+                            <span class="family-stat-label">Registrazioni</span>
+                        </span>
                     </div>
-                    <div class="summary-item">
-                        <div class="summary-value">{{ scambio_retta_inline_context.total_hours }}</div>
-                        <div class="summary-label">Ore totali</div>
+                    <div class="family-stat-card scambio-summary-card">
+                        <span class="family-stat-icon family-stat-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <span class="family-stat-content">
+                            <span class="family-stat-value">{{ scambio_retta_inline_context.total_hours }}</span>
+                            <span class="family-stat-label">Ore totali</span>
+                        </span>
                     </div>
-                    <div class="summary-item">
-                        <div class="summary-value">EUR {{ scambio_retta_inline_context.total_amount|euro }}</div>
-                        <div class="summary-label">Importo maturato</div>
+                    <div class="family-stat-card scambio-summary-card">
+                        <span class="family-stat-icon family-stat-orange" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <span class="family-stat-content">
+                            <span class="family-stat-value">EUR {{ scambio_retta_inline_context.total_amount|euro }}</span>
+                            <span class="family-stat-label">Importo maturato</span>
+                        </span>
                     </div>
                 </div>
 
@@ -81,9 +102,14 @@
 
                                     <a
                                         href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ section.default_reference|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
-                                        class="btn btn-secondary btn-sm"
+                                        class="family-dashed-add scambio-year-add"
+                                        data-window-popup="1"
+                                        data-popup-window-name="arboris-prestazione-scambio-popup"
+                                        data-popup-window-features="width=860,height=760,resizable=yes,scrollbars=yes"
+                                        data-popup-url="{% url 'crea_prestazione_scambio_retta' %}?popup=1&familiare={{ familiare.pk }}&data={{ section.default_reference|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
                                     >
-                                        + Aggiungi
+                                        <span aria-hidden="true">+</span>
+                                        Aggiungi prestazione
                                     </a>
                                 </div>
 
@@ -122,6 +148,10 @@
                                                             href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ day.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
                                                             class="scambio-mini-add"
                                                             aria-label="Aggiungi prestazione il {{ day.date|date:'d/m/Y' }}"
+                                                            data-window-popup="1"
+                                                            data-popup-window-name="arboris-prestazione-scambio-popup"
+                                                            data-popup-window-features="width=860,height=760,resizable=yes,scrollbars=yes"
+                                                            data-popup-url="{% url 'crea_prestazione_scambio_retta' %}?popup=1&familiare={{ familiare.pk }}&data={{ day.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
                                                         >
                                                             +
                                                         </a>
@@ -197,6 +227,10 @@
                                                                     href="{% url 'crea_prestazione_scambio_retta' %}?familiare={{ familiare.pk }}&data={{ cell.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
                                                                     class="scambio-mini-add"
                                                                     aria-label="Aggiungi prestazione il {{ cell.date|date:'d/m/Y' }}"
+                                                                    data-window-popup="1"
+                                                                    data-popup-window-name="arboris-prestazione-scambio-popup"
+                                                                    data-popup-window-features="width=860,height=760,resizable=yes,scrollbars=yes"
+                                                                    data-popup-url="{% url 'crea_prestazione_scambio_retta' %}?popup=1&familiare={{ familiare.pk }}&data={{ cell.date|date:'Y-m-d' }}&return_to={{ scambio_retta_return_to|urlencode }}"
                                                                 >
                                                                     +
                                                                 </a>
@@ -279,5 +313,5 @@
                 {% endfor %}
             </div>
         </div>
-    </div>
+    </section>
 {% endif %}

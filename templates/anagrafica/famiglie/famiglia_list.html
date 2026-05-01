@@ -6,44 +6,82 @@
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-sep">&gt;</span>
         <span>Famiglie</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Famiglie</h1>
-        <a href="{% url 'crea_famiglia' %}" class="btn btn-primary">Nuova famiglia</a>
+    <div class="page-head family-page-head anagrafica-list-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Famiglie</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ famiglie|length }} schede
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                Archivio famiglie, referenti, studenti e documenti collegati
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'crea_famiglia' %}" class="btn btn-primary btn-icon-text btn-add-action">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Nuova famiglia</span>
+            </a>
+        </div>
     </div>
 
-    <!-- INIZIO BARRA DI RICERCA -->
-    <div class="list-toolbar">
-        <form method="get" class="search-form" data-live-list-form data-live-list-target="#famiglie-results">
-            <input
-                type="text"
-                name="q"
-                value="{{ q|default:'' }}"
-                placeholder="Cerca per cognome famiglia, familiare, studente, email, telefono..."
-                class="search-input"
-                data-live-list-input
-            >
-            <button type="submit" class="btn btn-secondary">Cerca</button>
-            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary" data-live-list-clear{% if not q %} hidden{% endif %}>Pulisci</a>
+    <div class="list-toolbar anagrafica-list-toolbar-card">
+        <form method="get" class="search-form anagrafica-search-form" data-live-list-form data-live-list-target="#famiglie-results">
+            <label class="anagrafica-search-field">
+                <span class="anagrafica-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ q|default:'' }}"
+                    placeholder="Cerca per cognome famiglia, familiare, studente, email, telefono..."
+                    class="search-input"
+                    data-live-list-input
+                >
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Stato relazione</span>
+                <select name="stato_relazione" data-live-list-filter>
+                    <option value="">Tutti</option>
+                    {% for stato in stati_relazione %}
+                        <option value="{{ stato.pk }}"{% if stato_relazione_id|stringformat:'s' == stato.pk|stringformat:'s' %} selected{% endif %}>{{ stato.stato }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <span class="btn-label">Cerca</span>
+            </button>
+            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear{% if not q and not stato_relazione_id %} hidden{% endif %}>
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Pulisci</span>
+            </a>
         </form>
     </div>
-    <!-- FINE BARRA DI RICERCA -->
 
-    <div class="panel panel-standalone list-live-search-results" id="famiglie-results" data-live-list-results>
+    <div class="panel panel-standalone list-live-search-results anagrafica-list-panel" id="famiglie-results" data-live-list-results>
         <div class="panel-body">
             {% if famiglie %}
-                <table class="list-table">
+                <table class="list-table anagrafica-list-table famiglie-list-table">
+                    <colgroup>
+                        <col class="famiglie-col-name">
+                        <col class="famiglie-col-address">
+                        <col class="famiglie-col-status">
+                        <col class="famiglie-col-actions">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Cognome famiglia</th>
-                            <th>Stato relazione</th>
                             <th>Indirizzo principale</th>
-                            <th>Attiva</th>
+                            <th>Stato relazione</th>
                             <th>Azioni</th>
                         </tr>
                     </thead>
@@ -53,27 +91,54 @@
                                 class="list-row-link {% if evidenzia_id and evidenzia_id|stringformat:'s' == famiglia.pk|stringformat:'s' %}highlight-row{% endif %}"
                                 data-row-href="{% url 'modifica_famiglia' famiglia.pk %}"
                             >
-                                <td class="family-label-cell">
-                                    <div class="table-main-text">{{ famiglia.cognome_famiglia }}</div>
-                                    {% with famiglia_context=famiglia.label_contesto_anagrafica %}
-                                        {% if famiglia_context %}
-                                            <div class="table-subtext">{{ famiglia_context }}</div>
-                                        {% endif %}
-                                    {% endwith %}
+                                <td class="family-label-cell anagrafica-record-cell">
+                                    <a href="{% url 'modifica_famiglia' famiglia.pk %}" class="anagrafica-record-link">
+                                        <span class="anagrafica-record-avatar anagrafica-record-avatar-family" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-avatars.svg' %}#avatar-family"></use></svg>
+                                        </span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ famiglia.cognome_famiglia }}</span>
+                                            {% with famiglia_context=famiglia.label_contesto_anagrafica %}
+                                                {% if famiglia_context %}
+                                                    <span class="table-subtext">{{ famiglia_context }}</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </span>
+                                    </a>
                                 </td>
-                                <td>{{ famiglia.stato_relazione_famiglia }}</td>
-                                <td>
+                                <td class="famiglie-address-cell">
                                     {% if famiglia.indirizzo_principale %}
-                                        {{ famiglia.indirizzo_principale }}
+                                        {{ famiglia.indirizzo_principale.label_full }}
                                     {% else %}
-                                        <span class="table-muted">—</span>
+                                        <span class="table-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{% if famiglia.attiva %}Sì{% else %}No{% endif %}</td>
+                                <td>
+                                    {% if famiglia.stato_relazione_famiglia %}
+                                        <span class="anagrafica-status-chip is-success">{{ famiglia.stato_relazione_famiglia }}</span>
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td class="actions-cell">
-                                    <a class="table-link" href="{% url 'modifica_famiglia' famiglia.pk %}">Modifica</a>
-                                    |
-                                    <a class="table-link table-link-danger" href="{% url 'elimina_famiglia' famiglia.pk %}">Elimina</a>
+                                    <div class="table-icon-actions famiglie-row-actions">
+                                        <a
+                                            class="table-icon-link famiglie-action-btn famiglie-action-open"
+                                            href="{% url 'modifica_famiglia' famiglia.pk %}"
+                                            title="Apri scheda"
+                                            aria-label="Apri scheda famiglia {{ famiglia.cognome_famiglia }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                        <a
+                                            class="table-icon-link table-icon-link-danger famiglie-action-btn famiglie-action-delete"
+                                            href="{% url 'elimina_famiglia' famiglia.pk %}"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'elimina_famiglia' famiglia.pk %}?popup=1"
+                                            data-popup-window-name="arboris-delete-famiglia-popup"
+                                            data-popup-window-features="width=900,height=760,resizable=yes,scrollbars=yes"
+                                            title="Elimina"
+                                            aria-label="Elimina famiglia {{ famiglia.cognome_famiglia }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}

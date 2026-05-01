@@ -4,94 +4,152 @@
 {% block title %}{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %} - Arboris School Management{% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}</h1>
-    </div>
+    <div class="content-card related-config-popup-card related-address-popup-card">
+        <button type="button" class="related-address-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
 
-    <div class="info-box">
-        Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
-    </div>
-
-    <div class="content-card">
-        <form method="post">
+        <form method="post" class="related-config-popup-form related-address-popup-form">
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
             <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
-            <div class="panel-body">
-                <table class="form-table">
-                    <tr>
-                        <th>{{ form.via.label_tag }}</th>
-                        <td>
-                            {{ form.via }}
-                            {{ form.via.errors }}
-                        </td>
-                    </tr>
+            <div class="related-address-popup-hero">
+                <span class="related-address-icon-tile" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg>
+                </span>
+                <div class="related-address-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}</h1>
+                    <p>{% if indirizzo %}Aggiorna i dati dell'indirizzo selezionato.{% else %}Aggiungi un nuovo indirizzo di residenza o domicilio.{% endif %}</p>
+                </div>
+            </div>
 
-                    <tr>
-                        <th>{{ form.numero_civico.label_tag }}</th>
-                        <td>
-                            {{ form.numero_civico }}
-                            {{ form.numero_civico.errors }}
-                        </td>
-                    </tr>
+            <div class="related-address-popup-info">
+                <span class="related-address-popup-info-icon" aria-hidden="true">
+                    i
+                </span>
+                <div>
+                    <p>Se la citt&agrave; ha un solo CAP, verr&agrave; selezionato automaticamente.</p>
+                    <p>Se ha pi&ugrave; CAP, potrai scegliere quello corretto dall'elenco.</p>
+                </div>
+            </div>
 
-                    <tr>
-                        <th>{{ form.citta_search.label_tag }}</th>
-                        <td>
-                            <div class="related-field-stack">
+            <div class="related-config-popup-editor related-address-popup-editor">
+                <div class="related-address-popup-grid">
+                    <div class="related-address-form-field related-address-field-street">
+                        <label for="{{ form.via.id_for_label }}">{{ form.via.label }} <span class="required-marker">*</span></label>
+                        <div class="related-address-input-shell">
+                            <span class="related-address-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg>
+                            </span>
+                            <div class="related-address-input-control">
+                                {{ form.via }}
+                            </div>
+                        </div>
+                        {{ form.via.errors }}
+                    </div>
+
+                    <div class="related-address-form-field related-address-field-number">
+                        <label for="{{ form.numero_civico.id_for_label }}">{{ form.numero_civico.label }} <span class="required-marker">*</span></label>
+                        <div class="related-address-input-shell">
+                            <span class="related-address-input-addon related-address-input-addon-text" aria-hidden="true">123</span>
+                            <div class="related-address-input-control">
+                                {{ form.numero_civico }}
+                            </div>
+                        </div>
+                        {{ form.numero_civico.errors }}
+                    </div>
+
+                    <div class="related-address-form-field related-address-field-city">
+                        <label for="{{ form.citta_search.id_for_label }}">{{ form.citta_search.label }} <span class="required-marker">*</span></label>
+                        <div class="related-address-input-shell has-trailing-icon">
+                            <span class="related-address-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                            </span>
+                            <div class="related-address-input-control">
                                 <div class="autocomplete-wrapper citta-autocomplete">
                                     {{ form.citta_search }}
                                     {{ form.citta }}
                                 </div>
+                                <span class="related-address-input-trailing" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                                </span>
                             </div>
-                            {{ form.citta_search.errors }}
-                            {{ form.citta.errors }}
-                        </td>
-                    </tr>
+                        </div>
+                        {{ form.citta_search.errors }}
+                        {{ form.citta.errors }}
+                    </div>
 
-                    <tr>
-                        <th><label for="id_provincia_display">Provincia</label></th>
-                        <td>
-                            <input
-                                type="text"
-                                id="id_provincia_display"
-                                class="readonly-field"
-                                readonly
-                                value="{% if form.instance.pk and form.instance.provincia %}{{ form.instance.provincia.nome }} ({{ form.instance.provincia.sigla }}){% endif %}"
-                            >
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th><label for="id_regione_display">Regione</label></th>
-                        <td>
-                            <input
-                                type="text"
-                                id="id_regione_display"
-                                class="readonly-field"
-                                readonly
-                                value="{% if form.instance.pk and form.instance.regione %}{{ form.instance.regione.nome }}{% endif %}"
-                            >
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th>{{ form.cap_scelto.label_tag }}</th>
-                        <td>
-                            {{ form.cap_scelto }}
-                            {{ form.cap_scelto.errors }}
-                            <div class="help-text" id="cap-help-text">
-                                Seleziona il CAP solo quando la città ne ha più di uno.
+                    <div class="related-address-form-field related-address-field-cap">
+                        <label for="{{ form.cap_scelto.id_for_label }}">{{ form.cap_scelto.label }} <span class="required-marker">*</span></label>
+                        <div class="related-address-input-shell">
+                            <span class="related-address-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg>
+                            </span>
+                            <div class="related-address-input-control">
+                                {{ form.cap_scelto }}
                             </div>
-                        </td>
-                    </tr>
-                </table>
+                        </div>
+                        {{ form.cap_scelto.errors }}
+                        <div class="related-address-help" id="cap-help-text">
+                            Seleziona il CAP solo quando la citt&agrave; ne ha pi&ugrave; di uno.
+                        </div>
+                    </div>
+
+                    <div class="related-address-form-field related-address-field-province">
+                        <label for="id_provincia_display">Provincia</label>
+                        <div class="related-address-input-shell">
+                            <span class="related-address-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg>
+                            </span>
+                            <div class="related-address-input-control">
+                                <input
+                                    type="text"
+                                    id="id_provincia_display"
+                                    class="readonly-field related-address-readonly"
+                                    readonly
+                                    placeholder="Es. BO"
+                                    value="{% if form.instance.pk and form.instance.provincia %}{{ form.instance.provincia.nome }} ({{ form.instance.provincia.sigla }}){% endif %}"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="related-address-form-field related-address-field-region">
+                        <label for="id_regione_display">Regione</label>
+                        <div class="related-address-input-shell">
+                            <span class="related-address-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                            </span>
+                            <div class="related-address-input-control">
+                                <input
+                                    type="text"
+                                    id="id_regione_display"
+                                    class="readonly-field related-address-readonly"
+                                    readonly
+                                    placeholder="Es. Emilia-Romagna"
+                                    value="{% if form.instance.pk and form.instance.regione %}{{ form.instance.regione.nome }}{% endif %}"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
             </div>
         </form>
     </div>
@@ -109,17 +167,24 @@
                 capSelect.innerHTML = "";
                 const option = document.createElement("option");
                 option.value = "";
-                option.textContent = "---------";
+                option.textContent = "Seleziona il CAP";
                 capSelect.appendChild(option);
                 capSelect.classList.remove("select-single-cap");
-                capHelpText.textContent = "Seleziona il CAP solo quando la città ne ha più di uno.";
+                capHelpText.textContent = "Seleziona il CAP solo quando la citta ne ha piu di uno.";
+            }
+
+            function normalizeEmptyCapLabel() {
+                const emptyOption = capSelect ? capSelect.querySelector('option[value=""]') : null;
+                if (emptyOption) {
+                    emptyOption.textContent = "Seleziona il CAP";
+                }
             }
 
             function loadCaps(caps, preferredCapId) {
                 resetCapSelect();
 
                 if (!caps || !caps.length) {
-                    capHelpText.textContent = "Per questa città non risultano CAP disponibili.";
+                    capHelpText.textContent = "Per questa citta non risultano CAP disponibili.";
                     return;
                 }
 
@@ -136,13 +201,13 @@
                     capSelect.value = String(preferredCapId);
                     capHelpText.textContent = caps.length === 1
                         ? "CAP selezionato automaticamente."
-                        : "Questa città ha più CAP: seleziona quello corretto.";
+                        : "Questa citta ha piu CAP: seleziona quello corretto.";
                 } else if (caps.length === 1) {
                     capSelect.value = String(caps[0].id);
                     capSelect.classList.add("select-single-cap");
                     capHelpText.textContent = "CAP selezionato automaticamente.";
                 } else {
-                    capHelpText.textContent = "Questa città ha più CAP: seleziona quello corretto.";
+                    capHelpText.textContent = "Questa citta ha piu CAP: seleziona quello corretto.";
                 }
             }
 
@@ -188,6 +253,7 @@
             }
 
             if (cittaInput) {
+                normalizeEmptyCapLabel();
                 cittaInput.addEventListener("change", syncCityDetails);
                 syncCityDetails();
             }

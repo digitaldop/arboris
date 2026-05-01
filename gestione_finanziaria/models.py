@@ -839,6 +839,52 @@ class MovimentoFinanziario(models.Model):
         return self.importo is not None and self.importo > 0
 
 
+class RiconciliazioneRataMovimento(models.Model):
+    movimento = models.ForeignKey(
+        MovimentoFinanziario,
+        on_delete=models.CASCADE,
+        related_name="riconciliazioni_rate",
+    )
+    rata = models.ForeignKey(
+        "economia.RataIscrizione",
+        on_delete=models.CASCADE,
+        related_name="riconciliazioni_movimenti",
+    )
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    note = models.TextField(blank=True)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="riconciliazioni_rate_movimenti_create",
+        blank=True,
+        null=True,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_riconciliazione_rata_movimento"
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Riconciliazione rata movimento"
+        verbose_name_plural = "Riconciliazioni rate movimenti"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["movimento", "rata"],
+                name="gf_ric_rata_mov_unique",
+            ),
+            models.CheckConstraint(
+                check=models.Q(importo__gt=0),
+                name="gf_ric_rata_mov_importo_pos",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["movimento"], name="gf_ric_rata_mov_idx"),
+            models.Index(fields=["rata"], name="gf_ric_rata_rata_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.movimento_id} -> {self.rata_id}: {self.importo}"
+
+
 # =========================================================================
 #  Log delle sincronizzazioni
 # =========================================================================

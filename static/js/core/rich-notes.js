@@ -229,6 +229,28 @@ window.ArborisRichNotes = (function () {
         }
     }
 
+    function getShortcutCommand(event) {
+        if (!event || (!event.ctrlKey && !event.metaKey) || event.altKey) {
+            return "";
+        }
+
+        const key = (event.key || "").toLowerCase();
+
+        if (key === "b") {
+            return "bold";
+        }
+
+        if (key === "i") {
+            return "italic";
+        }
+
+        if (key === "u") {
+            return "underline";
+        }
+
+        return "";
+    }
+
     function updateToolbarState(wrapper) {
         if (!wrapper) {
             return;
@@ -272,9 +294,9 @@ window.ArborisRichNotes = (function () {
         const toolbar = document.createElement("div");
         toolbar.className = "rich-note-toolbar";
         toolbar.setAttribute("role", "toolbar");
-        toolbar.appendChild(createToolbarButton("B", "bold", "Grassetto"));
-        toolbar.appendChild(createToolbarButton("I", "italic", "Corsivo"));
-        toolbar.appendChild(createToolbarButton("U", "underline", "Sottolineato"));
+        toolbar.appendChild(createToolbarButton("B", "bold", "Grassetto (Ctrl+B)"));
+        toolbar.appendChild(createToolbarButton("I", "italic", "Corsivo (Ctrl+I)"));
+        toolbar.appendChild(createToolbarButton("U", "underline", "Sottolineato (Ctrl+U)"));
 
         const editor = document.createElement("div");
         editor.className = "rich-note-editor";
@@ -309,6 +331,18 @@ window.ArborisRichNotes = (function () {
         });
 
         editor.addEventListener("input", function () {
+            syncTextareaFromEditor(textarea);
+            updateToolbarState(wrapper);
+        });
+
+        editor.addEventListener("keydown", function (event) {
+            const command = getShortcutCommand(event);
+            if (!command) {
+                return;
+            }
+
+            event.preventDefault();
+            applyCommand(editor, command);
             syncTextareaFromEditor(textarea);
             updateToolbarState(wrapper);
         });

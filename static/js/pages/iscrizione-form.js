@@ -103,6 +103,7 @@ window.ArborisIscrizioneForm = (function () {
         const modalitaPagamentoSelect = document.getElementById("id_modalita_pagamento_retta");
         const scontoUnicoTipoSelect = document.getElementById("id_sconto_unica_soluzione_tipo");
         const scontoUnicoValoreInput = document.getElementById("id_sconto_unica_soluzione_valore");
+        const scadenzaUnicoInput = document.getElementById("id_scadenza_pagamento_unica");
         const scontoUnicoRow = document.querySelector(".iscrizione-sconto-unico-row");
         const scadenzaUnicoRow = document.querySelector(".iscrizione-scadenza-unico-row");
         const scontoUnicoSuffix = document.querySelector("[data-single-payment-discount-suffix]");
@@ -227,6 +228,19 @@ window.ArborisIscrizioneForm = (function () {
         }
 
         if (modalitaPagamentoSelect && scontoUnicoTipoSelect && scontoUnicoValoreInput) {
+            function setConditionalInputDisabled(input, disabled) {
+                if (!input) {
+                    return;
+                }
+
+                input.disabled = disabled;
+                if ("readOnly" in input) {
+                    input.readOnly = disabled;
+                }
+                input.classList.toggle("is-conditional-disabled", disabled);
+                input.classList.toggle("is-readonly", disabled);
+            }
+
             function syncPagamentoUnico() {
                 const isViewMode = detailForm && detailForm.classList.contains("is-view-mode");
                 const pagamentoUnico = modalitaPagamentoSelect.value === "unica_soluzione";
@@ -240,16 +254,22 @@ window.ArborisIscrizioneForm = (function () {
                     return;
                 }
 
-                if (scontoUnicoRow) scontoUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
-                if (scadenzaUnicoRow) scadenzaUnicoRow.classList.toggle("is-hidden", !pagamentoUnico);
-                scontoUnicoTipoSelect.disabled = !pagamentoUnico;
-                scontoUnicoValoreInput.readOnly = !scontoAttivo;
-                scontoUnicoValoreInput.classList.toggle("is-readonly", !scontoAttivo);
+                if (scontoUnicoRow) scontoUnicoRow.classList.remove("is-hidden");
+                if (scadenzaUnicoRow) {
+                    scadenzaUnicoRow.classList.remove("is-hidden");
+                    scadenzaUnicoRow.classList.toggle("is-conditional-disabled", !pagamentoUnico);
+                }
+                scontoUnicoTipoSelect.disabled = false;
+                setConditionalInputDisabled(scontoUnicoValoreInput, !scontoAttivo);
+                setConditionalInputDisabled(scadenzaUnicoInput, !pagamentoUnico);
                 if (currencyGroup) {
                     currencyGroup.classList.toggle("is-disabled", !scontoAttivo);
                 }
                 if (scontoUnicoSuffix) {
                     scontoUnicoSuffix.textContent = scontoTipo === "percentuale" ? "%" : "EUR";
+                }
+                if (!pagamentoUnico && scadenzaUnicoInput) {
+                    scadenzaUnicoInput.value = "";
                 }
                 if (!scontoAttivo) {
                     scontoUnicoValoreInput.value = "0,00";

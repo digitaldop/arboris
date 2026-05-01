@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static currency %}
 
 {% block title %}
@@ -24,13 +24,18 @@
                 <a href="{% url 'elimina_prestazione_scambio_retta' prestazione.pk %}?return_to={{ return_to|urlencode }}" class="btn btn-danger">Elimina</a>
                 <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-prestazione-btn">Annulla modifiche</button>
             {% endif %}
-            <a href="{{ return_url }}" class="btn btn-secondary">{{ back_label }}</a>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
+            {% else %}
+                <a href="{{ return_url }}" class="btn btn-secondary">{{ back_label }}</a>
+            {% endif %}
         </div>
     </div>
 
     <form method="post" id="prestazione-scambio-detail-form" class="detail-form{% if prestazione %} is-view-mode{% endif %}">
         {% csrf_token %}
         <input type="hidden" name="return_to" value="{{ return_to }}">
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
 
         <fieldset id="prestazione-scambio-lock-container" class="mode-lock-container" {% if prestazione %}disabled{% endif %}>
             <div class="content-card">
@@ -127,8 +132,14 @@
 
                 <div class="form-actions mode-edit-only">
                     <button type="submit" class="btn btn-primary">Salva</button>
-                    <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua</button>
-                    <a href="{{ return_url }}" class="btn btn-secondary">Annulla</a>
+                    {% if not popup %}
+                        <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua</button>
+                    {% endif %}
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                    {% else %}
+                        <a href="{{ return_url }}" class="btn btn-secondary">Annulla</a>
+                    {% endif %}
                 </div>
             </div>
         </fieldset>

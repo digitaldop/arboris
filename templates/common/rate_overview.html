@@ -1,4 +1,4 @@
-{% load currency %}
+{% load currency static %}
 
 <div class="admin-section compact student-rate-section">
     <button type="button" class="admin-section-title collapsible-title is-open" data-target="student-rate-overview-panel" data-storage-key="student-rate-overview-{{ rate_overview_storage_key }}" data-default-open="true">
@@ -49,23 +49,25 @@
                                     {% if can_manage_economia and item.iscrizione.pk %}
                                         <button
                                             type="button"
-                                            class="btn btn-rate-recalc btn-sm student-rate-recalc-btn"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit student-rate-recalc-btn"
                                             data-rate-recalc-form="1"
                                             data-action-url="{% url 'ricalcola_rate_iscrizione' item.iscrizione.pk %}"
                                             data-next-url="{{ request.path }}"
                                         >
-                                            Ricalcola rate
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                            <span class="btn-label">Ricalcola rate</span>
                                         </button>
                                         {% if item.iscrizione.attiva %}
                                             <button
                                                 type="button"
-                                                class="btn btn-rate-withdraw btn-sm"
+                                                class="btn btn-danger btn-sm btn-icon-text"
                                                 data-window-popup="1"
                                                 data-popup-window-name="arboris-withdrawal-popup"
                                                 data-popup-window-features="width=760,height=720,resizable=yes,scrollbars=yes"
                                                 data-popup-url="{% url 'ritiro_anticipato_iscrizione' item.iscrizione.pk %}?popup=1&next={{ request.get_full_path|urlencode }}"
                                             >
-                                                Chiudi iscrizione
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                                <span class="btn-label">Chiudi iscrizione</span>
                                             </button>
                                         {% endif %}
                                     {% endif %}
@@ -77,7 +79,7 @@
                                     {% for month_row in item.month_rows %}
                                         <div class="student-rate-timeline-row" style="--student-rate-row-items: {{ month_row|length }};">
                                             {% for month in month_row %}
-                                                <div class="student-rate-card{% if month.pagata %} is-paid{% endif %}{% if month.is_projected %} is-projected{% endif %}{% if month.is_preiscrizione %} is-preiscrizione{% endif %}{% if month.is_unica_soluzione %} is-unica-soluzione{% endif %}">
+                                                <div class="student-rate-card {{ month.status_class }}{% if month.is_preiscrizione %} is-preiscrizione{% endif %}{% if month.is_unica_soluzione %} is-unica-soluzione{% endif %}">
                                                     {% if month.is_preiscrizione %}
                                                         <div class="student-rate-card-badge">Preiscrizione</div>
                                                     {% elif month.is_unica_soluzione %}
@@ -101,18 +103,24 @@
                                                     {% if month.data_pagamento %}
                                                         <div class="student-rate-card-detail">Pagata il: {{ month.data_pagamento|it_date }}</div>
                                                     {% endif %}
-                                                    {% if month.is_projected %}
-                                                        <div class="student-rate-card-status">Prevista</div>
-                                                    {% elif month.pagata %}
+                                                    {% if month.payment_status == "paid" %}
                                                         <div class="student-rate-card-status">Pagata{% if month.importo_pagato %} - EUR {{ month.importo_pagato|euro }}{% endif %}</div>
+                                                    {% elif month.payment_status == "partial" %}
+                                                        <div class="student-rate-card-status">Pagata parzialmente{% if month.importo_pagato %} - EUR {{ month.importo_pagato|euro }}{% endif %}</div>
                                                     {% else %}
-                                                        <div class="student-rate-card-status">Da pagare</div>
+                                                        <div class="student-rate-card-status">{{ month.status_label }}</div>
                                                     {% endif %}
                                                     {% if month.rata_pk %}
                                                         <div class="student-rate-card-actions">
-                                                            <a href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm">Dettaglio rata</a>
+                                                            <a href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
+                                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                                <span class="btn-label">Dettaglio rata</span>
+                                                            </a>
                                                             {% if can_manage_economia and not month.pagata %}
-                                                                <button type="button" class="btn btn-rate-paid btn-sm" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=760,height=680,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">Conferma pagamento</button>
+                                                                <button type="button" class="btn btn-save-soft btn-sm btn-icon-text" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=760,height=680,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">
+                                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                                    <span class="btn-label">Conferma pagamento</span>
+                                                                </button>
                                                             {% endif %}
                                                         </div>
                                                     {% endif %}

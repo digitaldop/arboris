@@ -19,6 +19,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Optional
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -626,10 +627,216 @@ class CandidatoRiconciliazione:
         return max(0, min(100, self.score))
 
 
+@dataclass
+class CandidatoMovimentoRiconciliazione:
+    movimento: object
+    importo_disponibile: Decimal
+    score: int
+    motivazioni: list
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+
 _TOLLERANZA_IMPORTO_ESATTO = Decimal("0.01")
 _TOLLERANZA_IMPORTO_APPROX = Decimal("1.00")
 _TOLLERANZA_GIORNI_VICINI = 7
 _TOLLERANZA_GIORNI_ESTESA = 30
+
+
+def _importo_movimento_assoluto(movimento):
+    return abs(movimento.importo or Decimal("0.00"))
+
+
+def _importo_movimento_riconciliato(movimento):
+    if movimento is None or not getattr(movimento, "pk", None):
+        return Decimal("0.00")
+    return movimento.riconciliazioni_rate.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
+
+
+def importo_movimento_disponibile(movimento):
+    return max(_importo_movimento_assoluto(movimento) - _importo_movimento_riconciliato(movimento), Decimal("0.00"))
+
+
+def importo_rata_residuo(rata):
+    return max((rata.importo_finale or Decimal("0.00")) - (rata.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+
+
+def _testo_contiene_parola(testo: str, parola: str) -> bool:
+    return bool(parola and f" {parola} " in f" {testo or ''} ")
+
+
+def _testo_contiene_frase(testo: str, frase: str) -> bool:
+    return bool(frase and f" {frase} " in f" {testo or ''} ")
+
+
+def _persona_presente_in_testo(testo: str, nome: str, cognome: str, *, accetta_solo_cognome: bool = True) -> str:
+    nome = _normalizza_testo_match(nome or "")
+    cognome = _normalizza_testo_match(cognome or "")
+    if nome and cognome:
+        nome_cognome = f"{nome} {cognome}"
+        cognome_nome = f"{cognome} {nome}"
+        if (
+            _testo_contiene_frase(testo, nome_cognome)
+            or _testo_contiene_frase(testo, cognome_nome)
+            or (_testo_contiene_parola(testo, nome) and _testo_contiene_parola(testo, cognome))
+        ):
+            return "completo"
+    if accetta_solo_cognome and cognome and len(cognome) >= 4 and _testo_contiene_parola(testo, cognome):
+        return "cognome"
+    return ""
+
+
+def _label_persona(nome: str, cognome: str) -> str:
+    return " ".join(part for part in [nome or "", cognome or ""] if part).strip()
+
+
+def _match_familiari_in_testo(famiglia, testo: str) -> tuple[list[str], list[str]]:
+    if famiglia is None:
+        return [], []
+
+    try:
+        familiari = famiglia.familiari.all()
+    except Exception:
+        return [], []
+
+    match_completi = []
+    match_cognomi = []
+    for familiare in familiari:
+        livello = _persona_presente_in_testo(
+            testo,
+            getattr(familiare, "nome", "") or "",
+            getattr(familiare, "cognome", "") or "",
+        )
+        if not livello:
+            continue
+        label = _label_persona(getattr(familiare, "nome", ""), getattr(familiare, "cognome", ""))
+        if livello == "completo":
+            match_completi.append(label)
+        elif livello == "cognome":
+            match_cognomi.append(label)
+    return match_completi, match_cognomi
+
+
+def _famiglia_ha_familiari(famiglia) -> bool:
+    if famiglia is None:
+        return False
+    try:
+        return famiglia.familiari.exists()
+    except Exception:
+        return False
+
+
+def _valuta_identita_famiglia_in_causale(famiglia, studente, testo_movimento: str) -> tuple[bool, int, list[str]]:
+    return _valuta_identita_famiglia_studenti_in_causale(
+        famiglia,
+        [studente] if studente is not None else [],
+        testo_movimento,
+    )
+
+
+def _valuta_identita_famiglia_studenti_in_causale(famiglia, studenti, testo_movimento: str) -> tuple[bool, int, list[str]]:
+    score = 0
+    motivazioni = []
+    ha_match = False
+
+    familiari_completi, familiari_cognome = _match_familiari_in_testo(famiglia, testo_movimento)
+    familiari_registrati = bool(familiari_completi or familiari_cognome) or _famiglia_ha_familiari(famiglia)
+    if familiari_completi:
+        score += 42
+        ha_match = True
+        label = ", ".join(familiari_completi[:2])
+        motivazioni.append(f"Genitore/familiare presente nella causale: {label}")
+    elif familiari_cognome:
+        score += 8
+        label = ", ".join(familiari_cognome[:2])
+        motivazioni.append(f"Cognome di un familiare presente nella causale: {label}")
+
+    studenti = [studente for studente in (studenti or []) if studente is not None]
+    studenti_completi = []
+    studenti_cognome = []
+    for studente in studenti:
+        livello_studente = _persona_presente_in_testo(
+            testo_movimento,
+            getattr(studente, "nome", "") or "",
+            getattr(studente, "cognome", "") or "",
+        )
+        if livello_studente == "completo":
+            studenti_completi.append(_label_persona(getattr(studente, "nome", ""), getattr(studente, "cognome", "")))
+        elif livello_studente == "cognome" and not familiari_registrati:
+            studenti_cognome.append(_label_persona(getattr(studente, "nome", ""), getattr(studente, "cognome", "")))
+
+    if studenti_completi:
+        score += 30
+        ha_match = True
+        label = ", ".join(studenti_completi[:2])
+        motivazioni.append(f"Nome e cognome studente presenti nella causale: {label}")
+    elif studenti_cognome:
+        score += 12
+        ha_match = True
+        label = ", ".join(studenti_cognome[:2])
+        motivazioni.append(f"Cognome studente presente nella causale: {label}")
+
+    cognome_famiglia = _normalizza_testo_match(getattr(famiglia, "cognome_famiglia", "") or "")
+    if (
+        not familiari_registrati
+        and cognome_famiglia
+        and len(cognome_famiglia) >= 3
+        and _testo_contiene_frase(testo_movimento, cognome_famiglia)
+    ):
+        score += 14
+        ha_match = True
+        motivazioni.append("Cognome famiglia presente nella causale")
+
+    return ha_match, score, motivazioni
+
+
+def _testo_movimento_per_identita(movimento) -> str:
+    return _normalizza_testo_match(f"{getattr(movimento, 'descrizione', '') or ''} {getattr(movimento, 'controparte', '') or ''}")
+
+
+def _famiglia_label_sicurezza(famiglia) -> str:
+    return getattr(famiglia, "cognome_famiglia", "") or "selezionata"
+
+
+def _valida_identita_movimento_rate(movimento, rate):
+    testo_movimento = _testo_movimento_per_identita(movimento)
+    gruppi = {}
+    for rata in rate or []:
+        studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
+        famiglia = getattr(studente, "famiglia", None) or getattr(rata, "famiglia", None)
+        chiave = getattr(famiglia, "pk", None) or id(famiglia) or id(rata)
+        if chiave not in gruppi:
+            gruppi[chiave] = {"famiglia": famiglia, "studenti": []}
+        if studente is not None:
+            gruppi[chiave]["studenti"].append(studente)
+
+    for gruppo in gruppi.values():
+        famiglia = gruppo["famiglia"]
+        ha_match_identita, _score_identita, _motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
+            famiglia,
+            gruppo["studenti"],
+            testo_movimento,
+        )
+        if not ha_match_identita:
+            raise ValidationError(
+                "Controllo di sicurezza: la causale o la controparte del movimento non contiene "
+                f"un nominativo compatibile con la famiglia {_famiglia_label_sicurezza(famiglia)}. "
+                "Verifica il movimento bancario prima di riconciliare."
+            )
+
+
+def _decimal_close(a, b, tolleranza=_TOLLERANZA_IMPORTO_APPROX):
+    return abs((a or Decimal("0.00")) - (b or Decimal("0.00"))) <= tolleranza
+
+
+def _esiste_somma_compatibile(importo, rate_residue, *, max_items=12):
+    residui = [item for item in rate_residue if item > 0][:max_items]
+    somme = {Decimal("0.00")}
+    for residuo in residui:
+        somme.update({somma + residuo for somma in list(somme)})
+    return any(_decimal_close(somma, importo) for somma in somme if somma > 0)
 
 
 def trova_rate_candidate(movimento, *, limite: int = 10):
@@ -665,6 +872,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
             "iscrizione__studente__famiglia",
             "iscrizione__anno_scolastico",
         )
+        .prefetch_related("iscrizione__studente__famiglia__familiari")
         .filter(
             importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
             importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
@@ -705,31 +913,116 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
             score += 10
             motivazioni.append("Rata non ancora marcata come pagata")
 
-        try:
-            studente = rata.iscrizione.studente
-            famiglia = rata.iscrizione.studente.famiglia
-            nome = _normalizza_testo_match(getattr(studente, "nome", "") or "")
-            cognome = _normalizza_testo_match(getattr(studente, "cognome", "") or "")
-            cognome_famiglia = _normalizza_testo_match(getattr(famiglia, "cognome_famiglia", "") or "")
-
-            nome_presente = bool(nome and len(nome) >= 3 and nome in testo_movimento)
-            cognome_presente = bool(cognome and len(cognome) >= 3 and cognome in testo_movimento)
-            famiglia_presente = bool(cognome_famiglia and len(cognome_famiglia) >= 3 and cognome_famiglia in testo_movimento)
-
-            if nome_presente and cognome_presente:
-                score += 30
-                motivazioni.append("Nome e cognome studente presenti nella causale")
-            elif cognome_presente or famiglia_presente:
-                score += 15
-                motivazioni.append("Cognome studente/famiglia presente nella causale")
-        except Exception:
-            famiglia = None
+        studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
+        famiglia = getattr(studente, "famiglia", None)
+        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_in_causale(
+            famiglia,
+            studente,
+            testo_movimento,
+        )
+        if not ha_match_identita:
+            continue
+        score += score_identita
+        motivazioni.extend(motivazioni_identita)
 
         candidati.append(
             CandidatoRiconciliazione(rata=rata, score=score, motivazioni=motivazioni)
         )
 
     candidati.sort(key=lambda c: c.score, reverse=True)
+    return candidati[:limite]
+
+
+def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 12):
+    from .models import MovimentoFinanziario, StatoRiconciliazione
+
+    if rata_principale is None:
+        return []
+
+    rate_aperte = list(rate_aperte or [])
+    residuo_principale = importo_rata_residuo(rata_principale)
+    residui_rate = [importo_rata_residuo(rata) for rata in rate_aperte]
+    totale_residui = sum(residui_rate, Decimal("0.00"))
+
+    famiglia = getattr(getattr(rata_principale, "iscrizione", None), "studente", None)
+    famiglia = getattr(famiglia, "famiglia", None)
+    studente = getattr(rata_principale.iscrizione, "studente", None)
+    studenti_rate_aperte = []
+    for rata in rate_aperte:
+        studente_rata = getattr(getattr(rata, "iscrizione", None), "studente", None)
+        if studente_rata is not None:
+            studenti_rate_aperte.append(studente_rata)
+    if studente is not None and studente not in studenti_rate_aperte:
+        studenti_rate_aperte.insert(0, studente)
+    queryset = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(importo__gt=0)
+        .order_by("-data_contabile", "-id")[:300]
+    )
+
+    candidati = []
+    for movimento in queryset:
+        if movimento.rata_iscrizione_id and not movimento.riconciliazioni_rate.exists():
+            continue
+
+        disponibile = importo_movimento_disponibile(movimento)
+        if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
+            continue
+
+        testo_movimento = _normalizza_testo_match(f"{movimento.descrizione or ''} {movimento.controparte or ''}")
+        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
+            famiglia,
+            studenti_rate_aperte,
+            testo_movimento,
+        )
+        if not ha_match_identita:
+            continue
+
+        score = score_identita
+        motivazioni = list(motivazioni_identita)
+
+        if residuo_principale > 0 and _decimal_close(disponibile, residuo_principale, _TOLLERANZA_IMPORTO_ESATTO):
+            score += 45
+            motivazioni.append("Importo identico al residuo della rata selezionata")
+        elif residuo_principale > 0 and _decimal_close(disponibile, residuo_principale):
+            score += 32
+            motivazioni.append("Importo simile al residuo della rata selezionata")
+
+        if totale_residui > 0 and _decimal_close(disponibile, totale_residui, _TOLLERANZA_IMPORTO_ESATTO):
+            score += 35
+            motivazioni.append("Copre tutte le rate aperte della famiglia per l'anno")
+        elif _esiste_somma_compatibile(disponibile, residui_rate):
+            score += 30
+            motivazioni.append("Compatibile con una combinazione di rate aperte della famiglia")
+        elif totale_residui > 0 and disponibile < totale_residui:
+            score += 8
+            motivazioni.append("Importo utilizzabile come pagamento parziale o cumulativo")
+
+        data_rif = rata_principale.data_scadenza or rata_principale.data_pagamento
+        if data_rif and movimento.data_contabile:
+            delta_giorni = abs((movimento.data_contabile - data_rif).days)
+            if delta_giorni <= _TOLLERANZA_GIORNI_VICINI:
+                score += 18
+                motivazioni.append(f"Data vicina alla scadenza della rata (+/- {delta_giorni} gg)")
+            elif delta_giorni <= _TOLLERANZA_GIORNI_ESTESA:
+                score += 8
+                motivazioni.append(f"Data entro 30 giorni dalla scadenza ({delta_giorni} gg)")
+
+        if not motivazioni:
+            score += 1
+            motivazioni.append("Movimento disponibile per riconciliazione manuale")
+
+        candidati.append(
+            CandidatoMovimentoRiconciliazione(
+                movimento=movimento,
+                importo_disponibile=disponibile,
+                score=score,
+                motivazioni=motivazioni,
+            )
+        )
+
+    candidati.sort(key=lambda candidato: (candidato.score, candidato.movimento.data_contabile), reverse=True)
     return candidati[:limite]
 
 
@@ -768,6 +1061,74 @@ def riconcilia_movimento_automaticamente(
 
 
 @transaction.atomic
+def riconcilia_movimento_con_rate(
+    movimento,
+    allocazioni,
+    *,
+    utente=None,
+):
+    from .models import RiconciliazioneRataMovimento, StatoRiconciliazione
+
+    allocazioni = [
+        (rata, importo)
+        for rata, importo in (allocazioni or [])
+        if rata is not None and importo and importo > 0
+    ]
+    if not allocazioni:
+        raise ValidationError("Seleziona almeno una rata e indica l'importo da riconciliare.")
+
+    _valida_identita_movimento_rate(movimento, [rata for rata, _importo in allocazioni])
+
+    disponibile = importo_movimento_disponibile(movimento)
+    totale_allocato = sum((importo for _rata, importo in allocazioni), Decimal("0.00"))
+    if totale_allocato > disponibile + _TOLLERANZA_IMPORTO_ESATTO:
+        raise ValidationError("L'importo assegnato supera il residuo disponibile del movimento bancario.")
+
+    for rata, importo in allocazioni:
+        residuo_rata = importo_rata_residuo(rata)
+        if importo > residuo_rata + _TOLLERANZA_IMPORTO_ESATTO:
+            raise ValidationError(f"L'importo assegnato a {rata.display_label} supera il residuo della rata.")
+
+    for rata, importo in allocazioni:
+        link, created = RiconciliazioneRataMovimento.objects.get_or_create(
+            movimento=movimento,
+            rata=rata,
+            defaults={
+                "importo": importo,
+                "creato_da": utente if getattr(utente, "is_authenticated", False) else None,
+            },
+        )
+        if not created:
+            link.importo += importo
+            if utente and getattr(utente, "is_authenticated", False) and not link.creato_da_id:
+                link.creato_da = utente
+            link.save(update_fields=["importo", "creato_da"])
+
+        importo_finale = rata.importo_finale or Decimal("0.00")
+        rata.importo_pagato = min((rata.importo_pagato or Decimal("0.00")) + importo, importo_finale)
+        rata.pagata = importo_finale <= 0 or rata.importo_pagato >= importo_finale - _TOLLERANZA_IMPORTO_ESATTO
+        rata.data_pagamento = rata.data_pagamento or movimento.data_contabile
+        rata.save(update_fields=["importo_pagato", "pagata", "data_pagamento", "importo_finale"])
+
+    residuo_movimento = importo_movimento_disponibile(movimento)
+    links = list(movimento.riconciliazioni_rate.select_related("rata"))
+    movimento.rata_iscrizione = links[0].rata if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO and len(links) == 1 else None
+    movimento.stato_riconciliazione = (
+        StatoRiconciliazione.RICONCILIATO
+        if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO
+        else StatoRiconciliazione.NON_RICONCILIATO
+    )
+    movimento.save(
+        update_fields=[
+            "rata_iscrizione",
+            "stato_riconciliazione",
+            "data_aggiornamento",
+        ]
+    )
+    return movimento
+
+
+@transaction.atomic
 def riconcilia_movimento_con_rata(
     movimento,
     rata,
@@ -776,41 +1137,45 @@ def riconcilia_movimento_con_rata(
     marca_rata_pagata: bool = True,
 ):
     """
-    Collega un :class:`MovimentoFinanziario` a una :class:`RataIscrizione`.
-
-    Se ``marca_rata_pagata`` e' True (default) e la rata non risulta ancora
-    pagata, viene contrassegnata come pagata con data uguale alla
-    ``data_contabile`` del movimento e l'importo del movimento (valore
-    assoluto) viene scritto su ``importo_pagato``. Questo allinea la rata
-    al movimento bancario effettivo senza sovrascrivere riconciliazioni
-    gia' esistenti.
+    Collega un movimento a una rata. Per i nuovi flussi crea anche il legame
+    analitico con importo, così rimangono gestibili pagamenti cumulativi o
+    parziali.
     """
 
     from .models import StatoRiconciliazione
 
+    if marca_rata_pagata:
+        riconcilia_movimento_con_rate(
+            movimento,
+            [(rata, _importo_movimento_assoluto(movimento))],
+            utente=utente,
+        )
+        return movimento
+
+    _valida_identita_movimento_rate(movimento, [rata])
+
     movimento.rata_iscrizione = rata
     movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
-    movimento.save(
-        update_fields=[
-            "rata_iscrizione",
-            "stato_riconciliazione",
-            "data_aggiornamento",
-        ]
-    )
-
-    if marca_rata_pagata and rata is not None and not rata.pagata:
-        rata.pagata = True
-        rata.data_pagamento = rata.data_pagamento or movimento.data_contabile
-        if not rata.importo_pagato or rata.importo_pagato == Decimal("0"):
-            rata.importo_pagato = abs(movimento.importo or Decimal("0"))
-        rata.save()
-
+    movimento.save(update_fields=["rata_iscrizione", "stato_riconciliazione", "data_aggiornamento"])
     return movimento
 
 
 @transaction.atomic
 def annulla_riconciliazione(movimento):
     from .models import StatoRiconciliazione
+
+    links = list(movimento.riconciliazioni_rate.select_related("rata"))
+    for link in links:
+        rata = link.rata
+        rata.importo_pagato = max((rata.importo_pagato or Decimal("0.00")) - link.importo, Decimal("0.00"))
+        importo_finale = rata.importo_finale or Decimal("0.00")
+        rata.pagata = importo_finale <= 0 or rata.importo_pagato >= importo_finale - _TOLLERANZA_IMPORTO_ESATTO
+        if rata.importo_pagato <= 0:
+            rata.data_pagamento = None
+        rata.save(update_fields=["importo_pagato", "pagata", "data_pagamento", "importo_finale"])
+
+    if links:
+        movimento.riconciliazioni_rate.all().delete()
 
     movimento.rata_iscrizione = None
     movimento.stato_riconciliazione = StatoRiconciliazione.NON_RICONCILIATO

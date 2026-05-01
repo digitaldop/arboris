@@ -42,6 +42,7 @@ urlpatterns = [
     path("economia/rate-iscrizione/", economia_view(iscrizioni_views.lista_rate_iscrizione), name="lista_rate_iscrizione"),
     path("economia/rate-iscrizione/<int:pk>/modifica/", economia_edit(iscrizioni_views.modifica_rata_iscrizione), name="modifica_rata_iscrizione"),
     path("economia/rate-iscrizione/<int:pk>/pagamento-rapido/", economia_manage(iscrizioni_views.pagamento_rapido_rata_iscrizione), name="pagamento_rapido_rata_iscrizione"),
+    path("economia/rate-iscrizione/<int:pk>/riconcilia/", economia_manage(iscrizioni_views.riconcilia_rata_iscrizione), name="riconcilia_rata_iscrizione"),
     path("economia/verifica-situazione-rette/", economia_view(iscrizioni_views.verifica_situazione_rette), name="verifica_situazione_rette"),
     path("economia/scambio-retta/", economia_view(scambio_retta_views.lista_scambi_retta), name="lista_scambi_retta"),
     path("economia/scambio-retta/nuovo/", economia_manage(scambio_retta_views.crea_scambio_retta), name="crea_scambio_retta"),

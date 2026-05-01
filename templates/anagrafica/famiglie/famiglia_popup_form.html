@@ -1,0 +1,161 @@
+{% extends "popup_base.html" %}
+{% load static %}
+
+{% block title %}Nuova famiglia - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card related-config-popup-card related-family-popup-card">
+        <button type="button" class="related-family-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+
+        <form method="post" class="related-config-popup-form related-family-popup-form">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <div class="related-family-popup-hero">
+                <span class="related-family-icon-tile" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                </span>
+                <div class="related-family-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">Nuova famiglia</h1>
+                    <p>Inserisci i dati principali per creare la nuova famiglia e collegare subito familiari e {{ student_terminology.selected_plural_lower }}.</p>
+                </div>
+            </div>
+
+            <div class="related-family-popup-info">
+                <span class="related-family-popup-info-icon" aria-hidden="true">i</span>
+                <div>
+                    <p>Inserisci i dati principali della famiglia.</p>
+                    <p>Potrai aggiungere familiari e {{ student_terminology.selected_plural_lower }} dopo il salvataggio.</p>
+                </div>
+            </div>
+
+            <div class="related-config-popup-editor related-family-popup-editor">
+                <div class="related-family-popup-grid">
+                    <div class="related-family-form-field related-family-field-surname">
+                        <label for="{{ form.cognome_famiglia.id_for_label }}">Cognome famiglia <span class="required-marker">*</span></label>
+                        <div class="related-family-input-shell">
+                            <span class="related-family-input-addon related-family-input-addon-text" aria-hidden="true">T</span>
+                            <div class="related-family-input-control">
+                                {{ form.cognome_famiglia }}
+                            </div>
+                        </div>
+                        {{ form.cognome_famiglia.errors }}
+                    </div>
+
+                    <div class="related-family-form-field related-family-field-state">
+                        <label for="{{ form.stato_relazione_famiglia.id_for_label }}">Stato relazione <span class="required-marker">*</span></label>
+                        <div class="related-family-related-row">
+                            <div class="related-family-input-shell">
+                                <span class="related-family-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                                </span>
+                                <div class="related-family-input-control">
+                                    {{ form.stato_relazione_famiglia }}
+                                </div>
+                            </div>
+                            <div class="related-actions related-family-related-actions">
+                                <button type="button" class="related-btn related-btn-add" id="add-stato-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        {{ form.stato_relazione_famiglia.errors }}
+                    </div>
+
+                    <div class="related-family-form-field related-family-field-address">
+                        <label for="{{ form.indirizzo_principale.id_for_label }}">Indirizzo principale</label>
+                        <div class="related-family-related-row">
+                            <div class="related-family-input-shell has-trailing-icon">
+                                <span class="related-family-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg>
+                                </span>
+                                <div class="related-family-input-control">
+                                    {{ form.indirizzo_principale }}
+                                    <span class="related-family-input-trailing" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="related-actions related-family-related-actions">
+                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn" aria-label="Nuovo indirizzo" title="Nuovo indirizzo" data-floating-text="Nuovo indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn" aria-label="Modifica indirizzo" title="Modifica indirizzo" data-floating-text="Modifica indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                </button>
+                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn" aria-label="Elimina indirizzo" title="Elimina indirizzo" data-floating-text="Elimina indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="related-family-help">
+                            Questo indirizzo verr&agrave; usato come riferimento per familiari e {{ student_terminology.selected_plural_lower }} quando il loro indirizzo specifico &egrave; vuoto.
+                        </div>
+                        {{ form.indirizzo_principale.errors }}
+                    </div>
+
+                    <div class="related-family-form-field related-family-field-active">
+                        <label class="related-family-check">
+                            {{ form.attiva }}
+                            <span>Famiglia attiva</span>
+                        </label>
+                        {{ form.attiva.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <span class="btn-label">Salva famiglia</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const routes = window.ArborisRelatedEntityRoutes;
+            const relatedPopups = routes && routes.initRelatedPopups ? routes.initRelatedPopups() : null;
+            if (!routes || !relatedPopups || typeof routes.wireCrudButtonsById !== "function") {
+                return;
+            }
+
+            routes.wireCrudButtonsById({
+                selectId: "id_stato_relazione_famiglia",
+                relatedType: "stato_relazione_famiglia",
+                addBtnId: "add-stato-btn",
+                editBtnId: "edit-stato-btn",
+                deleteBtnId: "delete-stato-btn",
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+
+            routes.wireCrudButtonsById({
+                selectId: "id_indirizzo_principale",
+                relatedType: "indirizzo",
+                addBtnId: "add-indirizzo-btn",
+                editBtnId: "edit-indirizzo-btn",
+                deleteBtnId: "delete-indirizzo-btn",
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+            });
+        });
+    </script>
+{% endblock %}

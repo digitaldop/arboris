@@ -363,3 +363,44 @@ class EconomiaBatchRateTests(TestCase):
         movimento.refresh_from_db()
         self.assertEqual(risultato["stats"]["riconciliati"], 1)
         self.assertEqual(movimento.rata_iscrizione, rata)
+
+    def test_reverse_reconciliation_popup_links_selected_movement(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Bonifico retta Luca Bianchi",
+            controparte="Bianchi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.get(
+            reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {"popup": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Riconcilia rate")
+        self.assertContains(response, "Movimenti candidati")
+        self.assertContains(response, f'value="{movimento.pk}"')
+
+        response = self.client.post(
+            reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {
+                "popup": "1",
+                "movimento_pk": str(movimento.pk),
+                f"importo_rata_{rata.pk}": "100,00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Riconciliazione registrata correttamente")
+        movimento.refresh_from_db()
+        rata.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(movimento.rata_iscrizione_id, rata.pk)
+        self.assertTrue(rata.pagata)
+        self.assertEqual(rata.riconciliazioni_movimenti.count(), 1)

@@ -95,6 +95,45 @@ window.ArborisViewMode = (function () {
         });
     }
 
+    function getButtonLabel(button, fallback) {
+        if (!button) {
+            return fallback || "";
+        }
+
+        const labelElement = button.querySelector("[data-btn-label], .btn-label");
+        const label = labelElement ? labelElement.textContent.trim() : button.textContent.trim();
+        return label || fallback || "";
+    }
+
+    function setButtonLabel(button, label) {
+        if (!button) {
+            return;
+        }
+
+        const labelElement = button.querySelector("[data-btn-label], .btn-label");
+        if (labelElement) {
+            labelElement.textContent = label;
+            return;
+        }
+
+        const iconElement = button.querySelector(".btn-icon");
+        if (!iconElement) {
+            button.textContent = label;
+            return;
+        }
+
+        Array.from(button.childNodes).forEach(node => {
+            if (node !== iconElement && node.nodeType === Node.TEXT_NODE) {
+                node.remove();
+            }
+        });
+
+        const createdLabel = document.createElement("span");
+        createdLabel.className = "btn-label";
+        createdLabel.textContent = label;
+        button.appendChild(createdLabel);
+    }
+
     function clearInlineAddOnlyMode(form) {
         if (!form) return;
 
@@ -129,7 +168,7 @@ window.ArborisViewMode = (function () {
             mainContainer.disabled = false;
         }
 
-        const editButtonDefaultLabel = editButton ? editButton.textContent.trim() : "Modifica";
+        const editButtonDefaultLabel = getButtonLabel(editButton, "Modifica");
         const mainFields = getScopeFields(mainContainer, inlineContainer);
         const inlineFields = getScopeFields(inlineContainer, null);
 
@@ -168,7 +207,7 @@ window.ArborisViewMode = (function () {
             }
 
             if (editButton) {
-                editButton.textContent = isFullEditing ? "Annulla modifiche" : editButtonDefaultLabel;
+                setButtonLabel(editButton, isFullEditing ? "Annulla modifiche" : editButtonDefaultLabel);
                 editButton.classList.toggle("is-hidden", isInlineEditing);
             }
 
@@ -190,9 +229,9 @@ window.ArborisViewMode = (function () {
 
             if (inlineEditButton) {
                 if (isInlineEditing) {
-                    inlineEditButton.textContent = "Annulla modifiche";
+                    setButtonLabel(inlineEditButton, "Annulla modifiche");
                 } else if (typeof config.onModeChange !== "function") {
-                    inlineEditButton.textContent = "Modifica";
+                    setButtonLabel(inlineEditButton, "Modifica");
                 }
                 inlineEditButton.classList.toggle("is-hidden", isFullEditing);
             }

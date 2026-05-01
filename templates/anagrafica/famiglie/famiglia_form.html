@@ -16,33 +16,638 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">
-            {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
-        </h1>
-        <div class="page-head-actions">
-            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">Indietro</button>
+    <div class="page-head family-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">
+                    {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
+                </h1>
+                {% if famiglia %}
+                    <span class="family-status-pill{% if not famiglia.attiva %} is-muted{% endif %}">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {% if famiglia.stato_relazione_famiglia %}{{ famiglia.stato_relazione_famiglia }}{% elif famiglia.attiva %}Attiva{% else %}Non attiva{% endif %}
+                    </span>
+                {% else %}
+                    <span class="family-status-pill is-muted">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        Nuova scheda
+                    </span>
+                {% endif %}
+            </div>
             {% if famiglia %}
-                <button
-                    type="button"
-                    class="btn btn-secondary btn-icon-text"
-                    id="print-famiglia-btn"
-                    data-print-url="{% url 'stampa_famiglia' famiglia.pk %}"
-                    title="Stampa scheda famiglia"
-                >
-                    <span class="btn-icon" aria-hidden="true">&#128424;</span>
-                    Stampa
-                </button>
-                <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger">Elimina</a>
+                <div class="family-page-address">
+                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
+                    {% if famiglia.indirizzo_principale %}
+                        {{ famiglia.indirizzo_principale.label_full }}
+                    {% else %}
+                        Nessun indirizzo principale registrato
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="family-page-address">
+                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                    Inserimento nuova scheda famiglia
+                </div>
             {% endif %}
-            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary">Torna all'elenco</a>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            {% if famiglia %}
+                <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </button>
+                <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Familiare</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Documento</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#printer"></use></svg></span>
+                    <span class="btn-label">Stampa</span>
+                </button>
+                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                    <span class="btn-label">Elenco</span>
+                </a>
+                <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina</span>
+                </a>
+            {% else %}
+                <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </button>
+                <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Familiare</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Documento</span>
+                </button>
+                <button type="submit" form="famiglia-detail-form" name="_save" class="btn btn-save-soft btn-icon-text" data-auto-save-for="famiglia-detail-form">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva famiglia</span>
+                </button>
+                <button type="button" class="btn btn-intent-danger btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                    <span class="btn-label">Elenco</span>
+                </a>
+            {% endif %}
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% endif %}" autocomplete="off" data-lpignore="true">
+    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% else %} is-create-mode{% endif %}{% if has_form_errors %} has-form-errors{% endif %}" autocomplete="off" data-lpignore="true">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="famiglia-edit-scope" value="{{ edit_scope|default:'view' }}">
-        <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'familiari' }}">
+        <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'studenti' }}">
+        {% if famiglia %}
+            <div class="family-dashboard-view mode-view-only">
+                <div class="family-dashboard-layout">
+                    <div class="family-dashboard-main">
+                        <section class="family-overview-card" data-family-general-card>
+                            <div class="family-avatar-illustration" aria-hidden="true">
+                                <svg viewBox="0 0 128 128" focusable="false">
+                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-family"></use>
+                                </svg>
+                            </div>
+                            <div class="family-overview-content">
+                                <div class="family-overview-title-row">
+                                    <h2>Famiglia {{ famiglia.cognome_famiglia }}</h2>
+                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-family-general-action="edit">
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                        <span class="btn-label">Modifica dati generali</span>
+                                    </button>
+                                </div>
+                                <div class="family-overview-status">
+                                    Stato relazione:
+                                    <span>{% if famiglia.stato_relazione_famiglia %}{{ famiglia.stato_relazione_famiglia }}{% elif famiglia.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
+                                </div>
+                                <div class="family-overview-details">
+                                    <div class="family-overview-detail">
+                                        <span class="family-detail-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
+                                        <div>
+                                            <div class="family-detail-label">Indirizzo principale</div>
+                                            <div class="family-detail-value">
+                                                {% if famiglia.indirizzo_principale %}
+                                                    {{ famiglia.indirizzo_principale.label_full }}
+                                                {% else %}
+                                                    Nessun indirizzo registrato
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="family-stat-grid">
+                            <a href="#tab-familiari" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_familiari }}</span>
+                                    <span class="family-stat-label">Familiari</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                            <a href="#tab-studenti" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_studenti }}</span>
+                                    <span class="family-stat-label">{{ student_terminology.selected_plural }}</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                            <a href="#tab-documenti" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-purple" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_documenti }}</span>
+                                    <span class="family-stat-label">Documenti</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                            <a href="#tab-documenti" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_documenti_in_scadenza }}</span>
+                                    <span class="family-stat-label">In scadenza</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                            <a href="#tab-documenti" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_documenti_scaduti }}</span>
+                                    <span class="family-stat-label">Scaduti</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <aside class="family-dashboard-side" data-family-side-reorder data-family-side-order-key="arboris-family-side-card-order">
+                        {% if can_view_system_tables %}
+                            <section class="family-side-card" data-family-side-card data-family-side-card-key="system">
+                                <div class="family-side-card-head">
+                                    <h2>Informazioni di sistema</h2>
+                                    <div class="family-side-card-tools">
+                                        <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Informazioni di sistema" title="Trascina per riordinare">
+                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Informazioni di sistema" title="Comprimi card">
+                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="family-side-card-body" data-family-side-card-body>
+                                    <div class="family-system-list">
+                                        <div class="family-system-item">
+                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                            <div>
+                                                <div>Data creazione</div>
+                                                <strong>{{ famiglia.data_creazione|date:"d F Y H:i" }}</strong>
+                                            </div>
+                                        </div>
+                                        <div class="family-system-item">
+                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                            <div>
+                                                <div>Creato da</div>
+                                                <strong>{{ famiglia_creata_da_label|default:"-" }}</strong>
+                                            </div>
+                                        </div>
+                                        <div class="family-system-item">
+                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                                            <div>
+                                                <div>Ultimo aggiornamento</div>
+                                                <strong>{{ famiglia.data_aggiornamento|date:"d F Y H:i" }}</strong>
+                                            </div>
+                                        </div>
+                                        <div class="family-system-item">
+                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                                            <div>
+                                                <div>Aggiornato da</div>
+                                                <strong>{{ famiglia_aggiornata_da_label|default:"-" }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        {% endif %}
+
+                        <section class="family-side-card family-rate-summary-card" data-family-side-card data-family-side-card-key="rette">
+                            <div class="family-side-card-head">
+                                <h2>Rette mensili</h2>
+                                <div class="family-side-card-tools">
+                                    <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Rette mensili" title="Trascina per riordinare">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Rette mensili" title="Comprimi card">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="family-side-card-body" data-family-side-card-body>
+                                {% if famiglia_rette_summary.years %}
+                                    {% if famiglia_rette_summary.has_year_switch %}
+                                        <div class="family-rate-year-switch" role="tablist" aria-label="Anno scolastico rette">
+                                            {% for year_summary in famiglia_rette_summary.years %}
+                                                <button
+                                                    type="button"
+                                                    class="family-rate-year-tab{% if year_summary.is_default %} is-active{% endif %}"
+                                                    role="tab"
+                                                    aria-selected="{% if year_summary.is_default %}true{% else %}false{% endif %}"
+                                                    aria-controls="{{ year_summary.panel_id }}"
+                                                    data-family-rate-year-tab="{{ year_summary.key }}"
+                                                >
+                                                    <span>{{ year_summary.anno_label }}</span>
+                                                    {% if year_summary.is_current %}
+                                                        <small>corrente</small>
+                                                    {% endif %}
+                                                </button>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="family-rate-year-panels">
+                                        {% for year_summary in famiglia_rette_summary.years %}
+                                            <div
+                                                id="{{ year_summary.panel_id }}"
+                                                class="family-rate-year-panel{% if year_summary.is_default %} is-active{% endif %}"
+                                                role="tabpanel"
+                                                data-family-rate-year-panel="{{ year_summary.key }}"
+                                                {% if not year_summary.is_default %}hidden{% endif %}
+                                            >
+                                                {% if year_summary.rows %}
+                                                    <div class="family-rate-total">
+                                                        <div>
+                                                            <span>Totale mensile</span>
+                                                            <strong>EUR {{ year_summary.totale_mensile|euro }}</strong>
+                                                        </div>
+                                                        {% if year_summary.anno_label %}
+                                                            <small>{{ year_summary.anno_label }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="family-rate-student-list">
+                                                        {% for item in year_summary.rows %}
+                                                            <article class="family-rate-student">
+                                                                <div class="family-rate-student-head">
+                                                                    <div>
+                                                                        <div class="family-rate-student-name">{{ item.studente.nome }} {{ item.studente.cognome }}</div>
+                                                                        <div class="family-rate-student-meta">
+                                                                            {% if item.classe_label %}
+                                                                                {{ item.classe_tipo }}: {{ item.classe_label }}
+                                                                            {% else %}
+                                                                                Iscrizione attiva
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="family-rate-amount">
+                                                                        <strong>EUR {{ item.importo_rata|euro }}</strong>
+                                                                        <span>{{ item.importo_caption }}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="family-rate-student-foot">
+                                                                    <span>{{ item.importo_meta }}</span>
+                                                                    {% if item.pagamento_unica_soluzione %}
+                                                                        <span>Annuale</span>
+                                                                    {% elif item.non_pagante %}
+                                                                        <span>Esente</span>
+                                                                    {% else %}
+                                                                        <span>Mensile</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="family-rate-progress" aria-hidden="true">
+                                                                    <span style="width: {{ item.progresso }}%;"></span>
+                                                                </div>
+                                                                <div class="family-rate-paid-row">
+                                                                    <span>Pagato EUR {{ item.pagato|euro }}</span>
+                                                                    <span>Residuo EUR {{ item.residuo|euro }}</span>
+                                                                </div>
+                                                            </article>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% else %}
+                                                    <div class="empty-state compact-empty-state">
+                                                        {{ year_summary.empty_message }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="empty-state compact-empty-state">
+                                        {% if famiglia_rette_summary.has_studenti %}
+                                            Nessuna iscrizione attiva per l'anno corrente.
+                                        {% else %}
+                                            Nessuno studente inserito.
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </section>
+
+                        <section class="family-side-card family-notes-card" data-family-side-card data-family-side-card-key="notes">
+                            <div class="family-side-card-head">
+                                <h2>Note</h2>
+                                <div class="family-side-card-tools">
+                                    <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Note" title="Trascina per riordinare">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Note" title="Comprimi card">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="family-side-card-body" data-family-side-card-body>
+                                {% if famiglia.note %}
+                                    <div class="family-note-box family-note-rich">{{ famiglia.note|render_rich_notes }}</div>
+                                {% else %}
+                                    <div class="family-note-box">Nessuna nota presente.</div>
+                                {% endif %}
+                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" id="family-note-edit-shortcut">
+                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                    Modifica note
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="family-side-card family-activity-card" data-family-side-card data-family-side-card-key="activity">
+                            <div class="family-side-card-head">
+                                <h2>Cronologia attivit&agrave;</h2>
+                                <div class="family-side-card-tools">
+                                    <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Cronologia attivita" title="Trascina per riordinare">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Cronologia attivita" title="Comprimi card">
+                                        <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="family-side-card-body" data-family-side-card-body>
+                                {% if famiglia_activity_entries %}
+                                    <ol class="family-activity-list">
+                                        {% for activity in famiglia_activity_entries|slice:":3" %}
+                                            <li class="family-activity-item {{ activity.azione_badge_class }}">
+                                                <span class="family-activity-dot" aria-hidden="true"></span>
+                                                <div>
+                                                    <div class="family-activity-title">{{ activity.descrizione }}</div>
+                                                    <div class="family-activity-time">{{ activity.data_operazione|date:"d/m/Y H:i" }}</div>
+                                                </div>
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                {% else %}
+                                    <div class="empty-state compact-empty-state">Nessuna attivit&agrave; registrata.</div>
+                                {% endif %}
+                                {% if can_view_operation_history %}
+                                    <a href="{% url 'cronologia_operazioni_sistema' %}?q={{ famiglia.cognome_famiglia|urlencode }}" class="btn btn-secondary btn-sm family-activity-link">
+                                        Vedi tutta la cronologia
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </section>
+                    </aside>
+                </div>
+            </div>
+        {% else %}
+            <div class="family-create-dashboard">
+                <div class="family-create-main">
+                    <div id="famiglia-lock-container" class="mode-lock-container main-fields-section family-create-main-fields" data-mode-lock-scope="main">
+                    <section class="family-overview-card family-create-overview-card is-card-editing">
+                        <div class="family-avatar-illustration" aria-hidden="true">
+                            <svg viewBox="0 0 128 128" focusable="false">
+                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-family"></use>
+                            </svg>
+                        </div>
+                        <div class="family-general-card-editor family-create-general-editor">
+                            <div class="family-general-card-editor-head">
+                                <h3>Dati nuova famiglia</h3>
+                            </div>
+
+                            <div class="family-general-editor-grid">
+                                <div class="family-general-editor-field family-general-editor-field-half">
+                                    <label for="{{ form.cognome_famiglia.id_for_label }}">Cognome famiglia</label>
+                                    <div class="family-general-editor-control">
+                                        {{ form.cognome_famiglia }}
+                                    </div>
+                                    {{ form.cognome_famiglia.errors }}
+                                </div>
+
+                                <div class="family-general-editor-field family-general-editor-field-half family-general-editor-field-related family-general-editor-field-state">
+                                    <label for="{{ form.stato_relazione_famiglia.id_for_label }}">Stato relazione</label>
+                                    <div class="related-field-row mode-edit-field family-general-editor-related-control">
+                                        {{ form.stato_relazione_famiglia }}
+                                        <div class="related-actions">
+                                            <button type="button" class="related-btn related-btn-add" id="add-stato-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {{ form.stato_relazione_famiglia.errors }}
+                                </div>
+
+                                <div class="family-general-editor-field family-general-editor-field-wide family-general-editor-field-related family-general-editor-field-address">
+                                    <label for="{{ form.indirizzo_principale.id_for_label }}">Indirizzo principale</label>
+                                    <div class="related-field-row mode-edit-field family-general-editor-related-control">
+                                        {{ form.indirizzo_principale }}
+                                        <div class="related-actions">
+                                            <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="help-text">
+                                        Questo indirizzo verr&agrave; usato come riferimento per familiari e {{ student_terminology.selected_plural_lower }} quando il loro indirizzo specifico &egrave; vuoto.
+                                    </div>
+                                    {{ form.indirizzo_principale.errors }}
+                                </div>
+
+                                <div class="family-general-editor-field family-general-editor-field-check">
+                                    <label class="family-general-editor-check">
+                                        {{ form.attiva }}
+                                        <span>Famiglia attiva</span>
+                                    </label>
+                                    {{ form.attiva.errors }}
+                                </div>
+                            </div>
+
+                            <div class="family-general-card-editor-actions">
+                                <button type="submit" name="_save" class="btn btn-save-soft btn-sm btn-icon-text" data-family-general-submit="1">
+                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                    <span class="btn-label">Salva famiglia</span>
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                                    <span class="btn-label">Annulla</span>
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    </div>
+
+                    <div class="family-stat-grid family-create-stat-grid">
+                        <a href="#tab-familiari" class="family-stat-card">
+                            <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                            <span class="family-stat-content">
+                                <span class="family-stat-value">0</span>
+                                <span class="family-stat-label">Familiari</span>
+                                <span class="family-stat-link">Da aggiungere</span>
+                            </span>
+                        </a>
+                        <a href="#tab-studenti" class="family-stat-card">
+                            <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
+                            <span class="family-stat-content">
+                                <span class="family-stat-value">0</span>
+                                <span class="family-stat-label">{{ student_terminology.selected_plural }}</span>
+                                <span class="family-stat-link">Da aggiungere</span>
+                            </span>
+                        </a>
+                        <a href="#tab-documenti" class="family-stat-card">
+                            <span class="family-stat-icon family-stat-purple" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <span class="family-stat-content">
+                                <span class="family-stat-value">0</span>
+                                <span class="family-stat-label">Documenti</span>
+                                <span class="family-stat-link">Da caricare</span>
+                            </span>
+                        </a>
+                        <a href="#tab-documenti" class="family-stat-card">
+                            <span class="family-stat-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg></span>
+                            <span class="family-stat-content">
+                                <span class="family-stat-value">0</span>
+                                <span class="family-stat-label">In scadenza</span>
+                                <span class="family-stat-link">Da caricare</span>
+                            </span>
+                        </a>
+                        <a href="#tab-documenti" class="family-stat-card">
+                            <span class="family-stat-icon family-stat-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                            <span class="family-stat-content">
+                                <span class="family-stat-value">0</span>
+                                <span class="family-stat-label">Scaduti</span>
+                                <span class="family-stat-link">Da caricare</span>
+                            </span>
+                        </a>
+                    </div>
+                </div>
+
+                <aside class="family-dashboard-side family-create-side" data-family-side-reorder data-family-side-order-key="arboris-family-create-side-card-order">
+                    <section class="family-side-card" data-family-side-card data-family-side-card-key="create-system">
+                        <div class="family-side-card-head">
+                            <h2>Informazioni di sistema</h2>
+                            <div class="family-side-card-tools">
+                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Informazioni di sistema" title="Trascina per riordinare">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                </button>
+                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Informazioni di sistema" title="Comprimi card">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="family-side-card-body" data-family-side-card-body>
+                            <div class="family-system-list">
+                                <div class="family-system-item">
+                                    <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                    <div>
+                                        <div>Data creazione</div>
+                                        <strong>Dopo il salvataggio</strong>
+                                    </div>
+                                </div>
+                                <div class="family-system-item">
+                                    <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                    <div>
+                                        <div>Creato da</div>
+                                        <strong>{{ request.user.get_full_name|default:request.user.email|default:request.user.username }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="family-side-card family-rate-summary-card" data-family-side-card data-family-side-card-key="create-rette">
+                        <div class="family-side-card-head">
+                            <h2>Rette mensili</h2>
+                            <div class="family-side-card-tools">
+                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Rette mensili" title="Trascina per riordinare">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                </button>
+                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Rette mensili" title="Comprimi card">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="family-side-card-body" data-family-side-card-body>
+                            <div class="empty-state compact-empty-state">
+                                Il riepilogo delle rette sar&agrave; disponibile dopo il salvataggio e l'inserimento delle iscrizioni.
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="family-side-card family-notes-card" data-family-side-card data-family-side-card-key="create-notes">
+                        <div class="family-side-card-head">
+                            <h2>Note</h2>
+                            <div class="family-side-card-tools">
+                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Note" title="Trascina per riordinare">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                </button>
+                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Note" title="Comprimi card">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="family-side-card-body" data-family-side-card-body>
+                            <div class="family-create-note-field">
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="family-side-card family-activity-card" data-family-side-card data-family-side-card-key="create-activity">
+                        <div class="family-side-card-head">
+                            <h2>Cronologia attivit&agrave;</h2>
+                            <div class="family-side-card-tools">
+                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Cronologia attivita" title="Trascina per riordinare">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                </button>
+                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Cronologia attivita" title="Comprimi card">
+                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="family-side-card-body" data-family-side-card-body>
+                            <div class="empty-state compact-empty-state">La cronologia sar&agrave; disponibile dopo il primo salvataggio.</div>
+                        </div>
+                    </section>
+                </aside>
+            </div>
+        {% endif %}
+        {% if famiglia %}
         <div id="famiglia-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
 
         <!-- INIZIO SEZIONE DATI PRINCIPALI -->
@@ -53,7 +658,7 @@
                         <span class="admin-section-title-label">Dati principali</span>
                         {% if famiglia %}
                             <div class="admin-section-title-actions">
-                                <button type="button" class="admin-section-title-btn" id="enable-edit-famiglia-btn">Modifica dati principali</button>
+                                <button type="button" class="admin-section-title-btn family-legacy-edit-btn">Modifica dati principali</button>
                             </div>
                         {% endif %}
                     </div>
@@ -237,12 +842,48 @@
                 </div>
                 <!-- FINE SEZIONE LATERALE DI RIEPILOGO -->
 
+                <!-- INIZIO SEZIONE LATERALE CRONOLOGIA ATTIVITA -->
+                <div class="admin-section compact family-activity-section">
+                    <div class="admin-section-title">Cronologia attivit&agrave;</div>
+                    <div class="panel">
+                        <div class="panel-body activity-panel-body">
+                            {% if famiglia_activity_entries %}
+                                <ol class="activity-timeline">
+                                    {% for activity in famiglia_activity_entries %}
+                                        <li class="activity-timeline-item {{ activity.azione_badge_class }}">
+                                            <div class="activity-timeline-marker" aria-hidden="true"></div>
+                                            <div class="activity-timeline-content">
+                                                <div class="activity-timeline-title">{{ activity.descrizione }}</div>
+                                                <div class="activity-timeline-meta">
+                                                    {{ activity.data_operazione|date:"d/m/Y H:i" }}
+                                                    {% if activity.utente_display %}
+                                                        &middot; {{ activity.utente_display }}
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                </ol>
+                            {% else %}
+                                <div class="empty-state compact-empty-state">Nessuna attivit&agrave; registrata.</div>
+                            {% endif %}
+                            {% if can_view_operation_history %}
+                                <a href="{% url 'cronologia_operazioni_sistema' %}?q={{ famiglia.cognome_famiglia|urlencode }}" class="btn btn-secondary btn-sm activity-timeline-link">
+                                    Vedi tutta la cronologia
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <!-- FINE SEZIONE LATERALE CRONOLOGIA ATTIVITA -->
+
             </div>
             <!-- FINE SEZIONE LATERALE DESTRA -->
         </div>
         <!-- FINE SEZIONE DATI PRINCIPALI -->
 
         </div>
+        {% endif %}
         
 
         <!-- INIZIO CODICE GENERICO DEGLI INLINE-->
@@ -302,6 +943,105 @@
                             </div>
                         {% endif %}
                         {{ familiari_formset.management_form }}
+                        <div
+                            class="family-related-list mode-view-only"
+                            data-relative-card-list
+                            data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
+                            data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
+                        >
+                            {% for f in familiari_formset %}
+                                {% if f.instance.pk %}
+                                    <article class="family-person-card family-relative-card" data-relative-card data-relative-form-prefix="{{ f.prefix }}" data-relative-id="{{ f.instance.pk }}">
+                                        <a href="{% url 'modifica_familiare' f.instance.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                            <svg viewBox="0 0 96 96" focusable="false">
+                                                {% with relazione=f.instance.relazione_familiare.relazione|lower %}
+                                                    {% if f.instance.sesso == 'F' or relazione == 'madre' %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-woman"></use>
+                                                    {% elif f.instance.sesso == 'M' or relazione == 'padre' %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-man"></use>
+                                                    {% else %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </svg>
+                                        </a>
+                                        <div class="family-person-main">
+                                            <div class="family-person-heading">
+                                                <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
+                                            </div>
+                                            <div class="family-person-meta">
+                                                {% if f.instance.relazione_familiare %}
+                                                    <span class="family-relation-pill{% if f.instance.sesso == 'M' %} is-male{% elif f.instance.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ f.instance.relazione_familiare }}</span>
+                                                {% endif %}
+                                                {% if f.instance.formatted_telefono %}
+                                                    <span class="family-person-contact readonly-display-link">
+                                                        <span class="readonly-action-group">
+                                                            <a href="{{ f.instance.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.formatted_telefono }}</a>
+                                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.formatted_telefono }}" data-floating-text="Copia" aria-label="Copia numero di telefono">
+                                                                <span class="copy-inline-icon" aria-hidden="true">
+                                                                    <span class="copy-inline-icon-back"></span>
+                                                                    <span class="copy-inline-icon-front"></span>
+                                                                </span>
+                                                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                            </button>
+                                                        </span>
+                                                    </span>
+                                                {% endif %}
+                                                {% if f.instance.email %}
+                                                    <span class="family-person-contact readonly-display-link">
+                                                        <span class="readonly-action-group">
+                                                            <a href="mailto:{{ f.instance.email }}">{{ f.instance.email }}</a>
+                                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.email }}" data-floating-text="Copia" aria-label="Copia email">
+                                                                <span class="copy-inline-icon" aria-hidden="true">
+                                                                    <span class="copy-inline-icon-back"></span>
+                                                                    <span class="copy-inline-icon-front"></span>
+                                                                </span>
+                                                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                            </button>
+                                                        </span>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                            {% if f.instance.codice_fiscale %}
+                                                <div class="family-person-submeta family-person-tax-code">
+                                                    <span>Codice fiscale:</span>
+                                                    <span class="readonly-action-group">
+                                                        <span>{{ f.instance.codice_fiscale }}</span>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+                                            {% if f.instance.indirizzo_effettivo %}
+                                                <div class="family-person-submeta">{{ f.instance.indirizzo_effettivo.label_full }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="family-person-actions">
+                                            <a href="{% url 'modifica_familiare' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                Vedi profilo
+                                            </a>
+                                            <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-relative-card-action="edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                Modifica
+                                            </button>
+                                        </div>
+                                    </article>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not count_familiari %}
+                                <div class="family-card-empty">Ancora nessun familiare inserito.</div>
+                            {% endif %}
+                            <button type="button" class="family-dashed-add" data-relative-card-action="add">
+                                <span aria-hidden="true">+</span>
+                                Aggiungi familiare
+                            </button>
+                        </div>
                         <table class="inline-table" id="familiari-table">
                             <thead>
                                 <tr>
@@ -668,9 +1408,6 @@
                                 Ancora nessun familiare inserito.
                             </div>
                         {% endif %}
-                        <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" data-inline-action="add-view" data-inline-prefix="familiari">+ Aggiungi un altro Familiare</button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -681,6 +1418,81 @@
                 <div class="admin-section-title">{{ student_terminology.selected_plural }}</div>
                 <div class="panel">
                     <div class="panel-body">
+                        <div
+                            class="family-related-list mode-view-only"
+                            data-student-card-list
+                            data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
+                            data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
+                            data-student-singular="{{ student_terminology.selected_singular }}"
+                            data-student-new-title="Nuovo {{ student_terminology.selected_singular_lower }}"
+                        >
+                            {% for f in studenti_formset %}
+                                {% if f.instance.pk %}
+                                    <article class="family-person-card family-student-card" data-student-card data-student-form-prefix="{{ f.prefix }}" data-student-id="{{ f.instance.pk }}">
+                                        <a href="{% url 'modifica_studente' f.instance.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                            <svg viewBox="0 0 96 96" focusable="false">
+                                                {% if f.instance.sesso == 'F' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
+                                                {% elif f.instance.sesso == 'M' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
+                                                {% else %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                {% endif %}
+                                            </svg>
+                                        </a>
+                                        <div class="family-person-main">
+                                            <div class="family-person-heading">
+                                                <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
+                                                {% include "common/badges/student_iscrizione_status.html" with studente=f.instance only %}
+                                            </div>
+                                            <div class="family-person-meta">
+                                                {% if f.instance.data_nascita %}
+                                                    <span>{{ f.instance.data_nascita|it_date_with_age }}</span>
+                                                {% endif %}
+                                                {% if f.instance.luogo_nascita_display %}
+                                                    <span>{{ f.instance.luogo_nascita_display }}</span>
+                                                {% endif %}
+                                                {% if f.instance.ha_iscrizione_attiva_corrente and f.instance.classe_corrente_famiglia_label %}
+                                                    <span>{{ f.instance.classe_corrente_famiglia_tipo }}: {{ f.instance.classe_corrente_famiglia_label }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if f.instance.codice_fiscale %}
+                                                <div class="family-person-submeta family-person-tax-code">
+                                                    <span>Codice fiscale:</span>
+                                                    <span class="readonly-action-group">
+                                                        <span>{{ f.instance.codice_fiscale }}</span>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="family-person-actions">
+                                            <a href="{% url 'modifica_studente' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                Vedi profilo
+                                            </a>
+                                            <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-student-card-action="edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                Modifica
+                                            </button>
+                                        </div>
+                                    </article>
+                                {% endif %}
+                            {% endfor %}
+                            {% if not count_studenti %}
+                                <div class="family-card-empty">Ancora nessun {{ student_terminology.selected_singular_lower }} inserito.</div>
+                            {% endif %}
+                            <button type="button" class="family-dashed-add" data-student-card-action="add">
+                                <span aria-hidden="true">+</span>
+                                Aggiungi {{ student_terminology.selected_singular_lower }}
+                            </button>
+                        </div>
                         {% include "common/inlines/studenti_famiglia_formset_table.html" with studenti_add_action="add-view" studenti_add_prefix="studenti" %}
                     </div>
                 </div>
@@ -693,6 +1505,141 @@
                 <div class="panel">
                     <div class="panel-body">
                         {{ documenti_formset.management_form }}
+                        <div
+                            class="family-related-list family-documents-list mode-view-only"
+                            data-document-card-list
+                            data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
+                        >
+                            {% for f in documenti_formset %}
+                                {% if f.instance.pk %}
+                                    <article class="family-document-card" data-document-card data-document-form-prefix="{{ f.prefix }}" data-document-id="{{ f.instance.pk }}">
+                                        {% if f.instance.file %}
+                                            <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer" class="family-document-icon" aria-label="Apri documento">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                            </a>
+                                        {% else %}
+                                            <span class="family-document-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                        {% endif %}
+                                        <div class="family-document-main">
+                                            <h3>{% if f.instance.tipo_documento %}{{ f.instance.tipo_documento }}{% else %}Documento famiglia{% endif %}</h3>
+                                            <div class="family-document-meta">
+                                                {% if f.instance.descrizione %}<span>{{ f.instance.descrizione }}</span>{% endif %}
+                                                {% if f.instance.data_caricamento %}<span class="family-document-muted-meta">Caricato il {{ f.instance.data_caricamento|it_date }}</span>{% endif %}
+                                                {% if f.instance.scadenza %}<span>Scadenza {{ f.instance.scadenza|it_date }}</span>{% endif %}
+                                                {% if f.instance.filename %}<span class="family-document-filename family-document-muted-meta">{{ f.instance.filename }}</span>{% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="family-person-actions">
+                                            {% if f.instance.file %}
+                                                <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm btn-icon-text">
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                    Apri
+                                                </a>
+                                            {% endif %}
+                                            <button
+                                                type="button"
+                                                class="btn btn-danger btn-sm btn-icon-text"
+                                                data-document-card-action="delete"
+                                                data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
+                                                data-document-delete-label="{% if f.instance.tipo_documento %}{{ f.instance.tipo_documento }}{% else %}Documento famiglia{% endif %}"
+                                            >
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                Elimina
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-document-card-action="edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                Modifica
+                                            </button>
+                                        </div>
+                                    </article>
+                                {% endif %}
+                            {% endfor %}
+                            {% for doc in documenti_familiari %}
+                                <article class="family-document-card">
+                                    {% if doc.file %}
+                                        <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer" class="family-document-icon family-document-related" aria-label="Apri documento">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                        </a>
+                                    {% else %}
+                                        <span class="family-document-icon family-document-related" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                    {% endif %}
+                                    <div class="family-document-main">
+                                        <h3>{{ doc.tipo_documento }}</h3>
+                                        <div class="family-document-meta">
+                                            <span>{{ doc.familiare }}</span>
+                                            {% if doc.descrizione %}<span>{{ doc.descrizione }}</span>{% endif %}
+                                            {% if doc.data_caricamento %}<span class="family-document-muted-meta">Caricato il {{ doc.data_caricamento|it_date }}</span>{% endif %}
+                                            {% if doc.scadenza %}<span>Scadenza {{ doc.scadenza|it_date }}</span>{% endif %}
+                                            {% if doc.filename %}<span class="family-document-filename family-document-muted-meta">{{ doc.filename }}</span>{% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="family-person-actions">
+                                        {% if doc.file %}
+                                            <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                Apri
+                                            </a>
+                                        {% endif %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-danger btn-sm btn-icon-text"
+                                            data-document-card-action="delete"
+                                            data-popup-url="{% url 'elimina_documento' doc.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
+                                            data-document-delete-label="{{ doc.tipo_documento }}"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                            Elimina
+                                        </button>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                            {% for doc in documenti_studenti %}
+                                <article class="family-document-card">
+                                    {% if doc.file %}
+                                        <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer" class="family-document-icon family-document-related" aria-label="Apri documento">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                        </a>
+                                    {% else %}
+                                        <span class="family-document-icon family-document-related" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                    {% endif %}
+                                    <div class="family-document-main">
+                                        <h3>{{ doc.tipo_documento }}</h3>
+                                        <div class="family-document-meta">
+                                            <span>{{ doc.studente }}</span>
+                                            {% if doc.descrizione %}<span>{{ doc.descrizione }}</span>{% endif %}
+                                            {% if doc.data_caricamento %}<span class="family-document-muted-meta">Caricato il {{ doc.data_caricamento|it_date }}</span>{% endif %}
+                                            {% if doc.scadenza %}<span>Scadenza {{ doc.scadenza|it_date }}</span>{% endif %}
+                                            {% if doc.filename %}<span class="family-document-filename family-document-muted-meta">{{ doc.filename }}</span>{% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="family-person-actions">
+                                        {% if doc.file %}
+                                            <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                Apri
+                                            </a>
+                                        {% endif %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-danger btn-sm btn-icon-text"
+                                            data-document-card-action="delete"
+                                            data-popup-url="{% url 'elimina_documento' doc.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
+                                            data-document-delete-label="{{ doc.tipo_documento }}"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                            Elimina
+                                        </button>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                            {% if not count_documenti %}
+                                <div class="family-card-empty">Ancora nessun documento caricato.</div>
+                            {% endif %}
+                            <button type="button" class="family-dashed-add" data-document-card-action="add">
+                                <span aria-hidden="true">+</span>
+                                Aggiungi documento
+                            </button>
+                        </div>
                         <table class="inline-table" id="documenti-table">
                             <thead>
                                 <tr>
@@ -789,6 +1736,7 @@
                                         </td>
                                         <td class="inline-delete-cell mode-edit-only-table-cell">
                                             {% if f.instance.pk %}
+                                                <span class="inline-delete-hidden">{{ f.DELETE }}</span>
                                                 <button
                                                     type="button"
                                                     class="inline-remove-btn"
@@ -815,9 +1763,6 @@
                                 Ancora nessun documento caricato.
                             </div>
                         {% endif %}
-                        <div class="inline-add-row inline-add-row-view-enabled">
-                            <button type="button" class="inline-add-btn" data-inline-action="add-view" data-inline-prefix="documenti">+ Aggiungi un altro Documento</button>
-                        </div>
                         <!-- VISUALIZZAZIONE DEI DOCUMENTI DI FAMILIARI E STUDENTI-->
                         <div class="aggregated-documents-sections">
                             <div class="aggregated-documents-block">
@@ -914,15 +1859,78 @@
         </div> <!-- CHIUSURA CODICE DEGLI INLINE -->
 
         <!-- PULSANTI DI AZIONE DEL FORM -->
-        <div class="form-actions sticky-form-actions mode-edit-only" id="sticky-form-actions">
-            <button type="submit" name="_save" class="btn btn-save-soft">Salva</button>
-            <button type="submit" name="_continue" class="btn btn-secondary">Salva e continua a modificare</button>
-            <button type="submit" name="_addanother" class="btn btn-secondary">Salva e aggiungi un'altra famiglia</button>
-            <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-famiglia-btn">Annulla</button>
+        <div class="form-actions sticky-form-actions mode-edit-only{% if not famiglia %} family-create-sticky-actions{% endif %}" id="sticky-form-actions">
+            {% if not famiglia %}
+                <div class="family-create-sticky-context">
+                    <span class="family-card-sticky-kicker">Nuova famiglia</span>
+                    <strong>Completa e salva la scheda</strong>
+                </div>
+                <div class="family-create-sticky-controls">
+            {% endif %}
+            <button type="submit" name="_save" class="btn btn-save-soft btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                <span class="btn-label">Salva</span>
+            </button>
+            <button type="submit" name="_continue" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-return-list{% endif %} btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if famiglia %}check{% else %}list{% endif %}"></use></svg></span>
+                <span class="btn-label">{% if famiglia %}Salva e continua{% else %}Salva e torna all'elenco{% endif %}</span>
+            </button>
+            <button type="submit" name="_addanother" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-add-another{% endif %} btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                <span class="btn-label">Salva e aggiungi un'altra</span>
+            </button>
+            <button type="button" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-danger{% endif %} btn-icon-text" id="sticky-cancel-edit-famiglia-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Annulla</span>
+            </button>
+            {% if not famiglia %}
+                </div>
+            {% endif %}
         </div>
         <div class="sticky-actions-spacer"></div>
+        <div class="form-actions sticky-form-actions family-card-sticky-actions is-hidden" id="family-card-sticky-actions" hidden>
+            <div class="family-card-sticky-context">
+                <span class="family-card-sticky-kicker">Card attiva</span>
+                <strong data-family-card-sticky-title>Modifica card</strong>
+            </div>
+            <div class="family-card-sticky-controls">
+                <button type="submit" name="_save" class="btn btn-save-soft btn-icon-text" id="family-card-sticky-save" data-family-card-sticky-save="1">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" id="family-card-sticky-cancel" data-family-card-sticky-cancel="1">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            </div>
+        </div>
+        <div class="family-card-sticky-spacer is-hidden" id="family-card-sticky-spacer" hidden></div>
         <!-- FINE PULSANTI DI AZIONE DEL FORM -->
     </form>
+
+    {% if famiglia %}
+        <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="family-note-dialog-overlay" aria-hidden="true">
+            <form method="post" class="app-dialog family-note-dialog" id="family-note-popup-form" role="dialog" aria-modal="true" aria-labelledby="family-note-dialog-title">
+                {% csrf_token %}
+                <input type="hidden" name="_note_popup" value="1">
+                <input type="hidden" name="_note_active_tab" id="family-note-active-tab" value="{{ active_inline_tab|default:'studenti' }}">
+                <div class="app-dialog-header">
+                    <h2 class="app-dialog-title" id="family-note-dialog-title">Modifica note</h2>
+                </div>
+                <div class="app-dialog-body family-note-dialog-body">
+                    <label class="app-dialog-field-label" for="id_family_note_popup">Note famiglia</label>
+                    <textarea name="note" id="id_family_note_popup" rows="10" data-rich-notes="1">{{ famiglia.note }}</textarea>
+                </div>
+                <div class="app-dialog-actions family-note-dialog-actions">
+                    <button type="button" class="btn btn-secondary" data-family-note-dialog-cancel>Annulla</button>
+                    <button type="submit" class="btn btn-primary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    {% endif %}
 
     <!-- TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
     <template id="familiari-empty-form-template">
@@ -1190,15 +2198,15 @@
 
     <!-- RICHIAMO I CORE SCRIPT -->
     {% load static %}
-    <script src="{% static 'js/core/related-popups.js' %}?v=2"></script>
+    <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/tabs.js' %}?v=3"></script>
     <script src="{% static 'js/core/inline-tabs.js' %}?v=5"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
-    <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=39"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=52"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -1229,6 +2237,15 @@
 
         if (stickyCancelButton) {
             stickyCancelButton.addEventListener("click", function () {
+                const formEl = document.getElementById("famiglia-detail-form");
+                if (formEl && formEl.classList.contains("is-create-mode")) {
+                    const fallbackUrl = stickyCancelButton.dataset.fallbackUrl || "{% url 'lista_famiglie' %}";
+                    const targetUrl = window.ArborisAppNavigation && typeof window.ArborisAppNavigation.resolveBackUrl === "function"
+                        ? window.ArborisAppNavigation.resolveBackUrl(fallbackUrl)
+                        : fallbackUrl;
+                    window.location.assign(targetUrl || fallbackUrl);
+                    return;
+                }
                 if (window.famigliaViewMode && typeof window.famigliaViewMode.returnToView === "function") {
                     window.famigliaViewMode.returnToView();
                     return;
@@ -1241,6 +2258,22 @@
             });
         }
 
+        document.querySelectorAll(".family-stat-card[href^='#tab-']").forEach(function (link) {
+            link.addEventListener("click", function (event) {
+                const targetId = link.getAttribute("href").slice(1);
+                const tabButton = document.querySelector('[data-tab-target="' + targetId + '"]');
+                const inlineRoot = document.getElementById("famiglia-inline-lock-container");
+                if (!tabButton) {
+                    return;
+                }
+                event.preventDefault();
+                tabButton.click();
+                if (inlineRoot) {
+                    inlineRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            });
+        });
+
         if (!window.ArborisFamigliaForm) {
             console.error("ArborisFamigliaForm non caricato.");
             return;
@@ -1249,7 +2282,8 @@
         try {
             ArborisFamigliaForm.init({
                 famigliaId: famigliaId,
-                initialActiveTab: "{{ active_inline_tab|default:'familiari' }}",
+                initialActiveTab: "{{ active_inline_tab|default:'studenti' }}",
+                defaultInlineTab: "studenti",
                 preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
                 urls: {
                     creaStatoRelazioneFamiglia: "{% url 'crea_stato_relazione_famiglia' %}",

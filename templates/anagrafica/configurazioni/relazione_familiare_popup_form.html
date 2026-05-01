@@ -1,39 +1,94 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ titolo }}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body style="padding: 20px;">
-    <h1 class="section-title">{{ titolo }}</h1>
+{% extends "popup_base.html" %}
+{% load static %}
 
-    <div class="panel">
-        <form method="post">
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card related-config-popup-card related-relation-popup-card">
+        <button type="button" class="related-relation-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+
+        <form method="post" class="related-config-popup-form related-relation-popup-form">
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
             <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
-            <div class="panel-body">
-                <table class="form-table">
-                    {% for field in form %}
-                        <tr>
-                            <th>{{ field.label_tag }}</th>
-                            <td>
-                                {{ field }}
-                                {{ field.errors }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </table>
+            <div class="related-relation-popup-hero">
+                <span class="related-relation-icon-tile" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                </span>
+                <div class="related-relation-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p>Definisci il tipo di relazione tra il familiare e il bambino.</p>
+                </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+            <div class="related-relation-popup-info">
+                <span class="related-relation-popup-info-icon" aria-hidden="true">i</span>
+                <div>
+                    <p>Questa relazione verr&agrave; associata al bambino e al familiare selezionati.</p>
+                    <p>L'ordine indica la priorit&agrave; della relazione.</p>
+                </div>
+            </div>
+
+            <div class="related-config-popup-editor related-relation-popup-editor">
+                <div class="related-relation-popup-grid">
+                    <div class="related-relation-form-field related-relation-field-main">
+                        <label for="{{ form.relazione.id_for_label }}">Parentela <span class="required-marker">*</span></label>
+                        <div class="related-relation-input-shell">
+                            <span class="related-relation-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                            </span>
+                            <div class="related-relation-input-control">
+                                {{ form.relazione }}
+                            </div>
+                        </div>
+                        {{ form.relazione.errors }}
+                    </div>
+
+                    <div class="related-relation-order-row">
+                        <div class="related-relation-form-field related-relation-field-order">
+                            <label for="{{ form.ordine.id_for_label }}">{{ form.ordine.label }}</label>
+                            <div class="related-relation-input-shell">
+                                <span class="related-relation-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                                </span>
+                                <div class="related-relation-input-control">
+                                    {{ form.ordine }}
+                                </div>
+                            </div>
+                            {{ form.ordine.errors }}
+                        </div>
+                        <div class="related-relation-order-help">
+                            <span>Numero che definisce la priorit&agrave; della relazione.</span>
+                            <span>1 = principale</span>
+                        </div>
+                    </div>
+
+                    <div class="related-relation-form-field related-relation-field-notes">
+                        <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                        {{ form.note }}
+                        {{ form.note.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
             </div>
         </form>
     </div>
-</body>
-</html>
+{% endblock %}

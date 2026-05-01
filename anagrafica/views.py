@@ -188,7 +188,7 @@ def build_document_owner_redirect_url(documento):
     if documento.familiare_id:
         return reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
     if documento.studente_id:
-        return reverse("modifica_studente", kwargs={"pk": documento.studente_id})
+        return build_studente_redirect_url(documento.studente_id, "documenti")
     return reverse("lista_famiglie")
 
 
@@ -260,6 +260,13 @@ def build_familiare_redirect_url(pk, active_inline_tab=None, default_tab="studen
     return url
 
 
+def build_studente_redirect_url(pk, active_inline_tab=None):
+    url = reverse("modifica_studente", kwargs={"pk": pk})
+    if active_inline_tab and active_inline_tab != "iscrizioni":
+        return f"{url}?tab={active_inline_tab}"
+    return url
+
+
 def pick_audit_entry(entries, action, reverse=False):
     action_entries = [entry for entry in entries if entry.azione == action]
     if reverse:
@@ -303,6 +310,161 @@ def famiglia_audit_labels(famiglia):
     ) or created_entry
 
     return audit_user_label_with_role(created_entry), audit_user_label_with_role(updated_entry)
+
+
+def studente_audit_labels(studente):
+    if not studente or not studente.pk:
+        return {
+            "created_data": None,
+            "created_label": "-",
+            "updated_data": None,
+            "updated_label": "-",
+        }
+
+    entries = list(SistemaOperazioneCronologia.objects.select_related(
+        "utente",
+        "utente__profilo_permessi",
+        "utente__profilo_permessi__ruolo_permessi",
+    ).filter(
+        app_label="anagrafica",
+        model_name="studente",
+        oggetto_id=str(studente.pk),
+    ).order_by("data_operazione", "id"))
+    created_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.CREAZIONE,
+    )
+    updated_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.MODIFICA,
+        reverse=True,
+    ) or created_entry
+
+    return {
+        "created_data": created_entry.data_operazione if created_entry else None,
+        "created_label": audit_user_label_with_role(created_entry),
+        "updated_data": updated_entry.data_operazione if updated_entry else None,
+        "updated_label": audit_user_label_with_role(updated_entry),
+    }
+
+
+def familiare_audit_labels(familiare):
+    if not familiare or not familiare.pk:
+        return {
+            "created_data": None,
+            "created_label": "-",
+            "updated_data": None,
+            "updated_label": "-",
+        }
+
+    entries = list(SistemaOperazioneCronologia.objects.select_related(
+        "utente",
+        "utente__profilo_permessi",
+        "utente__profilo_permessi__ruolo_permessi",
+    ).filter(
+        app_label="anagrafica",
+        model_name="familiare",
+        oggetto_id=str(familiare.pk),
+    ).order_by("data_operazione", "id"))
+    created_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.CREAZIONE,
+    )
+    updated_entry = pick_audit_entry(
+        entries,
+        AzioneOperazioneCronologia.MODIFICA,
+        reverse=True,
+    ) or created_entry
+
+    return {
+        "created_data": created_entry.data_operazione if created_entry else None,
+        "created_label": audit_user_label_with_role(created_entry),
+        "updated_data": updated_entry.data_operazione if updated_entry else None,
+        "updated_label": audit_user_label_with_role(updated_entry),
+    }
+
+
+def famiglia_activity_entries(famiglia, limit=6):
+    if not famiglia or not famiglia.pk:
+        return []
+
+    filters = Q(model_name="famiglia", oggetto_id=str(famiglia.pk))
+
+    familiari_ids = [str(pk) for pk in famiglia.familiari.values_list("pk", flat=True)]
+    if familiari_ids:
+        filters |= Q(model_name="familiare", oggetto_id__in=familiari_ids)
+
+    studenti_ids = [str(pk) for pk in famiglia.studenti.values_list("pk", flat=True)]
+    if studenti_ids:
+        filters |= Q(model_name="studente", oggetto_id__in=studenti_ids)
+
+    documenti_ids = [
+        str(pk)
+        for pk in Documento.objects.filter(
+            Q(famiglia=famiglia)
+            | Q(familiare__famiglia=famiglia)
+            | Q(studente__famiglia=famiglia)
+        ).values_list("pk", flat=True)
+    ]
+    if documenti_ids:
+        filters |= Q(model_name="documento", oggetto_id__in=documenti_ids)
+
+    return list(
+        SistemaOperazioneCronologia.objects.select_related(
+            "utente",
+            "utente__profilo_permessi",
+            "utente__profilo_permessi__ruolo_permessi",
+        )
+        .filter(app_label="anagrafica")
+        .filter(filters)
+        .order_by("-data_operazione", "-id")[:limit]
+    )
+
+
+def studente_activity_entries(studente, iscrizione_ids=None, documenti_ids=None, limit=5):
+    if not studente or not studente.pk:
+        return []
+
+    filters = Q(app_label="anagrafica", model_name="studente", oggetto_id=str(studente.pk))
+
+    documenti_ids = [str(pk) for pk in (documenti_ids or []) if pk]
+    if documenti_ids:
+        filters |= Q(app_label="anagrafica", model_name="documento", oggetto_id__in=documenti_ids)
+
+    iscrizione_ids = [str(pk) for pk in (iscrizione_ids or []) if pk]
+    if iscrizione_ids:
+        filters |= Q(app_label="economia", model_name="iscrizione", oggetto_id__in=iscrizione_ids)
+
+    return list(
+        SistemaOperazioneCronologia.objects.select_related(
+            "utente",
+            "utente__profilo_permessi",
+            "utente__profilo_permessi__ruolo_permessi",
+        )
+        .filter(filters)
+        .order_by("-data_operazione", "-id")[:limit]
+    )
+
+
+def familiare_activity_entries(familiare, documenti_ids=None, limit=5):
+    if not familiare or not familiare.pk:
+        return []
+
+    filters = Q(app_label="anagrafica", model_name="familiare", oggetto_id=str(familiare.pk))
+
+    documenti_ids = [str(pk) for pk in (documenti_ids or []) if pk]
+    if documenti_ids:
+        filters |= Q(app_label="anagrafica", model_name="documento", oggetto_id__in=documenti_ids)
+
+    return list(
+        SistemaOperazioneCronologia.objects.select_related(
+            "utente",
+            "utente__profilo_permessi",
+            "utente__profilo_permessi__ruolo_permessi",
+        )
+        .filter(filters)
+        .order_by("-data_operazione", "-id")[:limit]
+    )
 
 
 def audit_user_label_with_role(entry):
@@ -420,6 +582,64 @@ def annotate_studenti_current_iscrizione_status(queryset, today=None):
     return queryset.annotate(
         ha_iscrizione_attiva_corrente=Exists(iscrizione_corrente),
     )
+
+
+def current_iscrizione_class_display(iscrizione):
+    classe_label = str(iscrizione.classe) if iscrizione and iscrizione.classe_id else ""
+    if iscrizione and iscrizione.gruppo_classe_id:
+        gruppo_label = iscrizione.gruppo_classe.nome_gruppo_classe if iscrizione.gruppo_classe else ""
+        if gruppo_label and classe_label:
+            return "Pluriclasse", f"{gruppo_label} ({classe_label})"
+        if gruppo_label:
+            return "Pluriclasse", gruppo_label
+    if classe_label:
+        return "Classe", classe_label
+    return "", ""
+
+
+def decorate_studenti_formset_current_enrollment_labels(studenti_formset, today=None):
+    if studenti_formset is None:
+        return
+
+    student_instances = [form.instance for form in studenti_formset.forms if form.instance.pk]
+    decorate_studenti_current_enrollment_labels(student_instances, today=today)
+
+
+def decorate_studenti_current_enrollment_labels(student_instances, today=None):
+    if not student_instances:
+        return
+
+    today = today or timezone.localdate()
+    for studente in student_instances:
+        studente.classe_corrente_famiglia_tipo = ""
+        studente.classe_corrente_famiglia_label = ""
+
+    student_ids = [studente.pk for studente in student_instances]
+    if not student_ids:
+        return
+
+    iscrizioni_correnti = (
+        Iscrizione.objects
+        .filter(
+            studente_id__in=student_ids,
+            attiva=True,
+            anno_scolastico__data_inizio__lte=today,
+            anno_scolastico__data_fine__gte=today,
+        )
+        .select_related("classe", "gruppo_classe")
+        .order_by("studente_id", "-data_iscrizione", "-id")
+    )
+
+    labels_by_student = {}
+    for iscrizione in iscrizioni_correnti:
+        tipo, label = current_iscrizione_class_display(iscrizione)
+        if label and iscrizione.studente_id not in labels_by_student:
+            labels_by_student[iscrizione.studente_id] = (tipo, label)
+
+    for studente in student_instances:
+        tipo, label = labels_by_student.get(studente.pk, ("", ""))
+        studente.classe_corrente_famiglia_tipo = tipo
+        studente.classe_corrente_famiglia_label = label
 
 
 def famiglia_documenti_inline_queryset(famiglia=None):
@@ -569,6 +789,25 @@ def build_studente_document_counts(studente, today):
     }
 
 
+def count_studente_rate_scadute(iscrizioni, today):
+    count = 0
+
+    for iscrizione in iscrizioni or []:
+        for rata in iscrizione.rate.all():
+            importo_finale = rata.importo_finale or Decimal("0.00")
+            importo_pagato = rata.importo_pagato or Decimal("0.00")
+            if (
+                rata.data_scadenza
+                and rata.data_scadenza < today
+                and importo_finale > 0
+                and not rata.pagata
+                and importo_pagato < importo_finale
+            ):
+                count += 1
+
+    return count
+
+
 def should_prefer_initial_famiglia_tab(request, allowed_targets):
     if request.method == "POST":
         return True
@@ -674,6 +913,233 @@ def build_iscrizione_dashboard_rate_rows(iscrizione):
 
 def build_studente_projected_rate_plan(iscrizione, tariffa, importo_preiscrizione):
     return iscrizione.build_rate_plan()
+
+
+def build_rate_month_payment_status(*, importo_finale, importo_pagato, pagata=False, is_projected=False):
+    if is_projected:
+        return {
+            "payment_status": "projected",
+            "status_class": "is-projected",
+            "status_label": "Prevista",
+        }
+
+    finale = importo_finale or Decimal("0.00")
+    pagato = importo_pagato or Decimal("0.00")
+
+    if pagata or (finale > 0 and pagato >= finale):
+        return {
+            "payment_status": "paid",
+            "status_class": "is-paid",
+            "status_label": "Pagata",
+        }
+
+    if pagato > 0:
+        return {
+            "payment_status": "partial",
+            "status_class": "is-partial",
+            "status_label": "Pagata parzialmente",
+        }
+
+    if finale > 0:
+        return {
+            "payment_status": "unpaid",
+            "status_class": "is-unpaid",
+            "status_label": "Da pagare",
+        }
+
+    return {
+        "payment_status": "not_due",
+        "status_class": "is-not-due",
+        "status_label": "Non dovuta",
+    }
+
+
+def build_famiglia_rette_mensili_year_summary(famiglia, anno_scolastico, iscrizioni, *, today=None, index=0):
+    today = today or timezone.localdate()
+    has_studenti = famiglia.studenti.exists()
+    rows = []
+    totale_mensile = Decimal("0.00")
+    totale_pagato = Decimal("0.00")
+    totale_residuo = Decimal("0.00")
+    anno_label = anno_scolastico.nome_anno_scolastico if anno_scolastico else ""
+
+    for iscrizione in iscrizioni:
+        riepilogo = iscrizione.get_riepilogo_economico()
+        rate_rows = build_iscrizione_dashboard_rate_rows(iscrizione)
+        importo_pagato = sum(
+            ((row["importo_incassato"] or Decimal("0.00")) for row in rate_rows),
+            Decimal("0.00"),
+        )
+        importo_residuo = sum(
+            ((row["importo_rimanente"] or Decimal("0.00")) for row in rate_rows),
+            Decimal("0.00"),
+        )
+        importo_totale = importo_pagato + importo_residuo
+        progresso = (
+            int(((importo_pagato / importo_totale) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if importo_totale > 0
+            else 0
+        )
+        classe_tipo, classe_label = current_iscrizione_class_display(iscrizione)
+
+        if iscrizione.non_pagante:
+            importo_rata = Decimal("0.00")
+            importo_caption = "Non pagante"
+            importo_meta = "Nessuna retta mensile"
+        elif riepilogo["pagamento_unica_soluzione"]:
+            importo_rata = riepilogo["rata_unica"] or Decimal("0.00")
+            importo_caption = "Unica soluzione"
+            importo_meta = (
+                f"Scadenza {riepilogo['scadenza_pagamento_unica'].strftime('%d/%m/%Y')}"
+                if riepilogo.get("scadenza_pagamento_unica")
+                else "Pagamento annuale"
+            )
+        else:
+            importo_rata = riepilogo["rata_standard"] or Decimal("0.00")
+            importo_caption = f"{riepilogo['numero_mensilita']} rate mensili"
+            importo_meta = (
+                f"Ultima rata {riepilogo['rata_finale']}"
+                if riepilogo["ultima_rata_diversa"]
+                else "Importo ricorrente"
+            )
+            totale_mensile += importo_rata
+
+        totale_pagato += importo_pagato
+        totale_residuo += importo_residuo
+        rows.append(
+            {
+                "studente": iscrizione.studente,
+                "iscrizione": iscrizione,
+                "classe_tipo": classe_tipo,
+                "classe_label": classe_label,
+                "importo_rata": importo_rata,
+                "importo_caption": importo_caption,
+                "importo_meta": importo_meta,
+                "pagato": importo_pagato,
+                "residuo": importo_residuo,
+                "progresso": min(max(progresso, 0), 100),
+                "pagamento_unica_soluzione": riepilogo["pagamento_unica_soluzione"],
+                "non_pagante": iscrizione.non_pagante,
+            }
+        )
+
+    anno_key = f"anno-{anno_scolastico.pk}" if anno_scolastico else f"anno-empty-{index}"
+    is_current = bool(
+        anno_scolastico
+        and anno_scolastico.data_inizio
+        and anno_scolastico.data_fine
+        and anno_scolastico.data_inizio <= today <= anno_scolastico.data_fine
+    )
+
+    return {
+        "anno": anno_scolastico,
+        "anno_id": anno_scolastico.pk if anno_scolastico else None,
+        "key": anno_key,
+        "panel_id": f"family-rate-year-panel-{anno_scolastico.pk if anno_scolastico else index}",
+        "anno_label": anno_label,
+        "is_current": is_current,
+        "empty_message": (
+            "Nessuna iscrizione attiva per l'anno corrente."
+            if is_current
+            else "Nessuna iscrizione attiva per l'anno selezionato."
+        ) if has_studenti else "Nessuno studente inserito.",
+        "rows": rows,
+        "totale_mensile": totale_mensile,
+        "totale_pagato": totale_pagato,
+        "totale_residuo": totale_residuo,
+        "has_studenti": has_studenti,
+    }
+
+
+def build_famiglia_rette_mensili_summary(famiglia, today=None):
+    today = today or timezone.localdate()
+    anno_predefinito = resolve_default_anno_scolastico(today=today)
+    iscrizioni = list(
+        Iscrizione.objects.filter(
+            studente__famiglia=famiglia,
+            attiva=True,
+        )
+        .select_related(
+            "studente",
+            "anno_scolastico",
+            "stato_iscrizione",
+            "condizione_iscrizione",
+            "classe",
+            "gruppo_classe",
+            "agevolazione",
+        )
+        .prefetch_related("rate", "condizione_iscrizione__tariffe")
+        .order_by(
+            "anno_scolastico__data_inizio",
+            "anno_scolastico_id",
+            "studente__data_nascita",
+            "studente__cognome",
+            "studente__nome",
+            "studente_id",
+            "-data_iscrizione",
+            "-id",
+        )
+    )
+
+    iscrizioni_per_anno = defaultdict(list)
+    anni_per_id = {}
+
+    if anno_predefinito:
+        anni_per_id[anno_predefinito.pk] = anno_predefinito
+
+    for iscrizione in iscrizioni:
+        if not iscrizione.anno_scolastico_id:
+            continue
+
+        anno = iscrizione.anno_scolastico
+        include_anno = (
+            not anno_predefinito
+            or anno.pk == anno_predefinito.pk
+            or (anno.data_fine and anno.data_fine >= today)
+        )
+        if not include_anno:
+            continue
+
+        anni_per_id[anno.pk] = anno
+        iscrizioni_per_anno[anno.pk].append(iscrizione)
+
+    anni = sorted(
+        anni_per_id.values(),
+        key=lambda anno: (
+            0 if anno_predefinito and anno.pk == anno_predefinito.pk else 1,
+            anno.data_inizio or date.max,
+            anno.pk,
+        ),
+    )
+
+    year_summaries = [
+        build_famiglia_rette_mensili_year_summary(
+            famiglia,
+            anno,
+            iscrizioni_per_anno.get(anno.pk, []),
+            today=today,
+            index=index,
+        )
+        for index, anno in enumerate(anni)
+    ]
+
+    for index, summary in enumerate(year_summaries):
+        summary["is_default"] = index == 0
+
+    default_summary = year_summaries[0] if year_summaries else {
+        "anno_label": "",
+        "rows": [],
+        "totale_mensile": Decimal("0.00"),
+        "totale_pagato": Decimal("0.00"),
+        "totale_residuo": Decimal("0.00"),
+        "has_studenti": famiglia.studenti.exists(),
+    }
+
+    return {
+        **default_summary,
+        "years": year_summaries,
+        "has_year_switch": len(year_summaries) > 1,
+    }
 
 
 def build_economia_dashboard_data(anno_corrente):
@@ -929,6 +1395,11 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                     "metodo_pagamento": rata.metodo_pagamento,
                     "rata_pk": rata.pk,
                     "is_projected": False,
+                    **build_rate_month_payment_status(
+                        importo_finale=rata.importo_finale,
+                        importo_pagato=rata.importo_pagato,
+                        pagata=rata.pagata,
+                    ),
                 }
                 for rata in rate
             ]
@@ -964,6 +1435,12 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                     "metodo_pagamento": None,
                     "rata_pk": None,
                     "is_projected": True,
+                    **build_rate_month_payment_status(
+                        importo_finale=item["importo_finale"],
+                        importo_pagato=None,
+                        pagata=False,
+                        is_projected=True,
+                    ),
                 }
                 for item in piano
             ]
@@ -975,23 +1452,77 @@ def build_studente_rate_overview(studente, iscrizioni=None):
         ]
         single_payment_month = next((month for month in months if month.get("is_unica_soluzione")), None)
         is_pagamento_unica_soluzione = iscrizione.is_pagamento_unica_soluzione
+        numero_mensilita = 1 if is_pagamento_unica_soluzione else max(
+            iscrizione.condizione_iscrizione.numero_mensilita_default or 0,
+            1,
+        )
+        rata_standard = single_payment_month["importo_dovuto"] if single_payment_month else (
+            monthly_months[0]["importo_dovuto"] if monthly_months else None
+        )
+        totale_dovuto = sum(
+            (
+                (
+                    month["importo_finale"]
+                    if month.get("importo_finale") is not None
+                    else month.get("importo_dovuto")
+                ) or Decimal("0.00")
+                for month in months
+            ),
+            Decimal("0.00"),
+        )
+        totale_dovuto_senza_preiscrizione = sum(
+            (
+                (
+                    month["importo_finale"]
+                    if month.get("importo_finale") is not None
+                    else month.get("importo_dovuto")
+                ) or Decimal("0.00")
+                for month in months
+                if not month["is_preiscrizione"]
+            ),
+            Decimal("0.00"),
+        )
+        totale_pagato = sum(
+            ((month.get("importo_pagato") or Decimal("0.00")) for month in months),
+            Decimal("0.00"),
+        )
+        totale_residuo = max(totale_dovuto - totale_pagato, Decimal("0.00"))
+        progresso = (
+            int(((totale_pagato / totale_dovuto) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if totale_dovuto > 0
+            else 0
+        )
+        classe_tipo, classe_label = current_iscrizione_class_display(iscrizione)
+        anno_scolastico = iscrizione.anno_scolastico
+        is_current = bool(
+            anno_scolastico
+            and anno_scolastico.data_inizio
+            and anno_scolastico.data_fine
+            and anno_scolastico.data_inizio <= timezone.localdate() <= anno_scolastico.data_fine
+        )
+        if iscrizione.non_pagante:
+            importo_caption = "Non pagante"
+            importo_meta = "Nessuna retta dovuta"
+        elif is_pagamento_unica_soluzione:
+            importo_caption = "Unica soluzione"
+            importo_meta = "Pagamento annuale"
+        else:
+            importo_caption = f"{numero_mensilita} rate mensili"
+            importo_meta = "Importo ricorrente"
 
         overview.append(
             {
                 "iscrizione": iscrizione,
                 "anno_label": iscrizione.anno_scolastico.nome_anno_scolastico,
-                "classe_label": str(iscrizione.classe) if iscrizione.classe else None,
+                "classe_tipo": classe_tipo,
+                "classe_label": classe_label,
                 "stato_label": str(iscrizione.stato_iscrizione),
                 "condizione_label": iscrizione.condizione_iscrizione.nome_condizione_iscrizione,
                 "has_tariffa": bool(tariffa),
                 "retta_annuale_base": tariffa.retta_annuale if tariffa else None,
                 "preiscrizione": importo_preiscrizione,
-                "numero_mensilita": 1
-                if is_pagamento_unica_soluzione
-                else max(iscrizione.condizione_iscrizione.numero_mensilita_default or 0, 1),
-                "rata_standard": single_payment_month["importo_dovuto"]
-                if single_payment_month
-                else (monthly_months[0]["importo_dovuto"] if monthly_months else None),
+                "numero_mensilita": numero_mensilita,
+                "rata_standard": rata_standard,
                 "pagamento_unica_soluzione": is_pagamento_unica_soluzione,
                 "modalita_pagamento_label": iscrizione.get_modalita_pagamento_retta_display(),
                 "sconto_unica_soluzione": iscrizione.get_importo_sconto_unica_soluzione_applicato(),
@@ -1001,10 +1532,27 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                     if iscrizione.riduzione_speciale and iscrizione.importo_riduzione_speciale
                     else None
                 ),
+                "totale_dovuto": totale_dovuto,
+                "totale_dovuto_senza_preiscrizione": totale_dovuto_senza_preiscrizione,
+                "totale_pagato": totale_pagato,
+                "totale_residuo": totale_residuo,
+                "progresso": min(max(progresso, 0), 100),
+                "importo_caption": importo_caption,
+                "importo_meta": importo_meta,
+                "is_current": is_current,
                 "months": months,
                 "month_rows": build_balanced_rate_rows(months),
                 "has_projected_plan": bool(months) and all(month["is_projected"] for month in months),
             }
+        )
+
+    if any(item["is_current"] for item in overview):
+        overview.sort(
+            key=lambda item: (
+                0 if item["is_current"] else 1,
+                item["iscrizione"].anno_scolastico.data_inizio or date.max,
+                item["iscrizione"].pk,
+            )
         )
 
     return overview
@@ -1674,6 +2222,7 @@ def ricerche_anagrafica(request):
 #INIZIO VIEWS DELLE FAMIGLIE
 def lista_famiglie(request):
     q = request.GET.get("q", "").strip()
+    stato_relazione_id = request.GET.get("stato_relazione", "").strip()
 
     famiglie = (
         Famiglia.objects
@@ -1703,7 +2252,11 @@ def lista_famiglie(request):
             Q(indirizzo_principale__citta__nome__icontains=q)
         ).distinct()
 
+    if stato_relazione_id.isdigit():
+        famiglie = famiglie.filter(stato_relazione_famiglia_id=stato_relazione_id)
+
     evidenzia_id = request.GET.get("highlight")
+    stati_relazione = StatoRelazioneFamiglia.objects.filter(attivo=True).order_by("ordine", "stato")
 
     return render(
         request,
@@ -1712,21 +2265,50 @@ def lista_famiglie(request):
             "famiglie": famiglie,
             "evidenzia_id": evidenzia_id,
             "q": q,
+            "stato_relazione_id": stato_relazione_id,
+            "stati_relazione": stati_relazione,
         },
     )
 
 
 def crea_famiglia(request):
+    popup = is_popup_request(request)
+
+    if popup:
+        if request.method == "POST":
+            form = FamigliaForm(request.POST)
+            if form.is_valid():
+                famiglia = form.save()
+                return popup_select_response(
+                    request,
+                    field_name="famiglia",
+                    object_id=famiglia.pk,
+                    object_label=famiglia.label_select(),
+                )
+        else:
+            form = FamigliaForm()
+
+        form.fields["cognome_famiglia"].widget.attrs.setdefault("placeholder", "Es. Rossi, Bianchi...")
+
+        return render(
+            request,
+            "anagrafica/famiglie/famiglia_popup_form.html",
+            {
+                "form": form,
+                "popup": popup,
+            },
+        )
+
     allowed_inline_targets = {"familiari", "studenti", "documenti"}
     edit_scope = "full"
-    inline_target = "familiari"
-    active_inline_tab = "familiari"
+    inline_target = "studenti"
+    active_inline_tab = "studenti"
     prefer_initial_active_tab = False
     familiari_formset = None
     studenti_formset = None
     documenti_formset = None
     if request.method == "POST":
-        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         edit_scope, inline_target = resolve_inline_target(
             request,
@@ -1774,8 +2356,8 @@ def crea_famiglia(request):
                 messages.error(request, build_document_storage_error_message(exc))
             else:
                 if "_continue" in request.POST:
-                    messages.success(request, "Famiglia creata correttamente. Ora puoi continuare a modificarla.")
-                    return redirect(build_famiglia_redirect_url(famiglia.pk, active_inline_tab))
+                    messages.success(request, "Famiglia creata correttamente.")
+                    return redirect("lista_famiglie")
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Famiglia creata correttamente. Puoi inserirne un'altra.")
@@ -1791,7 +2373,7 @@ def crea_famiglia(request):
         if documenti_formset is None:
             documenti_formset = build_documenti_famiglia_formset(prefix="documenti")
     else:
-        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = FamigliaForm()
         familiari_formset = build_familiari_formset(prefix="familiari")
@@ -1814,6 +2396,7 @@ def crea_famiglia(request):
         "documenti_studenti": [],
         "count_documenti_familiari": 0,
         "count_documenti_studenti": 0,
+        "famiglia_activity_entries": [],
         "edit_scope": edit_scope,
         "inline_target": inline_target,
         "active_inline_tab": active_inline_tab,
@@ -1843,15 +2426,31 @@ def modifica_famiglia(request, pk):
         pk=pk,
     )
     edit_scope = "view"
-    inline_target = "familiari"
-    active_inline_tab = "familiari"
+    inline_target = "studenti"
+    active_inline_tab = "studenti"
     prefer_initial_active_tab = False
     familiari_formset = None
     studenti_formset = None
     documenti_formset = None
 
+    if request.method == "POST" and request.POST.get("_note_popup") == "1":
+        note_active_tab = (request.POST.get("_note_active_tab") or "studenti").strip()
+        if note_active_tab.startswith("tab-"):
+            note_active_tab = note_active_tab[4:]
+        if note_active_tab not in allowed_inline_targets:
+            note_active_tab = "studenti"
+
+        nuova_nota = request.POST.get("note", "")
+        if famiglia.note != nuova_nota:
+            famiglia.note = nuova_nota
+            famiglia.save(update_fields=["note", "data_aggiornamento"])
+            messages.success(request, "Note aggiornate correttamente.")
+        else:
+            messages.info(request, "Nessuna modifica alle note.")
+        return redirect(build_famiglia_redirect_url(famiglia.pk, note_active_tab))
+
     if request.method == "POST":
-        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         edit_scope, inline_target = resolve_inline_target(
             request,
@@ -1915,7 +2514,7 @@ def modifica_famiglia(request, pk):
         if documenti_formset is None:
             documenti_formset = build_documenti_famiglia_formset(instance=famiglia, prefix="documenti")
     else:
-        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "familiari")
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = FamigliaForm(instance=famiglia)
         familiari_formset = build_familiari_formset(instance=famiglia, prefix="familiari")
@@ -1962,6 +2561,7 @@ def modifica_famiglia(request, pk):
         + count_documenti_familiari
         + count_documenti_studenti
     )
+    decorate_studenti_formset_current_enrollment_labels(studenti_formset, today)
     famiglia_creata_da_label, famiglia_aggiornata_da_label = famiglia_audit_labels(famiglia)
 
     ctx = {
@@ -1981,6 +2581,8 @@ def modifica_famiglia(request, pk):
         "documenti_studenti": documenti_studenti,
         "count_documenti_familiari": count_documenti_familiari,
         "count_documenti_studenti": count_documenti_studenti,
+        "famiglia_activity_entries": famiglia_activity_entries(famiglia),
+        "famiglia_rette_summary": build_famiglia_rette_mensili_summary(famiglia, today),
         "edit_scope": edit_scope,
         "inline_target": inline_target,
         "active_inline_tab": active_inline_tab,
@@ -2002,16 +2604,23 @@ def modifica_famiglia(request, pk):
 def elimina_famiglia(request, pk):
     famiglia = get_object_or_404(Famiglia, pk=pk)
     impact = get_famiglia_delete_impact(famiglia)
+    popup = is_popup_request(request)
+    template_name = (
+        "anagrafica/famiglie/famiglia_popup_delete.html"
+        if popup
+        else "anagrafica/famiglie/famiglia_conferma_elimina.html"
+    )
 
     if request.method == "POST":
         if request.POST.get("confirm_delete_related") != "1":
             return render(
                 request,
-                "anagrafica/famiglie/famiglia_conferma_elimina.html",
+                template_name,
                 {
                     "famiglia": famiglia,
                     "impact": impact,
                     "double_confirm": True,
+                    "popup": popup,
                 },
             )
 
@@ -2022,16 +2631,20 @@ def elimina_famiglia(request, pk):
             if indirizzi_da_eliminare_ids:
                 Indirizzo.objects.filter(pk__in=indirizzi_da_eliminare_ids).delete()
 
+        if popup:
+            return popup_response(request, "Famiglia e dati correlati eliminati correttamente.")
+
         messages.success(request, "Famiglia e dati correlati eliminati correttamente.")
         return redirect("lista_famiglie")
 
     return render(
         request,
-        "anagrafica/famiglie/famiglia_conferma_elimina.html",
+        template_name,
         {
             "famiglia": famiglia,
             "impact": impact,
             "double_confirm": False,
+            "popup": popup,
         },
     )
 
@@ -2093,6 +2706,15 @@ def crea_stato_relazione_famiglia(request):
     else:
         form = StatoRelazioneFamigliaForm()
 
+    form.fields["stato"].widget.attrs.setdefault("placeholder", "Es. Attiva, Interessata, Ex-Famiglia, Ritirata, etc.")
+    form.fields["ordine"].widget.attrs.setdefault("min", "1")
+    form.fields["note"].widget.attrs.update(
+        {
+            "placeholder": "Aggiungi una nota (opzionale)...",
+            "rows": "5",
+        }
+    )
+
     return render(
         request,
         "anagrafica/configurazioni/stato_relazione_famiglia_popup_form.html" if popup else "anagrafica/configurazioni/stato_relazione_famiglia_form.html",
@@ -2130,6 +2752,15 @@ def modifica_stato_relazione_famiglia(request, pk):
             return redirect("lista_famiglie")
     else:
         form = StatoRelazioneFamigliaForm(instance=stato)
+
+    form.fields["stato"].widget.attrs.setdefault("placeholder", "Es. Attiva, Interessata, Ex-Famiglia, Ritirata, etc.")
+    form.fields["ordine"].widget.attrs.setdefault("min", "1")
+    form.fields["note"].widget.attrs.update(
+        {
+            "placeholder": "Aggiungi una nota (opzionale)...",
+            "rows": "5",
+        }
+    )
 
     return render(
         request,
@@ -2202,12 +2833,22 @@ def crea_relazione_familiare(request):
     else:
         form = RelazioneFamiliareForm()
 
+    form.fields["relazione"].widget.attrs.setdefault("placeholder", "Es. Padre, Madre, Tutore...")
+    form.fields["ordine"].widget.attrs.setdefault("min", "1")
+    form.fields["note"].widget.attrs.update(
+        {
+            "placeholder": "Aggiungi una nota (opzionale)...",
+            "rows": "6",
+            "data-rich-notes": "1",
+        }
+    )
+
     return render(
         request,
         "anagrafica/configurazioni/relazione_familiare_popup_form.html" if popup else "anagrafica/configurazioni/relazione_familiare_form.html",
         {
             "form": form,
-            "titolo": "Nuova relazione familiare",
+            "titolo": "Nuova parentela",
             "popup": popup,
         },
     )
@@ -2240,12 +2881,22 @@ def modifica_relazione_familiare(request, pk):
     else:
         form = RelazioneFamiliareForm(instance=relazione)
 
+    form.fields["relazione"].widget.attrs.setdefault("placeholder", "Es. Padre, Madre, Tutore...")
+    form.fields["ordine"].widget.attrs.setdefault("min", "1")
+    form.fields["note"].widget.attrs.update(
+        {
+            "placeholder": "Aggiungi una nota (opzionale)...",
+            "rows": "6",
+            "data-rich-notes": "1",
+        }
+    )
+
     return render(
         request,
         "anagrafica/configurazioni/relazione_familiare_popup_form.html" if popup else "anagrafica/configurazioni/relazione_familiare_form.html",
         {
             "form": form,
-            "titolo": "Modifica relazione familiare",
+            "titolo": "Modifica parentela",
             "popup": popup,
         },
     )
@@ -2275,7 +2926,7 @@ def elimina_relazione_familiare(request, pk):
         "anagrafica/configurazioni/relazione_familiare_popup_delete.html" if popup else "anagrafica/configurazioni/relazione_familiare_delete.html",
         {
             "oggetto": relazione,
-            "titolo": "Elimina relazione familiare",
+            "titolo": "Elimina parentela",
             "popup": popup,
         },
     )
@@ -2335,36 +2986,99 @@ def lista_familiari(request):
 
 
 def crea_familiare(request):
+    allowed_inline_targets = {"studenti", "parenti", "documenti"}
+    edit_scope = "full"
+    inline_target = "studenti"
+    active_inline_tab = "studenti"
+    studenti_formset = None
+    parenti_formset = None
+    documenti_formset = None
     if request.method == "POST":
-        form = FamiliareForm(request.POST)
-        documenti_formset = DocumentoFamiliareFormSet(
-            request.POST,
-            request.FILES,
-            prefix="documenti",
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
+        edit_scope, inline_target = resolve_inline_target(
+            request,
+            allowed_inline_targets,
+        )
+        form = FamiliareForm(request.POST, detailed_famiglia_choices=True)
+        studenti_formset = (
+            build_studenti_formset(data=request.POST, prefix="studenti")
+            if inline_target in (None, "studenti")
+            else None
+        )
+        parenti_formset = (
+            build_familiari_formset(data=request.POST, prefix="parenti")
+            if inline_target in (None, "parenti")
+            else None
+        )
+        documenti_formset = (
+            DocumentoFamiliareFormSet(
+                request.POST,
+                request.FILES,
+                prefix="documenti",
+            )
+            if inline_target in (None, "documenti")
+            else None
         )
 
-        if form.is_valid() and documenti_formset.is_valid():
+        form_is_valid = form.is_valid()
+        studenti_is_valid = studenti_formset.is_valid() if inline_target in (None, "studenti") else True
+        parenti_is_valid = parenti_formset.is_valid() if inline_target in (None, "parenti") else True
+        documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
+
+        if form_is_valid and studenti_is_valid and parenti_is_valid and documenti_is_valid:
             try:
                 with transaction.atomic():
                     familiare = form.save()
-                    documenti_formset.instance = familiare
-                    documenti_formset.save()
+                    famiglia = familiare.famiglia
+
+                    if inline_target in (None, "studenti"):
+                        studenti_formset.instance = famiglia
+                        studenti_formset.save()
+
+                    if inline_target in (None, "parenti"):
+                        parenti_formset.instance = famiglia
+                        parenti_formset.save()
+
+                    if inline_target in (None, "documenti"):
+                        documenti_formset.instance = familiare
+                        documenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
                 if "_continue" in request.POST:
-                    messages.success(request, "Familiare creato correttamente. Ora puoi continuare a modificarlo.")
-                    return redirect("modifica_familiare", pk=familiare.pk)
+                    messages.success(request, "Familiare creato correttamente.")
+                    return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Familiare creato correttamente. Puoi inserirne un altro.")
                     return redirect("crea_familiare")
 
-                messages.success(request, "Familiare creato correttamente.")
-                return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
+                messages.success(request, "Familiare creato correttamente. Ora puoi continuare a inserire i dati.")
+                default_target = "studenti"
+                target = active_inline_tab if active_inline_tab in allowed_inline_targets else default_target
+                return redirect(build_familiare_redirect_url(familiare.pk, target, default_target))
+
+        if studenti_formset is None:
+            studenti_formset = build_studenti_formset(prefix="studenti")
+        if parenti_formset is None:
+            parenti_formset = build_familiari_formset(prefix="parenti")
+        if documenti_formset is None:
+            documenti_formset = DocumentoFamiliareFormSet(prefix="documenti")
     else:
-        form = FamiliareForm()
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
+        form = FamiliareForm(detailed_famiglia_choices=True)
+        studenti_formset = build_studenti_formset(prefix="studenti")
+        parenti_formset = build_familiari_formset(prefix="parenti")
         documenti_formset = DocumentoFamiliareFormSet(prefix="documenti")
+
+    today = timezone.localdate()
+    decorate_studenti_formset_current_enrollment_labels(studenti_formset, today)
+    has_form_errors = bool(
+        form.errors
+        or studenti_formset.total_error_count()
+        or parenti_formset.total_error_count()
+        or documenti_formset.total_error_count()
+    )
 
     return render(
         request,
@@ -2372,27 +3086,44 @@ def crea_familiare(request):
         {
             "form": form,
             "documenti_formset": documenti_formset,
-            "studenti_formset": None,
+            "studenti_formset": studenti_formset,
+            "parenti_formset": parenti_formset,
             "studenti_famiglia": None,
             "count_studenti": 0,
+            "count_parenti": 0,
             "studente_inline_defaults": None,
             "count_documenti": 0,
             "count_documenti_in_scadenza": 0,
             "count_documenti_scaduti": 0,
             "scambio_retta_inline_context": {"enabled": False, "sections": []},
             "scambio_retta_return_to": "",
-            "edit_scope": "full",
-            "inline_target": "documenti",
+            "edit_scope": edit_scope,
+            "inline_target": active_inline_tab,
+            "has_form_errors": has_form_errors,
             "familiare_inline_tabs": [
+                {
+                    "tab_id": "tab-studenti",
+                    "label": get_student_terminology()["selected_plural"],
+                    "base_label": get_student_terminology()["selected_plural"],
+                    "count": 0,
+                    "is_active": active_inline_tab == "studenti",
+                },
+                {
+                    "tab_id": "tab-parenti",
+                    "label": "Familiari",
+                    "base_label": "Familiari",
+                    "count": 0,
+                    "is_active": active_inline_tab == "parenti",
+                },
                 {
                     "tab_id": "tab-documenti",
                     "label": "Documenti",
                     "base_label": "Documenti",
                     "count": 0,
-                    "is_active": True,
+                    "is_active": active_inline_tab == "documenti",
                 },
             ],
-            "familiare_inline_edit_label": "Modifica Documenti",
+            "familiare_inline_edit_label": "Modifica",
         },
     )
 
@@ -2420,6 +3151,28 @@ def modifica_familiare(request, pk):
     edit_scope = "view"
 
     studenti_formset = None
+    parenti_formset = None
+
+    if request.method == "POST" and request.POST.get("_note_popup") == "1":
+        note_active_tab = (request.POST.get("_note_active_tab") or "studenti").strip()
+        if note_active_tab.startswith("tab-"):
+            note_active_tab = note_active_tab[4:]
+        allowed_note_tabs = ["documenti"]
+        if familiare.famiglia_id:
+            allowed_note_tabs.insert(0, "studenti")
+            allowed_note_tabs.insert(1, "parenti")
+        default_note_tab = "studenti" if "studenti" in allowed_note_tabs else "documenti"
+        if note_active_tab not in allowed_note_tabs:
+            note_active_tab = default_note_tab
+
+        nuova_nota = request.POST.get("note", "")
+        if familiare.note != nuova_nota:
+            familiare.note = nuova_nota
+            familiare.save(update_fields=["note"])
+            messages.success(request, "Note aggiornate correttamente.")
+        else:
+            messages.info(request, "Nessuna modifica alle note.")
+        return redirect(build_familiare_redirect_url(familiare.pk, note_active_tab, default_note_tab))
 
     def famiglia_for_studenti_inline(current_edit_scope=None):
         if request.method != "POST" or current_edit_scope == "inline":
@@ -2439,13 +3192,14 @@ def modifica_familiare(request, pk):
             return redirect(request.get_full_path())
 
         inline_editing = edit_scope == "inline"
+        inline_target = (request.POST.get("_inline_target") or "").strip()
         famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
         form = (
             FamiliareForm(instance=familiare)
             if inline_editing
             else FamiliareForm(request.POST, instance=familiare)
         )
-        if inline_editing:
+        if inline_editing and inline_target == "documenti":
             documenti_formset = DocumentoFamiliareFormSet(
                 request.POST,
                 request.FILES,
@@ -2456,24 +3210,32 @@ def modifica_familiare(request, pk):
             documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
         if famiglia_for_studenti:
             studenti_formset = build_studenti_formset(
-                data=request.POST if inline_editing else None,
+                data=request.POST if inline_editing and inline_target == "studenti" else None,
                 instance=famiglia_for_studenti,
                 prefix="studenti",
             )
+            parenti_formset = build_familiari_formset(
+                data=request.POST if inline_editing and inline_target == "parenti" else None,
+                instance=famiglia_for_studenti,
+                prefix="parenti",
+            )
 
-        studenti_ok = studenti_formset.is_valid() if inline_editing and studenti_formset is not None else True
+        studenti_ok = studenti_formset.is_valid() if inline_editing and inline_target == "studenti" and studenti_formset is not None else True
+        parenti_ok = parenti_formset.is_valid() if inline_editing and inline_target == "parenti" and parenti_formset is not None else True
         form_ok = True if inline_editing else form.is_valid()
-        documenti_ok = documenti_formset.is_valid() if inline_editing else True
+        documenti_ok = documenti_formset.is_valid() if inline_editing and inline_target == "documenti" else True
 
-        if form_ok and documenti_ok and studenti_ok:
+        if form_ok and documenti_ok and studenti_ok and parenti_ok:
             try:
                 with transaction.atomic():
                     if not inline_editing:
                         familiare = form.save()
-                    if inline_editing:
+                    if inline_editing and inline_target == "documenti":
                         documenti_formset.save()
-                    if inline_editing and studenti_formset is not None:
+                    if inline_editing and inline_target == "studenti" and studenti_formset is not None:
                         studenti_formset.save()
+                    if inline_editing and inline_target == "parenti" and parenti_formset is not None:
+                        parenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
@@ -2483,6 +3245,9 @@ def modifica_familiare(request, pk):
                     allowed_targets = ["documenti"]
                     if studenti_formset is not None:
                         allowed_targets.insert(0, "studenti")
+                    if parenti_formset is not None:
+                        insert_at = 1 if "studenti" in allowed_targets else 0
+                        allowed_targets.insert(insert_at, "parenti")
                     default_target = "studenti" if "studenti" in allowed_targets else "documenti"
                     if target not in allowed_targets:
                         target = default_target
@@ -2497,20 +3262,27 @@ def modifica_familiare(request, pk):
                 allowed_targets = ["documenti"]
                 if studenti_formset is not None:
                     allowed_targets.insert(0, "studenti")
+                if parenti_formset is not None:
+                    insert_at = 1 if "studenti" in allowed_targets else 0
+                    allowed_targets.insert(insert_at, "parenti")
                 default_target = "studenti" if "studenti" in allowed_targets else "documenti"
                 if target not in allowed_targets:
                     target = default_target
                 return redirect(build_familiare_redirect_url(familiare.pk, target, default_target))
         if studenti_formset is None and famiglia_for_studenti:
             studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
+        if parenti_formset is None and famiglia_for_studenti:
+            parenti_formset = build_familiari_formset(instance=famiglia_for_studenti, prefix="parenti")
     else:
         famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
         form = FamiliareForm(instance=familiare)
         documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
         if famiglia_for_studenti:
             studenti_formset = build_studenti_formset(instance=famiglia_for_studenti, prefix="studenti")
+            parenti_formset = build_familiari_formset(instance=famiglia_for_studenti, prefix="parenti")
 
     count_studenti = famiglia_for_studenti.studenti.count() if famiglia_for_studenti else 0
+    count_parenti = famiglia_for_studenti.familiari.exclude(pk=familiare.pk).count() if famiglia_for_studenti else 0
     studente_inline_defaults = None
     if famiglia_for_studenti:
         studente_inline_defaults = {
@@ -2522,6 +3294,9 @@ def modifica_familiare(request, pk):
     allowed_inline_targets = ["documenti"]
     if studenti_formset is not None:
         allowed_inline_targets.insert(0, "studenti")
+    if parenti_formset is not None:
+        insert_at = 1 if "studenti" in allowed_inline_targets else 0
+        allowed_inline_targets.insert(insert_at, "parenti")
     default_inline_target = "studenti" if "studenti" in allowed_inline_targets else "documenti"
     inline_target = resolve_active_inline_tab(request, allowed_inline_targets, default_inline_target)
     familiare_inline_tabs = []
@@ -2537,6 +3312,16 @@ def modifica_familiare(request, pk):
         })
         if inline_target == "studenti":
             familiare_inline_edit_label = f"Modifica {terminology['selected_plural']}"
+    if parenti_formset is not None:
+        familiare_inline_tabs.append({
+            "tab_id": "tab-parenti",
+            "label": "Parenti",
+            "base_label": "Parenti",
+            "count": count_parenti,
+            "is_active": inline_target == "parenti",
+        })
+        if inline_target == "parenti":
+            familiare_inline_edit_label = "Modifica Parenti"
     familiare_inline_tabs.append({
         "tab_id": "tab-documenti",
         "label": "Documenti",
@@ -2544,7 +3329,9 @@ def modifica_familiare(request, pk):
         "count": familiare.documenti.count(),
         "is_active": inline_target == "documenti",
     })
-    familiare_audit_info = last_update_audit_info(familiare)
+    decorate_studenti_formset_current_enrollment_labels(studenti_formset, today)
+    familiare_audit_info = familiare_audit_labels(familiare)
+    documenti_ids = list(familiare.documenti.values_list("pk", flat=True))
 
     return render(
         request,
@@ -2554,8 +3341,10 @@ def modifica_familiare(request, pk):
             "familiare": familiare,
             "documenti_formset": documenti_formset,
             "studenti_formset": studenti_formset,
+            "parenti_formset": parenti_formset,
             "studenti_famiglia": famiglia_for_studenti,
             "count_studenti": count_studenti,
+            "count_parenti": count_parenti,
             "studente_inline_defaults": studente_inline_defaults,
             "count_documenti": familiare.documenti.count(),
             "count_documenti_in_scadenza": familiare.documenti.filter(
@@ -2573,8 +3362,11 @@ def modifica_familiare(request, pk):
             "inline_target": inline_target,
             "familiare_inline_tabs": familiare_inline_tabs,
             "familiare_inline_edit_label": familiare_inline_edit_label,
-            "familiare_ultima_modifica_data": familiare_audit_info["data"],
-            "familiare_aggiornato_da_label": familiare_audit_info["utente_label"],
+            "familiare_creazione_data": familiare_audit_info["created_data"],
+            "familiare_creato_da_label": familiare_audit_info["created_label"],
+            "familiare_ultima_modifica_data": familiare_audit_info["updated_data"],
+            "familiare_aggiornato_da_label": familiare_audit_info["updated_label"],
+            "familiare_activity_entries": familiare_activity_entries(familiare, documenti_ids=documenti_ids),
         },
     )
 
@@ -2582,18 +3374,27 @@ def modifica_familiare(request, pk):
 def elimina_familiare(request, pk):
     familiare = get_object_or_404(Familiare, pk=pk)
     impact = get_record_documents_impact(familiare)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
+        object_id = familiare.pk
         familiare.delete()
+
+        if popup:
+            return popup_delete_response(request, "familiare", object_id)
+
         messages.success(request, "Familiare eliminato correttamente.")
         return redirect("lista_familiari")
 
+    template_name = "anagrafica/familiari/familiare_popup_delete.html" if popup else "anagrafica/familiari/familiari_conferma_elimina.html"
+
     return render(
         request,
-        "anagrafica/familiari/familiari_conferma_elimina.html",
+        template_name,
         {
             "familiare": familiare,
             "impact": impact,
+            "popup": popup,
         },
     )
 
@@ -2747,6 +3548,8 @@ def lista_studenti(request):
             Q(famiglia__cognome_famiglia__icontains=q)
         )
 
+    studenti = list(studenti)
+    decorate_studenti_current_enrollment_labels(studenti)
     evidenzia_id = request.GET.get("highlight")
 
     return render(
@@ -2789,35 +3592,50 @@ def crea_studente(request):
             },
         )
 
+    allowed_inline_targets = {"iscrizioni", "parenti", "documenti"}
     edit_scope = "full"
     inline_target = "iscrizioni"
+    active_inline_tab = "iscrizioni"
+    prefer_initial_active_tab = False
+    iscrizioni_formset = None
+    parenti_formset = None
+    documenti_formset = None
 
     if request.method == "POST":
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "iscrizioni")
+        prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         edit_scope, inline_target = resolve_inline_target(
             request,
-            {"iscrizioni", "documenti"},
+            allowed_inline_targets,
         )
         form = StudenteStandaloneForm(request.POST)
         iscrizioni_formset = (
             build_iscrizioni_studente_formset(data=request.POST, prefix="iscrizioni")
             if inline_target in (None, "iscrizioni")
-            else build_iscrizioni_studente_formset(prefix="iscrizioni")
+            else None
+        )
+        parenti_formset = (
+            build_familiari_formset(data=request.POST, prefix="parenti")
+            if inline_target in (None, "parenti")
+            else None
         )
         documenti_formset = (
             build_documenti_studente_formset(data=request.POST, files=request.FILES, prefix="documenti")
             if inline_target in (None, "documenti")
-            else build_documenti_studente_formset(prefix="documenti")
+            else None
         )
 
         form_is_valid = form.is_valid()
         iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target in (None, "iscrizioni") else True
+        parenti_is_valid = parenti_formset.is_valid() if inline_target in (None, "parenti") else True
         documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
 
-        if form_is_valid and iscrizioni_is_valid and documenti_is_valid:
+        if form_is_valid and iscrizioni_is_valid and parenti_is_valid and documenti_is_valid:
             missing_rate_count = 0
             try:
                 with transaction.atomic():
                     studente = form.save()
+                    famiglia = studente.famiglia
 
                     if inline_target in (None, "iscrizioni"):
                         iscrizioni_formset.instance = studente
@@ -2841,6 +3659,10 @@ def crea_studente(request):
                             if esito_rate == "missing":
                                 missing_rate_count += 1
 
+                    if inline_target in (None, "parenti"):
+                        parenti_formset.instance = famiglia
+                        parenti_formset.save()
+
                     if inline_target in (None, "documenti"):
                         documenti_formset.instance = studente
                         documenti_formset.save()
@@ -2854,39 +3676,66 @@ def crea_studente(request):
                     )
 
                 if "_continue" in request.POST:
-                    messages.success(request, "Studente creato correttamente. Ora puoi continuare a modificarlo.")
-                    return redirect("modifica_studente", pk=studente.pk)
+                    messages.success(request, "Studente creato correttamente.")
+                    return redirect(f"{reverse('lista_studenti')}?highlight={studente.pk}")
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Studente creato correttamente. Puoi inserirne un altro.")
                     return redirect("crea_studente")
 
-                messages.success(request, "Studente creato correttamente.")
-                return redirect(f"{reverse('lista_studenti')}?highlight={studente.pk}")
+                messages.success(request, "Studente creato correttamente. Ora puoi continuare a inserire i dati.")
+                return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
+
+        if iscrizioni_formset is None:
+            iscrizioni_formset = build_iscrizioni_studente_formset(prefix="iscrizioni")
+        if parenti_formset is None:
+            parenti_formset = build_familiari_formset(prefix="parenti")
+        if documenti_formset is None:
+            documenti_formset = build_documenti_studente_formset(prefix="documenti")
     else:
+        active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "iscrizioni")
+        prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = StudenteStandaloneForm()
         iscrizioni_formset = build_iscrizioni_studente_formset(prefix="iscrizioni")
+        parenti_formset = build_familiari_formset(prefix="parenti")
         documenti_formset = build_documenti_studente_formset(prefix="documenti")
 
     ctx = {
         "form": form,
         "iscrizioni_formset": iscrizioni_formset,
         "documenti_formset": documenti_formset,
+        "parenti_formset": parenti_formset,
         "classe_corrente_label": "",
+        "classe_corrente_tipo": "",
         "edit_scope": edit_scope,
-        "inline_target": inline_target,
+        "inline_target": active_inline_tab,
+        "active_inline_tab": active_inline_tab,
+        "prefer_initial_active_tab": prefer_initial_active_tab,
         "show_inline_iscrizioni_editor": edit_scope == "inline" and inline_target == "iscrizioni",
         "count_iscrizioni": 0,
         "count_documenti": 0,
+        "count_parenti": 0,
+        "parenti_famiglia": [],
+        "studenti_parenti_famiglia": [],
         "count_documenti_in_scadenza": 0,
         "count_documenti_scaduti": 0,
+        "count_rate_scadute": 0,
         "rate_overview": [],
+        "iscrizione_corrente": None,
+        "studente_activity_entries": [],
+        "has_form_errors": bool(
+            form.errors
+            or iscrizioni_formset.total_error_count()
+            or parenti_formset.total_error_count()
+            or documenti_formset.total_error_count()
+        ),
     }
     ctx.update(
         studente_inline_head(
-            inline_target=inline_target,
+            inline_target=active_inline_tab,
             count_iscrizioni=ctx["count_iscrizioni"],
             count_documenti=ctx["count_documenti"],
+            count_parenti=0,
         )
     )
     return render(request, "anagrafica/studenti/studente_form.html", ctx)
@@ -2914,6 +3763,10 @@ def modifica_studente(request, pk):
     popup = is_popup_request(request)
     edit_scope = "view"
     inline_target = "iscrizioni"
+    allowed_display_targets = {"iscrizioni", "parenti", "documenti"}
+    allowed_edit_targets = {"iscrizioni", "parenti", "documenti"}
+    active_inline_tab = resolve_active_inline_tab(request, allowed_display_targets, "iscrizioni")
+    prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_display_targets)
 
     if popup:
         if request.method == "POST":
@@ -2936,12 +3789,27 @@ def modifica_studente(request, pk):
 
     iscrizioni_queryset = studente_iscrizioni_inline_queryset(studente)
     documenti_queryset = studente_documenti_inline_queryset(studente)
+    famiglia_for_parenti = studente.famiglia if studente.famiglia_id else None
 
     if request.method == "POST":
+        if request.POST.get("_note_popup") == "1":
+            nuova_nota = request.POST.get("note", "")
+            if studente.note != nuova_nota:
+                studente.note = nuova_nota
+                studente.save(update_fields=["note"])
+                messages.success(request, "Note dello studente aggiornate correttamente.")
+
+            note_active_tab = (request.POST.get("_note_active_tab") or "iscrizioni").strip()
+            if note_active_tab not in allowed_display_targets:
+                note_active_tab = "iscrizioni"
+            return redirect(build_studente_redirect_url(studente.pk, note_active_tab))
+
         edit_scope, inline_target = resolve_inline_target(
             request,
-            {"iscrizioni", "documenti"},
+            allowed_edit_targets,
         )
+        if inline_target in allowed_edit_targets:
+            active_inline_tab = inline_target
         form = StudenteStandaloneForm(request.POST, instance=studente)
         iscrizioni_formset = (
             build_iscrizioni_studente_formset(
@@ -2972,12 +3840,29 @@ def modifica_studente(request, pk):
                 queryset=documenti_queryset,
             )
         )
+        parenti_formset = (
+            build_familiari_formset(
+                data=request.POST,
+                instance=famiglia_for_parenti,
+                prefix="parenti",
+            )
+            if inline_target == "parenti" and famiglia_for_parenti
+            else (
+                build_familiari_formset(
+                    instance=famiglia_for_parenti,
+                    prefix="parenti",
+                )
+                if famiglia_for_parenti
+                else None
+            )
+        )
 
         form_is_valid = form.is_valid()
         iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target == "iscrizioni" else True
         documenti_is_valid = documenti_formset.is_valid() if inline_target == "documenti" else True
+        parenti_is_valid = parenti_formset.is_valid() if inline_target == "parenti" and parenti_formset is not None else True
 
-        if form_is_valid and iscrizioni_is_valid and documenti_is_valid:
+        if form_is_valid and iscrizioni_is_valid and documenti_is_valid and parenti_is_valid:
             missing_rate_count = 0
             try:
                 with transaction.atomic():
@@ -3004,6 +3889,9 @@ def modifica_studente(request, pk):
 
                     if inline_target == "documenti":
                         documenti_formset.save()
+
+                    if inline_target == "parenti" and parenti_formset is not None:
+                        parenti_formset.save()
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
@@ -3015,14 +3903,14 @@ def modifica_studente(request, pk):
 
                 if "_continue" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente.")
-                    return redirect("modifica_studente", pk=studente.pk)
+                    return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo studente.")
                     return redirect("crea_studente")
 
                 messages.success(request, "Modifiche salvate correttamente.")
-                return redirect("modifica_studente", pk=studente.pk)
+                return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
     else:
         form = StudenteStandaloneForm(instance=studente)
         iscrizioni_formset = build_iscrizioni_studente_formset(
@@ -3034,6 +3922,14 @@ def modifica_studente(request, pk):
             instance=studente,
             prefix="documenti",
             queryset=documenti_queryset,
+        )
+        parenti_formset = (
+            build_familiari_formset(
+                instance=famiglia_for_parenti,
+                prefix="parenti",
+            )
+            if famiglia_for_parenti
+            else None
         )
 
     iscrizioni_correnti_list = list(iscrizioni_queryset)
@@ -3052,37 +3948,62 @@ def modifica_studente(request, pk):
             None,
         )
     )
-    classe_corrente_label = ""
-    if iscrizione_corrente:
-        if iscrizione_corrente.classe:
-            classe_corrente_label = str(iscrizione_corrente.classe)
-        elif iscrizione_corrente.gruppo_classe_id:
-            classe_corrente_label = iscrizione_corrente.gruppo_classe.nome_gruppo_classe
+    classe_corrente_tipo, classe_corrente_label = current_iscrizione_class_display(iscrizione_corrente)
     document_counts = build_studente_document_counts(studente, today)
-    studente_audit_info = last_update_audit_info(studente)
+    studente_activity = studente_activity_entries(
+        studente,
+        iscrizione_ids=[item.pk for item in iscrizioni_correnti_list],
+    )
+    studente_audit_info = studente_audit_labels(studente)
+    parenti_famiglia = []
+    studenti_parenti_famiglia = []
+    count_parenti_familiari = 0
+    if studente.famiglia_id:
+        if parenti_formset is not None:
+            count_parenti_familiari = parenti_formset.initial_form_count()
+        else:
+            parenti_famiglia = list(famiglia_familiari_inline_queryset(studente.famiglia))
+            count_parenti_familiari = len(parenti_famiglia)
+        studenti_parenti_famiglia = list(
+            famiglia_studenti_inline_queryset(studente.famiglia).exclude(pk=studente.pk)
+        )
+        decorate_studenti_current_enrollment_labels(studenti_parenti_famiglia, today=today)
+    count_parenti = count_parenti_familiari + len(studenti_parenti_famiglia)
 
     ctx = {
         "form": form,
         "studente": studente,
+        "parenti_famiglia": parenti_famiglia,
+        "studenti_parenti_famiglia": studenti_parenti_famiglia,
+        "count_parenti": count_parenti,
         "iscrizioni_formset": iscrizioni_formset,
         "documenti_formset": documenti_formset,
+        "parenti_formset": parenti_formset,
         "classe_corrente_label": classe_corrente_label,
+        "classe_corrente_tipo": classe_corrente_tipo,
         "edit_scope": edit_scope,
-        "inline_target": inline_target,
+        "inline_target": active_inline_tab,
+        "prefer_initial_active_tab": prefer_initial_active_tab,
         "show_inline_iscrizioni_editor": edit_scope == "inline" and inline_target == "iscrizioni",
         "count_iscrizioni": len(iscrizioni_correnti_list),
         "count_documenti": document_counts["count_documenti"],
         "count_documenti_in_scadenza": document_counts["count_documenti_in_scadenza"],
         "count_documenti_scaduti": document_counts["count_documenti_scaduti"],
+        "count_rate_scadute": count_studente_rate_scadute(iscrizioni_correnti_list, today),
         "rate_overview": build_studente_rate_overview(studente, iscrizioni_correnti_list),
-        "studente_ultima_modifica_data": studente_audit_info["data"],
-        "studente_aggiornato_da_label": studente_audit_info["utente_label"],
+        "iscrizione_corrente": iscrizione_corrente,
+        "studente_activity_entries": studente_activity,
+        "studente_creazione_data": studente_audit_info["created_data"],
+        "studente_creato_da_label": studente_audit_info["created_label"],
+        "studente_ultima_modifica_data": studente_audit_info["updated_data"],
+        "studente_aggiornato_da_label": studente_audit_info["updated_label"],
     }
     ctx.update(
         studente_inline_head(
-            inline_target=inline_target,
+            inline_target=active_inline_tab,
             count_iscrizioni=ctx["count_iscrizioni"],
             count_documenti=ctx["count_documenti"],
+            count_parenti=count_parenti,
         )
     )
     return render(request, "anagrafica/studenti/studente_form.html", ctx)

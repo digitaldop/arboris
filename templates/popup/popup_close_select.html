@@ -7,13 +7,39 @@
 <body>
     <script>
         (function () {
-            if (window.opener && !window.opener.closed) {
-                const action = "{{ action|default:'select'|escapejs }}";
-                const fieldName = "{{ field_name|escapejs }}";
-                const objectId = "{{ object_id|escapejs }}";
-                const objectLabel = "{{ object_label|default:''|escapejs }}";
-                const targetInputName = "{{ target_input_name|default:''|escapejs }}";
+            const action = "{{ action|default:'select'|escapejs }}";
+            const fieldName = "{{ field_name|escapejs }}";
+            const objectId = "{{ object_id|escapejs }}";
+            const objectLabel = "{{ object_label|default:''|escapejs }}";
+            const targetInputName = "{{ target_input_name|default:''|escapejs }}";
 
+            function getModalHost() {
+                try {
+                    if (window.parent && window.parent !== window && window.parent.ArborisModalPopups) {
+                        return window.parent.ArborisModalPopups;
+                    }
+                    if (window.top && window.top !== window && window.top.ArborisModalPopups) {
+                        return window.top.ArborisModalPopups;
+                    }
+                } catch (error) {
+                    return null;
+                }
+                return null;
+            }
+
+            const modalHost = getModalHost();
+            if (modalHost && typeof modalHost.handleRelatedSelection === "function") {
+                modalHost.handleRelatedSelection({
+                    action: action,
+                    fieldName: fieldName,
+                    objectId: objectId,
+                    objectLabel: objectLabel,
+                    targetInputName: targetInputName,
+                }, window);
+                return;
+            }
+
+            if (window.opener && !window.opener.closed) {
                 if (action === "delete") {
                     if (typeof window.opener.dismissDeletedRelatedPopup === "function") {
                         window.opener.dismissDeletedRelatedPopup(

@@ -67,6 +67,46 @@ def famiglia_choice_label(famiglia):
     return str(famiglia)
 
 
+def _person_choice_label(person):
+    return " ".join(part for part in [person.nome, person.cognome] if part).strip()
+
+
+def _join_choice_labels(items, limit=3):
+    values = [item for item in items if item]
+    if not values:
+        return ""
+
+    visible = values[:limit]
+    label = ", ".join(visible)
+    remaining = len(values) - len(visible)
+    if remaining > 0:
+        label = f"{label} +{remaining}"
+    return label
+
+
+def famiglia_nuovo_familiare_choice_label(famiglia):
+    dettagli = []
+
+    familiari = _join_choice_labels(
+        [_person_choice_label(familiare) for familiare in famiglia.familiari.all()]
+    )
+    if familiari:
+        dettagli.append(f"Familiari: {familiari}")
+
+    bambini = _join_choice_labels(
+        [_person_choice_label(studente) for studente in famiglia.studenti.all()]
+    )
+    if bambini:
+        dettagli.append(f"Bambini: {bambini}")
+
+    if famiglia.indirizzo_principale:
+        dettagli.append(f"Indirizzo: {famiglia.indirizzo_principale.label_select()}")
+
+    if dettagli:
+        return f"{famiglia.cognome_famiglia} - {' | '.join(dettagli)}"
+    return famiglia.cognome_famiglia or str(famiglia)
+
+
 def configure_famiglia_choice_field(field):
     field.queryset = famiglia_choice_queryset()
     field.label_from_instance = famiglia_choice_label
@@ -192,6 +232,7 @@ class FamigliaStudenteSelect(forms.Select):
             option["attrs"]["data-indirizzo-famiglia-id"] = famiglia.indirizzo_principale_id or ""
             option["attrs"]["data-search-text"] = " ".join(
                 part for part in [
+                    str(label),
                     famiglia_choice_label(famiglia),
                     famiglia.indirizzo_principale.label_full() if famiglia.indirizzo_principale else "",
                 ] if part
@@ -212,6 +253,9 @@ class FamigliaSearchMixin:
             }
         ),
     )
+
+    def get_famiglia_choice_label(self, famiglia):
+        return famiglia_choice_label(famiglia)
 
     def setup_famiglia_search(self):
         if "famiglia_search" not in self.fields:
@@ -256,19 +300,19 @@ class FamigliaSearchMixin:
             if famiglia_id:
                 famiglia = self.fields["famiglia"].queryset.filter(pk=famiglia_id).first()
                 if famiglia and not famiglia_label:
-                    famiglia_label = famiglia_choice_label(famiglia)
+                    famiglia_label = self.get_famiglia_choice_label(famiglia)
         else:
             famiglia = self.initial.get("famiglia") or getattr(self.instance, "famiglia", None)
             if famiglia:
                 if hasattr(famiglia, "pk"):
                     famiglia_id = famiglia.pk
-                    famiglia_label = famiglia_choice_label(famiglia)
+                    famiglia_label = self.get_famiglia_choice_label(famiglia)
                 else:
                     famiglia_id = famiglia
                     famiglia_obj = self.fields["famiglia"].queryset.filter(pk=famiglia).first()
                     if famiglia_obj:
                         famiglia = famiglia_obj
-                        famiglia_label = famiglia_choice_label(famiglia_obj)
+                        famiglia_label = self.get_famiglia_choice_label(famiglia_obj)
 
         if famiglia_id:
             self.initial["famiglia"] = famiglia_id
@@ -681,6 +725,8 @@ class IndirizzoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["via"].label = "Via / Strada / Piazza"
+        self.fields["via"].widget.attrs["placeholder"] = "Via Roma, Piazza Maggiore, Viale dei Mille, etc."
+        self.fields["numero_civico"].widget.attrs["placeholder"] = "Es. 15, 3/B, interno 2, etc."
         self.fields["citta"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
         self.fields["citta"].queryset = Citta.objects.none()
         self.fields["citta_search"].widget.attrs.update(
@@ -824,6 +870,7 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
 
     def __init__(self, *args, **kwargs):
         shared_lookups = kwargs.pop("shared_lookups", None) or {}
+        detailed_famiglia_choices = kwargs.pop("detailed_famiglia_choices", False)
         super().__init__(*args, **kwargs)
 
         self.fields["indirizzo"].required = False
@@ -832,6 +879,10 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         )
         if "famiglia" in self.fields:
             configure_famiglia_choice_field(self.fields["famiglia"])
+            if detailed_famiglia_choices:
+                self.fields["famiglia"].label_from_instance = famiglia_nuovo_familiare_choice_label
+            else:
+                self.fields["famiglia"].label_from_instance = lambda obj: obj.cognome_famiglia or str(obj)
         relazioni = shared_lookups.get("relazioni_familiari")
         if relazioni is None:
             self.fields["relazione_familiare"].queryset = (
@@ -1288,10 +1339,14 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
+    def get_famiglia_choice_label(self, famiglia):
+        return famiglia.cognome_famiglia or str(famiglia)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         configure_famiglia_choice_field(self.fields["famiglia"])
+        self.fields["famiglia"].label_from_instance = self.get_famiglia_choice_label
 
         self.fields["indirizzo"].queryset = (
             Indirizzo.objects.select_related("citta", "provincia", "regione")

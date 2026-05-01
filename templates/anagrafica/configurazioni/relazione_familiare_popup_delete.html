@@ -1,30 +1,57 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ titolo }}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-</head>
-<body style="padding: 20px;">
-    <h1 class="section-title">{{ titolo }}</h1>
+{% extends "popup_base.html" %}
 
-    <div class="panel">
-        <div class="panel-body" style="padding: 20px;">
-            <p>Sei sicuro di voler eliminare questo elemento?</p>
-            <p><strong>{{ oggetto }}</strong></p>
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
 
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="popup" value="1">
-                <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
-
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Sì, elimina</button>
-                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
-                </div>
-            </form>
+{% block content %}
+    <div class="page-head related-config-popup-head">
+        <div class="family-page-title-block">
+            <div class="related-config-kicker">Anagrafica</div>
+            <h1 class="page-title">{{ titolo }}</h1>
         </div>
     </div>
-</body>
-</html>
+
+    <div class="content-card related-config-popup-card">
+        <div class="related-config-delete-state">
+            <div class="related-config-delete-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18"></path>
+                    <path d="M8 6V4h8v2"></path>
+                    <path d="M19 6l-1 14H6L5 6"></path>
+                    <path d="M10 11v5"></path>
+                    <path d="M14 11v5"></path>
+                </svg>
+            </div>
+            <div>
+                <p class="related-config-delete-title">Eliminare questa parentela?</p>
+                <p class="related-config-delete-text">
+                    Stai per eliminare <strong>{{ oggetto }}</strong>. Il valore verra rimosso dagli elenchi disponibili.
+                </p>
+            </div>
+        </div>
+
+        <form method="post" class="related-config-popup-actions">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <button type="submit" class="btn btn-danger btn-icon-text">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"></path>
+                        <path d="M8 6V4h8v2"></path>
+                        <path d="M19 6l-1 14H6L5 6"></path>
+                    </svg>
+                </span>
+                <span>Elimina</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m15 18-6-6 6-6"></path>
+                    </svg>
+                </span>
+                <span>Annulla</span>
+            </button>
+        </form>
+    </div>
+{% endblock %}

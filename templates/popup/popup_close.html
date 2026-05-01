@@ -6,6 +6,24 @@
 </head>
 <body>
     <script>
+        function getModalHost() {
+            try {
+                if (window.parent && window.parent !== window && window.parent.ArborisModalPopups) {
+                    return window.parent.ArborisModalPopups;
+                }
+                if (window.top && window.top !== window && window.top.ArborisModalPopups) {
+                    return window.top.ArborisModalPopups;
+                }
+            } catch (error) {
+                return null;
+            }
+            return null;
+        }
+
+        const modalHost = getModalHost();
+        if (modalHost && typeof modalHost.handleReload === "function") {
+            modalHost.handleReload(window);
+        } else {
         if (window.opener) {
             if (typeof window.opener.ArborisReloadWithLongWait === "function") {
                 window.opener.ArborisReloadWithLongWait();
@@ -14,6 +32,7 @@
             }
         }
         window.close();
+        }
     </script>
 
     <p>{{ message }}</p>

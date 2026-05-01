@@ -1,8 +1,8 @@
 window.ArborisDashboardFinanziaria = (function () {
-    const INCOME_COLOR = "#2e9f8d";
-    const EXPENSE_COLOR = "#c7465a";
-    const GRID_COLOR = "#d8e1e6";
-    const TEXT_COLOR = "#52636e";
+    const INCOME_COLOR = "#36a66a";
+    const EXPENSE_COLOR = "#d14a66";
+    const GRID_COLOR = "#e2edf4";
+    const TEXT_COLOR = "#60738d";
 
     function formatCurrency(value) {
         const formatter = new Intl.NumberFormat("it-IT", {

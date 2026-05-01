@@ -1,6 +1,8 @@
 from decimal import Decimal
 
+from django import forms
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -35,6 +37,14 @@ from economia.services import (
 )
 from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
+from arboris.form_widgets import italian_decimal_to_python
+from gestione_finanziaria.models import MovimentoFinanziario
+from gestione_finanziaria.services import (
+    importo_movimento_disponibile,
+    importo_rata_residuo,
+    riconcilia_movimento_con_rate,
+    trova_movimenti_candidati_per_rate,
+)
 
 
 def is_popup_request(request):
@@ -42,6 +52,12 @@ def is_popup_request(request):
 
 
 LAST_METODO_PAGAMENTO_SESSION_KEY = "ultima_metodo_pagamento_retta_id"
+
+
+def _parse_importo_riconciliazione(raw_value):
+    field = forms.DecimalField(max_digits=12, decimal_places=2, required=False)
+    value = italian_decimal_to_python(field, raw_value)
+    return value or Decimal("0.00")
 
 
 def get_stato_ritirato():
@@ -855,6 +871,91 @@ def pagamento_rapido_rata_iscrizione(request, pk):
             "form": form,
             "rata": rata,
             "popup": popup,
+        },
+    )
+
+
+def riconcilia_rata_iscrizione(request, pk):
+    rata = get_object_or_404(
+        RataIscrizione.objects.select_related(
+            "famiglia",
+            "iscrizione",
+            "iscrizione__studente",
+            "iscrizione__studente__famiglia",
+            "iscrizione__anno_scolastico",
+        ),
+        pk=pk,
+    )
+    popup = is_popup_request(request)
+    famiglia = rata.famiglia or rata.iscrizione.studente.famiglia
+    rate_aperte_queryset = (
+        RataIscrizione.objects.select_related(
+            "iscrizione",
+            "iscrizione__studente",
+            "iscrizione__anno_scolastico",
+        )
+        .filter(
+            famiglia=famiglia,
+            iscrizione__anno_scolastico=rata.iscrizione.anno_scolastico,
+            importo_finale__gt=models.F("importo_pagato"),
+        )
+        .order_by("iscrizione__studente__cognome", "iscrizione__studente__nome", "anno_riferimento", "mese_riferimento", "numero_rata")
+    )
+    rate_aperte = list(rate_aperte_queryset)
+    if rata not in rate_aperte and importo_rata_residuo(rata) > 0:
+        rate_aperte.insert(0, rata)
+    rate_aperte.sort(key=lambda item: (0 if item.pk == rata.pk else 1, item.iscrizione.studente.cognome, item.iscrizione.studente.nome, item.anno_riferimento, item.mese_riferimento, item.numero_rata))
+
+    if request.method == "POST":
+        movimento_pk = request.POST.get("movimento_pk") or ""
+        if not movimento_pk.isdigit():
+            messages.error(request, "Seleziona un movimento bancario da riconciliare.")
+        else:
+            movimento = get_object_or_404(MovimentoFinanziario.objects.select_related("conto"), pk=int(movimento_pk), importo__gt=0)
+            allocazioni = []
+            try:
+                for rata_aperta in rate_aperte:
+                    importo = _parse_importo_riconciliazione(request.POST.get(f"importo_rata_{rata_aperta.pk}", ""))
+                    if importo > 0:
+                        allocazioni.append((rata_aperta, importo))
+                riconcilia_movimento_con_rate(movimento, allocazioni, utente=request.user)
+            except ValidationError as exc:
+                for message in exc.messages:
+                    messages.error(request, message)
+            else:
+                messages.success(request, "Riconciliazione registrata correttamente.")
+                if popup:
+                    return render(
+                        request,
+                        "popup/popup_close.html",
+                        {"message": "Riconciliazione registrata correttamente."},
+                    )
+                return redirect("modifica_rata_iscrizione", pk=rata.pk)
+
+    rate_rows = [
+        {
+            "rata": rata_aperta,
+            "studente": rata_aperta.iscrizione.studente,
+            "residuo": importo_rata_residuo(rata_aperta),
+            "importo_iniziale": importo_rata_residuo(rata_aperta) if rata_aperta.pk == rata.pk else Decimal("0.00"),
+            "is_selected": rata_aperta.pk == rata.pk,
+        }
+        for rata_aperta in rate_aperte
+    ]
+    candidati = trova_movimenti_candidati_per_rate(rata, rate_aperte)
+    for candidato in candidati:
+        candidato.movimento.importo_disponibile_riconciliazione = candidato.importo_disponibile
+
+    return render(
+        request,
+        "economia/iscrizioni/rata_iscrizione_riconciliazione_popup.html",
+        {
+            "rata": rata,
+            "rata_residuo": importo_rata_residuo(rata),
+            "rate_rows": rate_rows,
+            "candidati": candidati,
+            "popup": popup,
+            "success": request.GET.get("success") == "1",
         },
     )
 

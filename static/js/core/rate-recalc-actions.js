@@ -25,6 +25,13 @@ window.ArborisRateRecalcActions = (function () {
                             autocomplete="off"
                             spellcheck="false"
                         >
+                        <label class="app-dialog-confirm-check" for="rate-recalc-dialog-second-confirm">
+                            <input
+                                type="checkbox"
+                                id="rate-recalc-dialog-second-confirm"
+                            >
+                            <span>Confermo il ricalcolo del piano rate</span>
+                        </label>
                     </div>
                     <div class="app-dialog-actions">
                         <button type="button" class="btn btn-secondary" data-rate-dialog-cancel="1">Annulla</button>
@@ -36,12 +43,13 @@ window.ArborisRateRecalcActions = (function () {
         }
 
         const input = overlay.querySelector("#rate-recalc-dialog-input");
+        const secondConfirm = overlay.querySelector("#rate-recalc-dialog-second-confirm");
         const confirmButton = overlay.querySelector('[data-rate-dialog-confirm="1"]');
         const cancelButton = overlay.querySelector('[data-rate-dialog-cancel="1"]');
         let resolver = null;
 
         function syncConfirmState() {
-            confirmButton.disabled = (input.value || "").trim().toUpperCase() !== "RICALCOLA";
+            confirmButton.disabled = (input.value || "").trim().toUpperCase() !== "RICALCOLA" || !secondConfirm.checked;
         }
 
         function closeDialog(confirmed) {
@@ -52,6 +60,7 @@ window.ArborisRateRecalcActions = (function () {
             overlay.classList.add("is-hidden");
             document.body.classList.remove("app-dialog-open");
             input.value = "";
+            secondConfirm.checked = false;
             syncConfirmState();
 
             const resolve = resolver;
@@ -63,6 +72,7 @@ window.ArborisRateRecalcActions = (function () {
             overlay.dataset.boundRateDialog = "1";
 
             input.addEventListener("input", syncConfirmState);
+            secondConfirm.addEventListener("change", syncConfirmState);
             input.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" && !confirmButton.disabled) {
                     event.preventDefault();
