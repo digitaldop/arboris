@@ -19604,6 +19604,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     background: #fffafa;
 }
 
+.module-gestione_finanziaria .finance-success-panel {
+    border-color: #b7ddb0;
+    background: #f6fff3;
+}
+
 .module-gestione_finanziaria .finance-guide-icon {
     display: inline-flex;
     align-items: center;
@@ -19619,6 +19624,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .finance-danger-panel .finance-guide-icon {
     background: #fde7ec;
     color: #a30f2d;
+}
+
+.module-gestione_finanziaria .finance-success-panel .finance-guide-icon {
+    background: #e4f7df;
+    color: #2f7d32;
 }
 
 .module-gestione_finanziaria .finance-guide-icon svg {

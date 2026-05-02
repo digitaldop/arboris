@@ -753,6 +753,7 @@ def modifica_fatture_in_cloud(request, pk):
             "connessione": connessione,
             "default_redirect_uri": default_redirect_uri,
             "oauth_render_configurato": oauth_env_configured(),
+            "oauth_confermato": request.GET.get("oauth") == "ok",
             "webhook_url": webhook_url,
             "logs": connessione.log_sincronizzazioni.order_by("-data_operazione", "-id")[:10],
         },
@@ -814,6 +815,7 @@ def callback_fatture_in_cloud(request):
         connessione.stato = StatoConnessioneFattureInCloud.ATTIVA
         connessione.save(update_fields=["company_id", "oauth_state", "stato", "data_aggiornamento"])
         messages.success(request, "Fatture in Cloud collegato correttamente.")
+        return redirect(f"{reverse('modifica_fatture_in_cloud', kwargs={'pk': connessione.pk})}?oauth=ok")
     except FattureInCloudError as exc:
         messages.error(request, str(exc))
     except Exception as exc:

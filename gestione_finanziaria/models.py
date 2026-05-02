@@ -256,7 +256,7 @@ class DocumentoFornitore(models.Model):
     external_source = models.CharField(max_length=60, blank=True, db_index=True)
     external_id = models.CharField(max_length=120, blank=True, db_index=True)
     external_type = models.CharField(max_length=60, blank=True)
-    external_url = models.URLField(blank=True)
+    external_url = models.URLField(max_length=1000, blank=True)
     external_payload = models.JSONField(default=dict, blank=True)
     importato_at = models.DateTimeField(blank=True, null=True)
     external_updated_at = models.DateTimeField(blank=True, null=True)

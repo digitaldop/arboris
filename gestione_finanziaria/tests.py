@@ -610,6 +610,35 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(DocumentoFornitore.objects.filter(external_id="987").count(), 1)
         self.assertEqual(NotificaFinanziaria.objects.filter(documento=documento).count(), 1)
 
+    def test_importa_documento_fatture_in_cloud_accetta_url_allegato_lunghi(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        attachment_url = "https://files.example.com/" + ("a" * 1200)
+        payload = {
+            "id": 988,
+            "type": "expense",
+            "description": "Documento con URL allegato lungo",
+            "invoice_number": "FC-43",
+            "date": "2026-04-21",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "attachment_url": attachment_url,
+            "entity": {"name": "Long Link Supplier Srl", "vat_number": "IT12345678902"},
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="988")
+        self.assertLessEqual(len(documento.external_url), 1000)
+        self.assertEqual(documento.external_payload["attachment_url"], attachment_url)
+        self.assertEqual(
+            DocumentoFornitore._meta.get_field("external_url").max_length,
+            1000,
+        )
+
     @override_settings(
         FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",
         FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET="render-secret",
@@ -678,12 +707,16 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+        expected_url = f"{reverse('modifica_fatture_in_cloud', kwargs={'pk': connessione.pk})}?oauth=ok"
+        self.assertEqual(response["Location"], expected_url)
         connessione.refresh_from_db()
         self.assertEqual(connessione.company_id, 456)
         self.assertEqual(connessione.oauth_state, "")
         self.assertTrue(connessione.access_token_cifrato)
         self.assertTrue(connessione.refresh_token_cifrato)
+        page_response = self.client.get(expected_url)
+        self.assertContains(page_response, "Collegamento OAuth completato")
+        self.assertContains(page_response, "Company ID collegato: 456")
 
     def test_riconciliazione_fornitore_collega_movimento_in_uscita(self):
         fornitore = Fornitore.objects.create(

@@ -58,6 +58,19 @@
         </div>
     </div>
 
+    {% if oauth_confermato %}
+        <div class="finance-guide-panel finance-success-panel">
+            <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></div>
+            <div class="finance-guide-copy">
+                <div class="finance-guide-title">Collegamento OAuth completato</div>
+                <p>
+                    Fatture in Cloud e' collegato correttamente. Da ora Arboris puo sincronizzare le fatture passive ricevute.
+                    {% if connessione.company_id %}Company ID collegato: {{ connessione.company_id }}.{% else %}Se l'account gestisce piu aziende, inserisci il Company ID prima della sincronizzazione.{% endif %}
+                </p>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="finance-guide-panel finance-oauth-guide">
         <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></div>
         <div class="finance-guide-copy">

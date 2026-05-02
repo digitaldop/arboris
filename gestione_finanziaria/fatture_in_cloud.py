@@ -109,6 +109,15 @@ def _clean_identifier(value):
     return "".join(ch for ch in (value or "").upper().strip() if ch.isalnum())
 
 
+def _limit_model_field(model, field_name, value):
+    if value in (None, ""):
+        return ""
+    field = model._meta.get_field(field_name)
+    max_length = getattr(field, "max_length", None)
+    value = str(value)
+    return value[:max_length] if max_length else value
+
+
 def _response_json(response, error_prefix):
     try:
         return response.json()
@@ -286,7 +295,11 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")
     documento.external_type = "pending" if pending else (document_data.get("type") or "")
-    documento.external_url = document_data.get("attachment_url") or document_data.get("attachment_preview_url") or ""
+    documento.external_url = _limit_model_field(
+        DocumentoFornitore,
+        "external_url",
+        document_data.get("attachment_url") or document_data.get("attachment_preview_url") or "",
+    )
     documento.external_payload = document_data
     documento.importato_at = documento.importato_at or timezone.now()
     documento.external_updated_at = _as_datetime(document_data.get("updated_at"))
