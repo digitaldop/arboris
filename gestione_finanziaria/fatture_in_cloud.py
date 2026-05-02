@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from json import JSONDecodeError
 from urllib.parse import urlencode
 
 import requests
@@ -106,6 +107,13 @@ def _as_datetime(value):
 
 def _clean_identifier(value):
     return "".join(ch for ch in (value or "").upper().strip() if ch.isalnum())
+
+
+def _response_json(response, error_prefix):
+    try:
+        return response.json()
+    except (ValueError, JSONDecodeError) as exc:
+        raise FattureInCloudError(f"{error_prefix}: risposta non valida da Fatture in Cloud.") from exc
 
 
 def _entity_from_document(document_data):
@@ -372,14 +380,17 @@ class FattureInCloudClient:
 
     def request(self, method, path, *, params=None, json=None, retry_refresh=True):
         url = f"{self.base_url}{path}"
-        response = requests.request(
-            method,
-            url,
-            params=params,
-            json=json,
-            headers=self._headers(),
-            timeout=30,
-        )
+        try:
+            response = requests.request(
+                method,
+                url,
+                params=params,
+                json=json,
+                headers=self._headers(),
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise FattureInCloudError(f"Connessione API Fatture in Cloud fallita: {exc}") from exc
         if response.status_code == 401 and retry_refresh and self.refresh_token:
             self.refresh_access_token()
             return self.request(method, path, params=params, json=json, retry_refresh=False)
@@ -387,7 +398,7 @@ class FattureInCloudClient:
             raise FattureInCloudError(f"Errore API Fatture in Cloud {response.status_code}: {response.text[:500]}")
         if not response.content:
             return {}
-        return response.json()
+        return _response_json(response, "Errore API Fatture in Cloud")
 
     def refresh_access_token(self):
         if not self.client_id or not self.refresh_token:
@@ -399,10 +410,13 @@ class FattureInCloudClient:
         }
         if self.client_secret:
             payload["client_secret"] = self.client_secret
-        response = requests.post(TOKEN_URL, json=payload, timeout=30)
+        try:
+            response = requests.post(TOKEN_URL, json=payload, timeout=30)
+        except requests.RequestException as exc:
+            raise FattureInCloudError(f"Refresh token fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
         if response.status_code >= 400:
             raise FattureInCloudError(f"Refresh token fallito: {response.text[:500]}")
-        self._store_tokens(response.json())
+        self._store_tokens(_response_json(response, "Refresh token fallito"))
 
     def exchange_code(self, code, redirect_uri):
         if not self.client_id or not self.client_secret:
@@ -414,10 +428,13 @@ class FattureInCloudClient:
             "redirect_uri": redirect_uri,
             "code": code,
         }
-        response = requests.post(TOKEN_URL, json=payload, timeout=30)
+        try:
+            response = requests.post(TOKEN_URL, json=payload, timeout=30)
+        except requests.RequestException as exc:
+            raise FattureInCloudError(f"Scambio code fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
         if response.status_code >= 400:
             raise FattureInCloudError(f"Scambio code fallito: {response.text[:500]}")
-        self._store_tokens(response.json())
+        self._store_tokens(_response_json(response, "Scambio code fallito"))
 
     def _store_tokens(self, payload):
         access_token = payload.get("access_token") or ""
@@ -431,13 +448,23 @@ class FattureInCloudClient:
             self.connessione.refresh_token_cifrato = cifra_testo(refresh_token)
             update_fields.append("refresh_token_cifrato")
         if expires_in:
-            self.connessione.token_scadenza = timezone.now() + timedelta(seconds=int(expires_in))
-            update_fields.append("token_scadenza")
+            try:
+                expires_in_seconds = int(expires_in)
+            except (TypeError, ValueError):
+                expires_in_seconds = 0
+            if expires_in_seconds > 0:
+                self.connessione.token_scadenza = timezone.now() + timedelta(seconds=expires_in_seconds)
+                update_fields.append("token_scadenza")
         self.connessione.stato = StatoConnessioneFattureInCloud.ATTIVA
         self.connessione.save(update_fields=update_fields)
 
     def list_user_companies(self):
-        return self.request("GET", "/user/companies").get("data", [])
+        data = self.request("GET", "/user/companies").get("data", [])
+        if isinstance(data, dict):
+            companies = data.get("companies") or []
+        else:
+            companies = data or []
+        return [company for company in companies if isinstance(company, dict)]
 
     def list_received_documents(self, doc_type, *, page=1, per_page=50):
         params = {

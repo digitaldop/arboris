@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import logging
 import re
 import secrets
 import unicodedata
@@ -129,6 +130,8 @@ from .services import (
     trova_scadenze_fornitori_candidate,
     trova_rate_candidate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _oauth_redirect_uri(request, provider):
@@ -813,6 +816,13 @@ def callback_fatture_in_cloud(request):
         messages.success(request, "Fatture in Cloud collegato correttamente.")
     except FattureInCloudError as exc:
         messages.error(request, str(exc))
+    except Exception as exc:
+        logger.exception("Errore inatteso nella callback Fatture in Cloud per connessione %s", connessione.pk)
+        messages.error(
+            request,
+            "Collegamento Fatture in Cloud non completato per un errore interno. "
+            "Controlla i log applicativi e riprova.",
+        )
     return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
 
 

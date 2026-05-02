@@ -65,12 +65,36 @@
             <ol class="finance-step-list">
                 {% if oauth_render_configurato %}
                     <li>Usa la app privata Fatture in Cloud dedicata alla scuola, con l'account autorizzato in whitelist.</li>
-                    <li>Verifica che nella app Fatture in Cloud sia registrato questo Redirect URI: <code>{{ default_redirect_uri }}</code>.</li>
+                    <li>
+                        Verifica che nella app Fatture in Cloud sia registrato questo Redirect URI:
+                        <span class="finance-copy-uri">
+                            <code>{{ default_redirect_uri }}</code>
+                            <button type="button" class="copy-inline-btn" data-copy-text="{{ default_redirect_uri }}" data-floating-text="Copia" aria-label="Copia Redirect URI Fatture in Cloud">
+                                <span class="copy-inline-icon" aria-hidden="true">
+                                    <span class="copy-inline-icon-back"></span>
+                                    <span class="copy-inline-icon-front"></span>
+                                </span>
+                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                            </button>
+                        </span>
+                    </li>
                     <li>Lascia vuoti Client ID e Client Secret nella scheda: Arboris usera quelli configurati nelle variabili ambiente Render.</li>
                     <li>Usa <strong>Salva e collega OAuth</strong>, poi completa il consenso su Fatture in Cloud.</li>
                 {% else %}
                     <li>Crea o apri l'app in Fatture in Cloud da <strong>Impostazioni &gt; Sviluppatore</strong>.</li>
-                    <li>Imposta come Redirect URI questo indirizzo: <code>{{ default_redirect_uri }}</code>.</li>
+                    <li>
+                        Imposta come Redirect URI questo indirizzo:
+                        <span class="finance-copy-uri">
+                            <code>{{ default_redirect_uri }}</code>
+                            <button type="button" class="copy-inline-btn" data-copy-text="{{ default_redirect_uri }}" data-floating-text="Copia" aria-label="Copia Redirect URI Fatture in Cloud">
+                                <span class="copy-inline-icon" aria-hidden="true">
+                                    <span class="copy-inline-icon-back"></span>
+                                    <span class="copy-inline-icon-front"></span>
+                                </span>
+                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                            </button>
+                        </span>
+                    </li>
                     <li>Copia Client ID e Client Secret dentro Arboris, poi usa <strong>Salva e collega OAuth</strong>.</li>
                     <li>Dopo il consenso, Arboris prova a recuperare il Company ID se l'account gestisce una sola azienda.</li>
                 {% endif %}
@@ -140,7 +164,19 @@
                                         <button type="button" class="finance-help-trigger" data-floating-text="{% if oauth_render_configurato %}Su Render puo essere fissato via variabile ambiente. Compila il campo solo se devi usare un redirect diverso per questa connessione.{% else %}Deve coincidere con la Redirect URL configurata nella app Fatture in Cloud. Se lo lasci vuoto, Arboris usa l'indirizzo mostrato nel riquadro guida.{% endif %}" aria-label="Aiuto Redirect URI">?</button>
                                     </label>
                                     {{ form.redirect_uri }}
-                                    <div class="help-text">Default: <code>{{ default_redirect_uri }}</code></div>
+                                    <div class="help-text">
+                                        Default:
+                                        <span class="finance-copy-uri">
+                                            <code>{{ default_redirect_uri }}</code>
+                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ default_redirect_uri }}" data-floating-text="Copia" aria-label="Copia Redirect URI Fatture in Cloud">
+                                                <span class="copy-inline-icon" aria-hidden="true">
+                                                    <span class="copy-inline-icon-back"></span>
+                                                    <span class="copy-inline-icon-front"></span>
+                                                </span>
+                                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                            </button>
+                                        </span>
+                                    </div>
                                     {{ form.redirect_uri.errors }}
                                 </div>
                             </div>
@@ -275,7 +311,16 @@
                     <div class="finance-side-card">
                         <div class="finance-side-title">Webhook</div>
                         <p class="help-text">Endpoint da inserire nei webhook Fatture in Cloud se vuoi ricevere eventi in tempo quasi reale.</p>
-                        <input type="text" class="finance-readonly-input" value="{{ webhook_url }}" readonly>
+                        <div class="finance-copy-field">
+                            <input type="text" class="finance-readonly-input" value="{{ webhook_url }}" readonly>
+                            <button type="button" class="copy-inline-btn" data-copy-text="{{ webhook_url }}" data-floating-text="Copia" aria-label="Copia endpoint webhook Fatture in Cloud">
+                                <span class="copy-inline-icon" aria-hidden="true">
+                                    <span class="copy-inline-icon-back"></span>
+                                    <span class="copy-inline-icon-front"></span>
+                                </span>
+                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                            </button>
+                        </div>
                     </div>
                 {% endif %}
             </aside>

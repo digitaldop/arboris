@@ -19654,6 +19654,19 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     margin-top: 4px;
 }
 
+.module-gestione_finanziaria .finance-copy-uri {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+.module-gestione_finanziaria .finance-copy-uri code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .module-gestione_finanziaria .finance-form-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
@@ -19843,6 +19856,23 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .finance-readonly-input {
     font-size: 12px;
+}
+
+.module-gestione_finanziaria .finance-copy-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-copy-field .finance-readonly-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-copy-uri .copy-inline-btn,
+.module-gestione_finanziaria .finance-copy-field .copy-inline-btn {
+    flex: 0 0 auto;
 }
 
 .module-gestione_finanziaria .finance-sticky-actions {

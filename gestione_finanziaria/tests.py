@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 import shutil
 import tempfile
+from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -642,6 +643,47 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertIn("client_id=render-client", response["Location"])
         self.assertIn("state=", response["Location"])
         self.assertIn("redirect_uri=https%3A%2F%2Farboris-test.onrender.com", response["Location"])
+
+    @override_settings(
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET="render-secret",
+        FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI="https://arboris-test.onrender.com/gestione-finanziaria/fatture-in-cloud/callback/",
+    )
+    @patch("gestione_finanziaria.fatture_in_cloud.requests.request")
+    @patch("gestione_finanziaria.fatture_in_cloud.requests.post")
+    def test_callback_fatture_in_cloud_legge_company_id_da_data_companies(self, mock_post, mock_request):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC Render", oauth_state="state-test")
+        token_response = Mock(
+            status_code=200,
+            content=b"{}",
+            text='{"access_token": "token"}',
+        )
+        token_response.json.return_value = {
+            "access_token": "access-token",
+            "refresh_token": "refresh-token",
+            "expires_in": 86400,
+        }
+        companies_response = Mock(
+            status_code=200,
+            content=b"{}",
+            text='{"data": {"companies": [{"id": 456}]}}',
+        )
+        companies_response.json.return_value = {"data": {"companies": [{"id": 456}]}}
+        mock_post.return_value = token_response
+        mock_request.return_value = companies_response
+
+        response = self.client.get(
+            reverse("callback_fatture_in_cloud"),
+            {"code": "auth-code", "state": "state-test"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+        connessione.refresh_from_db()
+        self.assertEqual(connessione.company_id, 456)
+        self.assertEqual(connessione.oauth_state, "")
+        self.assertTrue(connessione.access_token_cifrato)
+        self.assertTrue(connessione.refresh_token_cifrato)
 
     def test_riconciliazione_fornitore_collega_movimento_in_uscita(self):
         fornitore = Fornitore.objects.create(
