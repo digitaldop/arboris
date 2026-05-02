@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=172">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=173">
     {% if role_theme %}
         <style>
             :root {
@@ -80,6 +80,31 @@
                             </div>
                         {% endif %}
                         <span class="header-divider" aria-hidden="true"></span>
+                    {% endif %}
+
+                    {% if can_view_gestione_finanziaria %}
+                        <details class="header-notification-dropdown">
+                            <summary class="header-icon-btn" aria-label="Apri notifiche finanziarie">
+                                <span class="header-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
+                                {% if notifiche_finanziarie_non_lette %}
+                                    <span class="header-notification-count">{{ notifiche_finanziarie_non_lette }}</span>
+                                {% endif %}
+                            </summary>
+                            <div class="header-notification-menu">
+                                <div class="header-notification-head">
+                                    <span>Notifiche finanziarie</span>
+                                    <a href="{% url 'lista_notifiche_finanziarie' %}">Apri</a>
+                                </div>
+                                {% for notifica in notifiche_finanziarie_recenti %}
+                                    <a class="header-notification-item" href="{% if notifica.url %}{{ notifica.url }}{% else %}{% url 'lista_notifiche_finanziarie' %}{% endif %}">
+                                        <span class="header-notification-title">{{ notifica.titolo }}</span>
+                                        <span class="header-notification-text">{{ notifica.messaggio|truncatechars:90 }}</span>
+                                    </a>
+                                {% empty %}
+                                    <div class="header-notification-empty">Nessuna nuova notifica.</div>
+                                {% endfor %}
+                            </div>
+                        </details>
                     {% endif %}
 
                     <details class="header-settings-dropdown header-profile-dropdown">
@@ -502,6 +527,18 @@
                                                     <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
                                                     <span class="sidebar-link-text">Scadenziario fornitori</span>
                                                 </a>
+                                                <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare_fornitori' or request.resolver_match.url_name == 'riconcilia_movimento_fornitore' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                    <span class="sidebar-link-text">Pagamenti fornitori</span>
+                                                </a>
+                                                <a href="{% url 'lista_fatture_in_cloud' %}" class="{% if request.resolver_match.url_name == 'lista_fatture_in_cloud' or request.resolver_match.url_name == 'crea_fatture_in_cloud' or request.resolver_match.url_name == 'modifica_fatture_in_cloud' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                                    <span class="sidebar-link-text">Fatture in Cloud</span>
+                                                </a>
+                                                <a href="{% url 'lista_notifiche_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_notifiche_finanziarie' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
+                                                    <span class="sidebar-link-text">Notifiche</span>
+                                                </a>
                                                 <a href="{% url 'lista_categorie_spesa' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_spesa' or request.resolver_match.url_name == 'crea_categoria_spesa' or request.resolver_match.url_name == 'modifica_categoria_spesa' or request.resolver_match.url_name == 'elimina_categoria_spesa' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
                                                     <span class="sidebar-link-text">Categorie spesa</span>
@@ -528,6 +565,20 @@
                                                     <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
                                                     <span class="sidebar-link-text">Movimenti</span>
                                                 </a>
+                                                <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                                                    <span class="sidebar-link-text">Categorie movimenti</span>
+                                                </a>
+                                                {% if can_manage_gestione_finanziaria %}
+                                                    <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
+                                                        <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                                        <span class="sidebar-link-text">Import estratto conto</span>
+                                                    </a>
+                                                {% endif %}
+                                                <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                    <span class="sidebar-link-text">Riconciliazione</span>
+                                                </a>
                                                 <a href="{% url 'report_categorie_mensile' %}" class="{% if request.resolver_match.url_name == 'report_categorie_mensile' or request.resolver_match.url_name == 'report_categorie_annuale' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
                                                     <span class="sidebar-link-text">Report categorie</span>
@@ -551,20 +602,6 @@
                                                             <a href="{% url 'lista_saldi_conti' %}" class="{% if request.resolver_match.url_name == 'lista_saldi_conti' or request.resolver_match.url_name == 'crea_saldo_conto' or request.resolver_match.url_name == 'modifica_saldo_conto' or request.resolver_match.url_name == 'elimina_saldo_conto' or request.resolver_match.url_name == 'import_saldi_conti' %}active{% endif %}">
                                                                 <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
                                                                 <span class="sidebar-link-text">Saldi conti</span>
-                                                            </a>
-                                                            {% if can_manage_gestione_finanziaria %}
-                                                                <a href="{% url 'import_estratto_conto' %}" class="{% if request.resolver_match.url_name == 'import_estratto_conto' %}active{% endif %}">
-                                                                    <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                                                                    <span class="sidebar-link-text">Import estratto conto</span>
-                                                                </a>
-                                                            {% endif %}
-                                                            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare' or request.resolver_match.url_name == 'riconcilia_movimento' %}active{% endif %}">
-                                                                <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                                                <span class="sidebar-link-text">Riconciliazione</span>
-                                                            </a>
-                                                            <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
-                                                                <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                                                                <span class="sidebar-link-text">Categorie movimenti</span>
                                                             </a>
                                                             <a href="{% url 'lista_regole_categorizzazione' %}" class="{% if request.resolver_match.url_name == 'lista_regole_categorizzazione' or request.resolver_match.url_name == 'crea_regola_categorizzazione' or request.resolver_match.url_name == 'modifica_regola_categorizzazione' or request.resolver_match.url_name == 'elimina_regola_categorizzazione' %}active{% endif %}">
                                                                 <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>

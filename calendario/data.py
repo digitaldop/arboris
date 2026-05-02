@@ -5,12 +5,14 @@ from django.utils import timezone
 
 from anagrafica.models import Documento
 from economia.models import RataIscrizione
+from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 
 from .models import (
     CategoriaCalendario,
     EventoCalendario,
     SYSTEM_CATEGORY_DOCUMENTS,
     SYSTEM_CATEGORY_RATE_DUE,
+    SYSTEM_CATEGORY_SUPPLIER_DUE,
     ensure_system_calendar_categories,
 )
 
@@ -257,6 +259,7 @@ def build_calendar_deadline_records(system_categories=None):
 
     categoria_rate = system_categories.get(SYSTEM_CATEGORY_RATE_DUE)
     categoria_documenti = system_categories.get(SYSTEM_CATEGORY_DOCUMENTS)
+    categoria_fornitori = system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE)
 
     if categoria_rate:
         rate = (
@@ -316,6 +319,39 @@ def build_calendar_deadline_records(system_categories=None):
                     detail_label="Documento in scadenza",
                     description=" - ".join([part for part in description_parts if part]),
                     url=owner_url,
+                    external=False,
+                    action_label="Apri",
+                )
+            )
+
+    if categoria_fornitori:
+        scadenze = (
+            ScadenzaPagamentoFornitore.objects.exclude(
+                stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+            )
+            .select_related("documento", "documento__fornitore", "documento__categoria_spesa")
+            .order_by("data_scadenza", "pk")
+        )
+        for scadenza in scadenze:
+            documento = scadenza.documento
+            description_parts = [
+                documento.fornitore.denominazione,
+                documento.get_tipo_documento_display(),
+                documento.numero_documento,
+            ]
+            if documento.categoria_spesa:
+                description_parts.append(str(documento.categoria_spesa))
+            records.append(
+                build_calendar_entry_record(
+                    f"fornitore-scadenza-{scadenza.pk}",
+                    "fornitore_scadenza",
+                    f"Scadenza fornitore - {documento.fornitore.denominazione}",
+                    categoria_fornitori,
+                    scadenza.data_scadenza,
+                    scadenza.data_scadenza,
+                    detail_label=f"{scadenza.get_stato_display()} - EUR {scadenza.importo_residuo}",
+                    description=" - ".join([part for part in description_parts if part]),
+                    url=reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
                     external=False,
                     action_label="Apri",
                 )

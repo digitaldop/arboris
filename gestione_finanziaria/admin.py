@@ -6,8 +6,13 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    FattureInCloudConnessione,
+    FattureInCloudSyncLog,
     Fornitore,
     MovimentoFinanziario,
+    NotificaFinanziaria,
+    NotificaFinanziariaLettura,
+    PagamentoFornitore,
     ProviderBancario,
     RegolaCategorizzazione,
     SaldoConto,
@@ -45,13 +50,20 @@ class ScadenzaPagamentoFornitoreInline(admin.TabularInline):
     autocomplete_fields = ("conto_bancario", "movimento_finanziario")
 
 
+class PagamentoFornitoreInline(admin.TabularInline):
+    model = PagamentoFornitore
+    extra = 0
+    autocomplete_fields = ("movimento_finanziario", "conto_bancario", "creato_da")
+
+
 @admin.register(DocumentoFornitore)
 class DocumentoFornitoreAdmin(admin.ModelAdmin):
-    list_display = ("numero_documento", "tipo_documento", "fornitore", "data_documento", "totale", "stato")
-    list_filter = ("tipo_documento", "stato", "categoria_spesa")
-    search_fields = ("numero_documento", "descrizione", "fornitore__denominazione")
+    list_display = ("numero_documento", "tipo_documento", "fornitore", "data_documento", "totale", "stato", "origine")
+    list_filter = ("tipo_documento", "stato", "categoria_spesa", "origine")
+    search_fields = ("numero_documento", "descrizione", "fornitore__denominazione", "external_id")
     date_hierarchy = "data_documento"
     autocomplete_fields = ("fornitore", "categoria_spesa")
+    readonly_fields = ("external_payload", "external_source", "external_id", "importato_at", "external_updated_at")
     inlines = [ScadenzaPagamentoFornitoreInline]
 
 
@@ -62,6 +74,45 @@ class ScadenzaPagamentoFornitoreAdmin(admin.ModelAdmin):
     search_fields = ("documento__numero_documento", "documento__fornitore__denominazione")
     date_hierarchy = "data_scadenza"
     autocomplete_fields = ("documento", "conto_bancario", "movimento_finanziario")
+    inlines = [PagamentoFornitoreInline]
+
+
+@admin.register(PagamentoFornitore)
+class PagamentoFornitoreAdmin(admin.ModelAdmin):
+    list_display = ("scadenza", "data_pagamento", "importo", "metodo", "movimento_finanziario")
+    list_filter = ("metodo", "data_pagamento")
+    search_fields = ("scadenza__documento__numero_documento", "scadenza__documento__fornitore__denominazione")
+    date_hierarchy = "data_pagamento"
+    autocomplete_fields = ("scadenza", "movimento_finanziario", "conto_bancario", "creato_da")
+
+
+@admin.register(FattureInCloudConnessione)
+class FattureInCloudConnessioneAdmin(admin.ModelAdmin):
+    list_display = ("nome", "company_id", "stato", "attiva", "ultimo_sync_at", "ultimo_esito")
+    list_filter = ("stato", "attiva")
+    search_fields = ("nome", "company_id", "client_id")
+    readonly_fields = (
+        "client_secret_cifrato",
+        "access_token_cifrato",
+        "refresh_token_cifrato",
+        "oauth_state",
+        "webhook_key",
+    )
+
+
+@admin.register(FattureInCloudSyncLog)
+class FattureInCloudSyncLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "data_operazione",
+        "connessione",
+        "tipo_operazione",
+        "esito",
+        "documenti_creati",
+        "documenti_aggiornati",
+        "notifiche_create",
+    )
+    list_filter = ("tipo_operazione", "esito")
+    date_hierarchy = "data_operazione"
 
 
 @admin.register(ProviderBancario)
@@ -149,3 +200,19 @@ class SincronizzazioneLogAdmin(admin.ModelAdmin):
     )
     list_filter = ("tipo_operazione", "esito")
     date_hierarchy = "data_operazione"
+
+
+class NotificaFinanziariaLetturaInline(admin.TabularInline):
+    model = NotificaFinanziariaLettura
+    extra = 0
+    autocomplete_fields = ("user",)
+
+
+@admin.register(NotificaFinanziaria)
+class NotificaFinanziariaAdmin(admin.ModelAdmin):
+    list_display = ("titolo", "tipo", "livello", "richiede_gestione", "data_creazione")
+    list_filter = ("tipo", "livello", "richiede_gestione")
+    search_fields = ("titolo", "messaggio", "chiave_deduplica")
+    date_hierarchy = "data_creazione"
+    autocomplete_fields = ("documento", "scadenza", "movimento_finanziario")
+    inlines = [NotificaFinanziariaLetturaInline]

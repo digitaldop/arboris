@@ -214,6 +214,21 @@ def sistema_permissions_context(request):
 
     can_view_system_tables = user_is_operational_admin(user)
     role_theme = profilo.role_theme_variables if profilo else None
+    notifiche_finanziarie_non_lette = 0
+    notifiche_finanziarie_recenti = []
+
+    if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
+        try:
+            from gestione_finanziaria.models import NotificaFinanziaria
+
+            notifiche_qs = NotificaFinanziaria.objects.exclude(letture__user=user)
+            if not can_manage_gestione_finanziaria:
+                notifiche_qs = notifiche_qs.filter(richiede_gestione=False)
+            notifiche_finanziarie_non_lette = notifiche_qs.count()
+            notifiche_finanziarie_recenti = list(notifiche_qs.order_by("-data_creazione", "-id")[:5])
+        except (OperationalError, ProgrammingError):
+            notifiche_finanziarie_non_lette = 0
+            notifiche_finanziarie_recenti = []
 
     return {
         "user_permission_profile": profilo,
@@ -239,6 +254,8 @@ def sistema_permissions_context(request):
         "can_view_operation_history": can_view_system_tables,
         "can_view_system_tables": can_view_system_tables,
         "can_access_database_backups": user_can_access_database_backups(user),
+        "notifiche_finanziarie_non_lette": notifiche_finanziarie_non_lette,
+        "notifiche_finanziarie_recenti": notifiche_finanziarie_recenti,
     }
 
 

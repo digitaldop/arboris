@@ -259,3 +259,19 @@ CELERY_TIMEZONE = TIME_ZONE
 # Evita attese infinite su code non raggiungibili in sviluppo
 if CELERY_BROKER_URL:
     CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Fatture in Cloud OAuth centralizzato (es. deploy Render).
+# Se valorizzate, queste credenziali vengono usate come fallback rispetto
+# alle credenziali salvate sulla singola connessione.
+FATTURE_IN_CLOUD_OAUTH_CLIENT_ID = (
+    os.environ.get("FATTURE_IN_CLOUD_OAUTH_CLIENT_ID")
+    or os.environ.get("FATTURE_IN_CLOUD_CLIENT_ID", "")
+).strip()
+FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET = (
+    os.environ.get("FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET")
+    or os.environ.get("FATTURE_IN_CLOUD_CLIENT_SECRET", "")
+).strip()
+FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI = (
+    os.environ.get("FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI")
+    or os.environ.get("FATTURE_IN_CLOUD_REDIRECT_URI", "")
+).strip()

@@ -1,11 +1,12 @@
 import csv
 import io
+import json
 import re
 import secrets
 import unicodedata
 from calendar import monthrange
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -13,25 +14,41 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.csrf import csrf_exempt
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from scuola.models import AnnoScolastico
+from sistema.models import LivelloPermesso
+from sistema.permissions import user_has_module_permission
 
+from .fatture_in_cloud import (
+    FattureInCloudError,
+    FattureInCloudClient,
+    authorization_url,
+    configured_oauth_redirect_uri,
+    has_oauth_credentials,
+    importa_documento_da_webhook,
+    oauth_env_configured,
+    sincronizza_fatture_in_cloud,
+)
 from .forms import (
     CategoriaSpesaForm,
     CategoriaFinanziariaForm,
     ContoBancarioForm,
     DocumentoFornitoreForm,
+    FattureInCloudConnessioneForm,
     FornitoreForm,
     ImportEstrattoContoForm,
     ImportSaldiContoCsvForm,
     MovimentoFinanziarioForm,
     NuovaConnessioneBancariaForm,
+    PagamentoFornitoreForm,
     PianificazioneSincronizzazioneForm,
     PuliziaMovimentiFinanziariForm,
     ProviderBancarioForm,
@@ -49,9 +66,14 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    FattureInCloudConnessione,
+    FattureInCloudSyncLog,
     FonteSaldo,
     Fornitore,
     MovimentoFinanziario,
+    NotificaFinanziaria,
+    NotificaFinanziariaLettura,
+    PagamentoFornitore,
     OrigineMovimento,
     ProviderBancario,
     RegolaCategorizzazione,
@@ -59,6 +81,7 @@ from .models import (
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
     StatoConnessioneBancaria,
+    StatoConnessioneFattureInCloud,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
     StatoRiconciliazione,
@@ -90,12 +113,20 @@ from .scheduler import (
 )
 from .services import (
     annulla_riconciliazione,
+    annulla_pagamento_fornitore,
     applica_regole_a_movimento,
+    aggiorna_stato_documento_da_scadenze as service_aggiorna_stato_documento_da_scadenze,
     calcola_saldo_conto_alla_data,
     calcola_hash_deduplica_movimento,
+    importo_movimento_disponibile_fornitori,
+    importo_scadenza_fornitore_residuo,
     ricalcola_saldo_corrente_conto,
+    riconcilia_fornitori_automaticamente,
+    riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rata,
+    registra_pagamento_fornitore,
     sincronizza_conto_psd2,
+    trova_scadenze_fornitori_candidate,
     trova_rate_candidate,
 )
 
@@ -150,6 +181,10 @@ def dashboard_gestione_finanziaria(request):
     scadenze_fornitori_aperte = ScadenzaPagamentoFornitore.objects.exclude(
         stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
     ).count()
+    scadenze_fornitori_scadute = ScadenzaPagamentoFornitore.objects.exclude(
+        stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+    ).filter(data_scadenza__lt=timezone.localdate()).count()
+    fatture_in_cloud_attive = FattureInCloudConnessione.objects.filter(attiva=True).count()
 
     return render(
         request,
@@ -164,6 +199,8 @@ def dashboard_gestione_finanziaria(request):
             "regole_attive": regole_attive,
             "fornitori_attivi": fornitori_attivi,
             "scadenze_fornitori_aperte": scadenze_fornitori_aperte,
+            "scadenze_fornitori_scadute": scadenze_fornitori_scadute,
+            "fatture_in_cloud_attive": fatture_in_cloud_attive,
         },
     )
 
@@ -174,26 +211,7 @@ def dashboard_gestione_finanziaria(request):
 
 
 def _aggiorna_stato_documento_da_scadenze(documento):
-    if documento.stato == StatoDocumentoFornitore.ANNULLATO:
-        return documento
-
-    scadenze = documento.scadenze.exclude(stato=StatoScadenzaFornitore.ANNULLATA)
-    if not scadenze.exists():
-        return documento
-
-    pagato = scadenze.aggregate(totale=Sum("importo_pagato"))["totale"] or Decimal("0.00")
-    totale = documento.totale or Decimal("0.00")
-    if totale > Decimal("0.00") and pagato >= totale:
-        nuovo_stato = StatoDocumentoFornitore.PAGATO
-    elif pagato > Decimal("0.00"):
-        nuovo_stato = StatoDocumentoFornitore.PARZIALMENTE_PAGATO
-    else:
-        nuovo_stato = StatoDocumentoFornitore.DA_PAGARE
-
-    if documento.stato != nuovo_stato:
-        documento.stato = nuovo_stato
-        documento.save(update_fields=["stato", "data_aggiornamento"])
-    return documento
+    return service_aggiorna_stato_documento_da_scadenze(documento)
 
 
 def _popup_target_input_name(request):
@@ -660,6 +678,370 @@ def scadenziario_fornitori(request):
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
             "categoria_selezionata": categoria_id,
             "fornitore_selezionato": fornitore_id,
+        },
+    )
+
+
+# =========================================================================
+#  Fatture in Cloud, pagamenti e notifiche fornitori
+# =========================================================================
+
+
+def lista_fatture_in_cloud(request):
+    connessioni = FattureInCloudConnessione.objects.order_by("nome")
+    logs = FattureInCloudSyncLog.objects.select_related("connessione").order_by("-data_operazione", "-id")[:20]
+    return render(
+        request,
+        "gestione_finanziaria/fatture_in_cloud_list.html",
+        {
+            "connessioni": connessioni,
+            "logs": logs,
+        },
+    )
+
+
+def crea_fatture_in_cloud(request):
+    if request.method == "POST":
+        form = FattureInCloudConnessioneForm(request.POST)
+        if form.is_valid():
+            connessione = form.save()
+            messages.success(request, "Connessione Fatture in Cloud creata correttamente.")
+            if request.POST.get("azione") == "salva_collega":
+                return redirect("avvia_oauth_fatture_in_cloud", pk=connessione.pk)
+            return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+    else:
+        form = FattureInCloudConnessioneForm()
+
+    default_redirect_uri = _fatture_in_cloud_redirect_uri(request, None)
+    return render(
+        request,
+        "gestione_finanziaria/fatture_in_cloud_form.html",
+        {
+            "form": form,
+            "connessione": None,
+            "default_redirect_uri": default_redirect_uri,
+            "oauth_render_configurato": oauth_env_configured(),
+        },
+    )
+
+
+def modifica_fatture_in_cloud(request, pk):
+    connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
+    if request.method == "POST":
+        form = FattureInCloudConnessioneForm(request.POST, instance=connessione)
+        if form.is_valid():
+            connessione = form.save()
+            messages.success(request, "Connessione Fatture in Cloud aggiornata correttamente.")
+            if request.POST.get("azione") == "salva_collega":
+                return redirect("avvia_oauth_fatture_in_cloud", pk=connessione.pk)
+            return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+    else:
+        form = FattureInCloudConnessioneForm(instance=connessione)
+
+    default_redirect_uri = _fatture_in_cloud_redirect_uri(request, connessione)
+    webhook_url = request.build_absolute_uri(
+        reverse("webhook_fatture_in_cloud", kwargs={"webhook_key": connessione.webhook_key})
+    )
+    return render(
+        request,
+        "gestione_finanziaria/fatture_in_cloud_form.html",
+        {
+            "form": form,
+            "connessione": connessione,
+            "default_redirect_uri": default_redirect_uri,
+            "oauth_render_configurato": oauth_env_configured(),
+            "webhook_url": webhook_url,
+            "logs": connessione.log_sincronizzazioni.order_by("-data_operazione", "-id")[:10],
+        },
+    )
+
+
+def _fatture_in_cloud_redirect_uri(request, connessione):
+    if connessione and connessione.redirect_uri:
+        return connessione.redirect_uri
+    if configured_oauth_redirect_uri():
+        return configured_oauth_redirect_uri()
+    return request.build_absolute_uri(reverse("callback_fatture_in_cloud"))
+
+
+def avvia_oauth_fatture_in_cloud(request, pk):
+    connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
+    if not has_oauth_credentials(connessione):
+        messages.error(
+            request,
+            "Configura prima Client ID e Client Secret nella connessione oppure nelle variabili ambiente Render.",
+        )
+        return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+
+    state = secrets.token_urlsafe(32)
+    connessione.oauth_state = state
+    connessione.save(update_fields=["oauth_state", "data_aggiornamento"])
+    try:
+        auth_url = authorization_url(connessione, _fatture_in_cloud_redirect_uri(request, connessione), state)
+    except FattureInCloudError as exc:
+        messages.error(request, str(exc))
+        return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+    return redirect(auth_url)
+
+
+def callback_fatture_in_cloud(request):
+    state = request.GET.get("state") or ""
+    code = request.GET.get("code") or ""
+    error = request.GET.get("error") or ""
+    if error:
+        messages.error(request, f"Autorizzazione Fatture in Cloud fallita: {error}")
+        return redirect("lista_fatture_in_cloud")
+    if not state or not code:
+        messages.error(request, "Callback Fatture in Cloud incompleta.")
+        return redirect("lista_fatture_in_cloud")
+
+    connessione = FattureInCloudConnessione.objects.filter(oauth_state=state).first()
+    if connessione is None:
+        messages.error(request, "State OAuth non riconosciuto.")
+        return redirect("lista_fatture_in_cloud")
+
+    try:
+        client = FattureInCloudClient(connessione)
+        client.exchange_code(code, _fatture_in_cloud_redirect_uri(request, connessione))
+        if not connessione.company_id:
+            companies = client.list_user_companies()
+            if len(companies) == 1 and companies[0].get("id"):
+                connessione.company_id = companies[0]["id"]
+        connessione.oauth_state = ""
+        connessione.stato = StatoConnessioneFattureInCloud.ATTIVA
+        connessione.save(update_fields=["company_id", "oauth_state", "stato", "data_aggiornamento"])
+        messages.success(request, "Fatture in Cloud collegato correttamente.")
+    except FattureInCloudError as exc:
+        messages.error(request, str(exc))
+    return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+
+
+def sincronizza_fatture_in_cloud_view(request, pk):
+    connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
+    if request.method != "POST":
+        return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+    try:
+        stats = sincronizza_fatture_in_cloud(connessione, utente=request.user)
+        messages.success(
+            request,
+            f"Sincronizzazione completata: {stats['creati']} nuovi, {stats['aggiornati']} aggiornati.",
+        )
+    except FattureInCloudError as exc:
+        messages.error(request, f"Sincronizzazione fallita: {exc}")
+    return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+
+
+@csrf_exempt
+def webhook_fatture_in_cloud(request, webhook_key):
+    connessione = get_object_or_404(FattureInCloudConnessione, webhook_key=webhook_key, attiva=True)
+    if request.method == "GET":
+        return JsonResponse({"success": True})
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Metodo non consentito."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    notification_type = request.headers.get("ce-type") or payload.get("type") or ""
+    data = payload.get("data") or {}
+    ids = data.get("ids") or data.get("id") or []
+    if isinstance(ids, (str, int)):
+        ids = [ids]
+    imported = 0
+    errors = []
+    for document_id in ids:
+        try:
+            importa_documento_da_webhook(connessione, notification_type, document_id)
+            imported += 1
+        except Exception as exc:
+            errors.append(str(exc))
+
+    status = 200 if not errors else 202
+    return JsonResponse({"success": True, "imported": imported, "errors": errors[:3]}, status=status)
+
+
+def lista_notifiche_finanziarie(request):
+    notifiche = NotificaFinanziaria.objects.select_related("documento", "scadenza", "movimento_finanziario")
+    can_manage_gestione_finanziaria = user_has_module_permission(
+        request.user,
+        "gestione_finanziaria",
+        LivelloPermesso.GESTIONE,
+    )
+    if not can_manage_gestione_finanziaria:
+        notifiche = notifiche.filter(richiede_gestione=False)
+    lette_ids = set(
+        NotificaFinanziariaLettura.objects.filter(user=request.user).values_list("notifica_id", flat=True)
+    )
+    only_unread = request.GET.get("stato") == "non_lette"
+    if only_unread:
+        notifiche = notifiche.exclude(letture__user=request.user)
+
+    return render(
+        request,
+        "gestione_finanziaria/notifiche_finanziarie_list.html",
+        {
+            "notifiche": notifiche.order_by("-data_creazione", "-id"),
+            "lette_ids": lette_ids,
+            "stato": request.GET.get("stato") or "",
+        },
+    )
+
+
+def segna_notifica_finanziaria_letta(request, pk):
+    notifica = get_object_or_404(NotificaFinanziaria, pk=pk)
+    if request.method == "POST":
+        NotificaFinanziariaLettura.objects.get_or_create(notifica=notifica, user=request.user)
+        if next_url := request.POST.get("next"):
+            if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+    return redirect("lista_notifiche_finanziarie")
+
+
+def segna_tutte_notifiche_finanziarie_lette(request):
+    if request.method == "POST":
+        qs = NotificaFinanziaria.objects.all()
+        if not user_has_module_permission(request.user, "gestione_finanziaria", LivelloPermesso.GESTIONE):
+            qs = qs.filter(richiede_gestione=False)
+        existing = set(
+            NotificaFinanziariaLettura.objects.filter(user=request.user).values_list("notifica_id", flat=True)
+        )
+        NotificaFinanziariaLettura.objects.bulk_create(
+            [
+                NotificaFinanziariaLettura(notifica=notifica, user=request.user)
+                for notifica in qs
+                if notifica.pk not in existing
+            ],
+            ignore_conflicts=True,
+        )
+        messages.success(request, "Notifiche segnate come lette.")
+    return redirect("lista_notifiche_finanziarie")
+
+
+def registra_pagamento_scadenza_fornitore(request, pk):
+    scadenza = get_object_or_404(
+        ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore", "conto_bancario"),
+        pk=pk,
+    )
+    if request.method == "POST":
+        form = PagamentoFornitoreForm(request.POST)
+        if form.is_valid():
+            movimento = form.cleaned_data.get("movimento_finanziario")
+            try:
+                registra_pagamento_fornitore(
+                    scadenza,
+                    importo=form.cleaned_data["importo"],
+                    data_pagamento=form.cleaned_data["data_pagamento"],
+                    movimento=movimento,
+                    metodo=form.cleaned_data["metodo"],
+                    conto=form.cleaned_data.get("conto_bancario"),
+                    note=form.cleaned_data.get("note") or "",
+                    utente=request.user,
+                )
+                messages.success(request, "Pagamento fornitore registrato correttamente.")
+                return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
+            except ValidationError as exc:
+                for message in exc.messages:
+                    messages.error(request, message)
+    else:
+        form = PagamentoFornitoreForm(
+            initial={
+                "scadenza": scadenza,
+                "data_pagamento": timezone.localdate(),
+                "importo": importo_scadenza_fornitore_residuo(scadenza),
+            }
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/pagamento_fornitore_form.html",
+        {"form": form, "scadenza": scadenza},
+    )
+
+
+def elimina_pagamento_fornitore(request, pk):
+    pagamento = get_object_or_404(
+        PagamentoFornitore.objects.select_related("scadenza", "scadenza__documento", "scadenza__documento__fornitore"),
+        pk=pk,
+    )
+    documento_id = pagamento.scadenza.documento_id
+    if request.method == "POST":
+        annulla_pagamento_fornitore(pagamento)
+        messages.success(request, "Pagamento fornitore annullato.")
+        return redirect("modifica_documento_fornitore", pk=documento_id)
+    return render(
+        request,
+        "gestione_finanziaria/pagamento_fornitore_confirm_delete.html",
+        {"pagamento": pagamento},
+    )
+
+
+def lista_movimenti_da_riconciliare_fornitori(request):
+    if request.method == "POST" and request.POST.get("azione") == "auto":
+        pagamenti = riconcilia_fornitori_automaticamente(utente=request.user)
+        if pagamenti:
+            messages.success(request, f"Riconciliazione automatica fornitori: {len(pagamenti)} pagamenti collegati.")
+        else:
+            messages.info(request, "Nessuna scadenza fornitore riconciliata automaticamente.")
+        return redirect("lista_movimenti_da_riconciliare_fornitori")
+
+    movimenti = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(importo__lt=0)
+        .order_by("-data_contabile", "-id")[:100]
+    )
+    movimenti_con_candidati = []
+    for movimento in movimenti:
+        residuo = importo_movimento_disponibile_fornitori(movimento)
+        if residuo <= Decimal("0.00"):
+            continue
+        candidati = trova_scadenze_fornitori_candidate(movimento, limite=3)
+        movimento.residuo_fornitori = residuo
+        movimenti_con_candidati.append({"movimento": movimento, "candidati": candidati})
+
+    return render(
+        request,
+        "gestione_finanziaria/riconciliazione_fornitori_list.html",
+        {"movimenti_con_candidati": movimenti_con_candidati},
+    )
+
+
+def riconcilia_movimento_fornitore(request, pk):
+    movimento = get_object_or_404(MovimentoFinanziario.objects.select_related("conto", "categoria"), pk=pk)
+    candidati = trova_scadenze_fornitori_candidate(movimento, limite=12)
+    if request.method == "POST":
+        scadenza_id = request.POST.get("scadenza")
+        importo = request.POST.get("importo")
+        scadenza = ScadenzaPagamentoFornitore.objects.filter(pk=scadenza_id).select_related("documento").first()
+        if scadenza is None:
+            messages.error(request, "Seleziona una scadenza fornitore valida.")
+        else:
+            try:
+                riconcilia_movimento_con_scadenza_fornitore(
+                    movimento,
+                    scadenza,
+                    importo=Decimal(str(importo).replace(",", ".")) if importo else None,
+                    utente=request.user,
+                    note=request.POST.get("note") or "",
+                )
+                messages.success(request, "Movimento riconciliato con la scadenza fornitore.")
+                return redirect("lista_movimenti_da_riconciliare_fornitori")
+            except (ValidationError, InvalidOperation, ValueError) as exc:
+                if isinstance(exc, ValidationError):
+                    for message in exc.messages:
+                        messages.error(request, message)
+                else:
+                    messages.error(request, "Importo non valido.")
+
+    return render(
+        request,
+        "gestione_finanziaria/riconciliazione_fornitore.html",
+        {
+            "movimento": movimento,
+            "candidati": candidati,
+            "residuo_movimento": importo_movimento_disponibile_fornitori(movimento),
         },
     )
 

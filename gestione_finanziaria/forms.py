@@ -8,6 +8,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from arboris.form_widgets import apply_eur_currency_widget
+from .security import cifra_testo
 
 from .models import (
     CategoriaSpesa,
@@ -15,8 +16,11 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    FattureInCloudConnessione,
     Fornitore,
+    MetodoPagamentoFornitore,
     MovimentoFinanziario,
+    PagamentoFornitore,
     PianificazioneSincronizzazione,
     ProviderBancario,
     RegolaCategorizzazione,
@@ -420,6 +424,139 @@ ScadenzaPagamentoFornitoreFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+
+class PagamentoFornitoreForm(forms.ModelForm):
+    class Meta:
+        model = PagamentoFornitore
+        fields = [
+            "scadenza",
+            "movimento_finanziario",
+            "data_pagamento",
+            "importo",
+            "metodo",
+            "conto_bancario",
+            "note",
+        ]
+        labels = {
+            "scadenza": "Scadenza",
+            "movimento_finanziario": "Movimento bancario",
+            "data_pagamento": "Data pagamento",
+            "importo": "Importo",
+            "metodo": "Metodo",
+            "conto_bancario": "Conto",
+            "note": "Note",
+        }
+        widgets = {
+            "data_pagamento": forms.DateInput(attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        movimento = kwargs.pop("movimento", None)
+        super().__init__(*args, **kwargs)
+        self.fields["scadenza"].queryset = (
+            ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore")
+            .exclude(stato=StatoScadenzaFornitore.ANNULLATA)
+            .order_by("data_scadenza", "id")
+        )
+        self.fields["movimento_finanziario"].queryset = MovimentoFinanziario.objects.order_by("-data_contabile", "-id")
+        self.fields["movimento_finanziario"].required = False
+        self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+        self.fields["conto_bancario"].required = False
+        self.fields["note"].required = False
+        apply_eur_currency_widget(self.fields["importo"])
+        make_searchable_select(self.fields["scadenza"], "Cerca una scadenza fornitore...")
+        make_searchable_select(self.fields["movimento_finanziario"], "Cerca un movimento...")
+        make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
+        if movimento is not None:
+            self.fields["movimento_finanziario"].initial = movimento
+            self.fields["metodo"].initial = MetodoPagamentoFornitore.BANCA
+            if movimento.conto_id:
+                self.fields["conto_bancario"].initial = movimento.conto
+            if movimento.data_contabile:
+                self.fields["data_pagamento"].initial = movimento.data_contabile
+
+    def clean_importo(self):
+        importo = self.cleaned_data.get("importo") or Decimal("0.00")
+        if importo <= Decimal("0.00"):
+            raise forms.ValidationError("L'importo deve essere maggiore di zero.")
+        return importo
+
+
+class FattureInCloudConnessioneForm(forms.ModelForm):
+    client_secret = forms.CharField(
+        label="Client secret",
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Lascia vuoto per mantenere il valore gia salvato.",
+    )
+    access_token = forms.CharField(
+        label="Access token manuale",
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Utile per un primo collegamento manuale o per test privati.",
+    )
+    refresh_token = forms.CharField(
+        label="Refresh token",
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Lascia vuoto se usi un token manuale senza scadenza.",
+    )
+
+    class Meta:
+        model = FattureInCloudConnessione
+        fields = [
+            "nome",
+            "company_id",
+            "client_id",
+            "redirect_uri",
+            "base_url",
+            "attiva",
+            "sincronizza_documenti_registrati",
+            "sincronizza_documenti_da_registrare",
+            "sync_automatico",
+            "intervallo_sync_ore",
+        ]
+        labels = {
+            "nome": "Nome connessione",
+            "company_id": "Company ID",
+            "client_id": "Client ID",
+            "redirect_uri": "Redirect URI OAuth",
+            "base_url": "Base URL API",
+            "attiva": "Connessione attiva",
+            "sincronizza_documenti_registrati": "Importa spese registrate",
+            "sincronizza_documenti_da_registrare": "Importa fatture da registrare",
+            "sync_automatico": "Sincronizzazione automatica",
+            "intervallo_sync_ore": "Intervallo automatico (ore)",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("company_id", "client_id", "redirect_uri"):
+            self.fields[field_name].required = False
+        if self.instance and self.instance.pk:
+            if self.instance.client_secret_cifrato:
+                self.fields["client_secret"].help_text = "Secret gia salvato. Compila solo per sostituirlo."
+            if self.instance.access_token_cifrato:
+                self.fields["access_token"].help_text = "Token gia salvato. Compila solo per sostituirlo."
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        client_secret = self.cleaned_data.get("client_secret") or ""
+        access_token = self.cleaned_data.get("access_token") or ""
+        refresh_token = self.cleaned_data.get("refresh_token") or ""
+        if client_secret:
+            instance.client_secret_cifrato = cifra_testo(client_secret)
+        if access_token:
+            instance.access_token_cifrato = cifra_testo(access_token)
+        if refresh_token:
+            instance.refresh_token_cifrato = cifra_testo(refresh_token)
+        if instance.access_token_cifrato and instance.company_id:
+            instance.stato = "attiva"
+        if commit:
+            instance.save()
+        return instance
 
 
 # =========================================================================

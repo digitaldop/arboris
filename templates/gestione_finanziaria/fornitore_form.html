@@ -16,14 +16,35 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo fornitore{% endif %}</h1>
-        <div class="page-head-actions">
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo fornitore{% endif %}</h1>
+                <span class="family-status-pill {% if fornitore and not fornitore.attivo %}is-muted{% else %}{% endif %}">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {% if fornitore %}{% if fornitore.attivo %}Attivo{% else %}Non attivo{% endif %}{% else %}Nuovo{% endif %}
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                Dati fiscali, contatti e riferimenti di pagamento del fornitore
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
             {% if fornitore %}
-                <a href="{% url 'crea_documento_fornitore' %}?fornitore={{ fornitore.pk }}" class="btn btn-primary">Nuovo documento</a>
-                <a href="{% url 'elimina_fornitore' fornitore.pk %}" class="btn btn-danger">Elimina</a>
+                <a href="{% url 'crea_documento_fornitore' %}?fornitore={{ fornitore.pk }}" class="btn btn-primary btn-icon-text btn-add-action">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Nuovo documento</span>
+                </a>
+                <a href="{% url 'elimina_fornitore' fornitore.pk %}" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina</span>
+                </a>
             {% endif %}
-            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Torna all'elenco</a>
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Elenco</span>
+            </a>
         </div>
     </div>
 
@@ -80,8 +101,14 @@
         </div>
 
         <div class="form-actions sticky-form-actions">
-            <button type="submit" class="btn btn-primary">Salva</button>
-            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Annulla</a>
+            <button type="submit" class="btn btn-primary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                <span class="btn-label">Salva</span>
+            </button>
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span class="btn-label">Annulla</span>
+            </a>
         </div>
     </form>
 
@@ -90,7 +117,7 @@
             <div class="admin-section-title">Documenti recenti</div>
             <div class="panel">
                 <div class="panel-body">
-                    <table class="list-table">
+                    <table class="list-table anagrafica-list-table finance-modern-table">
                         <thead>
                             <tr>
                                 <th>Documento</th>
@@ -122,7 +149,7 @@
             <div class="admin-section-title">Scadenze aperte</div>
             <div class="panel">
                 <div class="panel-body">
-                    <table class="list-table">
+                    <table class="list-table anagrafica-list-table finance-modern-table">
                         <thead>
                             <tr>
                                 <th>Scadenza</th>

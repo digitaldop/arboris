@@ -83,6 +83,66 @@ urlpatterns = [
         gf_view(views.scadenziario_fornitori),
         name="scadenziario_fornitori",
     ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/",
+        gf_view(views.lista_fatture_in_cloud),
+        name="lista_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/nuova/",
+        gf_manage(views.crea_fatture_in_cloud),
+        name="crea_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/<int:pk>/modifica/",
+        gf_manage(views.modifica_fatture_in_cloud),
+        name="modifica_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/<int:pk>/oauth/",
+        gf_manage(views.avvia_oauth_fatture_in_cloud),
+        name="avvia_oauth_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/callback/",
+        gf_manage(views.callback_fatture_in_cloud),
+        name="callback_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/<int:pk>/sincronizza/",
+        gf_manage(views.sincronizza_fatture_in_cloud_view),
+        name="sincronizza_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/fatture-in-cloud/webhook/<uuid:webhook_key>/",
+        views.webhook_fatture_in_cloud,
+        name="webhook_fatture_in_cloud",
+    ),
+    path(
+        "gestione-finanziaria/notifiche/",
+        gf_view(views.lista_notifiche_finanziarie),
+        name="lista_notifiche_finanziarie",
+    ),
+    path(
+        "gestione-finanziaria/notifiche/<int:pk>/letta/",
+        gf_view(views.segna_notifica_finanziaria_letta),
+        name="segna_notifica_finanziaria_letta",
+    ),
+    path(
+        "gestione-finanziaria/notifiche/segna-tutte-lette/",
+        gf_view(views.segna_tutte_notifiche_finanziarie_lette),
+        name="segna_tutte_notifiche_finanziarie_lette",
+    ),
+    path(
+        "gestione-finanziaria/scadenze-fornitori/<int:pk>/pagamento/",
+        gf_manage(views.registra_pagamento_scadenza_fornitore),
+        name="registra_pagamento_scadenza_fornitore",
+    ),
+    path(
+        "gestione-finanziaria/pagamenti-fornitori/<int:pk>/elimina/",
+        gf_manage(views.elimina_pagamento_fornitore),
+        name="elimina_pagamento_fornitore",
+    ),
 
     # Provider bancari
     path(
@@ -281,6 +341,16 @@ urlpatterns = [
         "gestione-finanziaria/riconciliazione/<int:pk>/",
         gf_edit(views.riconcilia_movimento),
         name="riconcilia_movimento",
+    ),
+    path(
+        "gestione-finanziaria/riconciliazione-fornitori/",
+        gf_view(views.lista_movimenti_da_riconciliare_fornitori),
+        name="lista_movimenti_da_riconciliare_fornitori",
+    ),
+    path(
+        "gestione-finanziaria/riconciliazione-fornitori/<int:pk>/",
+        gf_edit(views.riconcilia_movimento_fornitore),
+        name="riconcilia_movimento_fornitore",
     ),
 
     # Report per categoria

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Fatture in Cloud - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Fatture in Cloud</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Fatture in Cloud</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ connessioni|length }} connessioni
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                Import automatico delle fatture ricevute, scadenze fornitore e notifiche interne
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
+            <a href="{% url 'crea_fatture_in_cloud' %}" class="btn btn-primary btn-icon-text btn-add-action">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Nuova connessione</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="finance-guide-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Connessione guidata</div>
+            <p>
+                Arboris puo collegarsi via OAuth usando credenziali salvate nella singola connessione oppure, nella versione Render,
+                credenziali centralizzate configurate come variabili ambiente della app privata della scuola.
+            </p>
+        </div>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="panel-body">
+            {% if connessioni %}
+                <table class="list-table anagrafica-list-table finance-modern-table">
+                    <thead>
+                        <tr>
+                            <th>Connessione</th>
+                            <th>Company ID</th>
+                            <th>Stato</th>
+                            <th>Ultima sincronizzazione</th>
+                            <th>Esito</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for connessione in connessioni %}
+                            <tr class="list-row-link" data-row-href="{% url 'modifica_fatture_in_cloud' connessione.pk %}">
+                                <td class="anagrafica-record-cell">
+                                    <a href="{% url 'modifica_fatture_in_cloud' connessione.pk %}" class="anagrafica-record-link anagrafica-record-link-compact">
+                                        <span class="finance-record-icon finance-record-icon-cloud" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                        </span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ connessione.nome }}</span>
+                                            <span class="table-subtext">Fatture ricevute e da registrare</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ connessione.company_id|default:"-" }}</td>
+                                <td>
+                                    <span class="anagrafica-status-chip {% if connessione.stato == 'attiva' %}is-success{% elif connessione.stato == 'errore' %}is-danger{% else %}is-muted{% endif %}">
+                                        {{ connessione.get_stato_display }}
+                                    </span>
+                                </td>
+                                <td>{% if connessione.ultimo_sync_at %}{{ connessione.ultimo_sync_at|date:"d/m/Y H:i" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
+                                <td>{{ connessione.get_ultimo_esito_display|default:"-" }}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions anagrafica-row-actions">
+                                        <a
+                                            class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                            href="{% url 'modifica_fatture_in_cloud' connessione.pk %}"
+                                            title="Apri connessione"
+                                            aria-label="Apri connessione {{ connessione.nome }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessuna connessione Fatture in Cloud configurata.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Ultime sincronizzazioni</h2>
+                <p class="finance-section-subtitle">Cronologia import, webhook e sincronizzazioni manuali.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            {% if logs %}
+                <table class="list-table anagrafica-list-table finance-modern-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Connessione</th>
+                            <th>Esito</th>
+                            <th>Creati</th>
+                            <th>Aggiornati</th>
+                            <th>Messaggio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td>{{ log.data_operazione|date:"d/m/Y H:i" }}</td>
+                                <td>{{ log.connessione|default:"-" }}</td>
+                                <td>
+                                    <span class="anagrafica-status-chip {% if log.esito == 'ok' %}is-success{% else %}is-danger{% endif %}">
+                                        {{ log.get_esito_display }}
+                                    </span>
+                                </td>
+                                <td>{{ log.documenti_creati }}</td>
+                                <td>{{ log.documenti_aggiornati }}</td>
+                                <td>{{ log.messaggio|truncatechars:120 }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessuna sincronizzazione registrata.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}

@@ -26,6 +26,7 @@ from django.utils import timezone
 from .models import (
     ContoBancario,
     EsitoSincronizzazione,
+    FattureInCloudConnessione,
     PianificazioneSincronizzazione,
     TipoProviderBancario,
 )
@@ -36,6 +37,8 @@ from .services import sincronizza_conto_psd2
 STUCK_TIMEOUT = timedelta(hours=2)
 SYNC_SCHEDULE_CHECK_CACHE_KEY = "gestione_finanziaria:sync_schedule_recent_check"
 SYNC_SCHEDULE_CHECK_TTL_SECONDS = 60
+FIC_SYNC_SCHEDULE_CHECK_CACHE_KEY = "gestione_finanziaria:fic_sync_schedule_recent_check"
+FIC_SYNC_SCHEDULE_CHECK_TTL_SECONDS = 60
 
 
 def get_or_create_singleton() -> PianificazioneSincronizzazione:
@@ -197,3 +200,126 @@ def prossima_esecuzione_prevista(config: PianificazioneSincronizzazione):
         return None
     base = config.ultimo_run_at or timezone.now()
     return base + timedelta(hours=config.intervallo_ore)
+
+
+# =========================================================================
+#  Sincronizzazione Fatture in Cloud
+# =========================================================================
+
+
+def is_fatture_in_cloud_sync_due(connessione: FattureInCloudConnessione, *, now=None) -> bool:
+    if not connessione.attiva or not connessione.sync_automatico or connessione.intervallo_sync_ore <= 0:
+        return False
+    now = now or timezone.now()
+    if connessione.ultimo_sync_at is None:
+        return True
+    return connessione.ultimo_sync_at + timedelta(hours=connessione.intervallo_sync_ore) <= now
+
+
+def prossima_esecuzione_fatture_in_cloud(connessione: FattureInCloudConnessione):
+    if not connessione.attiva or not connessione.sync_automatico or connessione.intervallo_sync_ore <= 0:
+        return None
+    base = connessione.ultimo_sync_at or timezone.now()
+    return base + timedelta(hours=connessione.intervallo_sync_ore)
+
+
+def _acquire_fic_lock(connessione_id, now) -> Optional[FattureInCloudConnessione]:
+    try:
+        with transaction.atomic():
+            connessione = FattureInCloudConnessione.objects.select_for_update().get(pk=connessione_id)
+            if not is_fatture_in_cloud_sync_due(connessione, now=now):
+                return None
+
+            is_stuck = (
+                connessione.in_corso
+                and connessione.avviato_at
+                and connessione.avviato_at < now - STUCK_TIMEOUT
+            )
+            if connessione.in_corso and not is_stuck:
+                return None
+
+            connessione.in_corso = True
+            connessione.avviato_at = now
+            connessione.save(update_fields=["in_corso", "avviato_at", "data_aggiornamento"])
+            return connessione
+    except (OperationalError, ProgrammingError, FattureInCloudConnessione.DoesNotExist):
+        return None
+
+
+def maybe_run_scheduled_fatture_in_cloud_sync(triggered_by=None):
+    """
+    Esegue le sincronizzazioni Fatture in Cloud dovute.
+
+    Ritorna un dizionario con contatori se almeno una connessione e' stata
+    processata, altrimenti None.
+    """
+
+    if not cache.add(
+        FIC_SYNC_SCHEDULE_CHECK_CACHE_KEY,
+        True,
+        FIC_SYNC_SCHEDULE_CHECK_TTL_SECONDS,
+    ):
+        return None
+
+    now = timezone.now()
+    try:
+        snapshots = list(
+            FattureInCloudConnessione.objects.only(
+                "id",
+                "attiva",
+                "sync_automatico",
+                "intervallo_sync_ore",
+                "ultimo_sync_at",
+                "in_corso",
+                "avviato_at",
+            ).filter(attiva=True, sync_automatico=True)
+        )
+    except (OperationalError, ProgrammingError):
+        return None
+
+    due_ids = [connessione.pk for connessione in snapshots if is_fatture_in_cloud_sync_due(connessione, now=now)]
+    if not due_ids:
+        return None
+
+    from .fatture_in_cloud import FattureInCloudError, sincronizza_fatture_in_cloud
+
+    eseguite = 0
+    in_errore = 0
+    documenti_gestiti = 0
+
+    for connessione_id in due_ids:
+        connessione = _acquire_fic_lock(connessione_id, now)
+        if connessione is None:
+            continue
+        try:
+            stats = sincronizza_fatture_in_cloud(connessione, utente=triggered_by)
+            eseguite += 1
+            documenti_gestiti += stats["creati"] + stats["aggiornati"]
+        except FattureInCloudError:
+            in_errore += 1
+        except Exception:
+            in_errore += 1
+            try:
+                connessione.in_corso = False
+                connessione.ultimo_sync_at = timezone.now()
+                connessione.ultimo_esito = EsitoSincronizzazione.ERRORE
+                connessione.ultimo_messaggio = "Errore imprevisto durante la sincronizzazione automatica."
+                connessione.save(
+                    update_fields=[
+                        "in_corso",
+                        "ultimo_sync_at",
+                        "ultimo_esito",
+                        "ultimo_messaggio",
+                        "data_aggiornamento",
+                    ]
+                )
+            except Exception:
+                pass
+
+    if eseguite == 0 and in_errore == 0:
+        return None
+    return {
+        "eseguite": eseguite,
+        "in_errore": in_errore,
+        "documenti_gestiti": documenti_gestiti,
+    }

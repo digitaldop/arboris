@@ -23,6 +23,9 @@
             <a href="{% url 'report_categorie_mensile' %}" class="btn btn-secondary">Report categorie</a>
             <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Fornitori</a>
             <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary">Scadenziario fornitori</a>
+            <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="btn btn-secondary">Riconciliazione fornitori</a>
+            <a href="{% url 'lista_fatture_in_cloud' %}" class="btn btn-secondary">Fatture in Cloud</a>
+            <a href="{% url 'lista_notifiche_finanziarie' %}" class="btn btn-secondary">Notifiche</a>
             <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary">Conti</a>
             <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Movimenti</a>
             <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Categorie spesa</a>
@@ -56,6 +59,14 @@
             <div class="summary-item">
                 <div class="summary-value">{{ scadenze_fornitori_aperte }}</div>
                 <div class="summary-label">Scadenze fornitori aperte</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ scadenze_fornitori_scadute }}</div>
+                <div class="summary-label">Scadenze fornitori scadute</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ fatture_in_cloud_attive }}</div>
+                <div class="summary-label">Connessioni Fatture in Cloud</div>
             </div>
             <div class="summary-item">
                 <div class="summary-value">{{ regole_attive }}</div>

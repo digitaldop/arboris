@@ -2131,6 +2131,100 @@ a:hover {
     position: relative;
 }
 
+.header-notification-dropdown {
+    position: relative;
+}
+
+.header-notification-dropdown summary {
+    list-style: none;
+}
+
+.header-notification-dropdown summary::-webkit-details-marker {
+    display: none;
+}
+
+.header-notification-dropdown .header-icon-btn {
+    position: relative;
+}
+
+.header-notification-count {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #be123c;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 17px;
+    text-align: center;
+}
+
+.header-notification-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 5000;
+    width: min(360px, 92vw);
+    padding: 10px;
+    border: 1px solid rgba(65, 118, 144, 0.22);
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 18px 34px rgba(15, 39, 66, 0.18);
+    color: #203642;
+}
+
+.header-notification-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 4px 10px;
+    border-bottom: 1px solid #edf2f5;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.header-notification-head a {
+    color: #23628c;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.header-notification-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 6px;
+    border-bottom: 1px solid #edf2f5;
+    color: #203642;
+    text-decoration: none;
+}
+
+.header-notification-item:hover {
+    background: #f4f8fb;
+    text-decoration: none;
+}
+
+.header-notification-title {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.header-notification-text,
+.header-notification-empty {
+    color: #5b6f82;
+    font-size: 12px;
+}
+
+.header-notification-empty {
+    padding: 14px 6px 6px;
+}
+
 .header-settings-trigger {
     display: inline-flex;
     align-items: center;
@@ -19333,5 +19427,505 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
     .calendar-view-btn {
         flex: 1 1 0;
+    }
+}
+
+/* Gestione finanziaria: pagine operative moderne */
+.module-gestione_finanziaria .finance-page-head {
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-page-head .family-page-address {
+    max-width: 820px;
+    line-height: 1.4;
+}
+
+.module-gestione_finanziaria .finance-modern-panel {
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-modern-panel .panel-body {
+    padding: 10px 14px 14px;
+    overflow-x: auto;
+}
+
+.module-gestione_finanziaria .finance-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px 0;
+}
+
+.module-gestione_finanziaria .finance-section-head .section-title {
+    margin-bottom: 4px;
+}
+
+.module-gestione_finanziaria .finance-section-subtitle {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.module-gestione_finanziaria .finance-filter-toolbar .anagrafica-search-form {
+    align-items: flex-end;
+}
+
+.module-gestione_finanziaria .finance-modern-table {
+    min-width: 100%;
+    border: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    border-radius: 0;
+    overflow: visible;
+    font-size: 0.92rem;
+}
+
+.module-gestione_finanziaria .finance-modern-table th,
+.module-gestione_finanziaria .finance-modern-table td {
+    border-right: 0;
+    border-bottom: 0;
+}
+
+.module-gestione_finanziaria .finance-modern-table thead th {
+    padding: 0 14px 6px;
+    background: transparent;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody td {
+    padding: 16px 14px;
+    border-top: 1px solid #dce5f0;
+    border-bottom: 1px solid #dce5f0;
+    background: #ffffff;
+    color: #253246;
+    vertical-align: middle;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody td:first-child {
+    border-left: 1px solid #dce5f0;
+    border-radius: 8px 0 0 8px;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody td:last-child {
+    border-right: 1px solid #dce5f0;
+    border-radius: 0 8px 8px 0;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr:hover {
+    background: transparent;
+    transform: translateY(-1px);
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr:hover td {
+    border-color: #c4d9e8;
+    box-shadow: 0 8px 18px rgba(32, 54, 69, 0.07);
+}
+
+.module-gestione_finanziaria .finance-row-unread td {
+    background: #f7fbff;
+    border-color: #cfe4f2;
+}
+
+.module-gestione_finanziaria .finance-row-overdue td {
+    background: #fff7f7;
+    border-color: #f1c7c7;
+}
+
+.module-gestione_finanziaria .finance-record-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    background: #eef6ff;
+    color: #417690;
+    box-shadow: 0 7px 16px rgba(55, 86, 118, 0.1);
+}
+
+.module-gestione_finanziaria .finance-record-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.module-gestione_finanziaria .finance-record-icon-supplier {
+    background: #edf7ee;
+    color: #2f7040;
+}
+
+.module-gestione_finanziaria .finance-record-icon-bank {
+    background: #e6f0f6;
+    color: #2f6680;
+}
+
+.module-gestione_finanziaria .finance-record-icon-notice {
+    background: #fff4d9;
+    color: #8a5b00;
+}
+
+.module-gestione_finanziaria .finance-record-icon-document,
+.module-gestione_finanziaria .finance-record-icon-cloud {
+    background: #eef2ff;
+    color: #4256a6;
+}
+
+.module-gestione_finanziaria .finance-money-cell {
+    font-weight: 800;
+    color: #1f3f52;
+    white-space: nowrap;
+}
+
+.module-gestione_finanziaria .finance-icon-button {
+    font: inherit;
+    cursor: pointer;
+}
+
+.module-gestione_finanziaria .finance-guide-panel,
+.module-gestione_finanziaria .finance-danger-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 18px;
+    padding: 16px 18px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.06);
+}
+
+.module-gestione_finanziaria .finance-danger-panel {
+    border-color: #f0c6c6;
+    background: #fffafa;
+}
+
+.module-gestione_finanziaria .finance-guide-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: #eaf2f6;
+    color: #417690;
+}
+
+.module-gestione_finanziaria .finance-danger-panel .finance-guide-icon {
+    background: #fde7ec;
+    color: #a30f2d;
+}
+
+.module-gestione_finanziaria .finance-guide-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.module-gestione_finanziaria .finance-guide-copy {
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-guide-title {
+    color: #223846;
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.module-gestione_finanziaria .finance-guide-copy p {
+    margin: 0;
+    color: #41536a;
+    line-height: 1.45;
+}
+
+.module-gestione_finanziaria .finance-step-list {
+    margin: 8px 0 10px 18px;
+    padding: 0;
+    color: #41536a;
+    line-height: 1.5;
+}
+
+.module-gestione_finanziaria .finance-step-list li + li {
+    margin-top: 4px;
+}
+
+.module-gestione_finanziaria .finance-form-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+    gap: 18px;
+    align-items: start;
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-form-main,
+.module-gestione_finanziaria .finance-form-side {
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-form-side {
+    display: grid;
+    gap: 14px;
+}
+
+.module-gestione_finanziaria .finance-connection-form .admin-section,
+.module-gestione_finanziaria .finance-payment-form .admin-section {
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-connection-form .admin-section-title,
+.module-gestione_finanziaria .finance-payment-form .admin-section-title {
+    border-radius: 8px 8px 0 0;
+}
+
+.module-gestione_finanziaria .finance-connection-form .admin-section > .panel,
+.module-gestione_finanziaria .finance-payment-form .admin-section > .panel {
+    border-color: #dce5f0;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+}
+
+.module-gestione_finanziaria .finance-connection-form .panel-body:has(> .finance-field-grid),
+.module-gestione_finanziaria .finance-payment-form .panel-body:has(> .finance-field-grid) {
+    padding: 16px;
+}
+
+.module-gestione_finanziaria .finance-side-card {
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 14px;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+}
+
+.module-gestione_finanziaria .finance-side-title {
+    margin-bottom: 10px;
+    color: #223846;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .finance-side-list {
+    display: grid;
+    gap: 12px;
+}
+
+.module-gestione_finanziaria .finance-side-list div {
+    display: grid;
+    gap: 2px;
+}
+
+.module-gestione_finanziaria .finance-side-list strong {
+    color: #253246;
+    font-size: 13px;
+}
+
+.module-gestione_finanziaria .finance-side-list span {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.module-gestione_finanziaria .finance-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.module-gestione_finanziaria .finance-form-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-form-field-wide {
+    grid-column: 1 / -1;
+}
+
+.module-gestione_finanziaria .finance-form-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: #223846;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .finance-form-field input:not([type="checkbox"]),
+.module-gestione_finanziaria .finance-form-field select,
+.module-gestione_finanziaria .finance-form-field textarea,
+.module-gestione_finanziaria .finance-form-field .searchable-select,
+.module-gestione_finanziaria .finance-readonly-input {
+    width: 100%;
+    max-width: 100%;
+}
+
+.module-gestione_finanziaria .finance-help-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid #c9d7e2;
+    border-radius: 50%;
+    background: #f7fbfd;
+    color: #526b91;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: help;
+}
+
+.module-gestione_finanziaria .finance-help-trigger:hover,
+.module-gestione_finanziaria .finance-help-trigger:focus-visible {
+    border-color: #8fbdd7;
+    background: #ffffff;
+    color: #244f66;
+}
+
+.module-gestione_finanziaria .finance-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.module-gestione_finanziaria .finance-toggle-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .finance-toggle-field label {
+    margin: 0;
+    color: #253246;
+    font-weight: 700;
+}
+
+.module-gestione_finanziaria .finance-toggle-field .help-text {
+    grid-column: 2 / -1;
+    margin: 0;
+}
+
+.module-gestione_finanziaria .finance-token-section {
+    margin-bottom: 22px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.module-gestione_finanziaria .finance-token-section summary {
+    padding: 12px 14px;
+    color: #223846;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.module-gestione_finanziaria .finance-token-body {
+    padding: 0 14px 14px;
+}
+
+.module-gestione_finanziaria .finance-readonly-input {
+    font-size: 12px;
+}
+
+.module-gestione_finanziaria .finance-sticky-actions {
+    gap: 8px;
+}
+
+.module-gestione_finanziaria .finance-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-summary-strip .summary-item {
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+}
+
+.module-gestione_finanziaria .finance-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.module-gestione_finanziaria .finance-reasons span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eef2f6;
+    color: #52637c;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.module-gestione_finanziaria .finance-inline-match-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.module-gestione_finanziaria .finance-inline-match-form input {
+    width: 112px;
+    min-width: 112px;
+}
+
+.module-gestione_finanziaria .finance-confirm-actions {
+    margin-top: 14px;
+}
+
+@media (max-width: 1100px) {
+    .module-gestione_finanziaria .finance-form-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .module-gestione_finanziaria .finance-form-side {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .module-gestione_finanziaria .finance-field-grid,
+    .module-gestione_finanziaria .finance-toggle-grid,
+    .module-gestione_finanziaria .finance-summary-strip,
+    .module-gestione_finanziaria .finance-form-side {
+        grid-template-columns: 1fr;
+    }
+
+    .module-gestione_finanziaria .finance-guide-panel,
+    .module-gestione_finanziaria .finance-danger-panel {
+        flex-direction: column;
+    }
+
+    .module-gestione_finanziaria .finance-inline-match-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .module-gestione_finanziaria .finance-inline-match-form input,
+    .module-gestione_finanziaria .finance-inline-match-form .btn {
+        width: 100%;
     }
 }

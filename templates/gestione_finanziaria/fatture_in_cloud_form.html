@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if connessione %}{{ connessione.nome }}{% else %}Nuova connessione Fatture in Cloud{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_fatture_in_cloud' %}">Fatture in Cloud</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if connessione %}{{ connessione.nome }}{% else %}Nuova{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">{% if connessione %}{{ connessione.nome }}{% else %}Nuova connessione Fatture in Cloud{% endif %}</h1>
+                {% if connessione %}
+                    <span class="family-status-pill {% if connessione.stato == 'attiva' %}{% elif connessione.stato == 'errore' %}is-danger{% else %}is-muted{% endif %}">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {{ connessione.get_stato_display }}
+                    </span>
+                {% else %}
+                    <span class="family-status-pill is-muted">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        Da configurare
+                    </span>
+                {% endif %}
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                Importa fatture passive da Fatture in Cloud e le trasforma in spese, scadenze e notifiche Arboris
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'lista_fatture_in_cloud' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Elenco</span>
+            </a>
+            {% if connessione %}
+                <form method="post" action="{% url 'sincronizza_fatture_in_cloud' connessione.pk %}" class="page-head-inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <span class="btn-label">Sincronizza ora</span>
+                    </button>
+                </form>
+                <a href="{% url 'avvia_oauth_fatture_in_cloud' connessione.pk %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <span class="btn-label">Collega OAuth</span>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="finance-guide-panel finance-oauth-guide">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">{% if oauth_render_configurato %}OAuth Render configurato{% else %}Percorso consigliato{% endif %}</div>
+            <ol class="finance-step-list">
+                {% if oauth_render_configurato %}
+                    <li>Usa la app privata Fatture in Cloud dedicata alla scuola, con l'account autorizzato in whitelist.</li>
+                    <li>Verifica che nella app Fatture in Cloud sia registrato questo Redirect URI: <code>{{ default_redirect_uri }}</code>.</li>
+                    <li>Lascia vuoti Client ID e Client Secret nella scheda: Arboris usera quelli configurati nelle variabili ambiente Render.</li>
+                    <li>Usa <strong>Salva e collega OAuth</strong>, poi completa il consenso su Fatture in Cloud.</li>
+                {% else %}
+                    <li>Crea o apri l'app in Fatture in Cloud da <strong>Impostazioni &gt; Sviluppatore</strong>.</li>
+                    <li>Imposta come Redirect URI questo indirizzo: <code>{{ default_redirect_uri }}</code>.</li>
+                    <li>Copia Client ID e Client Secret dentro Arboris, poi usa <strong>Salva e collega OAuth</strong>.</li>
+                    <li>Dopo il consenso, Arboris prova a recuperare il Company ID se l'account gestisce una sola azienda.</li>
+                {% endif %}
+            </ol>
+            <p>
+                {% if oauth_render_configurato %}
+                    La procedura manuale resta disponibile per installazioni locali o override tecnici, ma su Render il Secret non deve essere richiesto all'utente.
+                {% else %}
+                    Senza un'app Arboris pubblica o centralizzata gia registrata in Fatture in Cloud, il primo inserimento delle credenziali non puo essere eliminato.
+                    Dopo il collegamento, refresh token e sincronizzazione automatica riducono l'intervento manuale.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form finance-connection-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <div class="finance-form-layout">
+            <div class="finance-form-main">
+                <div class="admin-section">
+                    <div class="admin-section-title admin-section-title-with-help">
+                        <span>{% if oauth_render_configurato %}Credenziali OAuth manuali opzionali{% else %}Credenziali OAuth{% endif %}</span>
+                        <button
+                            type="button"
+                            class="inline-help-trigger"
+                            data-floating-text="{% if oauth_render_configurato %}Su Render Arboris usa Client ID e Client Secret dalle variabili ambiente. Compila questi campi solo se vuoi sovrascrivere la configurazione per questa specifica connessione.{% else %}Usa OAuth quando vuoi che Arboris apra Fatture in Cloud, chieda il consenso e salvi token rinnovabili. Serve una app Fatture in Cloud con Client ID, Client Secret e Redirect URI.{% endif %}"
+                            aria-label="Aiuto OAuth"
+                        >?</button>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="finance-field-grid">
+                                <div class="finance-form-field">
+                                    <label for="{{ form.nome.id_for_label }}" class="finance-form-label">
+                                        {{ form.nome.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="Nome interno visibile solo in Arboris, utile se in futuro gestisci piu aziende o ambienti." aria-label="Aiuto nome connessione">?</button>
+                                    </label>
+                                    {{ form.nome }}
+                                    {{ form.nome.errors }}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.client_id.id_for_label }}" class="finance-form-label">
+                                        {{ form.client_id.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="{% if oauth_render_configurato %}Gia configurato lato Render. Compilalo solo se questa connessione deve usare una app Fatture in Cloud diversa da quella della scuola.{% else %}Lo trovi nella pagina della app Fatture in Cloud, sezione Sviluppatore. Identifica l'app che richiede il consenso OAuth.{% endif %}" aria-label="Aiuto Client ID">?</button>
+                                    </label>
+                                    {{ form.client_id }}
+                                    {% if oauth_render_configurato %}<div class="help-text">Configurato lato server su Render; campo opzionale per override.</div>{% endif %}
+                                    {{ form.client_id.errors }}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.client_secret.id_for_label }}" class="finance-form-label">
+                                        {{ form.client_secret.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="{% if oauth_render_configurato %}Gia configurato come secret Render. Non inserirlo nella UI salvo override tecnico della singola connessione.{% else %}Lo trovi nella stessa pagina della app Fatture in Cloud. E un dato sensibile: Arboris lo salva cifrato e il campo resta vuoto quando riapri la scheda.{% endif %}" aria-label="Aiuto Client Secret">?</button>
+                                    </label>
+                                    {{ form.client_secret }}
+                                    {% if form.client_secret.help_text %}<div class="help-text">{{ form.client_secret.help_text }}</div>{% endif %}
+                                    {{ form.client_secret.errors }}
+                                </div>
+
+                                <div class="finance-form-field finance-form-field-wide">
+                                    <label for="{{ form.redirect_uri.id_for_label }}" class="finance-form-label">
+                                        {{ form.redirect_uri.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="{% if oauth_render_configurato %}Su Render puo essere fissato via variabile ambiente. Compila il campo solo se devi usare un redirect diverso per questa connessione.{% else %}Deve coincidere con la Redirect URL configurata nella app Fatture in Cloud. Se lo lasci vuoto, Arboris usa l'indirizzo mostrato nel riquadro guida.{% endif %}" aria-label="Aiuto Redirect URI">?</button>
+                                    </label>
+                                    {{ form.redirect_uri }}
+                                    <div class="help-text">Default: <code>{{ default_redirect_uri }}</code></div>
+                                    {{ form.redirect_uri.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section">
+                    <div class="admin-section-title admin-section-title-with-help">
+                        <span>Azienda e sincronizzazione</span>
+                        <button
+                            type="button"
+                            class="inline-help-trigger"
+                            data-floating-text="Questi valori decidono quale azienda Fatture in Cloud interrogare e con quale frequenza importare fatture registrate o da registrare."
+                            aria-label="Aiuto sincronizzazione"
+                        >?</button>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="finance-field-grid">
+                                <div class="finance-form-field">
+                                    <label for="{{ form.company_id.id_for_label }}" class="finance-form-label">
+                                        {{ form.company_id.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="Lo trovi in alto a sinistra nella web app Fatture in Cloud accanto al nome azienda. Arboris prova anche a recuperarlo via API dopo OAuth se hai una sola azienda." aria-label="Aiuto Company ID">?</button>
+                                    </label>
+                                    {{ form.company_id }}
+                                    {{ form.company_id.errors }}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.base_url.id_for_label }}" class="finance-form-label">
+                                        {{ form.base_url.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="Lascia il valore ufficiale Fatture in Cloud salvo ambienti tecnici specifici o test controllati." aria-label="Aiuto Base URL">?</button>
+                                    </label>
+                                    {{ form.base_url }}
+                                    {{ form.base_url.errors }}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.intervallo_sync_ore.id_for_label }}" class="finance-form-label">
+                                        {{ form.intervallo_sync_ore.label }}
+                                        <button type="button" class="finance-help-trigger" data-floating-text="Intervallo minimo tra due sincronizzazioni automatiche della stessa connessione. La sincronizzazione parte quando Arboris esegue i controlli schedulati." aria-label="Aiuto intervallo sync">?</button>
+                                    </label>
+                                    {{ form.intervallo_sync_ore }}
+                                    {% if form.intervallo_sync_ore.help_text %}<div class="help-text">{{ form.intervallo_sync_ore.help_text }}</div>{% endif %}
+                                    {{ form.intervallo_sync_ore.errors }}
+                                </div>
+                            </div>
+
+                            <div class="finance-toggle-grid">
+                                <div class="finance-toggle-field">
+                                    {{ form.attiva }}
+                                    <label for="{{ form.attiva.id_for_label }}">{{ form.attiva.label }}</label>
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Disattiva la connessione per sospendere import e webhook senza cancellare credenziali e cronologia." aria-label="Aiuto connessione attiva">?</button>
+                                    {{ form.attiva.errors }}
+                                </div>
+                                <div class="finance-toggle-field">
+                                    {{ form.sincronizza_documenti_registrati }}
+                                    <label for="{{ form.sincronizza_documenti_registrati.id_for_label }}">{{ form.sincronizza_documenti_registrati.label }}</label>
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Importa le fatture passive gia registrate in Fatture in Cloud come documenti fornitore Arboris." aria-label="Aiuto spese registrate">?</button>
+                                    {{ form.sincronizza_documenti_registrati.errors }}
+                                </div>
+                                <div class="finance-toggle-field">
+                                    {{ form.sincronizza_documenti_da_registrare }}
+                                    <label for="{{ form.sincronizza_documenti_da_registrare.id_for_label }}">{{ form.sincronizza_documenti_da_registrare.label }}</label>
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Importa anche i documenti ricevuti ma ancora da registrare, cosi le scadenze sono visibili prima della contabilizzazione completa." aria-label="Aiuto documenti da registrare">?</button>
+                                    {{ form.sincronizza_documenti_da_registrare.errors }}
+                                </div>
+                                <div class="finance-toggle-field">
+                                    {{ form.sync_automatico }}
+                                    <label for="{{ form.sync_automatico.id_for_label }}">{{ form.sync_automatico.label }}</label>
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Abilita i tentativi periodici di import. Puoi comunque usare Sincronizza ora in qualsiasi momento." aria-label="Aiuto sincronizzazione automatica">?</button>
+                                    {% if form.sync_automatico.help_text %}<div class="help-text">{{ form.sync_automatico.help_text }}</div>{% endif %}
+                                    {{ form.sync_automatico.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="finance-token-section">
+                    <summary>Token manuale per test o casi privati</summary>
+                    <div class="finance-token-body">
+                        <p class="help-text">
+                            Usa questi campi solo se non puoi completare OAuth. In Fatture in Cloud il token manuale si genera da Impostazioni &gt; Applicazioni collegate,
+                            selezionando azienda e permessi necessari.
+                        </p>
+                        <div class="finance-field-grid">
+                            <div class="finance-form-field">
+                                <label for="{{ form.access_token.id_for_label }}" class="finance-form-label">
+                                    {{ form.access_token.label }}
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Token generato manualmente in Fatture in Cloud. Non scade automaticamente, quindi va custodito con attenzione e revocato se compromesso." aria-label="Aiuto access token manuale">?</button>
+                                </label>
+                                {{ form.access_token }}
+                                {% if form.access_token.help_text %}<div class="help-text">{{ form.access_token.help_text }}</div>{% endif %}
+                                {{ form.access_token.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.refresh_token.id_for_label }}" class="finance-form-label">
+                                    {{ form.refresh_token.label }}
+                                    <button type="button" class="finance-help-trigger" data-floating-text="Compilalo solo se hai ottenuto un refresh token da un flusso OAuth eseguito altrove. Arboris lo usa per rinnovare l'access token." aria-label="Aiuto refresh token">?</button>
+                                </label>
+                                {{ form.refresh_token }}
+                                {% if form.refresh_token.help_text %}<div class="help-text">{{ form.refresh_token.help_text }}</div>{% endif %}
+                                {{ form.refresh_token.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <aside class="finance-form-side">
+                <div class="finance-side-card">
+                    <div class="finance-side-title">Dove recupero i dati?</div>
+                    <div class="finance-side-list">
+                        <div>
+                            <strong>Client ID e Secret</strong>
+                            <span>{% if oauth_render_configurato %}Su Render sono gestiti come variabili ambiente e non vanno inseriti dall'utente.{% else %}Fatture in Cloud, Impostazioni &gt; Sviluppatore, dentro la tua app OAuth.{% endif %}</span>
+                        </div>
+                        <div>
+                            <strong>Redirect URI</strong>
+                            <span>Usa l'URL mostrato nella guida e copialo nella app Fatture in Cloud.</span>
+                        </div>
+                        <div>
+                            <strong>Company ID</strong>
+                            <span>Visibile in alto a sinistra nella web app, accanto al nome azienda; dopo OAuth Arboris lo rileva se possibile.</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if connessione %}
+                    <div class="finance-side-card">
+                        <div class="finance-side-title">Webhook</div>
+                        <p class="help-text">Endpoint da inserire nei webhook Fatture in Cloud se vuoi ricevere eventi in tempo quasi reale.</p>
+                        <input type="text" class="finance-readonly-input" value="{{ webhook_url }}" readonly>
+                    </div>
+                {% endif %}
+            </aside>
+        </div>
+
+        <div class="form-actions sticky-form-actions finance-sticky-actions">
+            <button type="submit" name="azione" value="salva" class="btn btn-primary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                <span class="btn-label">Salva</span>
+            </button>
+            <button type="submit" name="azione" value="salva_collega" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                <span class="btn-label">Salva e collega OAuth</span>
+            </button>
+            <a href="{% url 'lista_fatture_in_cloud' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span class="btn-label">Annulla</span>
+            </a>
+        </div>
+    </form>
+
+    {% if connessione %}
+        <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title">Ultimi log</h2>
+                    <p class="finance-section-subtitle">Risultati recenti di import manuale, automatico e webhook.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if logs %}
+                    <table class="list-table anagrafica-list-table finance-modern-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Esito</th>
+                                <th>Creati</th>
+                                <th>Aggiornati</th>
+                                <th>Messaggio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                                <tr>
+                                    <td>{{ log.data_operazione|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <span class="anagrafica-status-chip {% if log.esito == 'ok' %}is-success{% else %}is-danger{% endif %}">
+                                            {{ log.get_esito_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ log.documenti_creati }}</td>
+                                    <td>{{ log.documenti_aggiornati }}</td>
+                                    <td>{{ log.messaggio|truncatechars:140 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">Nessun log per questa connessione.</div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

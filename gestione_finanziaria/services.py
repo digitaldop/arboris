@@ -22,6 +22,7 @@ from typing import Optional
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.urls import reverse
 from django.utils import timezone
 
 
@@ -639,6 +640,18 @@ class CandidatoMovimentoRiconciliazione:
         return max(0, min(100, self.score))
 
 
+@dataclass
+class CandidatoScadenzaFornitoreRiconciliazione:
+    scadenza: object
+    importo_residuo: Decimal
+    score: int
+    motivazioni: list
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+
 _TOLLERANZA_IMPORTO_ESATTO = Decimal("0.01")
 _TOLLERANZA_IMPORTO_APPROX = Decimal("1.00")
 _TOLLERANZA_GIORNI_VICINI = 7
@@ -1187,3 +1200,337 @@ def annulla_riconciliazione(movimento):
         ]
     )
     return movimento
+
+
+# =========================================================================
+#  Documenti e pagamenti fornitori
+# =========================================================================
+
+
+def aggiorna_stato_documento_da_scadenze(documento):
+    from .models import StatoDocumentoFornitore, StatoScadenzaFornitore
+
+    if documento.stato == StatoDocumentoFornitore.ANNULLATO:
+        return documento
+
+    scadenze = documento.scadenze.exclude(stato=StatoScadenzaFornitore.ANNULLATA)
+    if not scadenze.exists():
+        return documento
+
+    pagato = scadenze.aggregate(totale=Sum("importo_pagato"))["totale"] or Decimal("0.00")
+    totale = documento.totale or Decimal("0.00")
+    if totale > Decimal("0.00") and pagato >= totale - _TOLLERANZA_IMPORTO_ESATTO:
+        nuovo_stato = StatoDocumentoFornitore.PAGATO
+    elif pagato > Decimal("0.00"):
+        nuovo_stato = StatoDocumentoFornitore.PARZIALMENTE_PAGATO
+    else:
+        nuovo_stato = StatoDocumentoFornitore.DA_PAGARE
+
+    if documento.stato != nuovo_stato:
+        documento.stato = nuovo_stato
+        documento.save(update_fields=["stato", "data_aggiornamento"])
+    return documento
+
+
+def aggiorna_scadenza_da_pagamenti(scadenza):
+    from .models import StatoScadenzaFornitore
+
+    totale_pagato = scadenza.pagamenti.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
+    scadenza.importo_pagato = min(totale_pagato, scadenza.importo_previsto or Decimal("0.00"))
+    if scadenza.importo_pagato > Decimal("0.00"):
+        scadenza.data_pagamento = (
+            scadenza.pagamenti.order_by("-data_pagamento", "-id")
+            .values_list("data_pagamento", flat=True)
+            .first()
+        )
+    else:
+        scadenza.data_pagamento = None
+    scadenza.stato = scadenza.calcola_stato_automatico()
+    scadenza.save(update_fields=["importo_pagato", "data_pagamento", "stato", "data_aggiornamento"])
+
+    documento = scadenza.documento
+    aggiorna_stato_documento_da_scadenze(documento)
+    return scadenza
+
+
+def importo_scadenza_fornitore_residuo(scadenza):
+    return max((scadenza.importo_previsto or Decimal("0.00")) - (scadenza.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+
+
+def _importo_movimento_fornitori_riconciliato(movimento):
+    if movimento is None or not getattr(movimento, "pk", None):
+        return Decimal("0.00")
+    return movimento.pagamenti_fornitori.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
+
+
+def importo_movimento_disponibile_fornitori(movimento):
+    return max(
+        _importo_movimento_assoluto(movimento) - _importo_movimento_fornitori_riconciliato(movimento),
+        Decimal("0.00"),
+    )
+
+
+def crea_notifica_finanziaria(
+    *,
+    titolo,
+    messaggio="",
+    tipo="integrazione",
+    livello="info",
+    url="",
+    documento=None,
+    scadenza=None,
+    movimento_finanziario=None,
+    chiave_deduplica="",
+    richiede_gestione=False,
+    payload=None,
+):
+    from .models import NotificaFinanziaria
+
+    defaults = {
+        "titolo": titolo,
+        "messaggio": messaggio,
+        "tipo": tipo,
+        "livello": livello,
+        "url": url,
+        "documento": documento,
+        "scadenza": scadenza,
+        "movimento_finanziario": movimento_finanziario,
+        "richiede_gestione": richiede_gestione,
+        "payload": payload or {},
+    }
+    if chiave_deduplica:
+        notifica, created = NotificaFinanziaria.objects.get_or_create(
+            chiave_deduplica=chiave_deduplica,
+            defaults=defaults,
+        )
+        return notifica, created
+    return NotificaFinanziaria.objects.create(**defaults), True
+
+
+@transaction.atomic
+def registra_pagamento_fornitore(
+    scadenza,
+    *,
+    importo,
+    data_pagamento=None,
+    movimento=None,
+    metodo="manuale",
+    conto=None,
+    note="",
+    utente=None,
+):
+    from .models import PagamentoFornitore
+
+    importo = Decimal(importo or Decimal("0.00"))
+    if importo <= Decimal("0.00"):
+        raise ValidationError("L'importo del pagamento deve essere maggiore di zero.")
+
+    residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
+    if importo > residuo_scadenza + _TOLLERANZA_IMPORTO_ESATTO:
+        raise ValidationError("L'importo supera il residuo della scadenza.")
+
+    if movimento is not None:
+        residuo_movimento = importo_movimento_disponibile_fornitori(movimento)
+        if importo > residuo_movimento + _TOLLERANZA_IMPORTO_ESATTO:
+            raise ValidationError("L'importo supera il residuo disponibile del movimento bancario.")
+
+    pagamento = PagamentoFornitore.objects.create(
+        scadenza=scadenza,
+        movimento_finanziario=movimento,
+        data_pagamento=data_pagamento or timezone.localdate(),
+        importo=importo,
+        metodo=metodo,
+        conto_bancario=conto or getattr(movimento, "conto", None),
+        note=note,
+        creato_da=utente if getattr(utente, "is_authenticated", False) else None,
+    )
+    aggiorna_scadenza_da_pagamenti(scadenza)
+    return pagamento
+
+
+@transaction.atomic
+def annulla_pagamento_fornitore(pagamento):
+    scadenza = pagamento.scadenza
+    pagamento.delete()
+    aggiorna_scadenza_da_pagamenti(scadenza)
+    return scadenza
+
+
+def _supplier_match_score(fornitore, testo_movimento):
+    score = 0
+    motivazioni = []
+    denominazione = _normalizza_testo_match(getattr(fornitore, "denominazione", "") or "")
+    if denominazione and _testo_contiene_frase(testo_movimento, denominazione):
+        score += 38
+        motivazioni.append("Denominazione fornitore presente nella causale")
+    else:
+        parole = [p for p in denominazione.split() if len(p) >= 4]
+        match = [p for p in parole if _testo_contiene_parola(testo_movimento, p)]
+        if match:
+            score += min(26, 8 * len(match))
+            motivazioni.append("Causale compatibile con il nome del fornitore")
+
+    partita_iva = _normalizza_testo_match(getattr(fornitore, "partita_iva", "") or "")
+    codice_fiscale = _normalizza_testo_match(getattr(fornitore, "codice_fiscale", "") or "")
+    if partita_iva and partita_iva in testo_movimento:
+        score += 28
+        motivazioni.append("Partita IVA presente nel movimento")
+    elif codice_fiscale and codice_fiscale in testo_movimento:
+        score += 24
+        motivazioni.append("Codice fiscale presente nel movimento")
+    return score, motivazioni
+
+
+def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
+    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+
+    if movimento is None or movimento.importo is None or movimento.importo >= 0:
+        return []
+
+    disponibile = importo_movimento_disponibile_fornitori(movimento)
+    if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+
+    testo_movimento = _normalizza_testo_match(
+        f"{movimento.descrizione or ''} {movimento.controparte or ''} {movimento.iban_controparte or ''}"
+    )
+
+    scadenze = (
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__fornitore",
+            "documento__categoria_spesa",
+        )
+        .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .order_by("data_scadenza", "id")[:300]
+    )
+    candidati = []
+    for scadenza in scadenze:
+        residuo = importo_scadenza_fornitore_residuo(scadenza)
+        if residuo <= _TOLLERANZA_IMPORTO_ESATTO:
+            continue
+
+        score = 0
+        motivazioni = []
+        differenza = abs(disponibile - residuo)
+        if differenza <= _TOLLERANZA_IMPORTO_ESATTO:
+            score += 45
+            motivazioni.append("Importo identico al residuo della scadenza")
+        elif differenza <= _TOLLERANZA_IMPORTO_APPROX:
+            score += 30
+            motivazioni.append("Importo molto vicino al residuo della scadenza")
+        elif disponibile < residuo:
+            score += 10
+            motivazioni.append("Movimento utilizzabile come pagamento parziale")
+        else:
+            continue
+
+        if movimento.data_contabile and scadenza.data_scadenza:
+            delta_giorni = abs((movimento.data_contabile - scadenza.data_scadenza).days)
+            if delta_giorni <= _TOLLERANZA_GIORNI_VICINI:
+                score += 22
+                motivazioni.append(f"Data vicina alla scadenza (+/- {delta_giorni} gg)")
+            elif delta_giorni <= _TOLLERANZA_GIORNI_ESTESA:
+                score += 8
+                motivazioni.append(f"Data entro 30 giorni dalla scadenza ({delta_giorni} gg)")
+
+        supplier_score, supplier_motivazioni = _supplier_match_score(scadenza.documento.fornitore, testo_movimento)
+        score += supplier_score
+        motivazioni.extend(supplier_motivazioni)
+
+        iban_fornitore = _normalizza_testo_match(getattr(scadenza.documento.fornitore, "iban", "") or "")
+        iban_movimento = _normalizza_testo_match(getattr(movimento, "iban_controparte", "") or "")
+        if iban_fornitore and iban_movimento and iban_fornitore == iban_movimento:
+            score += 24
+            motivazioni.append("IBAN fornitore corrispondente")
+
+        if score < 30:
+            continue
+        candidati.append(
+            CandidatoScadenzaFornitoreRiconciliazione(
+                scadenza=scadenza,
+                importo_residuo=residuo,
+                score=score,
+                motivazioni=motivazioni or ["Scadenza compatibile"],
+            )
+        )
+
+    candidati.sort(key=lambda candidato: (candidato.score, candidato.scadenza.data_scadenza), reverse=True)
+    return candidati[:limite]
+
+
+@transaction.atomic
+def riconcilia_movimento_con_scadenza_fornitore(
+    movimento,
+    scadenza,
+    *,
+    importo=None,
+    utente=None,
+    note="",
+):
+    from .models import MetodoPagamentoFornitore, StatoRiconciliazione
+
+    if movimento.importo is None or movimento.importo >= 0:
+        raise ValidationError("La riconciliazione fornitori richiede un movimento in uscita.")
+
+    disponibile = importo_movimento_disponibile_fornitori(movimento)
+    residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
+    importo = Decimal(importo if importo is not None else min(disponibile, residuo_scadenza))
+    pagamento = registra_pagamento_fornitore(
+        scadenza,
+        importo=importo,
+        data_pagamento=movimento.data_contabile,
+        movimento=movimento,
+        metodo=MetodoPagamentoFornitore.BANCA,
+        conto=movimento.conto,
+        note=note,
+        utente=utente,
+    )
+
+    residuo_movimento = importo_movimento_disponibile_fornitori(movimento)
+    if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO:
+        movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
+        movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
+
+    crea_notifica_finanziaria(
+        titolo="Pagamento fornitore riconciliato",
+        messaggio=f"{scadenza.documento.fornitore} - {scadenza.documento.numero_documento}",
+        tipo="riconciliazione",
+        url=reverse("modifica_documento_fornitore", kwargs={"pk": scadenza.documento_id}),
+        documento=scadenza.documento,
+        scadenza=scadenza,
+        movimento_finanziario=movimento,
+        chiave_deduplica=f"pagamento-fornitore-{pagamento.pk}",
+        payload={"pagamento_id": pagamento.pk},
+    )
+    return pagamento
+
+
+def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo: int = 85, limite_movimenti: int = 100):
+    from .models import MovimentoFinanziario, StatoRiconciliazione
+
+    riconciliati = []
+    movimenti = (
+        MovimentoFinanziario.objects.select_related("conto")
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(importo__lt=0)
+        .order_by("-data_contabile", "-id")[:limite_movimenti]
+    )
+    for movimento in movimenti:
+        if importo_movimento_disponibile_fornitori(movimento) <= _TOLLERANZA_IMPORTO_ESATTO:
+            continue
+        candidati = trova_scadenze_fornitori_candidate(movimento, limite=3)
+        if not candidati:
+            continue
+        top_score = candidati[0].score
+        migliori = [candidato for candidato in candidati if candidato.score == top_score]
+        if top_score < punteggio_minimo or len(migliori) != 1:
+            continue
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(
+            movimento,
+            migliori[0].scadenza,
+            utente=utente,
+            note="Riconciliazione automatica",
+        )
+        riconciliati.append(pagamento)
+    return riconciliati

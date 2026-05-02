@@ -10,7 +10,7 @@ Per esecuzioni indipendenti dal traffico si usa il management command
 
 from __future__ import annotations
 
-from .scheduler import maybe_run_scheduled_sync
+from .scheduler import maybe_run_scheduled_fatture_in_cloud_sync, maybe_run_scheduled_sync
 
 
 _EXCLUDE_PATH_PREFIXES = ("/admin/", "/media/", "/static/")
@@ -35,6 +35,7 @@ class SincronizzazionePsd2ScheduleMiddleware:
 
         try:
             maybe_run_scheduled_sync(triggered_by=getattr(request, "user", None))
+            maybe_run_scheduled_fatture_in_cloud_sync(triggered_by=getattr(request, "user", None))
         except Exception:
             # La sincronizzazione non deve mai compromettere la richiesta utente.
             pass

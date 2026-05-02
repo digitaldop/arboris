@@ -22,9 +22,12 @@ from .models import (
     CondizioneRegolaCategorizzazione,
     ContoBancario,
     DocumentoFornitore,
+    FattureInCloudConnessione,
     Fornitore,
     FonteSaldo,
     MovimentoFinanziario,
+    NotificaFinanziaria,
+    PagamentoFornitore,
     OrigineMovimento,
     ProviderBancario,
     RiconciliazioneRataMovimento,
@@ -40,11 +43,15 @@ from .models import (
     TipoProviderBancario,
     TipoDocumentoFornitore,
 )
+from .fatture_in_cloud import authorization_url, has_oauth_credentials, importa_documento_fatture_in_cloud
 from .importers import CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
 from .services import (
     applica_regole_a_movimento,
+    importo_movimento_disponibile_fornitori,
+    riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
+    trova_scadenze_fornitori_candidate,
     trova_movimenti_candidati_per_rate,
     trova_rate_candidate,
 )
@@ -553,6 +560,136 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         scadenza._preserve_manual_stato = True
         scadenza.save()
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PREVISTA)
+
+    def test_importa_documento_fatture_in_cloud_crea_documento_scadenza_notifica(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 987,
+            "type": "expense",
+            "description": "Consulenza mensile",
+            "invoice_number": "FC-42",
+            "date": "2026-04-20",
+            "next_due_date": "2026-05-20",
+            "amount_net": "1000.00",
+            "amount_vat": "220.00",
+            "amount_gross": "1220.00",
+            "entity": {
+                "name": "Cloud Supplier Srl",
+                "vat_number": "IT12345678901",
+                "tax_code": "12345678901",
+                "email": "info@example.com",
+            },
+            "payments_list": [
+                {
+                    "due_date": "2026-05-20",
+                    "amount": "1220.00",
+                    "status": "not_paid",
+                }
+            ],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="987")
+        self.assertEqual(documento.fornitore.denominazione, "Cloud Supplier Srl")
+        self.assertEqual(documento.numero_documento, "FC-42")
+        self.assertEqual(documento.totale, Decimal("1220.00"))
+        self.assertEqual(documento.origine, "fatture_in_cloud")
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 5, 20))
+        self.assertEqual(scadenza.importo_previsto, Decimal("1220.00"))
+        self.assertTrue(NotificaFinanziaria.objects.filter(documento=documento).exists())
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.filter(external_id="987").count(), 1)
+        self.assertEqual(NotificaFinanziaria.objects.filter(documento=documento).count(), 1)
+
+    @override_settings(
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET="render-secret",
+        FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI="https://arboris-test.onrender.com/gestione-finanziaria/fatture-in-cloud/callback/",
+    )
+    def test_fatture_in_cloud_oauth_usa_credenziali_render(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC Render")
+
+        self.assertTrue(has_oauth_credentials(connessione))
+        auth_url = authorization_url(
+            connessione,
+            "https://arboris-test.onrender.com/gestione-finanziaria/fatture-in-cloud/callback/",
+            "state-test",
+        )
+
+        self.assertIn("client_id=render-client", auth_url)
+        self.assertIn("state=state-test", auth_url)
+
+    @override_settings(
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",
+        FATTURE_IN_CLOUD_OAUTH_CLIENT_SECRET="render-secret",
+        FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI="https://arboris-test.onrender.com/gestione-finanziaria/fatture-in-cloud/callback/",
+    )
+    def test_avvia_oauth_fatture_in_cloud_con_credenziali_render(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC Render")
+
+        response = self.client.get(reverse("avvia_oauth_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("https://api-v2.fattureincloud.it/oauth/authorize", response["Location"])
+        self.assertIn("client_id=render-client", response["Location"])
+        self.assertIn("state=", response["Location"])
+        self.assertIn("redirect_uri=https%3A%2F%2Farboris-test.onrender.com", response["Location"])
+
+    def test_riconciliazione_fornitore_collega_movimento_in_uscita(self):
+        fornitore = Fornitore.objects.create(
+            denominazione="Energia Srl",
+            tipo_soggetto="azienda",
+            partita_iva="12345678901",
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="E-001",
+            data_documento=date(2026, 4, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 4, 30),
+            importo_previsto=Decimal("122.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 29),
+            importo=Decimal("-122.00"),
+            descrizione="Bonifico Energia Srl fattura E-001",
+            controparte="Energia Srl",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_scadenze_fornitori_candidate(movimento)
+        self.assertEqual(candidati[0].scadenza, scadenza)
+
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(
+            movimento,
+            scadenza,
+            utente=self.user,
+        )
+
+        self.assertEqual(pagamento.importo, Decimal("122.00"))
+        scadenza.refresh_from_db()
+        documento.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(scadenza.importo_pagato, Decimal("122.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0.00"))
+        self.assertEqual(PagamentoFornitore.objects.count(), 1)
 
     def test_fornitori_pages_render(self):
         categoria = CategoriaSpesa.objects.create(nome="Materiali")

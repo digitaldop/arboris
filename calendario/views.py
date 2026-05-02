@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_date, parse_time
 
 from anagrafica.models import Documento
 from economia.models import RataIscrizione
+from gestione_finanziaria.models import ScadenzaPagamentoFornitore
 
 from .data import (
     build_calendar_agenda_bundle,
@@ -24,6 +25,7 @@ from .models import (
     EventoCalendario,
     SYSTEM_CATEGORY_DOCUMENTS,
     SYSTEM_CATEGORY_RATE_DUE,
+    SYSTEM_CATEGORY_SUPPLIER_DUE,
     ensure_system_calendar_categories,
 )
 
@@ -148,6 +150,10 @@ def lista_categorie_calendario(request):
     if system_categories.get(SYSTEM_CATEGORY_DOCUMENTS):
         auto_counts[system_categories[SYSTEM_CATEGORY_DOCUMENTS].pk] = Documento.objects.filter(
             scadenza__isnull=False
+        ).count()
+    if system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE):
+        auto_counts[system_categories[SYSTEM_CATEGORY_SUPPLIER_DUE].pk] = ScadenzaPagamentoFornitore.objects.filter(
+            data_scadenza__isnull=False
         ).count()
 
     categorie = CategoriaCalendario.objects.annotate(count_eventi=Count("eventi")).order_by("ordine", "nome")

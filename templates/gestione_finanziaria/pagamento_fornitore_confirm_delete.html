@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Annulla pagamento fornitore - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Annulla pagamento fornitore</h1>
+                <span class="family-status-pill is-danger">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    Operazione reversibile
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                {{ pagamento.scadenza.documento.fornitore }} - {{ pagamento.scadenza.documento.numero_documento }}
+            </div>
+        </div>
+    </div>
+
+    <div class="finance-danger-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Conferma annullamento</div>
+            <p>
+                Vuoi annullare il pagamento di <strong>{{ pagamento.importo|euro }} &euro;</strong>
+                del {{ pagamento.data_pagamento|date:"d/m/Y" }}?
+            </p>
+            <p class="help-text">La scadenza tornera ad avere il residuo aggiornato e potra essere riconciliata di nuovo.</p>
+            <form method="post" class="form-actions finance-confirm-actions">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Annulla pagamento</span>
+                </button>
+                <a href="{% url 'modifica_documento_fornitore' pagamento.scadenza.documento.pk %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

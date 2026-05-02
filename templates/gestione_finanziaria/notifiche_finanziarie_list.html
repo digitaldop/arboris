@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Notifiche finanziarie - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Notifiche</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Notifiche finanziarie</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ notifiche|length }} notifiche
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
+                Avvisi riservati agli account abilitati alla gestione finanziaria e fornitori
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
+            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="page-head-inline-form">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Segna tutte lette</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="list-toolbar anagrafica-list-toolbar-card finance-filter-toolbar">
+        <form method="get" class="search-form anagrafica-search-form">
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Stato</span>
+                <select name="stato">
+                    <option value="">Tutte</option>
+                    <option value="non_lette" {% if stato == "non_lette" %}selected{% endif %}>Non lette</option>
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <span class="btn-label">Filtra</span>
+            </button>
+            <a href="{% url 'lista_notifiche_finanziarie' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Reset</span>
+            </a>
+        </form>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="panel-body">
+            {% if notifiche %}
+                <table class="list-table anagrafica-list-table finance-modern-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Notifica</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for notifica in notifiche %}
+                            <tr class="{% if notifica.pk not in lette_ids %}finance-row-unread{% endif %}">
+                                <td>{{ notifica.data_creazione|date:"d/m/Y H:i" }}</td>
+                                <td>{{ notifica.get_tipo_display }}</td>
+                                <td class="anagrafica-record-cell">
+                                    <div class="anagrafica-record-link anagrafica-record-link-compact">
+                                        <span class="finance-record-icon finance-record-icon-notice" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg>
+                                        </span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ notifica.titolo }}</span>
+                                            <span class="table-subtext">{{ notifica.messaggio }}</span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if notifica.pk in lette_ids %}
+                                        <span class="anagrafica-status-chip is-muted">Letta</span>
+                                    {% else %}
+                                        <span class="anagrafica-status-chip is-success">Nuova</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions anagrafica-row-actions">
+                                        {% if notifica.url %}
+                                            <a
+                                                class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                                href="{{ notifica.url }}"
+                                                title="Apri"
+                                                aria-label="Apri notifica {{ notifica.titolo }}"
+                                            ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                        {% endif %}
+                                        {% if notifica.pk not in lette_ids %}
+                                            <form method="post" action="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}" class="inline-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button
+                                                    type="submit"
+                                                    class="table-icon-link finance-icon-button"
+                                                    title="Segna letta"
+                                                    aria-label="Segna letta {{ notifica.titolo }}"
+                                                ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessuna notifica finanziaria.</div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

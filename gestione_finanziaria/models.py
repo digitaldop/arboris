@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -199,6 +200,11 @@ class StatoDocumentoFornitore(models.TextChoices):
     ANNULLATO = "annullato", "Annullato"
 
 
+class OrigineDocumentoFornitore(models.TextChoices):
+    MANUALE = "manuale", "Inserimento manuale"
+    FATTURE_IN_CLOUD = "fatture_in_cloud", "Fatture in Cloud"
+
+
 def documento_fornitore_upload_to(_instance, filename):
     return f"documenti_fornitori/{timezone.localdate():%Y/%m}/{filename}"
 
@@ -241,6 +247,19 @@ class DocumentoFornitore(models.Model):
         blank=True,
     )
     note = models.TextField(blank=True)
+    origine = models.CharField(
+        max_length=30,
+        choices=OrigineDocumentoFornitore.choices,
+        default=OrigineDocumentoFornitore.MANUALE,
+        db_index=True,
+    )
+    external_source = models.CharField(max_length=60, blank=True, db_index=True)
+    external_id = models.CharField(max_length=120, blank=True, db_index=True)
+    external_type = models.CharField(max_length=60, blank=True)
+    external_url = models.URLField(blank=True)
+    external_payload = models.JSONField(default=dict, blank=True)
+    importato_at = models.DateTimeField(blank=True, null=True)
+    external_updated_at = models.DateTimeField(blank=True, null=True)
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
@@ -258,6 +277,11 @@ class DocumentoFornitore(models.Model):
             models.UniqueConstraint(
                 fields=["fornitore", "tipo_documento", "numero_documento", "data_documento"],
                 name="gf_doc_forn_unique_numero_data",
+            ),
+            models.UniqueConstraint(
+                fields=["external_source", "external_id"],
+                condition=~models.Q(external_source="") & ~models.Q(external_id=""),
+                name="gf_doc_forn_unique_external",
             ),
         ]
 
@@ -374,6 +398,77 @@ class ScadenzaPagamentoFornitore(models.Model):
         if not getattr(self, "_preserve_manual_stato", False):
             self.stato = self.calcola_stato_automatico()
         super().save(*args, **kwargs)
+
+
+class MetodoPagamentoFornitore(models.TextChoices):
+    BANCA = "banca", "Movimento bancario"
+    MANUALE = "manuale", "Registrazione manuale"
+    CONTANTI = "contanti", "Contanti"
+    CARTA = "carta", "Carta"
+    ALTRO = "altro", "Altro"
+
+
+class PagamentoFornitore(models.Model):
+    scadenza = models.ForeignKey(
+        ScadenzaPagamentoFornitore,
+        on_delete=models.CASCADE,
+        related_name="pagamenti",
+    )
+    movimento_finanziario = models.ForeignKey(
+        "MovimentoFinanziario",
+        on_delete=models.SET_NULL,
+        related_name="pagamenti_fornitori",
+        blank=True,
+        null=True,
+    )
+    data_pagamento = models.DateField(db_index=True)
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    metodo = models.CharField(
+        max_length=20,
+        choices=MetodoPagamentoFornitore.choices,
+        default=MetodoPagamentoFornitore.MANUALE,
+    )
+    conto_bancario = models.ForeignKey(
+        "ContoBancario",
+        on_delete=models.SET_NULL,
+        related_name="pagamenti_fornitori",
+        blank=True,
+        null=True,
+    )
+    note = models.TextField(blank=True)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="pagamenti_fornitori_creati",
+        blank=True,
+        null=True,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_pagamento_fornitore"
+        ordering = ["-data_pagamento", "-id"]
+        verbose_name = "Pagamento fornitore"
+        verbose_name_plural = "Pagamenti fornitori"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(importo__gt=0),
+                name="gf_pag_forn_importo_pos",
+            ),
+            models.UniqueConstraint(
+                fields=["scadenza", "movimento_finanziario"],
+                condition=models.Q(movimento_finanziario__isnull=False),
+                name="gf_pag_forn_unique_scad_mov",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["scadenza", "data_pagamento"], name="gf_pag_forn_scad_data_idx"),
+            models.Index(fields=["movimento_finanziario"], name="gf_pag_forn_mov_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.scadenza} - {self.importo}"
 
 
 # =========================================================================
@@ -948,6 +1043,108 @@ class PianificazioneSincronizzazione(models.Model):
         return f"Pianificazione PSD2 ({stato}, ogni {self.intervallo_ore}h)"
 
 
+class StatoConnessioneFattureInCloud(models.TextChoices):
+    DA_CONFIGURARE = "da_configurare", "Da configurare"
+    ATTIVA = "attiva", "Attiva"
+    ERRORE = "errore", "In errore"
+
+
+class FattureInCloudConnessione(models.Model):
+    nome = models.CharField(max_length=150, default="Fatture in Cloud")
+    company_id = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="ID azienda Fatture in Cloud.",
+    )
+    client_id = models.CharField(max_length=160, blank=True)
+    client_secret_cifrato = models.TextField(blank=True)
+    access_token_cifrato = models.TextField(blank=True)
+    refresh_token_cifrato = models.TextField(blank=True)
+    token_scadenza = models.DateTimeField(blank=True, null=True)
+    redirect_uri = models.URLField(blank=True)
+    base_url = models.URLField(default="https://api-v2.fattureincloud.it")
+    stato = models.CharField(
+        max_length=20,
+        choices=StatoConnessioneFattureInCloud.choices,
+        default=StatoConnessioneFattureInCloud.DA_CONFIGURARE,
+    )
+    attiva = models.BooleanField(default=True)
+    sincronizza_documenti_registrati = models.BooleanField(default=True)
+    sincronizza_documenti_da_registrare = models.BooleanField(default=True)
+    sync_automatico = models.BooleanField(
+        default=False,
+        help_text="Se attivo, Arboris prova a sincronizzare periodicamente questa connessione.",
+    )
+    intervallo_sync_ore = models.PositiveIntegerField(
+        default=6,
+        help_text="Ogni quante ore tentare la sincronizzazione automatica.",
+    )
+    ultimo_sync_at = models.DateTimeField(blank=True, null=True)
+    avviato_at = models.DateTimeField(blank=True, null=True)
+    in_corso = models.BooleanField(default=False)
+    ultimo_esito = models.CharField(
+        max_length=20,
+        choices=EsitoSincronizzazione.choices,
+        blank=True,
+    )
+    ultimo_messaggio = models.TextField(blank=True)
+    oauth_state = models.CharField(max_length=120, blank=True)
+    webhook_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_fic_connessione"
+        ordering = ["nome"]
+        verbose_name = "Connessione Fatture in Cloud"
+        verbose_name_plural = "Connessioni Fatture in Cloud"
+
+    def __str__(self):
+        return self.nome
+
+
+class TipoSyncFattureInCloud(models.TextChoices):
+    COMPLETA = "completa", "Sincronizzazione completa"
+    DOCUMENTO = "documento", "Singolo documento"
+    WEBHOOK = "webhook", "Webhook"
+
+
+class FattureInCloudSyncLog(models.Model):
+    connessione = models.ForeignKey(
+        FattureInCloudConnessione,
+        on_delete=models.SET_NULL,
+        related_name="log_sincronizzazioni",
+        blank=True,
+        null=True,
+    )
+    tipo_operazione = models.CharField(
+        max_length=20,
+        choices=TipoSyncFattureInCloud.choices,
+        default=TipoSyncFattureInCloud.COMPLETA,
+    )
+    esito = models.CharField(
+        max_length=10,
+        choices=EsitoSincronizzazione.choices,
+        default=EsitoSincronizzazione.OK,
+    )
+    documenti_creati = models.PositiveIntegerField(default=0)
+    documenti_aggiornati = models.PositiveIntegerField(default=0)
+    scadenze_create = models.PositiveIntegerField(default=0)
+    notifiche_create = models.PositiveIntegerField(default=0)
+    durata_millisecondi = models.PositiveIntegerField(blank=True, null=True)
+    messaggio = models.TextField(blank=True)
+    data_operazione = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_fic_sync_log"
+        ordering = ["-data_operazione", "-id"]
+        verbose_name = "Log sincronizzazione Fatture in Cloud"
+        verbose_name_plural = "Log sincronizzazioni Fatture in Cloud"
+
+    def __str__(self):
+        return f"{self.get_tipo_operazione_display()} - {self.data_operazione:%d/%m/%Y %H:%M}"
+
+
 class SincronizzazioneLog(models.Model):
     conto = models.ForeignKey(
         ContoBancario,
@@ -986,3 +1183,111 @@ class SincronizzazioneLog(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_operazione_display()} - {self.data_operazione:%d/%m/%Y %H:%M}"
+
+
+# =========================================================================
+#  Notifiche finanziarie
+# =========================================================================
+
+
+class TipoNotificaFinanziaria(models.TextChoices):
+    FATTURA_RICEVUTA = "fattura_ricevuta", "Fattura ricevuta"
+    SCADENZA_PROSSIMA = "scadenza_prossima", "Scadenza prossima"
+    SCADENZA_INSOLUTA = "scadenza_insoluta", "Scadenza insoluta"
+    RICONCILIAZIONE = "riconciliazione", "Riconciliazione"
+    INTEGRAZIONE = "integrazione", "Integrazione"
+
+
+class LivelloNotificaFinanziaria(models.TextChoices):
+    INFO = "info", "Informazione"
+    WARNING = "warning", "Attenzione"
+    ERRORE = "errore", "Errore"
+
+
+class NotificaFinanziaria(models.Model):
+    titolo = models.CharField(max_length=180)
+    messaggio = models.TextField(blank=True)
+    tipo = models.CharField(
+        max_length=30,
+        choices=TipoNotificaFinanziaria.choices,
+        default=TipoNotificaFinanziaria.INTEGRAZIONE,
+    )
+    livello = models.CharField(
+        max_length=20,
+        choices=LivelloNotificaFinanziaria.choices,
+        default=LivelloNotificaFinanziaria.INFO,
+    )
+    richiede_gestione = models.BooleanField(
+        default=False,
+        help_text="Se attivo, la notifica e' visibile solo agli utenti con gestione finanziaria.",
+    )
+    url = models.CharField(max_length=300, blank=True)
+    documento = models.ForeignKey(
+        DocumentoFornitore,
+        on_delete=models.CASCADE,
+        related_name="notifiche",
+        blank=True,
+        null=True,
+    )
+    scadenza = models.ForeignKey(
+        ScadenzaPagamentoFornitore,
+        on_delete=models.CASCADE,
+        related_name="notifiche",
+        blank=True,
+        null=True,
+    )
+    movimento_finanziario = models.ForeignKey(
+        MovimentoFinanziario,
+        on_delete=models.CASCADE,
+        related_name="notifiche_fornitori",
+        blank=True,
+        null=True,
+    )
+    chiave_deduplica = models.CharField(max_length=180, blank=True, db_index=True)
+    payload = models.JSONField(default=dict, blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_notifica"
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Notifica finanziaria"
+        verbose_name_plural = "Notifiche finanziarie"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["chiave_deduplica"],
+                condition=~models.Q(chiave_deduplica=""),
+                name="gf_notifica_unique_dedup",
+            ),
+        ]
+
+    def __str__(self):
+        return self.titolo
+
+
+class NotificaFinanziariaLettura(models.Model):
+    notifica = models.ForeignKey(
+        NotificaFinanziaria,
+        on_delete=models.CASCADE,
+        related_name="letture",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifiche_finanziarie_lette",
+    )
+    letta_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_notifica_lettura"
+        ordering = ["-letta_il"]
+        verbose_name = "Lettura notifica finanziaria"
+        verbose_name_plural = "Letture notifiche finanziarie"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notifica", "user"],
+                name="gf_notifica_lettura_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.notifica_id}"
