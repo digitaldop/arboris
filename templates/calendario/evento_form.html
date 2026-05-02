@@ -1,177 +1,255 @@
-{% extends "base.html" %}
+{% extends base_template %}
+{% load static %}
 
 {% block title %}{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento calendario{% endif %} - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_eventi_calendario' %}">Calendario</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_eventi_calendario' %}">Calendario</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento calendario{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if can_manage_calendario %}
-                <button type="submit" form="evento-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
-            {% endif %}
-            {% if evento and can_manage_calendario %}
-                <a href="{% url 'elimina_evento_calendario' evento.pk %}" class="btn btn-danger">Elimina</a>
-            {% endif %}
-            <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Torna all'elenco</a>
+    <div class="calendar-event-editor-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero">
+            <span class="calendar-event-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">{% if evento %}{{ evento.titolo }}{% else %}Nuovo evento calendario{% endif %}</h1>
+                <p>{% if evento %}Aggiorna i dettagli dell'evento e la sua visibilita nel calendario.{% else %}Crea un nuovo evento per organizzare al meglio le attivita della scuola.{% endif %}</p>
+            </div>
         </div>
-    </div>
 
-    <form method="post" id="evento-form">
-        {% csrf_token %}
+        <form method="post" id="evento-form" class="calendar-event-form">
+            {% csrf_token %}
+            {% if popup %}
+                <input type="hidden" name="popup" value="1">
+            {% endif %}
 
-        <div class="family-top-layout">
-            <div class="family-main-column">
-                <div class="admin-section">
-                    <div class="admin-section-title">Dati evento</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            {% if form.non_field_errors %}
-                                <div class="settings-warning-box" style="margin-bottom: 16px;">
-                                    {{ form.non_field_errors }}
-                                </div>
+            <section class="calendar-event-form-card">
+                <div class="calendar-event-form-title">
+                    <span class="calendar-event-form-title-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                    </span>
+                    <span>Dettagli evento</span>
+                </div>
+
+                {% if form.non_field_errors %}
+                    <div class="settings-warning-box calendar-event-form-errors">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="calendar-event-form-grid">
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.titolo.id_for_label }}">
+                            <span class="calendar-event-field-label">Titolo *</span>
+                            {{ form.titolo }}
+                            {{ form.titolo.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.categoria_evento.id_for_label }}">
+                            <span class="calendar-event-field-label">Categoria *</span>
+                            {{ form.categoria_evento }}
+                            {{ form.categoria_evento.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.tipologia.id_for_label }}">
+                            <span class="calendar-event-field-label">Tipologia / tag</span>
+                            {{ form.tipologia }}
+                            {{ form.tipologia.errors }}
+                            <span class="help-text">Campo opzionale utile per aggiungere un tag o un dettaglio organizzativo.</span>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-event-checkbox-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        <label class="calendar-event-check-field" for="{{ form.intera_giornata.id_for_label }}">
+                            {{ form.intera_giornata }}
+                            <span>L'evento dura tutto il giorno</span>
+                            {{ form.intera_giornata.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.data_inizio.id_for_label }}">
+                            <span class="calendar-event-field-label">Data inizio *</span>
+                            {{ form.data_inizio }}
+                            {{ form.data_inizio.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.data_fine.id_for_label }}">
+                            <span class="calendar-event-field-label">Data fine *</span>
+                            {{ form.data_fine }}
+                            {{ form.data_fine.errors }}
+                            {% if form.data_fine.help_text %}
+                                <span class="help-text">{{ form.data_fine.help_text }}</span>
                             {% endif %}
-                            <table class="form-table">
-                                <tr>
-                                    <th>{{ form.titolo.label_tag }}</th>
-                                    <td>{{ form.titolo }} {{ form.titolo.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.categoria_evento.label_tag }}</th>
-                                    <td>{{ form.categoria_evento }} {{ form.categoria_evento.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.tipologia.label_tag }}</th>
-                                    <td>
-                                        {{ form.tipologia }} {{ form.tipologia.errors }}
-                                        <div class="help-text">Campo opzionale utile per aggiungere un tag o un dettaglio organizzativo.</div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.intera_giornata.label_tag }}</th>
-                                    <td>{{ form.intera_giornata }} {{ form.intera_giornata.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.data_inizio.label_tag }}</th>
-                                    <td>{{ form.data_inizio }} {{ form.data_inizio.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.data_fine.label_tag }}</th>
-                                    <td>
-                                        {{ form.data_fine }} {{ form.data_fine.errors }}
-                                        {% if form.data_fine.help_text %}
-                                            <div class="help-text">{{ form.data_fine.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr class="calendar-time-row">
-                                    <th>{{ form.ora_inizio.label_tag }}</th>
-                                    <td>{{ form.ora_inizio }} {{ form.ora_inizio.errors }}</td>
-                                </tr>
-                                <tr class="calendar-time-row">
-                                    <th>{{ form.ora_fine.label_tag }}</th>
-                                    <td>{{ form.ora_fine }} {{ form.ora_fine.errors }}</td>
-                                </tr>
-                                <tr class="calendar-time-row">
-                                    <th>{{ form.durata_minuti.label_tag }}</th>
-                                    <td>
-                                        {{ form.durata_minuti }} {{ form.durata_minuti.errors }}
-                                        {% if form.durata_minuti.help_text %}
-                                            <div class="help-text">{{ form.durata_minuti.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.ripetizione.label_tag }}</th>
-                                    <td>
-                                        {{ form.ripetizione }} {{ form.ripetizione.errors }}
-                                        <div class="help-text">
-                                            Puoi creare serie giornaliere, nei giorni feriali, settimanali, mensili o annuali. Per i centri estivi resta perfetto il blocco multi-giorno con ricorrenza settimanale.
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr class="calendar-recurrence-detail-row calendar-recurrence-interval-row">
-                                    <th>
-                                        <label for="{{ form.ripeti_ogni_intervallo.id_for_label }}" id="calendar-recurrence-interval-label">
-                                            {{ form.ripeti_ogni_intervallo.label }}
-                                        </label>
-                                    </th>
-                                    <td>
-                                        {{ form.ripeti_ogni_intervallo }} {{ form.ripeti_ogni_intervallo.errors }}
-                                        {% if form.ripeti_ogni_intervallo.help_text %}
-                                            <div class="help-text" id="calendar-recurrence-interval-help">{{ form.ripeti_ogni_intervallo.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr class="calendar-recurrence-detail-row">
-                                    <th>{{ form.ripetizione_numero_occorrenze.label_tag }}</th>
-                                    <td>
-                                        {{ form.ripetizione_numero_occorrenze }} {{ form.ripetizione_numero_occorrenze.errors }}
-                                        {% if form.ripetizione_numero_occorrenze.help_text %}
-                                            <div class="help-text">{{ form.ripetizione_numero_occorrenze.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr class="calendar-recurrence-detail-row">
-                                    <th>{{ form.ripetizione_fino_al.label_tag }}</th>
-                                    <td>
-                                        {{ form.ripetizione_fino_al }} {{ form.ripetizione_fino_al.errors }}
-                                        {% if form.ripetizione_fino_al.help_text %}
-                                            <div class="help-text">{{ form.ripetizione_fino_al.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.luogo.label_tag }}</th>
-                                    <td>{{ form.luogo }} {{ form.luogo.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.descrizione.label_tag }}</th>
-                                    <td>{{ form.descrizione }} {{ form.descrizione.errors }}</td>
-                                </tr>
-                            </table>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-time-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ora_inizio.id_for_label }}">
+                            <span class="calendar-event-field-label">Ora inizio</span>
+                            {{ form.ora_inizio }}
+                            {{ form.ora_inizio.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-time-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ora_fine.id_for_label }}">
+                            <span class="calendar-event-field-label">Ora fine</span>
+                            {{ form.ora_fine }}
+                            {{ form.ora_fine.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-time-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.durata_minuti.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.durata_minuti.label }}</span>
+                            {{ form.durata_minuti }}
+                            {{ form.durata_minuti.errors }}
+                            {% if form.durata_minuti.help_text %}
+                                <span class="help-text">{{ form.durata_minuti.help_text }}</span>
+                            {% endif %}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ripetizione.id_for_label }}">
+                            <span class="calendar-event-field-label">Ripetizione</span>
+                            {{ form.ripetizione }}
+                            {{ form.ripetizione.errors }}
+                            <span class="help-text">Puoi creare serie giornaliere, nei giorni feriali, settimanali, mensili o annuali.</span>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-recurrence-detail-row calendar-recurrence-interval-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ripeti_ogni_intervallo.id_for_label }}">
+                            <span class="calendar-event-field-label" id="calendar-recurrence-interval-label">{{ form.ripeti_ogni_intervallo.label }}</span>
+                            {{ form.ripeti_ogni_intervallo }}
+                            {{ form.ripeti_ogni_intervallo.errors }}
+                            {% if form.ripeti_ogni_intervallo.help_text %}
+                                <span class="help-text" id="calendar-recurrence-interval-help">{{ form.ripeti_ogni_intervallo.help_text }}</span>
+                            {% endif %}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-recurrence-detail-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ripetizione_numero_occorrenze.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.ripetizione_numero_occorrenze.label }}</span>
+                            {{ form.ripetizione_numero_occorrenze }}
+                            {{ form.ripetizione_numero_occorrenze.errors }}
+                            {% if form.ripetizione_numero_occorrenze.help_text %}
+                                <span class="help-text">{{ form.ripetizione_numero_occorrenze.help_text }}</span>
+                            {% endif %}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-recurrence-detail-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.ripetizione_fino_al.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.ripetizione_fino_al.label }}</span>
+                            {{ form.ripetizione_fino_al }}
+                            {{ form.ripetizione_fino_al.errors }}
+                            {% if form.ripetizione_fino_al.help_text %}
+                                <span class="help-text">{{ form.ripetizione_fino_al.help_text }}</span>
+                            {% endif %}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.luogo.id_for_label }}">
+                            <span class="calendar-event-field-label">Luogo</span>
+                            {{ form.luogo }}
+                            {{ form.luogo.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-event-description-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.descrizione.id_for_label }}">
+                            <span class="calendar-event-field-label">Descrizione</span>
+                            {{ form.descrizione }}
+                            {{ form.descrizione.errors }}
+                            <span class="help-text">Aggiungi informazioni utili per i partecipanti.</span>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row calendar-event-status-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                        <div class="calendar-event-field">
+                            <span class="calendar-event-field-label">Stato</span>
+                            <div class="calendar-event-status-grid">
+                                <label class="calendar-event-check-field" for="{{ form.visibile.id_for_label }}">
+                                    {{ form.visibile }}
+                                    <span>{{ form.visibile.label }}</span>
+                                    {{ form.visibile.errors }}
+                                </label>
+                                <label class="calendar-event-check-field" for="{{ form.attivo.id_for_label }}">
+                                    {{ form.attivo }}
+                                    <span>{{ form.attivo.label }}</span>
+                                    {{ form.attivo.errors }}
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="family-side-column">
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Stato</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table compact-form-table">
-                                <tr>
-                                    <th>{{ form.visibile.label_tag }}</th>
-                                    <td>{{ form.visibile }} {{ form.visibile.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.attivo.label_tag }}</th>
-                                    <td>{{ form.attivo }} {{ form.attivo.errors }}</td>
-                                </tr>
-                            </table>
-                        </div>
+                <div class="calendar-event-suggestion">
+                    <span class="calendar-event-suggestion-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                    </span>
+                    <div>
+                        <strong>Suggerimento</strong>
+                        <span>Piu dettagli inserisci, piu sara facile organizzare e comunicare l'evento a tutti.</span>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_calendario %}
-                <button type="submit" class="btn btn-primary">{% if evento %}Salva modifiche{% else %}Crea evento{% endif %}</button>
-            {% endif %}
-            <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary">Annulla</a>
-        </div>
-    </form>
+            <div class="calendar-event-actions">
+                {% if can_manage_calendario %}
+                    <button type="submit" class="btn btn-primary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <span>{% if evento %}Salva modifiche{% else %}Crea evento{% endif %}</span>
+                    </button>
+                {% endif %}
+                {% if evento and can_manage_calendario %}
+                    <a href="{% url 'elimina_evento_calendario' evento.pk %}{% if popup %}?popup=1{% endif %}" class="btn btn-danger" {% if popup %}data-window-popup="1" data-popup-url="{% url 'elimina_evento_calendario' evento.pk %}?popup=1" data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"{% endif %}>Elimina</a>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                {% else %}
+                    <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Annulla</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

@@ -1,38 +1,52 @@
-{% extends "base.html" %}
+{% extends base_template %}
+{% load static %}
 
 {% block title %}Elimina categoria calendario - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'calendario_agenda' %}">Calendario</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_categorie_calendario' %}">Categorie</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'calendario_agenda' %}">Calendario</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_categorie_calendario' %}">Categorie</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina categoria calendario</h1>
-    </div>
+    <div class="calendar-category-manager-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero">
+            <span class="calendar-event-hero-icon is-danger" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Elimina categoria calendario</h1>
+                <p>Stai per eliminare la categoria <strong>{{ categoria_obj.nome }}</strong>.</p>
+            </div>
+        </div>
 
-    <div class="panel">
-        <div class="panel-body">
-            <p>Stai per eliminare la categoria <strong>{{ categoria_obj.nome }}</strong>.</p>
+        <section class="calendar-event-form-card calendar-confirm-card">
             <p>Se ci sono eventi collegati, l'operazione non potra essere completata finche non li sposti su un'altra categoria.</p>
-
             <form method="post">
                 {% csrf_token %}
-                <div class="form-actions">
+                {% if popup %}
+                    <input type="hidden" name="popup" value="1">
+                {% endif %}
+                <div class="calendar-event-actions">
                     {% if can_manage_calendario %}
                         <button type="submit" class="btn btn-danger">Conferma eliminazione</button>
                     {% endif %}
-                    <a href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}" class="btn btn-secondary">Annulla</a>
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                    {% else %}
+                        <a href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}" class="btn btn-secondary">Annulla</a>
+                    {% endif %}
                 </div>
             </form>
-        </div>
+        </section>
     </div>
 {% endblock %}

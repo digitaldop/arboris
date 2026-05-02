@@ -19,6 +19,7 @@
     const WEEK_START_HOUR = 7;
     const WEEK_END_HOUR = 21;
     const MAX_MONTH_EVENTS_PER_DAY = 3;
+    const DAY_SELECTION_RENDER_DELAY_MS = 260;
     const DEFAULT_EVENT_COLOR = "#3b82f6";
 
     function parseISODate(value) {
@@ -184,18 +185,80 @@
         element.style.setProperty("--calendar-entry-color-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
     }
 
-    function createEntryLink(entry, className, label, meta, isBlock) {
+    function buildPopupUrl(rawUrl) {
+        const url = new URL(rawUrl, window.location.origin);
+        url.searchParams.set("popup", "1");
+        return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function buildCalendarReturnUrl() {
+        return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    }
+
+    function buildCalendarNavigationUrl(rawUrl) {
+        const url = new URL(rawUrl, window.location.origin);
+        if (url.origin !== window.location.origin) {
+            return rawUrl;
+        }
+        url.searchParams.set("next", buildCalendarReturnUrl());
+        return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    function canOpenEntryInPopup(entry) {
+        if (!entry || !entry.url || !entry.open_in_popup || entry.external) {
+            return false;
+        }
+
+        try {
+            return new URL(entry.url, window.location.origin).origin === window.location.origin;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function canShowEntryContextAction(entry) {
+        return canOpenEntryInPopup(entry) && entry.source === "locale";
+    }
+
+    function getEntryPopupTitle(entry) {
+        if (entry && entry.popup_title) {
+            return entry.popup_title;
+        }
+        return entry && entry.source === "locale" ? "Modifica evento calendario" : "Dettaglio calendario";
+    }
+
+    function createEntryLink(entry, className, label, meta, isBlock, state, contextDay) {
         const hasLink = Boolean(entry.url);
         const element = document.createElement(hasLink ? "a" : "div");
         element.className = className;
+        element.dataset.calendarEntryId = entry.id;
         applyEntryPalette(element, entry.color);
 
         if (hasLink) {
-            element.href = entry.url;
+            if (canOpenEntryInPopup(entry)) {
+                element.href = buildPopupUrl(entry.url);
+                element.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCalendarEntryPopup(entry);
+                });
+            } else {
+                element.href = buildCalendarNavigationUrl(entry.url);
+            }
             if (entry.external) {
                 element.target = "_blank";
                 element.rel = "noopener noreferrer";
             }
+        }
+
+        if (state && canShowEntryContextAction(entry)) {
+            element.addEventListener("contextmenu", function (event) {
+                openCalendarContextMenu(state, event, contextDay || entry.startDate, {
+                    allDay: entry.all_day,
+                    entry: entry,
+                    updateCurrentDate: true,
+                });
+            });
         }
 
         const badge = document.createElement("span");
@@ -259,6 +322,288 @@
         return `${url.pathname}${url.search}`;
     }
 
+    function openManagedCalendarPopup(url, title, features) {
+        if (window.ArborisRelatedPopups && typeof window.ArborisRelatedPopups.openManagedPopup === "function") {
+            window.ArborisRelatedPopups.openManagedPopup(
+                url,
+                "calendar_event_popup",
+                features || "width=920,height=760,resizable=yes,scrollbars=yes",
+                {
+                    title: title || "Calendario Arboris",
+                    lockMessage: "Completa il popup del calendario per continuare.",
+                }
+            );
+            return;
+        }
+
+        if (window.ArborisModalPopups && typeof window.ArborisModalPopups.open === "function") {
+            window.ArborisModalPopups.open(url, {
+                features: features || "width=920,height=760,resizable=yes,scrollbars=yes",
+                title: title || "Calendario Arboris",
+            });
+            return;
+        }
+
+        window.location.href = url;
+    }
+
+    function openEventCreatePopup(state, values) {
+        if (!state.canManage || !state.categories.length) {
+            return;
+        }
+
+        const config = values || {};
+        const url = buildPopupUrl(buildQuickCreateUrl(state.fullCreateUrl, {
+            date: config.date || formatDateKey(state.selectedDate),
+            endDate: config.endDate,
+            time: config.time,
+            duration: config.duration,
+            allDay: config.allDay !== false,
+            categoryId: config.categoryId,
+        }));
+        openManagedCalendarPopup(url, "Nuovo evento calendario", "width=920,height=760,resizable=yes,scrollbars=yes");
+    }
+
+    function updateSelectedCreateLinks(state) {
+        const selectedDateKey = formatDateKey(state.selectedDate);
+        document.querySelectorAll("[data-calendar-selected-create='1']").forEach((trigger) => {
+            const baseUrl = trigger.dataset.calendarBaseUrl
+                || trigger.dataset.popupUrl
+                || trigger.getAttribute("href")
+                || state.fullCreateUrl;
+            if (!baseUrl) {
+                return;
+            }
+
+            if (!trigger.dataset.calendarBaseUrl) {
+                trigger.dataset.calendarBaseUrl = baseUrl;
+            }
+
+            const selectedUrl = buildQuickCreateUrl(baseUrl, {
+                date: selectedDateKey,
+                allDay: true,
+            });
+            trigger.dataset.calendarSelectedDate = selectedDateKey;
+            trigger.setAttribute("href", selectedUrl);
+            if (trigger.hasAttribute("data-popup-url")) {
+                trigger.dataset.popupUrl = selectedUrl;
+            }
+        });
+    }
+
+    function getSelectedCreateDate(trigger, state) {
+        if (trigger.dataset.calendarSelectedDate) {
+            return trigger.dataset.calendarSelectedDate;
+        }
+
+        const rawUrl = trigger.dataset.popupUrl || trigger.getAttribute("href");
+        if (rawUrl) {
+            try {
+                const url = new URL(rawUrl, window.location.origin);
+                const requestedDate = url.searchParams.get("date");
+                if (requestedDate && parseISODate(requestedDate)) {
+                    return requestedDate;
+                }
+            } catch (error) {
+                // Keep the selected state as fallback when the link is not a valid URL.
+            }
+        }
+
+        return formatDateKey(state.selectedDate);
+    }
+
+    function openCalendarEntryPopup(entry) {
+        if (!entry || !entry.url) {
+            return;
+        }
+        openManagedCalendarPopup(
+            buildPopupUrl(entry.url),
+            getEntryPopupTitle(entry),
+            "width=920,height=760,resizable=yes,scrollbars=yes"
+        );
+    }
+
+    function bindCalendarEventPopupLinks() {
+        if (document.documentElement.dataset.calendarEventPopupLinksBound === "1") {
+            return;
+        }
+        document.documentElement.dataset.calendarEventPopupLinksBound = "1";
+
+        document.addEventListener("click", function (event) {
+            const trigger = event.target.closest("[data-calendar-event-popup='1']");
+            if (!trigger) {
+                return;
+            }
+
+            const rawUrl = trigger.dataset.popupUrl || trigger.getAttribute("href");
+            if (!rawUrl) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openManagedCalendarPopup(
+                buildPopupUrl(rawUrl),
+                trigger.dataset.popupTitle || "Dettaglio calendario",
+                trigger.dataset.popupWindowFeatures || "width=920,height=760,resizable=yes,scrollbars=yes"
+            );
+        }, true);
+
+    }
+
+    function bindSelectedCreatePopupLinks(state) {
+        if (document.documentElement.dataset.calendarSelectedCreateLinksBound === "1") {
+            return;
+        }
+        document.documentElement.dataset.calendarSelectedCreateLinksBound = "1";
+
+        document.addEventListener("click", function (event) {
+            const trigger = event.target.closest("[data-calendar-selected-create='1']");
+            if (!trigger) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openEventCreatePopup(state, {
+                date: getSelectedCreateDate(trigger, state),
+                allDay: true,
+            });
+        }, true);
+    }
+
+    function selectCalendarDay(state, day, options) {
+        const config = options || {};
+        clearPendingDayClick(state);
+        state.selectedDate = cloneDate(day);
+        if (config.updateCurrentDate) {
+            state.currentDate = cloneDate(day);
+        }
+        updateSelectedCreateLinks(state);
+        state.render();
+    }
+
+    function hideCalendarContextMenu(state) {
+        if (!state.contextMenu) {
+            return;
+        }
+        state.contextMenu.classList.remove("is-visible");
+    }
+
+    function getCalendarContextMenu(state) {
+        if (state.contextMenu && state.contextMenu.parentNode) {
+            return state.contextMenu;
+        }
+
+        const menu = document.createElement("div");
+        menu.className = "calendar-context-menu";
+        menu.setAttribute("role", "menu");
+        menu.innerHTML = `
+            <button type="button" class="calendar-context-menu-item" role="menuitem" data-calendar-context-create>
+                Crea un evento
+            </button>
+            <button type="button" class="calendar-context-menu-item" role="menuitem" data-calendar-context-edit>
+                Modifica Evento
+            </button>
+        `;
+        document.body.appendChild(menu);
+
+        menu.querySelector("[data-calendar-context-create]").addEventListener("click", function () {
+            if (!state.contextMenuConfig) {
+                hideCalendarContextMenu(state);
+                return;
+            }
+            const config = state.contextMenuConfig;
+            const options = config.options || {};
+            hideCalendarContextMenu(state);
+            selectCalendarDay(state, config.day, options);
+            openEventCreatePopup(state, {
+                date: formatDateKey(config.day),
+                endDate: options.endDate,
+                allDay: options.allDay !== false,
+                time: options.time,
+                duration: options.duration,
+                categoryId: options.categoryId,
+            });
+        });
+
+        menu.querySelector("[data-calendar-context-edit]").addEventListener("click", function () {
+            if (!state.contextMenuConfig || !state.contextMenuConfig.options.entry) {
+                hideCalendarContextMenu(state);
+                return;
+            }
+            const entry = state.contextMenuConfig.options.entry;
+            hideCalendarContextMenu(state);
+            openCalendarEntryPopup(entry);
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!menu.contains(event.target)) {
+                hideCalendarContextMenu(state);
+            }
+        });
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                hideCalendarContextMenu(state);
+            }
+        });
+        window.addEventListener("scroll", function () {
+            hideCalendarContextMenu(state);
+        }, true);
+        window.addEventListener("resize", function () {
+            hideCalendarContextMenu(state);
+        });
+
+        state.contextMenu = menu;
+        return menu;
+    }
+
+    function openCalendarContextMenu(state, event, day, options) {
+        const configOptions = Object.assign({}, options || {});
+        const hasEntryAction = canShowEntryContextAction(configOptions.entry);
+        if (!state.canManage && !hasEntryAction) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const menu = getCalendarContextMenu(state);
+        if ((!state.canManage || !state.categories.length) && !hasEntryAction) {
+            return;
+        }
+        state.contextMenuConfig = {
+            day: cloneDate(day),
+            options: configOptions,
+        };
+
+        const createButton = menu.querySelector("[data-calendar-context-create]");
+        const editButton = menu.querySelector("[data-calendar-context-edit]");
+        if (createButton) {
+            createButton.hidden = !state.canManage || !state.categories.length;
+        }
+        if (editButton) {
+            editButton.hidden = !hasEntryAction;
+        }
+
+        menu.style.left = "0";
+        menu.style.top = "0";
+        menu.classList.add("is-visible");
+
+        const menuRect = menu.getBoundingClientRect();
+        const viewportPadding = 10;
+        const left = Math.min(
+            event.clientX,
+            window.innerWidth - menuRect.width - viewportPadding
+        );
+        const top = Math.min(
+            event.clientY,
+            window.innerHeight - menuRect.height - viewportPadding
+        );
+        menu.style.left = `${Math.max(viewportPadding, left)}px`;
+        menu.style.top = `${Math.max(viewportPadding, top)}px`;
+    }
+
     function openDayView(state, day) {
         clearPendingDayClick(state);
         state.selectedDate = cloneDate(day);
@@ -275,255 +620,33 @@
         state.pendingDayClickTimer = null;
     }
 
+    function updateRenderedDaySelection(state) {
+        if (!state.renderTarget) {
+            return;
+        }
+
+        const selectedDateKey = formatDateKey(state.selectedDate);
+        state.renderTarget.querySelectorAll("[data-calendar-day-date]").forEach((node) => {
+            node.classList.toggle("is-selected", node.dataset.calendarDayDate === selectedDateKey);
+        });
+    }
+
     function scheduleDaySelection(state, day, options) {
         const config = options || {};
         clearPendingDayClick(state);
+        state.selectedDate = cloneDate(day);
+        if (config.updateCurrentDate) {
+            state.currentDate = cloneDate(day);
+        }
+        updateSelectedCreateLinks(state);
+        updateToolbar(state);
+        updateUrlState(state);
+        updateRenderedDaySelection(state);
+        updateSelectedDayPanel(state);
         state.pendingDayClickTimer = window.setTimeout(function () {
             state.pendingDayClickTimer = null;
-            state.selectedDate = cloneDate(day);
-            if (config.updateCurrentDate) {
-                state.currentDate = cloneDate(day);
-            }
             state.render();
-        }, 220);
-    }
-
-    function getQuickCreateDialog(root, state) {
-        let overlay = document.getElementById("calendar-quick-create-overlay");
-        if (!overlay) {
-            overlay = document.createElement("div");
-            overlay.id = "calendar-quick-create-overlay";
-            overlay.className = "app-dialog-overlay is-hidden";
-            overlay.innerHTML = `
-                <div class="app-dialog calendar-quick-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-quick-dialog-title">
-                    <div class="app-dialog-header">
-                        <h2 class="app-dialog-title" id="calendar-quick-dialog-title">Nuovo evento</h2>
-                    </div>
-                    <div class="app-dialog-body calendar-quick-dialog-body">
-                        <div class="calendar-quick-dialog-errors is-hidden" data-calendar-quick-errors="1"></div>
-                        <div class="calendar-quick-grid">
-                            <label class="calendar-quick-field">
-                                <span>Titolo</span>
-                                <input type="text" class="app-dialog-input" data-calendar-quick-field="titolo" maxlength="200">
-                            </label>
-                            <label class="calendar-quick-field">
-                                <span>Categoria</span>
-                                <select class="app-dialog-input" data-calendar-quick-field="categoria_evento"></select>
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-field-checkbox">
-                                <input type="checkbox" data-calendar-quick-field="intera_giornata">
-                                <span>Intera giornata</span>
-                            </label>
-                            <label class="calendar-quick-field">
-                                <span>Data inizio</span>
-                                <input type="date" class="app-dialog-input" data-calendar-quick-field="data_inizio">
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-all-day-row">
-                                <span>Data fine</span>
-                                <input type="date" class="app-dialog-input" data-calendar-quick-field="data_fine">
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-time-row">
-                                <span>Ora inizio</span>
-                                <input type="time" class="app-dialog-input" data-calendar-quick-field="ora_inizio">
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-time-row">
-                                <span>Durata (minuti)</span>
-                                <input type="number" class="app-dialog-input" data-calendar-quick-field="durata_minuti" min="15" max="1440" step="15">
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-field-wide">
-                                <span>Luogo</span>
-                                <input type="text" class="app-dialog-input" data-calendar-quick-field="luogo" maxlength="200">
-                            </label>
-                            <label class="calendar-quick-field calendar-quick-field-wide">
-                                <span>Descrizione</span>
-                                <textarea class="app-dialog-input calendar-quick-textarea" data-calendar-quick-field="descrizione" rows="4"></textarea>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="app-dialog-actions calendar-quick-actions">
-                        <a href="#" class="btn btn-secondary" data-calendar-quick-full="1">Apri scheda completa</a>
-                        <div class="calendar-quick-actions-right">
-                            <button type="button" class="btn btn-secondary" data-calendar-quick-cancel="1">Annulla</button>
-                            <button type="button" class="btn btn-primary" data-calendar-quick-save="1">Crea evento</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-        }
-
-        const fields = {
-            title: overlay.querySelector('[data-calendar-quick-field="titolo"]'),
-            category: overlay.querySelector('[data-calendar-quick-field="categoria_evento"]'),
-            allDay: overlay.querySelector('[data-calendar-quick-field="intera_giornata"]'),
-            date: overlay.querySelector('[data-calendar-quick-field="data_inizio"]'),
-            endDate: overlay.querySelector('[data-calendar-quick-field="data_fine"]'),
-            time: overlay.querySelector('[data-calendar-quick-field="ora_inizio"]'),
-            duration: overlay.querySelector('[data-calendar-quick-field="durata_minuti"]'),
-            location: overlay.querySelector('[data-calendar-quick-field="luogo"]'),
-            description: overlay.querySelector('[data-calendar-quick-field="descrizione"]'),
-        };
-        const errorsBox = overlay.querySelector('[data-calendar-quick-errors="1"]');
-        const cancelButton = overlay.querySelector('[data-calendar-quick-cancel="1"]');
-        const saveButton = overlay.querySelector('[data-calendar-quick-save="1"]');
-        const fullButton = overlay.querySelector('[data-calendar-quick-full="1"]');
-        const timeRows = overlay.querySelectorAll(".calendar-quick-time-row");
-        const allDayRows = overlay.querySelectorAll(".calendar-quick-all-day-row");
-
-        function syncFieldRows() {
-            timeRows.forEach((row) => {
-                row.style.display = fields.allDay.checked ? "none" : "";
-            });
-            allDayRows.forEach((row) => {
-                row.style.display = fields.allDay.checked ? "" : "none";
-            });
-        }
-
-        function hideErrors() {
-            errorsBox.classList.add("is-hidden");
-            errorsBox.innerHTML = "";
-        }
-
-        function showErrors(messages) {
-            errorsBox.innerHTML = "";
-            const list = document.createElement("ul");
-            messages.forEach((message) => {
-                const item = document.createElement("li");
-                item.textContent = message;
-                list.appendChild(item);
-            });
-            errorsBox.appendChild(list);
-            errorsBox.classList.remove("is-hidden");
-        }
-
-        function syncFullLink() {
-            fullButton.href = buildQuickCreateUrl(state.fullCreateUrl, {
-                date: fields.date.value,
-                endDate: fields.endDate.value,
-                time: fields.time.value,
-                duration: fields.duration.value,
-                allDay: fields.allDay.checked,
-                categoryId: fields.category.value,
-            });
-        }
-
-        async function saveEntry() {
-            hideErrors();
-            saveButton.disabled = true;
-
-            const formData = new FormData();
-            formData.append("titolo", fields.title.value.trim());
-            formData.append("categoria_evento", fields.category.value);
-            formData.append("intera_giornata", fields.allDay.checked ? "on" : "");
-            formData.append("data_inizio", fields.date.value);
-            formData.append("data_fine", fields.endDate.value || fields.date.value);
-            formData.append("ora_inizio", fields.time.value);
-            formData.append("durata_minuti", fields.duration.value || "60");
-            formData.append("luogo", fields.location.value.trim());
-            formData.append("descrizione", fields.description.value.trim());
-            formData.append("visibile", "on");
-
-            try {
-                const response = await fetch(state.createUrl, {
-                    method: "POST",
-                    headers: {
-                        "X-CSRFToken": state.csrfToken,
-                        "X-Requested-With": "XMLHttpRequest",
-                    },
-                    body: formData,
-                });
-                const payload = await response.json();
-
-                if (!response.ok || !payload.success) {
-                    showErrors(payload.error_messages || ["Impossibile creare l'evento."]);
-                    return;
-                }
-
-                state.entries.push(normalizeEntry(payload.entry));
-                state.selectedDate = parseISODate(payload.entry.start_date) || state.selectedDate;
-                state.currentDate = cloneDate(state.selectedDate);
-                closeDialog();
-                state.render();
-            } catch (error) {
-                showErrors(["Si e verificato un errore durante il salvataggio rapido dell'evento."]);
-            } finally {
-                saveButton.disabled = false;
-            }
-        }
-
-        function openDialog(config) {
-            hideErrors();
-
-            fields.category.innerHTML = "";
-            state.categories.forEach((category) => {
-                const option = document.createElement("option");
-                option.value = `${category.id}`;
-                option.textContent = category.name;
-                fields.category.appendChild(option);
-            });
-
-            fields.title.value = "";
-            fields.category.value = config.categoryId || (state.categories[0] ? `${state.categories[0].id}` : "");
-            fields.allDay.checked = Boolean(config.allDay);
-            fields.date.value = config.date || formatDateKey(state.selectedDate);
-            fields.endDate.value = config.endDate || fields.date.value;
-            fields.time.value = config.time || "09:00";
-            fields.duration.value = `${config.duration || 60}`;
-            fields.location.value = "";
-            fields.description.value = "";
-            syncFieldRows();
-            syncFullLink();
-
-            saveButton.disabled = !state.categories.length;
-            overlay.classList.remove("is-hidden");
-            document.body.classList.add("app-dialog-open");
-            window.setTimeout(() => fields.title.focus(), 0);
-        }
-
-        function closeDialog() {
-            overlay.classList.add("is-hidden");
-            document.body.classList.remove("app-dialog-open");
-        }
-
-        if (!overlay.dataset.calendarQuickBound) {
-            overlay.dataset.calendarQuickBound = "1";
-            cancelButton.addEventListener("click", closeDialog);
-            saveButton.addEventListener("click", saveEntry);
-            overlay.addEventListener("click", function (event) {
-                if (event.target === overlay) {
-                    closeDialog();
-                }
-            });
-            document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape" && !overlay.classList.contains("is-hidden")) {
-                    closeDialog();
-                }
-            });
-
-            fields.allDay.addEventListener("change", function () {
-                if (!fields.endDate.value) {
-                    fields.endDate.value = fields.date.value;
-                }
-                syncFieldRows();
-                syncFullLink();
-            });
-            fields.date.addEventListener("input", syncFullLink);
-            fields.date.addEventListener("change", function () {
-                if (fields.allDay.checked && (!fields.endDate.value || fields.endDate.value < fields.date.value)) {
-                    fields.endDate.value = fields.date.value;
-                }
-                syncFullLink();
-            });
-            fields.endDate.addEventListener("input", syncFullLink);
-            fields.time.addEventListener("input", syncFullLink);
-            fields.duration.addEventListener("input", syncFullLink);
-            fields.category.addEventListener("change", syncFullLink);
-        }
-
-        return {
-            open: openDialog,
-            close: closeDialog,
-        };
+        }, DAY_SELECTION_RENDER_DELAY_MS);
     }
 
     function updateSelectedDayPanel(state) {
@@ -590,7 +713,24 @@
             titleNode.className = "calendar-selected-day-item-title";
             titleNode.textContent = entry.title;
             if (entry.url) {
-                titleNode.href = entry.url;
+                if (canOpenEntryInPopup(entry)) {
+                    titleNode.href = buildPopupUrl(entry.url);
+                    titleNode.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        openCalendarEntryPopup(entry);
+                    });
+                    if (canShowEntryContextAction(entry)) {
+                        titleNode.addEventListener("contextmenu", function (event) {
+                            openCalendarContextMenu(state, event, state.selectedDate, {
+                                allDay: entry.all_day,
+                                entry: entry,
+                                updateCurrentDate: true,
+                            });
+                        });
+                    }
+                } else {
+                    titleNode.href = buildCalendarNavigationUrl(entry.url);
+                }
                 if (entry.external) {
                     titleNode.target = "_blank";
                     titleNode.rel = "noopener noreferrer";
@@ -647,6 +787,7 @@
             const dayEntries = sortEntries(getEntriesForDay(state.entries, day));
             const cell = document.createElement("div");
             cell.className = "calendar-month-cell";
+            cell.dataset.calendarDayDate = formatDateKey(day);
 
             if (!isSameMonth(day, monthStart)) {
                 cell.classList.add("is-other-month");
@@ -664,6 +805,7 @@
                 }
                 scheduleDaySelection(state, day, {
                     updateCurrentDate: !isSameMonth(day, monthStart),
+                    allDay: true,
                 });
             });
 
@@ -675,20 +817,38 @@
                 openDayView(state, day);
             });
 
+            cell.addEventListener("contextmenu", function (event) {
+                if (event.target.closest("a, button")) {
+                    return;
+                }
+                openCalendarContextMenu(state, event, day, {
+                    updateCurrentDate: !isSameMonth(day, monthStart),
+                    allDay: true,
+                });
+            });
+
             const dayButton = document.createElement("button");
             dayButton.type = "button";
             dayButton.className = "calendar-day-button";
+            dayButton.dataset.calendarDayDate = formatDateKey(day);
             dayButton.textContent = `${day.getDate()}`;
             dayButton.addEventListener("click", (event) => {
                 event.stopPropagation();
                 scheduleDaySelection(state, day, {
                     updateCurrentDate: true,
+                    allDay: true,
                 });
             });
             dayButton.addEventListener("dblclick", (event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 openDayView(state, day);
+            });
+            dayButton.addEventListener("contextmenu", (event) => {
+                openCalendarContextMenu(state, event, day, {
+                    updateCurrentDate: true,
+                    allDay: true,
+                });
             });
             cell.appendChild(dayButton);
 
@@ -697,7 +857,7 @@
 
             dayEntries.slice(0, MAX_MONTH_EVENTS_PER_DAY).forEach((entry) => {
                 const label = entry.all_day ? entry.title : `${entry.start_time || ""} ${entry.title}`.trim();
-                eventsBox.appendChild(createEntryLink(entry, "calendar-entry-chip", label, "", false));
+                eventsBox.appendChild(createEntryLink(entry, "calendar-entry-chip", label, "", false, state, day));
             });
 
             if (dayEntries.length > MAX_MONTH_EVENTS_PER_DAY) {
@@ -757,6 +917,7 @@
             const dayButton = document.createElement("button");
             dayButton.type = "button";
             dayButton.className = "calendar-week-day-button";
+            dayButton.dataset.calendarDayDate = formatDateKey(day);
             if (isSameDay(day, state.selectedDate)) {
                 dayButton.classList.add("is-selected");
             }
@@ -772,6 +933,12 @@
             dayButton.addEventListener("dblclick", (event) => {
                 event.preventDefault();
                 openDayView(state, day);
+            });
+            dayButton.addEventListener("contextmenu", (event) => {
+                openCalendarContextMenu(state, event, day, {
+                    updateCurrentDate: true,
+                    allDay: true,
+                });
             });
             header.appendChild(dayButton);
         }
@@ -790,19 +957,23 @@
             const day = addDays(weekStart, offset);
             const cell = document.createElement("div");
             cell.className = "calendar-week-all-day-cell";
+            cell.dataset.calendarDayDate = formatDateKey(day);
 
             cell.addEventListener("click", function (event) {
                 if (event.target.closest("a")) {
                     return;
                 }
                 state.selectedDate = cloneDate(day);
-                if (state.canManage && state.categories.length) {
-                    state.quickDialog.open({
-                        date: formatDateKey(day),
-                        allDay: true,
-                    });
-                }
                 state.render();
+            });
+            cell.addEventListener("contextmenu", function (event) {
+                if (event.target.closest("a")) {
+                    return;
+                }
+                openCalendarContextMenu(state, event, day, {
+                    updateCurrentDate: true,
+                    allDay: true,
+                });
             });
 
             const allDayEntries = sortEntries(
@@ -815,7 +986,7 @@
                 cell.innerHTML = `<div class="calendar-week-empty">${state.canManage ? "+" : "-"}</div>`;
             } else {
                 allDayEntries.forEach((entry) => {
-                    cell.appendChild(createEntryLink(entry, "calendar-entry-chip", entry.title, "", false));
+                    cell.appendChild(createEntryLink(entry, "calendar-entry-chip", entry.title, "", false, state, day));
                 });
             }
 
@@ -845,6 +1016,7 @@
             const day = addDays(weekStart, offset);
             const column = document.createElement("div");
             column.className = "calendar-week-day-column";
+            column.dataset.calendarDayDate = formatDateKey(day);
             if (isSameDay(day, state.selectedDate)) {
                 column.classList.add("is-selected");
             }
@@ -853,17 +1025,18 @@
                 const row = document.createElement("button");
                 row.type = "button";
                 row.className = "calendar-week-hour-row";
+                row.dataset.calendarDayDate = formatDateKey(day);
                 row.addEventListener("click", function () {
                     state.selectedDate = cloneDate(day);
-                    if (state.canManage && state.categories.length) {
-                        state.quickDialog.open({
-                            date: formatDateKey(day),
-                            allDay: false,
-                            time: `${`${hour}`.padStart(2, "0")}:00`,
-                            duration: 60,
-                        });
-                    }
                     state.render();
+                });
+                row.addEventListener("contextmenu", function (event) {
+                    openCalendarContextMenu(state, event, day, {
+                        updateCurrentDate: true,
+                        allDay: false,
+                        time: `${`${hour}`.padStart(2, "0")}:00`,
+                        duration: 60,
+                    });
                 });
                 column.appendChild(row);
             });
@@ -884,7 +1057,9 @@
                     "calendar-week-event-block",
                     entry.title,
                     `${getTimeLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}`,
-                    true
+                    true,
+                    state,
+                    day
                 );
 
                 const clampedStart = Math.max(entry.startMinutes, WEEK_START_HOUR * 60);
@@ -939,18 +1114,22 @@
 
         const allDayCell = document.createElement("div");
         allDayCell.className = "calendar-day-all-day-cell";
+        allDayCell.dataset.calendarDayDate = formatDateKey(day);
         allDayCell.addEventListener("click", function (event) {
             if (event.target.closest("a")) {
                 return;
             }
             state.selectedDate = cloneDate(day);
-            if (state.canManage && state.categories.length) {
-                state.quickDialog.open({
-                    date: formatDateKey(day),
-                    allDay: true,
-                });
-            }
             state.render();
+        });
+        allDayCell.addEventListener("contextmenu", function (event) {
+            if (event.target.closest("a")) {
+                return;
+            }
+            openCalendarContextMenu(state, event, day, {
+                updateCurrentDate: true,
+                allDay: true,
+            });
         });
 
         const allDayEntries = sortEntries(
@@ -963,7 +1142,7 @@
             allDayCell.innerHTML = `<div class="calendar-week-empty">${state.canManage ? "+" : "-"}</div>`;
         } else {
             allDayEntries.forEach((entry) => {
-                allDayCell.appendChild(createEntryLink(entry, "calendar-entry-chip", entry.title, "", false));
+                allDayCell.appendChild(createEntryLink(entry, "calendar-entry-chip", entry.title, "", false, state, day));
             });
         }
 
@@ -990,17 +1169,18 @@
             const row = document.createElement("button");
             row.type = "button";
             row.className = "calendar-day-hour-row";
+            row.dataset.calendarDayDate = formatDateKey(day);
             row.addEventListener("click", function () {
                 state.selectedDate = cloneDate(day);
-                if (state.canManage && state.categories.length) {
-                    state.quickDialog.open({
-                        date: formatDateKey(day),
-                        allDay: false,
-                        time: `${`${hour}`.padStart(2, "0")}:00`,
-                        duration: 60,
-                    });
-                }
                 state.render();
+            });
+            row.addEventListener("contextmenu", function (event) {
+                openCalendarContextMenu(state, event, day, {
+                    updateCurrentDate: true,
+                    allDay: false,
+                    time: `${`${hour}`.padStart(2, "0")}:00`,
+                    duration: 60,
+                });
             });
             dayColumn.appendChild(row);
         });
@@ -1022,7 +1202,9 @@
                 "calendar-day-event-block",
                 entry.title,
                 `${getTimeLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}`,
-                true
+                true,
+                state,
+                day
             );
 
             const clampedStart = Math.max(entry.startMinutes, WEEK_START_HOUR * 60);
@@ -1080,6 +1262,7 @@
                 const dayButton = document.createElement("button");
                 dayButton.type = "button";
                 dayButton.className = "calendar-year-day";
+                dayButton.dataset.calendarDayDate = formatDateKey(day);
 
                 if (!isSameMonth(day, monthDate)) {
                     dayButton.classList.add("is-other-month");
@@ -1099,6 +1282,12 @@
                 dayButton.addEventListener("dblclick", (event) => {
                     event.preventDefault();
                     openDayView(state, day);
+                });
+                dayButton.addEventListener("contextmenu", (event) => {
+                    openCalendarContextMenu(state, event, day, {
+                        updateCurrentDate: true,
+                        allDay: true,
+                    });
                 });
 
                 const number = document.createElement("span");
@@ -1169,6 +1358,8 @@
         const categoriesNode = document.getElementById("calendar-categories-data");
         const renderTarget = document.getElementById("calendar-agenda-render");
 
+        bindCalendarEventPopupLinks();
+
         if (!root || !dataNode || !categoriesNode || !renderTarget) {
             return;
         }
@@ -1183,17 +1374,59 @@
             createUrl: root.dataset.createUrl,
             fullCreateUrl: root.dataset.fullCreateUrl,
             csrfToken: root.dataset.csrfToken,
+            renderTarget: renderTarget,
             pendingDayClickTimer: null,
+            contextMenu: null,
+            contextMenuConfig: null,
             quickDialog: null,
             render: null,
         };
 
-        state.quickDialog = getQuickCreateDialog(root, state);
+        function findRenderedEntry(event) {
+            const entryNode = event.target.closest("[data-calendar-entry-id]");
+            if (!entryNode || !renderTarget.contains(entryNode)) {
+                return null;
+            }
+
+            return state.entries.find((entry) => `${entry.id}` === entryNode.dataset.calendarEntryId) || null;
+        }
+
+        renderTarget.addEventListener("click", function (event) {
+            const entry = findRenderedEntry(event);
+            if (!canOpenEntryInPopup(entry)) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            openCalendarEntryPopup(entry);
+        }, true);
+
+        renderTarget.addEventListener("contextmenu", function (event) {
+            const entry = findRenderedEntry(event);
+            if (!canShowEntryContextAction(entry)) {
+                return;
+            }
+            openCalendarContextMenu(state, event, entry.startDate || state.selectedDate, {
+                allDay: entry.all_day,
+                entry: entry,
+                updateCurrentDate: true,
+            });
+        }, true);
+
+        state.quickDialog = {
+            open: function (config) {
+                openEventCreatePopup(state, config || {});
+            },
+            close: function () {},
+        };
+
+        bindSelectedCreatePopupLinks(state);
 
         state.render = function render() {
             renderTarget.innerHTML = "";
             updateToolbar(state);
             updateUrlState(state);
+            updateSelectedCreateLinks(state);
 
             if (state.currentView === "day") {
                 buildDayView(state, renderTarget);

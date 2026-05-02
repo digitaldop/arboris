@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
@@ -30,6 +31,9 @@ from .models import (
 )
 
 
+CALENDAR_EVENTS_PER_PAGE = 12
+
+
 def serialize_calendar_category(categoria, event_count=0):
     return {
         "id": categoria.pk,
@@ -43,6 +47,50 @@ def parse_bool(value, default=False):
     if value is None:
         return default
     return str(value).strip().lower() in {"1", "true", "si", "s", "yes", "on"}
+
+
+def is_popup_request(request):
+    return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
+def render_popup_close(request, message):
+    return render(request, "popup/popup_close.html", {"message": message})
+
+
+def get_popup_template_context(request, extra=None):
+    popup = is_popup_request(request)
+    context = {
+        "popup": popup,
+        "base_template": "popup_base.html" if popup else "base.html",
+    }
+    if extra:
+        context.update(extra)
+    return context
+
+
+def paginate_calendar_records(request, records):
+    paginator = Paginator(records, CALENDAR_EVENTS_PER_PAGE)
+    return paginator.get_page(request.GET.get("page"))
+
+
+def build_event_list_context(request, list_bundle, *, prefix=""):
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
+    query_params.pop("popup", None)
+
+    page_obj = paginate_calendar_records(request, list_bundle["records"])
+    return {
+        f"{prefix}eventi": page_obj.object_list,
+        f"{prefix}eventi_page_obj": page_obj,
+        f"{prefix}eventi_querystring": query_params.urlencode(),
+        f"{prefix}categorie": list_bundle["categories"],
+        f"{prefix}categoria": (request.GET.get("categoria") or "").strip(),
+        f"{prefix}q": (request.GET.get("q") or "").strip(),
+        f"{prefix}count_eventi_totali": list_bundle["count_eventi_totali"],
+        f"{prefix}count_eventi_filtrati": page_obj.paginator.count,
+        f"{prefix}count_intera_giornata": list_bundle["count_intera_giornata"],
+        f"{prefix}count_con_orario": list_bundle["count_con_orario"],
+    }
 
 
 def resolve_calendar_initial_state(request):
@@ -94,28 +142,34 @@ def build_event_initial_from_request(request):
 def calendario_agenda(request):
     initial_view, initial_date = resolve_calendar_initial_state(request)
     agenda_bundle = build_calendar_agenda_bundle()
+    list_bundle = build_calendar_list_bundle(
+        categoria_filter=(request.GET.get("categoria") or "").strip(),
+        query=(request.GET.get("q") or "").strip(),
+    )
     calendar_records = agenda_bundle["records"]
     categorie = agenda_bundle["categories"]
     counts_by_category = agenda_bundle["counts_by_category"]
+    context = {
+        "calendar_entries": [serialize_calendar_record(record) for record in calendar_records],
+        "calendar_categories": categorie,
+        "calendar_categories_payload": [
+            serialize_calendar_category(categoria, event_count=counts_by_category.get(categoria.pk, 0))
+            for categoria in categorie
+            if categoria.attiva
+        ],
+        "calendar_initial_view": initial_view,
+        "calendar_initial_date": initial_date,
+        "count_eventi_locali": len(calendar_records),
+        "count_categorie": len(categorie),
+        "count_intera_giornata": sum(1 for record in calendar_records if record["all_day"]),
+        "count_con_orario": sum(1 for record in calendar_records if not record["all_day"]),
+    }
+    context.update(build_event_list_context(request, list_bundle, prefix="lista_"))
 
     return render(
         request,
         "calendario/calendario_view.html",
-        {
-            "calendar_entries": [serialize_calendar_record(record) for record in calendar_records],
-            "calendar_categories": categorie,
-            "calendar_categories_payload": [
-                serialize_calendar_category(categoria, event_count=counts_by_category.get(categoria.pk, 0))
-                for categoria in categorie
-                if categoria.attiva
-            ],
-            "calendar_initial_view": initial_view,
-            "calendar_initial_date": initial_date,
-            "count_eventi_locali": len(calendar_records),
-            "count_categorie": len(categorie),
-            "count_intera_giornata": sum(1 for record in calendar_records if record["all_day"]),
-            "count_con_orario": sum(1 for record in calendar_records if not record["all_day"]),
-        },
+        context,
     )
 
 
@@ -123,19 +177,12 @@ def lista_eventi_calendario(request):
     categoria = (request.GET.get("categoria") or "").strip()
     q = (request.GET.get("q") or "").strip()
     list_bundle = build_calendar_list_bundle(categoria_filter=categoria, query=q)
+    context = build_event_list_context(request, list_bundle)
 
     return render(
         request,
         "calendario/evento_list.html",
-        {
-            "eventi": list_bundle["records"],
-            "categorie": list_bundle["categories"],
-            "categoria": categoria,
-            "q": q,
-            "count_eventi_totali": list_bundle["count_eventi_totali"],
-            "count_intera_giornata": list_bundle["count_intera_giornata"],
-            "count_con_orario": list_bundle["count_con_orario"],
-        },
+        context,
     )
 
 
@@ -163,20 +210,23 @@ def lista_categorie_calendario(request):
     return render(
         request,
         "calendario/categoria_list.html",
-        {
+        get_popup_template_context(request, {
             "categorie": categorie,
             "count_attive": categorie.filter(attiva=True).count(),
             "count_totali": categorie.count(),
-        },
+        }),
     )
 
 
 def crea_categoria_calendario(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = CategoriaCalendarioForm(request.POST)
         if form.is_valid():
             categoria = form.save()
             messages.success(request, "Categoria calendario creata correttamente.")
+            if popup:
+                return render_popup_close(request, "Categoria calendario creata correttamente.")
             return redirect("modifica_categoria_calendario", pk=categoria.pk)
     else:
         form = CategoriaCalendarioForm()
@@ -184,18 +234,21 @@ def crea_categoria_calendario(request):
     return render(
         request,
         "calendario/categoria_form.html",
-        {"form": form, "categoria_obj": None},
+        get_popup_template_context(request, {"form": form, "categoria_obj": None}),
     )
 
 
 def modifica_categoria_calendario(request, pk):
     categoria_obj = get_object_or_404(CategoriaCalendario, pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         form = CategoriaCalendarioForm(request.POST, instance=categoria_obj)
         if form.is_valid():
             categoria_obj = form.save()
             messages.success(request, "Categoria calendario aggiornata correttamente.")
+            if popup:
+                return render_popup_close(request, "Categoria calendario aggiornata correttamente.")
             return redirect("modifica_categoria_calendario", pk=categoria_obj.pk)
     else:
         form = CategoriaCalendarioForm(instance=categoria_obj)
@@ -203,15 +256,18 @@ def modifica_categoria_calendario(request, pk):
     return render(
         request,
         "calendario/categoria_form.html",
-        {"form": form, "categoria_obj": categoria_obj},
+        get_popup_template_context(request, {"form": form, "categoria_obj": categoria_obj}),
     )
 
 
 def elimina_categoria_calendario(request, pk):
     categoria_obj = get_object_or_404(CategoriaCalendario, pk=pk)
+    popup = is_popup_request(request)
 
     if categoria_obj.is_system_category:
         messages.error(request, "Questa categoria e di sistema e non puo essere eliminata.")
+        if popup:
+            return render_popup_close(request, "Questa categoria e di sistema e non puo essere eliminata.")
         return redirect("modifica_categoria_calendario", pk=categoria_obj.pk)
 
     if request.method == "POST":
@@ -222,19 +278,27 @@ def elimina_categoria_calendario(request, pk):
                 request,
                 "Questa categoria e ancora collegata ad almeno un evento. Sposta prima gli eventi su un'altra categoria.",
             )
+            if popup:
+                return render_popup_close(
+                    request,
+                    "Questa categoria e ancora collegata ad almeno un evento.",
+                )
             return redirect("modifica_categoria_calendario", pk=categoria_obj.pk)
 
         messages.success(request, "Categoria calendario eliminata correttamente.")
+        if popup:
+            return render_popup_close(request, "Categoria calendario eliminata correttamente.")
         return redirect("lista_categorie_calendario")
 
     return render(
         request,
         "calendario/categoria_confirm_delete.html",
-        {"categoria_obj": categoria_obj},
+        get_popup_template_context(request, {"categoria_obj": categoria_obj}),
     )
 
 
 def crea_evento_calendario(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = EventoCalendarioForm(request.POST)
         if form.is_valid():
@@ -244,6 +308,8 @@ def crea_evento_calendario(request):
                 evento.aggiornato_da = request.user
             evento.save()
             messages.success(request, "Evento calendario creato correttamente.")
+            if popup:
+                return render_popup_close(request, "Evento calendario creato correttamente.")
             return redirect("modifica_evento_calendario", pk=evento.pk)
     else:
         form = EventoCalendarioForm(initial=build_event_initial_from_request(request))
@@ -251,7 +317,7 @@ def crea_evento_calendario(request):
     return render(
         request,
         "calendario/evento_form.html",
-        {"form": form, "evento": None},
+        get_popup_template_context(request, {"form": form, "evento": None}),
     )
 
 
@@ -304,6 +370,7 @@ def crea_evento_calendario_rapido(request):
 
 def modifica_evento_calendario(request, pk):
     evento = get_object_or_404(EventoCalendario.objects.select_related("categoria_evento"), pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         form = EventoCalendarioForm(request.POST, instance=evento)
@@ -313,6 +380,8 @@ def modifica_evento_calendario(request, pk):
                 evento.aggiornato_da = request.user
             evento.save()
             messages.success(request, "Evento calendario aggiornato correttamente.")
+            if popup:
+                return render_popup_close(request, "Evento calendario aggiornato correttamente.")
             return redirect("modifica_evento_calendario", pk=evento.pk)
     else:
         form = EventoCalendarioForm(instance=evento)
@@ -320,20 +389,23 @@ def modifica_evento_calendario(request, pk):
     return render(
         request,
         "calendario/evento_form.html",
-        {"form": form, "evento": evento},
+        get_popup_template_context(request, {"form": form, "evento": evento}),
     )
 
 
 def elimina_evento_calendario(request, pk):
     evento = get_object_or_404(EventoCalendario, pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         evento.delete()
         messages.success(request, "Evento calendario eliminato correttamente.")
+        if popup:
+            return render_popup_close(request, "Evento calendario eliminato correttamente.")
         return redirect("lista_eventi_calendario")
 
     return render(
         request,
         "calendario/evento_confirm_delete.html",
-        {"evento": evento},
+        get_popup_template_context(request, {"evento": evento}),
     )

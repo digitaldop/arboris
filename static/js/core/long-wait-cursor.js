@@ -155,6 +155,30 @@
         armLongWaitIfSameOriginFullNavigation(destUrlString, window.location.href);
     };
 
+    window.ArborisResetLongWaitCursor = resetAll;
+
+    function isPopupOrModalLink(anchor) {
+        if (!anchor || !anchor.dataset) {
+            return false;
+        }
+
+        if (
+            anchor.dataset.windowPopup === "1" ||
+            anchor.dataset.calendarEventPopup === "1" ||
+            anchor.dataset.calendarSelectedCreate === "1" ||
+            anchor.dataset.popupUrl
+        ) {
+            return true;
+        }
+
+        try {
+            const url = new URL(anchor.href, window.location.href);
+            return url.searchParams.get("popup") === "1";
+        } catch (e) {
+            return false;
+        }
+    }
+
     function isCurrentWindowLocation(loc) {
         try {
             return loc === window.location || (typeof document !== "undefined" && loc === document.location);
@@ -238,6 +262,9 @@
                 return;
             }
             if (a.target === "_blank" || a.hasAttribute("download")) {
+                return;
+            }
+            if (isPopupOrModalLink(a)) {
                 return;
             }
             const hrefAttr = (a.getAttribute("href") || "").trim();

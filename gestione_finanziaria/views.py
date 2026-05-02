@@ -61,7 +61,6 @@ from .forms import (
 from .importers import Camt053Parser, CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
 from .models import (
-    CategoriaSpesa,
     CategoriaFinanziaria,
     CanaleMovimento,
     ConnessioneBancaria,
@@ -231,6 +230,13 @@ def _categoria_spesa_template(popup, action):
     return "gestione_finanziaria/categoria_spesa_popup_delete.html"
 
 
+def _categorie_spesa_queryset(*, attive_solo=False):
+    queryset = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA)
+    if attive_solo:
+        queryset = queryset.filter(attiva=True)
+    return queryset.order_by("parent__nome", "ordine", "nome")
+
+
 def _generic_popup_form_context(request, form, title):
     return {
         "form": form,
@@ -250,9 +256,10 @@ def _generic_popup_delete_context(request, title, object_label, ha_vincoli=False
 
 
 def lista_categorie_spesa(request):
-    categorie = CategoriaSpesa.objects.annotate(
+    categorie = _categorie_spesa_queryset().annotate(
         numero_fornitori=Count("fornitori", distinct=True),
         numero_documenti=Count("documenti_fornitori", distinct=True),
+        numero_movimenti=Count("movimenti", distinct=True),
     ).order_by("ordine", "nome")
     return render(
         request,
@@ -288,7 +295,7 @@ def crea_categoria_spesa(request):
 
 def modifica_categoria_spesa(request, pk):
     popup = is_popup_request(request)
-    categoria = get_object_or_404(CategoriaSpesa, pk=pk)
+    categoria = get_object_or_404(_categorie_spesa_queryset(), pk=pk)
     if request.method == "POST":
         form = CategoriaSpesaForm(request.POST, instance=categoria)
         if form.is_valid():
@@ -314,10 +321,13 @@ def modifica_categoria_spesa(request, pk):
 
 def elimina_categoria_spesa(request, pk):
     popup = is_popup_request(request)
-    categoria = get_object_or_404(CategoriaSpesa, pk=pk)
+    categoria = get_object_or_404(_categorie_spesa_queryset(), pk=pk)
     count_fornitori = categoria.fornitori.count()
     count_documenti = categoria.documenti_fornitori.count()
-    ha_vincoli = bool(count_fornitori or count_documenti)
+    count_movimenti = categoria.movimenti.count()
+    count_regole = categoria.regole.count()
+    count_figlie = categoria.figli.count()
+    ha_vincoli = bool(count_fornitori or count_documenti or count_movimenti or count_regole or count_figlie)
 
     if request.method == "POST":
         if ha_vincoli:
@@ -329,13 +339,16 @@ def elimina_categoria_spesa(request, pk):
                         "categoria": categoria,
                         "count_fornitori": count_fornitori,
                         "count_documenti": count_documenti,
+                        "count_movimenti": count_movimenti,
+                        "count_regole": count_regole,
+                        "count_figlie": count_figlie,
                         "ha_vincoli": ha_vincoli,
                         "target_input_name": _popup_target_input_name(request),
                     },
                 )
             messages.error(
                 request,
-                "Impossibile eliminare la categoria: e' collegata a fornitori o documenti. "
+                "Impossibile eliminare la categoria: e' collegata a fornitori, documenti o movimenti. "
                 "Puoi disattivarla invece di eliminarla.",
             )
             return redirect("lista_categorie_spesa")
@@ -353,6 +366,9 @@ def elimina_categoria_spesa(request, pk):
             "categoria": categoria,
             "count_fornitori": count_fornitori,
             "count_documenti": count_documenti,
+            "count_movimenti": count_movimenti,
+            "count_regole": count_regole,
+            "count_figlie": count_figlie,
             "ha_vincoli": ha_vincoli,
             "popup": popup,
             "target_input_name": _popup_target_input_name(request),
@@ -391,7 +407,7 @@ def lista_fornitori(request):
         "gestione_finanziaria/fornitori_list.html",
         {
             "fornitori": fornitori,
-            "categorie": CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome"),
+            "categorie": _categorie_spesa_queryset(attive_solo=True),
             "q": q,
             "categoria_selezionata": categoria_id,
             "stato": stato,
@@ -553,7 +569,7 @@ def lista_documenti_fornitori(request):
         {
             "documenti": documenti,
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
-            "categorie": CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome"),
+            "categorie": _categorie_spesa_queryset(attive_solo=True),
             "stati": StatoDocumentoFornitore.choices,
             "q": q,
             "fornitore_selezionato": fornitore_id,
@@ -640,6 +656,73 @@ def elimina_documento_fornitore(request, pk):
     )
 
 
+def _ids_selezionati_da_post(request):
+    ids = []
+    for raw_id in request.POST.getlist("selected_ids"):
+        if str(raw_id).isdigit():
+            ids.append(int(raw_id))
+    return list(dict.fromkeys(ids))
+
+
+def _safe_bulk_next_url(request, fallback_url_name):
+    next_url = request.POST.get("next") or ""
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse(fallback_url_name)
+
+
+def elimina_documenti_fornitori_multipla(request):
+    if request.method != "POST":
+        return redirect("lista_documenti_fornitori")
+
+    next_url = _safe_bulk_next_url(request, "lista_documenti_fornitori")
+    selected_ids = _ids_selezionati_da_post(request)
+    if not selected_ids:
+        messages.error(request, "Seleziona almeno un documento fornitore da eliminare.")
+        return redirect(next_url)
+
+    queryset = (
+        DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa")
+        .filter(pk__in=selected_ids)
+        .order_by("-data_documento", "-id")
+    )
+    documenti = list(queryset)
+    if not documenti:
+        messages.error(request, "I documenti selezionati non sono piu disponibili.")
+        return redirect(next_url)
+
+    if request.POST.get("conferma") == "1":
+        count = len(documenti)
+        with transaction.atomic():
+            DocumentoFornitore.objects.filter(pk__in=[documento.pk for documento in documenti]).delete()
+        messages.success(request, f"Eliminati {count} documenti fornitori selezionati.")
+        return redirect(next_url)
+
+    totale_documenti = sum(
+        ((documento.totale or Decimal("0.00")) for documento in documenti),
+        Decimal("0.00"),
+    )
+    scadenze_count = ScadenzaPagamentoFornitore.objects.filter(documento__in=documenti).count()
+    pagamenti_count = PagamentoFornitore.objects.filter(scadenza__documento__in=documenti).count()
+
+    return render(
+        request,
+        "gestione_finanziaria/documenti_fornitori_bulk_confirm_delete.html",
+        {
+            "documenti": documenti,
+            "selected_ids": selected_ids,
+            "next_url": next_url,
+            "totale_documenti": totale_documenti,
+            "scadenze_count": scadenze_count,
+            "pagamenti_count": pagamenti_count,
+        },
+    )
+
+
 def scadenziario_fornitori(request):
     stato = request.GET.get("stato") or "aperte"
     categoria_id = request.GET.get("categoria") or ""
@@ -677,7 +760,7 @@ def scadenziario_fornitori(request):
             "totale_residuo": max(totale_previsto - totale_pagato, Decimal("0.00")),
             "stati": StatoScadenzaFornitore.choices,
             "stato": stato,
-            "categorie": CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome"),
+            "categorie": _categorie_spesa_queryset(attive_solo=True),
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
             "categoria_selezionata": categoria_id,
             "fornitore_selezionato": fornitore_id,
@@ -836,7 +919,10 @@ def sincronizza_fatture_in_cloud_view(request, pk):
         stats = sincronizza_fatture_in_cloud(connessione, utente=request.user)
         messages.success(
             request,
-            f"Sincronizzazione completata: {stats['creati']} nuovi, {stats['aggiornati']} aggiornati.",
+            f"Sincronizzazione completata: {stats['creati']} documenti nuovi, "
+            f"{stats['aggiornati']} documenti aggiornati. "
+            f"Fornitori: {stats.get('fornitori_creati', 0)} nuovi, "
+            f"{stats.get('fornitori_aggiornati', 0)} aggiornati.",
         )
     except FattureInCloudError as exc:
         messages.error(request, f"Sincronizzazione fallita: {exc}")
@@ -1927,6 +2013,74 @@ def elimina_movimento_finanziario(request, pk):
         request,
         "gestione_finanziaria/movimento_confirm_delete.html",
         {"movimento": movimento},
+    )
+
+
+def elimina_movimenti_finanziari_multipla(request):
+    if request.method != "POST":
+        return redirect("lista_movimenti_finanziari")
+
+    next_url = _safe_bulk_next_url(request, "lista_movimenti_finanziari")
+    selected_ids = _ids_selezionati_da_post(request)
+    if not selected_ids:
+        messages.error(request, "Seleziona almeno un movimento da eliminare.")
+        return redirect(next_url)
+
+    queryset = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
+        .filter(pk__in=selected_ids)
+        .order_by("-data_contabile", "-id")
+    )
+    movimenti = list(queryset)
+    if not movimenti:
+        messages.error(request, "I movimenti selezionati non sono piu disponibili.")
+        return redirect(next_url)
+
+    if request.POST.get("conferma") == "1":
+        conti_da_ricalcolare_ids = list(
+            queryset.filter(conto__isnull=False, incide_su_saldo_banca=True)
+            .values_list("conto_id", flat=True)
+            .distinct()
+        )
+        count = len(movimenti)
+        with transaction.atomic():
+            MovimentoFinanziario.objects.filter(pk__in=[movimento.pk for movimento in movimenti]).delete()
+
+        for conto in ContoBancario.objects.filter(pk__in=conti_da_ricalcolare_ids):
+            ricalcola_saldo_corrente_conto(conto)
+
+        messages.success(request, f"Eliminati {count} movimenti selezionati.")
+        return redirect(next_url)
+
+    totale_importi = sum(
+        ((movimento.importo or Decimal("0.00")) for movimento in movimenti),
+        Decimal("0.00"),
+    )
+    conti_count = len({movimento.conto_id for movimento in movimenti if movimento.conto_id})
+    riconciliazioni_rate_count = (
+        MovimentoFinanziario.objects.filter(pk__in=[movimento.pk for movimento in movimenti])
+        .filter(Q(rata_iscrizione__isnull=False) | Q(riconciliazioni_rate__isnull=False))
+        .distinct()
+        .count()
+    )
+    scadenze_collegate_count = ScadenzaPagamentoFornitore.objects.filter(
+        movimento_finanziario__in=movimenti
+    ).count()
+    pagamenti_collegati_count = PagamentoFornitore.objects.filter(movimento_finanziario__in=movimenti).count()
+
+    return render(
+        request,
+        "gestione_finanziaria/movimenti_bulk_confirm_delete.html",
+        {
+            "movimenti": movimenti,
+            "selected_ids": selected_ids,
+            "next_url": next_url,
+            "totale_importi": totale_importi,
+            "conti_count": conti_count,
+            "riconciliazioni_rate_count": riconciliazioni_rate_count,
+            "scadenze_collegate_count": scadenze_collegate_count,
+            "pagamenti_collegati_count": pagamenti_collegati_count,
+        },
     )
 
 

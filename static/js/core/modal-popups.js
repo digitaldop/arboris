@@ -401,6 +401,10 @@ window.ArborisModalPopups = (function () {
     }
 
     function open(url, options) {
+        if (typeof window.ArborisResetLongWaitCursor === "function") {
+            window.ArborisResetLongWaitCursor();
+        }
+
         const topApi = getTopModalApi();
         if (topApi && topApi !== api) {
             return topApi.open(url, Object.assign({}, options || {}, { openerWindow: window }));

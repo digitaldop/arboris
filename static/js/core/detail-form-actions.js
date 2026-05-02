@@ -360,12 +360,32 @@
         return fallbackUrl ? fallbackUrl.pathname + fallbackUrl.search + fallbackUrl.hash : "/";
     }
 
+    function getExplicitBackUrl() {
+        const currentUrl = normalizeInternalUrl(window.location.href);
+        if (!currentUrl) {
+            return "";
+        }
+
+        const nextValue = currentUrl.searchParams.get("next");
+        const nextUrl = normalizeInternalUrl(nextValue);
+        return nextUrl ? nextUrl.pathname + nextUrl.search + nextUrl.hash : "";
+    }
+
     function resolveApplicationBackUrl(fallback, options) {
         const cfg = options || {};
         const currentUrl = getCurrentApplicationUrl();
         const fallbackUrl = buildFallbackBackUrl(fallback);
+        const explicitBackUrl = getExplicitBackUrl();
         let stack = normalizeStack(readApplicationStack());
         let target = null;
+
+        if (explicitBackUrl) {
+            if (cfg.commit && currentUrl) {
+                stack = stack.filter(entry => entry.url !== currentUrl);
+                writeApplicationStack(stack);
+            }
+            return explicitBackUrl;
+        }
 
         if (currentUrl) {
             const currentIndex = stack.findIndex(entry => entry.url === currentUrl);

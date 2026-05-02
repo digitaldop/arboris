@@ -134,6 +134,7 @@
         .verifica-rette-scroll {
             overflow-x: auto;
             max-width: 100%;
+            box-sizing: border-box;
         }
 
         .verifica-rette-table {
@@ -165,8 +166,8 @@
             left: 0;
             z-index: 2;
             background: #fff;
-            min-width: 220px;
-            max-width: 240px;
+            min-width: 190px;
+            max-width: 220px;
         }
         .verifica-rette-table thead .sticky-col {
             z-index: 4;
@@ -177,7 +178,7 @@
         }
         .verifica-rette-table .studente-link {
             display: block;
-            padding: 0.55rem 0.75rem;
+            padding: 0.48rem 0.62rem;
             text-decoration: none;
             color: inherit;
         }
@@ -205,10 +206,10 @@
             border-top-width: 2px;
         }
         .verifica-rette-total-cell {
-            min-width: 130px;
-            max-width: 160px;
+            min-width: 112px;
+            max-width: 138px;
             color: #223846;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
             line-height: 1.25;
         }
         .verifica-rette-total-cell .cell-amount .label {
@@ -231,15 +232,15 @@
         }
 
         .verifica-rette-cell {
-            min-width: 130px;
-            max-width: 160px;
+            min-width: 112px;
+            max-width: 138px;
         }
         .verifica-rette-cell .cell-link {
             display: block;
-            padding: 0.4rem 0.5rem;
+            padding: 0.34rem 0.42rem;
             color: inherit;
             text-decoration: none;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
             line-height: 1.2;
         }
         .verifica-rette-cell .cell-link:hover {
@@ -248,7 +249,7 @@
         .verifica-rette-cell .cell-amount {
             display: flex;
             justify-content: space-between;
-            gap: 0.5rem;
+            gap: 0.35rem;
         }
         .verifica-rette-cell .cell-amount .label {
             color: rgba(0, 0, 0, 0.6);
@@ -314,67 +315,310 @@
             overflow: hidden; clip: rect(0,0,0,0);
             white-space: nowrap; border: 0;
         }
+
+        .verifica-rette-page-shell {
+            display: grid;
+            gap: 18px;
+        }
+        .verifica-rette-page-head {
+            margin-bottom: 0;
+        }
+        .verifica-rette-page-head .page-title {
+            margin: 0;
+        }
+        .verifica-rette-control-card,
+        .verifica-rette-summary-card,
+        .verifica-rette-legenda-card,
+        .verifica-rette-table-card {
+            overflow: hidden;
+            border: 1px solid #dfe8ef;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 14px 34px rgba(19, 42, 63, 0.06);
+        }
+        .verifica-rette-control-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 16px 18px;
+            background: #f8fbfd;
+        }
+        .verifica-rette-control-main {
+            display: flex;
+            align-items: end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .verifica-rette-control-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .verifica-rette-anno-form {
+            display: grid;
+            gap: 6px;
+        }
+        .verifica-rette-anno-form label:not(.sr-only) {
+            color: #344a63;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .verifica-rette-anno-form select.form-control {
+            width: min(100%, 280px);
+            min-height: 40px;
+            border: 1px solid #d6e2ea;
+            border-radius: 7px;
+            background: #ffffff;
+            color: #172131;
+            font: inherit;
+        }
+        .verifica-rette-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 18px;
+            border-bottom: 1px solid #e7eef4;
+        }
+        .verifica-rette-card-title {
+            margin: 0;
+            color: #172131;
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .verifica-rette-card-subtitle {
+            margin: 5px 0 0;
+            color: #60738d;
+            font-size: 13px;
+        }
+        .verifica-rette-summary-title {
+            padding: 0;
+            border-bottom: 0;
+        }
+        .verifica-rette-summary-grid {
+            grid-template-columns: repeat(2, minmax(280px, 1fr));
+            gap: 14px;
+            padding: 18px;
+        }
+        .verifica-rette-summary-block {
+            position: relative;
+            overflow: hidden;
+            display: grid;
+            gap: 14px;
+            padding: 16px;
+            border: 1px solid #e1ebf2;
+            border-radius: 8px;
+            background: var(--verifica-rette-card-tint, #f8fbfd);
+            box-shadow: inset 4px 0 0 var(--verifica-rette-card-accent, #75a9c2);
+        }
+        .verifica-rette-summary-block:last-child {
+            border-right: 1px solid #e1ebf2;
+        }
+        .verifica-rette-summary-block:nth-child(2) {
+            --verifica-rette-card-accent: #84c89b;
+            --verifica-rette-card-tint: #f7fdf9;
+        }
+        .verifica-rette-summary-label-row {
+            margin-bottom: 0;
+        }
+        .verifica-rette-summary-label {
+            color: #172131;
+            font-size: 14px;
+        }
+        .verifica-rette-summary-values {
+            gap: 10px;
+        }
+        .verifica-rette-summary-metric {
+            border-color: #dbe7ef;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 8px 18px rgba(19, 42, 63, 0.04);
+        }
+        .verifica-rette-summary-metric-label {
+            color: #60738d;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .verifica-rette-summary-metric-value {
+            color: #172131;
+            font-size: 1.3rem;
+            font-weight: 850;
+        }
+        .verifica-rette-legenda-card {
+            padding: 0;
+        }
+        .verifica-rette-legenda {
+            padding: 16px 18px 18px;
+        }
+        .verifica-rette-legenda .legenda-item {
+            min-height: 32px;
+            padding: 6px 10px;
+            border: 1px solid #dbe7ef;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #344a63;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .verifica-rette-legenda .legenda-chip {
+            width: 20px;
+            height: 16px;
+            border-radius: 5px;
+        }
+        .verifica-rette-scroll {
+            padding: 0 18px 18px;
+        }
+        .verifica-rette-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            border: 1px solid #dfe8ef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .verifica-rette-table th,
+        .verifica-rette-table td {
+            border-color: #e2ebf2;
+        }
+        .verifica-rette-table thead th {
+            background: #f3f9fc;
+            color: #344a63;
+            font-weight: 800;
+        }
+        .verifica-rette-table .sticky-col,
+        .verifica-rette-table thead .sticky-col {
+            background: #ffffff;
+            box-shadow: 7px 0 14px rgba(19, 42, 63, 0.06);
+        }
+        .verifica-rette-table thead .sticky-col {
+            background: #f3f9fc;
+        }
+        .verifica-rette-table .classe-separator td {
+            background: #e8f2f7;
+            color: #27465c;
+            font-weight: 800;
+        }
+        .verifica-rette-empty-card {
+            padding: 24px;
+        }
+        @media (max-width: 980px) {
+            .verifica-rette-control-card,
+            .verifica-rette-card-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .verifica-rette-control-actions {
+                justify-content: flex-start;
+            }
+            .verifica-rette-summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 720px) {
+            .verifica-rette-summary-values {
+                grid-template-columns: 1fr;
+            }
+            .verifica-rette-control-main,
+            .verifica-rette-control-actions {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+            .verifica-rette-anno-form select.form-control,
+            .verifica-rette-control-actions .btn {
+                width: 100%;
+            }
+        }
     </style>
 
-    <div class="page-head">
-        <h1 class="page-title">Verifica situazione rette</h1>
-
-        <div class="page-head-actions">
-            <form method="get" class="verifica-rette-anno-form">
-                <label for="anno_scolastico" class="sr-only">Anno scolastico</label>
-                <select
-                    id="anno_scolastico"
-                    name="anno_scolastico"
-                    class="form-control"
-                    onchange="this.form.submit()"
-                >
-                    {% for anno in anni_scolastici %}
-                        <option
-                            value="{{ anno.pk }}"
-                            {% if anno_scolastico and anno.pk == anno_scolastico.pk %}selected{% endif %}
-                        >
-                            {{ anno.nome_anno_scolastico }}{% if anno.is_corrente %} (corrente){% endif %}
-                        </option>
-                    {% empty %}
-                        <option value="">Nessun anno scolastico disponibile</option>
-                    {% endfor %}
-                </select>
-                <noscript>
-                    <button type="submit" class="btn btn-secondary">Aggiorna</button>
-                </noscript>
-            </form>
-            {% if can_manage_economia and anno_scolastico %}
-                <form
-                    method="post"
-                    action="{% url 'ricalcola_rate_anno_scolastico' %}"
-                    class="verifica-rette-batch-form"
-                    onsubmit="return confirm('Ricalcolare le rate di tutte le iscrizioni attive per l anno scolastico selezionato? Le rate con pagamenti o movimenti non verranno rigenerate.');"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-secondary">Ricalcola rate anno</button>
-                </form>
-                <form
-                    method="post"
-                    action="{% url 'riconcilia_pagamenti_rate_anno_scolastico' %}"
-                    class="verifica-rette-batch-form"
-                    onsubmit="return confirm('Avviare la riconciliazione automatica dei pagamenti per l anno scolastico selezionato? I casi ambigui resteranno da riconciliare manualmente.');"
-                >
-                    {% csrf_token %}
-                    <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <button type="submit" class="btn btn-primary">Riconcilia pagamenti anno</button>
-                </form>
-            {% endif %}
+    <div class="verifica-rette-page-shell">
+        <div class="page-head family-page-head anagrafica-list-head finance-page-head verifica-rette-page-head">
+            <div class="family-page-title-block">
+                <div class="family-page-title-line">
+                    <h1 class="page-title">Verifica situazione rette</h1>
+                    {% if anno_scolastico %}
+                        <span class="family-status-pill">
+                            <span class="family-status-dot"></span>
+                            {{ anno_scolastico.nome_anno_scolastico }}
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="family-page-address">
+                    Controlla incassi, insoluti e stato delle rate per classe e mese.
+                </div>
+            </div>
         </div>
-    </div>
+
+        <section class="verifica-rette-control-card" aria-label="Filtri e azioni verifica rette">
+            <div class="verifica-rette-control-main">
+                <form method="get" class="verifica-rette-anno-form">
+                    <label for="anno_scolastico">Anno scolastico</label>
+                    <select
+                        id="anno_scolastico"
+                        name="anno_scolastico"
+                        class="form-control"
+                        onchange="this.form.submit()"
+                    >
+                        {% for anno in anni_scolastici %}
+                            <option
+                                value="{{ anno.pk }}"
+                                {% if anno_scolastico and anno.pk == anno_scolastico.pk %}selected{% endif %}
+                            >
+                                {{ anno.nome_anno_scolastico }}{% if anno.is_corrente %} (corrente){% endif %}
+                            </option>
+                        {% empty %}
+                            <option value="">Nessun anno scolastico disponibile</option>
+                        {% endfor %}
+                    </select>
+                    <noscript>
+                        <button type="submit" class="btn btn-secondary">Aggiorna</button>
+                    </noscript>
+                </form>
+            </div>
+            {% if can_manage_economia and anno_scolastico %}
+                <div class="verifica-rette-control-actions">
+                    <form
+                        method="post"
+                        action="{% url 'ricalcola_rate_anno_scolastico' %}"
+                        class="verifica-rette-batch-form"
+                        onsubmit="return confirm('Ricalcolare le rate di tutte le iscrizioni attive per l anno scolastico selezionato? Le rate con pagamenti o movimenti non verranno rigenerate.');"
+                    >
+                        {% csrf_token %}
+                        <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                            <span>Ricalcola rate anno</span>
+                        </button>
+                    </form>
+                    <form
+                        method="post"
+                        action="{% url 'riconcilia_pagamenti_rate_anno_scolastico' %}"
+                        class="verifica-rette-batch-form"
+                        onsubmit="return confirm('Avviare la riconciliazione automatica dei pagamenti per l anno scolastico selezionato? I casi ambigui resteranno da riconciliare manualmente.');"
+                    >
+                        {% csrf_token %}
+                        <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-primary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                            <span>Riconcilia pagamenti anno</span>
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        </section>
 
     {% if anno_scolastico %}
-        <div class="content-card verifica-rette-summary-card">
-            <div class="verifica-rette-summary-title">Riepilogo generale</div>
+        <section class="verifica-rette-summary-card">
+            <div class="verifica-rette-card-head">
+                <div>
+                    <h2 class="verifica-rette-card-title">Riepilogo generale</h2>
+                    <p class="verifica-rette-card-subtitle">Totali calcolati sulle rate dell'anno scolastico selezionato.</p>
+                </div>
+            </div>
             <div class="verifica-rette-summary-grid" data-summary-grid>
-                <div class="verifica-rette-summary-block" data-summary-card data-summary-key="senza-preiscrizioni" draggable="true">
+                <article class="verifica-rette-summary-block" data-summary-card data-summary-key="senza-preiscrizioni" draggable="true">
                     <div class="verifica-rette-summary-label-row">
                         <button type="button" class="verifica-rette-summary-handle" aria-label="Sposta riquadro senza preiscrizioni" title="Trascina per riordinare"></button>
                         <div class="verifica-rette-summary-label">Senza preiscrizioni</div>
@@ -393,8 +637,8 @@
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_senza_preiscrizioni|euro }}</div>
                         </div>
                     </div>
-                </div>
-                <div class="verifica-rette-summary-block" data-summary-card data-summary-key="con-preiscrizioni" draggable="true">
+                </article>
+                <article class="verifica-rette-summary-block" data-summary-card data-summary-key="con-preiscrizioni" draggable="true">
                     <div class="verifica-rette-summary-label-row">
                         <button type="button" class="verifica-rette-summary-handle" aria-label="Sposta riquadro con preiscrizioni" title="Trascina per riordinare"></button>
                         <div class="verifica-rette-summary-label">Con preiscrizioni</div>
@@ -413,11 +657,17 @@
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_con_preiscrizioni|euro }}</div>
                         </div>
                     </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="verifica-rette-legenda-card">
+            <div class="verifica-rette-card-head">
+                <div>
+                    <h2 class="verifica-rette-card-title">Legenda stati rata</h2>
+                    <p class="verifica-rette-card-subtitle">Colori usati nella matrice per leggere rapidamente pagamenti e insoluti.</p>
                 </div>
             </div>
-        </div>
-
-        <div class="content-card verifica-rette-legenda-card">
             <div class="verifica-rette-legenda">
                 <span class="legenda-item">
                     <span class="legenda-chip cella-pagata"></span>
@@ -440,9 +690,15 @@
                     Rata non presente
                 </span>
             </div>
-        </div>
+        </section>
 
-        <div class="content-card verifica-rette-table-card">
+        <section class="verifica-rette-table-card">
+            <div class="verifica-rette-card-head">
+                <div>
+                    <h2 class="verifica-rette-card-title">Matrice rette per classe</h2>
+                    <p class="verifica-rette-card-subtitle">Ogni cella apre il dettaglio della rata corrispondente.</p>
+                </div>
+            </div>
             <div class="verifica-rette-scroll">
                 <table class="verifica-rette-table">
                     <thead>
@@ -544,14 +800,15 @@
                     {% endif %}
                 </table>
             </div>
-        </div>
+        </section>
     {% else %}
-        <div class="content-card">
+        <section class="verifica-rette-table-card verifica-rette-empty-card">
             <div class="empty-state">
                 Nessun anno scolastico configurato. Imposta un anno scolastico attivo per visualizzare la verifica rette.
             </div>
-        </div>
+        </section>
     {% endif %}
+    </div>
 
     <script>
         (function () {

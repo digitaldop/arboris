@@ -10,9 +10,9 @@
                 <div class="dashboard-page-title-line">
                     <h1 class="page-title dashboard-page-title">Anno Scolastico {{ anno_scolastico_corrente }}</h1>
                     {% if anno_scolastico_corrente %}
-                        <span class="family-status-pill{% if not anno_scolastico_corrente.attivo %} is-muted{% endif %}">
+                        <span class="family-status-pill dashboard-year-pill is-{{ anno_scolastico_corrente_status.tone }}">
                             <span class="family-status-dot" aria-hidden="true"></span>
-                            {% if anno_scolastico_corrente.attivo %}Attivo{% else %}Non attivo{% endif %}
+                            {{ anno_scolastico_corrente_status.label }}
                         </span>
                     {% endif %}
                 </div>
@@ -28,7 +28,7 @@
         </div>
 
         <div class="dashboard-overview-grid">
-            <section class="dashboard-info-card">
+            <section class="dashboard-info-card dashboard-info-card-blue">
                 <span class="dashboard-info-icon dashboard-info-icon-blue" aria-hidden="true">
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
                 </span>
@@ -42,8 +42,8 @@
                         <div>
                             <dt>Periodo</dt>
                             <dd>
-                                {% if anno_scolastico_corrente %}
-                                    {{ anno_scolastico_corrente.data_inizio|date:"d/m/Y" }} - {{ anno_scolastico_corrente.data_fine|date:"d/m/Y" }}
+                                {% if anno_scolastico_corrente_obj %}
+                                    {{ anno_scolastico_corrente_obj.data_inizio|date:"d/m/Y" }} - {{ anno_scolastico_corrente_obj.data_fine|date:"d/m/Y" }}
                                 {% else %}
                                     -
                                 {% endif %}
@@ -52,10 +52,8 @@
                         <div>
                             <dt>Stato</dt>
                             <dd>
-                                {% if anno_scolastico_corrente and anno_scolastico_corrente.attivo %}
-                                    <span class="dashboard-pill dashboard-pill-success">Attivo</span>
-                                {% elif anno_scolastico_corrente %}
-                                    <span class="dashboard-pill dashboard-pill-muted">Non attivo</span>
+                                {% if anno_scolastico_corrente_obj %}
+                                    <span class="dashboard-pill dashboard-pill-{{ anno_scolastico_corrente_status.tone }}">{{ anno_scolastico_corrente_status.label }}</span>
                                 {% else %}
                                     -
                                 {% endif %}
@@ -65,7 +63,7 @@
                 </div>
             </section>
 
-            <section class="dashboard-info-card">
+            <section class="dashboard-info-card dashboard-info-card-green">
                 <span class="dashboard-info-icon dashboard-info-icon-green" aria-hidden="true">
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
                 </span>
@@ -74,11 +72,11 @@
                     <dl class="dashboard-info-list">
                         <div>
                             <dt>Inizio periodo</dt>
-                            <dd>{% if anno_scolastico_corrente %}{{ anno_scolastico_corrente.data_inizio|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
+                            <dd>{% if anno_scolastico_corrente_obj %}{{ anno_scolastico_corrente_obj.data_inizio|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
                         </div>
                         <div>
                             <dt>Fine periodo</dt>
-                            <dd>{% if anno_scolastico_corrente %}{{ anno_scolastico_corrente.data_fine|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
+                            <dd>{% if anno_scolastico_corrente_obj %}{{ anno_scolastico_corrente_obj.data_fine|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
                         </div>
                         <div>
                             <dt>Settimana corrente</dt>
@@ -104,7 +102,7 @@
             <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali">
                 <div class="panel-body dashboard-panel-body">
                     <div class="dashboard-stats-grid">
-                        <div class="dashboard-stat-card dashboard-stat-card-full">
+                        <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-blue">
                             <div class="dashboard-stat-label">Composizione delle classi</div>
                             {% if composizione_classi %}
                                 <div class="dashboard-class-grid">
@@ -120,13 +118,13 @@
                             {% endif %}
                         </div>
 
-                        <div class="dashboard-stat-card">
+                        <div class="dashboard-stat-card dashboard-stat-tone-green">
                             <div class="dashboard-stat-label">{{ student_terminology.selected_plural }} iscritti</div>
                             <div class="dashboard-stat-value">{{ count_studenti_iscritti }}</div>
                             <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti all'anno scolastico corrente.</div>
                         </div>
 
-                        <div class="dashboard-stat-card">
+                        <div class="dashboard-stat-card dashboard-stat-tone-amber">
                             <div class="dashboard-stat-label">Famiglie iscritte</div>
                             <div class="dashboard-stat-value">{{ count_famiglie_iscritte }}</div>
                             <div class="dashboard-stat-note">Totale famiglie con figli iscritti all'anno scolastico corrente.</div>
@@ -152,25 +150,25 @@
                     <div class="panel-body dashboard-panel-body">
                         {% if economia_dashboard.configured_year %}
                             <div class="dashboard-stats-grid">
-                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-green">
                                     <div class="dashboard-stat-label">Totale {{ student_terminology.selected_plural }} iscritti</div>
                                     <div class="dashboard-class-grid dashboard-economy-highlights-grid">
-                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-blue">
                                             <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
                                             <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_iscritti }}</div>
                                             <div class="dashboard-economy-card-meta">Iscritti attivi nell'anno scolastico corrente.</div>
                                         </div>
-                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-green">
                                             <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} paganti</div>
                                             <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_paganti }}</div>
                                             <div class="dashboard-economy-card-meta">Tutti gli iscritti che pagano una retta.</div>
                                         </div>
-                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-amber">
                                             <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} non paganti</div>
                                             <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_non_paganti }}</div>
                                             <div class="dashboard-economy-card-meta">Iscritti senza quota retta da versare.</div>
                                         </div>
-                                        <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                        <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-rose">
                                             <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} con riduzione speciale</div>
                                             <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_riduzione_speciale }}</div>
                                             <div class="dashboard-economy-card-meta">Iscritti con riduzione speciale applicata.</div>
@@ -178,7 +176,7 @@
                                     </div>
                                 </div>
 
-                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-amber">
                                     <div class="dashboard-stat-label">Agevolazioni collegate</div>
                                     {% if economia_dashboard.agevolazioni %}
                                         <div class="dashboard-economy-list">
@@ -196,7 +194,7 @@
                                     {% endif %}
                                 </div>
 
-                                <div class="dashboard-stat-card dashboard-stat-card-full">
+                                <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-blue">
                                     <div class="dashboard-stat-label">Riepilogo rette</div>
 
                                     <div class="economia-summary-grid dashboard-economia-summary-grid">
@@ -397,7 +395,7 @@
                 <div class="panel collapsible-panel is-open" id="dashboard-statistiche-generali-prossimo-anno">
                     <div class="panel-body dashboard-panel-body">
                         <div class="dashboard-stats-grid">
-                            <div class="dashboard-stat-card dashboard-stat-card-full">
+                            <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-blue">
                                 <div class="dashboard-stat-label">Composizione delle classi</div>
                                 {% if dashboard_prossimo_anno.composizione_classi %}
                                     <div class="dashboard-class-grid">
@@ -413,13 +411,13 @@
                                 {% endif %}
                             </div>
 
-                            <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-card dashboard-stat-tone-green">
                                 <div class="dashboard-stat-label">{{ student_terminology.selected_plural }} iscritti</div>
                                 <div class="dashboard-stat-value">{{ dashboard_prossimo_anno.count_studenti_iscritti }}</div>
                                 <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti al prossimo anno scolastico.</div>
                             </div>
 
-                            <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-card dashboard-stat-tone-amber">
                                 <div class="dashboard-stat-label">Famiglie iscritte</div>
                                 <div class="dashboard-stat-value">{{ dashboard_prossimo_anno.count_famiglie_iscritte }}</div>
                                 <div class="dashboard-stat-note">Totale famiglie con figli iscritti al prossimo anno scolastico.</div>
@@ -445,25 +443,25 @@
                         <div class="panel-body dashboard-panel-body">
                             {% if economia_dashboard_prossimo_anno.configured_year %}
                                 <div class="dashboard-stats-grid">
-                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-green">
                                         <div class="dashboard-stat-label">Totale {{ student_terminology.selected_plural }} iscritti</div>
                                         <div class="dashboard-class-grid dashboard-economy-highlights-grid">
-                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-blue">
                                                 <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
                                                 <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_iscritti }}</div>
                                                 <div class="dashboard-economy-card-meta">Iscritti attivi nel prossimo anno scolastico.</div>
                                             </div>
-                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-green">
                                                 <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} paganti</div>
                                                 <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_paganti }}</div>
                                                 <div class="dashboard-economy-card-meta">Tutti gli iscritti che pagano una retta.</div>
                                             </div>
-                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-amber">
                                                 <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} non paganti</div>
                                                 <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_non_paganti }}</div>
                                                 <div class="dashboard-economy-card-meta">Iscritti senza quota retta da versare.</div>
                                             </div>
-                                            <div class="dashboard-class-item dashboard-economy-highlight-item">
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-rose">
                                                 <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} con riduzione speciale</div>
                                                 <div class="dashboard-economy-card-value">{{ economia_dashboard_prossimo_anno.count_studenti_riduzione_speciale }}</div>
                                                 <div class="dashboard-economy-card-meta">Iscritti con riduzione speciale applicata.</div>
@@ -471,7 +469,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-amber">
                                         <div class="dashboard-stat-label">Agevolazioni collegate</div>
                                         {% if economia_dashboard_prossimo_anno.agevolazioni %}
                                             <div class="dashboard-economy-list">
@@ -489,7 +487,7 @@
                                         {% endif %}
                                     </div>
 
-                                    <div class="dashboard-stat-card dashboard-stat-card-full">
+                                    <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-blue">
                                         <div class="dashboard-stat-label">Riepilogo rette</div>
 
                                         <div class="economia-summary-grid dashboard-economia-summary-grid">
@@ -612,7 +610,7 @@
                 <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-calendario">
                     <div class="panel-body dashboard-panel-body">
                         <div class="dashboard-stats-grid">
-                            <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-card dashboard-stat-tone-green">
                                 <div class="dashboard-stat-label">Impegni di oggi</div>
                                 <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.today_label }}</div>
                                 {% if calendario_dashboard.today_records %}
@@ -641,7 +639,7 @@
                                 {% endif %}
                             </div>
 
-                            <div class="dashboard-stat-card">
+                            <div class="dashboard-stat-card dashboard-stat-tone-blue">
                                 <div class="dashboard-stat-label">Eventi della settimana corrente</div>
                                 <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.week_label }}</div>
                                 {% if calendario_dashboard.week_records %}

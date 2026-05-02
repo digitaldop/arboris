@@ -241,6 +241,10 @@ window.ArborisRelatedPopups = (function () {
     }
 
     function openManagedPopup(url, windowName, features, options) {
+        if (typeof window.ArborisResetLongWaitCursor === "function") {
+            window.ArborisResetLongWaitCursor();
+        }
+
         const cfg = options || {};
         const baseName = windowName || "related_popup";
         const modalPopups = getModalPopupApi();

@@ -222,6 +222,9 @@ class EconomiaBatchRateTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "verifica-rette-page-shell")
+        self.assertContains(response, "verifica-rette-control-card")
+        self.assertContains(response, "verifica-rette-card-title")
         totali_colonne = response.context["totali_colonne"]
         riepilogo_totali = response.context["riepilogo_totali"]
 
@@ -404,3 +407,20 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(movimento.rata_iscrizione_id, rata.pk)
         self.assertTrue(rata.pagata)
         self.assertEqual(rata.riconciliazioni_movimenti.count(), 1)
+
+    def test_rate_detail_popup_uses_new_card_layout(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+
+        response = self.client.get(
+            reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {"popup": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "rate-detail-shell is-popup")
+        self.assertContains(response, "Dettagli rata")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertNotContains(response, "site-header")

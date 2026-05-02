@@ -10,7 +10,9 @@
     <div class="content-card">
         {% if ha_vincoli %}
             <div class="message message-error">
-                Questa categoria e' collegata a {{ count_fornitori }} fornitori e {{ count_documenti }} documenti, quindi non puo' essere eliminata.
+                Questa categoria e' collegata a {{ count_fornitori }} fornitori,
+                {{ count_documenti }} documenti, {{ count_movimenti }} movimenti,
+                {{ count_regole }} regole e {{ count_figlie }} sottocategorie, quindi non puo' essere eliminata.
                 Puoi disattivarla dalla scheda della categoria.
             </div>
         {% endif %}

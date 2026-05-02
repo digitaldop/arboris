@@ -11,7 +11,6 @@ from arboris.form_widgets import apply_eur_currency_widget
 from .security import cifra_testo
 
 from .models import (
-    CategoriaSpesa,
     CategoriaFinanziaria,
     ConnessioneBancaria,
     ContoBancario,
@@ -27,6 +26,7 @@ from .models import (
     SaldoConto,
     ScadenzaPagamentoFornitore,
     StatoScadenzaFornitore,
+    TipoCategoriaFinanziaria,
 )
 
 
@@ -58,6 +58,14 @@ def make_searchable_select(field, placeholder):
             "data-searchable-select": "1",
             "data-searchable-placeholder": placeholder,
         }
+    )
+
+
+def categorie_spesa_queryset():
+    return CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA, attiva=True).order_by(
+        "parent__nome",
+        "ordine",
+        "nome",
     )
 
 
@@ -162,8 +170,14 @@ class CategoriaFinanziariaForm(forms.ModelForm):
 
 
 class CategoriaSpesaForm(forms.ModelForm):
+    descrizione = forms.CharField(
+        label="Descrizione",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
     class Meta:
-        model = CategoriaSpesa
+        model = CategoriaFinanziaria
         fields = ["nome", "descrizione", "ordine", "attiva"]
         labels = {
             "nome": "Nome categoria",
@@ -171,14 +185,21 @@ class CategoriaSpesaForm(forms.ModelForm):
             "ordine": "Ordine",
             "attiva": "Attiva",
         }
-        widgets = {
-            "descrizione": forms.Textarea(attrs={"rows": 3}),
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["descrizione"].required = False
         self.fields["ordine"].required = False
+        if self.instance and self.instance.pk and not self.is_bound:
+            self.fields["descrizione"].initial = self.instance.note
+
+    def save(self, commit=True):
+        categoria = super().save(commit=False)
+        categoria.tipo = TipoCategoriaFinanziaria.SPESA
+        categoria.note = self.cleaned_data.get("descrizione") or ""
+        if commit:
+            categoria.save()
+            self.save_m2m()
+        return categoria
 
 
 class FornitoreForm(forms.ModelForm):
@@ -241,7 +262,7 @@ class FornitoreForm(forms.ModelForm):
         ]
         for field_name in optional_fields:
             self.fields[field_name].required = False
-        self.fields["categoria_spesa"].queryset = CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome")
+        self.fields["categoria_spesa"].queryset = categorie_spesa_queryset()
         self.fields["categoria_spesa"].empty_label = "--- nessuna ---"
 
 
@@ -310,7 +331,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             self.fields[field_name].required = False
         self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
-        self.fields["categoria_spesa"].queryset = CategoriaSpesa.objects.filter(attiva=True).order_by("ordine", "nome")
+        self.fields["categoria_spesa"].queryset = categorie_spesa_queryset()
         self.fields["categoria_spesa"].empty_label = "--- usa categoria del fornitore ---"
         self.fields["mese_competenza"].choices = MESE_COMPETENZA_CHOICES
         for field_name in ("imponibile", "iva", "totale"):

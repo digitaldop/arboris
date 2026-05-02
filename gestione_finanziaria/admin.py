@@ -1,7 +1,6 @@
 from django.contrib import admin
 
 from .models import (
-    CategoriaSpesa,
     CategoriaFinanziaria,
     ConnessioneBancaria,
     ContoBancario,
@@ -18,6 +17,7 @@ from .models import (
     SaldoConto,
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
+    TipoCategoriaFinanziaria,
 )
 
 
@@ -29,19 +29,17 @@ class CategoriaFinanziariaAdmin(admin.ModelAdmin):
     autocomplete_fields = ("parent",)
 
 
-@admin.register(CategoriaSpesa)
-class CategoriaSpesaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ordine", "attiva")
-    list_filter = ("attiva",)
-    search_fields = ("nome", "descrizione")
-
-
 @admin.register(Fornitore)
 class FornitoreAdmin(admin.ModelAdmin):
     list_display = ("denominazione", "tipo_soggetto", "categoria_spesa", "email", "telefono", "attivo")
     list_filter = ("tipo_soggetto", "categoria_spesa", "attivo")
     search_fields = ("denominazione", "codice_fiscale", "partita_iva", "email", "pec", "referente")
     autocomplete_fields = ("categoria_spesa",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "categoria_spesa":
+            kwargs["queryset"] = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class ScadenzaPagamentoFornitoreInline(admin.TabularInline):
@@ -65,6 +63,11 @@ class DocumentoFornitoreAdmin(admin.ModelAdmin):
     autocomplete_fields = ("fornitore", "categoria_spesa")
     readonly_fields = ("external_payload", "external_source", "external_id", "importato_at", "external_updated_at")
     inlines = [ScadenzaPagamentoFornitoreInline]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "categoria_spesa":
+            kwargs["queryset"] = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(ScadenzaPagamentoFornitore)

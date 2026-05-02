@@ -88,6 +88,12 @@ class CategoriaFinanziaria(models.Model):
             visited_ids.add(parent.pk)
             parent = parent.parent
 
+        if self.pk and self.tipo != TipoCategoriaFinanziaria.SPESA:
+            if self.fornitori.exists() or self.documenti_fornitori.exists():
+                raise ValidationError(
+                    {"tipo": "Una categoria collegata a fornitori o documenti fornitori deve restare di tipo spesa."}
+                )
+
     def save(self, *args, **kwargs):
         if self.ordine is None:
             self.ordine = next_order_value(CategoriaFinanziaria)
@@ -102,38 +108,14 @@ class CategoriaFinanziaria(models.Model):
             parent = parent.parent
         return " / ".join(reversed(parti))
 
+    @property
+    def descrizione(self):
+        return self.note
+
 
 # =========================================================================
-#  Categorie spesa e fornitori
+#  Fornitori e documenti passivi
 # =========================================================================
-
-
-class CategoriaSpesa(models.Model):
-    """
-    Categoria trasversale per classificare fornitori, documenti passivi e,
-    in futuro, voci di budget previsionale.
-    """
-
-    nome = models.CharField(max_length=140, unique=True)
-    descrizione = models.TextField(blank=True)
-    ordine = models.IntegerField(blank=True, null=True)
-    attiva = models.BooleanField(default=True)
-    data_creazione = models.DateTimeField(auto_now_add=True)
-    data_aggiornamento = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "gestione_finanziaria_categoria_spesa"
-        ordering = ["ordine", "nome"]
-        verbose_name = "Categoria spesa"
-        verbose_name_plural = "Categorie spesa"
-
-    def __str__(self):
-        return self.nome
-
-    def save(self, *args, **kwargs):
-        if self.ordine is None:
-            self.ordine = next_order_value(CategoriaSpesa)
-        super().save(*args, **kwargs)
 
 
 class TipoSoggettoFornitore(models.TextChoices):
@@ -152,7 +134,7 @@ class Fornitore(models.Model):
         default=TipoSoggettoFornitore.AZIENDA,
     )
     categoria_spesa = models.ForeignKey(
-        CategoriaSpesa,
+        CategoriaFinanziaria,
         on_delete=models.PROTECT,
         related_name="fornitori",
         blank=True,
@@ -182,6 +164,11 @@ class Fornitore(models.Model):
 
     def __str__(self):
         return self.denominazione
+
+    def clean(self):
+        super().clean()
+        if self.categoria_spesa_id and self.categoria_spesa.tipo != TipoCategoriaFinanziaria.SPESA:
+            raise ValidationError({"categoria_spesa": "Seleziona una categoria di tipo spesa."})
 
 
 class TipoDocumentoFornitore(models.TextChoices):
@@ -216,7 +203,7 @@ class DocumentoFornitore(models.Model):
         related_name="documenti",
     )
     categoria_spesa = models.ForeignKey(
-        CategoriaSpesa,
+        CategoriaFinanziaria,
         on_delete=models.PROTECT,
         related_name="documenti_fornitori",
         blank=True,
@@ -292,6 +279,8 @@ class DocumentoFornitore(models.Model):
         super().clean()
         if self.mese_competenza is not None and not 1 <= self.mese_competenza <= 12:
             raise ValidationError({"mese_competenza": "Il mese di competenza deve essere compreso tra 1 e 12."})
+        if self.categoria_spesa_id and self.categoria_spesa.tipo != TipoCategoriaFinanziaria.SPESA:
+            raise ValidationError({"categoria_spesa": "Seleziona una categoria di tipo spesa."})
 
     def save(self, *args, **kwargs):
         if not self.categoria_spesa_id and self.fornitore_id:

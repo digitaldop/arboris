@@ -29,6 +29,7 @@
                     <th>Descrizione</th>
                     <th>Fornitori</th>
                     <th>Documenti</th>
+                    <th>Movimenti</th>
                     <th>Ordine</th>
                     <th>Attiva</th>
                     <th>Azioni</th>
@@ -41,6 +42,7 @@
                         <td>{{ categoria.descrizione|truncatechars:80|default:"-" }}</td>
                         <td>{{ categoria.numero_fornitori }}</td>
                         <td>{{ categoria.numero_documenti }}</td>
+                        <td>{{ categoria.numero_movimenti }}</td>
                         <td>{{ categoria.ordine|default:"-" }}</td>
                         <td>{% if categoria.attiva %}Si{% else %}No{% endif %}</td>
                         <td class="actions-cell">
@@ -51,7 +53,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="empty-state">
                                 Nessuna categoria spesa impostata. Le categorie spesa serviranno per collegare fornitori, documenti e budget previsionale.
                             </div>

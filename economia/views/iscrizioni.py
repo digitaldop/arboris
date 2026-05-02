@@ -781,9 +781,10 @@ def modifica_rata_iscrizione(request, pk):
         ),
         pk=pk,
     )
+    popup = is_popup_request(request)
 
     fallback_back_url = f"{reverse('lista_rate_iscrizione')}?iscrizione={rata.iscrizione_id}"
-    requested_back_url = request.GET.get("next") or request.META.get("HTTP_REFERER", "")
+    requested_back_url = request.GET.get("next") or request.POST.get("next") or request.META.get("HTTP_REFERER", "")
     back_url = (
         requested_back_url
         if requested_back_url and url_has_allowed_host_and_scheme(requested_back_url, allowed_hosts={request.get_host()}, require_https=request.is_secure())
@@ -795,14 +796,22 @@ def modifica_rata_iscrizione(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, "Dati pagamento rata aggiornati correttamente.")
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Dati pagamento rata aggiornati correttamente."},
+                )
             return redirect(back_url)
     else:
         form = RataIscrizionePagamentoForm(instance=rata)
 
+    rata_residuo = max((rata.importo_finale or Decimal("0.00")) - (rata.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+
     return render(
         request,
         "economia/iscrizioni/rata_iscrizione_form.html",
-        {"form": form, "rata": rata, "back_url": back_url},
+        {"form": form, "rata": rata, "back_url": back_url, "popup": popup, "rata_residuo": rata_residuo},
     )
 
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static currency %}
 
 {% block title %}Calendario agenda - Arboris{% endblock %}
 
@@ -12,30 +12,24 @@
 {% endblock %}
 
 {% block content %}
+    {% url 'crea_evento_calendario' as crea_evento_url %}
+    {% url 'lista_categorie_calendario' as categorie_url %}
     <div class="calendar-page-shell">
         <div class="page-head family-page-head calendar-page-head">
             <div class="family-page-title-block">
                 <div class="family-page-title-line">
                     <h1 class="page-title">Calendario</h1>
                 </div>
-                <div class="family-page-address">Gestisci scadenze, eventi e attività della scuola</div>
+                <div class="family-page-address">Gestisci scadenze, eventi e attivita della scuola</div>
             </div>
-            <div class="page-head-actions family-page-actions calendar-page-actions">
-                <a href="{% url 'lista_eventi_calendario' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                    <span class="btn-label">Elenco eventi</span>
-                </a>
             {% if can_manage_calendario %}
-                <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
-                    <span class="btn-label">Categorie</span>
-                </a>
-                <a href="{% url 'crea_evento_calendario' %}" class="btn btn-primary btn-icon-text btn-add-action">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Nuovo evento</span>
-                </a>
+                <div class="page-head-actions family-page-actions calendar-page-actions">
+                    <a href="{{ crea_evento_url }}?popup=1" class="btn btn-primary btn-icon-text calendar-events-add-btn" data-calendar-selected-create="1" data-calendar-base-url="{{ crea_evento_url }}?popup=1" data-window-popup="1" data-popup-url="{{ crea_evento_url }}?popup=1" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">
+                        <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                        <span class="btn-label">Nuovo evento</span>
+                    </a>
+                </div>
             {% endif %}
-            </div>
         </div>
 
         <div class="calendar-workspace">
@@ -83,7 +77,7 @@
                         <span class="admin-section-title-label">Categorie</span>
                         {% if can_manage_calendario %}
                             <div class="admin-section-title-actions">
-                                <a href="{% url 'lista_categorie_calendario' %}" class="admin-section-title-btn admin-section-title-icon-btn" title="Modifica categorie" aria-label="Modifica categorie">
+                                <a href="{{ categorie_url }}?popup=1" class="admin-section-title-btn admin-section-title-icon-btn" title="Modifica categorie" aria-label="Modifica categorie" data-window-popup="1" data-popup-url="{{ categorie_url }}?popup=1" data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes">
                                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
                                 </a>
                             </div>
@@ -105,7 +99,7 @@
                                 <div class="calendar-selected-day-empty">Ancora nessuna categoria configurata.</div>
                             {% endif %}
                             {% if can_manage_calendario %}
-                                <a href="{% url 'lista_categorie_calendario' %}" class="calendar-sidebar-link">Gestisci categorie</a>
+                                <a href="{{ categorie_url }}?popup=1" class="calendar-sidebar-link" data-window-popup="1" data-popup-url="{{ categorie_url }}?popup=1" data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes">Gestisci categorie</a>
                             {% endif %}
                         </div>
                     </div>
@@ -124,7 +118,7 @@
                                     {% endif %}
                                 </div>
                                 {% if can_manage_calendario %}
-                                    <a href="{% url 'crea_evento_calendario' %}" class="btn btn-secondary btn-icon-text calendar-sidebar-add-btn">
+                                    <a href="{{ crea_evento_url }}?popup=1" class="btn btn-secondary btn-icon-text calendar-sidebar-add-btn" data-calendar-selected-create="1" data-calendar-base-url="{{ crea_evento_url }}?popup=1" data-window-popup="1" data-popup-url="{{ crea_evento_url }}?popup=1" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">
                                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                                         <span class="btn-label">Nuovo evento</span>
                                     </a>
@@ -133,12 +127,34 @@
                                     <span class="calendar-quick-tip-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
                                     <span>
                                         {% if can_manage_calendario %}
-                                            Puoi creare un evento anche cliccando direttamente sul giorno nel calendario.
+                                            Puoi creare un evento dal menu del tasto destro sul calendario.
                                         {% else %}
                                             Seleziona un giorno per vedere il dettaglio nella sidebar.
                                         {% endif %}
                                     </span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-section compact calendar-side-card calendar-shortcuts-card">
+                    <div class="admin-section-title admin-section-title-actionbar">
+                        <span class="admin-section-title-label">Scorciatoie</span>
+                        <div class="admin-section-title-actions">
+                            <button type="button" class="admin-section-title-btn admin-section-title-icon-btn" data-floating-text="In vista mese, fai doppio click su un giorno per aprire la vista giornaliera di quella data." aria-label="Informazioni doppio click">
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-body calendar-side-panel-body">
+                            <div class="calendar-shortcut-tip">
+                                <span class="calendar-shortcut-tip-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                <span>
+                                    <strong>Doppio click</strong>
+                                    <span>Apri la vista giorno dalla vista mese.</span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -185,16 +201,165 @@
                     data-initial-date="{{ calendar_initial_date|date:'Y-m-d' }}"
                     data-can-manage="{% if can_manage_calendario %}true{% else %}false{% endif %}"
                     data-create-url="{% url 'crea_evento_calendario_rapido' %}"
-                    data-full-create-url="{% url 'crea_evento_calendario' %}"
+                    data-full-create-url="{{ crea_evento_url }}?popup=1"
                     data-csrf-token="{{ csrf_token }}"
                 >
                     <div id="calendar-agenda-render"></div>
                 </div>
             </section>
         </div>
+
+        <section class="calendar-events-card" id="calendar-events-card">
+            <div class="calendar-events-head">
+                <div>
+                    <div class="section-title">Eventi e scadenze</div>
+                    <p class="calendar-events-subtitle">
+                        {{ lista_count_eventi_filtrati }} risultati visualizzati su {{ lista_count_eventi_totali }} eventi e scadenze.
+                    </p>
+                </div>
+                {% if can_manage_calendario %}
+                    <a href="{{ crea_evento_url }}?popup=1" class="btn btn-primary btn-icon-text calendar-events-add-btn" data-calendar-selected-create="1" data-calendar-base-url="{{ crea_evento_url }}?popup=1" data-window-popup="1" data-popup-url="{{ crea_evento_url }}?popup=1" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">
+                        <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                        <span class="btn-label">Nuovo evento</span>
+                    </a>
+                {% endif %}
+            </div>
+
+            <form method="get" action="{% url 'calendario_agenda' %}#calendar-events-card" class="calendar-events-toolbar">
+                <input type="hidden" name="view" value="{{ calendar_initial_view }}">
+                <input type="hidden" name="date" value="{{ calendar_initial_date|date:'Y-m-d' }}">
+                <label class="calendar-events-filter">
+                    <span>Categoria</span>
+                    <select name="categoria" data-calendar-category-filter>
+                        <option value="">Tutte le categorie</option>
+                        {% for categoria_obj in lista_categorie %}
+                            <option value="{{ categoria_obj.pk }}" {% if lista_categoria == categoria_obj.pk|stringformat:'s' %}selected{% endif %}>
+                                {{ categoria_obj.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="calendar-events-filter calendar-events-search">
+                    <span>Cerca</span>
+                    <input type="text" name="q" value="{{ lista_q|default:'' }}" placeholder="Titolo, luogo, descrizione...">
+                </label>
+                <div class="calendar-events-filter-actions">
+                    <button type="submit" class="btn btn-secondary">Filtra</button>
+                    {% if lista_categoria or lista_q %}
+                        <a href="{% url 'calendario_agenda' %}?view={{ calendar_initial_view }}&date={{ calendar_initial_date|date:'Y-m-d' }}#calendar-events-card" class="btn btn-secondary">Pulisci</a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <div class="calendar-events-table-wrap">
+                {% if lista_eventi %}
+                    <table class="list-table calendar-events-table">
+                        <thead>
+                            <tr>
+                                <th>Evento</th>
+                                <th>Categoria</th>
+                                <th>Inizio</th>
+                                <th>Fine</th>
+                                <th>Durata</th>
+                                <th>Luogo</th>
+                                <th>Stato</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for evento in lista_eventi %}
+                                <tr>
+                                    <td>
+                                        <div class="calendar-list-title">{{ evento.title }}</div>
+                                        {% if evento.detail_label %}
+                                            <div class="table-muted">{{ evento.detail_label }}</div>
+                                        {% endif %}
+                                        {% if evento.source != "locale" %}
+                                            <div class="table-muted">Scadenza automatica</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="calendar-category-pill" style="color: {{ evento.color }}; border-color: {{ evento.color }};">
+                                            {{ evento.category_label }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {{ evento.start_date|it_date }}
+                                        {% if not evento.all_day and evento.start_time %}
+                                            {{ evento.start_time }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ evento.end_date|it_date }}
+                                        {% if not evento.all_day and evento.end_time %}
+                                            {{ evento.end_time }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ evento.duration_label }}</td>
+                                    <td>{{ evento.location|default:"-" }}</td>
+                                    <td>
+                                        <span class="calendar-state-pill {% if evento.attivo and evento.visibile %}is-active{% else %}is-muted{% endif %}">
+                                            {% if evento.attivo and evento.visibile %}Visibile{% elif not evento.attivo %}Non attivo{% else %}Nascosto{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="actions-cell">
+                                        {% if evento.url %}
+                                            {% if evento.open_in_popup %}
+                                                <a href="{{ evento.url }}?popup=1" class="btn btn-secondary btn-sm calendar-row-action-btn" data-calendar-event-popup="1" data-window-popup="1" data-popup-url="{{ evento.url }}?popup=1" data-popup-title="{{ evento.popup_title }}" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">{{ evento.action_label }}</a>
+                                            {% elif evento.external %}
+                                                <a href="{{ evento.url }}" class="btn btn-secondary btn-sm calendar-row-action-btn">{{ evento.action_label }}</a>
+                                            {% else %}
+                                                <a href="{{ evento.url }}?next={{ request.get_full_path|add:'#calendar-events-card'|urlencode }}" class="btn btn-secondary btn-sm calendar-row-action-btn">{{ evento.action_label }}</a>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="table-muted">-</span>
+                                        {% endif %}
+                                        {% if can_manage_calendario and evento.delete_url %}
+                                            <span class="table-muted">|</span>
+                                            <a href="{{ evento.delete_url }}?popup=1" class="table-link table-link-danger" data-window-popup="1" data-popup-url="{{ evento.delete_url }}?popup=1" data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes">Elimina</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">Nessun evento o scadenza corrisponde ai filtri impostati.</div>
+                {% endif %}
+            </div>
+
+            {% if lista_eventi_page_obj.paginator.num_pages > 1 %}
+                <nav class="calendar-pagination" aria-label="Paginazione eventi calendario">
+                    {% if lista_eventi_page_obj.has_previous %}
+                        <a href="?{% if lista_eventi_querystring %}{{ lista_eventi_querystring }}&{% endif %}page={{ lista_eventi_page_obj.previous_page_number }}#calendar-events-card" class="calendar-page-link">Precedente</a>
+                    {% endif %}
+                    {% for page_number in lista_eventi_page_obj.paginator.page_range %}
+                        {% if page_number == lista_eventi_page_obj.number %}
+                            <span class="calendar-page-link is-current">{{ page_number }}</span>
+                        {% else %}
+                            <a href="?{% if lista_eventi_querystring %}{{ lista_eventi_querystring }}&{% endif %}page={{ page_number }}#calendar-events-card" class="calendar-page-link">{{ page_number }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    {% if lista_eventi_page_obj.has_next %}
+                        <a href="?{% if lista_eventi_querystring %}{{ lista_eventi_querystring }}&{% endif %}page={{ lista_eventi_page_obj.next_page_number }}#calendar-events-card" class="calendar-page-link">Successiva</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
+        </section>
     </div>
 
     {{ calendar_entries|json_script:"calendar-agenda-data" }}
     {{ calendar_categories_payload|json_script:"calendar-categories-data" }}
-    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=19"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("[data-calendar-category-filter]").forEach(function (select) {
+                select.addEventListener("change", function () {
+                    if (select.form) {
+                        select.form.submit();
+                    }
+                });
+            });
+        });
+    </script>
 {% endblock %}

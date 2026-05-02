@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 import shutil
 import tempfile
@@ -18,7 +18,6 @@ from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
 from .models import (
     CategoriaFinanziaria,
-    CategoriaSpesa,
     CanaleMovimento,
     CondizioneRegolaCategorizzazione,
     ContoBancario,
@@ -44,7 +43,17 @@ from .models import (
     TipoProviderBancario,
     TipoDocumentoFornitore,
 )
-from .fatture_in_cloud import authorization_url, has_oauth_credentials, importa_documento_fatture_in_cloud
+
+
+def crea_categoria_spesa_test(nome, **kwargs):
+    kwargs.setdefault("tipo", TipoCategoriaFinanziaria.SPESA)
+    return CategoriaFinanziaria.objects.create(nome=nome, **kwargs)
+from .fatture_in_cloud import (
+    authorization_url,
+    has_oauth_credentials,
+    importa_documento_fatture_in_cloud,
+    sincronizza_fatture_in_cloud,
+)
 from .importers import CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
 from .services import (
@@ -248,7 +257,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("lista_categorie_spesa"))
-        categoria = CategoriaSpesa.objects.get(nome="Consulenze")
+        categoria = CategoriaFinanziaria.objects.get(nome="Consulenze", tipo=TipoCategoriaFinanziaria.SPESA)
         self.assertTrue(categoria.attiva)
 
         response = self.client.get(reverse("lista_categorie_spesa"))
@@ -288,7 +297,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "js/pages/categoria-finanziaria-form.js")
 
     def test_fornitore_uses_categoria_spesa(self):
-        categoria = CategoriaSpesa.objects.create(nome="Utenze")
+        categoria = crea_categoria_spesa_test("Utenze")
 
         response = self.client.post(
             reverse("crea_fornitore"),
@@ -338,14 +347,14 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             },
         )
 
-        categoria = CategoriaSpesa.objects.get(nome="Servizi")
+        categoria = CategoriaFinanziaria.objects.get(nome="Servizi", tipo=TipoCategoriaFinanziaria.SPESA)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "dismissRelatedPopup")
         self.assertContains(response, "categoria_spesa")
         self.assertContains(response, str(categoria.pk))
 
     def test_documento_fornitore_creates_scadenza_and_calculates_totals(self):
-        categoria = CategoriaSpesa.objects.create(nome="Manutenzioni")
+        categoria = crea_categoria_spesa_test("Manutenzioni")
         fornitore = Fornitore.objects.create(
             denominazione="Tecnica Srl",
             tipo_soggetto="azienda",
@@ -414,7 +423,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "js/pages/documento-fornitore-form.js")
 
     def test_documento_fornitore_calculates_net_and_vat_from_total(self):
-        categoria = CategoriaSpesa.objects.create(nome="Servizi")
+        categoria = crea_categoria_spesa_test("Servizi")
         fornitore = Fornitore.objects.create(
             denominazione="Servizi Srl",
             tipo_soggetto="azienda",
@@ -454,7 +463,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(documento.mese_competenza, 4)
 
     def test_documento_fornitore_accepts_italian_currency_format(self):
-        categoria = CategoriaSpesa.objects.create(nome="Pulizie")
+        categoria = crea_categoria_spesa_test("Pulizie")
         fornitore = Fornitore.objects.create(
             denominazione="Pulizie Srl",
             tipo_soggetto="azienda",
@@ -493,7 +502,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(documento.totale, Decimal("1220.00"))
 
     def test_documento_fornitore_allegato_uses_supplier_prefix(self):
-        categoria = CategoriaSpesa.objects.create(nome="Materiali")
+        categoria = crea_categoria_spesa_test("Materiali")
         fornitore = Fornitore.objects.create(
             denominazione="Upload Srl",
             tipo_soggetto="azienda",
@@ -532,7 +541,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertTrue(documento.allegato.name.startswith("documenti_fornitori/"))
 
     def test_scadenza_auto_status_allows_manual_override(self):
-        categoria = CategoriaSpesa.objects.create(nome="Utenze")
+        categoria = crea_categoria_spesa_test("Utenze")
         fornitore = Fornitore.objects.create(
             denominazione="Acqua Srl",
             tipo_soggetto="azienda",
@@ -581,7 +590,16 @@ class FornitoriGestioneFinanziariaTests(TestCase):
                 "name": "Cloud Supplier Srl",
                 "vat_number": "IT12345678901",
                 "tax_code": "12345678901",
+                "address_street": "Via Nuvola 7",
+                "address_postal_code": "40100",
+                "address_city": "Bologna",
+                "address_province": "BO",
                 "email": "info@example.com",
+                "certified_email": "cloud@examplepec.it",
+                "phone": "051123456",
+                "ei_code": "ABC1234",
+                "bank_iban": "IT60X0542811101000000123456",
+                "bank_name": "Banca Cloud",
             },
             "payments_list": [
                 {
@@ -595,8 +613,19 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
 
         self.assertTrue(result["created"])
+        self.assertTrue(result["fornitore_created"])
+        self.assertFalse(result["fornitore_updated"])
         documento = DocumentoFornitore.objects.get(external_id="987")
         self.assertEqual(documento.fornitore.denominazione, "Cloud Supplier Srl")
+        self.assertEqual(documento.fornitore.partita_iva, "12345678901")
+        self.assertEqual(documento.fornitore.codice_fiscale, "12345678901")
+        self.assertEqual(documento.fornitore.indirizzo, "Via Nuvola 7 40100 Bologna BO")
+        self.assertEqual(documento.fornitore.email, "info@example.com")
+        self.assertEqual(documento.fornitore.pec, "cloud@examplepec.it")
+        self.assertEqual(documento.fornitore.telefono, "051123456")
+        self.assertEqual(documento.fornitore.codice_sdi, "ABC1234")
+        self.assertEqual(documento.fornitore.iban, "IT60X0542811101000000123456")
+        self.assertEqual(documento.fornitore.banca, "Banca Cloud")
         self.assertEqual(documento.numero_documento, "FC-42")
         self.assertEqual(documento.totale, Decimal("1220.00"))
         self.assertEqual(documento.origine, "fatture_in_cloud")
@@ -607,8 +636,71 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
         self.assertFalse(result["created"])
+        self.assertFalse(result["fornitore_created"])
+        self.assertFalse(result["fornitore_updated"])
         self.assertEqual(DocumentoFornitore.objects.filter(external_id="987").count(), 1)
         self.assertEqual(NotificaFinanziaria.objects.filter(documento=documento).count(), 1)
+
+    def test_importa_documento_fatture_in_cloud_arricchisce_fornitore_esistente(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        fornitore = Fornitore.objects.create(
+            denominazione="Fornitore gia censito",
+            tipo_soggetto="azienda",
+            partita_iva="12345678906",
+            email="manuale@example.com",
+            attivo=False,
+        )
+        payload = {
+            "id": 992,
+            "type": "expense",
+            "description": "Fattura con anagrafica completa",
+            "invoice_number": "SUP-1",
+            "date": "2026-04-24",
+            "amount_net": "200.00",
+            "amount_vat": "44.00",
+            "amount_gross": "244.00",
+            "entity": {
+                "name": "Nome da Fatture in Cloud",
+                "vat_number": "IT12345678906",
+                "tax_code": "12345678906",
+                "address_street": "Via Dati 10",
+                "address_postal_code": "20100",
+                "address_city": "Milano",
+                "address_province": "MI",
+                "email": "fic@example.com",
+                "certified_email": "fornitore@examplepec.it",
+                "phone": "02123456",
+                "ei_code": "XYZ9876",
+            },
+            "payments_list": [
+                {
+                    "due_date": "2026-05-24",
+                    "amount": "244.00",
+                    "iban": "IT60 X054 2811 1010 0000 0123 456",
+                    "bank_name": "Banca Test",
+                }
+            ],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        self.assertFalse(result["fornitore_created"])
+        self.assertTrue(result["fornitore_updated"])
+        self.assertEqual(Fornitore.objects.count(), 1)
+        fornitore.refresh_from_db()
+        self.assertEqual(fornitore.denominazione, "Fornitore gia censito")
+        self.assertEqual(fornitore.email, "manuale@example.com")
+        self.assertEqual(fornitore.codice_fiscale, "12345678906")
+        self.assertEqual(fornitore.indirizzo, "Via Dati 10 20100 Milano MI")
+        self.assertEqual(fornitore.pec, "fornitore@examplepec.it")
+        self.assertEqual(fornitore.telefono, "02123456")
+        self.assertEqual(fornitore.codice_sdi, "XYZ9876")
+        self.assertEqual(fornitore.iban, "IT60X0542811101000000123456")
+        self.assertEqual(fornitore.banca, "Banca Test")
+        self.assertFalse(fornitore.attivo)
 
     def test_importa_documento_fatture_in_cloud_accetta_url_allegato_lunghi(self):
         connessione = FattureInCloudConnessione.objects.create(
@@ -638,6 +730,141 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             DocumentoFornitore._meta.get_field("external_url").max_length,
             1000,
         )
+
+    def test_importa_documento_fatture_in_cloud_legge_fornitore_e_scadenza_da_e_invoice(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 989,
+            "type": "expense",
+            "description": "Fattura elettronica ricevuta",
+            "date": "2026-04-22",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "e_invoice": {
+                "dati_generali": {
+                    "dati_generali_documento": {
+                        "numero": "EI-44",
+                        "importo_totale_documento": "122.00",
+                    }
+                },
+                "cedente_prestatore": {
+                    "dati_anagrafici": {
+                        "id_fiscale_iva": {"id_codice": "12345678903"},
+                        "codice_fiscale": "12345678903",
+                        "anagrafica": {"denominazione": "E Invoice Supplier Srl"},
+                    },
+                    "sede": {
+                        "indirizzo": "Via Roma 1",
+                        "cap": "40100",
+                        "comune": "Bologna",
+                        "provincia": "BO",
+                    },
+                    "contatti": {"email": "fatture@example.com"},
+                },
+                "dati_pagamento": [
+                    {
+                        "dettaglio_pagamento": [
+                            {
+                                "data_scadenza_pagamento": "2026-06-15",
+                                "importo_pagamento": "122.00",
+                            }
+                        ]
+                    }
+                ],
+            },
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="989")
+        self.assertEqual(documento.fornitore.denominazione, "E Invoice Supplier Srl")
+        self.assertEqual(documento.fornitore.partita_iva, "12345678903")
+        self.assertEqual(documento.numero_documento, "EI-44")
+        self.assertEqual(documento.totale, Decimal("122.00"))
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 6, 15))
+        self.assertEqual(scadenza.importo_previsto, Decimal("122.00"))
+
+    def test_importa_documento_fatture_in_cloud_aggiorna_scadenza_importata_non_pagata(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        fornitore = Fornitore.objects.create(denominazione="Fornitore temporaneo")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="OLD-1",
+            data_documento=date(2026, 4, 22),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            external_source="fatture_in_cloud",
+            external_id="990",
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 4, 22),
+            importo_previsto=Decimal("122.00"),
+        )
+        payload = {
+            "id": 990,
+            "type": "expense",
+            "description": "Fattura aggiornata",
+            "invoice_number": "NEW-1",
+            "date": "2026-04-22",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Supplier Correct Srl", "vat_number": "IT12345678904"},
+            "payments_list": [{"due_date": "2026-06-30", "amount": "122.00"}],
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        documento.refresh_from_db()
+        self.assertEqual(documento.fornitore.denominazione, "Supplier Correct Srl")
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 6, 30))
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_recupera_dettaglio_prima_di_importare(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_da_registrare=False,
+        )
+        client = Mock()
+        client.list_received_documents.side_effect = [
+            {"data": [{"id": 991}], "pagination": {"current_page": 1, "last_page": 1}},
+            {"data": [], "pagination": {"current_page": 1, "last_page": 1}},
+        ]
+        client.get_received_document.return_value = {
+            "id": 991,
+            "type": "expense",
+            "description": "Dettaglio completo",
+            "invoice_number": "DET-1",
+            "date": "2026-04-23",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Detailed Supplier Srl", "vat_number": "IT12345678905"},
+            "payments_list": [{"due_date": "2026-07-01", "amount": "122.00"}],
+        }
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(stats["fornitori_creati"], 1)
+        self.assertEqual(stats["fornitori_aggiornati"], 0)
+        self.assertIn("Fornitori: 1 creati, 0 aggiornati.", stats["messaggi"][0])
+        client.get_received_document.assert_called_once_with(991)
+        documento = DocumentoFornitore.objects.get(external_id="991")
+        self.assertEqual(documento.fornitore.denominazione, "Detailed Supplier Srl")
+        self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 7, 1))
 
     @override_settings(
         FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",
@@ -719,10 +946,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(page_response, "Company ID collegato: 456")
 
     def test_riconciliazione_fornitore_collega_movimento_in_uscita(self):
+        categoria = crea_categoria_spesa_test("Utenze")
         fornitore = Fornitore.objects.create(
             denominazione="Energia Srl",
             tipo_soggetto="azienda",
             partita_iva="12345678901",
+            categoria_spesa=categoria,
         )
         documento = DocumentoFornitore.objects.create(
             fornitore=fornitore,
@@ -763,11 +992,13 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
         self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(movimento.categoria, categoria)
+        self.assertTrue(movimento.categorizzazione_automatica)
         self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0.00"))
         self.assertEqual(PagamentoFornitore.objects.count(), 1)
 
     def test_fornitori_pages_render(self):
-        categoria = CategoriaSpesa.objects.create(nome="Materiali")
+        categoria = crea_categoria_spesa_test("Materiali")
         fornitore = Fornitore.objects.create(
             denominazione="Carta Srl",
             tipo_soggetto="azienda",
@@ -795,6 +1026,60 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         for url in urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, url)
+
+    def test_eliminazione_multipla_documenti_fornitori_con_conferma(self):
+        fornitore = Fornitore.objects.create(
+            denominazione="Fornitore bulk",
+            tipo_soggetto="azienda",
+        )
+        documenti = [
+            DocumentoFornitore.objects.create(
+                fornitore=fornitore,
+                numero_documento=f"BULK-{index}",
+                data_documento=date(2026, 4, index),
+                imponibile=Decimal("100.00"),
+                iva=Decimal("22.00"),
+                totale=Decimal("122.00"),
+            )
+            for index in (1, 2, 3)
+        ]
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documenti[0],
+            data_scadenza=date(2026, 5, 1),
+            importo_previsto=Decimal("122.00"),
+        )
+        next_url = reverse("lista_documenti_fornitori") + "?stato=da_pagare"
+
+        response = self.client.get(reverse("lista_documenti_fornitori"))
+        self.assertContains(response, reverse("elimina_documenti_fornitori_multipla"))
+        self.assertContains(response, "data-bulk-form")
+
+        response = self.client.post(
+            reverse("elimina_documenti_fornitori_multipla"),
+            {
+                "selected_ids": [str(documenti[0].pk), str(documenti[1].pk)],
+                "next": next_url,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Elimina documenti fornitori")
+        self.assertContains(response, "BULK-1")
+        self.assertContains(response, "BULK-2")
+
+        response = self.client.post(
+            reverse("elimina_documenti_fornitori_multipla"),
+            {
+                "selected_ids": [str(documenti[0].pk), str(documenti[1].pk)],
+                "next": next_url,
+                "conferma": "1",
+            },
+        )
+
+        self.assertRedirects(response, next_url)
+        self.assertFalse(DocumentoFornitore.objects.filter(pk__in=[documenti[0].pk, documenti[1].pk]).exists())
+        self.assertTrue(DocumentoFornitore.objects.filter(pk=documenti[2].pk).exists())
+        self.assertFalse(ScadenzaPagamentoFornitore.objects.filter(documento=documenti[0]).exists())
 
     def test_cbi_csv_autodetect_parses_movements(self):
         detection = detect_csv_import_config(CBI_CSV_SAMPLE.encode("utf-8"))
@@ -1093,6 +1378,67 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "finance-movement-row-incoming")
         self.assertContains(response, "finance-movement-row-outgoing")
+
+    def test_eliminazione_multipla_movimenti_conferma_e_ricalcola_saldo(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto bulk",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            attivo=True,
+        )
+        SaldoConto.objects.create(
+            conto=conto,
+            data_riferimento=timezone.make_aware(datetime(2026, 4, 1, 23, 59)),
+            saldo_contabile=Decimal("1000.00"),
+            fonte=FonteSaldo.MANUALE,
+        )
+        movimento_da_eliminare = MovimentoFinanziario.objects.create(
+            conto=conto,
+            canale=CanaleMovimento.BANCA,
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-100.00"),
+            descrizione="Movimento da eliminare",
+            incide_su_saldo_banca=True,
+        )
+        movimento_da_mantenere = MovimentoFinanziario.objects.create(
+            conto=conto,
+            canale=CanaleMovimento.BANCA,
+            data_contabile=date(2026, 4, 3),
+            importo=Decimal("-25.00"),
+            descrizione="Movimento da mantenere",
+            incide_su_saldo_banca=True,
+        )
+        next_url = reverse("lista_movimenti_finanziari") + f"?conto={conto.pk}"
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+        self.assertContains(response, reverse("elimina_movimenti_finanziari_multipla"))
+        self.assertContains(response, "data-bulk-form")
+
+        response = self.client.post(
+            reverse("elimina_movimenti_finanziari_multipla"),
+            {
+                "selected_ids": [str(movimento_da_eliminare.pk)],
+                "next": next_url,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Elimina movimenti")
+        self.assertContains(response, "Movimento da eliminare")
+
+        response = self.client.post(
+            reverse("elimina_movimenti_finanziari_multipla"),
+            {
+                "selected_ids": [str(movimento_da_eliminare.pk)],
+                "next": next_url,
+                "conferma": "1",
+            },
+        )
+
+        self.assertRedirects(response, next_url)
+        self.assertFalse(MovimentoFinanziario.objects.filter(pk=movimento_da_eliminare.pk).exists())
+        self.assertTrue(MovimentoFinanziario.objects.filter(pk=movimento_da_mantenere.pk).exists())
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("975.00"))
 
     def test_saldo_conto_manuale_alimenta_saldo_corrente_con_movimenti_successivi(self):
         conto = ContoBancario.objects.create(

@@ -1,136 +1,268 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static currency %}
 
 {% block title %}{{ rata.display_label }} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_rate_iscrizione' %}">Rate iscrizione</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{{ rata.display_label }}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_rate_iscrizione' %}">Rate iscrizione</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{{ rata.display_label }}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{{ rata.display_label }} - {{ rata.iscrizione.studente }}</h1>
-        <div class="page-head-actions">
-            <a href="{{ back_url }}" class="btn btn-secondary">Indietro</a>
-            <button type="button" class="btn btn-primary" id="enable-edit-rata-btn">Modifica</button>
-            <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-rata-btn">Annulla modifiche</button>
-            <a href="{% url 'lista_rate_iscrizione' %}?iscrizione={{ rata.iscrizione_id }}" class="btn btn-secondary">Torna alle rate</a>
+    <div class="rate-detail-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero rate-detail-hero">
+            <span class="calendar-event-hero-icon rate-detail-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">{{ rata.display_label }} - {{ rata.iscrizione.studente }}</h1>
+                <p>{{ rata.iscrizione.anno_scolastico }} - {{ rata.display_period_label }}</p>
+            </div>
+            <div class="calendar-category-hero-actions rate-detail-hero-actions">
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Chiudi</span>
+                    </button>
+                {% else %}
+                    <a href="{{ back_url }}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                    <a href="{% url 'lista_rate_iscrizione' %}?iscrizione={{ rata.iscrizione_id }}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Torna alle rate</span>
+                    </a>
+                {% endif %}
+                <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-rata-btn">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                    <span class="btn-label">Modifica</span>
+                </button>
+                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-rata-btn">Annulla modifiche</button>
+            </div>
         </div>
+
+        <form method="post" id="rata-detail-form" class="calendar-event-form rate-detail-form detail-form is-view-mode">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+
+            {% if form.non_field_errors %}
+                <div class="settings-warning-box calendar-event-form-errors">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <section class="rate-detail-summary-grid" aria-label="Riepilogo rata">
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                    <div>
+                        <span>Importo finale</span>
+                        <strong>EUR {{ rata.importo_finale|euro }}</strong>
+                    </div>
+                </article>
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <div>
+                        <span>Pagato</span>
+                        <strong>EUR {{ rata.importo_pagato|euro }}</strong>
+                    </div>
+                </article>
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                    <div>
+                        <span>Residuo</span>
+                        <strong>EUR {{ rata_residuo|euro }}</strong>
+                    </div>
+                </article>
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon {% if rata.pagata %}is-green{% else %}is-red{% endif %}" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <div>
+                        <span>Stato</span>
+                        <strong>{% if rata.pagata %}Pagata{% elif rata.importo_pagato %}Parziale{% else %}Da pagare{% endif %}</strong>
+                    </div>
+                </article>
+            </section>
+
+            <fieldset id="rata-lock-container" class="mode-lock-container rate-detail-fieldset">
+                <section class="calendar-event-form-card rate-detail-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                        <span>Dettagli rata</span>
+                    </div>
+
+                    <div class="rate-detail-readonly-grid">
+                        <div class="rate-detail-readonly-item">
+                            <span>Iscrizione</span>
+                            {% if popup %}
+                                <strong>{{ rata.iscrizione }}</strong>
+                            {% else %}
+                                <a href="{% url 'modifica_iscrizione' rata.iscrizione.pk %}">{{ rata.iscrizione }}</a>
+                            {% endif %}
+                        </div>
+                        <div class="rate-detail-readonly-item">
+                            <span>Famiglia</span>
+                            {% if rata.famiglia %}
+                                {% if popup %}
+                                    <strong>{{ rata.famiglia }}</strong>
+                                {% else %}
+                                    <a href="{% url 'modifica_famiglia' rata.famiglia.pk %}">{{ rata.famiglia }}</a>
+                                {% endif %}
+                            {% else %}
+                                <strong>Non indicata</strong>
+                            {% endif %}
+                        </div>
+                        <div class="rate-detail-readonly-item">
+                            <span>Voce piano</span>
+                            <strong>{{ rata.display_label }}</strong>
+                        </div>
+                        <div class="rate-detail-readonly-item">
+                            <span>Descrizione</span>
+                            <strong>{{ rata.descrizione|default:"-" }}</strong>
+                        </div>
+                        <div class="rate-detail-readonly-item">
+                            <span>Importo dovuto</span>
+                            <strong>EUR {{ rata.importo_dovuto|euro }}</strong>
+                        </div>
+                        <div class="rate-detail-readonly-item">
+                            <span>Importo finale calcolato</span>
+                            <strong>EUR {{ rata.importo_finale|euro }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="calendar-event-form-grid rate-detail-form-grid">
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.data_scadenza.id_for_label }}">
+                                <span class="calendar-event-field-label">Data scadenza</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.is_preiscrizione %}
+                                        <span class="table-muted">Nessuna scadenza</span>
+                                    {% elif rata.data_scadenza %}
+                                        {{ rata.data_scadenza|it_date }}
+                                    {% else %}
+                                        <span class="table-muted">Nessuna scadenza</span>
+                                    {% endif %}
+                                </div>
+                                {% if not rata.is_preiscrizione %}
+                                    <div class="mode-edit-field">{{ form.data_scadenza }} {{ form.data_scadenza.errors }}</div>
+                                {% endif %}
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                            <div class="calendar-event-field">
+                                <span class="calendar-event-field-label">Pagamento</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.pagata %}Pagata{% elif rata.importo_pagato %}Pagamento parziale{% else %}Da pagare{% endif %}
+                                </div>
+                                <label class="mode-edit-field calendar-event-check-field" for="{{ form.pagata.id_for_label }}">
+                                    {{ form.pagata }}
+                                    <span>{{ form.pagata.label }}</span>
+                                    {{ form.pagata.errors }}
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.importo_pagato.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.importo_pagato.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.importo_pagato %}EUR {{ rata.importo_pagato|euro }}{% else %}<span class="table-muted">Ancora da pagare</span>{% endif %}
+                                </div>
+                                <div class="mode-edit-field">{{ form.importo_pagato }} {{ form.importo_pagato.errors }}</div>
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.data_pagamento.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.data_pagamento.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.data_pagamento %}{{ rata.data_pagamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}
+                                </div>
+                                <div class="mode-edit-field">{{ form.data_pagamento }} {{ form.data_pagamento.errors }}</div>
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.metodo_pagamento.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.metodo_pagamento.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {{ rata.metodo_pagamento|default:"-" }}
+                                </div>
+                                <div class="mode-edit-field">{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</div>
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.credito_applicato.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.credito_applicato.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.credito_applicato %}EUR {{ rata.credito_applicato|euro }}{% else %}<span class="table-muted">Nessun credito</span>{% endif %}
+                                </div>
+                                <div class="mode-edit-field">{{ form.credito_applicato }} {{ form.credito_applicato.errors }}</div>
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.altri_sgravi.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.altri_sgravi.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain">
+                                    {% if rata.altri_sgravi %}EUR {{ rata.altri_sgravi|euro }}{% else %}<span class="table-muted">Nessuno</span>{% endif %}
+                                </div>
+                                <div class="mode-edit-field">{{ form.altri_sgravi }} {{ form.altri_sgravi.errors }}</div>
+                            </label>
+                        </div>
+
+                        <div class="calendar-event-form-row rate-detail-notes-row">
+                            <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                            <label class="calendar-event-field" for="{{ form.note.id_for_label }}">
+                                <span class="calendar-event-field-label">{{ form.note.label }}</span>
+                                <div class="mode-view-only readonly-display readonly-display-plain rate-detail-notes-view">
+                                    {% if rata.note %}{{ rata.note|linebreaksbr }}{% else %}<span class="table-muted">Nessuna nota</span>{% endif %}
+                                </div>
+                                <div class="mode-edit-field">{{ form.note }} {{ form.note.errors }}</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="calendar-event-suggestion rate-detail-help">
+                        <span class="calendar-event-suggestion-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <div>
+                            <strong>Calcolo automatico</strong>
+                            <span>L'importo finale viene ricalcolato in base a importo dovuto, credito applicato e altri sgravi.</span>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            <div class="calendar-event-actions rate-detail-actions mode-edit-only">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva modifiche</span>
+                </button>
+                <a href="{{ request.get_full_path }}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            </div>
+        </form>
     </div>
 
-    <form method="post" id="rata-detail-form" class="detail-form is-view-mode">
-        {% csrf_token %}
-        <fieldset id="rata-lock-container" class="mode-lock-container" disabled>
-        <div class="content-card">
-            <table class="form-table">
-                <tr class="list-row-link" data-row-href="{% url 'modifica_iscrizione' rata.iscrizione.pk %}">
-                    <th>Iscrizione</th>
-                    <td>{{ rata.iscrizione }}</td>
-                </tr>
-                {% if rata.famiglia %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_famiglia' rata.famiglia.pk %}">
-                        <th>Famiglia</th>
-                        <td>{{ rata.famiglia }}</td>
-                    </tr>
-                {% else %}
-                    <tr><th>Famiglia</th><td><span class="table-muted">Non indicata</span></td></tr>
-                {% endif %}
-                <tr><th>Voce piano</th><td>{{ rata.display_label }}</td></tr>
-                <tr><th>Descrizione</th><td>{{ rata.descrizione|default:"-" }}</td></tr>
-                <tr><th>Importo dovuto</th><td>EUR {{ rata.importo_dovuto|euro }}</td></tr>
-                <tr><th>Importo finale calcolato</th><td>EUR {{ rata.importo_finale|euro }}</td></tr>
-                {% if rata.is_preiscrizione %}
-                    <tr><th>Scadenza</th><td><span class="table-muted">Nessuna scadenza</span></td></tr>
-                {% else %}
-                    <tr>
-                        <th>{{ form.data_scadenza.label_tag }}</th>
-                        <td>
-                            <div class="mode-view-only readonly-display readonly-display-plain">
-                                {% if rata.data_scadenza %}
-                                    {{ rata.data_scadenza|it_date }}
-                                {% else %}
-                                    <span class="table-muted">Nessuna scadenza</span>
-                                {% endif %}
-                            </div>
-                            <div class="mode-edit-field">{{ form.data_scadenza }} {{ form.data_scadenza.errors }}</div>
-                        </td>
-                    </tr>
-                {% endif %}
-                <tr><th>{{ form.pagata.label_tag }}</th><td>{{ form.pagata }} {{ form.pagata.errors }}</td></tr>
-                <tr>
-                    <th>{{ form.importo_pagato.label_tag }}</th>
-                    <td>
-                        <div class="mode-view-only readonly-display readonly-display-plain">
-                            {% if rata.importo_pagato %}
-                                EUR {{ rata.importo_pagato|euro }}
-                            {% else %}
-                                <span class="table-muted">Ancora da pagare</span>
-                            {% endif %}
-                        </div>
-                        <div class="mode-edit-field">{{ form.importo_pagato }} {{ form.importo_pagato.errors }}</div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.data_pagamento.label_tag }}</th>
-                    <td>
-                        <div class="mode-view-only readonly-display readonly-display-plain">
-                            {% if rata.data_pagamento %}
-                                {{ rata.data_pagamento|it_date }}
-                            {% else %}
-                                <span class="table-muted">-</span>
-                            {% endif %}
-                        </div>
-                        <div class="mode-edit-field">{{ form.data_pagamento }} {{ form.data_pagamento.errors }}</div>
-                    </td>
-                </tr>
-                <tr><th>{{ form.metodo_pagamento.label_tag }}</th><td>{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</td></tr>
-                <tr>
-                    <th>{{ form.credito_applicato.label_tag }}</th>
-                    <td>
-                        <div class="mode-view-only readonly-display readonly-display-plain">
-                            {% if rata.credito_applicato %}
-                                EUR {{ rata.credito_applicato|euro }}
-                            {% else %}
-                                <span class="table-muted">Nessun credito</span>
-                            {% endif %}
-                        </div>
-                        <div class="mode-edit-field">{{ form.credito_applicato }} {{ form.credito_applicato.errors }}</div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.altri_sgravi.label_tag }}</th>
-                    <td>
-                        <div class="mode-view-only readonly-display readonly-display-plain">
-                            {% if rata.altri_sgravi %}
-                                EUR {{ rata.altri_sgravi|euro }}
-                            {% else %}
-                                <span class="table-muted">Nessuno</span>
-                            {% endif %}
-                        </div>
-                        <div class="mode-edit-field">{{ form.altri_sgravi }} {{ form.altri_sgravi.errors }}</div>
-                    </td>
-                </tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="help-text" style="padding: 0 16px 16px 16px;">
-                L'importo finale viene ricalcolato automaticamente in base a importo dovuto, credito applicato e altri sgravi.
-                Se togli il flag "Pagata" da una voce del piano gia saldata, il salvataggio azzera anche i dati di pagamento per permettere il ricalcolo del piano rate.
-            </div>
-            <div class="form-actions mode-edit-only">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <a href="{{ back_url }}" class="btn btn-secondary">Annulla</a>
-            </div>
-        </div>
-        </fieldset>
-    </form>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisViewMode) {
@@ -142,9 +274,6 @@
                     startInEditMode: false,
                     reloadOnCancel: true
                 });
-            }
-            if (window.ArborisListRowLinks) {
-                ArborisListRowLinks.init();
             }
         });
     </script>

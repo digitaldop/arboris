@@ -69,6 +69,11 @@ urlpatterns = [
         name="crea_documento_fornitore",
     ),
     path(
+        "gestione-finanziaria/documenti-fornitori/elimina-selezionati/",
+        gf_manage(views.elimina_documenti_fornitori_multipla),
+        name="elimina_documenti_fornitori_multipla",
+    ),
+    path(
         "gestione-finanziaria/documenti-fornitori/<int:pk>/modifica/",
         gf_edit(views.modifica_documento_fornitore),
         name="modifica_documento_fornitore",
@@ -238,6 +243,11 @@ urlpatterns = [
         "gestione-finanziaria/movimenti/ripulisci/",
         gf_manage(views.pulizia_movimenti_finanziari),
         name="pulizia_movimenti_finanziari",
+    ),
+    path(
+        "gestione-finanziaria/movimenti/elimina-selezionati/",
+        gf_manage(views.elimina_movimenti_finanziari_multipla),
+        name="elimina_movimenti_finanziari_multipla",
     ),
     path(
         "gestione-finanziaria/movimenti/<int:pk>/modifica/",

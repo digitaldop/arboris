@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=173">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=182">
     {% if role_theme %}
         <style>
             :root {
@@ -34,7 +34,7 @@
         </style>
     {% endif %}
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
-    <script src="{% static 'js/core/detail-form-actions.js' %}?v=4"></script>
+    <script src="{% static 'js/core/detail-form-actions.js' %}?v=5"></script>
 </head>
 <body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
@@ -519,7 +519,7 @@
                                                     <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
                                                     <span class="sidebar-link-text">Fornitori</span>
                                                 </a>
-                                                <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' %}active{% endif %}">
+                                                <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' or request.resolver_match.url_name == 'elimina_documenti_fornitori_multipla' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
                                                     <span class="sidebar-link-text">Documenti fornitori</span>
                                                 </a>
@@ -561,7 +561,7 @@
                                         </button>
                                         <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-conti-panel">
                                             <nav class="sidebar-nav sidebar-subnav">
-                                                <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' %}active{% endif %}">
+                                                <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimenti_finanziari_multipla' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
                                                     <span class="sidebar-link-text">Movimenti</span>
                                                 </a>
@@ -826,7 +826,7 @@
 
     {{ student_terminology|json_script:"student-terminology-data" }}
     <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
-    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=7"></script>
+    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=8"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
@@ -840,8 +840,8 @@
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>
-    <script src="{% static 'js/core/modal-popups.js' %}?v=3"></script>
-    <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
+    <script src="{% static 'js/core/modal-popups.js' %}?v=4"></script>
+    <script src="{% static 'js/core/related-popups.js' %}?v=9"></script>
     <script src="{% static 'js/core/popup-window-triggers.js' %}?v=2"></script>
     <script src="{% static 'js/core/rate-recalc-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/rich-notes.js' %}?v=5"></script>

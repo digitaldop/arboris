@@ -13,153 +13,689 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Gestione finanziaria</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'import_estratto_conto' %}" class="btn btn-primary">Import estratto conto</a>
-            <a href="{% url 'crea_movimento_manuale' %}" class="btn btn-secondary">Nuovo movimento manuale</a>
-            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Connessioni PSD2</a>
-            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary">Riconciliazione</a>
-            <a href="{% url 'report_categorie_mensile' %}" class="btn btn-secondary">Report categorie</a>
-            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary">Fornitori</a>
-            <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary">Scadenziario fornitori</a>
-            <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="btn btn-secondary">Riconciliazione fornitori</a>
-            <a href="{% url 'lista_fatture_in_cloud' %}" class="btn btn-secondary">Fatture in Cloud</a>
-            <a href="{% url 'lista_notifiche_finanziarie' %}" class="btn btn-secondary">Notifiche</a>
-            <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary">Conti</a>
-            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Movimenti</a>
-            <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary">Categorie spesa</a>
-            <a href="{% url 'lista_categorie_finanziarie' %}" class="btn btn-secondary">Categorie movimenti</a>
-            <a href="{% url 'lista_regole_categorizzazione' %}" class="btn btn-secondary">Regole</a>
-        </div>
-    </div>
+    <style>
+        .finance-dashboard-shell {
+            --finance-dashboard-primary: var(--primary);
+            --finance-dashboard-primary-dark: var(--primary-dark);
+            --finance-dashboard-border: #dfe9f1;
+            --finance-dashboard-line: #e8eff5;
+            --finance-dashboard-muted: #60738d;
+            --finance-dashboard-title: #172131;
+            --finance-dashboard-soft: #eef7fb;
+            display: grid;
+            gap: 18px;
+            color: var(--finance-dashboard-title);
+        }
 
-    <div class="content-card">
-        <div class="summary-grid">
-            <div class="summary-item">
-                <div class="summary-value">{{ saldo_totale|euro }} &euro;</div>
-                <div class="summary-label">Saldo complessivo conti attivi</div>
+        .finance-dashboard-head {
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 0;
+        }
+
+        .finance-dashboard-head .page-title {
+            margin: 0;
+        }
+
+        .finance-dashboard-subtitle {
+            margin-top: 6px;
+            color: var(--finance-dashboard-muted);
+            font-size: 14px;
+        }
+
+        .finance-dashboard-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .finance-dashboard-nav .btn {
+            min-height: 42px;
+            border-radius: 7px;
+            padding: 0 16px;
+            box-shadow: 0 8px 18px rgba(19, 42, 63, 0.04);
+        }
+
+        .finance-dashboard-nav .finance-dashboard-nav-active {
+            border-color: var(--finance-dashboard-primary-dark);
+            background: var(--finance-dashboard-primary-dark);
+            color: #ffffff;
+        }
+
+        .finance-dashboard-nav .btn-icon-text .btn-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .finance-dashboard-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(150px, 1fr));
+            gap: 14px;
+        }
+
+        .finance-dashboard-kpi-card {
+            position: relative;
+            overflow: hidden;
+            min-height: 152px;
+            padding: 22px 18px 18px;
+            border: 1px solid var(--finance-dashboard-border);
+            border-radius: 8px;
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 253, 0.92)),
+                #ffffff;
+            box-shadow: 0 14px 34px rgba(19, 42, 63, 0.06);
+        }
+
+        .finance-dashboard-kpi-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-top: 4px solid var(--finance-dashboard-card-accent, var(--finance-dashboard-primary));
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .finance-dashboard-kpi-card.is-blue {
+            --finance-dashboard-card-accent: #75a9c2;
+            --finance-dashboard-card-tint: #e8f3f8;
+            --finance-dashboard-value: #275b75;
+        }
+
+        .finance-dashboard-kpi-card.is-green {
+            --finance-dashboard-card-accent: #78bf95;
+            --finance-dashboard-card-tint: #e8f7ee;
+            --finance-dashboard-value: #1f7a4a;
+        }
+
+        .finance-dashboard-kpi-card.is-amber {
+            --finance-dashboard-card-accent: #d9ad48;
+            --finance-dashboard-card-tint: #fff4d8;
+            --finance-dashboard-value: #806016;
+        }
+
+        .finance-dashboard-kpi-card.is-rose {
+            --finance-dashboard-card-accent: #dfa2b2;
+            --finance-dashboard-card-tint: #fdebf0;
+            --finance-dashboard-value: #8a314a;
+        }
+
+        .finance-dashboard-kpi-card.is-purple {
+            --finance-dashboard-card-accent: #9b8bd7;
+            --finance-dashboard-card-tint: #f0ecff;
+            --finance-dashboard-value: #57469b;
+        }
+
+        .finance-dashboard-kpi-icon {
+            display: inline-flex;
+            width: 56px;
+            height: 56px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: var(--finance-dashboard-card-accent, var(--finance-dashboard-primary));
+            background: var(--finance-dashboard-card-tint, var(--finance-dashboard-soft));
+        }
+
+        .finance-dashboard-kpi-icon svg {
+            width: 25px;
+            height: 25px;
+        }
+
+        .finance-dashboard-kpi-label {
+            margin-top: 14px;
+            color: #526983;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.35;
+            text-transform: uppercase;
+        }
+
+        .finance-dashboard-kpi-value {
+            margin-top: 8px;
+            color: var(--finance-dashboard-value, var(--finance-dashboard-title));
+            font-size: clamp(25px, 2.2vw, 34px);
+            font-weight: 850;
+            line-height: 1;
+        }
+
+        .finance-dashboard-kpi-note {
+            margin-top: 9px;
+            color: var(--finance-dashboard-muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .finance-dashboard-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(150px, 1fr));
+            gap: 14px;
+        }
+
+        .finance-dashboard-mini-item {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr);
+            gap: 12px;
+            align-items: center;
+            min-height: 78px;
+            padding: 16px;
+            border: 1px solid var(--finance-dashboard-border);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 10px 24px rgba(19, 42, 63, 0.05);
+        }
+
+        .finance-dashboard-mini-icon {
+            display: inline-flex;
+            width: 44px;
+            height: 44px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: var(--finance-dashboard-mini-accent, var(--finance-dashboard-primary));
+            background: var(--finance-dashboard-mini-tint, var(--finance-dashboard-soft));
+        }
+
+        .finance-dashboard-mini-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .finance-dashboard-mini-item.is-green {
+            --finance-dashboard-mini-accent: #26975a;
+            --finance-dashboard-mini-tint: #e8f7ee;
+        }
+
+        .finance-dashboard-mini-item.is-red {
+            --finance-dashboard-mini-accent: #d3495f;
+            --finance-dashboard-mini-tint: #fdebf0;
+        }
+
+        .finance-dashboard-mini-item.is-amber {
+            --finance-dashboard-mini-accent: #c78919;
+            --finance-dashboard-mini-tint: #fff4d8;
+        }
+
+        .finance-dashboard-mini-label {
+            color: #526983;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .finance-dashboard-mini-value {
+            margin-top: 4px;
+            color: var(--finance-dashboard-title);
+            font-size: 22px;
+            font-weight: 850;
+            line-height: 1;
+        }
+
+        .finance-dashboard-section {
+            overflow: hidden;
+            border: 1px solid var(--finance-dashboard-border);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 14px 34px rgba(19, 42, 63, 0.06);
+        }
+
+        .finance-dashboard-section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--finance-dashboard-line);
+        }
+
+        .finance-dashboard-section-title {
+            margin: 0;
+            color: var(--finance-dashboard-title);
+            font-size: 18px;
+            font-weight: 850;
+        }
+
+        .finance-dashboard-section-subtitle {
+            margin: 4px 0 0;
+            color: var(--finance-dashboard-muted);
+            font-size: 13px;
+        }
+
+        .finance-dashboard-balance-list {
+            display: grid;
+            gap: 12px;
+            padding: 16px;
+        }
+
+        .finance-dashboard-balance-item {
+            display: grid;
+            grid-template-columns: 68px minmax(0, 1.4fr) minmax(180px, 0.8fr);
+            gap: 16px;
+            align-items: center;
+            min-height: 110px;
+            padding: 18px;
+            border: 1px solid #dbe7ef;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ffffff, #f8fbfd);
+        }
+
+        .finance-dashboard-balance-icon {
+            display: inline-flex;
+            width: 60px;
+            height: 60px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            color: #ffffff;
+            background: var(--finance-dashboard-primary);
+            box-shadow: 0 14px 26px rgba(65, 118, 144, 0.22);
+        }
+
+        .finance-dashboard-balance-icon svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .finance-dashboard-balance-label {
+            color: #172131;
+            font-weight: 850;
+        }
+
+        .finance-dashboard-balance-meta {
+            margin-top: 5px;
+            color: var(--finance-dashboard-muted);
+            font-size: 13px;
+        }
+
+        .finance-dashboard-balance-total {
+            padding-left: 24px;
+            border-left: 1px solid var(--finance-dashboard-line);
+        }
+
+        .finance-dashboard-balance-total-label {
+            color: #526983;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .finance-dashboard-balance-total-value {
+            margin-top: 7px;
+            color: var(--finance-dashboard-primary-dark);
+            font-size: 28px;
+            font-weight: 850;
+        }
+
+        .finance-dashboard-table-wrap {
+            overflow-x: auto;
+            padding: 16px;
+        }
+
+        .finance-dashboard-table {
+            min-width: 900px;
+        }
+
+        .finance-dashboard-account-name,
+        .finance-dashboard-movement-text {
+            color: #172131;
+            font-weight: 800;
+        }
+
+        .finance-dashboard-muted {
+            color: var(--finance-dashboard-muted);
+            font-size: 12px;
+        }
+
+        .finance-dashboard-account-icon {
+            display: inline-flex;
+            width: 34px;
+            height: 34px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            color: var(--finance-dashboard-primary);
+            background: var(--finance-dashboard-soft);
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        .finance-dashboard-account-icon svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        .finance-dashboard-category-dot {
+            display: inline-flex;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #b7c5d0;
+            margin-right: 7px;
+            vertical-align: middle;
+        }
+
+        .finance-dashboard-category-dot.is-set {
+            background: #df9c2f;
+        }
+
+        .finance-dashboard-amount-positive {
+            color: #158347;
+            font-weight: 850;
+        }
+
+        .finance-dashboard-amount-negative {
+            color: #cf3f54;
+            font-weight: 850;
+        }
+
+        .finance-dashboard-empty {
+            padding: 28px;
+            color: var(--finance-dashboard-muted);
+            text-align: center;
+        }
+
+        @media (max-width: 1320px) {
+            .finance-dashboard-kpi-grid {
+                grid-template-columns: repeat(3, minmax(170px, 1fr));
+            }
+
+            .finance-dashboard-mini-grid {
+                grid-template-columns: repeat(2, minmax(170px, 1fr));
+            }
+        }
+
+        @media (max-width: 860px) {
+            .finance-dashboard-head,
+            .finance-dashboard-section-head,
+            .finance-dashboard-balance-item {
+                grid-template-columns: 1fr;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .finance-dashboard-kpi-grid,
+            .finance-dashboard-mini-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .finance-dashboard-balance-total {
+                padding-left: 0;
+                border-left: 0;
+                border-top: 1px solid var(--finance-dashboard-line);
+                padding-top: 14px;
+            }
+
+            .finance-dashboard-nav .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+
+    <div class="finance-dashboard-shell">
+        <div class="page-head family-page-head anagrafica-list-head finance-page-head finance-dashboard-head">
+            <div class="family-page-title-block">
+                <div class="family-page-title-line">
+                    <h1 class="page-title">Gestione finanziaria</h1>
+                </div>
+                <div class="finance-dashboard-subtitle">
+                    Saldi, movimenti, fornitori e riconciliazioni in un unico pannello operativo.
+                </div>
             </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ conti|length }}</div>
-                <div class="summary-label">Conti attivi</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ categorie_attive }}</div>
-                <div class="summary-label">Categorie movimenti attive</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ movimenti_senza_categoria }}</div>
-                <div class="summary-label">Movimenti da categorizzare</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ fornitori_attivi }}</div>
-                <div class="summary-label">Fornitori attivi</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ scadenze_fornitori_aperte }}</div>
-                <div class="summary-label">Scadenze fornitori aperte</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ scadenze_fornitori_scadute }}</div>
-                <div class="summary-label">Scadenze fornitori scadute</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ fatture_in_cloud_attive }}</div>
-                <div class="summary-label">Connessioni Fatture in Cloud</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ regole_attive }}</div>
-                <div class="summary-label">Regole attive</div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                    <span>Gestisci conti</span>
+                </a>
             </div>
         </div>
-    </div>
 
-    {% if saldo_per_tipo %}
-        <div class="content-card">
-            <h2 class="section-title">Saldi per tipo</h2>
-            <div class="finance-balance-type-grid">
-                {% for item in saldo_per_tipo %}
-                    <div class="finance-balance-type-item">
-                        <div class="finance-balance-type-label">{{ item.tipo }}</div>
-                        <div class="finance-balance-type-value">{{ item.saldo|euro }} &euro;</div>
+        <nav class="finance-dashboard-nav" aria-label="Azioni gestione finanziaria">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text finance-dashboard-nav-active" aria-current="page">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                <span>Dashboard</span>
+            </a>
+            <a href="{% url 'import_estratto_conto' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                <span>Import estratto conto</span>
+            </a>
+            <a href="{% url 'crea_movimento_manuale' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                <span>Nuovo movimento</span>
+            </a>
+            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                <span>Connessioni PSD2</span>
+            </a>
+            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                <span>Riconciliazione</span>
+            </a>
+            <a href="{% url 'report_categorie_mensile' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                <span>Report categorie</span>
+            </a>
+            <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                <span>Fornitori</span>
+            </a>
+            <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                <span>Scadenziario</span>
+            </a>
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                <span>Movimenti</span>
+            </a>
+            <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
+                <span>Categorie spesa</span>
+            </a>
+            <a href="{% url 'lista_regole_categorizzazione' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                <span>Regole</span>
+            </a>
+        </nav>
+
+        <section class="finance-dashboard-kpi-grid" aria-label="Indicatori gestione finanziaria">
+            <article class="finance-dashboard-kpi-card is-green">
+                <span class="finance-dashboard-kpi-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                <div class="finance-dashboard-kpi-label">Saldo complessivo conti attivi</div>
+                <div class="finance-dashboard-kpi-value">{{ saldo_totale|euro }} &euro;</div>
+                <div class="finance-dashboard-kpi-note">Disponibilita calcolata sui conti attivi.</div>
+            </article>
+            <article class="finance-dashboard-kpi-card is-blue">
+                <span class="finance-dashboard-kpi-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                <div class="finance-dashboard-kpi-label">Conti attivi</div>
+                <div class="finance-dashboard-kpi-value">{{ conti|length }}</div>
+                <div class="finance-dashboard-kpi-note">Banche, casse e canali operativi collegati.</div>
+            </article>
+            <article class="finance-dashboard-kpi-card is-purple">
+                <span class="finance-dashboard-kpi-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
+                <div class="finance-dashboard-kpi-label">Categorie movimenti attive</div>
+                <div class="finance-dashboard-kpi-value">{{ categorie_attive }}</div>
+                <div class="finance-dashboard-kpi-note">Organizzate in spese, ricavi e trasferimenti.</div>
+            </article>
+            <article class="finance-dashboard-kpi-card is-amber">
+                <span class="finance-dashboard-kpi-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                <div class="finance-dashboard-kpi-label">Movimenti da categorizzare</div>
+                <div class="finance-dashboard-kpi-value">{{ movimenti_senza_categoria }}</div>
+                <div class="finance-dashboard-kpi-note">Da assegnare per report e controllo costi.</div>
+            </article>
+            <article class="finance-dashboard-kpi-card is-blue">
+                <span class="finance-dashboard-kpi-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                <div class="finance-dashboard-kpi-label">Scadenziario fornitori aperto</div>
+                <div class="finance-dashboard-kpi-value">{{ scadenze_fornitori_aperte }}</div>
+                <div class="finance-dashboard-kpi-note">Scadenze ancora da chiudere o pagare.</div>
+            </article>
+        </section>
+
+        <section class="finance-dashboard-mini-grid" aria-label="Indicatori secondari">
+            <article class="finance-dashboard-mini-item is-green">
+                <span class="finance-dashboard-mini-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                <div>
+                    <div class="finance-dashboard-mini-label">Fornitori attivi</div>
+                    <div class="finance-dashboard-mini-value">{{ fornitori_attivi }}</div>
+                </div>
+            </article>
+            <article class="finance-dashboard-mini-item is-red">
+                <span class="finance-dashboard-mini-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                <div>
+                    <div class="finance-dashboard-mini-label">Scadenze fornitori scadute</div>
+                    <div class="finance-dashboard-mini-value">{{ scadenze_fornitori_scadute }}</div>
+                </div>
+            </article>
+            <article class="finance-dashboard-mini-item is-amber">
+                <span class="finance-dashboard-mini-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                <div>
+                    <div class="finance-dashboard-mini-label">Regole attive</div>
+                    <div class="finance-dashboard-mini-value">{{ regole_attive }}</div>
+                </div>
+            </article>
+            <article class="finance-dashboard-mini-item">
+                <span class="finance-dashboard-mini-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                <div>
+                    <div class="finance-dashboard-mini-label">Connessioni Fatture in Cloud</div>
+                    <div class="finance-dashboard-mini-value">{{ fatture_in_cloud_attive }}</div>
+                </div>
+            </article>
+        </section>
+
+        {% if saldo_per_tipo %}
+            <section class="finance-dashboard-section">
+                <div class="finance-dashboard-section-head">
+                    <div>
+                        <h2 class="finance-dashboard-section-title">Saldi per tipo</h2>
+                        <p class="finance-dashboard-section-subtitle">Raggruppamento dei saldi calcolati sui conti attivi.</p>
                     </div>
-                {% endfor %}
-            </div>
-        </div>
-    {% endif %}
-
-    <div class="content-card">
-        <h2 class="section-title">Conti attivi</h2>
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Nome conto</th>
-                    <th>Tipo</th>
-                    <th>Banca</th>
-                    <th>IBAN</th>
-                    <th>Saldo corrente</th>
-                    <th>Aggiornato al</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for conto in conti %}
-                    <tr>
-                        <td>{{ conto.nome_conto }}</td>
-                        <td>{{ conto.get_tipo_conto_display }}</td>
-                        <td>{{ conto.banca|default:"-" }}</td>
-                        <td>{{ conto.iban|default:"-" }}</td>
-                        <td>{{ conto.saldo_calcolato|euro }} &euro;</td>
-                        <td>{% if conto.saldo_corrente_aggiornato_al %}{{ conto.saldo_corrente_aggiornato_al|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6">
-                            <div class="empty-state">
-                                Nessun conto bancario collegato. I conti e le loro sincronizzazioni saranno configurabili nelle prossime iterazioni.
+                </div>
+                <div class="finance-dashboard-balance-list">
+                    {% for item in saldo_per_tipo %}
+                        <article class="finance-dashboard-balance-item">
+                            <span class="finance-dashboard-balance-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                            <div>
+                                <div class="finance-dashboard-balance-label">{{ item.tipo }}</div>
+                                <div class="finance-dashboard-balance-meta">Saldo aggregato dei conti attivi di questa tipologia.</div>
                             </div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                            <div class="finance-dashboard-balance-total">
+                                <div class="finance-dashboard-balance-total-label">Saldo conto corrente</div>
+                                <div class="finance-dashboard-balance-total-value">{{ item.saldo|euro }} &euro;</div>
+                                <div class="finance-dashboard-muted">Disponibile</div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
 
-    <div class="content-card">
-        <h2 class="section-title">Ultimi movimenti</h2>
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Conto</th>
-                    <th>Canale</th>
-                    <th>Descrizione</th>
-                    <th>Categoria</th>
-                    <th class="column-right">Importo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for movimento in ultimi_movimenti %}
-                    <tr class="{% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}">
-                        <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
-                        <td>{{ movimento.conto|default:"-" }}</td>
-                        <td>
-                            <span class="finance-channel-badge finance-channel-badge-{{ movimento.canale }}">
-                                {{ movimento.get_canale_display }}
-                            </span>
-                        </td>
-                        <td>{{ movimento.descrizione|truncatechars:80 }}</td>
-                        <td>{% if movimento.categoria %}{{ movimento.categoria }}{% else %}<span class="table-muted">non categorizzato</span>{% endif %}</td>
-                        <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6">
-                            <div class="empty-state">Nessun movimento registrato.</div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="finance-dashboard-section">
+            <div class="finance-dashboard-section-head">
+                <div>
+                    <h2 class="finance-dashboard-section-title">Conti attivi</h2>
+                    <p class="finance-dashboard-section-subtitle">Situazione aggiornata dei conti che incidono sulla gestione finanziaria.</p>
+                </div>
+                <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                    <span>Gestisci conti</span>
+                </a>
+            </div>
+            <div class="finance-dashboard-table-wrap">
+                <table class="list-table anagrafica-list-table finance-modern-table finance-dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Nome conto</th>
+                            <th>Tipo</th>
+                            <th>Banca</th>
+                            <th>IBAN</th>
+                            <th>Saldo corrente</th>
+                            <th>Aggiornato al</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conto in conti %}
+                            <tr>
+                                <td>
+                                    <span class="finance-dashboard-account-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                    <span class="finance-dashboard-account-name">{{ conto.nome_conto }}</span>
+                                </td>
+                                <td>{{ conto.get_tipo_conto_display }}</td>
+                                <td>{{ conto.banca|default:"-" }}</td>
+                                <td>{{ conto.iban|default:"-" }}</td>
+                                <td><span class="finance-dashboard-amount-positive">{{ conto.saldo_calcolato|euro }} &euro;</span></td>
+                                <td>{% if conto.saldo_corrente_aggiornato_al %}{{ conto.saldo_corrente_aggiornato_al|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6">
+                                    <div class="finance-dashboard-empty">
+                                        Nessun conto bancario collegato. Configura almeno un conto per iniziare a monitorare saldi e movimenti.
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="finance-dashboard-section">
+            <div class="finance-dashboard-section-head">
+                <div>
+                    <h2 class="finance-dashboard-section-title">Ultimi movimenti</h2>
+                    <p class="finance-dashboard-section-subtitle">Movimenti piu recenti importati o inseriti manualmente.</p>
+                </div>
+                <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                    <span>Vedi tutti i movimenti</span>
+                </a>
+            </div>
+            <div class="finance-dashboard-table-wrap">
+                <table class="list-table anagrafica-list-table finance-modern-table finance-dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Conto</th>
+                            <th>Canale</th>
+                            <th>Descrizione</th>
+                            <th>Categoria</th>
+                            <th class="column-right">Importo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movimento in ultimi_movimenti %}
+                            <tr class="{% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}">
+                                <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
+                                <td>{{ movimento.conto|default:"-" }}</td>
+                                <td>
+                                    <span class="finance-channel-badge finance-channel-badge-{{ movimento.canale }}">
+                                        {{ movimento.get_canale_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="finance-dashboard-movement-text">{{ movimento.descrizione|truncatechars:92 }}</span>
+                                </td>
+                                <td>
+                                    {% if movimento.categoria %}
+                                        <span class="finance-dashboard-category-dot is-set"></span>{{ movimento.categoria }}
+                                    {% else %}
+                                        <span class="finance-dashboard-category-dot"></span><span class="table-muted">Non categorizzato</span>
+                                    {% endif %}
+                                </td>
+                                <td class="column-right">
+                                    <span class="{% if movimento.importo > 0 %}finance-dashboard-amount-positive{% elif movimento.importo < 0 %}finance-dashboard-amount-negative{% endif %}">
+                                        {{ movimento.importo|euro }} &euro;
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6">
+                                    <div class="finance-dashboard-empty">Nessun movimento registrato.</div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 {% endblock %}

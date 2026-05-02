@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Elimina movimenti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina selezionati</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Elimina movimenti</h1>
+                <span class="family-status-pill is-danger">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    Conferma richiesta
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                {{ movimenti|length }} movimenti selezionati, saldo netto {{ totale_importi|euro }} &euro;
+            </div>
+        </div>
+    </div>
+
+    <div class="finance-danger-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Eliminazione multipla</div>
+            <p>
+                Stai per eliminare definitivamente i movimenti selezionati. I saldi dei conti interessati verranno ricalcolati
+                dopo la cancellazione.
+            </p>
+            <p class="help-text">
+                Conti interessati: {{ conti_count }}. Movimenti collegati a rate: {{ riconciliazioni_rate_count }}.
+                Scadenze fornitore collegate: {{ scadenze_collegate_count }}. Pagamenti fornitore collegati: {{ pagamenti_collegati_count }}.
+            </p>
+        </div>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="panel-body">
+            <table class="list-table anagrafica-list-table finance-modern-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Conto</th>
+                        <th>Descrizione</th>
+                        <th>Controparte</th>
+                        <th class="column-right">Importo</th>
+                        <th>Stato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movimento in movimenti %}
+                        <tr>
+                            <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
+                            <td>{{ movimento.conto|default:"-" }}</td>
+                            <td>{{ movimento.descrizione|truncatechars:90|default:"-" }}</td>
+                            <td>{{ movimento.controparte|default:"-" }}</td>
+                            <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
+                            <td>{{ movimento.get_stato_riconciliazione_display }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'elimina_movimenti_finanziari_multipla' %}" class="form-actions finance-confirm-actions">
+        {% csrf_token %}
+        <input type="hidden" name="conferma" value="1">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        {% for selected_id in selected_ids %}
+            <input type="hidden" name="selected_ids" value="{{ selected_id }}">
+        {% endfor %}
+        <button type="submit" class="btn btn-danger btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+            <span class="btn-label">Elimina {{ movimenti|length }} movimenti</span>
+        </button>
+        <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+            <span class="btn-label">Annulla</span>
+        </a>
+    </form>
+{% endblock %}

@@ -1,100 +1,124 @@
-{% extends "base.html" %}
+{% extends base_template %}
 {% load static %}
 
 {% block title %}Categorie calendario - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'calendario_agenda' %}">Calendario</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Categorie</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'calendario_agenda' %}">Calendario</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Categorie</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Categorie calendario</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Torna al calendario</a>
-            {% if can_manage_calendario %}
-                <a href="{% url 'crea_categoria_calendario' %}" class="btn btn-primary">Nuova categoria</a>
+    {% url 'crea_categoria_calendario' as crea_categoria_url %}
+    <div class="calendar-category-manager-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero">
+            <span class="calendar-event-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Categorie calendario</h1>
+                <p>Organizza colori e ordinamento delle categorie usate nel calendario della scuola.</p>
+            </div>
+            <div class="calendar-category-hero-actions">
+                {% if not popup %}
+                    <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Torna al calendario</a>
+                {% else %}
+                    <button type="button" class="btn btn-secondary" data-calendar-popup-reload>Chiudi e aggiorna</button>
+                {% endif %}
+                {% if can_manage_calendario %}
+                    <a href="{{ crea_categoria_url }}?popup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{{ crea_categoria_url }}?popup=1" data-popup-window-features="width=820,height=640,resizable=yes,scrollbars=yes">
+                        <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                        <span>Nuova categoria</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="calendar-category-summary-grid">
+            <div class="calendar-category-summary-item">
+                <span class="summary-value">{{ count_totali }}</span>
+                <span class="summary-label">Categorie</span>
+            </div>
+            <div class="calendar-category-summary-item">
+                <span class="summary-value">{{ count_attive }}</span>
+                <span class="summary-label">Attive</span>
+            </div>
+        </div>
+
+        <section class="calendar-event-form-card calendar-category-list-card">
+            <div class="calendar-event-form-title">
+                <span class="calendar-event-form-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+                <span>Elenco categorie</span>
+            </div>
+
+            {% if categorie %}
+                <div class="calendar-category-list">
+                    {% for categoria_obj in categorie %}
+                        {% url 'modifica_categoria_calendario' categoria_obj.pk as modifica_categoria_url %}
+                        <article class="calendar-category-row">
+                            <div class="calendar-category-color-swatch" style="background: {{ categoria_obj.colore }};" aria-hidden="true"></div>
+                            <div class="calendar-category-row-main">
+                                <div class="calendar-category-row-title">
+                                    <span>{{ categoria_obj.nome }}</span>
+                                    {% if categoria_obj.is_system_category %}
+                                        <span class="calendar-state-pill is-muted">Sistema</span>
+                                    {% endif %}
+                                </div>
+                                <div class="calendar-category-row-meta">
+                                    Ordine {{ categoria_obj.ordine }} - {{ categoria_obj.count_eventi_agenda }} eventi a calendario
+                                </div>
+                            </div>
+                            <div class="calendar-category-row-status">
+                                <span class="calendar-state-pill {% if categoria_obj.attiva %}is-active{% else %}is-muted{% endif %}">
+                                    {% if categoria_obj.attiva %}Attiva{% else %}Non attiva{% endif %}
+                                </span>
+                            </div>
+                            <div class="calendar-category-row-actions">
+                                <a href="{{ modifica_categoria_url }}?popup=1" class="btn btn-secondary btn-sm" data-window-popup="1" data-popup-url="{{ modifica_categoria_url }}?popup=1" data-popup-window-features="width=820,height=640,resizable=yes,scrollbars=yes">Modifica</a>
+                                {% if can_manage_calendario and not categoria_obj.is_system_category %}
+                                    {% url 'elimina_categoria_calendario' categoria_obj.pk as elimina_categoria_url %}
+                                    <a href="{{ elimina_categoria_url }}?popup=1" class="btn btn-danger btn-sm" data-window-popup="1" data-popup-url="{{ elimina_categoria_url }}?popup=1" data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes">Elimina</a>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">Ancora nessuna categoria inserita.</div>
             {% endif %}
-        </div>
+        </section>
     </div>
 
-    <div class="family-top-layout">
-        <div class="family-main-column">
-            <div class="panel">
-                <div class="panel-body">
-                    {% if categorie %}
-                        <table class="list-table">
-                            <thead>
-                                <tr>
-                                    <th>Categoria</th>
-                                    <th>Colore</th>
-                                    <th>Ordine</th>
-                                    <th>Eventi a calendario</th>
-                                    <th>Attiva</th>
-                                    <th>Azioni</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for categoria_obj in categorie %}
-                                    <tr class="list-row-link" data-row-href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}">
-                                        <td>
-                                            {{ categoria_obj.nome }}
-                                            {% if categoria_obj.is_system_category %}
-                                                <div class="table-muted">Categoria di sistema</div>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <span class="calendar-category-pill" style="color: {{ categoria_obj.colore }}; border-color: {{ categoria_obj.colore }};">
-                                                {{ categoria_obj.colore }}
-                                            </span>
-                                        </td>
-                                        <td>{{ categoria_obj.ordine }}</td>
-                                        <td>{{ categoria_obj.count_eventi_agenda }}</td>
-                                        <td>{% if categoria_obj.attiva %}Si{% else %}No{% endif %}</td>
-                                        <td class="actions-cell">
-                                            <a href="{% url 'modifica_categoria_calendario' categoria_obj.pk %}" class="table-link">Modifica</a>
-                                            {% if can_manage_calendario and not categoria_obj.is_system_category %}
-                                                <span class="table-muted">|</span>
-                                                <a href="{% url 'elimina_categoria_calendario' categoria_obj.pk %}" class="table-link table-link-danger">Elimina</a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% else %}
-                        <div class="empty-state">Ancora nessuna categoria inserita.</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="family-side-column">
-            <div class="admin-section compact">
-                <div class="admin-section-title">Riepilogo</div>
-                <div class="panel">
-                    <div class="panel-body summary-panel-body">
-                        <div class="summary-grid">
-                            <div class="summary-item">
-                                <div class="summary-value">{{ count_totali }}</div>
-                                <div class="summary-label">Categorie</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">{{ count_attive }}</div>
-                                <div class="summary-label">Attive</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const reloadButton = document.querySelector("[data-calendar-popup-reload]");
+            if (!reloadButton) {
+                return;
+            }
+            reloadButton.addEventListener("click", function () {
+                try {
+                    if (window.parent && window.parent.ArborisModalPopups) {
+                        window.parent.ArborisModalPopups.handleReload(window);
+                        return;
+                    }
+                    if (window.top && window.top.ArborisModalPopups) {
+                        window.top.ArborisModalPopups.handleReload(window);
+                        return;
+                    }
+                } catch (error) {
+                    // Fall back to the regular close bridge.
+                }
+                window.close();
+            });
+        });
+    </script>
 {% endblock %}

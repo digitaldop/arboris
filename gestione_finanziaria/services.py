@@ -1307,6 +1307,40 @@ def crea_notifica_finanziaria(
     return NotificaFinanziaria.objects.create(**defaults), True
 
 
+def applica_categoria_documento_a_movimento_fornitore(movimento, scadenza, *, utente=None):
+    if movimento is None or scadenza is None:
+        return False
+
+    documento = getattr(scadenza, "documento", None)
+    categoria = getattr(documento, "categoria_spesa", None)
+    if categoria is None:
+        return False
+
+    categoria_manuale = movimento.categoria_id and not movimento.categorizzazione_automatica
+    if categoria_manuale:
+        return False
+
+    if movimento.categoria_id == categoria.pk and movimento.categorizzazione_automatica:
+        return False
+
+    movimento.categoria = categoria
+    movimento.categorizzazione_automatica = True
+    movimento.regola_categorizzazione = None
+    movimento.categorizzato_da = utente if getattr(utente, "is_authenticated", False) else None
+    movimento.categorizzato_il = timezone.now()
+    movimento.save(
+        update_fields=[
+            "categoria",
+            "categorizzazione_automatica",
+            "regola_categorizzazione",
+            "categorizzato_da",
+            "categorizzato_il",
+            "data_aggiornamento",
+        ]
+    )
+    return True
+
+
 @transaction.atomic
 def registra_pagamento_fornitore(
     scadenza,
@@ -1344,6 +1378,7 @@ def registra_pagamento_fornitore(
         note=note,
         creato_da=utente if getattr(utente, "is_authenticated", False) else None,
     )
+    applica_categoria_documento_a_movimento_fornitore(movimento, scadenza, utente=utente)
     aggiorna_scadenza_da_pagamenti(scadenza)
     return pagamento
 

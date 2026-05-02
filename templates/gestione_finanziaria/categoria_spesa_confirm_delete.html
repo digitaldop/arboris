@@ -23,7 +23,9 @@
         <p>Stai per eliminare la categoria spesa <strong>{{ categoria.nome }}</strong>.</p>
         {% if ha_vincoli %}
             <p class="message message-error">
-                Non puo essere eliminata: e' collegata a {{ count_fornitori }} fornitori e {{ count_documenti }} documenti.
+                Non puo essere eliminata: e' collegata a {{ count_fornitori }} fornitori,
+                {{ count_documenti }} documenti, {{ count_movimenti }} movimenti,
+                {{ count_regole }} regole e {{ count_figlie }} sottocategorie.
             </p>
         {% endif %}
         <form method="post">

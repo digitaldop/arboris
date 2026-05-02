@@ -1,4 +1,5 @@
 from tempfile import TemporaryDirectory
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -14,6 +15,7 @@ from .popup_manifest import build_popup_manifest
 from anagrafica.models import Citta, Provincia, Regione
 from anagrafica.models import Indirizzo
 from gestione_finanziaria.models import MovimentoFinanziario
+from scuola.models import AnnoScolastico
 
 
 class AuthenticationInterfaceTests(TestCase):
@@ -92,6 +94,49 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_dipendenti")}"', html=False)
         self.assertNotContains(response, "GESTIONE FINANZIARIA")
+
+
+class HomeDashboardSchoolYearTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="dashboard@example.com",
+            email="dashboard@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(user=self.user)
+        self.client.force_login(self.user)
+
+    def test_home_uses_school_year_dates_for_current_status(self):
+        today = timezone.localdate()
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Anno Scolastico 2025/2026")
+        self.assertContains(response, "Corrente")
+        self.assertContains(response, anno.data_inizio.strftime("%d/%m/%Y"))
+        self.assertContains(response, anno.data_fine.strftime("%d/%m/%Y"))
+
+    def test_home_marks_future_school_year_as_upcoming(self):
+        today = timezone.localdate()
+        AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=today + timedelta(days=30),
+            data_fine=today + timedelta(days=395),
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Anno Scolastico 2026/2027")
+        self.assertContains(response, "Prossimo")
 
 
 class SidebarEconomiaTests(TestCase):

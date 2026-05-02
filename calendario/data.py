@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from django.urls import reverse
 from django.utils import timezone
@@ -94,6 +94,8 @@ def build_calendar_entry_record(
     description="",
     url="",
     external=False,
+    open_in_popup=False,
+    popup_title="Dettaglio calendario",
     visible=True,
     active=True,
     action_label="Apri",
@@ -117,6 +119,8 @@ def build_calendar_entry_record(
         "description": description,
         "url": url,
         "external": external,
+        "open_in_popup": open_in_popup,
+        "popup_title": popup_title,
         "color": category.colore,
         "badge_label": category.nome,
         "visibile": visible,
@@ -154,6 +158,8 @@ def serialize_calendar_entry(record):
         "description": record["description"],
         "url": record["url"],
         "external": record["external"],
+        "open_in_popup": record["open_in_popup"],
+        "popup_title": record["popup_title"],
         "color": record["color"],
         "badge_label": record["badge_label"],
     }
@@ -203,6 +209,8 @@ def build_local_calendar_occurrence_record(evento, occurrence):
         description=evento.descrizione,
         url=reverse("modifica_evento_calendario", kwargs={"pk": evento.pk}),
         external=False,
+        open_in_popup=True,
+        popup_title="Modifica evento calendario",
         visible=evento.visibile,
         active=evento.attivo,
         action_label="Apri",
@@ -234,6 +242,8 @@ def build_local_calendar_list_record(evento):
         description=evento.descrizione,
         url=reverse("modifica_evento_calendario", kwargs={"pk": evento.pk}),
         external=False,
+        open_in_popup=True,
+        popup_title="Modifica evento calendario",
         visible=evento.visibile,
         active=evento.attivo,
         action_label="Apri",
@@ -290,13 +300,18 @@ def build_calendar_deadline_records(system_categories=None):
                     description=description,
                     url=reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk}),
                     external=False,
-                    action_label="Apri",
+                    open_in_popup=True,
+                    popup_title="Scheda rata",
+                    action_label="Apri scheda",
                 )
             )
 
     if categoria_documenti:
+        today = timezone.localdate()
+        current_year_start = date(today.year, 1, 1)
+        current_year_end = date(today.year, 12, 31)
         documenti = (
-            Documento.objects.filter(scadenza__isnull=False)
+            Documento.objects.filter(scadenza__range=(current_year_start, current_year_end))
             .select_related("tipo_documento", "famiglia", "familiare", "studente")
             .order_by("scadenza", "pk")
         )
@@ -320,7 +335,7 @@ def build_calendar_deadline_records(system_categories=None):
                     description=" - ".join([part for part in description_parts if part]),
                     url=owner_url,
                     external=False,
-                    action_label="Apri",
+                    action_label="Vai alla scheda",
                 )
             )
 

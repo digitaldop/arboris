@@ -12,13 +12,18 @@
 {% endblock %}
 
 {% block content %}
+    {% url 'crea_evento_calendario' as crea_evento_url %}
+    {% url 'lista_categorie_calendario' as categorie_url %}
     <div class="page-head">
         <h1 class="page-title">Eventi calendario</h1>
         <div class="page-head-actions">
             <a href="{% url 'calendario_agenda' %}" class="btn btn-secondary">Vista calendario</a>
             {% if can_manage_calendario %}
-                <a href="{% url 'lista_categorie_calendario' %}" class="btn btn-secondary">Categorie</a>
-                <a href="{% url 'crea_evento_calendario' %}" class="btn btn-primary">Nuovo evento</a>
+                <a href="{{ categorie_url }}?popup=1" class="btn btn-secondary" data-window-popup="1" data-popup-url="{{ categorie_url }}?popup=1" data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes">Categorie</a>
+                <a href="{{ crea_evento_url }}?popup=1" class="btn btn-primary btn-icon-text calendar-events-add-btn" data-window-popup="1" data-popup-url="{{ crea_evento_url }}?popup=1" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span>Nuovo evento</span>
+                </a>
             {% endif %}
         </div>
     </div>
@@ -68,7 +73,7 @@
                             </thead>
                             <tbody>
                                 {% for evento in eventi %}
-                                    <tr{% if evento.url %} class="list-row-link" data-row-href="{{ evento.url }}"{% endif %}>
+                                    <tr>
                                         <td>
                                             <div class="calendar-list-title">{{ evento.title }}</div>
                                             {% if evento.detail_label %}
@@ -101,13 +106,19 @@
                                         <td>{% if evento.attivo %}Si{% else %}No{% endif %}</td>
                                         <td class="actions-cell">
                                             {% if evento.url %}
-                                                <a href="{{ evento.url }}" class="table-link">{{ evento.action_label }}</a>
+                                                {% if evento.open_in_popup %}
+                                                    <a href="{{ evento.url }}?popup=1" class="btn btn-secondary btn-sm calendar-row-action-btn" data-calendar-event-popup="1" data-window-popup="1" data-popup-url="{{ evento.url }}?popup=1" data-popup-title="{{ evento.popup_title }}" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">{{ evento.action_label }}</a>
+                                                {% elif evento.external %}
+                                                    <a href="{{ evento.url }}" class="btn btn-secondary btn-sm calendar-row-action-btn">{{ evento.action_label }}</a>
+                                                {% else %}
+                                                    <a href="{{ evento.url }}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm calendar-row-action-btn">{{ evento.action_label }}</a>
+                                                {% endif %}
                                             {% else %}
                                                 <span class="table-muted">-</span>
                                             {% endif %}
                                             {% if can_manage_calendario and evento.delete_url %}
                                                 <span class="table-muted">|</span>
-                                                <a href="{{ evento.delete_url }}" class="table-link table-link-danger">Elimina</a>
+                                                <a href="{{ evento.delete_url }}?popup=1" class="table-link table-link-danger" data-window-popup="1" data-popup-url="{{ evento.delete_url }}?popup=1" data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes">Elimina</a>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -119,6 +130,24 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if eventi_page_obj.paginator.num_pages > 1 %}
+                <nav class="calendar-pagination" aria-label="Paginazione eventi calendario">
+                    {% if eventi_page_obj.has_previous %}
+                        <a href="?{% if eventi_querystring %}{{ eventi_querystring }}&{% endif %}page={{ eventi_page_obj.previous_page_number }}" class="calendar-page-link">Precedente</a>
+                    {% endif %}
+                    {% for page_number in eventi_page_obj.paginator.page_range %}
+                        {% if page_number == eventi_page_obj.number %}
+                            <span class="calendar-page-link is-current">{{ page_number }}</span>
+                        {% else %}
+                            <a href="?{% if eventi_querystring %}{{ eventi_querystring }}&{% endif %}page={{ page_number }}" class="calendar-page-link">{{ page_number }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    {% if eventi_page_obj.has_next %}
+                        <a href="?{% if eventi_querystring %}{{ eventi_querystring }}&{% endif %}page={{ eventi_page_obj.next_page_number }}" class="calendar-page-link">Successiva</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
         </div>
 
         <div class="family-side-column">
@@ -147,4 +176,5 @@
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=19"></script>
 {% endblock %}

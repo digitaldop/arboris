@@ -129,6 +129,24 @@ def resolve_current_school_year():
     return None, f"{anno_inizio}/{anno_fine}"
 
 
+def build_school_year_status(anno_scolastico):
+    if not anno_scolastico:
+        return {"label": "Non configurato", "tone": "muted"}
+
+    oggi = timezone.localdate()
+    if anno_scolastico.data_inizio and anno_scolastico.data_fine:
+        if anno_scolastico.data_inizio <= oggi <= anno_scolastico.data_fine:
+            return {"label": "Corrente", "tone": "success"}
+        if anno_scolastico.data_inizio > oggi:
+            return {"label": "Prossimo", "tone": "upcoming"}
+        if anno_scolastico.data_fine < oggi:
+            return {"label": "Concluso", "tone": "past"}
+
+    if not anno_scolastico.attivo:
+        return {"label": "Non attivo", "tone": "muted"}
+    return {"label": "Da verificare", "tone": "muted"}
+
+
 def apri_documento(request, pk):
     documento = get_object_or_404(
         Documento.objects.select_related("tipo_documento", "famiglia", "familiare", "studente"),
@@ -1654,6 +1672,8 @@ def home(request):
 
     context = {
         "anno_scolastico_corrente": anno_scolastico_corrente,
+        "anno_scolastico_corrente_obj": anno_corrente,
+        "anno_scolastico_corrente_status": build_school_year_status(anno_corrente),
         "count_famiglie_iscritte": dashboard_corrente["count_famiglie_iscritte"],
         "count_studenti_iscritti": dashboard_corrente["count_studenti_iscritti"],
         "composizione_classi": dashboard_corrente["composizione_classi"],

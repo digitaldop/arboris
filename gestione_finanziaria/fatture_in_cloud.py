@@ -109,6 +109,34 @@ def _clean_identifier(value):
     return "".join(ch for ch in (value or "").upper().strip() if ch.isalnum())
 
 
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value):
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _first_present(*values):
+    for value in values:
+        if value not in (None, ""):
+            return value
+    return ""
+
+
+def _nested_dict(data, *keys):
+    current = _as_dict(data)
+    for key in keys:
+        current = _as_dict(current.get(key))
+        if not current:
+            return {}
+    return current
+
+
 def _limit_model_field(model, field_name, value):
     if value in (None, ""):
         return ""
@@ -125,13 +153,125 @@ def _response_json(response, error_prefix):
         raise FattureInCloudError(f"{error_prefix}: risposta non valida da Fatture in Cloud.") from exc
 
 
+def _normalize_entity(entity):
+    entity = _as_dict(entity)
+    if not entity:
+        return {}
+
+    dati_anagrafici = _as_dict(
+        entity.get("dati_anagrafici")
+        or entity.get("DatiAnagrafici")
+        or entity.get("datiAnagrafici")
+    )
+    anagrafica = _as_dict(dati_anagrafici.get("anagrafica") or dati_anagrafici.get("Anagrafica"))
+    id_fiscale_iva = _as_dict(
+        dati_anagrafici.get("id_fiscale_iva")
+        or dati_anagrafici.get("IdFiscaleIVA")
+        or dati_anagrafici.get("idFiscaleIva")
+    )
+    sede = _as_dict(entity.get("sede") or entity.get("Sede") or entity.get("address"))
+    contatti = _as_dict(entity.get("contatti") or entity.get("Contatti"))
+
+    normalized = dict(entity)
+    normalized["name"] = _first_present(
+        entity.get("name"),
+        entity.get("denominazione"),
+        entity.get("Denominazione"),
+        anagrafica.get("denominazione"),
+        anagrafica.get("Denominazione"),
+        entity.get("business_name"),
+    )
+    normalized["first_name"] = _first_present(
+        entity.get("first_name"),
+        entity.get("nome"),
+        entity.get("Nome"),
+        anagrafica.get("nome"),
+        anagrafica.get("Nome"),
+    )
+    normalized["last_name"] = _first_present(
+        entity.get("last_name"),
+        entity.get("cognome"),
+        entity.get("Cognome"),
+        anagrafica.get("cognome"),
+        anagrafica.get("Cognome"),
+    )
+    normalized["vat_number"] = _first_present(
+        entity.get("vat_number"),
+        entity.get("vatNumber"),
+        entity.get("partita_iva"),
+        entity.get("partitaIva"),
+        id_fiscale_iva.get("id_codice"),
+        id_fiscale_iva.get("IdCodice"),
+    )
+    normalized["tax_code"] = _first_present(
+        entity.get("tax_code"),
+        entity.get("taxCode"),
+        entity.get("codice_fiscale"),
+        entity.get("CodiceFiscale"),
+        dati_anagrafici.get("codice_fiscale"),
+        dati_anagrafici.get("CodiceFiscale"),
+    )
+    normalized["address_street"] = _first_present(
+        entity.get("address_street"),
+        entity.get("address"),
+        sede.get("indirizzo"),
+        sede.get("Indirizzo"),
+    )
+    normalized["address_postal_code"] = _first_present(
+        entity.get("address_postal_code"),
+        entity.get("postal_code"),
+        sede.get("cap"),
+        sede.get("CAP"),
+    )
+    normalized["address_city"] = _first_present(entity.get("address_city"), sede.get("comune"), sede.get("Comune"))
+    normalized["address_province"] = _first_present(
+        entity.get("address_province"),
+        sede.get("provincia"),
+        sede.get("Provincia"),
+    )
+    normalized["email"] = _first_present(entity.get("email"), contatti.get("email"), contatti.get("Email"))
+    normalized["certified_email"] = _first_present(
+        entity.get("certified_email"),
+        entity.get("pec"),
+        contatti.get("pec"),
+        contatti.get("PECMail"),
+    )
+    normalized["phone"] = _first_present(entity.get("phone"), contatti.get("telefono"), contatti.get("Telefono"))
+    normalized["type"] = _first_present(entity.get("type"), entity.get("kind"), entity.get("tipo_soggetto"))
+    normalized["ei_code"] = _first_present(
+        entity.get("ei_code"),
+        entity.get("e_invoice_code"),
+        entity.get("codice_sdi"),
+        entity.get("codice_destinatario"),
+        entity.get("CodiceDestinatario"),
+    )
+    normalized["bank_iban"] = _first_present(
+        entity.get("bank_iban"),
+        entity.get("bankIban"),
+        entity.get("iban"),
+        entity.get("IBAN"),
+    )
+    normalized["bank_name"] = _first_present(
+        entity.get("bank_name"),
+        entity.get("bankName"),
+        entity.get("banca"),
+        entity.get("istituto_bancario"),
+    )
+    return normalized
+
+
 def _entity_from_document(document_data):
-    return (
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    entity = (
         document_data.get("entity")
         or document_data.get("supplier")
-        or document_data.get("e_invoice", {}).get("supplier")
-        or {}
+        or e_invoice.get("entity")
+        or e_invoice.get("supplier")
+        or e_invoice.get("cedente_prestatore")
+        or e_invoice.get("CedentePrestatore")
+        or e_invoice.get("cedentePrestatore")
     )
+    return _normalize_entity(entity)
 
 
 def _supplier_name(entity, document_data):
@@ -177,13 +317,12 @@ def _find_or_create_supplier(entity, document_data):
         "email": (entity.get("email") or "")[:254],
         "pec": (entity.get("certified_email") or "")[:254],
         "telefono": (entity.get("phone") or "")[:40],
-        "codice_sdi": (entity.get("ei_code") or "")[:7],
-        "iban": (entity.get("bank_iban") or "")[:34],
+        "codice_sdi": _clean_identifier(entity.get("ei_code"))[:7],
+        "iban": _clean_identifier(entity.get("bank_iban"))[:34],
         "banca": (entity.get("bank_name") or "")[:160],
-        "attivo": True,
     }
     if fornitore is None:
-        return Fornitore.objects.create(denominazione=name, **defaults), True
+        return Fornitore.objects.create(denominazione=name, attivo=True, **defaults), True, False
 
     changed = []
     for field_name, value in defaults.items():
@@ -193,7 +332,7 @@ def _find_or_create_supplier(entity, document_data):
     if changed:
         changed.append("data_aggiornamento")
         fornitore.save(update_fields=changed)
-    return fornitore, False
+    return fornitore, False, bool(changed)
 
 
 def _document_type(document_data):
@@ -204,19 +343,118 @@ def _document_type(document_data):
 
 
 def _invoice_number(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    dati_generali_documento = _nested_dict(e_invoice, "dati_generali", "dati_generali_documento") or _nested_dict(
+        e_invoice,
+        "DatiGenerali",
+        "DatiGeneraliDocumento",
+    )
     return (
         document_data.get("invoice_number")
         or document_data.get("number")
-        or document_data.get("e_invoice", {}).get("number")
+        or e_invoice.get("number")
+        or e_invoice.get("numero")
+        or e_invoice.get("Numero")
+        or dati_generali_documento.get("numero")
+        or dati_generali_documento.get("Numero")
         or str(document_data.get("id") or "")
     )[:80]
+
+
+def _document_total(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    dati_generali_documento = _nested_dict(e_invoice, "dati_generali", "dati_generali_documento") or _nested_dict(
+        e_invoice,
+        "DatiGenerali",
+        "DatiGeneraliDocumento",
+    )
+    return _as_decimal(
+        document_data.get("amount_gross")
+        or document_data.get("total")
+        or document_data.get("amount")
+        or document_data.get("importo_totale_documento")
+        or document_data.get("ImportoTotaleDocumento")
+        or e_invoice.get("amount_gross")
+        or e_invoice.get("total")
+        or e_invoice.get("importo_totale_documento")
+        or e_invoice.get("ImportoTotaleDocumento")
+        or dati_generali_documento.get("importo_totale_documento")
+        or dati_generali_documento.get("ImportoTotaleDocumento")
+    )
+
+
+def _payment_items(document_data):
+    payments = list(_as_list(document_data.get("payments_list") or document_data.get("payments")))
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    payments.extend(_as_list(e_invoice.get("payments_list") or e_invoice.get("payments")))
+
+    e_invoice_payment_groups = _as_list(
+        e_invoice.get("dati_pagamento")
+        or e_invoice.get("DatiPagamento")
+        or e_invoice.get("datiPagamento")
+        or document_data.get("dati_pagamento")
+        or document_data.get("DatiPagamento")
+    )
+    for group in e_invoice_payment_groups:
+        group = _as_dict(group)
+        details = (
+            group.get("dettaglio_pagamento")
+            or group.get("DettaglioPagamento")
+            or group.get("dettaglioPagamento")
+        )
+        payments.extend(_as_list(details))
+    return [payment for payment in payments if isinstance(payment, dict)]
+
+
+def _supplier_payment_data_from_document(document_data):
+    data = {}
+    for payment in _payment_items(document_data):
+        iban = _first_present(
+            payment.get("iban"),
+            payment.get("IBAN"),
+            payment.get("bank_iban"),
+            payment.get("bankIban"),
+        )
+        bank_name = _first_present(
+            payment.get("bank_name"),
+            payment.get("bankName"),
+            payment.get("banca"),
+            payment.get("istituto_finanziario"),
+            payment.get("IstitutoFinanziario"),
+        )
+        if iban and not data.get("bank_iban"):
+            data["bank_iban"] = iban
+        if bank_name and not data.get("bank_name"):
+            data["bank_name"] = bank_name
+        if data.get("bank_iban") and data.get("bank_name"):
+            break
+    return data
+
+
+def _enrich_supplier_entity_from_document(entity, document_data):
+    enriched = dict(entity or {})
+    for key, value in _supplier_payment_data_from_document(document_data).items():
+        if value and not enriched.get(key):
+            enriched[key] = value
+    return enriched
+
+
+def _payment_amount(payment):
+    return _as_decimal(
+        payment.get("amount")
+        or payment.get("amount_gross")
+        or payment.get("paid_amount")
+        or payment.get("importo")
+        or payment.get("importo_pagamento")
+        or payment.get("ImportoPagamento")
+    )
 
 
 def _paid_amount_from_payments(payments):
     paid = Decimal("0.00")
     for payment in payments or []:
         status = (payment.get("status") or payment.get("payment_status") or "").lower()
-        amount = _as_decimal(payment.get("amount") or payment.get("amount_gross"))
+        amount = _payment_amount(payment)
         if status in {"paid", "payed", "saldata", "saldate", "paid_in_full"} or payment.get("paid_date"):
             paid += amount
     return paid
@@ -232,26 +470,39 @@ def _state_from_document(total, payments):
 
 
 def _payment_deadlines(document_data):
-    payments = document_data.get("payments_list") or document_data.get("payments") or []
+    payments = _payment_items(document_data)
+    total = _document_total(document_data)
     deadlines = []
     for payment in payments:
-        due_date = _as_date(payment.get("due_date") or payment.get("date") or payment.get("expiration_date"))
-        amount = _as_decimal(payment.get("amount") or payment.get("amount_gross"))
+        due_date = _as_date(
+            payment.get("due_date")
+            or payment.get("date")
+            or payment.get("expiration_date")
+            or payment.get("data_scadenza_pagamento")
+            or payment.get("DataScadenzaPagamento")
+        )
+        amount = _payment_amount(payment)
+        if amount <= Decimal("0.00") and len(payments) == 1:
+            amount = total
         if due_date and amount > Decimal("0.00"):
             deadlines.append(
                 {
                     "data_scadenza": due_date,
                     "importo_previsto": amount,
                     "importo_pagato": _as_decimal(payment.get("paid_amount")),
-                    "data_pagamento": _as_date(payment.get("paid_date")),
+                    "data_pagamento": _as_date(payment.get("paid_date") or payment.get("data_pagamento")),
                 }
             )
 
     if deadlines:
         return deadlines
 
-    total = _as_decimal(document_data.get("amount_gross") or document_data.get("total"))
-    due_date = _as_date(document_data.get("next_due_date") or document_data.get("date")) or timezone.localdate()
+    due_date = _as_date(
+        document_data.get("next_due_date")
+        or document_data.get("due_date")
+        or document_data.get("expiration_date")
+        or document_data.get("date")
+    ) or timezone.localdate()
     if total > Decimal("0.00"):
         return [
             {
@@ -264,11 +515,64 @@ def _payment_deadlines(document_data):
     return []
 
 
+def _scadenza_modificabile_da_import(scadenza):
+    return (
+        scadenza.importo_pagato == Decimal("0.00")
+        and not scadenza.data_pagamento
+        and not scadenza.movimento_finanziario_id
+        and not scadenza.pagamenti.exists()
+    )
+
+
+def _create_deadlines(documento, deadlines):
+    created = 0
+    for deadline in deadlines:
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=deadline["data_scadenza"],
+            importo_previsto=deadline["importo_previsto"],
+            importo_pagato=deadline["importo_pagato"],
+            data_pagamento=deadline["data_pagamento"],
+        )
+        created += 1
+    return created
+
+
+def _sync_document_deadlines(documento, deadlines):
+    if not deadlines:
+        return 0
+
+    existing = list(documento.scadenze.order_by("id"))
+    if not existing:
+        return _create_deadlines(documento, deadlines)
+
+    if not all(_scadenza_modificabile_da_import(scadenza) for scadenza in existing):
+        return 0
+
+    if len(existing) != len(deadlines):
+        documento.scadenze.all().delete()
+        return _create_deadlines(documento, deadlines)
+
+    updated = 0
+    for scadenza, deadline in zip(existing, deadlines):
+        changed = False
+        for field_name in ("data_scadenza", "importo_previsto", "importo_pagato", "data_pagamento"):
+            value = deadline[field_name]
+            if getattr(scadenza, field_name) != value:
+                setattr(scadenza, field_name, value)
+                changed = True
+        if changed:
+            scadenza.save()
+            updated += 1
+    return updated
+
+
 def _update_document_fields(documento, document_data, fornitore, pending):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
     doc_date = _as_date(document_data.get("date")) or timezone.localdate()
     amount_net = _as_decimal(document_data.get("amount_net"))
     amount_vat = _as_decimal(document_data.get("amount_vat"))
-    amount_gross = _as_decimal(document_data.get("amount_gross") or document_data.get("total"))
+    amount_gross = _document_total(document_data)
     if amount_gross == Decimal("0.00") and amount_net:
         amount_gross = amount_net + amount_vat
 
@@ -279,7 +583,7 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     documento.data_ricezione = _as_date(
         document_data.get("received_at")
         or document_data.get("created_at")
-        or document_data.get("e_invoice", {}).get("received_at")
+        or e_invoice.get("received_at")
     )
     documento.anno_competenza = doc_date.year
     documento.mese_competenza = doc_date.month
@@ -290,7 +594,7 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     documento.aliquota_iva = Decimal("0.00")
     if amount_net:
         documento.aliquota_iva = (amount_vat * Decimal("100") / amount_net).quantize(Decimal("0.01"))
-    documento.stato = _state_from_document(amount_gross, document_data.get("payments_list") or [])
+    documento.stato = _state_from_document(amount_gross, _payment_items(document_data))
     documento.origine = OrigineDocumentoFornitore.FATTURE_IN_CLOUD
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")
@@ -311,8 +615,8 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     if not document_data or not document_data.get("id"):
         raise ValidationError("Documento Fatture in Cloud privo di ID.")
 
-    entity = _entity_from_document(document_data)
-    fornitore, _fornitore_created = _find_or_create_supplier(entity, document_data)
+    entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
+    fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
     external_id = str(document_data.get("id"))
     documento = DocumentoFornitore.objects.filter(external_source=FIC_SOURCE, external_id=external_id).first()
     created = False
@@ -330,17 +634,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     _update_document_fields(documento, document_data, fornitore, pending)
     documento.save()
 
-    scadenze_create = 0
-    if created or not documento.scadenze.exists():
-        for deadline in _payment_deadlines(document_data):
-            ScadenzaPagamentoFornitore.objects.create(
-                documento=documento,
-                data_scadenza=deadline["data_scadenza"],
-                importo_previsto=deadline["importo_previsto"],
-                importo_pagato=deadline["importo_pagato"],
-                data_pagamento=deadline["data_pagamento"],
-            )
-            scadenze_create += 1
+    scadenze_create = _sync_document_deadlines(documento, _payment_deadlines(document_data))
 
     aggiorna_stato_documento_da_scadenze(documento)
     _notifica, notifica_created = crea_notifica_finanziaria(
@@ -356,6 +650,8 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         "documento": documento,
         "created": created,
         "updated": not created,
+        "fornitore_created": fornitore_created,
+        "fornitore_updated": fornitore_updated,
         "scadenze_create": scadenze_create,
         "notifica_created": notifica_created,
     }
@@ -543,6 +839,18 @@ def _iter_paginated(fetch_page):
         page += 1
 
 
+def _document_detail_from_summary(client, summary, *, pending):
+    if not isinstance(summary, dict):
+        return summary
+    document_id = summary.get("id")
+    if not document_id:
+        return summary
+    detail = client.get_pending_received_document(document_id) if pending else client.get_received_document(document_id)
+    if not isinstance(detail, dict) or not detail:
+        return summary
+    return {**summary, **detail}
+
+
 def sincronizza_fatture_in_cloud(connessione, *, utente=None):
     start = time.monotonic()
     stats = {
@@ -550,6 +858,8 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
         "aggiornati": 0,
         "scadenze": 0,
         "notifiche": 0,
+        "fornitori_creati": 0,
+        "fornitori_aggiornati": 0,
         "messaggi": [],
     }
     esito = EsitoSincronizzazione.OK
@@ -561,30 +871,38 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
 
         if connessione.sincronizza_documenti_registrati:
             for doc_type in RECEIVED_DOCUMENT_TYPES:
-                for document in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
+                for summary in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
+                    document = _document_detail_from_summary(client, summary, pending=False)
                     result = importa_documento_fatture_in_cloud(connessione, document, pending=False, utente=utente)
                     stats["creati"] += 1 if result["created"] else 0
                     stats["aggiornati"] += 1 if result["updated"] else 0
                     stats["scadenze"] += result["scadenze_create"]
                     stats["notifiche"] += 1 if result["notifica_created"] else 0
+                    stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
+                    stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
 
         if connessione.sincronizza_documenti_da_registrare:
             for doc_type in PENDING_DOCUMENT_TYPES:
                 try:
                     documents = _iter_paginated(lambda page: client.list_pending_received_documents(doc_type, page=page))
-                    for document in documents:
+                    for summary in documents:
+                        document = _document_detail_from_summary(client, summary, pending=True)
                         result = importa_documento_fatture_in_cloud(connessione, document, pending=True, utente=utente)
                         stats["creati"] += 1 if result["created"] else 0
                         stats["aggiornati"] += 1 if result["updated"] else 0
                         stats["scadenze"] += result["scadenze_create"]
                         stats["notifiche"] += 1 if result["notifica_created"] else 0
+                        stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
+                        stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
                 except FattureInCloudError as exc:
                     esito = EsitoSincronizzazione.PARZIALE
                     stats["messaggi"].append(f"Pending {doc_type}: {exc}")
 
         if not stats["messaggi"]:
             stats["messaggi"].append(
-                f"Importati {stats['creati']} nuovi documenti, aggiornati {stats['aggiornati']} documenti."
+                f"Importati {stats['creati']} nuovi documenti, aggiornati {stats['aggiornati']} documenti. "
+                f"Fornitori: {stats['fornitori_creati']} creati, "
+                f"{stats['fornitori_aggiornati']} aggiornati."
             )
     except Exception as exc:
         esito = EsitoSincronizzazione.ERRORE
