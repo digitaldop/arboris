@@ -413,7 +413,14 @@
                                                                 </div>
                                                                 {% if month.rata_pk %}
                                                                     <div class="student-main-rate-month-actions">
-                                                                        <a href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
+                                                                        <a
+                                                                            href="{% url 'modifica_rata_iscrizione' month.rata_pk %}?next={{ request.get_full_path|urlencode }}"
+                                                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile"
+                                                                            data-window-popup="1"
+                                                                            data-popup-window-name="arboris-rate-detail-popup"
+                                                                            data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                                            data-popup-url="{% url 'modifica_rata_iscrizione' month.rata_pk %}?popup=1&next={{ request.get_full_path|urlencode }}"
+                                                                        >
                                                                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
                                                                             <span class="btn-label">Dettaglio rata</span>
                                                                         </a>
@@ -422,7 +429,7 @@
                                                                                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
                                                                                 <span class="btn-label">Riconcilia</span>
                                                                             </button>
-                                                                            <button type="button" class="btn btn-save-soft btn-sm btn-icon-text" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=760,height=680,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">
+                                                                            <button type="button" class="btn btn-save-soft btn-sm btn-icon-text" data-window-popup="1" data-popup-window-name="arboris-rate-payment-popup" data-popup-window-features="width=900,height=740,resizable=yes,scrollbars=yes" data-popup-url="{% url 'pagamento_rapido_rata_iscrizione' month.rata_pk %}?popup=1">
                                                                                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                                                                                 <span class="btn-label">Conferma pagamento</span>
                                                                             </button>

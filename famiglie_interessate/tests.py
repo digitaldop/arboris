@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from calendario.data import build_calendar_agenda_bundle
+from scuola.models import Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
 from .models import (
@@ -44,15 +45,6 @@ class FamiglieInteressateModuleTests(TestCase):
             "anno_scolastico_interesse": "",
             "classe_eta_interesse": "",
             "note": "Prima richiesta informazioni.",
-            "referenti-TOTAL_FORMS": "1",
-            "referenti-INITIAL_FORMS": "0",
-            "referenti-MIN_NUM_FORMS": "0",
-            "referenti-MAX_NUM_FORMS": "1000",
-            "referenti-0-nome": "",
-            "referenti-0-relazione": "",
-            "referenti-0-telefono": "",
-            "referenti-0-email": "",
-            "referenti-0-note": "",
             "minori-TOTAL_FORMS": "1",
             "minori-INITIAL_FORMS": "0",
             "minori-MIN_NUM_FORMS": "0",
@@ -61,7 +53,7 @@ class FamiglieInteressateModuleTests(TestCase):
             "minori-0-cognome": "",
             "minori-0-data_nascita": "",
             "minori-0-eta_indicativa": "",
-            "minori-0-classe_eta_interesse": "",
+            "minori-0-classe_interesse": "",
             "minori-0-note": "",
         }
         payload.update(overrides)
@@ -107,38 +99,24 @@ class FamiglieInteressateModuleTests(TestCase):
         self.assertContains(response, 'body class="popup-page"')
         self.assertContains(response, "interested-editor-layout")
         self.assertContains(response, "interested-card-head-actions")
-        self.assertContains(response, 'data-formset-add="referenti"')
-        self.assertContains(response, 'data-formset-empty="referenti"')
+        self.assertNotContains(response, 'data-formset-add="referenti"')
+        self.assertContains(response, 'data-related-type="classe"')
         self.assertContains(response, 'data-formset-add="minori"')
         self.assertContains(response, 'data-formset-empty="minori"')
-        self.assertContains(response, "js/pages/famiglie-interessate-form.js?v=2")
+        self.assertContains(response, "js/pages/famiglie-interessate-form.js?v=3")
 
-    def test_create_accepts_no_referents_and_multiple_referents(self):
+    def test_create_ignores_obsolete_referent_payload(self):
         self.client.force_login(self.user)
 
-        response_without_referents = self.client.post(
+        response = self.client.post(
             reverse("crea_famiglia_interessata"),
             self.famiglia_create_payload(
                 telefono="3330001111",
                 **{
-                    "referenti-TOTAL_FORMS": "0",
-                },
-            ),
-        )
-
-        famiglia_senza_referenti = FamigliaInteressata.objects.get(telefono="3330001111")
-        self.assertRedirects(
-            response_without_referents,
-            reverse("modifica_famiglia_interessata", kwargs={"pk": famiglia_senza_referenti.pk}),
-        )
-        self.assertEqual(famiglia_senza_referenti.referenti.count(), 0)
-
-        response_with_referents = self.client.post(
-            reverse("crea_famiglia_interessata"),
-            self.famiglia_create_payload(
-                telefono="3330002222",
-                **{
                     "referenti-TOTAL_FORMS": "2",
+                    "referenti-INITIAL_FORMS": "0",
+                    "referenti-MIN_NUM_FORMS": "0",
+                    "referenti-MAX_NUM_FORMS": "1000",
                     "referenti-0-nome": "Maria Rossi",
                     "referenti-0-relazione": "Madre",
                     "referenti-0-telefono": "3331112222",
@@ -154,19 +132,17 @@ class FamiglieInteressateModuleTests(TestCase):
             ),
         )
 
-        famiglia_con_referenti = FamigliaInteressata.objects.get(telefono="3330002222")
+        famiglia = FamigliaInteressata.objects.get(telefono="3330001111")
         self.assertRedirects(
-            response_with_referents,
-            reverse("modifica_famiglia_interessata", kwargs={"pk": famiglia_con_referenti.pk}),
+            response,
+            reverse("modifica_famiglia_interessata", kwargs={"pk": famiglia.pk}),
         )
-        self.assertEqual(famiglia_con_referenti.referenti.count(), 2)
-        self.assertEqual(
-            list(famiglia_con_referenti.referenti.order_by("nome").values_list("nome", "relazione", "principale")),
-            [("Luca Rossi", "Padre", False), ("Maria Rossi", "Madre", True)],
-        )
+        self.assertEqual(famiglia.referenti.count(), 0)
 
-    def test_create_accepts_multiple_children(self):
+    def test_create_accepts_multiple_children_with_configured_classes(self):
         self.client.force_login(self.user)
+        infanzia = Classe.objects.create(nome_classe="Infanzia", ordine_classe=1)
+        primaria = Classe.objects.create(nome_classe="Primaria", ordine_classe=2)
 
         response = self.client.post(
             reverse("crea_famiglia_interessata"),
@@ -178,12 +154,12 @@ class FamiglieInteressateModuleTests(TestCase):
                     "minori-0-cognome": "Rossi",
                     "minori-0-data_nascita": "2020-05-10",
                     "minori-0-eta_indicativa": "",
-                    "minori-0-classe_eta_interesse": "Infanzia",
+                    "minori-0-classe_interesse": str(infanzia.pk),
                     "minori-1-nome": "Anna",
                     "minori-1-cognome": "Rossi",
                     "minori-1-data_nascita": "",
                     "minori-1-eta_indicativa": "3 anni",
-                    "minori-1-classe_eta_interesse": "Nido",
+                    "minori-1-classe_interesse": str(primaria.pk),
                     "minori-1-note": "Possibile inserimento da settembre.",
                 },
             ),
@@ -193,8 +169,8 @@ class FamiglieInteressateModuleTests(TestCase):
         self.assertRedirects(response, reverse("modifica_famiglia_interessata", kwargs={"pk": famiglia.pk}))
         self.assertEqual(famiglia.minori.count(), 2)
         self.assertEqual(
-            list(famiglia.minori.order_by("nome").values_list("nome", "cognome")),
-            [("Anna", "Rossi"), ("Luca", "Rossi")],
+            list(famiglia.minori.order_by("nome").values_list("nome", "cognome", "classe_interesse__nome_classe")),
+            [("Anna", "Rossi", "Primaria"), ("Luca", "Rossi", "Infanzia")],
         )
 
     def test_detail_and_activity_forms_use_modern_layout(self):
@@ -208,11 +184,15 @@ class FamiglieInteressateModuleTests(TestCase):
 
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, "interested-detail-shell")
+        self.assertContains(detail_response, "is-view-mode")
+        self.assertContains(detail_response, "enable-edit-famiglia-interessata-btn")
+        self.assertContains(detail_response, "Indietro")
         self.assertContains(detail_response, "interested-form-grid")
         self.assertContains(detail_response, "interested-editor-layout")
         self.assertEqual(activity_response.status_code, 200)
         self.assertContains(activity_response, 'body class="popup-page"')
         self.assertContains(activity_response, "interested-activity-editor-shell is-popup")
+        self.assertContains(activity_response, "interested-activity-card")
 
     def test_calendar_includes_followups_only_for_enabled_users(self):
         famiglia = FamigliaInteressata.objects.create(nome="Famiglia Neri", telefono="3335550000")

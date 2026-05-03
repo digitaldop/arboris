@@ -21,7 +21,7 @@ from economia.services import (
     riconcilia_pagamenti_rate_anno_scolastico,
 )
 from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
-from scuola.models import AnnoScolastico
+from scuola.models import AnnoScolastico, Classe
 from sistema.models import GestioneIscrizioneCorsoAnno, SistemaImpostazioniGenerali
 
 
@@ -245,6 +245,47 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(riepilogo_totali["pagato_senza_preiscrizioni"], Decimal("50.00"))
         self.assertEqual(riepilogo_totali["totale_anno_con_preiscrizioni"], Decimal("1100.00"))
         self.assertEqual(riepilogo_totali["totale_anno_senza_preiscrizioni"], Decimal("1000.00"))
+
+    def test_verifica_situazione_rette_defaults_to_alphabetical_matrix(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        classe_prima = Classe.objects.create(nome_classe="Prima", ordine_classe=1)
+        classe_seconda = Classe.objects.create(nome_classe="Seconda", ordine_classe=2)
+        self.iscrizione.classe = classe_seconda
+        self.iscrizione.save(update_fields=["classe"])
+
+        altra_famiglia = Famiglia.objects.create(
+            cognome_famiglia="Azzurri",
+            stato_relazione_famiglia=self.famiglia.stato_relazione_famiglia,
+        )
+        altro_studente = Studente.objects.create(
+            famiglia=altra_famiglia,
+            nome="Anna",
+            cognome="Azzurri",
+        )
+        Iscrizione.objects.create(
+            studente=altro_studente,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+            classe=classe_prima,
+        )
+
+        response = self.client.get(
+            reverse("verifica_situazione_rette"),
+            {"anno_scolastico": self.anno.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-matrix-view-panel="alfabetica"')
+        self.assertContains(response, 'data-matrix-view-panel="classe" hidden')
+        self.assertContains(response, "Ordine alfabetico")
+        self.assertContains(response, "Per classe")
+        self.assertEqual(
+            [riga["studente"].cognome for riga in response.context["righe_matrice_alfabetica"]],
+            ["Azzurri", "Bianchi"],
+        )
 
     def test_single_payment_plan_creates_one_annual_rate_with_discount(self):
         self.iscrizione.modalita_pagamento_retta = Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE

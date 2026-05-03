@@ -125,6 +125,36 @@ window.ArborisFamiglieInteressateForm = (function () {
         });
     }
 
+    function wireRelatedClassControls(root) {
+        const scope = root || document;
+        if (!window.ArborisRelatedEntityRoutes) {
+            return;
+        }
+        const relatedPopups = window.ArborisRelatedEntityRoutes.initRelatedPopups();
+        if (!relatedPopups) {
+            return;
+        }
+        window.ArborisRelatedEntityRoutes.wireInlineRelatedButtons(scope, {
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+    }
+
+    function initViewMode() {
+        const form = document.getElementById("famiglia-interessata-form");
+        const editButton = document.getElementById("enable-edit-famiglia-interessata-btn");
+        if (!form || !editButton || !window.ArborisViewMode) {
+            return;
+        }
+
+        window.ArborisViewMode.init({
+            formId: "famiglia-interessata-form",
+            lockContainerId: "famiglia-interessata-lock-container",
+            editButtonId: "enable-edit-famiglia-interessata-btn",
+            startInEditMode: form.dataset.startInEditMode === "1",
+            reloadOnCancel: true,
+        });
+    }
+
     function reindexDynamicRows(prefix) {
         const initialFormsInput = getManagementInput(prefix, "INITIAL_FORMS");
         const totalFormsInput = getManagementInput(prefix, "TOTAL_FORMS");
@@ -181,6 +211,7 @@ window.ArborisFamiglieInteressateForm = (function () {
         list.appendChild(fragment);
         totalFormsInput.value = String(currentIndex + 1);
         updateIndicativeAgeForRow(list.lastElementChild);
+        wireRelatedClassControls(list.lastElementChild);
 
         const focusTarget = list.lastElementChild ? list.lastElementChild.querySelector("input, select, textarea") : null;
         if (focusTarget) {
@@ -213,11 +244,14 @@ window.ArborisFamiglieInteressateForm = (function () {
         });
         wireRemoveButtons(scope);
         wireIndicativeAge(scope);
+        wireRelatedClassControls(scope);
+        initViewMode();
     }
 
     return {
         init,
         formatAgeFromBirthDate,
+        wireRelatedClassControls,
     };
 })();
 

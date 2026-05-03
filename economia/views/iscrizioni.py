@@ -1083,8 +1083,8 @@ def verifica_situazione_rette(request):
     Pagina "Verifica situazione rette":
 
     - dropdown di selezione anno scolastico (default: quello corrente);
-    - riga per ogni studente iscritto in quell'anno (ordinati per classe,
-      poi cognome/nome);
+    - riga per ogni studente iscritto in quell'anno, con vista alfabetica
+      predefinita e vista alternativa raggruppata per classe;
     - colonne: Preiscrizione + mensilita' settembre -> giugno;
     - ogni cella mostra importo dovuto, importo pagato e data pagamento
       con un colore semantico (verde/giallo/rosso);
@@ -1106,6 +1106,7 @@ def verifica_situazione_rette(request):
     colonne = []
     totali_colonne = []
     righe_per_classe = []
+    righe_matrice_alfabetica = []
     ha_preiscrizione = False
     riepilogo_totali = _empty_verifica_rette_riepilogo()
     today = timezone.localdate()
@@ -1252,6 +1253,23 @@ def verifica_situazione_rette(request):
                 }
             )
 
+        righe_matrice_alfabetica = sorted(
+            (
+                {
+                    **riga,
+                    "classe": gruppo["classe"],
+                    "classe_label": gruppo["classe_label"],
+                }
+                for gruppo in righe_per_classe
+                for riga in gruppo["righe"]
+            ),
+            key=lambda riga: (
+                (riga["studente"].cognome or "").lower(),
+                (riga["studente"].nome or "").lower(),
+                riga["studente"].pk,
+            ),
+        )
+
         totali_colonne = [
             {
                 "colonna": colonna,
@@ -1271,6 +1289,7 @@ def verifica_situazione_rette(request):
             "totali_colonne": totali_colonne,
             "riepilogo_totali": riepilogo_totali,
             "righe_per_classe": righe_per_classe,
+            "righe_matrice_alfabetica": righe_matrice_alfabetica,
             "num_colonne": len(colonne) + 1,  # +1 per la prima colonna "Studente"
         },
     )

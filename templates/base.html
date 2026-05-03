@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=196">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=198">
     {% if role_theme %}
         <style>
             :root {
@@ -340,33 +340,6 @@
                                     <button
                                         type="button"
                                         class="sidebar-collapsible collapsible-title is-open"
-                                        data-target="sidebar-economia-iscrizioni-panel"
-                                        data-storage-key="arboris-sidebar-economia-iscrizioni"
-                                        data-default-open="true"
-                                    >
-                                        <span>Iscrizioni</span>
-                                    </button>
-                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-economia-iscrizioni-panel">
-                                        <nav class="sidebar-nav sidebar-subnav">
-                                            <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' or request.resolver_match.url_name == 'crea_iscrizione' or request.resolver_match.url_name == 'modifica_iscrizione' or request.resolver_match.url_name == 'elimina_iscrizione' or request.resolver_match.url_name == 'ritiro_anticipato_iscrizione' or request.resolver_match.url_name == 'ricalcola_rate_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
-                                                <span class="sidebar-link-text">Iscrizioni</span>
-                                            </a>
-                                            <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' or request.resolver_match.url_name == 'crea_stato_iscrizione' or request.resolver_match.url_name == 'modifica_stato_iscrizione' or request.resolver_match.url_name == 'elimina_stato_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                                <span class="sidebar-link-text">Stati iscrizione</span>
-                                            </a>
-                                            <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' or request.resolver_match.url_name == 'pagamento_rapido_rata_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                                <span class="sidebar-link-text">Rate iscrizione</span>
-                                            </a>
-                                        </nav>
-                                    </div>
-                                </div>
-                                <div class="sidebar-subsection">
-                                    <button
-                                        type="button"
-                                        class="sidebar-collapsible collapsible-title is-open"
                                         data-target="sidebar-economia-impostazioni-panel"
                                         data-storage-key="arboris-sidebar-economia-impostazioni"
                                         data-default-open="true"
@@ -547,7 +520,7 @@
                                                 </a>
                                                 <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' or request.resolver_match.url_name == 'elimina_documenti_fornitori_multipla' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                                                    <span class="sidebar-link-text">Documenti fornitori</span>
+                                                    <span class="sidebar-link-text">Fatture fornitori</span>
                                                 </a>
                                                 <a href="{% url 'scadenziario_fornitori' %}" class="{% if request.resolver_match.url_name == 'scadenziario_fornitori' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
@@ -687,6 +660,52 @@
                                         <span class="sidebar-link-text">Categorie</span>
                                     </a>
                                 </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_system_tables and can_view_economia %}
+                        <div class="sidebar-section" data-sidebar-section-key="parcheggio">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-parcheggio-panel"
+                                data-storage-key="arboris-sidebar-parcheggio"
+                                data-default-open="true"
+                            >
+                                <span class="sidebar-heading-content">
+                                    <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                    <span>Parcheggio</span>
+                                </span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-parcheggio-panel">
+                                <div class="sidebar-subsection">
+                                    <button
+                                        type="button"
+                                        class="sidebar-collapsible collapsible-title is-open"
+                                        data-target="sidebar-parcheggio-iscrizioni-panel"
+                                        data-storage-key="arboris-sidebar-parcheggio-iscrizioni"
+                                        data-default-open="true"
+                                    >
+                                        <span>Iscrizioni</span>
+                                    </button>
+                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-parcheggio-iscrizioni-panel">
+                                        <nav class="sidebar-nav sidebar-subnav">
+                                            <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' or request.resolver_match.url_name == 'crea_iscrizione' or request.resolver_match.url_name == 'modifica_iscrizione' or request.resolver_match.url_name == 'elimina_iscrizione' or request.resolver_match.url_name == 'ritiro_anticipato_iscrizione' or request.resolver_match.url_name == 'ricalcola_rate_iscrizione' %}active{% endif %}">
+                                                <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                                                <span class="sidebar-link-text">Iscrizioni</span>
+                                            </a>
+                                            <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' or request.resolver_match.url_name == 'crea_stato_iscrizione' or request.resolver_match.url_name == 'modifica_stato_iscrizione' or request.resolver_match.url_name == 'elimina_stato_iscrizione' %}active{% endif %}">
+                                                <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                <span class="sidebar-link-text">Stati iscrizione</span>
+                                            </a>
+                                            <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' or request.resolver_match.url_name == 'pagamento_rapido_rata_iscrizione' %}active{% endif %}">
+                                                <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                                <span class="sidebar-link-text">Rate iscrizione</span>
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     {% endif %}

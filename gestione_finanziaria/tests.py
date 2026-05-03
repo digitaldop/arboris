@@ -1050,7 +1050,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         confirm_response = self.client.get(delete_url)
         self.assertEqual(confirm_response.status_code, 200)
-        self.assertContains(confirm_response, "documenti fornitori")
+        self.assertContains(confirm_response, "fatture fornitori")
         self.assertContains(confirm_response, "Rimuovi connessione")
 
         response = self.client.post(delete_url)
@@ -1232,6 +1232,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             iva=Decimal("11.00"),
             totale=Decimal("61.00"),
         )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("61.00"),
+        )
 
         urls = [
             reverse("dashboard_gestione_finanziaria"),
@@ -1245,6 +1250,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         for url in urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, url)
+
+        response = self.client.get(reverse("lista_documenti_fornitori"))
+        self.assertContains(response, "Fatture fornitori")
+        self.assertContains(response, "Data di scadenza")
+        self.assertContains(response, "31/05/2026")
+        self.assertContains(response, f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
 
     def test_eliminazione_multipla_documenti_fornitori_con_conferma(self):
         fornitore = Fornitore.objects.create(
@@ -1282,7 +1293,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Elimina documenti fornitori")
+        self.assertContains(response, "Elimina fatture fornitori")
         self.assertContains(response, "BULK-1")
         self.assertContains(response, "BULK-2")
 

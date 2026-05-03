@@ -25,7 +25,7 @@
             </div>
             <div class="family-page-address">
                 <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                Scadenze, residui e pagamenti parziali dei documenti fornitore
+                Scadenze, residui e pagamenti parziali delle fatture fornitore
             </div>
         </div>
         <div class="page-head-actions family-page-actions">
@@ -33,9 +33,9 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Dashboard</span>
             </a>
-            <a href="{% url 'crea_documento_fornitore' %}" class="btn btn-primary btn-icon-text btn-add-action">
+            <a href="{% url 'crea_documento_fornitore' %}?popup=1" class="btn btn-primary btn-icon-text btn-add-action" data-window-popup="1" data-popup-url="{% url 'crea_documento_fornitore' %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
                 <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                <span class="btn-label">Nuovo documento</span>
+                <span class="btn-label">Nuova fattura</span>
             </a>
         </div>
     </div>
@@ -103,7 +103,7 @@
                         <tr>
                             <th>Scadenza</th>
                             <th>Fornitore</th>
-                            <th>Documento</th>
+                            <th>Fattura</th>
                             <th>Categoria</th>
                             <th class="column-right">Previsto</th>
                             <th class="column-right">Pagato</th>
@@ -131,7 +131,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="anagrafica-inline-link">
+                                    <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" class="anagrafica-inline-link" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
                                         {{ scadenza.documento.get_tipo_documento_display }} {{ scadenza.documento.numero_documento }}
                                     </a>
                                 </td>

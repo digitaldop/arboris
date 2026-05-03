@@ -14,7 +14,6 @@ from .forms import (
     AttivitaFamigliaInteressataForm,
     FamigliaInteressataForm,
     MinoreInteressatoFormSet,
-    ReferenteFamigliaInteressataFormSet,
 )
 from .models import (
     AttivitaFamigliaInteressata,
@@ -88,6 +87,8 @@ def filtered_famiglie_interessate_queryset(request):
             | Q(referenti__email__icontains=q)
             | Q(minori__nome__icontains=q)
             | Q(minori__cognome__icontains=q)
+            | Q(minori__classe_interesse__nome_classe__icontains=q)
+            | Q(minori__classe_interesse__sezione_classe__icontains=q)
         ).distinct()
 
     if stato in {value for value, _label in StatoFamigliaInteressata.choices}:
@@ -174,7 +175,7 @@ def lista_famiglie_interessate(request):
     )
 
 
-def build_famiglia_form_context(request, famiglia, form, referenti_formset, minori_formset, *, is_new=False):
+def build_famiglia_form_context(request, famiglia, form, minori_formset, *, is_new=False):
     attivita = []
     if famiglia and famiglia.pk:
         attivita = list(
@@ -190,13 +191,11 @@ def build_famiglia_form_context(request, famiglia, form, referenti_formset, mino
         {
             "famiglia": famiglia,
             "form": form,
-            "referenti_formset": referenti_formset,
             "minori_formset": minori_formset,
             "attivita": attivita,
             "is_new": is_new,
             "has_form_errors": bool(
                 form.errors
-                or referenti_formset.total_error_count()
                 or minori_formset.total_error_count()
             ),
         },
@@ -206,18 +205,15 @@ def build_famiglia_form_context(request, famiglia, form, referenti_formset, mino
 def crea_famiglia_interessata(request):
     if request.method == "POST":
         form = FamigliaInteressataForm(request.POST)
-        referenti_formset = ReferenteFamigliaInteressataFormSet(request.POST, prefix="referenti")
         minori_formset = MinoreInteressatoFormSet(request.POST, prefix="minori")
 
-        if form.is_valid() and referenti_formset.is_valid() and minori_formset.is_valid():
+        if form.is_valid() and minori_formset.is_valid():
             with transaction.atomic():
                 famiglia = form.save(commit=False)
                 famiglia.creata_da = request.user
                 famiglia.aggiornata_da = request.user
                 famiglia.save()
-                referenti_formset.instance = famiglia
                 minori_formset.instance = famiglia
-                referenti_formset.save()
                 minori_formset.save()
             messages.success(request, "Famiglia interessata creata correttamente.")
             if is_popup_request(request):
@@ -225,13 +221,12 @@ def crea_famiglia_interessata(request):
             return redirect("modifica_famiglia_interessata", pk=famiglia.pk)
     else:
         form = FamigliaInteressataForm()
-        referenti_formset = ReferenteFamigliaInteressataFormSet(prefix="referenti")
         minori_formset = MinoreInteressatoFormSet(prefix="minori")
 
     return render(
         request,
         "famiglie_interessate/famiglia_form.html",
-        build_famiglia_form_context(request, None, form, referenti_formset, minori_formset, is_new=True),
+        build_famiglia_form_context(request, None, form, minori_formset, is_new=True),
     )
 
 
@@ -248,22 +243,16 @@ def modifica_famiglia_interessata(request, pk):
 
     if request.method == "POST":
         form = FamigliaInteressataForm(request.POST, instance=famiglia)
-        referenti_formset = ReferenteFamigliaInteressataFormSet(
-            request.POST,
-            instance=famiglia,
-            prefix="referenti",
-        )
         minori_formset = MinoreInteressatoFormSet(
             request.POST,
             instance=famiglia,
             prefix="minori",
         )
-        if form.is_valid() and referenti_formset.is_valid() and minori_formset.is_valid():
+        if form.is_valid() and minori_formset.is_valid():
             with transaction.atomic():
                 famiglia = form.save(commit=False)
                 famiglia.aggiornata_da = request.user
                 famiglia.save()
-                referenti_formset.save()
                 minori_formset.save()
             messages.success(request, "Famiglia interessata aggiornata correttamente.")
             if is_popup_request(request):
@@ -271,13 +260,12 @@ def modifica_famiglia_interessata(request, pk):
             return redirect("modifica_famiglia_interessata", pk=famiglia.pk)
     else:
         form = FamigliaInteressataForm(instance=famiglia)
-        referenti_formset = ReferenteFamigliaInteressataFormSet(instance=famiglia, prefix="referenti")
         minori_formset = MinoreInteressatoFormSet(instance=famiglia, prefix="minori")
 
     return render(
         request,
         "famiglie_interessate/famiglia_form.html",
-        build_famiglia_form_context(request, famiglia, form, referenti_formset, minori_formset),
+        build_famiglia_form_context(request, famiglia, form, minori_formset),
     )
 
 

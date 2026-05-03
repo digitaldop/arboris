@@ -313,9 +313,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
         labels = {
             "fornitore": "Fornitore",
             "categoria_spesa": "Categoria di spesa",
-            "tipo_documento": "Tipo documento",
-            "numero_documento": "Numero documento",
-            "data_documento": "Data documento",
+            "tipo_documento": "Tipo fattura",
+            "numero_documento": "Numero fattura",
+            "data_documento": "Data fattura",
             "data_ricezione": "Data ricezione",
             "anno_competenza": "Anno competenza",
             "mese_competenza": "Mese competenza",
@@ -323,7 +323,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "imponibile": "Imponibile",
             "aliquota_iva": "Aliquota IVA %",
             "iva": "IVA",
-            "totale": "Totale documento",
+            "totale": "Totale fattura",
             "stato": "Stato",
             "allegato": "Allegato",
             "note": "Note",
@@ -368,8 +368,8 @@ class DocumentoFornitoreForm(forms.ModelForm):
         totale = cleaned.get("totale")
 
         if imponibile in (None, "") and totale in (None, ""):
-            self.add_error("imponibile", "Inserisci l'imponibile oppure il totale documento.")
-            self.add_error("totale", "Inserisci il totale documento oppure l'imponibile.")
+            self.add_error("imponibile", "Inserisci l'imponibile oppure il totale fattura.")
+            self.add_error("totale", "Inserisci il totale fattura oppure l'imponibile.")
             return cleaned
 
         moltiplicatore_iva = Decimal("1.00") + (aliquota_iva / Decimal("100"))

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 
-from scuola.models import AnnoScolastico
+from scuola.models import AnnoScolastico, Classe
 
 from .models import (
     AttivitaFamigliaInteressata,
@@ -121,26 +121,44 @@ class MinoreInteressatoForm(forms.ModelForm):
 
     class Meta:
         model = MinoreInteressato
-        fields = ["nome", "cognome", "data_nascita", "eta_indicativa", "classe_eta_interesse", "note"]
+        fields = ["nome", "cognome", "data_nascita", "eta_indicativa", "classe_interesse", "note"]
         labels = {
             "nome": "Nome",
             "cognome": "Cognome",
             "eta_indicativa": "Eta indicativa",
-            "classe_eta_interesse": "Classe / fascia",
+            "classe_interesse": "Classe di interesse",
             "note": "Note",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["classe_interesse"].queryset = Classe.objects.order_by(
+            "ordine_classe",
+            "nome_classe",
+            "sezione_classe",
+            "id",
+        )
+        self.fields["classe_interesse"].required = False
+        self.fields["classe_interesse"].empty_label = "Seleziona classe"
         placeholders = {
             "nome": "Nome",
             "cognome": "Cognome",
             "eta_indicativa": "Es. 6 anni",
-            "classe_eta_interesse": "Es. Scuola primaria",
             "note": "Note aggiuntive",
         }
         for field_name, placeholder in placeholders.items():
             self.fields[field_name].widget.attrs.setdefault("placeholder", placeholder)
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if instance.classe_interesse_id:
+            instance.classe_eta_interesse = str(instance.classe_interesse)
+        elif "classe_interesse" in self.changed_data:
+            instance.classe_eta_interesse = ""
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 ReferenteFamigliaInteressataFormSet = inlineformset_factory(

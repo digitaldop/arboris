@@ -178,10 +178,6 @@ class SidebarEconomiaTests(TestCase):
             "<span>Scambi retta</span>",
             "Scambio retta",
             "Tariffe scambio retta",
-            "<span>Iscrizioni</span>",
-            "Iscrizioni",
-            "Stati iscrizione",
-            "Rate iscrizione",
             "<span>Impostazioni rette</span>",
         ]
 
@@ -190,6 +186,42 @@ class SidebarEconomiaTests(TestCase):
             current_index = economia_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+        self.assertNotIn('id="sidebar-economia-iscrizioni-panel"', economia_section)
+        self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
+
+    def test_home_renders_parcheggio_only_for_operational_admin(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-sidebar-section-key="parcheggio"', html=False)
+
+        admin_user = User.objects.create_user(
+            username="parcheggio-admin@example.com",
+            email="parcheggio-admin@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=admin_user,
+            ruolo=RuoloUtente.AMMINISTRATORE,
+            permesso_economia=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(admin_user)
+
+        admin_response = self.client.get(reverse("home"))
+
+        self.assertEqual(admin_response.status_code, 200)
+        content = admin_response.content.decode("utf-8")
+        start = content.index('data-sidebar-section-key="parcheggio"')
+        end = content.index('data-sidebar-section-key="sistema"', start)
+        parcheggio_section = content[start:end]
+
+        self.assertIn("Parcheggio", parcheggio_section)
+        self.assertIn('id="sidebar-parcheggio-iscrizioni-panel"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_iscrizioni")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_stati_iscrizione")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_rate_iscrizione")}"', parcheggio_section)
 
 
 class SidebarGestioneFinanziariaTests(TestCase):

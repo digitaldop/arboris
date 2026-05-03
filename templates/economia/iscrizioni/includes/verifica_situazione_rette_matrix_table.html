@@ -1,0 +1,81 @@
+{% load currency %}
+
+<div class="verifica-rette-scroll">
+    <table class="verifica-rette-table">
+        <thead>
+            <tr>
+                <th class="sticky-col sticky-head studente-col">Studente</th>
+                {% for colonna in colonne %}
+                    <th class="sticky-head">{{ colonna.label }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% if totali_colonne %}
+                <tr class="verifica-rette-total-row verifica-rette-total-row-top">
+                    <td class="sticky-col studente-col">Totali</td>
+                    {% for totale in totali_colonne %}
+                        <td class="verifica-rette-total-cell">
+                            <div class="cell-amount">
+                                <span class="label">Dovuto</span>
+                                <span class="value">&euro; {{ totale.dovuto|euro }}</span>
+                            </div>
+                            <div class="cell-amount">
+                                <span class="label">Incassato</span>
+                                <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                            </div>
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endif %}
+
+            {% if grouped %}
+                {% for gruppo in righe_per_classe %}
+                    <tr class="classe-separator">
+                        <td colspan="{{ num_colonne }}" class="classe-separator-cell">
+                            Classe: <strong>{{ gruppo.classe_label }}</strong>
+                        </td>
+                    </tr>
+                    {% for riga in gruppo.righe %}
+                        {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga only %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuno studente in questa classe.</div></td>
+                        </tr>
+                    {% endfor %}
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per l'anno selezionato.</div></td>
+                    </tr>
+                {% endfor %}
+            {% else %}
+                {% for riga in righe_matrice %}
+                    {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga show_classe_label=1 only %}
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per l'anno selezionato.</div></td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+        </tbody>
+        {% if totali_colonne %}
+            <tfoot>
+                <tr class="verifica-rette-total-row verifica-rette-total-row-bottom">
+                    <td class="sticky-col studente-col">Totali</td>
+                    {% for totale in totali_colonne %}
+                        <td class="verifica-rette-total-cell">
+                            <div class="cell-amount">
+                                <span class="label">Dovuto</span>
+                                <span class="value">&euro; {{ totale.dovuto|euro }}</span>
+                            </div>
+                            <div class="cell-amount">
+                                <span class="label">Incassato</span>
+                                <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                            </div>
+                        </td>
+                    {% endfor %}
+                </tr>
+            </tfoot>
+        {% endif %}
+    </table>
+</div>

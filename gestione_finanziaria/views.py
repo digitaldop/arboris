@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Min, Prefetch, Q, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -549,6 +549,7 @@ def lista_documenti_fornitori(request):
 
     documenti = (
         DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa")
+        .annotate(data_scadenza_prima=Min("scadenze__data_scadenza"))
         .prefetch_related("scadenze")
         .order_by("-data_documento", "-id")
     )
@@ -638,12 +639,12 @@ def crea_documento_fornitore(request):
             formset.instance = documento
             formset.save()
             _aggiorna_stato_documento_da_scadenze(documento)
-            messages.success(request, "Documento fornitore creato correttamente.")
+            messages.success(request, "Fattura fornitore creata correttamente.")
             if popup:
                 return render(
                     request,
                     "popup/popup_close.html",
-                    {"message": "Documento fornitore creato correttamente."},
+                    {"message": "Fattura fornitore creata correttamente."},
                 )
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
@@ -685,12 +686,12 @@ def modifica_documento_fornitore(request, pk):
             documento = form.save()
             formset.save()
             _aggiorna_stato_documento_da_scadenze(documento)
-            messages.success(request, "Documento fornitore aggiornato correttamente.")
+            messages.success(request, "Fattura fornitore aggiornata correttamente.")
             if popup:
                 return render(
                     request,
                     "popup/popup_close.html",
-                    {"message": "Documento fornitore aggiornato correttamente."},
+                    {"message": "Fattura fornitore aggiornata correttamente."},
                 )
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
@@ -711,7 +712,7 @@ def elimina_documento_fornitore(request, pk):
     documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
     if request.method == "POST":
         documento.delete()
-        messages.success(request, "Documento fornitore eliminato correttamente.")
+        messages.success(request, "Fattura fornitore eliminata correttamente.")
         return redirect("lista_documenti_fornitori")
 
     return render(
@@ -747,7 +748,7 @@ def elimina_documenti_fornitori_multipla(request):
     next_url = _safe_bulk_next_url(request, "lista_documenti_fornitori")
     selected_ids = _ids_selezionati_da_post(request)
     if not selected_ids:
-        messages.error(request, "Seleziona almeno un documento fornitore da eliminare.")
+        messages.error(request, "Seleziona almeno una fattura fornitore da eliminare.")
         return redirect(next_url)
 
     queryset = (
@@ -757,14 +758,14 @@ def elimina_documenti_fornitori_multipla(request):
     )
     documenti = list(queryset)
     if not documenti:
-        messages.error(request, "I documenti selezionati non sono piu disponibili.")
+        messages.error(request, "Le fatture selezionate non sono piu disponibili.")
         return redirect(next_url)
 
     if request.POST.get("conferma") == "1":
         count = len(documenti)
         with transaction.atomic():
             DocumentoFornitore.objects.filter(pk__in=[documento.pk for documento in documenti]).delete()
-        messages.success(request, f"Eliminati {count} documenti fornitori selezionati.")
+        messages.success(request, f"Eliminate {count} fatture fornitori selezionate.")
         return redirect(next_url)
 
     totale_documenti = sum(

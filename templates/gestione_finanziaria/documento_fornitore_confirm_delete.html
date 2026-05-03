@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static currency %}
 
-{% block title %}Elimina documento fornitore - Arboris School Management{% endblock %}
+{% block title %}Elimina fattura fornitore - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -9,7 +9,7 @@
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_documenti_fornitori' %}">Documenti fornitori</a>
+        <a href="{% url 'lista_documenti_fornitori' %}">Fatture fornitori</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>Elimina</span>
     </div>
@@ -19,7 +19,7 @@
     <div class="page-head family-page-head anagrafica-list-head finance-page-head">
         <div class="family-page-title-block">
             <div class="family-page-title-line">
-                <h1 class="page-title">Elimina documento fornitore</h1>
+                <h1 class="page-title">Elimina fattura fornitore</h1>
                 <span class="family-status-pill is-danger">
                     <span class="family-status-dot" aria-hidden="true"></span>
                     Conferma richiesta
@@ -35,12 +35,12 @@
     <div class="finance-danger-panel">
         <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
         <div class="finance-guide-copy">
-            <div class="finance-guide-title">Eliminazione documento</div>
+            <div class="finance-guide-title">Eliminazione fattura</div>
             <p>
                 Stai per eliminare <strong>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</strong>
                 del fornitore <strong>{{ documento.fornitore.denominazione }}</strong>.
             </p>
-            <p class="help-text">Totale documento: {{ documento.totale|euro }} &euro;.</p>
+            <p class="help-text">Totale fattura: {{ documento.totale|euro }} &euro;.</p>
             <form method="post">
                 {% csrf_token %}
                 <div class="form-actions finance-confirm-actions">

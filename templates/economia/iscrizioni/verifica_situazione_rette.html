@@ -189,6 +189,12 @@
             font-weight: 600;
             color: #1f2937;
         }
+        .verifica-rette-table .studente-classe-label {
+            margin-top: 0.18rem;
+            color: #60738d;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
 
         .verifica-rette-table .verifica-rette-total-row td {
             background: #f8fafc;
@@ -392,6 +398,44 @@
             margin: 5px 0 0;
             color: #60738d;
             font-size: 13px;
+        }
+        .verifica-rette-card-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .verifica-rette-view-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .verifica-rette-view-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 36px;
+            padding: 8px 14px;
+            border: 1px solid #cfdce8;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #29415b;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .verifica-rette-view-btn:hover,
+        .verifica-rette-view-btn:focus-visible,
+        .verifica-rette-view-btn.is-active {
+            border-color: #9fc7d8;
+            background: #eef6fa;
+            color: #2b5d77;
+        }
+        .verifica-rette-matrix-panel[hidden] {
+            display: none !important;
         }
         .verifica-rette-summary-title {
             padding: 0;
@@ -695,110 +739,35 @@
         <section class="verifica-rette-table-card">
             <div class="verifica-rette-card-head">
                 <div>
-                    <h2 class="verifica-rette-card-title">Matrice rette per classe</h2>
-                    <p class="verifica-rette-card-subtitle">Ogni cella apre il dettaglio della rata corrispondente.</p>
+                    <h2 class="verifica-rette-card-title">Matrice rette</h2>
+                    <p class="verifica-rette-card-subtitle">Vista alfabetica predefinita; puoi passare alla divisione per classe quando serve.</p>
+                </div>
+                <div class="verifica-rette-card-actions">
+                    <div class="verifica-rette-view-switch" role="group" aria-label="Vista matrice rette">
+                        <button
+                            type="button"
+                            class="verifica-rette-view-btn is-active"
+                            data-matrix-view-button="alfabetica"
+                            aria-pressed="true"
+                        >
+                            Ordine alfabetico
+                        </button>
+                        <button
+                            type="button"
+                            class="verifica-rette-view-btn"
+                            data-matrix-view-button="classe"
+                            aria-pressed="false"
+                        >
+                            Per classe
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="verifica-rette-scroll">
-                <table class="verifica-rette-table">
-                    <thead>
-                        <tr>
-                            <th class="sticky-col sticky-head studente-col">Studente</th>
-                            {% for colonna in colonne %}
-                                <th class="sticky-head">{{ colonna.label }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if totali_colonne %}
-                            <tr class="verifica-rette-total-row verifica-rette-total-row-top">
-                                <td class="sticky-col studente-col">Totali</td>
-                                {% for totale in totali_colonne %}
-                                    <td class="verifica-rette-total-cell">
-                                        <div class="cell-amount">
-                                            <span class="label">Dovuto</span>
-                                            <span class="value">&euro; {{ totale.dovuto|euro }}</span>
-                                        </div>
-                                        <div class="cell-amount">
-                                            <span class="label">Incassato</span>
-                                            <span class="value">&euro; {{ totale.pagato|euro }}</span>
-                                        </div>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                        {% endif %}
-                        {% for gruppo in righe_per_classe %}
-                            <tr class="classe-separator">
-                                <td colspan="{{ num_colonne }}" class="classe-separator-cell">
-                                    Classe: <strong>{{ gruppo.classe_label }}</strong>
-                                </td>
-                            </tr>
-                            {% for riga in gruppo.righe %}
-                                <tr>
-                                    <td class="sticky-col studente-col">
-                                        <a href="{% url 'modifica_studente' riga.studente.pk %}" class="studente-link" title="Apri scheda studente">
-                                            <div class="studente-nome">{{ riga.studente.cognome }} {{ riga.studente.nome }}</div>
-                                        </a>
-                                    </td>
-                                    {% for cella in riga.celle %}
-                                        {% if cella.rata %}
-                                            <td class="verifica-rette-cell cella-{{ cella.stato }}">
-                                                <a href="{{ cella.url }}" class="cell-link" title="Apri dettaglio rata">
-                                                    <div class="cell-amount">
-                                                        <span class="label">Dovuto</span>
-                                                        <span class="value">&euro; {{ cella.rata.importo_finale|euro }}</span>
-                                                    </div>
-                                                    <div class="cell-amount">
-                                                        <span class="label">Pagato</span>
-                                                        <span class="value">&euro; {{ cella.rata.importo_pagato|euro }}</span>
-                                                    </div>
-                                                    <div class="cell-date">
-                                                        {% if cella.rata.data_pagamento %}
-                                                            {{ cella.rata.data_pagamento|it_date }}
-                                                        {% else %}
-                                                            &ndash;
-                                                        {% endif %}
-                                                    </div>
-                                                </a>
-                                            </td>
-                                        {% else %}
-                                            <td class="verifica-rette-cell cella-assente">
-                                                <div class="cell-empty">&mdash;</div>
-                                            </td>
-                                        {% endif %}
-                                    {% endfor %}
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuno studente in questa classe.</div></td>
-                                </tr>
-                            {% endfor %}
-                        {% empty %}
-                            <tr>
-                                <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per l'anno selezionato.</div></td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if totali_colonne %}
-                        <tfoot>
-                            <tr class="verifica-rette-total-row verifica-rette-total-row-bottom">
-                                <td class="sticky-col studente-col">Totali</td>
-                                {% for totale in totali_colonne %}
-                                    <td class="verifica-rette-total-cell">
-                                        <div class="cell-amount">
-                                            <span class="label">Dovuto</span>
-                                            <span class="value">&euro; {{ totale.dovuto|euro }}</span>
-                                        </div>
-                                        <div class="cell-amount">
-                                            <span class="label">Incassato</span>
-                                            <span class="value">&euro; {{ totale.pagato|euro }}</span>
-                                        </div>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                        </tfoot>
-                    {% endif %}
-                </table>
+            <div class="verifica-rette-matrix-panel" data-matrix-view-panel="alfabetica">
+                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with righe_matrice=righe_matrice_alfabetica %}
+            </div>
+            <div class="verifica-rette-matrix-panel" data-matrix-view-panel="classe" hidden>
+                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with grouped=1 %}
             </div>
         </section>
     {% else %}
@@ -811,6 +780,34 @@
     </div>
 
     <script>
+        (function () {
+            var buttons = Array.prototype.slice.call(document.querySelectorAll("[data-matrix-view-button]"));
+            var panels = Array.prototype.slice.call(document.querySelectorAll("[data-matrix-view-panel]"));
+            if (!buttons.length || !panels.length) {
+                return;
+            }
+
+            function setMatrixView(view) {
+                buttons.forEach(function (button) {
+                    var isActive = button.dataset.matrixViewButton === view;
+                    button.classList.toggle("is-active", isActive);
+                    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+                });
+
+                panels.forEach(function (panel) {
+                    panel.hidden = panel.dataset.matrixViewPanel !== view;
+                });
+            }
+
+            buttons.forEach(function (button) {
+                button.addEventListener("click", function () {
+                    setMatrixView(button.dataset.matrixViewButton);
+                });
+            });
+
+            setMatrixView("alfabetica");
+        })();
+
         (function () {
             var storageKey = "arboris.verificaRette.summaryOrder";
             var grid = document.querySelector("[data-summary-grid]");

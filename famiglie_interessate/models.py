@@ -205,6 +205,13 @@ class MinoreInteressato(models.Model):
     data_nascita = models.DateField(blank=True, null=True)
     eta_indicativa = models.CharField(max_length=80, blank=True)
     classe_eta_interesse = models.CharField(max_length=120, blank=True)
+    classe_interesse = models.ForeignKey(
+        "scuola.Classe",
+        on_delete=models.SET_NULL,
+        related_name="minori_interessati",
+        blank=True,
+        null=True,
+    )
     note = models.CharField(max_length=255, blank=True)
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)

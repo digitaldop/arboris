@@ -1,7 +1,7 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static currency %}
 
-{% block title %}{% if documento %}Documento {{ documento.numero_documento }}{% else %}Nuovo documento fornitore{% endif %} - Arboris School Management{% endblock %}
+{% block title %}{% if documento %}Fattura {{ documento.numero_documento }}{% else %}Nuova fattura fornitore{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     {% if not popup %}
@@ -10,7 +10,7 @@
             <span class="breadcrumb-sep">&gt;</span>
             <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
             <span class="breadcrumb-sep">&gt;</span>
-            <a href="{% url 'lista_documenti_fornitori' %}">Documenti fornitori</a>
+            <a href="{% url 'lista_documenti_fornitori' %}">Fatture fornitori</a>
             <span class="breadcrumb-sep">&gt;</span>
             <span>{% if documento %}{{ documento.numero_documento }}{% else %}Nuovo{% endif %}</span>
         </div>
@@ -18,64 +18,68 @@
 {% endblock %}
 
 {% block content %}
-{% if popup and documento %}
+{% if popup %}
     <div class="supplier-document-detail-shell is-popup">
         <div class="calendar-event-hero supplier-document-hero">
             <span class="calendar-event-hero-icon supplier-document-hero-icon" aria-hidden="true">
                 <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
             </span>
             <div class="calendar-event-hero-copy">
-                <h1 class="page-title">Documento {{ documento.numero_documento }}</h1>
-                <p>{{ documento.fornitore }} - {{ documento.get_tipo_documento_display }} del {{ documento.data_documento|it_date }}</p>
+                <h1 class="page-title">{% if documento %}Fattura {{ documento.numero_documento }}{% else %}Nuova fattura fornitore{% endif %}</h1>
+                <p>{% if documento %}{{ documento.fornitore }} - {{ documento.get_tipo_documento_display }} del {{ documento.data_documento|it_date }}{% else %}Fattura, scadenze e allegato fornitore{% endif %}</p>
             </div>
-            <div class="calendar-category-hero-actions supplier-document-hero-actions">
-                <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-documento-fornitore-btn">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                    <span class="btn-label">Modifica</span>
-                </button>
-            </div>
+            {% if documento %}
+                <div class="calendar-category-hero-actions supplier-document-hero-actions">
+                    <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-documento-fornitore-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
+                </div>
+            {% endif %}
         </div>
 
-        <form method="post" enctype="multipart/form-data" class="calendar-event-form supplier-document-detail-form detail-form is-view-mode" id="documento-fornitore-form">
+        <form method="post" enctype="multipart/form-data" class="calendar-event-form supplier-document-detail-form detail-form {% if documento %}is-view-mode{% else %}is-edit-mode{% endif %}" id="documento-fornitore-form">
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
 
-            <section class="supplier-document-summary-grid" aria-label="Riepilogo documento fornitore">
-                <article class="supplier-document-summary-card">
-                    <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                    <div>
-                        <span>Totale documento</span>
-                        <strong>EUR {{ documento.totale|euro }}</strong>
-                    </div>
-                </article>
-                <article class="supplier-document-summary-card">
-                    <span class="supplier-document-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                    <div>
-                        <span>Pagato</span>
-                        <strong>EUR {{ documento.importo_pagato|euro }}</strong>
-                    </div>
-                </article>
-                <article class="supplier-document-summary-card">
-                    <span class="supplier-document-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                    <div>
-                        <span>Residuo</span>
-                        <strong>EUR {{ documento.residuo_da_pagare|euro }}</strong>
-                    </div>
-                </article>
-                <article class="supplier-document-summary-card">
-                    <span class="supplier-document-summary-icon {% if documento.stato == 'pagato' %}is-green{% elif documento.stato == 'annullato' %}is-red{% else %}is-blue{% endif %}" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
-                    <div>
-                        <span>Stato</span>
-                        <strong>{{ documento.get_stato_display }}</strong>
-                    </div>
-                </article>
-            </section>
+            {% if documento %}
+                <section class="supplier-document-summary-grid" aria-label="Riepilogo fattura fornitore">
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                        <div>
+                            <span>Totale fattura</span>
+                            <strong>EUR {{ documento.totale|euro }}</strong>
+                        </div>
+                    </article>
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <div>
+                            <span>Pagato</span>
+                            <strong>EUR {{ documento.importo_pagato|euro }}</strong>
+                        </div>
+                    </article>
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <div>
+                            <span>Residuo</span>
+                            <strong>EUR {{ documento.residuo_da_pagare|euro }}</strong>
+                        </div>
+                    </article>
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon {% if documento.stato == 'pagato' %}is-green{% elif documento.stato == 'annullato' %}is-red{% else %}is-blue{% endif %}" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                        <div>
+                            <span>Stato</span>
+                            <strong>{{ documento.get_stato_display }}</strong>
+                        </div>
+                    </article>
+                </section>
+            {% endif %}
 
-            <fieldset id="documento-fornitore-lock-container" class="mode-lock-container supplier-document-fieldset main-fields-section" disabled>
+            <fieldset id="documento-fornitore-lock-container" class="mode-lock-container supplier-document-fieldset main-fields-section" {% if documento %}disabled{% endif %}>
                 <section class="calendar-event-form-card supplier-document-form-card">
                     <div class="calendar-event-form-title">
                         <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                        <span>Dati documento</span>
+                        <span>Dati fattura</span>
                     </div>
 
                     <div class="supplier-document-form-grid">
@@ -425,6 +429,7 @@
                     </div>
                 </section>
 
+                {% if documento %}
                 <section class="calendar-event-form-card supplier-document-form-card">
                     <div class="calendar-event-form-title">
                         <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
@@ -480,6 +485,7 @@
                         </table>
                     </div>
                 </section>
+                {% endif %}
             </fieldset>
 
             <div class="form-actions sticky-form-actions mode-edit-only supplier-document-actions">
@@ -502,7 +508,7 @@
                 if (window.ArborisDocumentoFornitoreForm) {
                     ArborisDocumentoFornitoreForm.init();
                 }
-                if (window.ArborisViewMode) {
+                if (window.ArborisViewMode && document.getElementById("enable-edit-documento-fornitore-btn")) {
                     ArborisViewMode.init({
                         formId: "documento-fornitore-form",
                         lockContainerId: "documento-fornitore-lock-container",
@@ -518,7 +524,7 @@
     <div class="page-head family-page-head anagrafica-list-head finance-page-head">
         <div class="family-page-title-block">
             <div class="family-page-title-line">
-                <h1 class="page-title">{% if documento %}Documento {{ documento.numero_documento }}{% else %}Nuovo documento fornitore{% endif %}</h1>
+                <h1 class="page-title">{% if documento %}Fattura {{ documento.numero_documento }}{% else %}Nuova fattura fornitore{% endif %}</h1>
                 <span class="family-status-pill {% if documento and documento.stato == 'pagato' %}{% elif documento and documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
                     <span class="family-status-dot" aria-hidden="true"></span>
                     {% if documento %}{{ documento.get_stato_display }}{% else %}Nuovo{% endif %}
@@ -563,7 +569,7 @@
         {% endif %}
         <fieldset id="documento-fornitore-lock-container" class="mode-lock-container" {% if documento and popup %}disabled{% endif %}>
         <div class="admin-section">
-            <div class="admin-section-title">Dati documento</div>
+            <div class="admin-section-title">Dati fattura</div>
             <div class="panel">
                 <div class="panel-body">
                     <table class="form-table">

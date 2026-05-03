@@ -1,0 +1,39 @@
+{% load currency %}
+
+<tr>
+    <td class="sticky-col studente-col">
+        <a href="{% url 'modifica_studente' riga.studente.pk %}" class="studente-link" title="Apri scheda studente">
+            <div class="studente-nome">{{ riga.studente.cognome }} {{ riga.studente.nome }}</div>
+            {% if show_classe_label %}
+                <div class="studente-classe-label">{{ riga.classe_label }}</div>
+            {% endif %}
+        </a>
+    </td>
+    {% for cella in riga.celle %}
+        {% if cella.rata %}
+            <td class="verifica-rette-cell cella-{{ cella.stato }}">
+                <a href="{{ cella.url }}" class="cell-link" title="Apri dettaglio rata">
+                    <div class="cell-amount">
+                        <span class="label">Dovuto</span>
+                        <span class="value">&euro; {{ cella.rata.importo_finale|euro }}</span>
+                    </div>
+                    <div class="cell-amount">
+                        <span class="label">Pagato</span>
+                        <span class="value">&euro; {{ cella.rata.importo_pagato|euro }}</span>
+                    </div>
+                    <div class="cell-date">
+                        {% if cella.rata.data_pagamento %}
+                            {{ cella.rata.data_pagamento|it_date }}
+                        {% else %}
+                            &ndash;
+                        {% endif %}
+                    </div>
+                </a>
+            </td>
+        {% else %}
+            <td class="verifica-rette-cell cella-assente">
+                <div class="cell-empty">&mdash;</div>
+            </td>
+        {% endif %}
+    {% endfor %}
+</tr>

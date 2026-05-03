@@ -4,129 +4,129 @@
 {% block title %}Riconcilia {{ rata.display_label }} - Arboris School Management{% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <div>
-            <h1 class="page-title">Riconcilia rate</h1>
-            <div class="page-subtitle">{{ rata.iscrizione.studente }} - {{ rata.iscrizione.anno_scolastico }}</div>
-        </div>
-        <div class="page-head-actions">
-            {% if popup %}
-                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-                    <span class="btn-label">Chiudi</span>
-                </button>
-            {% else %}
-                <a href="{% url 'modifica_rata_iscrizione' rata.pk %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Torna alla rata</span>
-                </a>
+    <div class="rate-reconcile-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero rate-reconcile-page-hero">
+            <span class="calendar-event-hero-icon rate-reconcile-page-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Riconcilia rate</h1>
+                <p>{{ rata.iscrizione.studente }} - {{ rata.iscrizione.anno_scolastico }}</p>
+            </div>
+            {% if not popup %}
+                <div class="calendar-category-hero-actions rate-reconcile-hero-actions">
+                    <a href="{% url 'modifica_rata_iscrizione' rata.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Torna alla rata</span>
+                    </a>
+                </div>
             {% endif %}
         </div>
-    </div>
 
-    <form method="post" class="rate-reconcile-form">
-        {% csrf_token %}
-        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+        <form method="post" class="rate-reconcile-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
 
-        <section class="family-overview-card rate-reconcile-hero">
-            <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
-            <div>
-                <h2>{{ rata.display_label }}</h2>
-                <p>{{ rata.iscrizione.studente.famiglia.cognome_famiglia }} - residuo rata EUR {{ rata_residuo|euro }}</p>
-            </div>
-        </section>
-
-        <div class="rate-reconcile-layout">
-            <section class="family-side-card rate-reconcile-card">
-                <div class="family-side-card-head">
-                    <h2>Rate da coprire</h2>
+            <section class="family-overview-card rate-reconcile-hero">
+                <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                <div>
+                    <h2>{{ rata.display_label }}</h2>
+                    <p>{{ rata.iscrizione.studente.famiglia.cognome_famiglia }} - residuo rata EUR {{ rata_residuo|euro }}</p>
                 </div>
-                <div class="rate-reconcile-rate-list">
-                    {% for row in rate_rows %}
-                        <article class="rate-reconcile-rate{% if row.is_selected %} is-selected{% endif %}">
-                            <div>
-                                <strong>{{ row.studente.cognome }} {{ row.studente.nome }}</strong>
-                                <span>{{ row.rata.display_label }}{% if row.rata.data_scadenza %} - scadenza {{ row.rata.data_scadenza|it_date }}{% endif %}</span>
-                                <small>Residuo EUR {{ row.residuo|euro }}</small>
-                            </div>
-                            <label>
-                                <span>Importo</span>
-                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                                    <input
-                                        type="text"
-                                        name="importo_rata_{{ row.rata.pk }}"
-                                        value="{{ row.importo_iniziale|euro }}"
-                                        class="currency-field currency-field-suffix currency-field-compact"
-                                        inputmode="decimal"
-                                        autocomplete="off"
-                                        data-currency="EUR"
-                                        data-currency-display="suffix"
-                                    >
-                                    <span class="currency-suffix">EUR</span>
+            </section>
+
+            <div class="rate-reconcile-layout">
+                <section class="family-side-card rate-reconcile-card">
+                    <div class="family-side-card-head">
+                        <h2>Rate da coprire</h2>
+                    </div>
+                    <div class="rate-reconcile-rate-list">
+                        {% for row in rate_rows %}
+                            <article class="rate-reconcile-rate{% if row.is_selected %} is-selected{% endif %}">
+                                <div>
+                                    <strong>{{ row.studente.cognome }} {{ row.studente.nome }}</strong>
+                                    <span>{{ row.rata.display_label }}{% if row.rata.data_scadenza %} - scadenza {{ row.rata.data_scadenza|it_date }}{% endif %}</span>
+                                    <small>Residuo EUR {{ row.residuo|euro }}</small>
                                 </div>
+                                <label>
+                                    <span>Importo</span>
+                                    <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                        <input
+                                            type="text"
+                                            name="importo_rata_{{ row.rata.pk }}"
+                                            value="{{ row.importo_iniziale|euro }}"
+                                            class="currency-field currency-field-suffix currency-field-compact"
+                                            inputmode="decimal"
+                                            autocomplete="off"
+                                            data-currency="EUR"
+                                            data-currency-display="suffix"
+                                        >
+                                        <span class="currency-suffix">EUR</span>
+                                    </div>
+                                </label>
+                            </article>
+                        {% empty %}
+                            <div class="empty-state compact-empty-state">Non ci sono rate aperte da riconciliare per questo anno scolastico.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="family-side-card rate-reconcile-card">
+                    <div class="family-side-card-head">
+                        <h2>Movimenti candidati</h2>
+                    </div>
+                    <div class="rate-reconcile-movement-list">
+                        {% for candidato in candidati %}
+                            <label class="rate-reconcile-movement{% if forloop.first %} is-best{% endif %}">
+                                <input type="radio" name="movimento_pk" value="{{ candidato.movimento.pk }}" {% if forloop.first %}checked{% endif %}>
+                                <span class="rate-reconcile-movement-body">
+                                    <span class="rate-reconcile-movement-head">
+                                        <strong>EUR {{ candidato.importo_disponibile|euro }}</strong>
+                                        <span>{{ candidato.score_percentuale }}%</span>
+                                    </span>
+                                    <span>
+                                        {{ candidato.movimento.data_contabile|it_date }} -
+                                        {% if candidato.movimento.controparte %}
+                                            {{ candidato.movimento.controparte }}
+                                        {% elif candidato.movimento.conto %}
+                                            {{ candidato.movimento.conto }}
+                                        {% else %}
+                                            Movimento bancario
+                                        {% endif %}
+                                    </span>
+                                    <small>{{ candidato.movimento.descrizione|default:"Nessuna descrizione" }}</small>
+                                    <span class="rate-reconcile-reasons">
+                                        {% for motivo in candidato.motivazioni %}
+                                            <em>{{ motivo }}</em>
+                                        {% endfor %}
+                                    </span>
+                                </span>
                             </label>
-                        </article>
-                    {% empty %}
-                        <div class="empty-state compact-empty-state">Non ci sono rate aperte da riconciliare per questo anno scolastico.</div>
-                    {% endfor %}
-                </div>
-            </section>
+                        {% empty %}
+                            <div class="empty-state compact-empty-state">Nessun movimento bancario disponibile trovato. Verifica che i movimenti siano importati e non gia riconciliati.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
 
-            <section class="family-side-card rate-reconcile-card">
-                <div class="family-side-card-head">
-                    <h2>Movimenti candidati</h2>
-                </div>
-                <div class="rate-reconcile-movement-list">
-                    {% for candidato in candidati %}
-                        <label class="rate-reconcile-movement{% if forloop.first %} is-best{% endif %}">
-                            <input type="radio" name="movimento_pk" value="{{ candidato.movimento.pk }}" {% if forloop.first %}checked{% endif %}>
-                            <span class="rate-reconcile-movement-body">
-                                <span class="rate-reconcile-movement-head">
-                                    <strong>EUR {{ candidato.importo_disponibile|euro }}</strong>
-                                    <span>{{ candidato.score_percentuale }}%</span>
-                                </span>
-                                <span>
-                                    {{ candidato.movimento.data_contabile|it_date }} -
-                                    {% if candidato.movimento.controparte %}
-                                        {{ candidato.movimento.controparte }}
-                                    {% elif candidato.movimento.conto %}
-                                        {{ candidato.movimento.conto }}
-                                    {% else %}
-                                        Movimento bancario
-                                    {% endif %}
-                                </span>
-                                <small>{{ candidato.movimento.descrizione|default:"Nessuna descrizione" }}</small>
-                                <span class="rate-reconcile-reasons">
-                                    {% for motivo in candidato.motivazioni %}
-                                        <em>{{ motivo }}</em>
-                                    {% endfor %}
-                                </span>
-                            </span>
-                        </label>
-                    {% empty %}
-                        <div class="empty-state compact-empty-state">Nessun movimento bancario disponibile trovato. Verifica che i movimenti siano importati e non gia riconciliati.</div>
-                    {% endfor %}
-                </div>
-            </section>
-        </div>
-
-        <div class="rate-reconcile-sticky-shell">
-            <div class="family-card-sticky-actions rate-reconcile-actions">
-                <div class="family-card-sticky-context">
-                    <span class="family-card-sticky-kicker">Riconciliazione</span>
-                    <strong>Seleziona un movimento e distribuisci l'importo sulle rate interessate.</strong>
-                </div>
-                <div class="family-card-sticky-controls">
-                    <button type="submit" class="btn btn-save-soft btn-icon-text" {% if not candidati or not rate_rows %}disabled{% endif %}>
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                        <span class="btn-label">Salva riconciliazione</span>
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="{% if popup %}window.close(){% else %}window.history.back(){% endif %}">
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                        <span class="btn-label">Annulla</span>
-                    </button>
+            <div class="rate-reconcile-sticky-shell">
+                <div class="family-card-sticky-actions rate-reconcile-actions">
+                    <div class="family-card-sticky-context">
+                        <span class="family-card-sticky-kicker">Riconciliazione</span>
+                        <strong>Seleziona un movimento e distribuisci l'importo sulle rate interessate.</strong>
+                    </div>
+                    <div class="family-card-sticky-controls">
+                        <button type="submit" class="btn btn-save-soft btn-icon-text" {% if not candidati or not rate_rows %}disabled{% endif %}>
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                            <span class="btn-label">Salva riconciliazione</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-icon-text" onclick="{% if popup %}window.close(){% else %}window.history.back(){% endif %}">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 {% endblock %}

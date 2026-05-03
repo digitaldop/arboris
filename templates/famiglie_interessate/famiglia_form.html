@@ -33,30 +33,32 @@
                 </div>
             </div>
             <div class="page-head-actions family-page-actions">
-                {% if not popup %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-intent-return-list" onclick="window.close();">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </button>
+                {% else %}
                     <a href="{% url 'lista_famiglie_interessate' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                        <span class="btn-label">Elenco</span>
+                        <span class="btn-label">Indietro</span>
                     </a>
                 {% endif %}
                 {% if famiglia and can_manage_famiglie_interessate %}
-                    <a href="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
+                    <a href="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" class="btn btn-secondary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">Follow-up</span>
                     </a>
+                    <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-famiglia-interessata-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
                 {% endif %}
             </div>
         </div>
 
         {% if famiglia %}
             <section class="interested-summary-grid interested-detail-summary">
-                <article class="interested-summary-card">
-                    <span class="interested-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                    <div>
-                        <span class="interested-summary-label">Referenti</span>
-                        <strong>{{ referenti_formset.initial_form_count }}</strong>
-                    </div>
-                </article>
                 <article class="interested-summary-card">
                     <span class="interested-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
                     <div>
@@ -81,10 +83,16 @@
             </section>
         {% endif %}
 
-        <form method="post" id="famiglia-interessata-form" class="detail-form interested-form{% if has_form_errors %} has-form-errors{% endif %}" data-interested-family-form>
+        <form
+            method="post"
+            id="famiglia-interessata-form"
+            class="detail-form interested-form{% if famiglia and not has_form_errors %} is-view-mode{% else %} is-edit-mode{% endif %}{% if has_form_errors %} has-form-errors{% endif %}"
+            data-interested-family-form
+            data-start-in-edit-mode="{% if is_new or has_form_errors %}1{% else %}0{% endif %}"
+        >
             {% csrf_token %}
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
-            <fieldset {% if not can_manage_famiglie_interessate %}disabled{% endif %}>
+            <fieldset id="famiglia-interessata-lock-container" class="mode-lock-container" {% if not can_manage_famiglie_interessate %}disabled{% endif %}>
                 <section class="interested-editor-layout">
                     <div class="interested-editor-main">
                         <section class="interested-card interested-section">
@@ -185,57 +193,8 @@
                     </aside>
                 </section>
 
-                <section class="interested-two-column">
-                    <div class="interested-card interested-section">
-                        <header class="interested-card-head interested-card-head-actions">
-                            <span class="interested-card-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                            <div>
-                                <h2>Referenti</h2>
-                                <span>Persone da contattare</span>
-                            </div>
-                            {% if can_manage_famiglie_interessate %}
-                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text interested-add-inline-btn" data-formset-add="referenti">
-                                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                                    <span class="btn-label">Aggiungi referente</span>
-                                </button>
-                            {% endif %}
-                        </header>
-                        <div class="interested-card-body">
-                            {{ referenti_formset.management_form }}
-                            <div class="interested-inline-list" data-formset-list="referenti">
-                                {% for ref_form in referenti_formset.forms %}
-                                    <div class="interested-inline-row" data-formset-row="referenti">
-                                        {% for hidden in ref_form.hidden_fields %}{{ hidden }}{% endfor %}
-                                        <label><span>Nome</span>{{ ref_form.nome }}{{ ref_form.nome.errors }}</label>
-                                        <label><span>Relazione</span>{{ ref_form.relazione }}{{ ref_form.relazione.errors }}</label>
-                                        <label><span>Telefono</span>{{ ref_form.telefono }}{{ ref_form.telefono.errors }}</label>
-                                        <label><span>Email</span>{{ ref_form.email }}{{ ref_form.email.errors }}</label>
-                                        <label><span>Note</span>{{ ref_form.note }}{{ ref_form.note.errors }}</label>
-                                        <label class="interested-inline-check">{{ ref_form.principale }} <span>Principale</span></label>
-                                        {% if ref_form.instance.pk %}
-                                            <label class="interested-inline-check is-danger">{{ ref_form.DELETE }} <span>Elimina</span></label>
-                                        {% else %}
-                                            <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-                            <template data-formset-empty="referenti">
-                                <div class="interested-inline-row" data-formset-row="referenti">
-                                    {% for hidden in referenti_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
-                                    <label><span>Nome</span>{{ referenti_formset.empty_form.nome }}</label>
-                                    <label><span>Relazione</span>{{ referenti_formset.empty_form.relazione }}</label>
-                                    <label><span>Telefono</span>{{ referenti_formset.empty_form.telefono }}</label>
-                                    <label><span>Email</span>{{ referenti_formset.empty_form.email }}</label>
-                                    <label><span>Note</span>{{ referenti_formset.empty_form.note }}</label>
-                                    <label class="interested-inline-check">{{ referenti_formset.empty_form.principale }} <span>Principale</span></label>
-                                    <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <div class="interested-card interested-section">
+                <section class="interested-two-column interested-children-section">
+                    <div class="interested-card interested-section interested-card-wide">
                         <header class="interested-card-head interested-card-head-actions">
                             <span class="interested-card-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
                             <div>
@@ -243,7 +202,7 @@
                                 <span>Figli o minori per cui la famiglia chiede informazioni</span>
                             </div>
                             {% if can_manage_famiglie_interessate %}
-                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text interested-add-inline-btn" data-formset-add="minori">
+                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text interested-add-inline-btn mode-edit-only" data-formset-add="minori">
                                     <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                                     <span class="btn-label">Aggiungi bambino</span>
                                 </button>
@@ -253,18 +212,29 @@
                             {{ minori_formset.management_form }}
                             <div class="interested-inline-list" data-formset-list="minori">
                                 {% for minore_form in minori_formset.forms %}
-                                    <div class="interested-inline-row" data-formset-row="minori">
+                                    <div class="interested-inline-row{% if famiglia and not minore_form.instance.pk %} mode-edit-only{% endif %}" data-formset-row="minori">
                                         {% for hidden in minore_form.hidden_fields %}{{ hidden }}{% endfor %}
                                         <label><span>Nome</span>{{ minore_form.nome }}{{ minore_form.nome.errors }}</label>
                                         <label><span>Cognome</span>{{ minore_form.cognome }}{{ minore_form.cognome.errors }}</label>
                                         <label><span>Data nascita</span>{{ minore_form.data_nascita }}{{ minore_form.data_nascita.errors }}</label>
                                         <label><span>Eta indicativa</span>{{ minore_form.eta_indicativa }}{{ minore_form.eta_indicativa.errors }}</label>
-                                        <label><span>Classe / fascia</span>{{ minore_form.classe_eta_interesse }}{{ minore_form.classe_eta_interesse.errors }}</label>
+                                        <label class="interested-field">
+                                            <span>{{ minore_form.classe_interesse.label }}</span>
+                                            <div class="inline-related-field interested-class-related-field">
+                                                {{ minore_form.classe_interesse }}
+                                                <span class="inline-related-actions related-actions" aria-label="Azioni classe">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="classe" aria-label="Nuova classe" title="Nuova classe">+</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="classe" aria-label="Modifica classe" title="Modifica classe">&#9998;</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="classe" aria-label="Elimina classe" title="Elimina classe">&#10006;</button>
+                                                </span>
+                                            </div>
+                                            {{ minore_form.classe_interesse.errors }}
+                                        </label>
                                         <label><span>Note</span>{{ minore_form.note }}{{ minore_form.note.errors }}</label>
                                         {% if minore_form.instance.pk %}
-                                            <label class="interested-inline-check is-danger">{{ minore_form.DELETE }} <span>Elimina</span></label>
+                                            <label class="interested-inline-check is-danger mode-edit-only">{{ minore_form.DELETE }} <span>Elimina</span></label>
                                         {% else %}
-                                            <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                            <button type="button" class="interested-inline-remove mode-edit-only" data-formset-remove>Rimuovi riga</button>
                                         {% endif %}
                                     </div>
                                 {% endfor %}
@@ -276,9 +246,19 @@
                                     <label><span>Cognome</span>{{ minori_formset.empty_form.cognome }}</label>
                                     <label><span>Data nascita</span>{{ minori_formset.empty_form.data_nascita }}</label>
                                     <label><span>Eta indicativa</span>{{ minori_formset.empty_form.eta_indicativa }}</label>
-                                    <label><span>Classe / fascia</span>{{ minori_formset.empty_form.classe_eta_interesse }}</label>
+                                    <label class="interested-field">
+                                        <span>{{ minori_formset.empty_form.classe_interesse.label }}</span>
+                                        <div class="inline-related-field interested-class-related-field">
+                                            {{ minori_formset.empty_form.classe_interesse }}
+                                            <span class="inline-related-actions related-actions" aria-label="Azioni classe">
+                                                <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="classe" aria-label="Nuova classe" title="Nuova classe">+</button>
+                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="classe" aria-label="Modifica classe" title="Modifica classe">&#9998;</button>
+                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="classe" aria-label="Elimina classe" title="Elimina classe">&#10006;</button>
+                                            </span>
+                                        </div>
+                                    </label>
                                     <label><span>Note</span>{{ minori_formset.empty_form.note }}</label>
-                                    <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                    <button type="button" class="interested-inline-remove mode-edit-only" data-formset-remove>Rimuovi riga</button>
                                 </div>
                             </template>
                         </div>
@@ -287,7 +267,7 @@
             </fieldset>
 
             {% if can_manage_famiglie_interessate %}
-                <div class="form-actions sticky-form-actions interested-sticky-actions">
+                <div class="form-actions sticky-form-actions interested-sticky-actions mode-edit-only">
                     {% if popup %}
                         <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close();">
                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
@@ -354,5 +334,7 @@
             </section>
         {% endif %}
     </div>
-    <script src="{% static 'js/pages/famiglie-interessate-form.js' %}?v=2"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/famiglie-interessate-form.js' %}?v=3"></script>
 {% endblock %}

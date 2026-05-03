@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static currency %}
 
-{% block title %}Elimina documenti fornitori - Arboris School Management{% endblock %}
+{% block title %}Elimina fatture fornitori - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -9,7 +9,7 @@
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_documenti_fornitori' %}">Documenti fornitori</a>
+        <a href="{% url 'lista_documenti_fornitori' %}">Fatture fornitori</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>Elimina selezionati</span>
     </div>
@@ -19,7 +19,7 @@
     <div class="page-head family-page-head anagrafica-list-head finance-page-head">
         <div class="family-page-title-block">
             <div class="family-page-title-line">
-                <h1 class="page-title">Elimina documenti fornitori</h1>
+                <h1 class="page-title">Elimina fatture fornitori</h1>
                 <span class="family-status-pill is-danger">
                     <span class="family-status-dot" aria-hidden="true"></span>
                     Conferma richiesta
@@ -27,7 +27,7 @@
             </div>
             <div class="family-page-address">
                 <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
-                {{ documenti|length }} documenti selezionati, totale {{ totale_documenti|euro }} &euro;
+                {{ documenti|length }} fatture selezionate, totale {{ totale_documenti|euro }} &euro;
             </div>
         </div>
     </div>
@@ -37,7 +37,7 @@
         <div class="finance-guide-copy">
             <div class="finance-guide-title">Eliminazione multipla</div>
             <p>
-                Stai per eliminare definitivamente i documenti selezionati. Verranno eliminate anche le scadenze collegate
+                Stai per eliminare definitivamente le fatture selezionate. Verranno eliminate anche le scadenze collegate
                 e gli eventuali pagamenti registrati su quelle scadenze.
             </p>
             <p class="help-text">
@@ -51,7 +51,7 @@
             <table class="list-table anagrafica-list-table finance-modern-table">
                 <thead>
                     <tr>
-                        <th>Documento</th>
+                        <th>Fattura</th>
                         <th>Fornitore</th>
                         <th>Data</th>
                         <th class="column-right">Totale</th>
@@ -82,7 +82,7 @@
         {% endfor %}
         <button type="submit" class="btn btn-danger btn-icon-text">
             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-            <span class="btn-label">Elimina {{ documenti|length }} documenti</span>
+            <span class="btn-label">Elimina {{ documenti|length }} fatture</span>
         </button>
         <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
