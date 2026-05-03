@@ -67,6 +67,7 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    EsitoSincronizzazione,
     FattureInCloudConnessione,
     FattureInCloudSyncLog,
     FonteSaldo,
@@ -981,13 +982,17 @@ def sincronizza_fatture_in_cloud_view(request, pk):
         return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
     try:
         stats = sincronizza_fatture_in_cloud(connessione, utente=request.user)
-        messages.success(
-            request,
+        message = (
             f"Sincronizzazione completata: {stats['creati']} documenti nuovi, "
             f"{stats['aggiornati']} documenti aggiornati. "
             f"Fornitori: {stats.get('fornitori_creati', 0)} nuovi, "
-            f"{stats.get('fornitori_aggiornati', 0)} aggiornati.",
+            f"{stats.get('fornitori_aggiornati', 0)} aggiornati."
         )
+        if stats.get("esito") == EsitoSincronizzazione.PARZIALE:
+            detail = " ".join(stats.get("messaggi") or [])
+            messages.warning(request, f"{message} Alcuni elementi non sono stati completati. {detail}"[:4000])
+        else:
+            messages.success(request, message)
     except FattureInCloudError as exc:
         messages.error(request, f"Sincronizzazione fallita: {exc}")
     return redirect("modifica_fatture_in_cloud", pk=connessione.pk)

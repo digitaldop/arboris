@@ -22,6 +22,7 @@ from .models import (
     CondizioneRegolaCategorizzazione,
     ContoBancario,
     DocumentoFornitore,
+    EsitoSincronizzazione,
     FattureInCloudConnessione,
     Fornitore,
     FonteSaldo,
@@ -48,7 +49,11 @@ from .models import (
 def crea_categoria_spesa_test(nome, **kwargs):
     kwargs.setdefault("tipo", TipoCategoriaFinanziaria.SPESA)
     return CategoriaFinanziaria.objects.create(nome=nome, **kwargs)
+
+
 from .fatture_in_cloud import (
+    FattureInCloudClient,
+    FattureInCloudError,
     authorization_url,
     has_oauth_credentials,
     importa_documento_fatture_in_cloud,
@@ -915,6 +920,75 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         documento = DocumentoFornitore.objects.get(external_id="991")
         self.assertEqual(documento.fornitore.denominazione, "Detailed Supplier Srl")
         self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 7, 1))
+
+    @override_settings(
+        FATTURE_IN_CLOUD_API_CONNECT_TIMEOUT_SECONDS=2,
+        FATTURE_IN_CLOUD_API_READ_TIMEOUT_SECONDS=6,
+    )
+    @patch("gestione_finanziaria.fatture_in_cloud.requests.request")
+    def test_fatture_in_cloud_client_usa_timeout_api_breve(self, mock_request):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        response = Mock(status_code=200, content=b"{}", text="{}")
+        response.json.return_value = {}
+        mock_request.return_value = response
+        client = FattureInCloudClient(connessione)
+        client._headers = Mock(return_value={})
+
+        client.request("GET", "/test")
+
+        self.assertEqual(mock_request.call_args.kwargs["timeout"], (2.0, 6.0))
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_restituisce_parziale_su_errore_dettaglio(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_registrati=False,
+            sincronizza_documenti_da_registrare=True,
+        )
+        client = Mock()
+
+        def list_pending(doc_type, *, page=1, per_page=50):
+            if doc_type == "expense":
+                return {"data": [{"id": 992}], "pagination": {"current_page": 1, "last_page": 1}}
+            return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
+
+        client.list_pending_received_documents.side_effect = list_pending
+        client.get_pending_received_document.side_effect = FattureInCloudError("Timeout Fatture in Cloud")
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["esito"], EsitoSincronizzazione.PARZIALE)
+        self.assertEqual(stats["creati"], 0)
+        self.assertIn("documento 992", stats["messaggi"][0])
+        connessione.refresh_from_db()
+        self.assertEqual(connessione.ultimo_esito, EsitoSincronizzazione.PARZIALE)
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    @patch("gestione_finanziaria.fatture_in_cloud.time.monotonic")
+    def test_sincronizza_fatture_in_cloud_si_interrompe_prima_del_timeout_worker(
+        self,
+        mock_monotonic,
+        mock_client_class,
+    ):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_registrati=True,
+            sincronizza_documenti_da_registrare=True,
+        )
+        mock_monotonic.side_effect = [0, 30, 30]
+        mock_client_class.return_value = Mock()
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user, max_seconds=10)
+
+        self.assertEqual(stats["esito"], EsitoSincronizzazione.PARZIALE)
+        self.assertTrue(stats["interrotta_per_tempo"])
+        self.assertIn("Tempo massimo", stats["messaggi"][0])
+        mock_client_class.return_value.list_received_documents.assert_not_called()
+        connessione.refresh_from_db()
+        self.assertEqual(connessione.ultimo_esito, EsitoSincronizzazione.PARZIALE)
 
     @override_settings(
         FATTURE_IN_CLOUD_OAUTH_CLIENT_ID="render-client",

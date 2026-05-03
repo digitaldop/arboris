@@ -38,10 +38,42 @@ TOKEN_URL = "https://api-v2.fattureincloud.it/oauth/token"
 RECEIVED_DOCUMENT_TYPES = ("expense", "passive_credit_note")
 PENDING_DOCUMENT_TYPES = ("expense", "passive_credit_note")
 DEFAULT_SCOPES = "received_documents:r"
+DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
+DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
+DEFAULT_SYNC_MAX_SECONDS = 18.0
 
 
 class FattureInCloudError(Exception):
     pass
+
+
+class FattureInCloudSyncBudgetExceeded(FattureInCloudError):
+    pass
+
+
+def _positive_float_setting(name, default):
+    value = getattr(settings, name, default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _api_timeout():
+    connect_timeout = _positive_float_setting(
+        "FATTURE_IN_CLOUD_API_CONNECT_TIMEOUT_SECONDS",
+        DEFAULT_API_CONNECT_TIMEOUT_SECONDS,
+    )
+    read_timeout = _positive_float_setting(
+        "FATTURE_IN_CLOUD_API_READ_TIMEOUT_SECONDS",
+        DEFAULT_API_READ_TIMEOUT_SECONDS,
+    )
+    return (max(connect_timeout, 0.1), max(read_timeout, 0.1))
+
+
+def _sync_max_seconds():
+    value = _positive_float_setting("FATTURE_IN_CLOUD_SYNC_MAX_SECONDS", DEFAULT_SYNC_MAX_SECONDS)
+    return value if value > 0 else None
 
 
 def oauth_env_configured():
@@ -696,7 +728,7 @@ class FattureInCloudClient:
                 params=params,
                 json=json,
                 headers=self._headers(),
-                timeout=30,
+                timeout=_api_timeout(),
             )
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Connessione API Fatture in Cloud fallita: {exc}") from exc
@@ -720,7 +752,7 @@ class FattureInCloudClient:
         if self.client_secret:
             payload["client_secret"] = self.client_secret
         try:
-            response = requests.post(TOKEN_URL, json=payload, timeout=30)
+            response = requests.post(TOKEN_URL, json=payload, timeout=_api_timeout())
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Refresh token fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
         if response.status_code >= 400:
@@ -738,7 +770,7 @@ class FattureInCloudClient:
             "code": code,
         }
         try:
-            response = requests.post(TOKEN_URL, json=payload, timeout=30)
+            response = requests.post(TOKEN_URL, json=payload, timeout=_api_timeout())
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Scambio code fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
         if response.status_code >= 400:
@@ -851,8 +883,32 @@ def _document_detail_from_summary(client, summary, *, pending):
     return {**summary, **detail}
 
 
-def sincronizza_fatture_in_cloud(connessione, *, utente=None):
+def _check_sync_budget(start, max_seconds):
+    if max_seconds and time.monotonic() - start >= max_seconds:
+        raise FattureInCloudSyncBudgetExceeded(
+            "Tempo massimo della sincronizzazione raggiunto prima del completamento. "
+            "Alcuni documenti potrebbero essere gia stati importati: ripeti la sincronizzazione per continuare."
+        )
+
+
+def _add_import_result_to_stats(stats, result):
+    stats["creati"] += 1 if result["created"] else 0
+    stats["aggiornati"] += 1 if result["updated"] else 0
+    stats["scadenze"] += result["scadenze_create"]
+    stats["notifiche"] += 1 if result["notifica_created"] else 0
+    stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
+    stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
+
+
+def _sync_summary_label(doc_type, pending):
+    prefix = "Da registrare" if pending else "Registrati"
+    return f"{prefix} {doc_type}"
+
+
+def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
     start = time.monotonic()
+    if max_seconds is None:
+        max_seconds = _sync_max_seconds()
     stats = {
         "creati": 0,
         "aggiornati": 0,
@@ -861,6 +917,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
         "fornitori_creati": 0,
         "fornitori_aggiornati": 0,
         "messaggi": [],
+        "interrotta_per_tempo": False,
     }
     esito = EsitoSincronizzazione.OK
     client = FattureInCloudClient(connessione)
@@ -871,32 +928,58 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
 
         if connessione.sincronizza_documenti_registrati:
             for doc_type in RECEIVED_DOCUMENT_TYPES:
-                for summary in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
-                    document = _document_detail_from_summary(client, summary, pending=False)
-                    result = importa_documento_fatture_in_cloud(connessione, document, pending=False, utente=utente)
-                    stats["creati"] += 1 if result["created"] else 0
-                    stats["aggiornati"] += 1 if result["updated"] else 0
-                    stats["scadenze"] += result["scadenze_create"]
-                    stats["notifiche"] += 1 if result["notifica_created"] else 0
-                    stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
-                    stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
+                label = _sync_summary_label(doc_type, pending=False)
+                try:
+                    _check_sync_budget(start, max_seconds)
+                    for summary in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
+                        _check_sync_budget(start, max_seconds)
+                        try:
+                            document = _document_detail_from_summary(client, summary, pending=False)
+                            result = importa_documento_fatture_in_cloud(
+                                connessione,
+                                document,
+                                pending=False,
+                                utente=utente,
+                            )
+                            _add_import_result_to_stats(stats, result)
+                        except FattureInCloudSyncBudgetExceeded:
+                            raise
+                        except (FattureInCloudError, ValidationError) as exc:
+                            esito = EsitoSincronizzazione.PARZIALE
+                            stats["messaggi"].append(f"{label}: documento {summary.get('id') or '-'}: {exc}")
+                except FattureInCloudSyncBudgetExceeded:
+                    raise
+                except FattureInCloudError as exc:
+                    esito = EsitoSincronizzazione.PARZIALE
+                    stats["messaggi"].append(f"{label}: {exc}")
 
         if connessione.sincronizza_documenti_da_registrare:
             for doc_type in PENDING_DOCUMENT_TYPES:
+                label = _sync_summary_label(doc_type, pending=True)
                 try:
+                    _check_sync_budget(start, max_seconds)
                     documents = _iter_paginated(lambda page: client.list_pending_received_documents(doc_type, page=page))
                     for summary in documents:
-                        document = _document_detail_from_summary(client, summary, pending=True)
-                        result = importa_documento_fatture_in_cloud(connessione, document, pending=True, utente=utente)
-                        stats["creati"] += 1 if result["created"] else 0
-                        stats["aggiornati"] += 1 if result["updated"] else 0
-                        stats["scadenze"] += result["scadenze_create"]
-                        stats["notifiche"] += 1 if result["notifica_created"] else 0
-                        stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
-                        stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
+                        _check_sync_budget(start, max_seconds)
+                        try:
+                            document = _document_detail_from_summary(client, summary, pending=True)
+                            result = importa_documento_fatture_in_cloud(
+                                connessione,
+                                document,
+                                pending=True,
+                                utente=utente,
+                            )
+                            _add_import_result_to_stats(stats, result)
+                        except FattureInCloudSyncBudgetExceeded:
+                            raise
+                        except (FattureInCloudError, ValidationError) as exc:
+                            esito = EsitoSincronizzazione.PARZIALE
+                            stats["messaggi"].append(f"{label}: documento {summary.get('id') or '-'}: {exc}")
+                except FattureInCloudSyncBudgetExceeded:
+                    raise
                 except FattureInCloudError as exc:
                     esito = EsitoSincronizzazione.PARZIALE
-                    stats["messaggi"].append(f"Pending {doc_type}: {exc}")
+                    stats["messaggi"].append(f"{label}: {exc}")
 
         if not stats["messaggi"]:
             stats["messaggi"].append(
@@ -904,6 +987,10 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
                 f"Fornitori: {stats['fornitori_creati']} creati, "
                 f"{stats['fornitori_aggiornati']} aggiornati."
             )
+    except FattureInCloudSyncBudgetExceeded as exc:
+        esito = EsitoSincronizzazione.PARZIALE
+        stats["interrotta_per_tempo"] = True
+        stats["messaggi"].append(str(exc))
     except Exception as exc:
         esito = EsitoSincronizzazione.ERRORE
         stats["messaggi"].append(str(exc))
@@ -948,6 +1035,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None):
             durata_millisecondi=durata_ms,
             messaggio=messaggio,
         )
+    stats["esito"] = esito
     if esito == EsitoSincronizzazione.ERRORE:
         raise FattureInCloudError(stats["messaggi"][-1])
     return stats
