@@ -87,6 +87,18 @@ class EconomiaCurrencyWidgetTests(TestCase):
         self.assertIn("currency-field-compact", retta_field.widget.attrs["class"])
         self.assertIn("currency-field-compact", preiscrizione_field.widget.attrs["class"])
 
+    def test_metodo_pagamento_popup_uses_new_card_layout(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+
+        response = self.client.get(reverse("crea_metodo_pagamento"), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "method-payment-shell")
+        self.assertContains(response, "calendar-event-form-card")
+        self.assertContains(response, "Dati metodo")
+        self.assertNotContains(response, "form-table")
+
 
 class ScambioRettaFormFamilySyncTests(TestCase):
     def setUp(self):
@@ -390,6 +402,53 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(movimento.rata_iscrizione, rata)
         self.assertTrue(rata.pagata)
         self.assertEqual(rata.importo_pagato, rata.importo_finale)
+
+    def test_batch_reconciliation_splits_cumulative_family_payment(self):
+        sorella = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Marta",
+            cognome="Bianchi",
+        )
+        iscrizione_sorella = Iscrizione.objects.create(
+            studente=sorella,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+        )
+        self.iscrizione.sync_rate_schedule()
+        iscrizione_sorella.sync_rate_schedule()
+        rata_luca = self.iscrizione.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+        )
+        rata_marta = iscrizione_sorella.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=rata_luca.importo_finale + rata_marta.importo_finale,
+            descrizione="Bonifico rette settembre Luca e Marta Bianchi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        risultato = riconcilia_pagamenti_rate_anno_scolastico(self.anno)
+
+        movimento.refresh_from_db()
+        rata_luca.refresh_from_db()
+        rata_marta.refresh_from_db()
+        self.assertEqual(risultato["stats"]["riconciliati"], 1)
+        self.assertEqual(risultato["stats"]["riconciliati_cumulativi"], 1)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertIsNone(movimento.rata_iscrizione_id)
+        self.assertTrue(rata_luca.pagata)
+        self.assertTrue(rata_marta.pagata)
+        self.assertEqual(rata_luca.importo_pagato, rata_luca.importo_finale)
+        self.assertEqual(rata_marta.importo_pagato, rata_marta.importo_finale)
+        self.assertEqual(movimento.riconciliazioni_rate.count(), 2)
 
     def test_single_enrollment_reconciliation_links_only_that_enrollment(self):
         self.iscrizione.sync_rate_schedule()

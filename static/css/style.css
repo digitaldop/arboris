@@ -18635,7 +18635,35 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 }
 
 .rate-reconcile-card .family-side-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 0;
+}
+
+.rate-reconcile-help-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #cfe0ea;
+    border-radius: 999px;
+    background: #eef6fa;
+    color: var(--primary-dark);
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.rate-reconcile-help-trigger:hover,
+.rate-reconcile-help-trigger:focus-visible {
+    border-color: #9fc7d8;
+    background: #e2f1f7;
+    outline: 0;
 }
 
 .rate-reconcile-rate-list,
@@ -18684,6 +18712,34 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     color: #29415b;
     font-size: 12px;
     font-weight: 800;
+}
+
+.rate-reconcile-multi-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid #dce8f0;
+    border-radius: 8px;
+    background: #f8fbfd;
+}
+
+.rate-reconcile-multi-toggle {
+    min-height: 24px;
+}
+
+.rate-reconcile-extra-rates {
+    display: grid;
+    gap: 10px;
+}
+
+.rate-reconcile-extra-rates[hidden] {
+    display: none !important;
+}
+
+.rate-reconcile-extra-rate {
+    background: #ffffff;
 }
 
 .rate-reconcile-movement {
@@ -22049,6 +22105,64 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     display: none;
 }
 
+.method-payment-shell {
+    --calendar-editor-primary: var(--primary);
+    --calendar-editor-primary-dark: var(--primary-dark);
+    display: grid;
+    gap: 18px;
+    max-width: 720px;
+    margin: 0 auto;
+    color: #172131;
+}
+
+.popup-page .method-payment-shell.is-popup {
+    max-width: 680px;
+    padding: 14px 18px 8px;
+}
+
+.method-payment-hero {
+    align-items: start;
+}
+
+.method-payment-hero-icon {
+    background: #e8f2f7;
+    color: var(--calendar-editor-primary);
+}
+
+.method-payment-form {
+    display: grid;
+    gap: 16px;
+}
+
+.method-payment-card {
+    box-shadow: 0 18px 38px rgba(19, 42, 63, 0.08);
+}
+
+.method-payment-fields {
+    gap: 16px;
+}
+
+.method-payment-note-row {
+    align-items: start;
+}
+
+.method-payment-note-row textarea {
+    min-height: 104px;
+}
+
+.method-payment-help {
+    margin-top: 18px;
+}
+
+.method-payment-actions {
+    justify-content: flex-end;
+    padding: 14px 16px;
+    border: 1px solid #d5e5ee;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 -8px 24px rgba(41, 65, 91, 0.08);
+}
+
 @media (max-width: 900px) {
     .rate-detail-summary-grid,
     .popup-page .rate-detail-shell.is-popup .rate-detail-summary-grid,
@@ -22085,7 +22199,8 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     }
 
     .rate-payment-hero-actions,
-    .rate-payment-actions {
+    .rate-payment-actions,
+    .method-payment-actions {
         justify-content: flex-start;
     }
 

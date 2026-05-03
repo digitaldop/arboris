@@ -87,27 +87,45 @@ def _riconcilia_movimenti_con_rate(
     utente=None,
     punteggio_minimo=PUNTEGGIO_MINIMO_RICONCILIAZIONE_AUTOMATICA,
 ):
-    from gestione_finanziaria.services import riconcilia_movimento_con_rata, trova_rate_candidate
+    from gestione_finanziaria.services import (
+        riconcilia_movimento_con_rata,
+        riconcilia_movimento_con_rate,
+        trova_rate_candidate,
+        trova_rate_cumulative_candidate,
+    )
 
     stats = Counter()
     dettagli = []
 
     for movimento in movimenti:
         stats["movimenti_esaminati"] += 1
+        if movimento.riconciliazioni_rate.exists():
+            stats["gia_parzialmente_riconciliati"] += 1
+            continue
+
         candidati = [
             candidato
             for candidato in trova_rate_candidate(movimento, limite=10)
             if include_rata(candidato.rata)
             and not candidato.rata.pagata
             and not candidato.rata.movimenti_finanziari.exists()
+            and not candidato.rata.riconciliazioni_movimenti.exists()
         ]
+        candidati_cumulativi = trova_rate_cumulative_candidate(
+            movimento,
+            limite=5,
+            include_rata=include_rata,
+        )
 
-        if not candidati:
+        opzioni = [("singola", candidato.score, candidato) for candidato in candidati]
+        opzioni.extend(("cumulativa", candidato.score, candidato) for candidato in candidati_cumulativi)
+
+        if not opzioni:
             stats["senza_candidati"] += 1
             continue
 
-        top_score = candidati[0].score
-        migliori = [candidato for candidato in candidati if candidato.score == top_score]
+        top_score = max(score for _tipo, score, _candidato in opzioni)
+        migliori = [(tipo, candidato) for tipo, score, candidato in opzioni if score == top_score]
 
         if top_score < punteggio_minimo:
             stats["score_basso"] += 1
@@ -117,21 +135,34 @@ def _riconcilia_movimenti_con_rate(
             stats["ambigui"] += 1
             continue
 
-        candidato = migliori[0]
-        riconcilia_movimento_con_rata(
-            movimento,
-            candidato.rata,
-            utente=utente,
-            marca_rata_pagata=True,
-        )
+        tipo, candidato = migliori[0]
+        if tipo == "cumulativa":
+            riconcilia_movimento_con_rate(movimento, candidato.allocazioni, utente=utente)
+            stats["riconciliati_cumulativi"] += 1
+            dettagli.append(
+                {
+                    "movimento_id": movimento.pk,
+                    "rate_ids": [rata.pk for rata, _importo in candidato.allocazioni],
+                    "score": candidato.score,
+                    "tipo": "cumulativa",
+                }
+            )
+        else:
+            riconcilia_movimento_con_rata(
+                movimento,
+                candidato.rata,
+                utente=utente,
+                marca_rata_pagata=True,
+            )
+            dettagli.append(
+                {
+                    "movimento_id": movimento.pk,
+                    "rata_id": candidato.rata.pk,
+                    "score": candidato.score,
+                    "tipo": "singola",
+                }
+            )
         stats["riconciliati"] += 1
-        dettagli.append(
-            {
-                "movimento_id": movimento.pk,
-                "rata_id": candidato.rata.pk,
-                "score": candidato.score,
-            }
-        )
 
     return {
         "stats": dict(stats),
@@ -186,6 +217,7 @@ def build_riconciliazione_batch_feedback(stats):
     return (
         f"{stats.get('riconciliati', 0)} movimento/i riconciliati su "
         f"{stats.get('movimenti_esaminati', 0)} esaminati. "
+        f"{stats.get('riconciliati_cumulativi', 0)} cumulativi, "
         f"{stats.get('ambigui', 0)} ambigui, "
         f"{stats.get('score_basso', 0)} con affidabilita bassa, "
         f"{stats.get('senza_candidati', 0)} senza candidati."

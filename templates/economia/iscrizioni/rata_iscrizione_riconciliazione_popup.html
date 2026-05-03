@@ -38,42 +38,102 @@
             <div class="rate-reconcile-layout">
                 <section class="family-side-card rate-reconcile-card">
                     <div class="family-side-card-head">
-                        <h2>Rate da coprire</h2>
+                        <h2>Rata da riconciliare</h2>
+                        <button
+                            type="button"
+                            class="rate-reconcile-help-trigger"
+                            data-floating-text="Di default Arboris riconcilia solo la rata da cui sei partito. L'importo resta modificabile per registrare pagamenti parziali o importi effettivamente diversi dal residuo."
+                            aria-label="Aiuto rata da riconciliare"
+                        >?</button>
                     </div>
                     <div class="rate-reconcile-rate-list">
                         {% for row in rate_rows %}
-                            <article class="rate-reconcile-rate{% if row.is_selected %} is-selected{% endif %}">
-                                <div>
-                                    <strong>{{ row.studente.cognome }} {{ row.studente.nome }}</strong>
-                                    <span>{{ row.rata.display_label }}{% if row.rata.data_scadenza %} - scadenza {{ row.rata.data_scadenza|it_date }}{% endif %}</span>
-                                    <small>Residuo EUR {{ row.residuo|euro }}</small>
-                                </div>
-                                <label>
-                                    <span>Importo</span>
-                                    <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                                        <input
-                                            type="text"
-                                            name="importo_rata_{{ row.rata.pk }}"
-                                            value="{{ row.importo_iniziale|euro }}"
-                                            class="currency-field currency-field-suffix currency-field-compact"
-                                            inputmode="decimal"
-                                            autocomplete="off"
-                                            data-currency="EUR"
-                                            data-currency-display="suffix"
-                                        >
-                                        <span class="currency-suffix">EUR</span>
+                            {% if row.is_selected %}
+                                <article class="rate-reconcile-rate is-selected">
+                                    <div>
+                                        <strong>{{ row.studente.cognome }} {{ row.studente.nome }}</strong>
+                                        <span>{{ row.rata.display_label }}{% if row.rata.data_scadenza %} - scadenza {{ row.rata.data_scadenza|it_date }}{% endif %}</span>
+                                        <small>Residuo EUR {{ row.residuo|euro }}</small>
                                     </div>
-                                </label>
-                            </article>
+                                    <label data-floating-text="Modifica questo importo solo se il movimento copre una parte della rata o se l'importo effettivamente pagato e diverso dal residuo.">
+                                        <span>Importo da riconciliare</span>
+                                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                            <input
+                                                type="text"
+                                                name="importo_rata_{{ row.rata.pk }}"
+                                                value="{{ row.importo_iniziale|euro }}"
+                                                class="currency-field currency-field-suffix currency-field-compact"
+                                                inputmode="decimal"
+                                                autocomplete="off"
+                                                data-currency="EUR"
+                                                data-currency-display="suffix"
+                                            >
+                                            <span class="currency-suffix">EUR</span>
+                                        </div>
+                                    </label>
+                                </article>
+                            {% endif %}
                         {% empty %}
                             <div class="empty-state compact-empty-state">Non ci sono rate aperte da riconciliare per questo anno scolastico.</div>
                         {% endfor %}
+
+                        {% if altre_rate_count %}
+                            <div class="rate-reconcile-multi-control">
+                                <label class="calendar-event-check-field rate-reconcile-multi-toggle" for="rate-reconcile-multi-toggle">
+                                    <input type="checkbox" id="rate-reconcile-multi-toggle" data-rate-reconcile-multi-toggle>
+                                    <span>Distribuisci su più rate aperte</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    class="rate-reconcile-help-trigger"
+                                    data-floating-text="Attiva questa opzione solo quando un unico movimento bancario copre piu rate della stessa famiglia, ad esempio due mensilita o rate di piu figli."
+                                    aria-label="Aiuto distribuzione su piu rate"
+                                >?</button>
+                            </div>
+                            <div class="rate-reconcile-extra-rates" data-rate-reconcile-extra-rates hidden>
+                                {% for row in rate_rows %}
+                                    {% if not row.is_selected %}
+                                        <article class="rate-reconcile-rate rate-reconcile-extra-rate">
+                                            <div>
+                                                <strong>{{ row.studente.cognome }} {{ row.studente.nome }}</strong>
+                                                <span>{{ row.rata.display_label }}{% if row.rata.data_scadenza %} - scadenza {{ row.rata.data_scadenza|it_date }}{% endif %}</span>
+                                                <small>Residuo EUR {{ row.residuo|euro }}</small>
+                                            </div>
+                                            <label data-floating-text="Lascia 0,00 se il movimento non deve coprire questa rata. Inserisci un importo solo per distribuire parte del pagamento anche qui.">
+                                                <span>Quota su questa rata</span>
+                                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                                    <input
+                                                        type="text"
+                                                        name="importo_rata_{{ row.rata.pk }}"
+                                                        value="{{ row.importo_iniziale|euro }}"
+                                                        class="currency-field currency-field-suffix currency-field-compact"
+                                                        inputmode="decimal"
+                                                        autocomplete="off"
+                                                        data-currency="EUR"
+                                                        data-currency-display="suffix"
+                                                        data-rate-reconcile-extra-input
+                                                        disabled
+                                                    >
+                                                    <span class="currency-suffix">EUR</span>
+                                                </div>
+                                            </label>
+                                        </article>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 </section>
 
                 <section class="family-side-card rate-reconcile-card">
                     <div class="family-side-card-head">
                         <h2>Movimenti candidati</h2>
+                        <button
+                            type="button"
+                            class="rate-reconcile-help-trigger"
+                            data-floating-text="Arboris propone movimenti bancari disponibili. La percentuale indica quanto il movimento sembra compatibile con rata, famiglia e importo residuo."
+                            aria-label="Aiuto movimenti candidati"
+                        >?</button>
                     </div>
                     <div class="rate-reconcile-movement-list">
                         {% for candidato in candidati %}
@@ -129,4 +189,30 @@
             </div>
         </form>
     </div>
+    <script>
+        (function () {
+            var toggle = document.querySelector("[data-rate-reconcile-multi-toggle]");
+            var extraRates = document.querySelector("[data-rate-reconcile-extra-rates]");
+            if (!toggle || !extraRates) {
+                return;
+            }
+
+            var inputs = Array.prototype.slice.call(extraRates.querySelectorAll("[data-rate-reconcile-extra-input]"));
+
+            function syncExtraRates() {
+                var enabled = toggle.checked;
+                extraRates.hidden = !enabled;
+                inputs.forEach(function (input) {
+                    input.disabled = !enabled;
+                    if (!enabled) {
+                        input.value = "0,00";
+                        input.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                });
+            }
+
+            toggle.addEventListener("change", syncExtraRates);
+            syncExtraRates();
+        })();
+    </script>
 {% endblock %}

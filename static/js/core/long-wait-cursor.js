@@ -79,6 +79,15 @@
         }
     }
 
+    function resetFormWait() {
+        if (formTimer) {
+            clearTimeout(formTimer);
+            formTimer = null;
+        }
+        formArmed = false;
+        updateVisual();
+    }
+
     function resetAll() {
         if (formTimer) {
             clearTimeout(formTimer);
@@ -249,7 +258,7 @@
 
     document.addEventListener(
         "submit",
-        function () {
+        function (event) {
             if (formTimer) {
                 clearTimeout(formTimer);
             }
@@ -260,6 +269,12 @@
                 formArmed = true;
                 updateVisual();
             }, DELAY_MS);
+
+            setTimeout(function () {
+                if (event.defaultPrevented) {
+                    resetFormWait();
+                }
+            }, 0);
         },
         true
     );

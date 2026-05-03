@@ -1,32 +1,94 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}{% if metodo %}Metodo di pagamento {{ metodo }}{% else %}Nuovo metodo di pagamento{% endif %} - Arboris School Management{% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if metodo %}Metodo di pagamento {{ metodo }}{% else %}Nuovo metodo di pagamento{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if popup %}
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
-            {% endif %}
-        </div>
-    </div>
-
-    <form method="post" class="detail-form">
-        {% csrf_token %}
-        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
-        <div class="content-card">
-            <table class="form-table">
-                <tr><th>{{ form.metodo_pagamento.label_tag }}</th><td>{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</td></tr>
-                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                {% if popup %}
-                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
-                {% endif %}
+    <div class="method-payment-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero method-payment-hero">
+            <span class="calendar-event-hero-icon method-payment-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">{% if metodo %}Metodo di pagamento{% else %}Nuovo metodo di pagamento{% endif %}</h1>
+                <p>{% if metodo %}Aggiorna disponibilita e note del metodo selezionato.{% else %}Aggiungi un metodo utilizzabile nella conferma pagamento delle rette.{% endif %}</p>
             </div>
         </div>
-    </form>
+
+        <form method="post" class="calendar-event-form method-payment-form detail-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+
+            {% if form.non_field_errors %}
+                <div class="settings-warning-box calendar-event-form-errors">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <section class="calendar-event-form-card method-payment-card">
+                <div class="calendar-event-form-title">
+                    <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                    <span>Dati metodo</span>
+                </div>
+
+                <div class="calendar-event-form-grid method-payment-fields">
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.metodo_pagamento.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.metodo_pagamento.label }}</span>
+                            {{ form.metodo_pagamento }}
+                            {{ form.metodo_pagamento.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                        <div class="calendar-event-field">
+                            <span class="calendar-event-field-label">{{ form.attivo.label }}</span>
+                            <label class="calendar-event-check-field" for="{{ form.attivo.id_for_label }}">
+                                {{ form.attivo }}
+                                <span>Disponibile nelle conferme pagamento</span>
+                            </label>
+                            {{ form.attivo.errors }}
+                        </div>
+                    </div>
+
+                    <div class="calendar-event-form-row method-payment-note-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.note.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.note.label }}</span>
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </label>
+                    </div>
+                </div>
+
+                <div class="calendar-event-suggestion method-payment-help">
+                    <span class="calendar-event-suggestion-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                    <div>
+                        <strong>Metodo di pagamento</strong>
+                        <span>I metodi attivi vengono proposti nella conferma pagamento delle rette e restano disponibili per i prossimi pagamenti.</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="calendar-event-actions method-payment-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva metodo</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'home' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 {% endblock %}

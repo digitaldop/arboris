@@ -97,11 +97,10 @@
                                                     {% if month.altri_sgravi %}
                                                         <div class="student-rate-card-detail">Sgravi: EUR {{ month.altri_sgravi|euro }}</div>
                                                     {% endif %}
-                                                    {% if month.data_scadenza %}
-                                                        <div class="student-rate-card-detail">Scadenza: {{ month.data_scadenza|it_date }}</div>
-                                                    {% endif %}
-                                                    {% if month.data_pagamento %}
+                                                    {% if month.pagata and month.data_pagamento %}
                                                         <div class="student-rate-card-detail">Pagata il: {{ month.data_pagamento|it_date }}</div>
+                                                    {% elif month.data_scadenza %}
+                                                        <div class="student-rate-card-detail">Scadenza: {{ month.data_scadenza|it_date }}</div>
                                                     {% endif %}
                                                     {% if month.payment_status == "paid" %}
                                                         <div class="student-rate-card-status">Pagata{% if month.importo_pagato %} - EUR {{ month.importo_pagato|euro }}{% endif %}</div>

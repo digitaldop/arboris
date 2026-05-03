@@ -951,6 +951,7 @@ def riconcilia_rata_iscrizione(request, pk):
         }
         for rata_aperta in rate_aperte
     ]
+    altre_rate_count = sum(1 for row in rate_rows if not row["is_selected"])
     candidati = trova_movimenti_candidati_per_rate(rata, rate_aperte)
     for candidato in candidati:
         candidato.movimento.importo_disponibile_riconciliazione = candidato.importo_disponibile
@@ -962,6 +963,7 @@ def riconcilia_rata_iscrizione(request, pk):
             "rata": rata,
             "rata_residuo": importo_rata_residuo(rata),
             "rate_rows": rate_rows,
+            "altre_rate_count": altre_rate_count,
             "candidati": candidati,
             "popup": popup,
             "success": request.GET.get("success") == "1",

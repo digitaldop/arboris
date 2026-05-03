@@ -1503,6 +1503,99 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(rata.importo_pagato, Decimal("100.00"))
         self.assertEqual(rata.data_pagamento, date(2025, 9, 10))
 
+    def test_import_movimenti_riconcilia_pagamento_cumulativo_rette(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import rette cumulative test",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto rette",
+            iban="IT00X0000000000000000000000",
+            provider=provider,
+            attivo=True,
+        )
+        stato_relazione = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=stato_relazione,
+        )
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        classe = Classe.objects.create(nome_classe="Materna", ordine_classe=1)
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto")
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione,
+            ordine_figlio_da=1,
+            retta_annuale=Decimal("1000.00"),
+            preiscrizione=Decimal("0.00"),
+        )
+        iscrizioni = []
+        for nome in ["Luca", "Marta"]:
+            studente = Studente.objects.create(
+                famiglia=famiglia,
+                nome=nome,
+                cognome="Rossi",
+                data_nascita=date(2020, 5, 5),
+            )
+            iscrizione = Iscrizione.objects.create(
+                studente=studente,
+                anno_scolastico=anno,
+                classe=classe,
+                stato_iscrizione=stato_iscrizione,
+                condizione_iscrizione=condizione,
+                data_iscrizione=date(2025, 9, 1),
+                data_fine_iscrizione=date(2026, 6, 30),
+            )
+            self.assertEqual(iscrizione.sync_rate_schedule(), "created")
+            iscrizioni.append(iscrizione)
+
+        rate = [
+            iscrizione.rate.get(tipo_rata=RataIscrizione.TIPO_MENSILE, numero_rata=1)
+            for iscrizione in iscrizioni
+        ]
+        raw_csv = (
+            "Data;Importo;Descrizione\n"
+            "10/09/2025;200,00;Bonifico rette settembre Luca e Marta Rossi\n"
+        ).encode("utf-8")
+        config = CsvImporterConfig(
+            delimiter=";",
+            ha_intestazione=True,
+            colonna_data_contabile="Data",
+            colonna_importo="Importo",
+            colonna_descrizione="Descrizione",
+        )
+
+        risultato = importa_movimenti_da_file(
+            parser=CsvImporter(config),
+            raw_bytes=raw_csv,
+            conto=conto,
+            provider=provider,
+            nome_file="rette-cumulative.csv",
+        )
+
+        self.assertEqual(risultato.inseriti, 1)
+        self.assertEqual(risultato.riconciliati, 1)
+        movimento = MovimentoFinanziario.objects.get(conto=conto)
+        movimento.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertIsNone(movimento.rata_iscrizione_id)
+        self.assertEqual(movimento.riconciliazioni_rate.count(), 2)
+        for rata in rate:
+            rata.refresh_from_db()
+            self.assertTrue(rata.pagata)
+            self.assertEqual(rata.importo_pagato, Decimal("100.00"))
+            self.assertEqual(rata.data_pagamento, date(2025, 9, 10))
+
     def test_riconcilia_movimento_con_rate_supporta_pagamento_cumulativo(self):
         stato_relazione = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
         famiglia = Famiglia.objects.create(

@@ -408,7 +408,7 @@
                                                                 <div>
                                                                     <strong>EUR {{ month.importo_finale|euro }}</strong>
                                                                     <span>
-                                                                        {% if month.data_scadenza %}Scadenza {{ month.data_scadenza|it_date }}{% else %}Scadenza non indicata{% endif %}
+                                                                        {% if month.pagata and month.data_pagamento %}Pagata il {{ month.data_pagamento|it_date }}{% elif month.data_scadenza %}Scadenza {{ month.data_scadenza|it_date }}{% else %}Scadenza non indicata{% endif %}
                                                                     </span>
                                                                 </div>
                                                                 {% if month.rata_pk %}

@@ -629,6 +629,20 @@ class CandidatoRiconciliazione:
 
 
 @dataclass
+class CandidatoRiconciliazioneCumulativa:
+    """Gruppo di rate candidate per un pagamento cumulativo."""
+
+    rate: list
+    allocazioni: list
+    score: int
+    motivazioni: list
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+
+@dataclass
 class CandidatoMovimentoRiconciliazione:
     movimento: object
     importo_disponibile: Decimal
@@ -852,6 +866,113 @@ def _esiste_somma_compatibile(importo, rate_residue, *, max_items=12):
     return any(_decimal_close(somma, importo) for somma in somme if somma > 0)
 
 
+def _decimal_to_cents(value) -> int:
+    return int(((value or Decimal("0.00")) * Decimal("100")).quantize(Decimal("1")))
+
+
+def _giorni_distanza_rata_movimento(rata, movimento) -> int:
+    if not getattr(movimento, "data_contabile", None) or not getattr(rata, "data_scadenza", None):
+        return 9999
+    return abs((movimento.data_contabile - rata.data_scadenza).days)
+
+
+def _qualita_sottoinsieme_rate(rate, movimento):
+    distanze = [_giorni_distanza_rata_movimento(rata, movimento) for rata in rate]
+    max_distanza = max(distanze) if distanze else 9999
+    totale_distanza = sum(distanze)
+    studenti = {
+        getattr(getattr(rata.iscrizione, "studente", None), "pk", None)
+        for rata in rate
+        if getattr(getattr(rata, "iscrizione", None), "studente", None) is not None
+    }
+    periodi = {(rata.anno_riferimento, rata.mese_riferimento) for rata in rate}
+    return (
+        -max_distanza,
+        -totale_distanza,
+        len(studenti),
+        -len(periodi),
+        -len(rate),
+    )
+
+
+def _trova_sottoinsieme_rate_per_importo(rate, importo_target, movimento):
+    target_cents = _decimal_to_cents(importo_target)
+    tolleranza_cents = _decimal_to_cents(_TOLLERANZA_IMPORTO_ESATTO)
+    if target_cents <= 0:
+        return []
+
+    dp = {0: []}
+    rate_ordinate = sorted(
+        rate,
+        key=lambda rata: (
+            _giorni_distanza_rata_movimento(rata, movimento),
+            rata.data_scadenza or date.max,
+            rata.pk or 0,
+        ),
+    )[:18]
+
+    for rata in rate_ordinate:
+        residuo_cents = _decimal_to_cents(importo_rata_residuo(rata))
+        if residuo_cents <= 0 or residuo_cents > target_cents + tolleranza_cents:
+            continue
+        for somma, sottoinsieme in list(dp.items()):
+            nuova_somma = somma + residuo_cents
+            if nuova_somma > target_cents + tolleranza_cents:
+                continue
+            nuovo_sottoinsieme = sottoinsieme + [rata]
+            if len(nuovo_sottoinsieme) > 10:
+                continue
+            esistente = dp.get(nuova_somma)
+            if (
+                esistente is None
+                or _qualita_sottoinsieme_rate(nuovo_sottoinsieme, movimento)
+                > _qualita_sottoinsieme_rate(esistente, movimento)
+            ):
+                dp[nuova_somma] = nuovo_sottoinsieme
+
+    somme_compatibili = [
+        somma
+        for somma, sottoinsieme in dp.items()
+        if len(sottoinsieme) >= 2 and abs(somma - target_cents) <= tolleranza_cents
+    ]
+    if not somme_compatibili:
+        return []
+
+    somma_migliore = max(
+        somme_compatibili,
+        key=lambda somma: _qualita_sottoinsieme_rate(dp[somma], movimento),
+    )
+    return dp[somma_migliore]
+
+
+def _studenti_unici_da_rate(rate):
+    studenti = []
+    visti = set()
+    for rata in rate or []:
+        studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
+        if studente is None:
+            continue
+        chiave = getattr(studente, "pk", None) or id(studente)
+        if chiave in visti:
+            continue
+        visti.add(chiave)
+        studenti.append(studente)
+    return studenti
+
+
+def _rata_disponibile_per_auto(rata, include_rata=None):
+    if rata is None or getattr(rata, "pagata", False):
+        return False
+    if include_rata is not None and not include_rata(rata):
+        return False
+    try:
+        if rata.movimenti_finanziari.exists() or rata.riconciliazioni_movimenti.exists():
+            return False
+    except Exception:
+        return False
+    return importo_rata_residuo(rata) > Decimal("0.00")
+
+
 def trova_rate_candidate(movimento, *, limite: int = 10):
     """
     Ritorna una lista ordinata di :class:`CandidatoRiconciliazione`
@@ -943,6 +1064,117 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
         )
 
     candidati.sort(key=lambda c: c.score, reverse=True)
+    return candidati[:limite]
+
+
+def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=None):
+    """
+    Ritorna gruppi di rate della stessa famiglia compatibili con un unico
+    movimento bancario. E' usata dalla riconciliazione automatica per i
+    bonifici cumulativi, quindi resta volutamente conservativa: almeno due
+    rate aperte, somma esatta e identita' familiare riconoscibile in causale.
+    """
+
+    from economia.models.iscrizioni import RataIscrizione
+
+    if movimento is None or movimento.importo is None or movimento.importo <= 0:
+        return []
+
+    importo_cerca = importo_movimento_disponibile(movimento)
+    if importo_cerca <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+    testo_movimento = _testo_movimento_per_identita(movimento)
+
+    qs = (
+        RataIscrizione.objects.select_related(
+            "famiglia",
+            "iscrizione__studente__famiglia",
+            "iscrizione__anno_scolastico",
+        )
+        .prefetch_related("iscrizione__studente__famiglia__familiari")
+        .filter(
+            pagata=False,
+            importo_finale__gt=0,
+            importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_ESATTO,
+            movimenti_finanziari__isnull=True,
+            riconciliazioni_movimenti__isnull=True,
+        )
+        .distinct()
+        .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
+    )
+
+    gruppi = {}
+    for rata in qs:
+        if not _rata_disponibile_per_auto(rata, include_rata):
+            continue
+        famiglia = getattr(rata, "famiglia", None) or getattr(getattr(rata.iscrizione, "studente", None), "famiglia", None)
+        if famiglia is None:
+            continue
+        chiave = getattr(famiglia, "pk", None) or id(famiglia)
+        gruppi.setdefault(chiave, {"famiglia": famiglia, "rate": []})["rate"].append(rata)
+
+    candidati = []
+    for gruppo in gruppi.values():
+        rate_gruppo = gruppo["rate"]
+        if len(rate_gruppo) < 2:
+            continue
+
+        sottoinsieme = _trova_sottoinsieme_rate_per_importo(rate_gruppo, importo_cerca, movimento)
+        if len(sottoinsieme) < 2:
+            continue
+
+        famiglia = gruppo["famiglia"]
+        studenti = _studenti_unici_da_rate(sottoinsieme)
+        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
+            famiglia,
+            studenti,
+            testo_movimento,
+        )
+        if not ha_match_identita:
+            continue
+
+        score = score_identita + 50 + 10
+        motivazioni = list(motivazioni_identita)
+        motivazioni.append("Importo identico alla somma di piu rate aperte")
+        motivazioni.append("Rate non ancora pagate")
+
+        distanze = [
+            _giorni_distanza_rata_movimento(rata, movimento)
+            for rata in sottoinsieme
+            if getattr(rata, "data_scadenza", None)
+        ]
+        if distanze:
+            max_distanza = max(distanze)
+            if max_distanza <= _TOLLERANZA_GIORNI_VICINI:
+                score += 25
+                motivazioni.append(f"Scadenze vicine al movimento (+/- {max_distanza} gg)")
+            elif max_distanza <= _TOLLERANZA_GIORNI_ESTESA:
+                score += 10
+                motivazioni.append(f"Scadenze entro 30 giorni dal movimento ({max_distanza} gg)")
+
+        if len(studenti) >= 2:
+            score += 12
+            motivazioni.append("Pagamento cumulativo per piu studenti della stessa famiglia")
+        else:
+            score += 6
+            motivazioni.append("Pagamento cumulativo su piu rate della stessa iscrizione")
+
+        periodi = {(rata.anno_riferimento, rata.mese_riferimento) for rata in sottoinsieme}
+        if len(periodi) == 1:
+            score += 8
+            motivazioni.append("Le rate appartengono allo stesso periodo")
+
+        allocazioni = [(rata, importo_rata_residuo(rata)) for rata in sottoinsieme]
+        candidati.append(
+            CandidatoRiconciliazioneCumulativa(
+                rate=sottoinsieme,
+                allocazioni=allocazioni,
+                score=score,
+                motivazioni=motivazioni,
+            )
+        )
+
+    candidati.sort(key=lambda candidato: (candidato.score, _qualita_sottoinsieme_rate(candidato.rate, movimento)), reverse=True)
     return candidati[:limite]
 
 
@@ -1044,32 +1276,35 @@ def riconcilia_movimento_automaticamente(
     *,
     utente=None,
     punteggio_minimo: int = 85,
+    include_rata=None,
 ):
     if movimento is None or movimento.importo is None or movimento.importo <= 0:
         return None
-    if movimento.rata_iscrizione_id:
+    if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate.exists():
         return None
 
-    candidati = [
-        candidato
-        for candidato in trova_rate_candidate(movimento, limite=10)
-        if not candidato.rata.pagata and not candidato.rata.movimenti_finanziari.exists()
-    ]
-    if not candidati:
+    opzioni = []
+    for candidato in trova_rate_candidate(movimento, limite=10):
+        if _rata_disponibile_per_auto(candidato.rata, include_rata):
+            opzioni.append(("singola", candidato.score, candidato))
+
+    for candidato in trova_rate_cumulative_candidate(movimento, limite=5, include_rata=include_rata):
+        opzioni.append(("cumulativa", candidato.score, candidato))
+
+    if not opzioni:
         return None
 
-    top_score = candidati[0].score
-    migliori = [candidato for candidato in candidati if candidato.score == top_score]
+    top_score = max(score for _tipo, score, _candidato in opzioni)
+    migliori = [(tipo, candidato) for tipo, score, candidato in opzioni if score == top_score]
     if top_score < punteggio_minimo or len(migliori) != 1:
         return None
 
-    candidato = migliori[0]
-    riconcilia_movimento_con_rata(
-        movimento,
-        candidato.rata,
-        utente=utente,
-        marca_rata_pagata=True,
-    )
+    tipo, candidato = migliori[0]
+    if tipo == "cumulativa":
+        riconcilia_movimento_con_rate(movimento, candidato.allocazioni, utente=utente)
+        return candidato
+
+    riconcilia_movimento_con_rata(movimento, candidato.rata, utente=utente, marca_rata_pagata=True)
     return candidato
 
 
