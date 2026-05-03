@@ -104,6 +104,11 @@ urlpatterns = [
         name="modifica_fatture_in_cloud",
     ),
     path(
+        "gestione-finanziaria/fatture-in-cloud/<int:pk>/elimina/",
+        gf_manage(views.elimina_fatture_in_cloud),
+        name="elimina_fatture_in_cloud",
+    ),
+    path(
         "gestione-finanziaria/fatture-in-cloud/<int:pk>/oauth/",
         gf_manage(views.avvia_oauth_fatture_in_cloud),
         name="avvia_oauth_fatture_in_cloud",

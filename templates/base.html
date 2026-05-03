@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=195">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=196">
     {% if role_theme %}
         <style>
             :root {
@@ -557,7 +557,7 @@
                                                     <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                                                     <span class="sidebar-link-text">Pagamenti fornitori</span>
                                                 </a>
-                                                <a href="{% url 'lista_fatture_in_cloud' %}" class="{% if request.resolver_match.url_name == 'lista_fatture_in_cloud' or request.resolver_match.url_name == 'crea_fatture_in_cloud' or request.resolver_match.url_name == 'modifica_fatture_in_cloud' %}active{% endif %}">
+                                                <a href="{% url 'lista_fatture_in_cloud' %}" class="{% if request.resolver_match.url_name == 'lista_fatture_in_cloud' or request.resolver_match.url_name == 'crea_fatture_in_cloud' or request.resolver_match.url_name == 'modifica_fatture_in_cloud' or request.resolver_match.url_name == 'elimina_fatture_in_cloud' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
                                                     <span class="sidebar-link-text">Fatture in Cloud</span>
                                                 </a>

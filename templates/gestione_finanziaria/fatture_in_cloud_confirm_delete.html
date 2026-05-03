@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Rimuovi connessione Fatture in Cloud - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_fatture_in_cloud' %}">Fatture in Cloud</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Rimuovi connessione</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Rimuovi connessione Fatture in Cloud</h1>
+                <span class="family-status-pill is-danger">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    Conferma richiesta
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                {{ connessione.nome }}{% if connessione.company_id %} - Company ID {{ connessione.company_id }}{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="finance-danger-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Rimozione collegamento</div>
+            <p>
+                Stai per rimuovere la connessione <strong>{{ connessione.nome }}</strong> e le credenziali salvate per Fatture in Cloud.
+            </p>
+            <p class="help-text">
+                I documenti fornitori, le scadenze, i fornitori importati e i pagamenti gia gestiti restano in Arboris.
+                Dopo la rimozione puoi creare una nuova connessione, completare OAuth e ripetere la sincronizzazione.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-actions finance-confirm-actions">
+                    <button type="submit" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Rimuovi connessione</span>
+                    </button>
+                    <a href="{% url 'modifica_fatture_in_cloud' connessione.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -908,6 +908,25 @@ def modifica_fatture_in_cloud(request, pk):
     )
 
 
+def elimina_fatture_in_cloud(request, pk):
+    connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
+
+    if request.method == "POST":
+        nome = connessione.nome
+        connessione.delete()
+        messages.success(
+            request,
+            f"Connessione Fatture in Cloud \"{nome}\" rimossa. Puoi crearne una nuova e ripetere la sincronizzazione.",
+        )
+        return redirect("lista_fatture_in_cloud")
+
+    return render(
+        request,
+        "gestione_finanziaria/fatture_in_cloud_confirm_delete.html",
+        {"connessione": connessione},
+    )
+
+
 def _fatture_in_cloud_redirect_uri(request, connessione):
     if connessione and connessione.redirect_uri:
         return connessione.redirect_uri

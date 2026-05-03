@@ -54,6 +54,10 @@
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
                     <span class="btn-label">Collega OAuth</span>
                 </a>
+                <a href="{% url 'elimina_fatture_in_cloud' connessione.pk %}" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Rimuovi connessione</span>
+                </a>
             {% endif %}
         </div>
     </div>
@@ -334,6 +338,17 @@
                                 <span class="copy-inline-tooltip" role="tooltip">Copia</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div class="finance-side-card finance-side-card-danger">
+                        <div class="finance-side-title">Ripristina collegamento</div>
+                        <p class="help-text">
+                            Rimuove solo questa connessione e le credenziali salvate. Documenti, fornitori, scadenze e pagamenti gia importati restano in Arboris.
+                        </p>
+                        <a href="{% url 'elimina_fatture_in_cloud' connessione.pk %}" class="btn btn-danger btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            <span class="btn-label">Rimuovi connessione</span>
+                        </a>
                     </div>
                 {% endif %}
             </aside>

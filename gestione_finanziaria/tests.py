@@ -24,6 +24,7 @@ from .models import (
     DocumentoFornitore,
     EsitoSincronizzazione,
     FattureInCloudConnessione,
+    FattureInCloudSyncLog,
     Fornitore,
     FonteSaldo,
     MovimentoFinanziario,
@@ -843,6 +844,45 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.data_scadenza, date(2026, 6, 15))
         self.assertEqual(scadenza.importo_previsto, Decimal("122.00"))
 
+    def test_importa_documento_fatture_in_cloud_pending_usa_supplier_name_e_scadenza(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 993,
+            "type": "agyo",
+            "document_type": "expense",
+            "subject": "Fattura da registrare",
+            "supplier_name": "Fornitore Pending Srl",
+            "invoice_number": "PEND-1",
+            "emssion_date": "2026-04-25",
+            "amount_net": "300.00",
+            "amount_vat": "66.00",
+            "amount_gross": "366.00",
+            "payments_list": [
+                {
+                    "due_date": "2026-06-10",
+                    "amount": "366.00",
+                    "status": "not_paid",
+                }
+            ],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        self.assertTrue(result["created"])
+        self.assertTrue(result["fornitore_created"])
+        documento = DocumentoFornitore.objects.get(external_id="993")
+        self.assertEqual(documento.fornitore.denominazione, "Fornitore Pending Srl")
+        self.assertEqual(documento.tipo_documento, TipoDocumentoFornitore.FATTURA)
+        self.assertEqual(documento.data_documento, date(2026, 4, 25))
+        self.assertEqual(documento.numero_documento, "PEND-1")
+        self.assertEqual(documento.totale, Decimal("366.00"))
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 6, 10))
+        self.assertEqual(scadenza.importo_previsto, Decimal("366.00"))
+
     def test_importa_documento_fatture_in_cloud_aggiorna_scadenza_importata_non_pagata(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
@@ -949,7 +989,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         client = Mock()
 
         def list_pending(doc_type, *, page=1, per_page=50):
-            if doc_type == "expense":
+            if doc_type == "agyo":
                 return {"data": [{"id": 992}], "pagination": {"current_page": 1, "last_page": 1}}
             return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
 
@@ -964,6 +1004,61 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertIn("documento 992", stats["messaggi"][0])
         connessione.refresh_from_db()
         self.assertEqual(connessione.ultimo_esito, EsitoSincronizzazione.PARZIALE)
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_pending_usa_tipi_sorgente_fic(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_registrati=False,
+            sincronizza_documenti_da_registrare=True,
+        )
+        client = Mock()
+        client.list_pending_received_documents.return_value = {
+            "data": [],
+            "pagination": {"current_page": 1, "last_page": 1},
+        }
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["esito"], EsitoSincronizzazione.OK)
+        called_types = [
+            call.args[0]
+            for call in client.list_pending_received_documents.call_args_list
+        ]
+        self.assertEqual(called_types, ["agyo", "mail", "browser"])
+        client.get_pending_received_document.assert_not_called()
+
+    def test_fatture_in_cloud_connessione_puo_essere_rimossa(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC da rifare",
+            company_id=123,
+            access_token_cifrato="token-cifrato",
+            refresh_token_cifrato="refresh-cifrato",
+        )
+        FattureInCloudSyncLog.objects.create(
+            connessione=connessione,
+            esito=EsitoSincronizzazione.OK,
+            documenti_creati=2,
+        )
+        delete_url = reverse("elimina_fatture_in_cloud", kwargs={"pk": connessione.pk})
+
+        response = self.client.get(reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+        self.assertContains(response, delete_url)
+        self.assertContains(response, "Rimuovi connessione")
+
+        confirm_response = self.client.get(delete_url)
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertContains(confirm_response, "documenti fornitori")
+        self.assertContains(confirm_response, "Rimuovi connessione")
+
+        response = self.client.post(delete_url)
+
+        self.assertRedirects(response, reverse("lista_fatture_in_cloud"))
+        self.assertFalse(FattureInCloudConnessione.objects.filter(pk=connessione.pk).exists())
+        log = FattureInCloudSyncLog.objects.get()
+        self.assertIsNone(log.connessione)
 
     @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
     @patch("gestione_finanziaria.fatture_in_cloud.time.monotonic")

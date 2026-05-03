@@ -36,7 +36,7 @@ DEFAULT_BASE_URL = "https://api-v2.fattureincloud.it"
 AUTHORIZATION_URL = "https://api-v2.fattureincloud.it/oauth/authorize"
 TOKEN_URL = "https://api-v2.fattureincloud.it/oauth/token"
 RECEIVED_DOCUMENT_TYPES = ("expense", "passive_credit_note")
-PENDING_DOCUMENT_TYPES = ("expense", "passive_credit_note")
+PENDING_DOCUMENT_TYPES = ("agyo", "mail", "browser")
 DEFAULT_SCOPES = "received_documents:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
@@ -303,6 +303,23 @@ def _entity_from_document(document_data):
         or e_invoice.get("CedentePrestatore")
         or e_invoice.get("cedentePrestatore")
     )
+    if not entity:
+        entity = {
+            "name": _first_present(
+                document_data.get("supplier_name"),
+                document_data.get("supplierName"),
+            ),
+            "vat_number": _first_present(
+                document_data.get("supplier_vat_number"),
+                document_data.get("supplierVatNumber"),
+                document_data.get("supplier_vat_code"),
+                document_data.get("supplierVatCode"),
+            ),
+            "tax_code": _first_present(
+                document_data.get("supplier_tax_code"),
+                document_data.get("supplierTaxCode"),
+            ),
+        }
     return _normalize_entity(entity)
 
 
@@ -310,7 +327,10 @@ def _supplier_name(entity, document_data):
     return (
         entity.get("name")
         or " ".join(part for part in [entity.get("first_name"), entity.get("last_name")] if part)
+        or document_data.get("supplier_name")
+        or document_data.get("supplierName")
         or document_data.get("description")
+        or document_data.get("subject")
         or "Fornitore non identificato"
     )[:220]
 
@@ -368,7 +388,12 @@ def _find_or_create_supplier(entity, document_data):
 
 
 def _document_type(document_data):
-    fic_type = document_data.get("type") or ""
+    fic_type = (
+        document_data.get("document_type")
+        or document_data.get("documentType")
+        or document_data.get("type")
+        or ""
+    )
     if "credit" in fic_type:
         return TipoDocumentoFornitore.NOTA_CREDITO
     return TipoDocumentoFornitore.FATTURA
@@ -383,6 +408,9 @@ def _invoice_number(document_data):
     )
     return (
         document_data.get("invoice_number")
+        or document_data.get("invoiceNumber")
+        or document_data.get("document_number")
+        or document_data.get("documentNumber")
         or document_data.get("number")
         or e_invoice.get("number")
         or e_invoice.get("numero")
@@ -395,6 +423,7 @@ def _invoice_number(document_data):
 
 def _document_total(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
+    amounts = _as_dict(document_data.get("amounts"))
     dati_generali_documento = _nested_dict(e_invoice, "dati_generali", "dati_generali_documento") or _nested_dict(
         e_invoice,
         "DatiGenerali",
@@ -404,6 +433,10 @@ def _document_total(document_data):
         document_data.get("amount_gross")
         or document_data.get("total")
         or document_data.get("amount")
+        or amounts.get("gross")
+        or amounts.get("amount_gross")
+        or amounts.get("total")
+        or amounts.get("amount")
         or document_data.get("importo_totale_documento")
         or document_data.get("ImportoTotaleDocumento")
         or e_invoice.get("amount_gross")
@@ -433,6 +466,9 @@ def _payment_items(document_data):
             group.get("dettaglio_pagamento")
             or group.get("DettaglioPagamento")
             or group.get("dettaglioPagamento")
+            or group.get("details")
+            or group.get("payment_details")
+            or group.get("paymentDetails")
         )
         payments.extend(_as_list(details))
     return [payment for payment in payments if isinstance(payment, dict)]
@@ -472,10 +508,19 @@ def _enrich_supplier_entity_from_document(entity, document_data):
 
 
 def _payment_amount(payment):
+    amount = payment.get("amount")
+    if isinstance(amount, dict):
+        amount = (
+            amount.get("gross")
+            or amount.get("amount_gross")
+            or amount.get("total")
+            or amount.get("value")
+        )
     return _as_decimal(
-        payment.get("amount")
+        amount
         or payment.get("amount_gross")
         or payment.get("paid_amount")
+        or payment.get("paidAmount")
         or payment.get("importo")
         or payment.get("importo_pagamento")
         or payment.get("ImportoPagamento")
@@ -508,8 +553,12 @@ def _payment_deadlines(document_data):
     for payment in payments:
         due_date = _as_date(
             payment.get("due_date")
+            or payment.get("dueDate")
             or payment.get("date")
             or payment.get("expiration_date")
+            or payment.get("expirationDate")
+            or payment.get("payment_due_date")
+            or payment.get("paymentDueDate")
             or payment.get("data_scadenza_pagamento")
             or payment.get("DataScadenzaPagamento")
         )
@@ -521,8 +570,10 @@ def _payment_deadlines(document_data):
                 {
                     "data_scadenza": due_date,
                     "importo_previsto": amount,
-                    "importo_pagato": _as_decimal(payment.get("paid_amount")),
-                    "data_pagamento": _as_date(payment.get("paid_date") or payment.get("data_pagamento")),
+                    "importo_pagato": _as_decimal(payment.get("paid_amount") or payment.get("paidAmount")),
+                    "data_pagamento": _as_date(
+                        payment.get("paid_date") or payment.get("paidDate") or payment.get("data_pagamento")
+                    ),
                 }
             )
 
@@ -531,8 +582,15 @@ def _payment_deadlines(document_data):
 
     due_date = _as_date(
         document_data.get("next_due_date")
+        or document_data.get("nextDueDate")
         or document_data.get("due_date")
+        or document_data.get("dueDate")
         or document_data.get("expiration_date")
+        or document_data.get("expirationDate")
+        or document_data.get("payment_due_date")
+        or document_data.get("paymentDueDate")
+        or document_data.get("emission_date")
+        or document_data.get("emssion_date")
         or document_data.get("date")
     ) or timezone.localdate()
     if total > Decimal("0.00"):
@@ -545,6 +603,19 @@ def _payment_deadlines(document_data):
             }
         ]
     return []
+
+
+def _document_date(document_data):
+    return (
+        _as_date(
+            document_data.get("date")
+            or document_data.get("emission_date")
+            or document_data.get("emssion_date")
+            or document_data.get("document_date")
+            or document_data.get("documentDate")
+        )
+        or timezone.localdate()
+    )
 
 
 def _scadenza_modificabile_da_import(scadenza):
@@ -601,9 +672,18 @@ def _sync_document_deadlines(documento, deadlines):
 
 def _update_document_fields(documento, document_data, fornitore, pending):
     e_invoice = _as_dict(document_data.get("e_invoice"))
-    doc_date = _as_date(document_data.get("date")) or timezone.localdate()
-    amount_net = _as_decimal(document_data.get("amount_net"))
-    amount_vat = _as_decimal(document_data.get("amount_vat"))
+    amounts = _as_dict(document_data.get("amounts"))
+    doc_date = _document_date(document_data)
+    amount_net = _as_decimal(
+        document_data.get("amount_net")
+        or amounts.get("net")
+        or amounts.get("amount_net")
+    )
+    amount_vat = _as_decimal(
+        document_data.get("amount_vat")
+        or amounts.get("vat")
+        or amounts.get("amount_vat")
+    )
     amount_gross = _document_total(document_data)
     if amount_gross == Decimal("0.00") and amount_net:
         amount_gross = amount_net + amount_vat
@@ -619,7 +699,7 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     )
     documento.anno_competenza = doc_date.year
     documento.mese_competenza = doc_date.month
-    documento.descrizione = (document_data.get("description") or "")[:255]
+    documento.descrizione = (document_data.get("description") or document_data.get("subject") or "")[:255]
     documento.imponibile = amount_net
     documento.iva = amount_vat
     documento.totale = amount_gross
@@ -657,7 +737,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
             fornitore=fornitore,
             tipo_documento=_document_type(document_data),
             numero_documento=_invoice_number(document_data),
-            data_documento=_as_date(document_data.get("date")) or timezone.localdate(),
+            data_documento=_document_date(document_data),
         ).first()
     if documento is None:
         documento = DocumentoFornitore()

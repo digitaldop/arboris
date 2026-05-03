@@ -95,6 +95,12 @@
                                             title="Apri connessione"
                                             aria-label="Apri connessione {{ connessione.nome }}"
                                         ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                        <a
+                                            class="table-icon-link table-icon-link-danger anagrafica-action-btn anagrafica-action-delete"
+                                            href="{% url 'elimina_fatture_in_cloud' connessione.pk %}"
+                                            title="Rimuovi connessione"
+                                            aria-label="Rimuovi connessione {{ connessione.nome }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
                                     </div>
                                 </td>
                             </tr>

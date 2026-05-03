@@ -16873,6 +16873,57 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     color: #244f66;
 }
 
+/* Sidebar module grouping: each main menu entry owns its nested navigation area. */
+.sidebar-reorder-list {
+    padding: 0 10px;
+}
+
+.sidebar-reorder-list > .sidebar-section {
+    margin: 0;
+    padding: 8px 0 10px;
+    border: 1px solid #e4edf4;
+    border-radius: 9px;
+    background: #f8fbfd;
+    box-shadow: 0 5px 14px rgba(37, 63, 82, 0.035);
+}
+
+.sidebar-reorder-list > .sidebar-section + .sidebar-section {
+    margin-top: 12px;
+}
+
+.sidebar-reorder-list > .sidebar-section:has(.active) {
+    border-color: #cfe0ea;
+    background: linear-gradient(180deg, #f1f8fb 0%, #fbfdff 100%);
+    box-shadow: 0 7px 18px rgba(37, 63, 82, 0.055);
+}
+
+.sidebar-reorder-list > .sidebar-section > .sidebar-collapsible {
+    padding: 9px 12px 8px;
+}
+
+.sidebar-reorder-list > .sidebar-section > .sidebar-module-panel {
+    padding-bottom: 2px;
+}
+
+.sidebar-reorder-list .sidebar-nav a {
+    margin-left: 8px;
+    margin-right: 8px;
+}
+
+.sidebar-reorder-list .sidebar-subsection {
+    margin-left: 8px;
+    margin-right: 8px;
+    padding-bottom: 6px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.54);
+}
+
+.sidebar-reorder-list .sidebar-subsection .sidebar-subsection {
+    margin-left: 6px;
+    margin-right: 6px;
+    background: rgba(247, 251, 247, 0.78);
+}
+
 /* Sidebar hierarchy: keep module labels firm, make submenu labels lighter. */
 .sidebar-section > .sidebar-collapsible {
     color: #314d63;
@@ -22535,6 +22586,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     background: #ffffff;
     padding: 14px;
     box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+}
+
+.module-gestione_finanziaria .finance-side-card-danger {
+    border-color: #f0c6c6;
+    background: #fffafa;
 }
 
 .module-gestione_finanziaria .finance-side-title {
