@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    FeedbackSegnalazione,
     SistemaOperazioneCronologia,
     SistemaBackupDatabaseConfigurazione,
     SistemaDatabaseBackup,
@@ -68,6 +69,7 @@ class SistemaUtentePermessiAdmin(admin.ModelAdmin):
         "ruolo",
         "controllo_completo",
         "permesso_anagrafica",
+        "permesso_famiglie_interessate",
         "permesso_economia",
         "permesso_sistema",
         "permesso_calendario",
@@ -139,6 +141,43 @@ class SistemaDatabaseRestoreJobAdmin(admin.ModelAdmin):
         "backup_sicurezza",
         "celery_task_id",
     )
+
+
+@admin.register(FeedbackSegnalazione)
+class FeedbackSegnalazioneAdmin(admin.ModelAdmin):
+    list_display = (
+        "data_creazione",
+        "tipo",
+        "stato",
+        "utente_display",
+        "pagina_titolo",
+        "email_status_label",
+    )
+    list_filter = ("tipo", "stato", "data_creazione", "email_inviata_at")
+    search_fields = ("messaggio", "utente_nome", "utente_email", "pagina_titolo", "pagina_path")
+    readonly_fields = (
+        "tipo",
+        "messaggio",
+        "utente",
+        "utente_nome",
+        "utente_email",
+        "utente_ruolo",
+        "pagina_url",
+        "pagina_path",
+        "pagina_titolo",
+        "breadcrumb",
+        "user_agent",
+        "referer",
+        "ip_address",
+        "email_destinatario",
+        "email_inviata_at",
+        "email_errore",
+        "data_creazione",
+        "data_aggiornamento",
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(SistemaOperazioneCronologia)

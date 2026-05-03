@@ -179,8 +179,21 @@ class CalendarioAgendaInterfaceTests(TestCase):
         popup_response = self.client.get(f"{documento_url}?popup=1")
         self.assertEqual(popup_response.status_code, 200)
         self.assertContains(popup_response, 'body class="popup-page"')
+        self.assertContains(popup_response, "supplier-document-detail-shell is-popup")
+        self.assertContains(popup_response, "supplier-document-summary-grid")
+        self.assertContains(popup_response, "supplier-document-form-grid")
+        self.assertContains(popup_response, "supplier-deadline-view-list")
+        self.assertContains(popup_response, "supplier-document-edit-table")
+        self.assertContains(popup_response, 'id="documento-fornitore-form"')
+        self.assertContains(popup_response, "is-view-mode")
+        self.assertContains(
+            popup_response,
+            'id="documento-fornitore-lock-container" class="mode-lock-container supplier-document-fieldset main-fields-section" disabled',
+        )
+        self.assertContains(popup_response, 'id="enable-edit-documento-fornitore-btn"')
+        self.assertContains(popup_response, "js/core/view-mode.js")
         self.assertContains(popup_response, 'name="popup" value="1"')
-        self.assertContains(popup_response, "Chiudi")
+        self.assertNotContains(popup_response, '<span class="btn-label">Chiudi</span>')
         self.assertNotContains(popup_response, '<div class="breadcrumb">')
 
     def test_event_form_popup_closes_after_create(self):

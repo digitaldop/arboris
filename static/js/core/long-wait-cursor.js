@@ -179,6 +179,22 @@
         }
     }
 
+    function shouldSkipLongWaitForLink(anchor) {
+        if (!anchor) {
+            return false;
+        }
+
+        if (anchor.hasAttribute("download")) {
+            return true;
+        }
+
+        if (!anchor.dataset) {
+            return false;
+        }
+
+        return anchor.dataset.longWaitSkip === "1" || anchor.dataset.noLongWait === "1";
+    }
+
     function isCurrentWindowLocation(loc) {
         try {
             return loc === window.location || (typeof document !== "undefined" && loc === document.location);
@@ -261,7 +277,7 @@
             if (e.defaultPrevented || e.button !== 0) {
                 return;
             }
-            if (a.target === "_blank" || a.hasAttribute("download")) {
+            if (a.target === "_blank" || shouldSkipLongWaitForLink(a)) {
                 return;
             }
             if (isPopupOrModalLink(a)) {

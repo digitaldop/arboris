@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=182">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=195">
     {% if role_theme %}
         <style>
             :root {
@@ -152,6 +152,7 @@
                                     {% endif %}
                                     {% if can_view_operation_history %}
                                         <a href="{% url 'cronologia_operazioni_sistema' %}">Cronologia Operazioni</a>
+                                        <a href="{% url 'lista_feedback_segnalazioni' %}">Feedback beta</a>
                                     {% endif %}
                                 </div>
                             {% endif %}
@@ -231,6 +232,31 @@
                                     <a href="{% url 'ricerche_anagrafica' %}" class="{% if request.resolver_match.url_name == 'ricerche_anagrafica' %}active{% endif %}">
                                         <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                                         <span class="sidebar-link-text">Ricerche</span>
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if can_view_famiglie_interessate %}
+                        <div class="sidebar-section" data-sidebar-section-key="famiglie-interessate">
+                            <button
+                                type="button"
+                                class="sidebar-collapsible collapsible-title is-open"
+                                data-target="sidebar-famiglie-interessate-panel"
+                                data-storage-key="arboris-sidebar-famiglie-interessate"
+                                data-default-open="true"
+                            >
+                                <span class="sidebar-heading-content">
+                                    <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+                                    <span>Famiglie interessate</span>
+                                </span>
+                            </button>
+                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-famiglie-interessate-panel">
+                                <nav class="sidebar-nav sidebar-subnav">
+                                    <a href="{% url 'lista_famiglie_interessate' %}" class="{% if request.resolver_match.url_name == 'lista_famiglie_interessate' or request.resolver_match.url_name == 'crea_famiglia_interessata' or request.resolver_match.url_name == 'modifica_famiglia_interessata' or request.resolver_match.url_name == 'crea_attivita_famiglia_interessata' or request.resolver_match.url_name == 'modifica_attivita_famiglia_interessata' %}active{% endif %}">
+                                        <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+                                        <span class="sidebar-link-text">Contatti e follow-up</span>
                                     </a>
                                 </nav>
                             </div>
@@ -737,6 +763,10 @@
                                                         <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
                                                         <span class="sidebar-link-text">Cronologia Operazioni</span>
                                                     </a>
+                                                    <a href="{% url 'lista_feedback_segnalazioni' %}" class="{% if request.resolver_match.url_name == 'lista_feedback_segnalazioni' %}active{% endif %}">
+                                                        <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                                                        <span class="sidebar-link-text">Feedback beta</span>
+                                                    </a>
                                                 {% endif %}
                                             </nav>
                                         </div>
@@ -824,9 +854,84 @@
         </div>
     </footer>
 
+    {% if request.user.is_authenticated %}
+        <div
+            class="beta-feedback-widget"
+            data-feedback-endpoint="{% url 'crea_feedback_beta' %}"
+            aria-label="Feedback beta"
+        >
+            <button
+                type="button"
+                class="beta-feedback-trigger is-bug"
+                data-feedback-type="bug"
+                data-feedback-title="Segnala un bug"
+                title="Segnala un bug"
+                aria-label="Segnala un bug"
+            >
+                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#bug"></use></svg>
+            </button>
+            <button
+                type="button"
+                class="beta-feedback-trigger is-feature"
+                data-feedback-type="funzione"
+                data-feedback-title="Suggerisci una funzione"
+                title="Suggerisci una funzione"
+                aria-label="Suggerisci una funzione"
+            >
+                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#lightbulb"></use></svg>
+            </button>
+        </div>
+
+        <div class="beta-feedback-dialog is-hidden" id="beta-feedback-dialog" aria-hidden="true">
+            <div class="beta-feedback-backdrop" data-feedback-close="1"></div>
+            <section class="beta-feedback-card" role="dialog" aria-modal="true" aria-labelledby="beta-feedback-title">
+                <div class="beta-feedback-card-head">
+                    <span class="beta-feedback-card-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="beta-feedback-title">Feedback beta</h2>
+                        <p>Il messaggio arrivera al team con pagina e utente gia collegati.</p>
+                    </div>
+                    <button type="button" class="beta-feedback-close" data-feedback-close="1" aria-label="Chiudi">
+                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+                    </button>
+                </div>
+                <form class="beta-feedback-form" id="beta-feedback-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="tipo" id="beta-feedback-type" value="">
+                    <input type="hidden" name="pagina_url" id="beta-feedback-page-url" value="">
+                    <input type="hidden" name="pagina_path" id="beta-feedback-page-path" value="">
+                    <input type="hidden" name="pagina_titolo" id="beta-feedback-page-title" value="">
+                    <input type="hidden" name="breadcrumb" id="beta-feedback-breadcrumb" value="">
+                    <label for="beta-feedback-message">Messaggio</label>
+                    <textarea
+                        id="beta-feedback-message"
+                        name="messaggio"
+                        rows="5"
+                        maxlength="4000"
+                        required
+                        placeholder="Scrivi qui il bug o il suggerimento..."
+                    ></textarea>
+                    <div class="beta-feedback-status" id="beta-feedback-status" aria-live="polite"></div>
+                    <div class="beta-feedback-actions">
+                        <button type="button" class="btn btn-secondary btn-icon-text" data-feedback-close="1">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-icon-text" id="beta-feedback-submit">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                            <span class="btn-label">Invia</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    {% endif %}
+
     {{ student_terminology|json_script:"student-terminology-data" }}
     <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
-    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=8"></script>
+    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=9"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
@@ -849,6 +954,7 @@
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
     <script src="{% static 'js/core/sidebar-collapse.js' %}?v=2"></script>
     <script src="{% static 'js/core/sidebar-reorder.js' %}?v=1"></script>
+    <script src="{% static 'js/core/beta-feedback.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisTerminology) {

@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -57,6 +57,7 @@ from .forms import (
     RegolaCategorizzazioneForm,
     SaldoContoForm,
     ScadenzaPagamentoFornitoreFormSet,
+    movimenti_fornitore_recenti_ids,
 )
 from .importers import Camt053Parser, CsvImporter, CsvImporterConfig, detect_csv_import_config
 from .importers.service import importa_movimenti_da_file
@@ -588,11 +589,49 @@ def _documento_form_context(form, formset, documento, popup=False):
     }
 
 
+def _documento_fornitore_scadenze_queryset():
+    return ScadenzaPagamentoFornitore.objects.select_related("conto_bancario", "movimento_finanziario").order_by(
+        "data_scadenza",
+        "id",
+    )
+
+
+def _documento_fornitore_pagamenti_queryset():
+    return PagamentoFornitore.objects.select_related("movimento_finanziario", "conto_bancario").order_by(
+        "data_pagamento",
+        "id",
+    )
+
+
+def _documento_fornitore_detail_queryset():
+    return DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa").prefetch_related(
+        Prefetch(
+            "scadenze",
+            queryset=_documento_fornitore_scadenze_queryset().prefetch_related(
+                Prefetch("pagamenti", queryset=_documento_fornitore_pagamenti_queryset())
+            ),
+        )
+    )
+
+
+def _documento_fornitore_formset_kwargs(documento=None, compact_movimenti=False):
+    kwargs = {}
+    if compact_movimenti:
+        kwargs["form_kwargs"] = {"movimento_choices_ids": movimenti_fornitore_recenti_ids()}
+    if documento and documento.pk:
+        kwargs["queryset"] = _documento_fornitore_scadenze_queryset().filter(documento=documento)
+    return kwargs
+
+
 def crea_documento_fornitore(request):
     popup = is_popup_request(request)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES)
-        formset = ScadenzaPagamentoFornitoreFormSet(request.POST, instance=DocumentoFornitore())
+        formset = ScadenzaPagamentoFornitoreFormSet(
+            request.POST,
+            instance=DocumentoFornitore(),
+            **_documento_fornitore_formset_kwargs(compact_movimenti=popup),
+        )
         if form.is_valid() and formset.is_valid():
             documento = form.save()
             formset.instance = documento
@@ -619,7 +658,10 @@ def crea_documento_fornitore(request):
                 initial["fornitore"] = fornitore
                 initial["categoria_spesa"] = fornitore.categoria_spesa
         form = DocumentoFornitoreForm(initial=initial)
-        formset = ScadenzaPagamentoFornitoreFormSet(instance=DocumentoFornitore())
+        formset = ScadenzaPagamentoFornitoreFormSet(
+            instance=DocumentoFornitore(),
+            **_documento_fornitore_formset_kwargs(compact_movimenti=popup),
+        )
 
     return render(
         request,
@@ -630,10 +672,14 @@ def crea_documento_fornitore(request):
 
 def modifica_documento_fornitore(request, pk):
     popup = is_popup_request(request)
-    documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa"), pk=pk)
+    documento = get_object_or_404(_documento_fornitore_detail_queryset(), pk=pk)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES, instance=documento)
-        formset = ScadenzaPagamentoFornitoreFormSet(request.POST, instance=documento)
+        formset = ScadenzaPagamentoFornitoreFormSet(
+            request.POST,
+            instance=documento,
+            **_documento_fornitore_formset_kwargs(documento, compact_movimenti=popup),
+        )
         if form.is_valid() and formset.is_valid():
             documento = form.save()
             formset.save()
@@ -648,7 +694,10 @@ def modifica_documento_fornitore(request, pk):
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
         form = DocumentoFornitoreForm(instance=documento)
-        formset = ScadenzaPagamentoFornitoreFormSet(instance=documento)
+        formset = ScadenzaPagamentoFornitoreFormSet(
+            instance=documento,
+            **_documento_fornitore_formset_kwargs(documento, compact_movimenti=popup),
+        )
 
     return render(
         request,

@@ -1,0 +1,131 @@
+{% extends base_template %}
+{% load static %}
+
+{% block title %}{% if attivita %}{{ attivita.calendar_title }}{% else %}Nuova attivita{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_famiglie_interessate' %}">Famiglie interessate</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'modifica_famiglia_interessata' famiglia.pk %}">{{ famiglia.nome_display }}</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if attivita %}Attivita{% else %}Nuova attivita{% endif %}</span>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="interested-activity-editor-shell{% if popup %} is-popup{% endif %}">
+        <div class="page-head family-page-head anagrafica-list-head interested-page-head">
+            <div class="family-page-title-block">
+                <div class="family-page-title-line">
+                    <h1 class="page-title">{% if attivita %}{{ attivita.calendar_title }}{% else %}Nuova attivita{% endif %}</h1>
+                    <span class="family-status-pill is-info">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {{ famiglia.nome_display }}
+                    </span>
+                </div>
+                <div class="family-page-address">
+                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                    Colloqui, messaggi, telefonate e follow-up calendarizzati
+                </div>
+            </div>
+            {% if popup %}
+                <div class="page-head-actions family-page-actions">
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close();">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Chiudi</span>
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        <form method="post" class="detail-form interested-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <fieldset {% if not can_manage_famiglie_interessate %}disabled{% endif %}>
+                <section class="admin-section interested-section">
+                    <div class="admin-section-title">
+                        <span class="admin-section-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        Dettagli attivita
+                    </div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            {{ form.non_field_errors }}
+                            <div class="interested-form-grid">
+                                <label class="interested-field">
+                                    <span>{{ form.tipo.label }}</span>
+                                    {{ form.tipo }}{{ form.tipo.errors }}
+                                </label>
+                                <label class="interested-field is-wide">
+                                    <span>{{ form.titolo.label }}</span>
+                                    {{ form.titolo }}{{ form.titolo.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.stato.label }}</span>
+                                    {{ form.stato }}{{ form.stato.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.data_programmata.label }}</span>
+                                    {{ form.data_programmata }}{{ form.data_programmata.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.durata_minuti.label }}</span>
+                                    {{ form.durata_minuti }}{{ form.durata_minuti.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.data_svolgimento.label }}</span>
+                                    {{ form.data_svolgimento }}{{ form.data_svolgimento.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.luogo.label }}</span>
+                                    {{ form.luogo }}{{ form.luogo.errors }}
+                                </label>
+                                <label class="interested-field">
+                                    <span>{{ form.assegnata_a.label }}</span>
+                                    {{ form.assegnata_a }}{{ form.assegnata_a.errors }}
+                                </label>
+                                <label class="interested-check">
+                                    {{ form.calendarizza }}
+                                    <span>{{ form.calendarizza.label }}</span>
+                                    {{ form.calendarizza.errors }}
+                                </label>
+                                <label class="interested-field is-wide">
+                                    <span>{{ form.descrizione.label }}</span>
+                                    {{ form.descrizione }}{{ form.descrizione.errors }}
+                                </label>
+                                <label class="interested-field is-wide">
+                                    <span>{{ form.esito.label }}</span>
+                                    {{ form.esito }}{{ form.esito.errors }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            {% if can_manage_famiglie_interessate %}
+                <div class="form-actions sticky-form-actions interested-sticky-actions">
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva attivita</span>
+                    </button>
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close();">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </button>
+                    {% else %}
+                        <a href="{% url 'modifica_famiglia_interessata' famiglia.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                            <span class="btn-label">Torna alla scheda</span>
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

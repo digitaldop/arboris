@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import shutil
 import tempfile
@@ -421,6 +421,56 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-related-type="movimento_finanziario"')
         self.assertContains(response, "Gennaio")
         self.assertContains(response, "js/pages/documento-fornitore-form.js")
+
+    def test_documento_fornitore_popup_limits_movimento_choices_but_keeps_selected_one(self):
+        fornitore = Fornitore.objects.create(denominazione="Tecnica Srl")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="F-010",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        movimento_storico_collegato = MovimentoFinanziario.objects.create(
+            data_contabile=date(2024, 1, 2),
+            importo=Decimal("-122.00"),
+            descrizione="Movimento storico collegato",
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2024, 1, 1),
+            importo=Decimal("-50.00"),
+            descrizione="Movimento storico non collegato",
+        )
+        MovimentoFinanziario.objects.bulk_create(
+            [
+                MovimentoFinanziario(
+                    data_contabile=date(2026, 5, 1) + timedelta(days=index),
+                    importo=Decimal("-10.00"),
+                    descrizione=f"Movimento recente {index}",
+                )
+                for index in range(130)
+            ]
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+            movimento_finanziario=movimento_storico_collegato,
+        )
+
+        response = self.client.get(f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "supplier-document-detail-shell is-popup")
+        self.assertContains(response, "supplier-document-summary-grid")
+        self.assertContains(response, "supplier-deadline-view-list")
+        self.assertContains(response, "supplier-document-edit-table")
+        self.assertContains(response, "is-view-mode")
+        self.assertContains(response, 'id="enable-edit-documento-fornitore-btn"')
+        self.assertContains(response, "mode-edit-only-table-cell")
+        self.assertContains(response, "Movimento storico collegato")
+        self.assertNotContains(response, "Movimento storico non collegato")
 
     def test_documento_fornitore_calculates_net_and_vat_from_total(self):
         categoria = crea_categoria_spesa_test("Servizi")

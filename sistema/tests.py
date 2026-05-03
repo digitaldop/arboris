@@ -2,7 +2,9 @@ from tempfile import TemporaryDirectory
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core import mail
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -10,7 +12,15 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
-from .models import LivelloPermesso, RuoloUtente, SistemaDatabaseBackup, SistemaRuoloPermessi, SistemaUtentePermessi
+from .models import (
+    FeedbackSegnalazione,
+    LivelloPermesso,
+    RuoloUtente,
+    SistemaDatabaseBackup,
+    SistemaRuoloPermessi,
+    SistemaUtentePermessi,
+    TipoFeedbackSegnalazione,
+)
 from .popup_manifest import build_popup_manifest
 from anagrafica.models import Citta, Provincia, Regione
 from anagrafica.models import Indirizzo
@@ -296,6 +306,20 @@ class SidebarSistemaTests(TestCase):
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
 
+    def test_home_keeps_sidebar_reorder_toggle_available(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+        css = (settings.BASE_DIR / "static" / "css" / "style.css").read_text(encoding="utf-8")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="sidebar-reorder-toggle"')
+        self.assertContains(response, "Modalita drag and drop")
+        self.assertNotRegex(
+            css,
+            r"\.sidebar-reorder-footer\s*,\s*\.sidebar-reorder-list[^{]*\{\s*display:\s*none",
+        )
+
 
 class RuoliUtenteTests(TestCase):
     def setUp(self):
@@ -341,7 +365,7 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(response, "Gestione finanziaria")
         self.assertNotContains(response, "Modulo anagrafica")
 
-    def test_user_permission_lists_include_financial_management_module(self):
+    def test_user_permission_lists_include_financial_management_and_interested_families_modules(self):
         self.client.force_login(self.user)
 
         users_response = self.client.get(reverse("lista_utenti"))
@@ -351,6 +375,8 @@ class RuoliUtenteTests(TestCase):
         self.assertEqual(roles_response.status_code, 200)
         self.assertContains(users_response, "Gestione finanziaria")
         self.assertContains(roles_response, "Gestione finanziaria")
+        self.assertContains(users_response, "Famiglie interessate")
+        self.assertContains(roles_response, "Famiglie interessate")
 
     def test_header_settings_dropdown_renders_system_links(self):
         self.client.force_login(self.user)
@@ -529,6 +555,30 @@ class BackupDatabaseAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backup Database")
 
+    def test_backup_download_link_does_not_arm_long_wait_cursor(self):
+        self.client.force_login(self.amministratore)
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                backup = SistemaDatabaseBackup.objects.create(
+                    nome_file="backup-manuale.sql.gz",
+                    tipo_backup="manuale",
+                    dimensione_file_bytes=12,
+                    creato_da=self.amministratore,
+                    file_backup=SimpleUploadedFile(
+                        "backup-manuale.sql.gz",
+                        b"backup-source",
+                        content_type="application/gzip",
+                    ),
+                )
+
+                response = self.client.get(reverse("backup_database_sistema"))
+
+        download_url = reverse("scarica_backup_database", kwargs={"pk": backup.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{download_url}"')
+        self.assertContains(response, 'download="backup-manuale.sql.gz"')
+        self.assertContains(response, 'data-long-wait-skip="1"')
+
     def test_backup_database_page_denies_staff_user_without_admin_role(self):
         self.client.force_login(self.staff_non_admin)
 
@@ -543,6 +593,134 @@ class BackupDatabaseAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backup Database")
+
+
+class BetaFeedbackTests(TestCase):
+    def setUp(self):
+        self.password = "Password123!"
+        self.user = User.objects.create_user(
+            username="operatore-feedback@example.com",
+            email="operatore-feedback@example.com",
+            password=self.password,
+            first_name="Mario",
+            last_name="Rossi",
+        )
+        SistemaUtentePermessi.objects.create(user=self.user)
+
+        self.admin = User.objects.create_user(
+            username="admin-feedback@example.com",
+            email="admin-feedback@example.com",
+            password=self.password,
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.admin,
+            ruolo=RuoloUtente.AMMINISTRATORE,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+
+        self.system_operator = User.objects.create_user(
+            username="system-operator-feedback@example.com",
+            email="system-operator-feedback@example.com",
+            password=self.password,
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.system_operator,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+
+        self.superuser = User.objects.create_superuser(
+            username="superuser-feedback@example.com",
+            email="superuser-feedback@example.com",
+            password=self.password,
+        )
+
+    def test_base_layout_renders_beta_feedback_buttons_for_authenticated_users(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "beta-feedback-widget")
+        self.assertContains(response, reverse("crea_feedback_beta"))
+        self.assertContains(response, "Segnala un bug")
+        self.assertContains(response, "Suggerisci una funzione")
+        self.assertContains(response, "#bug")
+        self.assertContains(response, "#lightbulb")
+        self.assertContains(response, "beta-feedback.js")
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        BETA_FEEDBACK_RECIPIENT_EMAIL="gliptica.software@gmail.com",
+        DEFAULT_FROM_EMAIL="Arboris Test <noreply@example.com>",
+    )
+    def test_authenticated_user_can_submit_feedback_and_email_is_sent(self):
+        mail.outbox = []
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("crea_feedback_beta"),
+            {
+                "tipo": TipoFeedbackSegnalazione.BUG,
+                "messaggio": "Il calendario non salva la data selezionata.",
+                "pagina_url": "http://testserver/calendario/?view=month",
+                "pagina_path": "/calendario/?view=month",
+                "pagina_titolo": "Calendario - Arboris",
+                "breadcrumb": "Home > Calendario",
+            },
+            HTTP_USER_AGENT="Firefox Test",
+            HTTP_REFERER="http://testserver/calendario/",
+            HTTP_X_FORWARDED_FOR="203.0.113.10",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        feedback = FeedbackSegnalazione.objects.get()
+        self.assertEqual(feedback.tipo, TipoFeedbackSegnalazione.BUG)
+        self.assertEqual(feedback.utente_nome, "Mario Rossi")
+        self.assertEqual(feedback.utente_email, "operatore-feedback@example.com")
+        self.assertEqual(feedback.pagina_path, "/calendario/?view=month")
+        self.assertEqual(feedback.breadcrumb, "Home > Calendario")
+        self.assertEqual(feedback.user_agent, "Firefox Test")
+        self.assertEqual(feedback.ip_address, "203.0.113.10")
+        self.assertIsNotNone(feedback.email_inviata_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["gliptica.software@gmail.com"])
+        self.assertIn("[Arboris Beta][Bug]", mail.outbox[0].subject)
+        self.assertIn("Il calendario non salva la data selezionata.", mail.outbox[0].body)
+        self.assertIn("Home > Calendario", mail.outbox[0].body)
+
+    def test_feedback_page_denies_non_admin_system_user(self):
+        self.client.force_login(self.system_operator)
+
+        response = self.client.get(reverse("lista_feedback_segnalazioni"))
+
+        self.assertRedirects(response, reverse("home"))
+
+    def test_feedback_page_allows_administrator_role(self):
+        FeedbackSegnalazione.objects.create(
+            tipo=TipoFeedbackSegnalazione.FUNZIONE,
+            messaggio="Aggiungere esportazione feedback.",
+            utente_nome="Utente beta",
+            utente_email="utente@example.com",
+            pagina_titolo="Dashboard",
+            pagina_path="/",
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("lista_feedback_segnalazioni"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Feedback beta")
+        self.assertContains(response, "Aggiungere esportazione feedback.")
+        self.assertContains(response, "Utente beta")
+
+    def test_feedback_page_allows_superuser(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse("lista_feedback_segnalazioni"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Feedback beta")
 
 
 class BackupDatabaseStorageTests(TestCase):

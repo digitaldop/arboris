@@ -24,6 +24,7 @@ urlpatterns = [
     path("", include("sistema.urls")),
     path("", include("scuola.urls")),
     path("", include("calendario.urls")),
+    path("", include("famiglie_interessate.urls")),
     path("", include("economia.urls")),
     path("", include("fondo_accantonamento.urls")),
     path("", include("servizi_extra.urls")),

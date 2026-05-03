@@ -18,6 +18,503 @@
 {% endblock %}
 
 {% block content %}
+{% if popup and documento %}
+    <div class="supplier-document-detail-shell is-popup">
+        <div class="calendar-event-hero supplier-document-hero">
+            <span class="calendar-event-hero-icon supplier-document-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Documento {{ documento.numero_documento }}</h1>
+                <p>{{ documento.fornitore }} - {{ documento.get_tipo_documento_display }} del {{ documento.data_documento|it_date }}</p>
+            </div>
+            <div class="calendar-category-hero-actions supplier-document-hero-actions">
+                <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-documento-fornitore-btn">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                    <span class="btn-label">Modifica</span>
+                </button>
+            </div>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="calendar-event-form supplier-document-detail-form detail-form is-view-mode" id="documento-fornitore-form">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+
+            <section class="supplier-document-summary-grid" aria-label="Riepilogo documento fornitore">
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                    <div>
+                        <span>Totale documento</span>
+                        <strong>EUR {{ documento.totale|euro }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <div>
+                        <span>Pagato</span>
+                        <strong>EUR {{ documento.importo_pagato|euro }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                    <div>
+                        <span>Residuo</span>
+                        <strong>EUR {{ documento.residuo_da_pagare|euro }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon {% if documento.stato == 'pagato' %}is-green{% elif documento.stato == 'annullato' %}is-red{% else %}is-blue{% endif %}" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <div>
+                        <span>Stato</span>
+                        <strong>{{ documento.get_stato_display }}</strong>
+                    </div>
+                </article>
+            </section>
+
+            <fieldset id="documento-fornitore-lock-container" class="mode-lock-container supplier-document-fieldset main-fields-section" disabled>
+                <section class="calendar-event-form-card supplier-document-form-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                        <span>Dati documento</span>
+                    </div>
+
+                    <div class="supplier-document-form-grid">
+                        <div class="supplier-document-field is-wide">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.fornitore.id_for_label }}">{{ form.fornitore.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.fornitore }}</div>
+                                <div class="mode-edit-field related-field-row popup-related-field documento-fornitore-related">
+                                    <div class="related-field-stack">{{ form.fornitore }}</div>
+                                    <div class="related-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-fornitore-btn">+</button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-fornitore-btn">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-fornitore-btn">&#10006;</button>
+                                    </div>
+                                </div>
+                                {{ form.fornitore.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.tipo_documento.id_for_label }}">{{ form.tipo_documento.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.get_tipo_documento_display }}</div>
+                                <div class="mode-edit-field">{{ form.tipo_documento }}</div>
+                                {{ form.tipo_documento.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.numero_documento.id_for_label }}">{{ form.numero_documento.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.numero_documento }}</div>
+                                <div class="mode-edit-field">{{ form.numero_documento }}</div>
+                                {{ form.numero_documento.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.data_documento.id_for_label }}">{{ form.data_documento.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.data_documento|it_date }}</div>
+                                <div class="mode-edit-field">{{ form.data_documento }}</div>
+                                {{ form.data_documento.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.data_ricezione.id_for_label }}">{{ form.data_ricezione.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.data_ricezione|it_date|default:"-" }}</div>
+                                <div class="mode-edit-field">{{ form.data_ricezione }}</div>
+                                {{ form.data_ricezione.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field is-wide">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.categoria_spesa.id_for_label }}">{{ form.categoria_spesa.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.categoria_spesa|default:"Categoria del fornitore" }}</div>
+                                <div class="mode-edit-field related-field-row popup-related-field documento-fornitore-related">
+                                    <div class="related-field-stack">{{ form.categoria_spesa }}</div>
+                                    <div class="related-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-documento-categoria-spesa-btn">+</button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-documento-categoria-spesa-btn">&#9998;</button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-documento-categoria-spesa-btn">&#10006;</button>
+                                    </div>
+                                </div>
+                                {{ form.categoria_spesa.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.anno_competenza.id_for_label }}">{{ form.anno_competenza.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.anno_competenza|default:"-" }}</div>
+                                <div class="mode-edit-field">{{ form.anno_competenza }}</div>
+                                {{ form.anno_competenza.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.mese_competenza.id_for_label }}">{{ form.mese_competenza.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.mese_competenza|default:"-" }}</div>
+                                <div class="mode-edit-field">{{ form.mese_competenza }}</div>
+                                {{ form.mese_competenza.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field is-wide">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.descrizione|default:"-" }}</div>
+                                <div class="mode-edit-field">{{ form.descrizione }}</div>
+                                {{ form.descrizione.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="calendar-event-form-card supplier-document-form-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        <span>Importi e stato</span>
+                    </div>
+
+                    <div class="supplier-document-form-grid">
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.imponibile.id_for_label }}">{{ form.imponibile.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.imponibile|euro }}</div>
+                                <div class="mode-edit-field">{{ form.imponibile }}</div>
+                                {{ form.imponibile.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.aliquota_iva.id_for_label }}">{{ form.aliquota_iva.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.aliquota_iva }}%</div>
+                                <div class="mode-edit-field">{{ form.aliquota_iva }}</div>
+                                {{ form.aliquota_iva.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.iva.id_for_label }}">{{ form.iva.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.iva|euro }}</div>
+                                <div class="mode-edit-field">{{ form.iva }}</div>
+                                {{ form.iva.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.totale.id_for_label }}">{{ form.totale.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.totale|euro }}</div>
+                                <div class="mode-edit-field">{{ form.totale }}</div>
+                                {{ form.totale.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.stato.id_for_label }}">{{ form.stato.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.get_stato_display }}</div>
+                                <div class="mode-edit-field">{{ form.stato }}</div>
+                                {{ form.stato.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.allegato.id_for_label }}">{{ form.allegato.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{% if documento.allegato %}Allegato presente{% else %}-{% endif %}</div>
+                                <div class="mode-edit-field">{{ form.allegato }}</div>
+                                {{ form.allegato.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field is-full">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.note|default:"Nessuna nota" }}</div>
+                                <div class="mode-edit-field">{{ form.note }}</div>
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="calendar-event-form-card supplier-document-form-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <span>Scadenze pagamento</span>
+                    </div>
+                    <div class="mode-view-only supplier-deadline-view-list">
+                        {% for scadenza in documento.scadenze.all %}
+                            <article class="supplier-deadline-view-card">
+                                <div class="supplier-deadline-view-field">
+                                    <span>Scadenza</span>
+                                    <strong>{{ scadenza.data_scadenza|it_date }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Previsto</span>
+                                    <strong>EUR {{ scadenza.importo_previsto|euro }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Pagato</span>
+                                    <strong>EUR {{ scadenza.importo_pagato|euro }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Residuo</span>
+                                    <strong>EUR {{ scadenza.importo_residuo|euro }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Stato</span>
+                                    <strong class="supplier-deadline-status {% if scadenza.stato == 'pagata' %}is-paid{% elif scadenza.stato == 'scaduta' %}is-overdue{% elif scadenza.stato == 'parzialmente_pagata' %}is-partial{% elif scadenza.stato == 'annullata' %}is-cancelled{% else %}is-pending{% endif %}">{{ scadenza.get_stato_display }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Data pagamento</span>
+                                    <strong>{{ scadenza.data_pagamento|it_date|default:"-" }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Conto</span>
+                                    <strong>{{ scadenza.conto_bancario|default:"-" }}</strong>
+                                </div>
+                                <div class="supplier-deadline-view-field">
+                                    <span>Movimento</span>
+                                    <strong>{{ scadenza.movimento_finanziario|default:"-" }}</strong>
+                                </div>
+                                {% if scadenza.note %}
+                                    <div class="supplier-deadline-view-field supplier-deadline-view-note">
+                                        <span>Note</span>
+                                        <strong>{{ scadenza.note }}</strong>
+                                    </div>
+                                {% endif %}
+                            </article>
+                        {% empty %}
+                            <div class="empty-state">Nessuna scadenza pagamento presente.</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mode-edit-field supplier-document-edit-table">
+                        {{ formset.management_form }}
+                        {{ formset.non_form_errors }}
+                        <div class="supplier-document-table-wrap">
+                            <table class="list-table anagrafica-list-table finance-modern-table supplier-deadlines-table" id="scadenze-fornitore-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data scadenza</th>
+                                        <th>Previsto</th>
+                                        <th>Pagato</th>
+                                        <th>Data pagamento</th>
+                                        <th>Stato</th>
+                                        <th>Conto</th>
+                                        <th>Movimento</th>
+                                        <th class="mode-edit-only-table-cell">Elimina</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for scadenza_form in formset.forms %}
+                                        <tr class="inline-form-row supplier-deadline-main-row">
+                                            <td>{{ scadenza_form.id }}{{ scadenza_form.data_scadenza }}{{ scadenza_form.data_scadenza.errors }}</td>
+                                            <td>{{ scadenza_form.importo_previsto }}{{ scadenza_form.importo_previsto.errors }}</td>
+                                            <td>{{ scadenza_form.importo_pagato }}{{ scadenza_form.importo_pagato.errors }}</td>
+                                            <td>{{ scadenza_form.data_pagamento }}{{ scadenza_form.data_pagamento.errors }}</td>
+                                            <td>{{ scadenza_form.stato }}{{ scadenza_form.stato.errors }}</td>
+                                            <td>
+                                                <div class="inline-related-field supplier-deadline-related">
+                                                    {{ scadenza_form.conto_bancario }}
+                                                    <div class="related-actions inline-related-actions">
+                                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="conto_bancario">+</button>
+                                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="conto_bancario">&#9998;</button>
+                                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="conto_bancario">&#10006;</button>
+                                                    </div>
+                                                </div>
+                                                {{ scadenza_form.conto_bancario.errors }}
+                                            </td>
+                                            <td>
+                                                <div class="inline-related-field supplier-deadline-related">
+                                                    {{ scadenza_form.movimento_finanziario }}
+                                                    <div class="related-actions inline-related-actions">
+                                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="movimento_finanziario">+</button>
+                                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="movimento_finanziario">&#9998;</button>
+                                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="movimento_finanziario">&#10006;</button>
+                                                    </div>
+                                                </div>
+                                                {{ scadenza_form.movimento_finanziario.errors }}
+                                            </td>
+                                            <td class="mode-edit-only-table-cell">
+                                                {% if scadenza_form.instance.pk %}
+                                                    <span class="supplier-deadline-delete-field">{{ scadenza_form.DELETE }}</span>
+                                                    <button type="button" class="inline-remove-btn" data-inline-delete-existing="1">Elimina</button>
+                                                {% else %}
+                                                    <button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr class="supplier-deadline-note-row">
+                                            <td colspan="8">
+                                                <label for="{{ scadenza_form.note.id_for_label }}">Note</label>
+                                                {{ scadenza_form.note }}
+                                                {{ scadenza_form.note.errors }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <template id="scadenze-fornitore-empty-form-template">
+                            <tr class="inline-form-row supplier-deadline-main-row">
+                                <td>{{ formset.empty_form.id }}{{ formset.empty_form.data_scadenza }}</td>
+                                <td>{{ formset.empty_form.importo_previsto }}</td>
+                                <td>{{ formset.empty_form.importo_pagato }}</td>
+                                <td>{{ formset.empty_form.data_pagamento }}</td>
+                                <td>{{ formset.empty_form.stato }}</td>
+                                <td>
+                                    <div class="inline-related-field supplier-deadline-related">
+                                        {{ formset.empty_form.conto_bancario }}
+                                        <div class="related-actions inline-related-actions">
+                                            <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="conto_bancario">+</button>
+                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="conto_bancario">&#9998;</button>
+                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="conto_bancario">&#10006;</button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="inline-related-field supplier-deadline-related">
+                                        {{ formset.empty_form.movimento_finanziario }}
+                                        <div class="related-actions inline-related-actions">
+                                            <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="movimento_finanziario">+</button>
+                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="movimento_finanziario">&#9998;</button>
+                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="movimento_finanziario">&#10006;</button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="mode-edit-only-table-cell"><button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button></td>
+                            </tr>
+                            <tr class="supplier-deadline-note-row">
+                                <td colspan="8">
+                                    <label for="{{ formset.empty_form.note.id_for_label }}">Note</label>
+                                    {{ formset.empty_form.note }}
+                                </td>
+                            </tr>
+                        </template>
+                        <p class="supplier-deadline-add-row mode-edit-only">
+                            <button type="button" class="inline-add-btn supplier-deadline-add-btn" id="add-scadenza-fornitore">+ Aggiungi un'altra scadenza</button>
+                        </p>
+                    </div>
+                </section>
+
+                <section class="calendar-event-form-card supplier-document-form-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span>Pagamenti registrati</span>
+                    </div>
+                    <div class="supplier-document-table-wrap">
+                        <table class="list-table anagrafica-list-table finance-modern-table">
+                            <thead>
+                                <tr>
+                                    <th>Scadenza</th>
+                                    <th>Data pagamento</th>
+                                    <th>Importo</th>
+                                    <th>Metodo</th>
+                                    <th>Movimento</th>
+                                    <th class="mode-edit-only-table-cell">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scadenza in documento.scadenze.all %}
+                                    {% for pagamento in scadenza.pagamenti.all %}
+                                        <tr>
+                                            <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
+                                            <td>{{ pagamento.data_pagamento|date:"d/m/Y" }}</td>
+                                            <td>{{ pagamento.importo|euro }} &euro;</td>
+                                            <td>{{ pagamento.get_metodo_display }}</td>
+                                            <td>{{ pagamento.movimento_finanziario|default:"-" }}</td>
+                                            <td class="actions-cell mode-edit-only-table-cell">
+                                                <a href="{% url 'elimina_pagamento_fornitore' pagamento.pk %}" class="table-link table-link-danger">Annulla</a>
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
+                                            <td colspan="4"><span class="table-muted">Nessun pagamento registrato per questa scadenza.</span></td>
+                                            <td class="actions-cell mode-edit-only-table-cell">-</td>
+                                        </tr>
+                                    {% endfor %}
+                                    {% if scadenza.importo_residuo %}
+                                        <tr>
+                                            <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
+                                            <td colspan="4"><span class="table-muted">Residuo: {{ scadenza.importo_residuo|euro }} &euro;</span></td>
+                                            <td class="actions-cell mode-edit-only-table-cell">
+                                                <a href="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}" class="table-link">Registra pagamento</a>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6"><div class="empty-state">Nessuna scadenza pagamento presente.</div></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </fieldset>
+
+            <div class="form-actions sticky-form-actions mode-edit-only supplier-document-actions">
+                <button type="submit" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            </div>
+        </form>
+
+        <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
+        <script src="{% static 'js/core/view-mode.js' %}"></script>
+        <script src="{% static 'js/pages/documento-fornitore-form.js' %}?v=2"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                if (window.ArborisDocumentoFornitoreForm) {
+                    ArborisDocumentoFornitoreForm.init();
+                }
+                if (window.ArborisViewMode) {
+                    ArborisViewMode.init({
+                        formId: "documento-fornitore-form",
+                        lockContainerId: "documento-fornitore-lock-container",
+                        editButtonId: "enable-edit-documento-fornitore-btn",
+                        reloadOnCancel: true,
+                    });
+                }
+            });
+        </script>
+    </div>
+{% else %}
+    <div class="supplier-document-shell{% if popup %} is-popup{% endif %}">
     <div class="page-head family-page-head anagrafica-list-head finance-page-head">
         <div class="family-page-title-block">
             <div class="family-page-title-line">
@@ -32,13 +529,15 @@
                 {% if documento %}{{ documento.fornitore }}{% else %}Fattura, scadenze e allegato fornitore{% endif %}
             </div>
         </div>
-        <div class="page-head-actions family-page-actions">
-            {% if popup %}
-                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-                    <span class="btn-label">Chiudi</span>
+        {% if popup and documento %}
+            <div class="page-head-actions family-page-actions">
+                <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-documento-fornitore-btn">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                    <span class="btn-label">Modifica</span>
                 </button>
-            {% else %}
+            </div>
+        {% elif not popup %}
+            <div class="page-head-actions family-page-actions">
                 <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_documenti_fornitori' %}">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                     <span class="btn-label">Indietro</span>
@@ -53,15 +552,16 @@
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
                     <span class="btn-label">Elenco</span>
                 </a>
-            {% endif %}
-        </div>
+            </div>
+        {% endif %}
     </div>
 
-    <form method="post" enctype="multipart/form-data" class="detail-form" id="documento-fornitore-form">
+    <form method="post" enctype="multipart/form-data" class="detail-form{% if documento and popup %} is-view-mode{% else %} is-edit-mode{% endif %}" id="documento-fornitore-form">
         {% csrf_token %}
         {% if popup %}
             <input type="hidden" name="popup" value="1">
         {% endif %}
+        <fieldset id="documento-fornitore-lock-container" class="mode-lock-container" {% if documento and popup %}disabled{% endif %}>
         <div class="admin-section">
             <div class="admin-section-title">Dati documento</div>
             <div class="panel">
@@ -144,7 +644,7 @@
                                 <th>Stato</th>
                                 <th>Conto</th>
                                 <th>Movimento</th>
-                                <th>Elimina</th>
+                                <th class="mode-edit-only-table-cell">Elimina</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -177,7 +677,7 @@
                                         </div>
                                         {{ scadenza_form.movimento_finanziario.errors }}
                                     </td>
-                                    <td>
+                                    <td class="mode-edit-only-table-cell">
                                         {% if scadenza_form.instance.pk %}
                                             <span class="supplier-deadline-delete-field">{{ scadenza_form.DELETE }}</span>
                                             <button type="button" class="inline-remove-btn" data-inline-delete-existing="1">Elimina</button>
@@ -223,7 +723,7 @@
                                     </div>
                                 </div>
                             </td>
-                            <td><button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button></td>
+                            <td class="mode-edit-only-table-cell"><button type="button" class="inline-remove-btn" data-inline-remove="1">Rimuovi</button></td>
                         </tr>
                         <tr class="supplier-deadline-note-row">
                             <td colspan="8">
@@ -232,7 +732,7 @@
                             </td>
                         </tr>
                     </template>
-                    <p class="supplier-deadline-add-row">
+                    <p class="supplier-deadline-add-row mode-edit-only">
                         <button type="button" class="inline-add-btn supplier-deadline-add-btn" id="add-scadenza-fornitore">+ Aggiungi un'altra scadenza</button>
                     </p>
                 </div>
@@ -252,7 +752,7 @@
                                     <th>Importo</th>
                                     <th>Metodo</th>
                                     <th>Movimento</th>
-                                    <th>Azioni</th>
+                                    <th class="mode-edit-only-table-cell">Azioni</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -264,7 +764,7 @@
                                             <td>{{ pagamento.importo|euro }} &euro;</td>
                                             <td>{{ pagamento.get_metodo_display }}</td>
                                             <td>{{ pagamento.movimento_finanziario|default:"-" }}</td>
-                                            <td class="actions-cell">
+                                            <td class="actions-cell mode-edit-only-table-cell">
                                                 <a href="{% url 'elimina_pagamento_fornitore' pagamento.pk %}" class="table-link table-link-danger">Annulla</a>
                                             </td>
                                         </tr>
@@ -272,14 +772,14 @@
                                         <tr>
                                             <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
                                             <td colspan="4"><span class="table-muted">Nessun pagamento registrato per questa scadenza.</span></td>
-                                            <td class="actions-cell">-</td>
+                                            <td class="actions-cell mode-edit-only-table-cell">-</td>
                                         </tr>
                                     {% endfor %}
                                     {% if scadenza.importo_residuo %}
                                         <tr>
                                             <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
                                             <td colspan="4"><span class="table-muted">Residuo: {{ scadenza.importo_residuo|euro }} &euro;</span></td>
-                                            <td class="actions-cell">
+                                            <td class="actions-cell mode-edit-only-table-cell">
                                                 <a href="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}" class="table-link">Registra pagamento</a>
                                             </td>
                                         </tr>
@@ -295,8 +795,9 @@
                 </div>
             </div>
         {% endif %}
+        </fieldset>
 
-        <div class="form-actions sticky-form-actions">
+        <div class="form-actions sticky-form-actions mode-edit-only">
             <button type="submit" class="btn btn-primary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                 <span class="btn-label">Salva</span>
@@ -316,12 +817,23 @@
     </form>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
+    <script src="{% static 'js/core/view-mode.js' %}"></script>
     <script src="{% static 'js/pages/documento-fornitore-form.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisDocumentoFornitoreForm) {
                 ArborisDocumentoFornitoreForm.init();
             }
+            if (window.ArborisViewMode && document.getElementById("enable-edit-documento-fornitore-btn")) {
+                ArborisViewMode.init({
+                    formId: "documento-fornitore-form",
+                    lockContainerId: "documento-fornitore-lock-container",
+                    editButtonId: "enable-edit-documento-fornitore-btn",
+                    reloadOnCancel: true,
+                });
+            }
         });
     </script>
+    </div>
+{% endif %}
 {% endblock %}

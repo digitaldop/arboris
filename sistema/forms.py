@@ -8,6 +8,7 @@ from anagrafica.models import Indirizzo
 from anagrafica.forms import make_searchable_select
 from anagrafica.utils import validate_and_normalize_phone_number
 from .models import (
+    FeedbackSegnalazione,
     Scuola,
     ScuolaSocial,
     ScuolaTelefono,
@@ -244,6 +245,41 @@ class SistemaBackupDatabaseRestoreConfirmForm(forms.Form):
         return value
 
 
+class FeedbackSegnalazioneForm(forms.ModelForm):
+    class Meta:
+        model = FeedbackSegnalazione
+        fields = [
+            "tipo",
+            "messaggio",
+            "pagina_url",
+            "pagina_path",
+            "pagina_titolo",
+            "breadcrumb",
+        ]
+        widgets = {
+            "messaggio": forms.Textarea(
+                attrs={
+                    "rows": 5,
+                    "maxlength": "4000",
+                    "placeholder": "Scrivi qui cosa hai notato o cosa ti piacerebbe aggiungere...",
+                }
+            ),
+            "pagina_url": forms.HiddenInput(),
+            "pagina_path": forms.HiddenInput(),
+            "pagina_titolo": forms.HiddenInput(),
+            "breadcrumb": forms.HiddenInput(),
+        }
+        labels = {
+            "messaggio": "Messaggio",
+        }
+
+    def clean_messaggio(self):
+        messaggio = (self.cleaned_data.get("messaggio") or "").strip()
+        if not messaggio:
+            raise forms.ValidationError("Scrivi un messaggio prima di inviare.")
+        return messaggio
+
+
 class SistemaRuoloPermessiForm(forms.ModelForm):
     class Meta:
         model = SistemaRuoloPermessi
@@ -256,6 +292,7 @@ class SistemaRuoloPermessiForm(forms.ModelForm):
             "accesso_backup_database",
             "controllo_completo",
             "permesso_anagrafica",
+            "permesso_famiglie_interessate",
             "permesso_economia",
             "permesso_sistema",
             "permesso_calendario",
@@ -272,6 +309,7 @@ class SistemaRuoloPermessiForm(forms.ModelForm):
             "accesso_backup_database": "Accesso Backup Database",
             "controllo_completo": "Controllo completo",
             "permesso_anagrafica": "Modulo anagrafica",
+            "permesso_famiglie_interessate": "Modulo famiglie interessate",
             "permesso_economia": "Modulo economia",
             "permesso_sistema": "Modulo sistema",
             "permesso_calendario": "Modulo calendario",
@@ -378,6 +416,7 @@ class SistemaUtenteForm(forms.ModelForm):
                     "ruolo": ruolo_permessi.chiave_legacy or "",
                     "controllo_completo": ruolo_permessi.controllo_completo,
                     "permesso_anagrafica": ruolo_permessi.permesso_anagrafica,
+                    "permesso_famiglie_interessate": ruolo_permessi.permesso_famiglie_interessate,
                     "permesso_economia": ruolo_permessi.permesso_economia,
                     "permesso_sistema": ruolo_permessi.permesso_sistema,
                     "permesso_calendario": ruolo_permessi.permesso_calendario,

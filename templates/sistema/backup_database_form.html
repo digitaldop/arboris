@@ -223,7 +223,7 @@
                                                 {% endif %}
                                             </td>
                                             <td class="actions-cell">
-                                                <a href="{% url 'scarica_backup_database' backup.pk %}" class="table-link">Scarica</a>
+                                                <a href="{% url 'scarica_backup_database' backup.pk %}" class="table-link" download="{{ backup.nome_file }}" data-long-wait-skip="1">Scarica</a>
                                                 {% if can_access_database_backups %}
                                                     <span class="table-muted">|</span>
                                                     <form method="post" style="display: inline;">

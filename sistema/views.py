@@ -1,18 +1,25 @@
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from pathlib import Path
+from django.views.decorators.http import require_POST
 
 from .inline_context import scuola_inline_head
 from .forms import (
     ArborisAuthenticationForm,
+    FeedbackSegnalazioneForm,
     SistemaBackupDatabaseConfigurazioneForm,
     SistemaBackupDatabaseRestoreConfirmForm,
     SistemaBackupDatabaseUploadForm,
@@ -37,6 +44,7 @@ from .database_backups import (
 from .restore_scheduler import schedule_restore_job
 from .models import (
     AzioneOperazioneCronologia,
+    FeedbackSegnalazione,
     ModuloOperazioneCronologia,
     Scuola,
     SistemaDatabaseBackup,
@@ -45,7 +53,9 @@ from .models import (
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
+    StatoFeedbackSegnalazione,
     StatoRipristinoDatabase,
+    TipoFeedbackSegnalazione,
 )
 from anagrafica.dati_base_import import (
     default_gi_file_path,
@@ -54,12 +64,13 @@ from anagrafica.dati_base_import import (
     run_import_nazioni_belfiore,
 )
 
-from .permissions import operational_admin_required
+from .permissions import authenticated_user_required, get_user_permission_profile, operational_admin_required
 
 
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
 PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
 CRONOLOGIA_RESULT_LIMIT = 250
+FEEDBACK_PER_PAGE = 20
 
 
 def sync_user_profiles_for_role(ruolo):
@@ -67,6 +78,7 @@ def sync_user_profiles_for_role(ruolo):
         ruolo=ruolo.chiave_legacy or "",
         controllo_completo=ruolo.controllo_completo,
         permesso_anagrafica=ruolo.permesso_anagrafica,
+        permesso_famiglie_interessate=ruolo.permesso_famiglie_interessate,
         permesso_economia=ruolo.permesso_economia,
         permesso_sistema=ruolo.permesso_sistema,
         permesso_calendario=ruolo.permesso_calendario,
@@ -85,6 +97,130 @@ def resolve_safe_next_url(request, fallback_url_name="home"):
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         return next_url
     return reverse(fallback_url_name)
+
+
+def feedback_user_label(user):
+    if not user or not user.is_authenticated:
+        return ""
+    return user.get_full_name().strip() or user.email or user.username
+
+
+def feedback_user_role_label(user):
+    if not user or not user.is_authenticated:
+        return ""
+    profilo = get_user_permission_profile(user)
+    if profilo and profilo.ruolo_display:
+        return profilo.ruolo_display
+    if user.is_superuser:
+        return "Superuser"
+    if user.is_staff:
+        return "Staff tecnico"
+    return "Utente"
+
+
+def feedback_client_ip(request):
+    forwarded_for = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+    return forwarded_for or request.META.get("REMOTE_ADDR") or None
+
+
+def feedback_email_subject(feedback):
+    tipo_label = "Bug" if feedback.tipo == TipoFeedbackSegnalazione.BUG else "Funzione"
+    pagina = feedback.pagina_titolo or feedback.pagina_path or "Pagina non specificata"
+    return f"[Arboris Beta][{tipo_label}] {pagina[:110]}"
+
+
+def feedback_email_body(feedback):
+    return "\n".join(
+        [
+            "Nuova segnalazione beta Arboris",
+            "",
+            f"Tipo: {feedback.get_tipo_display()}",
+            f"Data invio: {timezone.localtime(feedback.data_creazione):%d/%m/%Y %H:%M:%S}",
+            "",
+            "Utente",
+            f"- Nome: {feedback.utente_nome or '-'}",
+            f"- Email: {feedback.utente_email or '-'}",
+            f"- Ruolo: {feedback.utente_ruolo or '-'}",
+            f"- ID utente: {feedback.utente_id or '-'}",
+            f"- IP: {feedback.ip_address or '-'}",
+            "",
+            "Punto del software",
+            f"- Titolo pagina: {feedback.pagina_titolo or '-'}",
+            f"- URL: {feedback.pagina_url or '-'}",
+            f"- Path: {feedback.pagina_path or '-'}",
+            f"- Breadcrumb: {feedback.breadcrumb or '-'}",
+            f"- Referer: {feedback.referer or '-'}",
+            f"- Browser: {feedback.user_agent or '-'}",
+            "",
+            "Messaggio",
+            feedback.messaggio,
+        ]
+    )
+
+
+def invia_email_feedback(feedback):
+    recipient = (
+        getattr(settings, "BETA_FEEDBACK_RECIPIENT_EMAIL", "")
+        or "gliptica.software@gmail.com"
+    ).strip()
+    feedback.email_destinatario = recipient
+    feedback.save(update_fields=["email_destinatario", "data_aggiornamento"])
+
+    try:
+        send_mail(
+            feedback_email_subject(feedback),
+            feedback_email_body(feedback),
+            getattr(settings, "DEFAULT_FROM_EMAIL", "webmaster@localhost"),
+            [recipient],
+            fail_silently=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - il feedback non deve andare perso se l'e-mail fallisce.
+        feedback.email_errore = str(exc)
+        feedback.save(update_fields=["email_errore", "data_aggiornamento"])
+        return False
+
+    feedback.email_inviata_at = timezone.now()
+    feedback.email_errore = ""
+    feedback.save(update_fields=["email_inviata_at", "email_errore", "data_aggiornamento"])
+    return True
+
+
+@authenticated_user_required
+@require_POST
+def crea_feedback_beta(request):
+    form = FeedbackSegnalazioneForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "ok": False,
+                "errors": form.errors.get_json_data(),
+                "message": "Controlla il messaggio e riprova.",
+            },
+            status=400,
+        )
+
+    feedback = form.save(commit=False)
+    feedback.utente = request.user
+    feedback.utente_nome = feedback_user_label(request.user)
+    feedback.utente_email = request.user.email or request.user.username
+    feedback.utente_ruolo = feedback_user_role_label(request.user)
+    feedback.user_agent = request.META.get("HTTP_USER_AGENT", "")
+    feedback.referer = request.META.get("HTTP_REFERER", "")
+    feedback.ip_address = feedback_client_ip(request)
+    feedback.email_destinatario = (
+        getattr(settings, "BETA_FEEDBACK_RECIPIENT_EMAIL", "")
+        or "gliptica.software@gmail.com"
+    ).strip()
+    feedback.save()
+    email_sent = invia_email_feedback(feedback)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "email_sent": email_sent,
+            "message": "Segnalazione inviata. Grazie!",
+        }
+    )
 
 
 def login_view(request):
@@ -527,6 +663,76 @@ def cronologia_operazioni_sistema(request):
             "count_eliminazioni": riepilogo["count_eliminazioni"] or 0,
             "is_truncated": totale_operazioni > len(operazioni),
             "result_limit": CRONOLOGIA_RESULT_LIMIT,
+        },
+    )
+
+
+@operational_admin_required
+def lista_feedback_segnalazioni(request):
+    q = (request.GET.get("q") or "").strip()
+    tipo = (request.GET.get("tipo") or "").strip()
+    stato = (request.GET.get("stato") or "").strip()
+    email_status = (request.GET.get("email_status") or "").strip()
+
+    tipo_values = {value for value, _label in TipoFeedbackSegnalazione.choices}
+    stato_values = {value for value, _label in StatoFeedbackSegnalazione.choices}
+
+    if tipo not in tipo_values:
+        tipo = ""
+    if stato not in stato_values:
+        stato = ""
+    if email_status not in {"sent", "error", "pending"}:
+        email_status = ""
+
+    feedback_qs = FeedbackSegnalazione.objects.select_related("utente").order_by("-data_creazione", "-id")
+
+    if q:
+        feedback_qs = feedback_qs.filter(
+            Q(messaggio__icontains=q)
+            | Q(utente_nome__icontains=q)
+            | Q(utente_email__icontains=q)
+            | Q(pagina_titolo__icontains=q)
+            | Q(pagina_path__icontains=q)
+        )
+    if tipo:
+        feedback_qs = feedback_qs.filter(tipo=tipo)
+    if stato:
+        feedback_qs = feedback_qs.filter(stato=stato)
+    if email_status == "sent":
+        feedback_qs = feedback_qs.filter(email_inviata_at__isnull=False)
+    elif email_status == "error":
+        feedback_qs = feedback_qs.filter(email_inviata_at__isnull=True).exclude(email_errore="")
+    elif email_status == "pending":
+        feedback_qs = feedback_qs.filter(email_inviata_at__isnull=True, email_errore="")
+
+    riepilogo = feedback_qs.aggregate(
+        count_bug=Count("id", filter=Q(tipo=TipoFeedbackSegnalazione.BUG)),
+        count_funzioni=Count("id", filter=Q(tipo=TipoFeedbackSegnalazione.FUNZIONE)),
+        count_email_errori=Count("id", filter=Q(email_inviata_at__isnull=True) & ~Q(email_errore="")),
+    )
+
+    querystring = request.GET.copy()
+    querystring.pop("page", None)
+    paginator = Paginator(feedback_qs, FEEDBACK_PER_PAGE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "sistema/feedback_segnalazioni_list.html",
+        {
+            "feedback_page_obj": page_obj,
+            "feedback_list": page_obj.object_list,
+            "q": q,
+            "tipo": tipo,
+            "stato": stato,
+            "email_status": email_status,
+            "tipi_feedback": TipoFeedbackSegnalazione.choices,
+            "stati_feedback": StatoFeedbackSegnalazione.choices,
+            "count_totale": paginator.count,
+            "count_bug": riepilogo["count_bug"] or 0,
+            "count_funzioni": riepilogo["count_funzioni"] or 0,
+            "count_email_errori": riepilogo["count_email_errori"] or 0,
+            "feedback_querystring": querystring.urlencode(),
         },
     )
 

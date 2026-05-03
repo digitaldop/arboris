@@ -583,6 +583,93 @@ class SistemaDatabaseRestoreJob(models.Model):
         return filesizeformat(self.dimensione_file_bytes or 0)
 
 
+class TipoFeedbackSegnalazione(models.TextChoices):
+    BUG = "bug", "Segnalazione bug"
+    FUNZIONE = "funzione", "Suggerimento funzione"
+
+
+class StatoFeedbackSegnalazione(models.TextChoices):
+    NUOVA = "nuova", "Nuova"
+    LETTA = "letta", "Letta"
+    ARCHIVIATA = "archiviata", "Archiviata"
+
+
+class FeedbackSegnalazione(models.Model):
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoFeedbackSegnalazione.choices,
+        db_index=True,
+    )
+    stato = models.CharField(
+        max_length=20,
+        choices=StatoFeedbackSegnalazione.choices,
+        default=StatoFeedbackSegnalazione.NUOVA,
+        db_index=True,
+    )
+    messaggio = models.TextField()
+    utente = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="feedback_segnalazioni",
+        blank=True,
+        null=True,
+    )
+    utente_nome = models.CharField(max_length=255, blank=True)
+    utente_email = models.EmailField(blank=True)
+    utente_ruolo = models.CharField(max_length=255, blank=True)
+    pagina_url = models.TextField(blank=True)
+    pagina_path = models.CharField(max_length=700, blank=True)
+    pagina_titolo = models.CharField(max_length=255, blank=True)
+    breadcrumb = models.TextField(blank=True)
+    user_agent = models.TextField(blank=True)
+    referer = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    email_destinatario = models.EmailField(default="gliptica.software@gmail.com")
+    email_inviata_at = models.DateTimeField(blank=True, null=True)
+    email_errore = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True, db_index=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sistema_feedback_segnalazione"
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Feedback beta"
+        verbose_name_plural = "Feedback beta"
+        indexes = [
+            models.Index(fields=["tipo", "data_creazione"], name="sistema_feedback_tipo_idx"),
+            models.Index(fields=["stato", "data_creazione"], name="sistema_feedback_stato_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.utente_display}"
+
+    @property
+    def utente_display(self):
+        return self.utente_nome or self.utente_email or "Utente non disponibile"
+
+    @property
+    def email_status_label(self):
+        if self.email_inviata_at:
+            return "Inviata"
+        if self.email_errore:
+            return "Errore invio"
+        return "Da inviare"
+
+    @property
+    def email_status_class(self):
+        if self.email_inviata_at:
+            return "feedback-email-sent"
+        if self.email_errore:
+            return "feedback-email-error"
+        return "feedback-email-pending"
+
+    @property
+    def tipo_badge_class(self):
+        if self.tipo == TipoFeedbackSegnalazione.BUG:
+            return "feedback-type-bug"
+        return "feedback-type-feature"
+
+
 class AzioneOperazioneCronologia(models.TextChoices):
     CREAZIONE = "create", "Creazione"
     MODIFICA = "update", "Modifica"
@@ -591,6 +678,7 @@ class AzioneOperazioneCronologia(models.TextChoices):
 
 class ModuloOperazioneCronologia(models.TextChoices):
     ANAGRAFICA = "anagrafica", "Anagrafica"
+    FAMIGLIE_INTERESSATE = "famiglie_interessate", "Famiglie interessate"
     ECONOMIA = "economia", "Economia"
     SCUOLA = "scuola", "Scuola"
     CALENDARIO = "calendario", "Calendario"
@@ -696,6 +784,7 @@ class RuoloUtente(models.TextChoices):
 
 PERMISSION_MODULE_FIELDS = {
     "anagrafica": "permesso_anagrafica",
+    "famiglie_interessate": "permesso_famiglie_interessate",
     "economia": "permesso_economia",
     "sistema": "permesso_sistema",
     "calendario": "permesso_calendario",
@@ -762,6 +851,11 @@ class SistemaRuoloPermessi(models.Model):
         help_text="Permette agli utenti con questo ruolo di accedere e gestire tutte le sezioni del software.",
     )
     permesso_anagrafica = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
+    permesso_famiglie_interessate = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
         default=LivelloPermesso.NESSUNO,
@@ -886,6 +980,11 @@ class SistemaUtentePermessi(models.Model):
         choices=LivelloPermesso.choices,
         default=LivelloPermesso.NESSUNO,
     )
+    permesso_famiglie_interessate = models.CharField(
+        max_length=10,
+        choices=LivelloPermesso.choices,
+        default=LivelloPermesso.NESSUNO,
+    )
     permesso_economia = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
@@ -935,6 +1034,7 @@ class SistemaUtentePermessi(models.Model):
 
         mapping = {
             "anagrafica": self.permesso_anagrafica,
+            "famiglie_interessate": self.permesso_famiglie_interessate,
             "economia": self.permesso_economia,
             "sistema": self.permesso_sistema,
             "calendario": self.permesso_calendario,
@@ -997,6 +1097,10 @@ class SistemaUtentePermessi(models.Model):
     @property
     def permesso_anagrafica_effettivo_display(self):
         return self.get_module_level_display_value("anagrafica")
+
+    @property
+    def permesso_famiglie_interessate_effettivo_display(self):
+        return self.get_module_level_display_value("famiglie_interessate")
 
     @property
     def permesso_economia_effettivo_display(self):

@@ -1,0 +1,358 @@
+{% extends base_template %}
+{% load static %}
+
+{% block title %}{% if famiglia %}{{ famiglia.nome_display }}{% else %}Nuova famiglia interessata{% endif %} - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_famiglie_interessate' %}">Famiglie interessate</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if famiglia %}{{ famiglia.nome_display }}{% else %}Nuova{% endif %}</span>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="interested-detail-shell{% if popup %} is-popup{% endif %}">
+        <div class="page-head family-page-head anagrafica-list-head interested-page-head">
+            <span class="interested-page-hero-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+            <div class="family-page-title-block">
+                <div class="family-page-title-line">
+                    <h1 class="page-title">{% if famiglia %}{{ famiglia.nome_display }}{% else %}Nuova famiglia interessata{% endif %}</h1>
+                    <span class="family-status-pill {% if famiglia %}{{ famiglia.stato_badge_class }}{% else %}is-muted{% endif %}">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {% if famiglia %}{{ famiglia.get_stato_display }}{% else %}Nuovo contatto{% endif %}
+                    </span>
+                </div>
+                <div class="family-page-address">
+                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+                    {% if famiglia and famiglia.contatto_display %}{{ famiglia.contatto_display }}{% else %}Scheda semplificata per la fase pre-iscrizione{% endif %}
+                </div>
+            </div>
+            <div class="page-head-actions family-page-actions">
+                {% if not popup %}
+                    <a href="{% url 'lista_famiglie_interessate' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Elenco</span>
+                    </a>
+                {% endif %}
+                {% if famiglia and can_manage_famiglie_interessate %}
+                    <a href="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1&followup=1" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
+                        <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                        <span class="btn-label">Follow-up</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if famiglia %}
+            <section class="interested-summary-grid interested-detail-summary">
+                <article class="interested-summary-card">
+                    <span class="interested-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                    <div>
+                        <span class="interested-summary-label">Referenti</span>
+                        <strong>{{ referenti_formset.initial_form_count }}</strong>
+                    </div>
+                </article>
+                <article class="interested-summary-card">
+                    <span class="interested-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
+                    <div>
+                        <span class="interested-summary-label">Minori</span>
+                        <strong>{{ minori_formset.initial_form_count }}</strong>
+                    </div>
+                </article>
+                <article class="interested-summary-card">
+                    <span class="interested-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                    <div>
+                        <span class="interested-summary-label">Attivita</span>
+                        <strong>{{ attivita|length }}</strong>
+                    </div>
+                </article>
+                <article class="interested-summary-card">
+                    <span class="interested-summary-icon is-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                    <div>
+                        <span class="interested-summary-label">Anno interesse</span>
+                        <strong>{{ famiglia.anno_scolastico_interesse|default:"-" }}</strong>
+                    </div>
+                </article>
+            </section>
+        {% endif %}
+
+        <form method="post" id="famiglia-interessata-form" class="detail-form interested-form{% if has_form_errors %} has-form-errors{% endif %}" data-interested-family-form>
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <fieldset {% if not can_manage_famiglie_interessate %}disabled{% endif %}>
+                <section class="interested-editor-layout">
+                    <div class="interested-editor-main">
+                        <section class="interested-card interested-section">
+                            <header class="interested-card-head">
+                                <span class="interested-card-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+                                <div>
+                                    <h2>Dati contatto</h2>
+                                    <span>Informazioni essenziali della famiglia</span>
+                                </div>
+                            </header>
+                            <div class="interested-card-body">
+                                {{ form.non_field_errors }}
+                                <div class="interested-form-grid">
+                                    <label class="interested-field is-wide">
+                                        <span>{{ form.nome.label }}</span>
+                                        {{ form.nome }}
+                                        {{ form.nome.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.referente_principale.label }}</span>
+                                        {{ form.referente_principale }}
+                                        {{ form.referente_principale.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.telefono.label }}</span>
+                                        {{ form.telefono }}
+                                        {{ form.telefono.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.email.label }}</span>
+                                        {{ form.email }}
+                                        {{ form.email.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.fonte_contatto.label }}</span>
+                                        {{ form.fonte_contatto }}
+                                        {{ form.fonte_contatto.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.fonte_note.label }}</span>
+                                        {{ form.fonte_note }}
+                                        {{ form.fonte_note.errors }}
+                                    </label>
+                                    <label class="interested-field is-wide">
+                                        <span>{{ form.note.label }}</span>
+                                        {{ form.note }}
+                                        {{ form.note.errors }}
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <aside class="interested-editor-side">
+                        <section class="interested-card interested-section">
+                            <header class="interested-card-head">
+                                <span class="interested-card-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                                <div>
+                                    <h2>Stato percorso</h2>
+                                    <span>Priorita e interesse scolastico</span>
+                                </div>
+                            </header>
+                            <div class="interested-card-body interested-status-body">
+                                <div class="interested-status-fields">
+                                    <label class="interested-field">
+                                        <span>{{ form.stato.label }}</span>
+                                        {{ form.stato }}
+                                        {{ form.stato.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.priorita.label }}</span>
+                                        {{ form.priorita }}
+                                        {{ form.priorita.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.anno_scolastico_interesse.label }}</span>
+                                        {{ form.anno_scolastico_interesse }}
+                                        {{ form.anno_scolastico_interesse.errors }}
+                                    </label>
+                                    <label class="interested-field">
+                                        <span>{{ form.classe_eta_interesse.label }}</span>
+                                        {{ form.classe_eta_interesse }}
+                                        {{ form.classe_eta_interesse.errors }}
+                                    </label>
+                                    <label class="interested-check interested-privacy-check">
+                                        {{ form.privacy_consenso }}
+                                        <span>{{ form.privacy_consenso.label }}</span>
+                                        {{ form.privacy_consenso.errors }}
+                                    </label>
+                                </div>
+                                <aside class="interested-suggestion-card">
+                                    <span class="interested-suggestion-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#lightbulb"></use></svg></span>
+                                    <strong>Suggerimento</strong>
+                                    <p>Imposta priorita e anno di interesse per organizzare meglio follow-up e colloqui.</p>
+                                </aside>
+                            </div>
+                        </section>
+                    </aside>
+                </section>
+
+                <section class="interested-two-column">
+                    <div class="interested-card interested-section">
+                        <header class="interested-card-head interested-card-head-actions">
+                            <span class="interested-card-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                            <div>
+                                <h2>Referenti</h2>
+                                <span>Persone da contattare</span>
+                            </div>
+                            {% if can_manage_famiglie_interessate %}
+                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text interested-add-inline-btn" data-formset-add="referenti">
+                                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                                    <span class="btn-label">Aggiungi referente</span>
+                                </button>
+                            {% endif %}
+                        </header>
+                        <div class="interested-card-body">
+                            {{ referenti_formset.management_form }}
+                            <div class="interested-inline-list" data-formset-list="referenti">
+                                {% for ref_form in referenti_formset.forms %}
+                                    <div class="interested-inline-row" data-formset-row="referenti">
+                                        {% for hidden in ref_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                        <label><span>Nome</span>{{ ref_form.nome }}{{ ref_form.nome.errors }}</label>
+                                        <label><span>Relazione</span>{{ ref_form.relazione }}{{ ref_form.relazione.errors }}</label>
+                                        <label><span>Telefono</span>{{ ref_form.telefono }}{{ ref_form.telefono.errors }}</label>
+                                        <label><span>Email</span>{{ ref_form.email }}{{ ref_form.email.errors }}</label>
+                                        <label><span>Note</span>{{ ref_form.note }}{{ ref_form.note.errors }}</label>
+                                        <label class="interested-inline-check">{{ ref_form.principale }} <span>Principale</span></label>
+                                        {% if ref_form.instance.pk %}
+                                            <label class="interested-inline-check is-danger">{{ ref_form.DELETE }} <span>Elimina</span></label>
+                                        {% else %}
+                                            <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <template data-formset-empty="referenti">
+                                <div class="interested-inline-row" data-formset-row="referenti">
+                                    {% for hidden in referenti_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                    <label><span>Nome</span>{{ referenti_formset.empty_form.nome }}</label>
+                                    <label><span>Relazione</span>{{ referenti_formset.empty_form.relazione }}</label>
+                                    <label><span>Telefono</span>{{ referenti_formset.empty_form.telefono }}</label>
+                                    <label><span>Email</span>{{ referenti_formset.empty_form.email }}</label>
+                                    <label><span>Note</span>{{ referenti_formset.empty_form.note }}</label>
+                                    <label class="interested-inline-check">{{ referenti_formset.empty_form.principale }} <span>Principale</span></label>
+                                    <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="interested-card interested-section">
+                        <header class="interested-card-head interested-card-head-actions">
+                            <span class="interested-card-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
+                            <div>
+                                <h2>Bambini</h2>
+                                <span>Figli o minori per cui la famiglia chiede informazioni</span>
+                            </div>
+                            {% if can_manage_famiglie_interessate %}
+                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text interested-add-inline-btn" data-formset-add="minori">
+                                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                                    <span class="btn-label">Aggiungi bambino</span>
+                                </button>
+                            {% endif %}
+                        </header>
+                        <div class="interested-card-body">
+                            {{ minori_formset.management_form }}
+                            <div class="interested-inline-list" data-formset-list="minori">
+                                {% for minore_form in minori_formset.forms %}
+                                    <div class="interested-inline-row" data-formset-row="minori">
+                                        {% for hidden in minore_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                        <label><span>Nome</span>{{ minore_form.nome }}{{ minore_form.nome.errors }}</label>
+                                        <label><span>Cognome</span>{{ minore_form.cognome }}{{ minore_form.cognome.errors }}</label>
+                                        <label><span>Data nascita</span>{{ minore_form.data_nascita }}{{ minore_form.data_nascita.errors }}</label>
+                                        <label><span>Eta indicativa</span>{{ minore_form.eta_indicativa }}{{ minore_form.eta_indicativa.errors }}</label>
+                                        <label><span>Classe / fascia</span>{{ minore_form.classe_eta_interesse }}{{ minore_form.classe_eta_interesse.errors }}</label>
+                                        <label><span>Note</span>{{ minore_form.note }}{{ minore_form.note.errors }}</label>
+                                        {% if minore_form.instance.pk %}
+                                            <label class="interested-inline-check is-danger">{{ minore_form.DELETE }} <span>Elimina</span></label>
+                                        {% else %}
+                                            <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <template data-formset-empty="minori">
+                                <div class="interested-inline-row" data-formset-row="minori">
+                                    {% for hidden in minori_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                    <label><span>Nome</span>{{ minori_formset.empty_form.nome }}</label>
+                                    <label><span>Cognome</span>{{ minori_formset.empty_form.cognome }}</label>
+                                    <label><span>Data nascita</span>{{ minori_formset.empty_form.data_nascita }}</label>
+                                    <label><span>Eta indicativa</span>{{ minori_formset.empty_form.eta_indicativa }}</label>
+                                    <label><span>Classe / fascia</span>{{ minori_formset.empty_form.classe_eta_interesse }}</label>
+                                    <label><span>Note</span>{{ minori_formset.empty_form.note }}</label>
+                                    <button type="button" class="interested-inline-remove" data-formset-remove>Rimuovi riga</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            {% if can_manage_famiglie_interessate %}
+                <div class="form-actions sticky-form-actions interested-sticky-actions">
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close();">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Chiudi</span>
+                        </button>
+                    {% else %}
+                        <a href="{% url 'lista_famiglie_interessate' %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </a>
+                    {% endif %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text interested-save-action">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva scheda</span>
+                    </button>
+                </div>
+            {% endif %}
+        </form>
+
+        {% if famiglia %}
+            <section class="admin-section interested-section interested-activity-section">
+                <div class="admin-section-title admin-section-title-actionbar">
+                    <span class="admin-section-title-label">
+                        <span class="admin-section-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        Attivita e follow-up
+                    </span>
+                    {% if can_manage_famiglie_interessate %}
+                        <div class="admin-section-title-actions">
+                            <a href="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1" class="admin-section-title-btn" data-window-popup="1" data-popup-url="{% url 'crea_attivita_famiglia_interessata' famiglia.pk %}?popup=1" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                <span>Nuova attivita</span>
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="panel">
+                    <div class="panel-body">
+                        {% if attivita %}
+                            <div class="interested-timeline">
+                                {% for item in attivita %}
+                                    <article class="interested-timeline-item {% if item.is_overdue %}is-overdue{% endif %}">
+                                        <span class="interested-timeline-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                                        <div class="interested-timeline-content">
+                                            <div class="interested-timeline-head">
+                                                <strong>{{ item.calendar_title }}</strong>
+                                                <span class="anagrafica-status-chip {% if item.is_overdue %}is-warning{% else %}is-info{% endif %}">{{ item.get_stato_display }}</span>
+                                            </div>
+                                            <div class="table-subtext">
+                                                {% if item.data_programmata %}{{ item.data_programmata|date:"d/m/Y H:i" }}{% else %}Senza data{% endif %}
+                                                {% if item.assegnata_a %} - {{ item.assegnata_a.get_full_name|default:item.assegnata_a.email }}{% endif %}
+                                            </div>
+                                            {% if item.descrizione %}<p>{{ item.descrizione }}</p>{% endif %}
+                                            {% if item.esito %}<p class="interested-timeline-result">{{ item.esito }}</p>{% endif %}
+                                        </div>
+                                        <a href="{% url 'modifica_attivita_famiglia_interessata' item.pk %}?popup=1" class="btn btn-secondary btn-sm interested-timeline-action" data-window-popup="1" data-popup-url="{% url 'modifica_attivita_famiglia_interessata' item.pk %}?popup=1" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">Apri</a>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">Ancora nessuna attivita registrata per questa famiglia.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+        {% endif %}
+    </div>
+    <script src="{% static 'js/pages/famiglie-interessate-form.js' %}?v=2"></script>
+{% endblock %}

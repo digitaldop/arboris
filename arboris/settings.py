@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'sistema',
     'scuola',
     'calendario',
+    'famiglie_interessate.apps.FamiglieInteressateConfig',
     'economia',
     'fondo_accantonamento.apps.FondoAccantonamentoConfig',
     'servizi_extra',
@@ -206,6 +207,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
+
+BETA_FEEDBACK_RECIPIENT_EMAIL = os.environ.get(
+    "BETA_FEEDBACK_RECIPIENT_EMAIL",
+    "gliptica.software@gmail.com",
+).strip()
+
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+).strip()
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost").strip()
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "25") or 25)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=False)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", default=False)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Arboris <no-reply@arboris.local>").strip()
 
 #Aggiungo la regola per i file da caricare nella cartella media
 MEDIA_URL = "/media/"

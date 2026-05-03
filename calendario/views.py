@@ -25,6 +25,7 @@ from .models import (
     CategoriaCalendario,
     EventoCalendario,
     SYSTEM_CATEGORY_DOCUMENTS,
+    SYSTEM_CATEGORY_INTERESTED_FAMILIES,
     SYSTEM_CATEGORY_RATE_DUE,
     SYSTEM_CATEGORY_SUPPLIER_DUE,
     ensure_system_calendar_categories,
@@ -141,10 +142,11 @@ def build_event_initial_from_request(request):
 
 def calendario_agenda(request):
     initial_view, initial_date = resolve_calendar_initial_state(request)
-    agenda_bundle = build_calendar_agenda_bundle()
+    agenda_bundle = build_calendar_agenda_bundle(user=request.user)
     list_bundle = build_calendar_list_bundle(
         categoria_filter=(request.GET.get("categoria") or "").strip(),
         query=(request.GET.get("q") or "").strip(),
+        user=request.user,
     )
     calendar_records = agenda_bundle["records"]
     categorie = agenda_bundle["categories"]
@@ -176,7 +178,7 @@ def calendario_agenda(request):
 def lista_eventi_calendario(request):
     categoria = (request.GET.get("categoria") or "").strip()
     q = (request.GET.get("q") or "").strip()
-    list_bundle = build_calendar_list_bundle(categoria_filter=categoria, query=q)
+    list_bundle = build_calendar_list_bundle(categoria_filter=categoria, query=q, user=request.user)
     context = build_event_list_context(request, list_bundle)
 
     return render(
@@ -202,6 +204,12 @@ def lista_categorie_calendario(request):
         auto_counts[system_categories[SYSTEM_CATEGORY_SUPPLIER_DUE].pk] = ScadenzaPagamentoFornitore.objects.filter(
             data_scadenza__isnull=False
         ).count()
+    if system_categories.get(SYSTEM_CATEGORY_INTERESTED_FAMILIES):
+        from famiglie_interessate.models import AttivitaFamigliaInteressata
+
+        auto_counts[system_categories[SYSTEM_CATEGORY_INTERESTED_FAMILIES].pk] = (
+            AttivitaFamigliaInteressata.objects.filter(calendarizza=True, data_programmata__isnull=False).count()
+        )
 
     categorie = CategoriaCalendario.objects.annotate(count_eventi=Count("eventi")).order_by("ordine", "nome")
     for categoria in categorie:

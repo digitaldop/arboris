@@ -15,6 +15,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("privacy/", views.informativa_privacy, name="informativa_privacy"),
     path("termini-e-condizioni/", views.termini_e_condizioni, name="termini_condizioni"),
+    path("feedback/beta/", views.crea_feedback_beta, name="crea_feedback_beta"),
     path("sistema/scuola/", sistema_edit(views.scuola_sistema), name="scuola_sistema"),
     path("sistema/scuola/indirizzi/nuovo/", sistema_edit(anagrafica_views.crea_indirizzo), name="scuola_crea_indirizzo"),
     path(
@@ -56,6 +57,11 @@ urlpatterns = [
         "sistema/cronologia-operazioni/",
         views.cronologia_operazioni_sistema,
         name="cronologia_operazioni_sistema",
+    ),
+    path(
+        "sistema/feedback/",
+        views.lista_feedback_segnalazioni,
+        name="lista_feedback_segnalazioni",
     ),
     path("sistema/utenti/", sistema_view(views.lista_utenti), name="lista_utenti"),
     path("sistema/utenti/ruoli/", sistema_view(views.lista_ruoli_utenti), name="lista_ruoli_utenti"),

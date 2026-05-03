@@ -30,6 +30,7 @@ def add_years_preserving_day(base_date, years):
 SYSTEM_CATEGORY_RATE_DUE = "scadenze_rette"
 SYSTEM_CATEGORY_DOCUMENTS = "documenti"
 SYSTEM_CATEGORY_SUPPLIER_DUE = "scadenze_fornitori"
+SYSTEM_CATEGORY_INTERESTED_FAMILIES = "famiglie_interessate"
 SYSTEM_CATEGORY_DEFINITIONS = (
     {
         "key": SYSTEM_CATEGORY_RATE_DUE,
@@ -45,6 +46,11 @@ SYSTEM_CATEGORY_DEFINITIONS = (
         "key": SYSTEM_CATEGORY_SUPPLIER_DUE,
         "name": "Scadenze fornitori",
         "color": "#0f766e",
+    },
+    {
+        "key": SYSTEM_CATEGORY_INTERESTED_FAMILIES,
+        "name": "Famiglie interessate",
+        "color": "#417690",
     },
 )
 

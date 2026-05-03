@@ -1663,7 +1663,7 @@ def home(request):
         if prossimo_anno_scolastico
         else build_economia_dashboard_data(None)
     )
-    calendario_dashboard = build_dashboard_calendar_data()
+    calendario_dashboard = build_dashboard_calendar_data(user=request.user)
     gestione_finanziaria_dashboard = (
         build_home_financial_dashboard_data()
         if can_view_gestione_finanziaria

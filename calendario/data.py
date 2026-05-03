@@ -5,12 +5,16 @@ from django.utils import timezone
 
 from anagrafica.models import Documento
 from economia.models import RataIscrizione
+from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+from sistema.models import LivelloPermesso
+from sistema.permissions import user_has_module_permission
 
 from .models import (
     CategoriaCalendario,
     EventoCalendario,
     SYSTEM_CATEGORY_DOCUMENTS,
+    SYSTEM_CATEGORY_INTERESTED_FAMILIES,
     SYSTEM_CATEGORY_RATE_DUE,
     SYSTEM_CATEGORY_SUPPLIER_DUE,
     ensure_system_calendar_categories,
@@ -263,6 +267,68 @@ def get_document_owner_metadata(documento):
     return "Documento", ""
 
 
+def can_include_interested_family_records(user):
+    if user is None:
+        return True
+    return user_has_module_permission(user, "famiglie_interessate", LivelloPermesso.VISUALIZZAZIONE)
+
+
+def build_interested_family_activity_records(system_categories=None, user=None):
+    if not can_include_interested_family_records(user):
+        return []
+
+    system_categories = system_categories or ensure_system_calendar_categories()
+    categoria = system_categories.get(SYSTEM_CATEGORY_INTERESTED_FAMILIES)
+    if not categoria:
+        return []
+
+    records = []
+    attivita_qs = (
+        AttivitaFamigliaInteressata.objects.filter(
+            calendarizza=True,
+            data_programmata__isnull=False,
+        )
+        .exclude(stato=StatoAttivitaFamigliaInteressata.ANNULLATA)
+        .select_related("famiglia", "assegnata_a")
+        .order_by("data_programmata", "id")
+    )
+    for attivita in attivita_qs:
+        start_dt = attivita.calendar_start
+        end_dt = attivita.calendar_end
+        if not start_dt or not end_dt:
+            continue
+
+        detail_parts = [attivita.get_tipo_display(), attivita.get_stato_display()]
+        if attivita.assegnata_a_id:
+            assignee = attivita.assegnata_a.get_full_name().strip() or attivita.assegnata_a.email
+            if assignee:
+                detail_parts.append(assignee)
+
+        records.append(
+            build_calendar_entry_record(
+                f"famiglia-interessata-attivita-{attivita.pk}",
+                "famiglia_interessata",
+                attivita.calendar_title,
+                categoria,
+                start_dt.date(),
+                end_dt.date(),
+                detail_label=" - ".join([part for part in detail_parts if part]),
+                start_time=format_time_value(start_dt.time()),
+                end_time=format_time_value(end_dt.time()),
+                all_day=False,
+                location=attivita.luogo,
+                description=attivita.descrizione or attivita.esito or attivita.famiglia.nome_display,
+                url=reverse("modifica_attivita_famiglia_interessata", kwargs={"pk": attivita.pk}),
+                external=False,
+                open_in_popup=True,
+                popup_title="Attivita famiglia interessata",
+                action_label="Apri attivita",
+            )
+        )
+
+    return records
+
+
 def build_calendar_deadline_records(system_categories=None):
     system_categories = system_categories or ensure_system_calendar_categories()
     records = []
@@ -377,7 +443,7 @@ def build_calendar_deadline_records(system_categories=None):
     return records
 
 
-def build_calendar_agenda_bundle():
+def build_calendar_agenda_bundle(user=None):
     system_categories = ensure_system_calendar_categories()
     categorie = list(CategoriaCalendario.objects.order_by("ordine", "nome"))
     eventi_locali = list(
@@ -392,6 +458,7 @@ def build_calendar_agenda_bundle():
             records.append(build_local_calendar_occurrence_record(evento, occurrence))
 
     records.extend(build_calendar_deadline_records(system_categories))
+    records.extend(build_interested_family_activity_records(system_categories, user=user))
     records.sort(key=get_calendar_record_sort_key)
 
     counts_by_category = {}
@@ -425,7 +492,7 @@ def record_matches_query(record, query):
     return normalized_query in haystack
 
 
-def build_calendar_list_bundle(categoria_filter="", query=""):
+def build_calendar_list_bundle(categoria_filter="", query="", user=None):
     system_categories = ensure_system_calendar_categories()
     categorie = list(CategoriaCalendario.objects.order_by("ordine", "nome"))
     eventi_locali = list(
@@ -434,6 +501,7 @@ def build_calendar_list_bundle(categoria_filter="", query=""):
 
     all_records = [build_local_calendar_list_record(evento) for evento in eventi_locali]
     all_records.extend(build_calendar_deadline_records(system_categories))
+    all_records.extend(build_interested_family_activity_records(system_categories, user=user))
     all_records.sort(key=get_calendar_record_sort_key)
 
     filtered_records = all_records
@@ -453,9 +521,9 @@ def build_calendar_list_bundle(categoria_filter="", query=""):
     }
 
 
-def build_dashboard_calendar_data(today=None):
+def build_dashboard_calendar_data(today=None, user=None):
     today = today or timezone.localdate()
-    agenda_bundle = build_calendar_agenda_bundle()
+    agenda_bundle = build_calendar_agenda_bundle(user=user)
     records = agenda_bundle["records"]
 
     week_start = today - timedelta(days=today.weekday())

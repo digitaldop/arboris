@@ -19,6 +19,8 @@ def get_current_permission_module(request):
     view_module = getattr(resolver_match.func, "__module__", "")
     if view_module.startswith("anagrafica."):
         return "anagrafica"
+    if view_module.startswith("famiglie_interessate."):
+        return "famiglie_interessate"
     if view_module.startswith("economia."):
         return "economia"
     if view_module.startswith("calendario."):
@@ -153,6 +155,16 @@ def sistema_permissions_context(request):
     current_module = get_current_permission_module(request)
     can_view_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.GESTIONE)
+    can_view_famiglie_interessate = user_has_module_permission(
+        user,
+        "famiglie_interessate",
+        LivelloPermesso.VISUALIZZAZIONE,
+    )
+    can_manage_famiglie_interessate = user_has_module_permission(
+        user,
+        "famiglie_interessate",
+        LivelloPermesso.GESTIONE,
+    )
     can_view_economia = user_has_module_permission(user, "economia", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_economia = user_has_module_permission(user, "economia", LivelloPermesso.GESTIONE)
     can_view_sistema = user_has_module_permission(user, "sistema", LivelloPermesso.VISUALIZZAZIONE)
@@ -185,6 +197,8 @@ def sistema_permissions_context(request):
     can_manage_current_module = True
     if current_module == "anagrafica":
         can_manage_current_module = can_manage_anagrafica
+    elif current_module == "famiglie_interessate":
+        can_manage_current_module = can_manage_famiglie_interessate
     elif current_module == "economia":
         can_manage_current_module = can_manage_economia
     elif current_module == "sistema":
@@ -237,6 +251,8 @@ def sistema_permissions_context(request):
         "current_module_view_only": bool(current_module) and not can_manage_current_module,
         "can_view_anagrafica": can_view_anagrafica,
         "can_manage_anagrafica": can_manage_anagrafica,
+        "can_view_famiglie_interessate": can_view_famiglie_interessate,
+        "can_manage_famiglie_interessate": can_manage_famiglie_interessate,
         "can_view_economia": can_view_economia,
         "can_manage_economia": can_manage_economia,
         "can_view_sistema": can_view_sistema,

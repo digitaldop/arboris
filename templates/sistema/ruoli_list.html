@@ -37,6 +37,7 @@
                                 <th>Utenti</th>
                                 <th>Controllo completo</th>
                                 <th>Anagrafica</th>
+                                <th>Famiglie interessate</th>
                                 <th>Economia</th>
                                 <th>Gestione finanziaria</th>
                                 <th>Sistema</th>
@@ -60,6 +61,7 @@
                                     <td>{{ ruolo.count_utenti }}</td>
                                     <td>{% if ruolo.controllo_completo %}Si{% else %}No{% endif %}</td>
                                     <td>{{ ruolo.get_permesso_anagrafica_display }}</td>
+                                    <td>{{ ruolo.get_permesso_famiglie_interessate_display }}</td>
                                     <td>{{ ruolo.get_permesso_economia_display }}</td>
                                     <td>{{ ruolo.get_permesso_gestione_finanziaria_display }}</td>
                                     <td>{{ ruolo.get_permesso_sistema_display }}</td>
