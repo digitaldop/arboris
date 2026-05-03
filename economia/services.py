@@ -69,6 +69,7 @@ def _movimenti_da_riconciliare(data_inizio=None, data_fine=None):
     movimenti = MovimentoFinanziario.objects.filter(
         importo__gt=0,
         rata_iscrizione__isnull=True,
+        riconciliazioni_rate__isnull=True,
     ).exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
 
     if data_inizio and data_fine:
@@ -77,13 +78,35 @@ def _movimenti_da_riconciliare(data_inizio=None, data_fine=None):
             data_contabile__lte=data_fine + timedelta(days=180),
         )
 
-    return movimenti.order_by("data_contabile", "id")
+    return movimenti.distinct().order_by("data_contabile", "id")
+
+
+def _rate_disponibili_queryset():
+    from economia.models.iscrizioni import RataIscrizione
+
+    return (
+        RataIscrizione.objects.select_related(
+            "famiglia",
+            "iscrizione__studente__famiglia",
+            "iscrizione__anno_scolastico",
+        )
+        .prefetch_related("iscrizione__studente__famiglia__familiari")
+        .filter(
+            pagata=False,
+            importo_finale__gt=0,
+            movimenti_finanziari__isnull=True,
+            riconciliazioni_movimenti__isnull=True,
+        )
+        .distinct()
+        .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata", "id")
+    )
 
 
 def _riconcilia_movimenti_con_rate(
     movimenti,
     *,
     include_rata,
+    rate_queryset=None,
     utente=None,
     punteggio_minimo=PUNTEGGIO_MINIMO_RICONCILIAZIONE_AUTOMATICA,
 ):
@@ -96,25 +119,31 @@ def _riconcilia_movimenti_con_rate(
 
     stats = Counter()
     dettagli = []
+    rate_pool = list(rate_queryset) if rate_queryset is not None else None
+    rate_pool_escluse_ids = set()
 
     for movimento in movimenti:
         stats["movimenti_esaminati"] += 1
-        if movimento.riconciliazioni_rate.exists():
-            stats["gia_parzialmente_riconciliati"] += 1
-            continue
 
         candidati = [
             candidato
-            for candidato in trova_rate_candidate(movimento, limite=10)
+            for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True)
             if include_rata(candidato.rata)
             and not candidato.rata.pagata
-            and not candidato.rata.movimenti_finanziari.exists()
-            and not candidato.rata.riconciliazioni_movimenti.exists()
+            and candidato.rata.pk not in rate_pool_escluse_ids
         ]
+        rate_pool_disponibili = None
+        if rate_pool is not None:
+            rate_pool_disponibili = [
+                rata
+                for rata in rate_pool
+                if rata.pk not in rate_pool_escluse_ids and not rata.pagata
+            ]
         candidati_cumulativi = trova_rate_cumulative_candidate(
             movimento,
             limite=5,
             include_rata=include_rata,
+            rate_pool=rate_pool_disponibili,
         )
 
         opzioni = [("singola", candidato.score, candidato) for candidato in candidati]
@@ -139,6 +168,7 @@ def _riconcilia_movimenti_con_rate(
         if tipo == "cumulativa":
             riconcilia_movimento_con_rate(movimento, candidato.allocazioni, utente=utente)
             stats["riconciliati_cumulativi"] += 1
+            rate_pool_escluse_ids.update(rata.pk for rata, _importo in candidato.allocazioni)
             dettagli.append(
                 {
                     "movimento_id": movimento.pk,
@@ -154,6 +184,7 @@ def _riconcilia_movimenti_con_rate(
                 utente=utente,
                 marca_rata_pagata=True,
             )
+            rate_pool_escluse_ids.add(candidato.rata.pk)
             dettagli.append(
                 {
                     "movimento_id": movimento.pk,
@@ -184,9 +215,11 @@ def riconcilia_pagamenti_rate_anno_scolastico(
     """
 
     movimenti = _movimenti_da_riconciliare(anno_scolastico.data_inizio, anno_scolastico.data_fine)
+    rate_queryset = _rate_disponibili_queryset().filter(iscrizione__anno_scolastico=anno_scolastico)
     return _riconcilia_movimenti_con_rate(
         movimenti,
         include_rata=lambda rata: rata.iscrizione.anno_scolastico_id == anno_scolastico.pk,
+        rate_queryset=rate_queryset,
         utente=utente,
         punteggio_minimo=punteggio_minimo,
     )
@@ -202,9 +235,11 @@ def riconcilia_pagamenti_iscrizione(
 
     anno = iscrizione.anno_scolastico
     movimenti = _movimenti_da_riconciliare(anno.data_inizio, anno.data_fine)
+    rate_queryset = _rate_disponibili_queryset().filter(iscrizione=iscrizione)
     return _riconcilia_movimenti_con_rate(
         movimenti,
         include_rata=lambda rata: rata.iscrizione_id == iscrizione.pk,
+        rate_queryset=rate_queryset,
         utente=utente,
         punteggio_minimo=punteggio_minimo,
     )

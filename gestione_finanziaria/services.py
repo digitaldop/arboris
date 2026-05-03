@@ -960,20 +960,21 @@ def _studenti_unici_da_rate(rate):
     return studenti
 
 
-def _rata_disponibile_per_auto(rata, include_rata=None):
+def _rata_disponibile_per_auto(rata, include_rata=None, *, controlla_collegamenti: bool = True):
     if rata is None or getattr(rata, "pagata", False):
         return False
     if include_rata is not None and not include_rata(rata):
         return False
-    try:
-        if rata.movimenti_finanziari.exists() or rata.riconciliazioni_movimenti.exists():
+    if controlla_collegamenti:
+        try:
+            if rata.movimenti_finanziari.exists() or rata.riconciliazioni_movimenti.exists():
+                return False
+        except Exception:
             return False
-    except Exception:
-        return False
     return importo_rata_residuo(rata) > Decimal("0.00")
 
 
-def trova_rate_candidate(movimento, *, limite: int = 10):
+def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False):
     """
     Ritorna una lista ordinata di :class:`CandidatoRiconciliazione`
     per il movimento dato. Il matching e' pensato per entrate in conto
@@ -1011,8 +1012,15 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
             importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
             importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
         )
-        .order_by("-anno_riferimento", "-mese_riferimento")[:200]
+        .order_by("-anno_riferimento", "-mese_riferimento")
     )
+    if solo_disponibili:
+        qs = qs.filter(
+            pagata=False,
+            movimenti_finanziari__isnull=True,
+            riconciliazioni_movimenti__isnull=True,
+        ).distinct()
+    qs = qs[:200]
 
     data_mov = movimento.data_contabile
     testo_movimento = _normalizza_testo_match(f"{movimento.descrizione or ''} {movimento.controparte or ''}")
@@ -1067,7 +1075,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10):
     return candidati[:limite]
 
 
-def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=None):
+def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=None, rate_pool=None):
     """
     Ritorna gruppi di rate della stessa famiglia compatibili con un unico
     movimento bancario. E' usata dalla riconciliazione automatica per i
@@ -1085,27 +1093,40 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
         return []
     testo_movimento = _testo_movimento_per_identita(movimento)
 
-    qs = (
-        RataIscrizione.objects.select_related(
-            "famiglia",
-            "iscrizione__studente__famiglia",
-            "iscrizione__anno_scolastico",
+    if rate_pool is None:
+        qs = (
+            RataIscrizione.objects.select_related(
+                "famiglia",
+                "iscrizione__studente__famiglia",
+                "iscrizione__anno_scolastico",
+            )
+            .prefetch_related("iscrizione__studente__famiglia__familiari")
+            .filter(
+                pagata=False,
+                importo_finale__gt=0,
+                importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_ESATTO,
+                movimenti_finanziari__isnull=True,
+                riconciliazioni_movimenti__isnull=True,
+            )
+            .distinct()
+            .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
         )
-        .prefetch_related("iscrizione__studente__famiglia__familiari")
-        .filter(
-            pagata=False,
-            importo_finale__gt=0,
-            importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_ESATTO,
-            movimenti_finanziari__isnull=True,
-            riconciliazioni_movimenti__isnull=True,
-        )
-        .distinct()
-        .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
-    )
+        controlla_collegamenti = False
+    else:
+        qs = [
+            rata
+            for rata in rate_pool
+            if importo_rata_residuo(rata) <= importo_cerca + _TOLLERANZA_IMPORTO_ESATTO
+        ]
+        controlla_collegamenti = False
 
     gruppi = {}
     for rata in qs:
-        if not _rata_disponibile_per_auto(rata, include_rata):
+        if not _rata_disponibile_per_auto(
+            rata,
+            include_rata,
+            controlla_collegamenti=controlla_collegamenti,
+        ):
             continue
         famiglia = getattr(rata, "famiglia", None) or getattr(getattr(rata.iscrizione, "studente", None), "famiglia", None)
         if famiglia is None:
@@ -1284,8 +1305,8 @@ def riconcilia_movimento_automaticamente(
         return None
 
     opzioni = []
-    for candidato in trova_rate_candidate(movimento, limite=10):
-        if _rata_disponibile_per_auto(candidato.rata, include_rata):
+    for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True):
+        if _rata_disponibile_per_auto(candidato.rata, include_rata, controlla_collegamenti=False):
             opzioni.append(("singola", candidato.score, candidato))
 
     for candidato in trova_rate_cumulative_candidate(movimento, limite=5, include_rata=include_rata):
