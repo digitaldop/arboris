@@ -579,15 +579,17 @@ def lista_documenti_fornitori(request):
     )
 
 
-def _documento_form_context(form, formset, documento):
+def _documento_form_context(form, formset, documento, popup=False):
     return {
         "form": form,
         "formset": formset,
         "documento": documento,
+        "popup": popup,
     }
 
 
 def crea_documento_fornitore(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES)
         formset = ScadenzaPagamentoFornitoreFormSet(request.POST, instance=DocumentoFornitore())
@@ -597,6 +599,12 @@ def crea_documento_fornitore(request):
             formset.save()
             _aggiorna_stato_documento_da_scadenze(documento)
             messages.success(request, "Documento fornitore creato correttamente.")
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Documento fornitore creato correttamente."},
+                )
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
         initial = {
@@ -616,11 +624,12 @@ def crea_documento_fornitore(request):
     return render(
         request,
         "gestione_finanziaria/documento_fornitore_form.html",
-        _documento_form_context(form, formset, None),
+        _documento_form_context(form, formset, None, popup=popup),
     )
 
 
 def modifica_documento_fornitore(request, pk):
+    popup = is_popup_request(request)
     documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa"), pk=pk)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES, instance=documento)
@@ -630,6 +639,12 @@ def modifica_documento_fornitore(request, pk):
             formset.save()
             _aggiorna_stato_documento_da_scadenze(documento)
             messages.success(request, "Documento fornitore aggiornato correttamente.")
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Documento fornitore aggiornato correttamente."},
+                )
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
         form = DocumentoFornitoreForm(instance=documento)
@@ -638,7 +653,7 @@ def modifica_documento_fornitore(request, pk):
     return render(
         request,
         "gestione_finanziaria/documento_fornitore_form.html",
-        _documento_form_context(form, formset, documento),
+        _documento_form_context(form, formset, documento, popup=popup),
     )
 
 

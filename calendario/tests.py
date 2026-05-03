@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from anagrafica.models import Documento, Famiglia, StatoRelazioneFamiglia, TipoDocumento
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione
+from gestione_finanziaria.models import DocumentoFornitore, Fornitore, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
@@ -145,6 +146,42 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "Apri scheda")
         self.assertContains(response, f'data-popup-url="{rata_url}?popup=1"')
         self.assertContains(response, 'data-popup-title="Scheda rata"')
+
+    def test_supplier_deadline_opens_supplier_document_card_in_popup(self):
+        self.client.force_login(self.user)
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE
+        )
+        fornitore = Fornitore.objects.create(denominazione="Carta Srl")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="F-001",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 20),
+            importo_previsto=Decimal("122.00"),
+        )
+
+        response = self.client.get(reverse("calendario_agenda"))
+
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Scadenza fornitore - Carta Srl")
+        self.assertContains(response, "Apri scheda")
+        self.assertContains(response, f'data-popup-url="{documento_url}?popup=1"')
+        self.assertContains(response, 'data-popup-title="Scheda documento fornitore"')
+
+        popup_response = self.client.get(f"{documento_url}?popup=1")
+        self.assertEqual(popup_response.status_code, 200)
+        self.assertContains(popup_response, 'body class="popup-page"')
+        self.assertContains(popup_response, 'name="popup" value="1"')
+        self.assertContains(popup_response, "Chiudi")
+        self.assertNotContains(popup_response, '<div class="breadcrumb">')
 
     def test_event_form_popup_closes_after_create(self):
         self.client.force_login(self.user)

@@ -368,7 +368,9 @@ def build_calendar_deadline_records(system_categories=None):
                     description=" - ".join([part for part in description_parts if part]),
                     url=reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
                     external=False,
-                    action_label="Apri",
+                    open_in_popup=True,
+                    popup_title="Scheda documento fornitore",
+                    action_label="Apri scheda",
                 )
             )
 
