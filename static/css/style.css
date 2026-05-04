@@ -22067,6 +22067,21 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     justify-content: flex-end;
 }
 
+.rate-detail-payment-method-field {
+    width: 100%;
+    max-width: none;
+}
+
+.rate-detail-payment-method-field .related-field-stack {
+    min-width: 0;
+}
+
+.rate-detail-payment-method-field select,
+.rate-detail-payment-method-field .searchable-select {
+    width: 100%;
+    max-width: none;
+}
+
 .rate-payment-shell {
     display: grid;
     gap: 18px;
@@ -23283,6 +23298,97 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     margin-top: 14px;
 }
 
+.module-gestione_finanziaria .finance-import-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+}
+
+.module-gestione_finanziaria .finance-import-form .admin-section-title,
+.module-gestione_finanziaria .finance-import-preview-panel .admin-section-title {
+    border-radius: 8px 8px 0 0;
+}
+
+.module-gestione_finanziaria .finance-import-form .admin-section > .panel,
+.module-gestione_finanziaria .finance-import-preview-panel > .panel {
+    border-color: #dce5f0;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+}
+
+.module-gestione_finanziaria .finance-import-form .panel-body:has(> .finance-field-grid) {
+    padding: 16px;
+}
+
+.module-gestione_finanziaria .finance-import-related-field.inline-related-field {
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-import-related-field select,
+.module-gestione_finanziaria .finance-import-related-field .searchable-select {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .finance-import-related-actions {
+    align-self: stretch;
+    gap: 4px;
+}
+
+.module-gestione_finanziaria .finance-import-related-actions .related-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 7px;
+}
+
+.module-gestione_finanziaria .finance-import-related-actions .related-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.module-gestione_finanziaria .finance-import-advanced .finance-token-body {
+    padding-top: 2px;
+}
+
+.module-gestione_finanziaria .finance-import-advanced .finance-section-subtitle {
+    margin-bottom: 14px;
+}
+
+.module-gestione_finanziaria .finance-import-csv-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.module-gestione_finanziaria .finance-import-toggle-field {
+    align-self: end;
+}
+
+.module-gestione_finanziaria .finance-import-detection {
+    margin-bottom: 16px;
+    box-shadow: none;
+}
+
+.module-gestione_finanziaria .finance-import-summary-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.module-gestione_finanziaria .finance-import-confirm-form {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .finance-import-result-list {
+    margin: 10px 0 0 18px;
+    padding: 0;
+    color: #41536a;
+    line-height: 1.5;
+}
+
 @media (max-width: 1100px) {
     .module-gestione_finanziaria .finance-form-layout {
         grid-template-columns: 1fr;
@@ -23295,6 +23401,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 @media (max-width: 760px) {
     .module-gestione_finanziaria .finance-field-grid,
+    .module-gestione_finanziaria .finance-import-csv-grid,
     .module-gestione_finanziaria .finance-toggle-grid,
     .module-gestione_finanziaria .finance-summary-strip,
     .module-gestione_finanziaria .finance-form-side {

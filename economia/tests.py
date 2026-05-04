@@ -14,7 +14,15 @@ from economia.forms import (
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
-from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione, TariffaScambioRetta
+from economia.models import (
+    CondizioneIscrizione,
+    Iscrizione,
+    MetodoPagamento,
+    RataIscrizione,
+    StatoIscrizione,
+    TariffaCondizioneIscrizione,
+    TariffaScambioRetta,
+)
 from economia.services import (
     ricalcola_rate_anno_scolastico,
     riconcilia_pagamenti_iscrizione,
@@ -513,6 +521,12 @@ class EconomiaBatchRateTests(TestCase):
         self.client.login(username="admin", password="admin")
         self.iscrizione.sync_rate_schedule()
         rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        metodo = MetodoPagamento.objects.create(metodo_pagamento="Bonifico")
+        rata.importo_pagato = rata.importo_finale
+        rata.pagata = True
+        rata.data_pagamento = date(2025, 9, 10)
+        rata.metodo_pagamento = metodo
+        rata.save(update_fields=["importo_pagato", "pagata", "data_pagamento", "metodo_pagamento"])
 
         response = self.client.get(
             reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk}),
@@ -523,4 +537,10 @@ class EconomiaBatchRateTests(TestCase):
         self.assertContains(response, "rate-detail-shell is-popup")
         self.assertContains(response, "Dettagli rata")
         self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, "rate-detail-payment-method-field")
+        self.assertContains(response, 'id="detail-add-metodo-pagamento-btn"')
+        self.assertContains(response, 'id="detail-edit-metodo-pagamento-btn"')
+        self.assertContains(response, 'id="detail-delete-metodo-pagamento-btn"')
+        self.assertContains(response, 'data-searchable-placeholder="Cerca un metodo di pagamento..."')
+        self.assertContains(response, "rata-iscrizione-form.js")
         self.assertNotContains(response, "site-header")

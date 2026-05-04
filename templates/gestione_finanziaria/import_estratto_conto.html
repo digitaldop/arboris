@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load static currency %}
 
 {% block title %}Import estratto conto - Arboris School Management{% endblock %}
 
@@ -14,206 +14,397 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Import estratto conto</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary">Vai ai movimenti</a>
-            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary">Dashboard</a>
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Import estratto conto</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    File bancario
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                Carica CAMT.053, CSV o Excel, controlla l'anteprima e registra i movimenti sul conto corretto
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                <span class="btn-label">Movimenti</span>
+            </a>
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
         </div>
     </div>
 
-    <div class="content-card">
-        <p>
-            Questa è la <strong>modalità principale</strong> per importare i movimenti bancari:
-            scarica l&rsquo;estratto dalla tua banca (CAMT.053 XML o, se disponibile, CSV) e caricalo qui.
-        </p>
-        <p>
-            Arboris prova a riconoscere automaticamente formato, colonne, date, importi e conto bancario.
-            Prima dell&rsquo;import definitivo viene sempre mostrata un&rsquo;anteprima.
-        </p>
-        <p>
-            Per evitare timeout sui file con molti movimenti, l&rsquo;import registra prima i movimenti bancari.
-            La riconciliazione delle rette si avvia poi dalla
-            <a href="{% url 'lista_movimenti_da_riconciliare' %}">pagina dedicata</a>.
-        </p>
+    <div class="finance-guide-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Import controllato in due passaggi</div>
+            <p>
+                Arboris prova a riconoscere formato, colonne, date, importi e conto bancario.
+                Prima dell'import definitivo viene mostrata un'anteprima, cosi puoi verificare duplicati e conto di destinazione.
+            </p>
+            <ol class="finance-step-list">
+                <li>Carica il file scaricato dalla banca in formato CAMT.053 XML, CSV oppure Excel XLS/XLSX.</li>
+                <li>Se il conto non viene rilevato, selezionalo manualmente o crealo dai controlli accanto al campo.</li>
+                <li>Dopo l'import, la riconciliazione delle rette si avvia dalla pagina dei movimenti da riconciliare.</li>
+            </ol>
+        </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" class="detail-form">
+    <form method="post" enctype="multipart/form-data" class="detail-form finance-import-form">
         {% csrf_token %}
         <input type="hidden" name="import_action" value="preview">
-        <div class="content-card">
-            <h2 class="section-title">Carica estratto conto</h2>
-            <table class="form-table">
-                <tr>
-                    <th>{{ form.file.label_tag }}</th>
-                    <td>{{ form.file }} {{ form.file.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.conto.label_tag }}</th>
-                    <td>
-                        {{ form.conto }} {{ form.conto.errors }}
-                        <div class="help-text">{{ form.conto.help_text }}</div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.formato.label_tag }}</th>
-                    <td>{{ form.formato }} {{ form.formato.errors }}</td>
-                </tr>
-            </table>
-        </div>
+        {{ form.non_field_errors }}
 
-        <details class="content-card">
-            <summary class="section-title">Opzioni avanzate CSV</summary>
-            <p class="table-muted">
-                Da usare solo se il rilevamento automatico non riconosce il file.
-                Le colonne possono essere indicate tramite indice 0-based oppure tramite il nome dell'intestazione.
-            </p>
-            <div class="form-table-wrapper">
-                <table class="form-table">
-                    <tr><th>{{ form.csv_delimiter.label_tag }}</th><td>{{ form.csv_delimiter }} {{ form.csv_delimiter.errors }}<br><small>{{ form.csv_delimiter.help_text }}</small></td></tr>
-                    <tr><th>{{ form.csv_encoding.label_tag }}</th><td>{{ form.csv_encoding }} {{ form.csv_encoding.errors }}</td></tr>
-                    <tr><th>{{ form.csv_ha_intestazione.label_tag }}</th><td>{{ form.csv_ha_intestazione }} {{ form.csv_ha_intestazione.errors }}</td></tr>
-                    <tr><th>{{ form.csv_formato_data.label_tag }}</th><td>{{ form.csv_formato_data }} {{ form.csv_formato_data.errors }}<br><small>{{ form.csv_formato_data.help_text }}</small></td></tr>
-                    <tr><th>{{ form.csv_sep_decimale.label_tag }}</th><td>{{ form.csv_sep_decimale }} {{ form.csv_sep_decimale.errors }}</td></tr>
-                    <tr><th>{{ form.csv_sep_migliaia.label_tag }}</th><td>{{ form.csv_sep_migliaia }} {{ form.csv_sep_migliaia.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_data_contabile.label_tag }}</th><td>{{ form.csv_col_data_contabile }} {{ form.csv_col_data_contabile.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_data_valuta.label_tag }}</th><td>{{ form.csv_col_data_valuta }} {{ form.csv_col_data_valuta.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_importo.label_tag }}</th><td>{{ form.csv_col_importo }} {{ form.csv_col_importo.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_entrate.label_tag }}</th><td>{{ form.csv_col_entrate }} {{ form.csv_col_entrate.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_uscite.label_tag }}</th><td>{{ form.csv_col_uscite }} {{ form.csv_col_uscite.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_valuta.label_tag }}</th><td>{{ form.csv_col_valuta }} {{ form.csv_col_valuta.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_descrizione.label_tag }}</th><td>{{ form.csv_col_descrizione }} {{ form.csv_col_descrizione.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_controparte.label_tag }}</th><td>{{ form.csv_col_controparte }} {{ form.csv_col_controparte.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_iban_controparte.label_tag }}</th><td>{{ form.csv_col_iban_controparte }} {{ form.csv_col_iban_controparte.errors }}</td></tr>
-                    <tr><th>{{ form.csv_col_transaction_id.label_tag }}</th><td>{{ form.csv_col_transaction_id }} {{ form.csv_col_transaction_id.errors }}</td></tr>
-                </table>
+        <div class="finance-form-layout finance-import-layout">
+            <div class="finance-form-main">
+                <div class="admin-section finance-modern-panel">
+                    <div class="admin-section-title">
+                        <span>Carica estratto conto</span>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-body">
+                            <div class="finance-field-grid finance-import-primary-grid">
+                                <div class="finance-form-field finance-form-field-wide">
+                                    <label for="{{ form.file.id_for_label }}" class="finance-form-label">{{ form.file.label }}</label>
+                                    {{ form.file }}
+                                    {{ form.file.errors }}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.conto.id_for_label }}" class="finance-form-label">{{ form.conto.label }}</label>
+                                    <div class="inline-related-field finance-import-related-field">
+                                        {{ form.conto }}
+                                        <div class="related-actions inline-related-actions finance-import-related-actions">
+                                            <button type="button" id="add-import-conto-btn" class="related-btn related-btn-add" data-related-type="conto_bancario" aria-label="Aggiungi conto bancario">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                                            </button>
+                                            <button type="button" id="edit-import-conto-btn" class="related-btn related-btn-edit" data-related-type="conto_bancario" aria-label="Modifica conto bancario">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                            </button>
+                                            <button type="button" id="delete-import-conto-btn" class="related-btn related-btn-delete" data-related-type="conto_bancario" aria-label="Elimina conto bancario">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {{ form.conto.errors }}
+                                    {% if form.conto.help_text %}<div class="help-text">{{ form.conto.help_text }}</div>{% endif %}
+                                </div>
+
+                                <div class="finance-form-field">
+                                    <label for="{{ form.formato.id_for_label }}" class="finance-form-label">{{ form.formato.label }}</label>
+                                    {{ form.formato }}
+                                    {{ form.formato.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="finance-token-section finance-import-advanced">
+                    <summary>Opzioni avanzate CSV/Excel</summary>
+                    <div class="finance-token-body">
+                        <p class="finance-section-subtitle">
+                            Da usare solo se il rilevamento automatico non riconosce il file. Le colonne possono essere indicate
+                            tramite indice 0-based oppure tramite il nome dell'intestazione. Per Excel, separatore ed encoding CSV vengono ignorati.
+                        </p>
+                        <div class="finance-field-grid finance-import-csv-grid">
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_delimiter.id_for_label }}" class="finance-form-label">{{ form.csv_delimiter.label }}</label>
+                                {{ form.csv_delimiter }}
+                                {{ form.csv_delimiter.errors }}
+                                {% if form.csv_delimiter.help_text %}<div class="help-text">{{ form.csv_delimiter.help_text }}</div>{% endif %}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_encoding.id_for_label }}" class="finance-form-label">{{ form.csv_encoding.label }}</label>
+                                {{ form.csv_encoding }}
+                                {{ form.csv_encoding.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_formato_data.id_for_label }}" class="finance-form-label">{{ form.csv_formato_data.label }}</label>
+                                {{ form.csv_formato_data }}
+                                {{ form.csv_formato_data.errors }}
+                                {% if form.csv_formato_data.help_text %}<div class="help-text">{{ form.csv_formato_data.help_text }}</div>{% endif %}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_sep_decimale.id_for_label }}" class="finance-form-label">{{ form.csv_sep_decimale.label }}</label>
+                                {{ form.csv_sep_decimale }}
+                                {{ form.csv_sep_decimale.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_sep_migliaia.id_for_label }}" class="finance-form-label">{{ form.csv_sep_migliaia.label }}</label>
+                                {{ form.csv_sep_migliaia }}
+                                {{ form.csv_sep_migliaia.errors }}
+                            </div>
+                            <div class="finance-toggle-field finance-import-toggle-field">
+                                {{ form.csv_ha_intestazione }}
+                                <label for="{{ form.csv_ha_intestazione.id_for_label }}">{{ form.csv_ha_intestazione.label }}</label>
+                                {{ form.csv_ha_intestazione.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_data_contabile.id_for_label }}" class="finance-form-label">{{ form.csv_col_data_contabile.label }}</label>
+                                {{ form.csv_col_data_contabile }}
+                                {{ form.csv_col_data_contabile.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_data_valuta.id_for_label }}" class="finance-form-label">{{ form.csv_col_data_valuta.label }}</label>
+                                {{ form.csv_col_data_valuta }}
+                                {{ form.csv_col_data_valuta.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_importo.id_for_label }}" class="finance-form-label">{{ form.csv_col_importo.label }}</label>
+                                {{ form.csv_col_importo }}
+                                {{ form.csv_col_importo.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_entrate.id_for_label }}" class="finance-form-label">{{ form.csv_col_entrate.label }}</label>
+                                {{ form.csv_col_entrate }}
+                                {{ form.csv_col_entrate.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_uscite.id_for_label }}" class="finance-form-label">{{ form.csv_col_uscite.label }}</label>
+                                {{ form.csv_col_uscite }}
+                                {{ form.csv_col_uscite.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_valuta.id_for_label }}" class="finance-form-label">{{ form.csv_col_valuta.label }}</label>
+                                {{ form.csv_col_valuta }}
+                                {{ form.csv_col_valuta.errors }}
+                            </div>
+                            <div class="finance-form-field finance-form-field-wide">
+                                <label for="{{ form.csv_col_descrizione.id_for_label }}" class="finance-form-label">{{ form.csv_col_descrizione.label }}</label>
+                                {{ form.csv_col_descrizione }}
+                                {{ form.csv_col_descrizione.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_controparte.id_for_label }}" class="finance-form-label">{{ form.csv_col_controparte.label }}</label>
+                                {{ form.csv_col_controparte }}
+                                {{ form.csv_col_controparte.errors }}
+                            </div>
+                            <div class="finance-form-field">
+                                <label for="{{ form.csv_col_iban_controparte.id_for_label }}" class="finance-form-label">{{ form.csv_col_iban_controparte.label }}</label>
+                                {{ form.csv_col_iban_controparte }}
+                                {{ form.csv_col_iban_controparte.errors }}
+                            </div>
+                            <div class="finance-form-field finance-form-field-wide">
+                                <label for="{{ form.csv_col_transaction_id.id_for_label }}" class="finance-form-label">{{ form.csv_col_transaction_id.label }}</label>
+                                {{ form.csv_col_transaction_id }}
+                                {{ form.csv_col_transaction_id.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="form-actions finance-sticky-actions">
+                    <button type="submit" class="btn btn-primary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                        <span class="btn-label">Analizza file</span>
+                    </button>
+                    <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                </div>
             </div>
-        </details>
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Analizza file</button>
-            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary">Annulla</a>
+            <aside class="finance-form-side">
+                <div class="finance-side-card">
+                    <div class="finance-side-title">Formati consigliati</div>
+                    <div class="finance-side-list">
+                        <div>
+                            <strong>CAMT.053 XML</strong>
+                            <span>Formato bancario strutturato: e' il piu affidabile quando disponibile.</span>
+                        </div>
+                        <div>
+                            <strong>CSV o Excel</strong>
+                            <span>Usali se la banca non esporta CAMT.053. Arboris prova a rilevare colonne, importi e descrizioni.</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="finance-side-card">
+                    <div class="finance-side-title">Dopo l'import</div>
+                    <div class="finance-side-list">
+                        <div>
+                            <strong>Movimenti prima, riconciliazione poi</strong>
+                            <span>I movimenti vengono salvati subito; il matching delle rette resta nella procedura dedicata per evitare richieste troppo lunghe.</span>
+                        </div>
+                        <div>
+                            <strong>Duplicati controllati</strong>
+                            <span>La preview evidenzia i movimenti gia presenti prima della conferma.</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
         </div>
     </form>
 
     {% if preview %}
-        <div class="content-card">
-            <h2 class="section-title">Anteprima import</h2>
-            {% if detection %}
-                <p class="table-muted">
-                    Formato rilevato: <strong>{{ detection.formato_rilevato }}</strong>
-                    {% if detection.confidenza %} - confidenza {{ detection.confidenza }}%{% endif %}
-                    {% if detection.conto_label %} - {{ detection.conto_label }}{% endif %}
-                </p>
-                {% if detection.avvisi %}
-                    <ul>
-                        {% for avviso in detection.avvisi %}
-                            <li>{{ avviso }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-            {% endif %}
-
-            <div class="summary-grid">
-                <div class="summary-item"><div class="summary-value">{{ preview.totale_letti }}</div><div class="summary-label">Movimenti letti</div></div>
-                <div class="summary-item"><div class="summary-value">{{ preview.nuovi_stimati }}</div><div class="summary-label">Nuovi stimati</div></div>
-                <div class="summary-item"><div class="summary-value">{{ preview.duplicati_stimati }}</div><div class="summary-label">Duplicati stimati</div></div>
-                <div class="summary-item"><div class="summary-value">{{ preview.entrate|euro }}</div><div class="summary-label">Entrate</div></div>
-                <div class="summary-item"><div class="summary-value">{{ preview.uscite|euro }}</div><div class="summary-label">Uscite</div></div>
+        <div class="admin-section finance-modern-panel finance-import-preview-panel">
+            <div class="admin-section-title">
+                <span>Anteprima import</span>
             </div>
-            {% if preview.data_da and preview.data_a %}
-                <p class="table-muted">Periodo: {{ preview.data_da|date:"d/m/Y" }} - {{ preview.data_a|date:"d/m/Y" }}</p>
-            {% endif %}
+            <div class="panel">
+                <div class="panel-body">
+                    {% if detection %}
+                        <div class="finance-guide-panel finance-import-detection">
+                            <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></div>
+                            <div class="finance-guide-copy">
+                                <div class="finance-guide-title">Formato rilevato: {{ detection.formato_rilevato }}</div>
+                                <p>
+                                    {% if detection.confidenza %}Confidenza {{ detection.confidenza }}%.{% endif %}
+                                    {% if detection.conto_label %} {{ detection.conto_label }}.{% endif %}
+                                </p>
+                                {% if detection.avvisi %}
+                                    <ul class="finance-import-result-list">
+                                        {% for avviso in detection.avvisi %}
+                                            <li>{{ avviso }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
 
-            <table class="list-table">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Descrizione</th>
-                        <th class="column-right">Importo</th>
-                        <th>Esito stimato</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for movimento in preview.esempi %}
-                        <tr>
-                            <td>{{ movimento.data|date:"d/m/Y" }}</td>
-                            <td>{{ movimento.descrizione|truncatechars:140 }}</td>
-                            <td class="column-right">{{ movimento.importo|euro }}</td>
-                            <td>{% if movimento.duplicato %}Duplicato{% else %}Nuovo{% endif %}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    <div class="summary-grid finance-summary-strip finance-import-summary-strip">
+                        <div class="summary-item"><div class="summary-value">{{ preview.totale_letti }}</div><div class="summary-label">Movimenti letti</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ preview.nuovi_stimati }}</div><div class="summary-label">Nuovi stimati</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ preview.duplicati_stimati }}</div><div class="summary-label">Duplicati stimati</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ preview.entrate|euro }}</div><div class="summary-label">Entrate</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ preview.uscite|euro }}</div><div class="summary-label">Uscite</div></div>
+                    </div>
 
-            <form method="post" class="detail-form">
-                {% csrf_token %}
-                <input type="hidden" name="import_action" value="confirm">
-                <input type="hidden" name="import_token" value="{{ import_token }}">
-                <table class="form-table">
-                    <tr>
-                        <th>Conto bancario</th>
-                        <td>
-                            <select name="conto" class="form-control" required>
-                                <option value="">-----</option>
-                                {% for conto in conti_import %}
-                                    <option value="{{ conto.pk }}" {% if selected_conto and conto.pk == selected_conto.pk %}selected{% endif %}>
-                                        {{ conto.nome_conto }}{% if conto.iban %} - {{ conto.iban }}{% endif %}
-                                    </option>
+                    {% if preview.data_da and preview.data_a %}
+                        <p class="table-muted">Periodo: {{ preview.data_da|date:"d/m/Y" }} - {{ preview.data_a|date:"d/m/Y" }}</p>
+                    {% endif %}
+
+                    <div class="table-responsive">
+                        <table class="list-table finance-modern-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrizione</th>
+                                    <th class="column-right">Importo</th>
+                                    <th>Esito stimato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movimento in preview.esempi %}
+                                    <tr>
+                                        <td>{{ movimento.data|date:"d/m/Y" }}</td>
+                                        <td>{{ movimento.descrizione|truncatechars:140 }}</td>
+                                        <td class="column-right finance-money-cell">{{ movimento.importo|euro }}</td>
+                                        <td>
+                                            <span class="family-status-pill {% if movimento.duplicato %}is-muted{% endif %}">
+                                                <span class="family-status-dot" aria-hidden="true"></span>
+                                                {% if movimento.duplicato %}Duplicato{% else %}Nuovo{% endif %}
+                                            </span>
+                                        </td>
+                                    </tr>
                                 {% endfor %}
-                            </select>
-                            {% if detected_conto %}
-                                <div class="help-text">Conto rilevato automaticamente: {{ detected_conto.nome_conto }}</div>
-                            {% else %}
-                                <div class="help-text">Seleziona il conto su cui registrare questi movimenti.</div>
-                            {% endif %}
-                        </td>
-                    </tr>
-                </table>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-success">Conferma import</button>
-                    <a href="{% url 'import_estratto_conto' %}" class="btn btn-secondary">Annulla anteprima</a>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <form method="post" class="detail-form finance-import-confirm-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="import_action" value="confirm">
+                        <input type="hidden" name="import_token" value="{{ import_token }}">
+                        <div class="finance-field-grid finance-import-confirm-grid">
+                            <div class="finance-form-field finance-form-field-wide">
+                                <label for="confirm-import-conto" class="finance-form-label">Conto bancario</label>
+                                <div class="inline-related-field finance-import-related-field">
+                                    <select name="conto" id="confirm-import-conto" class="form-control" required data-searchable-select="1" data-searchable-placeholder="Cerca un conto...">
+                                        <option value="">-----</option>
+                                        {% for conto in conti_import %}
+                                            <option value="{{ conto.pk }}" {% if selected_conto and conto.pk == selected_conto.pk %}selected{% endif %}>
+                                                {{ conto.nome_conto }}{% if conto.iban %} - {{ conto.iban }}{% endif %}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="related-actions inline-related-actions finance-import-related-actions">
+                                        <button type="button" id="add-confirm-import-conto-btn" class="related-btn related-btn-add" data-related-type="conto_bancario" aria-label="Aggiungi conto bancario">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                                        </button>
+                                        <button type="button" id="edit-confirm-import-conto-btn" class="related-btn related-btn-edit" data-related-type="conto_bancario" aria-label="Modifica conto bancario">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                        </button>
+                                        <button type="button" id="delete-confirm-import-conto-btn" class="related-btn related-btn-delete" data-related-type="conto_bancario" aria-label="Elimina conto bancario">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% if detected_conto %}
+                                    <div class="help-text">Conto rilevato automaticamente: {{ detected_conto.nome_conto }}</div>
+                                {% else %}
+                                    <div class="help-text">Seleziona il conto su cui registrare questi movimenti.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="form-actions finance-confirm-actions">
+                            <button type="submit" class="btn btn-success btn-icon-text">
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                <span class="btn-label">Conferma import</span>
+                            </button>
+                            <a href="{% url 'import_estratto_conto' %}" class="btn btn-secondary btn-icon-text">
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                <span class="btn-label">Annulla anteprima</span>
+                            </a>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     {% endif %}
 
     {% if risultato %}
-        <div class="content-card">
-            <h2 class="section-title">Esito dell'ultimo import</h2>
-            <p class="table-muted">
-                I movimenti sono stati importati senza avviare la riconciliazione automatica nella stessa richiesta.
-                Puoi riconciliarli dalla <a href="{% url 'lista_movimenti_da_riconciliare' %}">pagina dedicata</a>.
-            </p>
-            <div class="summary-grid">
-                <div class="summary-item">
-                    <div class="summary-value">{{ risultato.totale_letti }}</div>
-                    <div class="summary-label">Movimenti letti</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value">{{ risultato.inseriti }}</div>
-                    <div class="summary-label">Nuovi inseriti</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value">{{ risultato.riconciliati }}</div>
-                    <div class="summary-label">Rette riconciliate</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value">{{ risultato.duplicati }}</div>
-                    <div class="summary-label">Duplicati scartati</div>
-                </div>
-                <div class="summary-item">
-                    <div class="summary-value">{{ risultato.errori }}</div>
-                    <div class="summary-label">Errori</div>
+        <div class="admin-section finance-modern-panel">
+            <div class="admin-section-title">
+                <span>Esito dell'ultimo import</span>
+            </div>
+            <div class="panel">
+                <div class="panel-body">
+                    <div class="finance-guide-panel finance-success-panel">
+                        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></div>
+                        <div class="finance-guide-copy">
+                            <div class="finance-guide-title">Movimenti registrati</div>
+                            <p>
+                                I movimenti sono stati importati senza avviare la riconciliazione automatica nella stessa richiesta.
+                                Puoi riconciliarli dalla <a href="{% url 'lista_movimenti_da_riconciliare' %}">pagina dedicata</a>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="summary-grid finance-summary-strip finance-import-summary-strip">
+                        <div class="summary-item"><div class="summary-value">{{ risultato.totale_letti }}</div><div class="summary-label">Movimenti letti</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ risultato.inseriti }}</div><div class="summary-label">Nuovi inseriti</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ risultato.riconciliati }}</div><div class="summary-label">Rette riconciliate</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ risultato.duplicati }}</div><div class="summary-label">Duplicati scartati</div></div>
+                        <div class="summary-item"><div class="summary-value">{{ risultato.errori }}</div><div class="summary-label">Errori</div></div>
+                    </div>
+
+                    {% if risultato.messaggi %}
+                        <ul class="finance-import-result-list">
+                            {% for msg in risultato.messaggi %}
+                                <li>{{ msg }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
                 </div>
             </div>
-            {% if risultato.messaggi %}
-                <ul>
-                    {% for msg in risultato.messaggi %}
-                        <li>{{ msg }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
         </div>
     {% endif %}
+
+    <script src="{% static 'js/pages/import-estratto-conto.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisImportEstrattoConto) {
+                ArborisImportEstrattoConto.init();
+            }
+        });
+    </script>
 {% endblock %}

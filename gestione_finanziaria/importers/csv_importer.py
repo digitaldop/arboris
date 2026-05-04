@@ -41,6 +41,7 @@ class CsvImporterConfig:
     delimiter: str = ""  # "" => autodetect
     encoding: str = "utf-8-sig"
     ha_intestazione: bool = True
+    righe_da_saltare: int = 0
 
     colonna_data_contabile: Optional[ColonnaRef] = None
     colonna_data_valuta: Optional[ColonnaRef] = None
@@ -311,6 +312,10 @@ class CsvImporter(BaseParser):
             return iter(())
 
         header_map: Dict[str, int] = {}
+        start_idx = max(int(self.config.righe_da_saltare or 0), 0)
+        rows = rows[start_idx:]
+        if not rows:
+            return iter(())
         data_rows = rows
         if self.config.ha_intestazione:
             header = rows[0]

@@ -970,15 +970,16 @@ FORMATO_IMPORT_CHOICES = [
     ("auto", "Rilevamento automatico"),
     ("camt053", "CAMT.053 (ISO 20022 XML)"),
     ("csv", "CSV con mappatura manuale"),
+    ("excel", "Excel XLS/XLSX con mappatura manuale"),
 ]
 
 
 class ImportEstrattoContoForm(forms.Form):
     """
-    Form di upload del file di estratto conto. Le opzioni CSV sono utilizzate
-    solo se ``formato == csv``: vengono ignorate per gli import CAMT.053.
+    Form di upload del file di estratto conto. Le opzioni tabellari sono
+    utilizzate per CSV/Excel: vengono ignorate per gli import CAMT.053.
 
-    Le colonne CSV possono essere indicate tramite indice 0-based
+    Le colonne CSV/Excel possono essere indicate tramite indice 0-based
     (es. ``0``, ``2``, ``5``) oppure tramite il nome dell'intestazione
     quando il file ha la prima riga di header.
     """
@@ -1055,6 +1056,10 @@ class ImportEstrattoContoForm(forms.Form):
         self.fields["conto"].queryset = ContoBancario.objects.filter(attivo=True).order_by(
             "nome_conto"
         )
+        make_searchable_select(self.fields["conto"], "Cerca un conto...")
+        self.fields["file"].widget.attrs.update(
+            {"accept": ".xml,.camt,.camt053,.csv,.xls,.xlsx,.xlsm"}
+        )
 
     def clean_csv_delimiter(self):
         valore = self.cleaned_data.get("csv_delimiter") or ""
@@ -1064,7 +1069,7 @@ class ImportEstrattoContoForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("formato") != "csv":
+        if cleaned.get("formato") not in {"csv", "excel"}:
             return cleaned
 
         data_col = cleaned.get("csv_col_data_contabile")
@@ -1075,7 +1080,7 @@ class ImportEstrattoContoForm(forms.Form):
         if not data_col:
             self.add_error(
                 "csv_col_data_contabile",
-                "La colonna della data contabile e' obbligatoria per i file CSV.",
+                "La colonna della data contabile e' obbligatoria per i file CSV/Excel.",
             )
 
         if not importo_col and not (entrate_col and uscite_col):

@@ -59,7 +59,15 @@ from .forms import (
     ScadenzaPagamentoFornitoreFormSet,
     movimenti_fornitore_recenti_ids,
 )
-from .importers import Camt053Parser, CsvImporter, CsvImporterConfig, detect_csv_import_config
+from .importers import (
+    Camt053Parser,
+    CsvImporter,
+    CsvImporterConfig,
+    ExcelImporter,
+    detect_csv_import_config,
+    detect_excel_import_config,
+    is_probable_excel_file,
+)
 from .importers.service import importa_movimenti_da_file
 from .models import (
     CategoriaFinanziaria,
@@ -2475,6 +2483,7 @@ def _csv_config_to_dict(config):
         "delimiter": config.delimiter,
         "encoding": config.encoding,
         "ha_intestazione": config.ha_intestazione,
+        "righe_da_saltare": config.righe_da_saltare,
         "colonna_data_contabile": config.colonna_data_contabile,
         "colonna_data_valuta": config.colonna_data_valuta,
         "colonna_importo": config.colonna_importo,
@@ -2500,6 +2509,8 @@ def _csv_config_from_dict(data):
 def _build_import_parser(parser_type, csv_config=None):
     if parser_type == "camt053":
         return Camt053Parser()
+    if parser_type == "excel":
+        return ExcelImporter(_csv_config_from_dict(csv_config))
     return CsvImporter(_csv_config_from_dict(csv_config))
 
 
@@ -2698,7 +2709,12 @@ def import_estratto_conto(request):
 
         try:
             if formato == "auto":
-                if _is_probable_xml(raw_bytes, getattr(uploaded, "name", "")):
+                if is_probable_excel_file(raw_bytes, getattr(uploaded, "name", "")):
+                    detection = detect_excel_import_config(raw_bytes)
+                    parser_type = "excel"
+                    parser = ExcelImporter(detection.config)
+                    detected_conto = _find_conto_from_cbi_metadata(detection)
+                elif _is_probable_xml(raw_bytes, getattr(uploaded, "name", "")):
                     parser_type = "camt053"
                     parser = Camt053Parser()
                 else:
@@ -2709,6 +2725,9 @@ def import_estratto_conto(request):
             elif formato == "camt053":
                 parser_type = "camt053"
                 parser = Camt053Parser()
+            elif formato == "excel":
+                parser_type = "excel"
+                parser = ExcelImporter(_build_manual_csv_config(form))
             else:
                 parser_type = "csv"
                 parser = CsvImporter(_build_manual_csv_config(form))
@@ -2719,7 +2738,7 @@ def import_estratto_conto(request):
                 messages.error(request, "Non ho trovato movimenti importabili nel file caricato.")
             else:
                 import_token = secrets.token_urlsafe(24)
-                csv_config = _csv_config_to_dict(parser.config) if isinstance(parser, CsvImporter) else None
+                csv_config = _csv_config_to_dict(parser.config) if isinstance(parser, (CsvImporter, ExcelImporter)) else None
                 cache.set(
                     f"gf-import-estratto:{import_token}",
                     {

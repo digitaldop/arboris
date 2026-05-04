@@ -366,6 +366,12 @@ class RataIscrizionePagamentoForm(forms.ModelForm):
         self.fields["metodo_pagamento"].queryset = self.fields["metodo_pagamento"].queryset.filter(attivo=True).order_by(
             "metodo_pagamento"
         )
+        self.fields["metodo_pagamento"].widget.attrs.update(
+            {
+                "data-searchable-select": "1",
+                "data-searchable-placeholder": "Cerca un metodo di pagamento...",
+            }
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -430,6 +436,12 @@ class RataIscrizionePagamentoRapidoForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.rata = rata
         self.fields["metodo_pagamento"].queryset = MetodoPagamento.objects.filter(attivo=True).order_by("metodo_pagamento")
+        self.fields["metodo_pagamento"].widget.attrs.update(
+            {
+                "data-searchable-select": "1",
+                "data-searchable-placeholder": "Cerca un metodo di pagamento...",
+            }
+        )
         self.fields["data_pagamento"].initial = timezone.localdate()
         apply_eur_currency_widget(self.fields["importo_pagato_personalizzato"])
 

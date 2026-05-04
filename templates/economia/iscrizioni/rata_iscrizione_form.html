@@ -196,13 +196,31 @@
 
                         <div class="calendar-event-form-row">
                             <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
-                            <label class="calendar-event-field" for="{{ form.metodo_pagamento.id_for_label }}">
+                            <div class="calendar-event-field">
                                 <span class="calendar-event-field-label">{{ form.metodo_pagamento.label }}</span>
                                 <div class="mode-view-only readonly-display readonly-display-plain">
                                     {{ rata.metodo_pagamento|default:"-" }}
                                 </div>
-                                <div class="mode-edit-field">{{ form.metodo_pagamento }} {{ form.metodo_pagamento.errors }}</div>
-                            </label>
+                                <div class="mode-edit-field">
+                                    <div class="popup-related-field rate-detail-payment-method-field">
+                                        <div class="related-field-stack">
+                                            {{ form.metodo_pagamento }}
+                                        </div>
+                                        <div class="related-actions" aria-label="Azioni metodo pagamento">
+                                            <button type="button" class="related-btn related-btn-add" id="detail-add-metodo-pagamento-btn" aria-label="Aggiungi metodo pagamento" title="Aggiungi">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-edit" id="detail-edit-metodo-pagamento-btn" aria-label="Modifica metodo pagamento" title="Modifica">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-delete" id="detail-delete-metodo-pagamento-btn" aria-label="Elimina metodo pagamento" title="Elimina">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {{ form.metodo_pagamento.errors }}
+                                </div>
+                            </div>
                         </div>
 
                         <div class="calendar-event-form-row">
@@ -263,6 +281,7 @@
     </div>
 
     <script src="{% static 'js/core/view-mode.js' %}"></script>
+    <script src="{% static 'js/pages/rata-iscrizione-form.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisViewMode) {
@@ -274,6 +293,9 @@
                     startInEditMode: false,
                     reloadOnCancel: true
                 });
+            }
+            if (window.ArborisRataIscrizioneForm) {
+                ArborisRataIscrizioneForm.init();
             }
         });
     </script>

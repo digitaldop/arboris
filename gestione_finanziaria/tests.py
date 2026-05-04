@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 import shutil
 import tempfile
 from unittest.mock import Mock, patch
@@ -60,7 +61,7 @@ from .fatture_in_cloud import (
     importa_documento_fatture_in_cloud,
     sincronizza_fatture_in_cloud,
 )
-from .importers import CsvImporter, CsvImporterConfig, detect_csv_import_config
+from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
 from .services import (
     applica_regole_a_movimento,
@@ -1501,6 +1502,108 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 2)
         movimento = MovimentoFinanziario.objects.get(importo=Decimal("300.00"))
         self.assertIn("Gheduzzi Sofia", movimento.descrizione)
+
+    def test_excel_autodetect_parses_movements(self):
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Data", "Data valuta", "Importo", "Descrizione", "ID transazione"])
+        sheet.append([date(2026, 4, 24), date(2026, 4, 24), 315.50, "Bonifico retta Rossi", "TX-1"])
+        sheet.append([date(2026, 4, 25), date(2026, 4, 25), -12.40, "Commissione banca", "TX-2"])
+        buffer = BytesIO()
+        workbook.save(buffer)
+        raw_excel = buffer.getvalue()
+
+        detection = detect_excel_import_config(raw_excel)
+
+        self.assertEqual(detection.formato_rilevato, "Excel")
+        self.assertEqual(detection.config.colonna_data_contabile, "data")
+        self.assertEqual(detection.config.colonna_importo, "importo")
+
+        movimenti = list(ExcelImporter(detection.config).parse(raw_excel))
+
+        self.assertEqual(len(movimenti), 2)
+        self.assertEqual(movimenti[0].data_contabile, date(2026, 4, 24))
+        self.assertEqual(movimenti[0].importo, Decimal("315.50"))
+        self.assertIn("Rossi", movimenti[0].descrizione)
+        self.assertEqual(movimenti[0].provider_transaction_id, "TX-1")
+        self.assertEqual(movimenti[1].importo, Decimal("-12.40"))
+
+    def test_excel_html_xls_autodetect_parses_movements(self):
+        raw_excel = (
+            "<html><body><table>"
+            "<tr><th>Data</th><th>Importo</th><th>Descrizione</th></tr>"
+            "<tr><td>02/05/2026</td><td>98,40</td><td>Incasso mensa</td></tr>"
+            "<tr><td>03/05/2026</td><td>-15,20</td><td>Commissione</td></tr>"
+            "</table></body></html>"
+        ).encode("utf-8")
+
+        detection = detect_excel_import_config(raw_excel)
+        movimenti = list(ExcelImporter(detection.config).parse(raw_excel))
+
+        self.assertEqual(detection.formato_rilevato, "Excel")
+        self.assertEqual(len(movimenti), 2)
+        self.assertEqual(movimenti[0].data_contabile, date(2026, 5, 2))
+        self.assertEqual(movimenti[0].importo, Decimal("98.40"))
+        self.assertIn("mensa", movimenti[0].descrizione)
+        self.assertEqual(movimenti[1].importo, Decimal("-15.20"))
+
+    def test_import_estratto_conto_preview_and_confirm_with_xlsx(self):
+        from openpyxl import Workbook
+
+        provider = ProviderBancario.objects.create(
+            nome="Import Excel test",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto Excel",
+            iban="IT00X0503437060000000003228",
+            provider=provider,
+            attivo=True,
+        )
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Data", "Data valuta", "Importo", "Descrizione", "ID transazione"])
+        sheet.append([date(2026, 5, 1), date(2026, 5, 1), 120.75, "Bonifico laboratorio", "XLSX-1"])
+        buffer = BytesIO()
+        workbook.save(buffer)
+        uploaded = SimpleUploadedFile(
+            "movimenti_unicredit.xlsx",
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        preview_response = self.client.post(
+            reverse("import_estratto_conto"),
+            {
+                "import_action": "preview",
+                "formato": "auto",
+                "conto": "",
+                "file": uploaded,
+            },
+        )
+
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertContains(preview_response, "Anteprima import")
+        self.assertContains(preview_response, "Excel")
+        self.assertEqual(preview_response.context["selected_conto"], conto)
+        token = preview_response.context["import_token"]
+        self.assertTrue(token)
+
+        confirm_response = self.client.post(
+            reverse("import_estratto_conto"),
+            {
+                "import_action": "confirm",
+                "import_token": token,
+                "conto": str(conto.pk),
+            },
+        )
+
+        self.assertEqual(confirm_response.status_code, 200)
+        movimento = MovimentoFinanziario.objects.get(conto=conto)
+        self.assertEqual(movimento.importo, Decimal("120.75"))
+        self.assertIn("laboratorio", movimento.descrizione)
 
     def test_regole_categorizzazione_supportano_condizioni_testuali_avanzate(self):
         categoria = CategoriaFinanziaria.objects.create(nome="Incassi rette")

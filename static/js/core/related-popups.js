@@ -300,6 +300,9 @@ window.ArborisRelatedPopups = (function () {
         if (targetInputName) {
             const exact = document.querySelector(`select[name="${targetInputName}"]`);
             if (exact) return exact;
+
+            const byExplicitId = document.getElementById(targetInputName);
+            if (byExplicitId && byExplicitId instanceof HTMLSelectElement) return byExplicitId;
         }
 
         const fallback = document.getElementById("id_" + fieldName);
