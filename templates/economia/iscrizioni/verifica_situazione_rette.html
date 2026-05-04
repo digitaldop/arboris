@@ -639,14 +639,13 @@
                         method="post"
                         action="{% url 'riconcilia_pagamenti_rate_anno_scolastico' %}"
                         class="verifica-rette-batch-form"
-                        onsubmit="return confirm('Avviare la riconciliazione automatica dei pagamenti per l anno scolastico selezionato? I casi ambigui resteranno da riconciliare manualmente.');"
                     >
                         {% csrf_token %}
                         <input type="hidden" name="anno_scolastico" value="{{ anno_scolastico.pk }}">
                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
                         <button type="submit" class="btn btn-primary btn-icon-text">
                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
-                            <span>Riconcilia pagamenti anno</span>
+                            <span>Anteprima riconciliazione</span>
                         </button>
                     </form>
                 </div>
@@ -680,6 +679,10 @@
                             <div class="verifica-rette-summary-metric-label">Totale anno scolastico</div>
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_senza_preiscrizioni|euro }}</div>
                         </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Rimanente per l'anno scolastico</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.rimanente_anno_senza_preiscrizioni|euro }}</div>
+                        </div>
                     </div>
                 </article>
                 <article class="verifica-rette-summary-block" data-summary-card data-summary-key="con-preiscrizioni" draggable="true">
@@ -699,6 +702,10 @@
                         <div class="verifica-rette-summary-metric">
                             <div class="verifica-rette-summary-metric-label">Totale anno scolastico</div>
                             <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.totale_anno_con_preiscrizioni|euro }}</div>
+                        </div>
+                        <div class="verifica-rette-summary-metric">
+                            <div class="verifica-rette-summary-metric-label">Rimanente per l'anno scolastico</div>
+                            <div class="verifica-rette-summary-metric-value">&euro; {{ riepilogo_totali.rimanente_anno_con_preiscrizioni|euro }}</div>
                         </div>
                     </div>
                 </article>

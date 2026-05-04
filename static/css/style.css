@@ -7157,13 +7157,40 @@ select:focus {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.supplier-profile-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    gap: 18px;
+    align-items: start;
+}
+
+.supplier-profile-layout.is-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .supplier-profile-form {
     display: grid;
     gap: 16px;
+    min-width: 0;
+}
+
+.supplier-profile-sidebar {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+
+.supplier-profile-form .supplier-document-fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
 }
 
 .supplier-profile-card {
     padding: 20px;
+    border-color: #dce5f0;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(32, 54, 69, 0.05);
 }
 
 .supplier-profile-form-grid,
@@ -7181,6 +7208,13 @@ select:focus {
     max-width: none;
 }
 
+.supplier-profile-related-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
 .supplier-profile-related-field.fornitore-category-related {
     max-width: none;
 }
@@ -7188,6 +7222,26 @@ select:focus {
 .supplier-profile-related-field.fornitore-category-related .related-field-stack {
     flex: 1 1 0;
     width: auto;
+    min-width: 0;
+}
+
+.supplier-profile-related-field .related-actions {
+    flex-wrap: nowrap;
+    width: auto;
+    min-width: max-content;
+}
+
+.supplier-profile-form .readonly-display-plain {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    overflow-wrap: anywhere;
+}
+
+.supplier-profile-note-view {
+    align-items: flex-start;
+    min-height: 72px;
+    padding-top: 8px;
 }
 
 .supplier-profile-actions,
@@ -7197,6 +7251,110 @@ select:focus {
 
 .supplier-profile-section {
     margin-top: 0;
+}
+
+.supplier-side-card {
+    padding: 16px;
+}
+
+.supplier-side-card .family-side-card-head {
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.supplier-side-card .family-side-card-head h2 {
+    font-size: 18px;
+}
+
+.supplier-side-card .family-side-card-head p {
+    margin: 4px 0 0;
+    color: #60738d;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.supplier-side-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+}
+
+.supplier-side-card-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+.supplier-side-card-icon.is-amber {
+    background: #fff6df;
+    color: #a86a00;
+}
+
+.supplier-side-card-icon.is-green {
+    background: #e8f7ef;
+    color: #0f8a52;
+}
+
+.supplier-side-table-wrap {
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.supplier-side-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: #223846;
+    font-size: 12px;
+}
+
+.supplier-side-table th {
+    padding: 8px 8px 9px;
+    border-bottom: 1px solid #dfe8ef;
+    color: #60738d;
+    font-size: 10px;
+    font-weight: 850;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.supplier-side-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #edf3f7;
+    vertical-align: top;
+}
+
+.supplier-side-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.supplier-side-table tbody tr.list-row-link:hover td {
+    background: #f7fbfe;
+}
+
+.supplier-side-table strong,
+.supplier-side-table span {
+    display: block;
+    min-width: 0;
+}
+
+.supplier-side-table strong {
+    color: #172131;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.supplier-side-table span {
+    margin-top: 3px;
+    color: #60738d;
+    font-size: 11px;
+    font-weight: 650;
 }
 
 .category-expense-editor-shell {
@@ -7246,9 +7404,27 @@ select:focus {
     margin: 4px 0 0 30px;
 }
 
+@media (max-width: 1080px) {
+    .supplier-profile-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 760px) {
     .popup-page .supplier-document-detail-shell.is-popup {
         padding: 22px 18px;
+    }
+
+    .supplier-profile-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .supplier-profile-related-field {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .supplier-profile-related-field .related-actions {
+        min-width: 0;
     }
 
     .supplier-document-summary-grid,

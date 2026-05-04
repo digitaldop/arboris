@@ -41,14 +41,14 @@
     </div>
 
     <div class="list-toolbar anagrafica-list-toolbar-card finance-filter-toolbar">
-        <form method="get" class="search-form anagrafica-search-form">
+        <form method="get" class="search-form anagrafica-search-form" data-live-list-form data-live-list-target="#documenti-fornitori-results">
             <label class="anagrafica-search-field">
                 <span class="anagrafica-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
-                <input type="search" name="q" value="{{ q }}" placeholder="Cerca numero, descrizione, fornitore..." class="search-input">
+                <input type="search" name="q" value="{{ q }}" placeholder="Cerca numero, descrizione, fornitore..." class="search-input" data-live-list-input>
             </label>
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Fornitore</span>
-                <select name="fornitore">
+                <select name="fornitore" data-live-list-filter>
                     <option value="">Tutti i fornitori</option>
                     {% for fornitore in fornitori %}
                         <option value="{{ fornitore.pk }}" {% if fornitore_selezionato == fornitore.pk|stringformat:"s" %}selected{% endif %}>{{ fornitore.denominazione }}</option>
@@ -57,7 +57,7 @@
             </label>
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Categoria</span>
-                <select name="categoria">
+                <select name="categoria" data-live-list-filter>
                     <option value="">Tutte le categorie</option>
                     {% for categoria in categorie %}
                         <option value="{{ categoria.pk }}" {% if categoria_selezionata == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nome }}</option>
@@ -66,7 +66,7 @@
             </label>
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Stato</span>
-                <select name="stato">
+                <select name="stato" data-live-list-filter>
                     <option value="">Tutti gli stati</option>
                     {% for value, label in stati %}
                         <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
@@ -77,95 +77,98 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                 <span class="btn-label">Filtra</span>
             </button>
-            <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary btn-icon-text">
+            <a href="{% url 'lista_documenti_fornitori' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear>
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                 <span class="btn-label">Reset</span>
             </a>
         </form>
     </div>
 
-    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
-        <div class="panel-body">
-            {% if documenti %}
-                <form method="post" action="{% url 'elimina_documenti_fornitori_multipla' %}" class="finance-bulk-form" data-bulk-form>
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <div class="finance-bulk-toolbar" data-bulk-toolbar>
-                        <div class="finance-bulk-summary">
-                            <strong><span data-bulk-count>0</span></strong>
-                            <span>fatture selezionate</span>
+    <div id="documenti-fornitori-results" class="live-list-results">
+        <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+            <div class="panel-body">
+                {% if documenti %}
+                    <form method="post" action="{% url 'elimina_documenti_fornitori_multipla' %}" class="finance-bulk-form" data-bulk-form>
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <div class="finance-bulk-toolbar" data-bulk-toolbar>
+                            <div class="finance-bulk-summary">
+                                <strong><span data-bulk-count>0</span></strong>
+                                <span>fatture selezionate</span>
+                            </div>
+                            <button type="submit" class="btn btn-danger btn-icon-text" data-bulk-submit>
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                <span class="btn-label">Elimina selezionati</span>
+                            </button>
                         </div>
-                        <button type="submit" class="btn btn-danger btn-icon-text" data-bulk-submit>
-                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                            <span class="btn-label">Elimina selezionati</span>
-                        </button>
-                    </div>
-                    <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table">
-                        <thead>
-                            <tr>
-                                <th class="finance-bulk-select-col">
-                                    <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all aria-label="Seleziona tutte le fatture visibili">
-                                </th>
-                                <th>Fattura</th>
-                                <th>Fornitore</th>
-                                <th>Data fattura</th>
-                                <th>Data di scadenza</th>
-                                <th>Categoria</th>
-                                <th class="column-right">Imponibile</th>
-                                <th class="column-right">IVA</th>
-                                <th class="column-right">Totale</th>
-                                <th>Stato</th>
-                                <th>Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for documento in documenti %}
-                                <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
-                                    <td class="finance-bulk-select-col">
-                                        <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ documento.pk }}" data-bulk-checkbox aria-label="Seleziona fattura {{ documento.numero_documento }}">
-                                    </td>
-                                    <td class="anagrafica-record-cell">
-                                        <a href="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" class="anagrafica-record-link anagrafica-record-link-compact" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
-                                            <span class="finance-record-icon finance-record-icon-document" aria-hidden="true">
-                                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
-                                            </span>
-                                            <span class="anagrafica-record-main">
-                                                <span class="table-main-text">{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</span>
-                                                <span class="table-subtext">{{ documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
-                                            </span>
-                                        </a>
-                                    </td>
-                                    <td>{{ documento.fornitore.denominazione }}</td>
-                                    <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
-                                    <td>{{ documento.data_scadenza_prima|date:"d/m/Y"|default:"-" }}</td>
-                                    <td>{{ documento.categoria_spesa|default:"-" }}</td>
-                                    <td class="column-right">{{ documento.imponibile|euro }} &euro;</td>
-                                    <td class="column-right">{{ documento.iva|euro }} &euro;</td>
-                                    <td class="column-right finance-money-cell">{{ documento.totale|euro }} &euro;</td>
-                                    <td>
-                                        <span class="anagrafica-status-chip {% if documento.stato == 'pagato' %}is-success{% elif documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
-                                            {{ documento.get_stato_display }}
-                                        </span>
-                                    </td>
-                                    <td class="actions-cell">
-                                        <div class="table-icon-actions anagrafica-row-actions">
-                                            <a class="table-icon-link anagrafica-action-btn anagrafica-action-open" href="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" title="Apri" aria-label="Apri fattura {{ documento.numero_documento }}" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
-                                            <a class="table-icon-link table-icon-link-danger anagrafica-action-btn anagrafica-action-delete" href="{% url 'elimina_documento_fornitore' documento.pk %}" title="Elimina" aria-label="Elimina fattura {{ documento.numero_documento }}"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
-                                        </div>
-                                    </td>
+                        <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table">
+                            <thead>
+                                <tr>
+                                    <th class="finance-bulk-select-col">
+                                        <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all aria-label="Seleziona tutte le fatture visibili">
+                                    </th>
+                                    <th>Fattura</th>
+                                    <th>Fornitore</th>
+                                    <th>Data fattura</th>
+                                    <th>Data di scadenza</th>
+                                    <th>Categoria</th>
+                                    <th class="column-right">Imponibile</th>
+                                    <th class="column-right">IVA</th>
+                                    <th class="column-right">Totale</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
                                 </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </form>
-            {% else %}
-                <div class="empty-state">Nessuna fattura fornitore trovata.</div>
-            {% endif %}
+                            </thead>
+                            <tbody>
+                                {% for documento in documenti %}
+                                    <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
+                                        <td class="finance-bulk-select-col">
+                                            <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ documento.pk }}" data-bulk-checkbox aria-label="Seleziona fattura {{ documento.numero_documento }}">
+                                        </td>
+                                        <td class="anagrafica-record-cell">
+                                            <a href="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" class="anagrafica-record-link anagrafica-record-link-compact" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
+                                                <span class="finance-record-icon finance-record-icon-document" aria-hidden="true">
+                                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                                </span>
+                                                <span class="anagrafica-record-main">
+                                                    <span class="table-main-text">{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</span>
+                                                    <span class="table-subtext">{{ documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
+                                                </span>
+                                            </a>
+                                        </td>
+                                        <td>{{ documento.fornitore.denominazione }}</td>
+                                        <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                                        <td>{{ documento.data_scadenza_prima|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>{{ documento.categoria_spesa_effettiva|default:"-" }}</td>
+                                        <td class="column-right">{{ documento.imponibile|euro }} &euro;</td>
+                                        <td class="column-right">{{ documento.iva|euro }} &euro;</td>
+                                        <td class="column-right finance-money-cell">{{ documento.totale|euro }} &euro;</td>
+                                        <td>
+                                            <span class="anagrafica-status-chip {% if documento.stato == 'pagato' %}is-success{% elif documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
+                                                {{ documento.get_stato_display }}
+                                            </span>
+                                        </td>
+                                        <td class="actions-cell">
+                                            <div class="table-icon-actions anagrafica-row-actions">
+                                                <a class="table-icon-link anagrafica-action-btn anagrafica-action-open" href="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" title="Apri" aria-label="Apri fattura {{ documento.numero_documento }}" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                                <a class="table-icon-link table-icon-link-danger anagrafica-action-btn anagrafica-action-delete" href="{% url 'elimina_documento_fornitore' documento.pk %}" title="Elimina" aria-label="Elimina fattura {{ documento.numero_documento }}"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </form>
+                {% else %}
+                    <div class="empty-state">Nessuna fattura fornitore trovata.</div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
     <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/core/live-list-search.js' %}?v=4"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

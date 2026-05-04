@@ -21,7 +21,7 @@
             <div class="family-page-title-block">
                 <div class="family-page-title-line">
                     <h1 class="page-title">{% if fornitore %}{{ fornitore.denominazione }}{% else %}Nuovo fornitore{% endif %}</h1>
-                    <span class="family-status-pill {% if fornitore and not fornitore.attivo %}is-muted{% else %}{% endif %}">
+                    <span class="family-status-pill {% if fornitore and not fornitore.attivo %}is-muted{% endif %}">
                         <span class="family-status-dot" aria-hidden="true"></span>
                         {% if fornitore %}{% if fornitore.attivo %}Attivo{% else %}Non attivo{% endif %}{% else %}Nuovo{% endif %}
                     </span>
@@ -32,20 +32,24 @@
                 </div>
             </div>
             <div class="page-head-actions family-page-actions">
+                <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_fornitori' %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </button>
                 {% if fornitore %}
                     <a href="{% url 'crea_documento_fornitore' %}?fornitore={{ fornitore.pk }}&popup=1" class="btn btn-primary btn-icon-text btn-add-action" data-window-popup="1" data-popup-url="{% url 'crea_documento_fornitore' %}?fornitore={{ fornitore.pk }}&popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
                         <span class="btn-label">Nuova fattura</span>
                     </a>
-                    <a href="{% url 'elimina_fornitore' fornitore.pk %}" class="btn btn-danger btn-icon-text">
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-intent-edit" id="enable-edit-fornitore-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
+                    <a href="{% url 'elimina_fornitore' fornitore.pk %}" class="btn btn-intent-danger btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                         <span class="btn-label">Elimina</span>
                     </a>
                 {% endif %}
-                <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Elenco</span>
-                </a>
             </div>
         </div>
 
@@ -80,259 +84,293 @@
             </article>
         </section>
 
-        <form method="post" class="detail-form supplier-profile-form">
-            {% csrf_token %}
-            {{ form.non_field_errors }}
+        <div class="supplier-profile-layout{% if not fornitore %} is-single{% endif %}">
+            <form method="post" id="fornitore-detail-form" class="detail-form supplier-profile-form {% if fornitore %}{% if edit_scope == 'full' %}is-edit-mode{% else %}is-view-mode{% endif %}{% else %}is-create-mode is-edit-mode{% endif %}">
+                {% csrf_token %}
+                <input type="hidden" name="_edit_scope" id="fornitore-edit-scope" value="{% if fornitore %}{{ edit_scope|default:'view' }}{% else %}full{% endif %}">
+                {{ form.non_field_errors }}
 
-            <fieldset class="supplier-document-fieldset">
-                <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
-                    <div class="calendar-event-form-title">
-                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
-                        Dati principali
-                    </div>
-                    <div class="supplier-document-form-grid supplier-profile-form-grid">
-                        <div class="supplier-document-field is-wide">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.denominazione.id_for_label }}">{{ form.denominazione.label }}</label>
-                                {{ form.denominazione }}
-                                {{ form.denominazione.errors }}
-                            </div>
+                <fieldset class="supplier-document-fieldset" id="fornitore-main-fields">
+                    <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
+                        <div class="calendar-event-form-title">
+                            <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                            Dati principali
                         </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.tipo_soggetto.id_for_label }}">{{ form.tipo_soggetto.label }}</label>
-                                {{ form.tipo_soggetto }}
-                                {{ form.tipo_soggetto.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field category-expense-check-field">
-                            <span class="supplier-document-field-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.attivo.id_for_label }}">{{ form.attivo.label }}</label>
-                                <div class="category-expense-checkbox-line">
-                                    {{ form.attivo }}
-                                    <span>Fornitore disponibile per nuove fatture.</span>
+                        <div class="supplier-document-form-grid supplier-profile-form-grid">
+                            <div class="supplier-document-field is-wide">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.denominazione.id_for_label }}">{{ form.denominazione.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.denominazione|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.denominazione }}</div>
+                                    {{ form.denominazione.errors }}
                                 </div>
-                                {{ form.attivo.errors }}
                             </div>
-                        </div>
-                        <div class="supplier-document-field is-wide">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.categoria_spesa.id_for_label }}">{{ form.categoria_spesa.label }}</label>
-                                <div class="related-field-row popup-related-field fornitore-category-related supplier-profile-related-field">
-                                    <div class="related-field-stack">
-                                        {{ form.categoria_spesa }}
-                                    </div>
-                                    <div class="related-actions">
-                                        <button type="button" class="related-btn related-btn-add" id="add-categoria-spesa-btn" aria-label="Aggiungi categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></button>
-                                        <button type="button" class="related-btn related-btn-edit" id="edit-categoria-spesa-btn" aria-label="Modifica categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></button>
-                                        <button type="button" class="related-btn related-btn-delete" id="delete-categoria-spesa-btn" aria-label="Elimina categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></button>
-                                    </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.tipo_soggetto.id_for_label }}">{{ form.tipo_soggetto.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{% if fornitore %}{{ fornitore.get_tipo_soggetto_display }}{% else %}-{% endif %}</div>
+                                    <div class="mode-edit-field">{{ form.tipo_soggetto }}</div>
+                                    {{ form.tipo_soggetto.errors }}
                                 </div>
-                                {{ form.categoria_spesa.errors }}
+                            </div>
+                            <div class="supplier-document-field category-expense-check-field">
+                                <span class="supplier-document-field-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.attivo.id_for_label }}">{{ form.attivo.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{% if fornitore and fornitore.attivo %}Attivo{% elif fornitore %}Non attivo{% else %}Attivo{% endif %}</div>
+                                    <div class="category-expense-checkbox-line mode-edit-field">
+                                        {{ form.attivo }}
+                                        <span>Fornitore disponibile per nuove fatture.</span>
+                                    </div>
+                                    {{ form.attivo.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field is-wide">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.categoria_spesa.id_for_label }}">{{ form.categoria_spesa.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{% if fornitore and fornitore.categoria_spesa %}{{ fornitore.categoria_spesa }}{% else %}Da assegnare{% endif %}</div>
+                                    <div class="related-field-row popup-related-field fornitore-category-related supplier-profile-related-field mode-edit-field">
+                                        <div class="related-field-stack">
+                                            {{ form.categoria_spesa }}
+                                        </div>
+                                        <div class="related-actions">
+                                            <button type="button" class="related-btn related-btn-add" id="add-categoria-spesa-btn" aria-label="Aggiungi categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></button>
+                                            <button type="button" class="related-btn related-btn-edit" id="edit-categoria-spesa-btn" aria-label="Modifica categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></button>
+                                            <button type="button" class="related-btn related-btn-delete" id="delete-categoria-spesa-btn" aria-label="Elimina categoria di spesa"><svg class="related-btn-icon" aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></button>
+                                        </div>
+                                    </div>
+                                    {{ form.categoria_spesa.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.codice_fiscale.id_for_label }}">{{ form.codice_fiscale.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.codice_fiscale|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.codice_fiscale }}</div>
+                                    {{ form.codice_fiscale.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.partita_iva.id_for_label }}">{{ form.partita_iva.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.partita_iva|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.partita_iva }}</div>
+                                    {{ form.partita_iva.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field is-full">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.indirizzo.id_for_label }}">{{ form.indirizzo.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.indirizzo|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.indirizzo }}</div>
+                                    {{ form.indirizzo.errors }}
+                                </div>
                             </div>
                         </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.codice_fiscale.id_for_label }}">{{ form.codice_fiscale.label }}</label>
-                                {{ form.codice_fiscale }}
-                                {{ form.codice_fiscale.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.partita_iva.id_for_label }}">{{ form.partita_iva.label }}</label>
-                                {{ form.partita_iva }}
-                                {{ form.partita_iva.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field is-full">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.indirizzo.id_for_label }}">{{ form.indirizzo.label }}</label>
-                                {{ form.indirizzo }}
-                                {{ form.indirizzo.errors }}
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                    </section>
 
-                <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
-                    <div class="calendar-event-form-title">
-                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
-                        Contatti
-                    </div>
-                    <div class="supplier-document-form-grid supplier-profile-form-grid">
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.referente.id_for_label }}">{{ form.referente.label }}</label>
-                                {{ form.referente }}
-                                {{ form.referente.errors }}
+                    <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
+                        <div class="calendar-event-form-title">
+                            <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                            Contatti
+                        </div>
+                        <div class="supplier-document-form-grid supplier-profile-form-grid">
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.referente.id_for_label }}">{{ form.referente.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.referente|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.referente }}</div>
+                                    {{ form.referente.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.telefono|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.telefono }}</div>
+                                    {{ form.telefono.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.email|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.email }}</div>
+                                    {{ form.email.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.pec.id_for_label }}">{{ form.pec.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.pec|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.pec }}</div>
+                                    {{ form.pec.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field is-full">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.codice_sdi.id_for_label }}">{{ form.codice_sdi.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.codice_sdi|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.codice_sdi }}</div>
+                                    {{ form.codice_sdi.errors }}
+                                </div>
                             </div>
                         </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
-                                {{ form.telefono }}
-                                {{ form.telefono.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
-                                {{ form.email }}
-                                {{ form.email.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.pec.id_for_label }}">{{ form.pec.label }}</label>
-                                {{ form.pec }}
-                                {{ form.pec.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field is-full">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.codice_sdi.id_for_label }}">{{ form.codice_sdi.label }}</label>
-                                {{ form.codice_sdi }}
-                                {{ form.codice_sdi.errors }}
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                    </section>
 
-                <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
-                    <div class="calendar-event-form-title">
-                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
-                        Pagamenti e note
-                    </div>
-                    <div class="supplier-document-form-grid supplier-profile-form-grid">
-                        <div class="supplier-document-field is-wide">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.iban.id_for_label }}">{{ form.iban.label }}</label>
-                                {{ form.iban }}
-                                {{ form.iban.errors }}
+                    <section class="calendar-event-form-card supplier-document-form-card supplier-profile-card">
+                        <div class="calendar-event-form-title">
+                            <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                            Pagamenti e note
+                        </div>
+                        <div class="supplier-document-form-grid supplier-profile-form-grid">
+                            <div class="supplier-document-field is-wide">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.iban.id_for_label }}">{{ form.iban.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.iban|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.iban }}</div>
+                                    {{ form.iban.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field is-wide">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.banca.id_for_label }}">{{ form.banca.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{{ fornitore.banca|default:"-" }}</div>
+                                    <div class="mode-edit-field">{{ form.banca }}</div>
+                                    {{ form.banca.errors }}
+                                </div>
+                            </div>
+                            <div class="supplier-document-field is-full">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain supplier-profile-note-view">{% if fornitore and fornitore.note %}{{ fornitore.note|linebreaksbr }}{% else %}-{% endif %}</div>
+                                    <div class="mode-edit-field">{{ form.note }}</div>
+                                    {{ form.note.errors }}
+                                </div>
                             </div>
                         </div>
-                        <div class="supplier-document-field is-wide">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.banca.id_for_label }}">{{ form.banca.label }}</label>
-                                {{ form.banca }}
-                                {{ form.banca.errors }}
-                            </div>
-                        </div>
-                        <div class="supplier-document-field is-full">
-                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
-                            <div class="supplier-document-field-body">
-                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
-                                {{ form.note }}
-                                {{ form.note.errors }}
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </fieldset>
+                    </section>
+                </fieldset>
 
-            <div class="form-actions sticky-form-actions supplier-profile-actions">
-                <button type="submit" class="btn btn-primary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                    <span class="btn-label">Salva scheda</span>
-                </button>
-                <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-                    <span class="btn-label">Annulla</span>
-                </a>
-            </div>
-        </form>
-
-        {% if fornitore %}
-            <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel supplier-profile-section">
-                <div class="finance-section-head">
-                    <div>
-                        <div class="section-title">Fatture recenti</div>
-                        <p class="finance-section-subtitle">Ultime fatture registrate per questo fornitore.</p>
-                    </div>
+                <div class="form-actions sticky-form-actions supplier-profile-actions mode-edit-field">
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva scheda</span>
+                    </button>
+                    {% if fornitore %}
+                        <a href="{% url 'modifica_fornitore' fornitore.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </a>
+                    {% else %}
+                        <a href="{% url 'lista_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </a>
+                    {% endif %}
                 </div>
-                <div class="panel-body">
-                    <table class="list-table anagrafica-list-table finance-modern-table">
-                        <thead>
-                            <tr>
-                                <th>Fattura</th>
-                                <th>Data fattura</th>
-                                <th>Categoria</th>
-                                <th class="column-right">Totale</th>
-                                <th>Stato</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for documento in documenti %}
-                                <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
-                                    <td>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</td>
-                                    <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
-                                    <td>{{ documento.categoria_spesa|default:"-" }}</td>
-                                    <td class="column-right">{{ documento.totale|euro }} &euro;</td>
-                                    <td>{{ documento.get_stato_display }}</td>
-                                </tr>
-                            {% empty %}
-                                <tr><td colspan="5"><div class="empty-state">Nessuna fattura registrata per questo fornitore.</div></td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            </form>
 
-            <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel supplier-profile-section">
-                <div class="finance-section-head">
-                    <div>
-                        <div class="section-title">Scadenze aperte</div>
-                        <p class="finance-section-subtitle">Rate e pagamenti ancora da chiudere.</p>
-                    </div>
-                </div>
-                <div class="panel-body">
-                    <table class="list-table anagrafica-list-table finance-modern-table">
-                        <thead>
-                            <tr>
-                                <th>Scadenza</th>
-                                <th>Fattura</th>
-                                <th class="column-right">Previsto</th>
-                                <th class="column-right">Pagato</th>
-                                <th>Stato</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for scadenza in scadenze_aperte %}
-                                <tr>
-                                    <td>{{ scadenza.data_scadenza|date:"d/m/Y" }}</td>
-                                    <td><a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" class="table-link" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">{{ scadenza.documento.numero_documento }}</a></td>
-                                    <td class="column-right">{{ scadenza.importo_previsto|euro }} &euro;</td>
-                                    <td class="column-right">{{ scadenza.importo_pagato|euro }} &euro;</td>
-                                    <td>{{ scadenza.get_stato_display }}</td>
-                                </tr>
-                            {% empty %}
-                                <tr><td colspan="5"><div class="empty-state">Nessuna scadenza aperta.</div></td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        {% endif %}
+            {% if fornitore %}
+                <aside class="supplier-profile-sidebar" aria-label="Fatture e scadenze del fornitore">
+                    <section class="family-side-card supplier-side-card">
+                        <div class="family-side-card-head">
+                            <div>
+                                <h2>Fatture recenti</h2>
+                                <p>Ultime fatture registrate.</p>
+                            </div>
+                            <span class="supplier-side-card-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                        </div>
+                        <div class="family-side-card-body">
+                            <div class="supplier-side-table-wrap">
+                                <table class="supplier-side-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fattura</th>
+                                            <th>Data</th>
+                                            <th class="column-right">Totale</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for documento in documenti %}
+                                            <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
+                                                <td>
+                                                    <strong>{{ documento.numero_documento|default:"Senza numero" }}</strong>
+                                                    <span>{{ documento.get_stato_display }}</span>
+                                                </td>
+                                                <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                                                <td class="column-right">{{ documento.totale|euro }} &euro;</td>
+                                            </tr>
+                                        {% empty %}
+                                            <tr><td colspan="3"><div class="empty-state">Nessuna fattura registrata.</div></td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="family-side-card supplier-side-card">
+                        <div class="family-side-card-head">
+                            <div>
+                                <h2>Scadenze aperte</h2>
+                                <p>Rate e pagamenti da chiudere.</p>
+                            </div>
+                            <span class="supplier-side-card-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        </div>
+                        <div class="family-side-card-body">
+                            <div class="supplier-side-table-wrap">
+                                <table class="supplier-side-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Scadenza</th>
+                                            <th>Fattura</th>
+                                            <th class="column-right">Residuo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for scadenza in scadenze_aperte %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ scadenza.data_scadenza|date:"d/m/Y" }}</strong>
+                                                    <span>{{ scadenza.get_stato_display }}</span>
+                                                </td>
+                                                <td>
+                                                    <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" class="table-link" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">{{ scadenza.documento.numero_documento|default:"-" }}</a>
+                                                </td>
+                                                <td class="column-right">{{ scadenza.importo_residuo|euro }} &euro;</td>
+                                            </tr>
+                                        {% empty %}
+                                            <tr><td colspan="3"><div class="empty-state">Nessuna scadenza aperta.</div></td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+            {% endif %}
+        </div>
     </div>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
-    <script src="{% static 'js/pages/fornitore-form.js' %}?v=1"></script>
+    <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
+    <script src="{% static 'js/pages/fornitore-form.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisFornitoreForm) {

@@ -134,7 +134,7 @@
                             <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
                             <div class="supplier-document-field-body">
                                 <label for="{{ form.data_ricezione.id_for_label }}">{{ form.data_ricezione.label }}</label>
-                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.data_ricezione|it_date|default:"-" }}</div>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.data_ricezione_effettiva|it_date|default:"-" }}</div>
                                 <div class="mode-edit-field">{{ form.data_ricezione }}</div>
                                 {{ form.data_ricezione.errors }}
                             </div>
@@ -144,7 +144,7 @@
                             <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
                             <div class="supplier-document-field-body">
                                 <label for="{{ form.categoria_spesa.id_for_label }}">{{ form.categoria_spesa.label }}</label>
-                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.categoria_spesa|default:"Categoria del fornitore" }}</div>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.categoria_spesa_effettiva|default:"Categoria del fornitore" }}</div>
                                 <div class="mode-edit-field related-field-row popup-related-field documento-fornitore-related">
                                     <div class="related-field-stack">{{ form.categoria_spesa }}</div>
                                     <div class="related-actions">
@@ -171,7 +171,7 @@
                             <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
                             <div class="supplier-document-field-body">
                                 <label for="{{ form.mese_competenza.id_for_label }}">{{ form.mese_competenza.label }}</label>
-                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.mese_competenza|default:"-" }}</div>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.mese_competenza_nome|default:"-" }}</div>
                                 <div class="mode-edit-field">{{ form.mese_competenza }}</div>
                                 {{ form.mese_competenza.errors }}
                             </div>

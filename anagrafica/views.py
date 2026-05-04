@@ -1,19 +1,20 @@
 import mimetypes
 import unicodedata
-
-from django.contrib import messages
-from django.conf import settings
-from django.http import FileResponse, Http404, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from django.utils import timezone
 
-from .utils import citta_choice_label
-from .storage_utils import DOCUMENT_STORAGE_ERROR_TYPES, build_document_storage_error_message
+from django.conf import settings
+from django.contrib import messages
+from django.db import transaction
+from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
+from django.forms import modelform_factory
+from django.http import FileResponse, Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+
 from .forms import (
     IndirizzoForm,
     FamigliaForm,
@@ -38,9 +39,12 @@ from .models import (
     Documento,
     Familiare,
 )
+from calendario.data import build_dashboard_calendar_data
 from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione, TariffaCondizioneIscrizione
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
-from calendario.data import build_dashboard_calendar_data
+from gestione_finanziaria.services import build_home_financial_dashboard_data
+from scuola.models import AnnoScolastico, Classe
+from scuola.utils import resolve_default_anno_scolastico
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
 from sistema.models import (
     AzioneOperazioneCronologia,
@@ -51,14 +55,9 @@ from sistema.models import (
 )
 from sistema.permissions import user_has_module_permission
 from sistema.terminology import get_student_terminology
-from scuola.models import AnnoScolastico, Classe
-from scuola.utils import resolve_default_anno_scolastico
-from gestione_finanziaria.services import build_home_financial_dashboard_data
-from django.forms import modelform_factory
 
-from django.db import transaction
-from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
-from django.utils.http import url_has_allowed_host_and_scheme
+from .storage_utils import DOCUMENT_STORAGE_ERROR_TYPES, build_document_storage_error_message
+from .utils import citta_choice_label
 
 MONTH_LABELS = {
     1: "Gennaio",
@@ -713,11 +712,14 @@ def studente_iscrizioni_inline_queryset(studente=None):
     if not studente:
         return Iscrizione.objects.none()
 
-    ordered_rate_queryset = RataIscrizione.objects.order_by(
-        "anno_riferimento",
-        "mese_riferimento",
-        "numero_rata",
-        "id",
+    ordered_rate_queryset = (
+        RataIscrizione.objects.select_related("metodo_pagamento")
+        .order_by(
+            "anno_riferimento",
+            "mese_riferimento",
+            "numero_rata",
+            "id",
+        )
     )
     tariffa_queryset = TariffaCondizioneIscrizione.objects.filter(attiva=True).order_by(
         "ordine_figlio_da",
@@ -742,6 +744,38 @@ def studente_iscrizioni_inline_queryset(studente=None):
         )
         .order_by("-anno_scolastico__data_inizio", "-id")
     )
+
+
+STUDENTE_RATE_SYNC_ALL_CHANGED_FIELDS = {"famiglia", "data_nascita"}
+
+
+def student_form_changes_require_full_rate_sync(form):
+    return bool(STUDENTE_RATE_SYNC_ALL_CHANGED_FIELDS.intersection(getattr(form, "changed_data", [])))
+
+
+def sync_studente_iscrizioni_rate_schedules(studente, *, iscrizioni=None, sync_all=False):
+    queryset = studente_iscrizioni_inline_queryset(studente)
+
+    if not sync_all:
+        iscrizione_ids = [item.pk for item in (iscrizioni or []) if getattr(item, "pk", None)]
+        if not iscrizione_ids:
+            return 0
+        queryset = queryset.filter(pk__in=iscrizione_ids)
+
+    missing_rate_count = 0
+    for iscrizione in queryset:
+        if (
+            not getattr(iscrizione, "anno_scolastico_id", None)
+            or not getattr(iscrizione, "condizione_iscrizione_id", None)
+            or not getattr(iscrizione, "stato_iscrizione_id", None)
+        ):
+            continue
+
+        esito_rate = iscrizione.sync_rate_schedule()
+        if esito_rate == "missing":
+            missing_rate_count += 1
+
+    return missing_rate_count
 
 
 def studente_documenti_inline_queryset(studente=None):
@@ -807,18 +841,18 @@ def build_studente_document_counts(studente, today):
     }
 
 
-def count_studente_rate_scadute(iscrizioni, today):
+def count_studente_rate_scadute_from_overview(rate_overview, today):
     count = 0
 
-    for iscrizione in iscrizioni or []:
-        for rata in iscrizione.rate.all():
-            importo_finale = rata.importo_finale or Decimal("0.00")
-            importo_pagato = rata.importo_pagato or Decimal("0.00")
+    for item in rate_overview or []:
+        for month in item.get("months", []):
+            importo_finale = month.get("importo_finale") or Decimal("0.00")
+            importo_pagato = month.get("importo_pagato") or Decimal("0.00")
             if (
-                rata.data_scadenza
-                and rata.data_scadenza < today
+                month.get("data_scadenza")
+                and month["data_scadenza"] < today
                 and importo_finale > 0
-                and not rata.pagata
+                and not month.get("pagata")
                 and importo_pagato < importo_finale
             ):
                 count += 1
@@ -1390,6 +1424,10 @@ def build_studente_rate_overview(studente, iscrizioni=None):
                 ),
                 None,
             )
+
+        if ordine_figlio is not None:
+            iscrizione._ordine_figlio_cache = ordine_figlio
+        iscrizione._tariffa_applicabile_cache = tariffa
 
         rate = list(iscrizione.rate.all())
         importo_preiscrizione = Decimal("0.00") if iscrizione.non_pagante or not tariffa else (tariffa.preiscrizione or Decimal("0.00"))
@@ -3659,25 +3697,11 @@ def crea_studente(request):
 
                     if inline_target in (None, "iscrizioni"):
                         iscrizioni_formset.instance = studente
-                        iscrizioni_formset.save()
-
-                    if inline_target in (None, "iscrizioni"):
-                        for iscrizione in studente.iscrizioni.select_related(
-                            "anno_scolastico",
-                            "condizione_iscrizione",
-                            "stato_iscrizione",
-                            "agevolazione",
-                            "studente__famiglia",
-                        ):
-                            if (
-                                not getattr(iscrizione, "anno_scolastico_id", None)
-                                or not getattr(iscrizione, "condizione_iscrizione_id", None)
-                                or not getattr(iscrizione, "stato_iscrizione_id", None)
-                            ):
-                                continue
-                            esito_rate = iscrizione.sync_rate_schedule()
-                            if esito_rate == "missing":
-                                missing_rate_count += 1
+                        iscrizioni_salvate = iscrizioni_formset.save()
+                        missing_rate_count = sync_studente_iscrizioni_rate_schedules(
+                            studente,
+                            iscrizioni=iscrizioni_salvate,
+                        )
 
                     if inline_target in (None, "parenti"):
                         parenti_formset.instance = famiglia
@@ -3775,8 +3799,7 @@ def modifica_studente(request, pk):
             "indirizzo__citta__provincia",
             "luogo_nascita",
             "luogo_nascita__provincia",
-        )
-        .prefetch_related("famiglia__familiari", "famiglia__studenti"),
+        ),
         pk=pk,
     )
     today = timezone.localdate()
@@ -3839,11 +3862,7 @@ def modifica_studente(request, pk):
                 queryset=iscrizioni_queryset,
             )
             if inline_target == "iscrizioni"
-            else build_iscrizioni_studente_formset(
-                instance=studente,
-                prefix="iscrizioni",
-                queryset=iscrizioni_queryset,
-            )
+            else None
         )
         documenti_formset = (
             build_documenti_studente_formset(
@@ -3854,11 +3873,7 @@ def modifica_studente(request, pk):
                 queryset=documenti_queryset,
             )
             if inline_target == "documenti"
-            else build_documenti_studente_formset(
-                instance=studente,
-                prefix="documenti",
-                queryset=documenti_queryset,
-            )
+            else None
         )
         parenti_formset = (
             build_familiari_formset(
@@ -3867,14 +3882,7 @@ def modifica_studente(request, pk):
                 prefix="parenti",
             )
             if inline_target == "parenti" and famiglia_for_parenti
-            else (
-                build_familiari_formset(
-                    instance=famiglia_for_parenti,
-                    prefix="parenti",
-                )
-                if famiglia_for_parenti
-                else None
-            )
+            else None
         )
 
         form_is_valid = form.is_valid()
@@ -3888,24 +3896,12 @@ def modifica_studente(request, pk):
                 with transaction.atomic():
                     studente = form.save()
                     if inline_target == "iscrizioni":
-                        iscrizioni_formset.save()
-
-                        for iscrizione in studente.iscrizioni.select_related(
-                            "anno_scolastico",
-                            "condizione_iscrizione",
-                            "stato_iscrizione",
-                            "agevolazione",
-                            "studente__famiglia",
-                        ):
-                            if (
-                                not getattr(iscrizione, "anno_scolastico_id", None)
-                                or not getattr(iscrizione, "condizione_iscrizione_id", None)
-                                or not getattr(iscrizione, "stato_iscrizione_id", None)
-                            ):
-                                continue
-                            esito_rate = iscrizione.sync_rate_schedule()
-                            if esito_rate == "missing":
-                                missing_rate_count += 1
+                        iscrizioni_salvate = iscrizioni_formset.save()
+                        missing_rate_count = sync_studente_iscrizioni_rate_schedules(
+                            studente,
+                            iscrizioni=iscrizioni_salvate,
+                            sync_all=student_form_changes_require_full_rate_sync(form),
+                        )
 
                     if inline_target == "documenti":
                         documenti_formset.save()
@@ -3931,6 +3927,24 @@ def modifica_studente(request, pk):
 
                 messages.success(request, "Modifiche salvate correttamente.")
                 return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
+
+        if iscrizioni_formset is None:
+            iscrizioni_formset = build_iscrizioni_studente_formset(
+                instance=studente,
+                prefix="iscrizioni",
+                queryset=iscrizioni_queryset,
+            )
+        if documenti_formset is None:
+            documenti_formset = build_documenti_studente_formset(
+                instance=studente,
+                prefix="documenti",
+                queryset=documenti_queryset,
+            )
+        if parenti_formset is None and famiglia_for_parenti:
+            parenti_formset = build_familiari_formset(
+                instance=famiglia_for_parenti,
+                prefix="parenti",
+            )
     else:
         form = StudenteStandaloneForm(instance=studente)
         iscrizioni_formset = build_iscrizioni_studente_formset(
@@ -3989,6 +4003,7 @@ def modifica_studente(request, pk):
         )
         decorate_studenti_current_enrollment_labels(studenti_parenti_famiglia, today=today)
     count_parenti = count_parenti_familiari + len(studenti_parenti_famiglia)
+    rate_overview = build_studente_rate_overview(studente, iscrizioni_correnti_list)
 
     ctx = {
         "form": form,
@@ -4009,8 +4024,8 @@ def modifica_studente(request, pk):
         "count_documenti": document_counts["count_documenti"],
         "count_documenti_in_scadenza": document_counts["count_documenti_in_scadenza"],
         "count_documenti_scaduti": document_counts["count_documenti_scaduti"],
-        "count_rate_scadute": count_studente_rate_scadute(iscrizioni_correnti_list, today),
-        "rate_overview": build_studente_rate_overview(studente, iscrizioni_correnti_list),
+        "count_rate_scadute": count_studente_rate_scadute_from_overview(rate_overview, today),
+        "rate_overview": rate_overview,
         "iscrizione_corrente": iscrizione_corrente,
         "studente_activity_entries": studente_activity,
         "studente_creazione_data": studente_audit_info["created_data"],

@@ -44,7 +44,7 @@
             <form method="post" class="inline-form" style="margin-top:1em">
                 {% csrf_token %}
                 <button type="submit" name="azione" value="annulla" class="btn btn-danger"
-                        onclick="return confirm('Annullare la riconciliazione con la rata {{ movimento.rata_iscrizione }}?');">
+                        onclick="return confirm('Annullare la riconciliazione di questo movimento? Rate e importi pagati verranno aggiornati.');">
                     Annulla riconciliazione
                 </button>
             </form>

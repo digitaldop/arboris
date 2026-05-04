@@ -264,6 +264,11 @@ urlpatterns = [
         gf_manage(views.elimina_movimento_finanziario),
         name="elimina_movimento_finanziario",
     ),
+    path(
+        "gestione-finanziaria/movimenti/<int:pk>/annulla-riconciliazione/",
+        gf_manage(views.annulla_riconciliazione_movimento),
+        name="annulla_riconciliazione_movimento",
+    ),
 
     # Regole di categorizzazione
     path(

@@ -1,9 +1,10 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
+import re
+from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
-from collections import Counter
-import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import pandas as pd
 from django.contrib.auth.models import User
@@ -29,7 +30,7 @@ from anagrafica.forms import (
     StudenteStandaloneForm,
     nazione_choice_queryset,
 )
-from anagrafica.views import famiglia_studenti_inline_queryset
+from anagrafica.views import famiglia_studenti_inline_queryset, sync_studente_iscrizioni_rate_schedules
 from anagrafica.models import (
     CAP,
     Citta,
@@ -2028,6 +2029,36 @@ class StudenteDetailPerformanceTests(TestCase):
         )
         self.client.force_login(self.user)
 
+    def create_next_year_enrollment(self):
+        anno_successivo = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=date(2026, 9, 1),
+            data_fine=date(2027, 8, 31),
+        )
+        condizione_successiva = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_successivo,
+            nome_condizione_iscrizione="Retta standard 2026",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione_successiva,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("4100.00"),
+            preiscrizione=Decimal("200.00"),
+            attiva=True,
+        )
+        return Iscrizione.objects.create(
+            studente=self.studente,
+            classe=self.classe,
+            anno_scolastico=anno_successivo,
+            data_iscrizione=date(2026, 9, 15),
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=condizione_successiva,
+            attiva=True,
+        )
+
     def test_modifica_studente_page_stays_within_reasonable_query_budget(self):
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
@@ -2042,6 +2073,34 @@ class StudenteDetailPerformanceTests(TestCase):
                 + [f"{count}x {sql}" for sql, count in normalized.most_common(20)]
             ),
         )
+
+    def test_sync_studente_rate_schedules_limits_work_to_saved_enrollments(self):
+        altra_iscrizione = self.create_next_year_enrollment()
+
+        with patch.object(Iscrizione, "sync_rate_schedule", autospec=True, return_value="unchanged") as sync_mock:
+            missing_count = sync_studente_iscrizioni_rate_schedules(
+                self.studente,
+                iscrizioni=[self.iscrizione],
+            )
+
+        self.assertEqual(missing_count, 0)
+        self.assertEqual(sync_mock.call_count, 1)
+        self.assertEqual(sync_mock.call_args.args[0].pk, self.iscrizione.pk)
+        self.assertNotEqual(sync_mock.call_args.args[0].pk, altra_iscrizione.pk)
+
+    def test_sync_studente_rate_schedules_can_force_full_student_sync(self):
+        seconda_iscrizione = self.create_next_year_enrollment()
+
+        with patch.object(Iscrizione, "sync_rate_schedule", autospec=True, return_value="unchanged") as sync_mock:
+            missing_count = sync_studente_iscrizioni_rate_schedules(
+                self.studente,
+                iscrizioni=[],
+                sync_all=True,
+            )
+
+        synced_ids = {call.args[0].pk for call in sync_mock.call_args_list}
+        self.assertEqual(missing_count, 0)
+        self.assertEqual(synced_ids, {self.iscrizione.pk, seconda_iscrizione.pk})
 
     def test_modifica_studente_inline_iscrizioni_renders_each_edit_field_once(self):
         response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))

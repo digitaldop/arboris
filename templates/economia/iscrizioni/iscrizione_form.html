@@ -29,11 +29,10 @@
                         method="post"
                         action="{% url 'riconcilia_pagamenti_iscrizione' iscrizione.pk %}"
                         class="page-head-inline-form"
-                        onsubmit="return confirm('Avviare la riconciliazione automatica dei pagamenti per questa iscrizione? I casi ambigui resteranno da riconciliare manualmente.');"
                     >
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <button type="submit" class="btn btn-secondary">Riconcilia pagamenti</button>
+                        <button type="submit" class="btn btn-secondary">Anteprima riconciliazione</button>
                     </form>
                     {% if iscrizione.attiva %}
                         <a href="{% url 'ritiro_anticipato_iscrizione' iscrizione.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-rate-withdraw">Chiudi iscrizione</a>

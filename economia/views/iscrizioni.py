@@ -29,11 +29,12 @@ from economia.models import (
     RataIscrizione,
 )
 from economia.services import (
+    applica_anteprima_riconciliazione_rate,
+    anteprima_riconcilia_pagamenti_iscrizione,
+    anteprima_riconcilia_pagamenti_rate_anno_scolastico,
     build_rate_batch_feedback,
     build_riconciliazione_batch_feedback,
     ricalcola_rate_anno_scolastico as ricalcola_rate_anno_scolastico_service,
-    riconcilia_pagamenti_iscrizione as riconcilia_pagamenti_iscrizione_service,
-    riconcilia_pagamenti_rate_anno_scolastico as riconcilia_pagamenti_rate_anno_scolastico_service,
 )
 from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
@@ -52,6 +53,7 @@ def is_popup_request(request):
 
 
 LAST_METODO_PAGAMENTO_SESSION_KEY = "ultima_metodo_pagamento_retta_id"
+RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY = "economia_riconciliazione_rate_preview"
 
 
 def _parse_importo_riconciliazione(raw_value):
@@ -628,17 +630,52 @@ def ricalcola_rate_anno_scolastico(request):
 @require_POST
 def riconcilia_pagamenti_rate_anno_scolastico(request):
     anno = get_object_or_404(AnnoScolastico, pk=request.POST.get("anno_scolastico"), attivo=True)
-    risultato = riconcilia_pagamenti_rate_anno_scolastico_service(anno, utente=request.user)
-    stats = risultato["stats"]
-    feedback = build_riconciliazione_batch_feedback(stats)
-
-    if stats.get("riconciliati"):
-        messages.success(request, f"Riconciliazione pagamenti {anno} completata: {feedback}")
-    else:
-        messages.info(request, f"Riconciliazione pagamenti {anno}: {feedback}")
-
     fallback_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico={anno.pk}"
-    return redirect(get_safe_next_url(request, fallback_url))
+    next_url = get_safe_next_url(request, fallback_url)
+
+    if request.POST.get("azione") == "conferma":
+        preview = request.session.get(RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY) or {}
+        if preview.get("scope") != "anno" or preview.get("scope_id") != anno.pk:
+            messages.error(request, "Anteprima riconciliazione scaduta. Rigenera il riepilogo prima di confermare.")
+            return redirect(next_url)
+        risultato = applica_anteprima_riconciliazione_rate(
+            preview.get("dettagli", []),
+            request.POST.getlist("selected_items"),
+            utente=request.user,
+        )
+        request.session.pop(RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY, None)
+        stats = risultato["stats"]
+        feedback = build_riconciliazione_batch_feedback(stats)
+        if risultato.get("errori"):
+            messages.warning(request, f"Riconciliazione pagamenti {anno} completata con errori: {feedback}")
+        elif stats.get("riconciliati"):
+            messages.success(request, f"Riconciliazione pagamenti {anno} completata: {feedback}")
+        else:
+            messages.info(request, f"Nessun movimento selezionato per la riconciliazione pagamenti {anno}.")
+        return redirect(next_url)
+
+    preview = anteprima_riconcilia_pagamenti_rate_anno_scolastico(anno)
+    request.session[RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY] = {
+        "scope": "anno",
+        "scope_id": anno.pk,
+        "next_url": next_url,
+        "dettagli": preview["dettagli"],
+    }
+    return render(
+        request,
+        "economia/iscrizioni/riconciliazione_rate_preview.html",
+        {
+            "titolo": f"Riconciliazione pagamenti {anno}",
+            "sottotitolo": "Controlla le proposte automatiche e deseleziona eventuali abbinamenti non corretti.",
+            "scope_label": "Anno scolastico",
+            "scope_value": anno,
+            "action_url": reverse("riconcilia_pagamenti_rate_anno_scolastico"),
+            "scope_hidden_name": "anno_scolastico",
+            "scope_hidden_value": anno.pk,
+            "next_url": next_url,
+            "preview": preview,
+        },
+    )
 
 
 @require_POST
@@ -647,17 +684,50 @@ def riconcilia_pagamenti_iscrizione(request, pk):
         Iscrizione.objects.select_related("studente", "anno_scolastico"),
         pk=pk,
     )
-    risultato = riconcilia_pagamenti_iscrizione_service(iscrizione, utente=request.user)
-    stats = risultato["stats"]
-    feedback = build_riconciliazione_batch_feedback(stats)
-
-    if stats.get("riconciliati"):
-        messages.success(request, f"Riconciliazione pagamenti iscrizione completata: {feedback}")
-    else:
-        messages.info(request, f"Riconciliazione pagamenti iscrizione: {feedback}")
-
     fallback_url = reverse("modifica_iscrizione", kwargs={"pk": iscrizione.pk})
-    return redirect(get_safe_next_url(request, fallback_url))
+    next_url = get_safe_next_url(request, fallback_url)
+
+    if request.POST.get("azione") == "conferma":
+        preview = request.session.get(RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY) or {}
+        if preview.get("scope") != "iscrizione" or preview.get("scope_id") != iscrizione.pk:
+            messages.error(request, "Anteprima riconciliazione scaduta. Rigenera il riepilogo prima di confermare.")
+            return redirect(next_url)
+        risultato = applica_anteprima_riconciliazione_rate(
+            preview.get("dettagli", []),
+            request.POST.getlist("selected_items"),
+            utente=request.user,
+        )
+        request.session.pop(RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY, None)
+        stats = risultato["stats"]
+        feedback = build_riconciliazione_batch_feedback(stats)
+        if risultato.get("errori"):
+            messages.warning(request, f"Riconciliazione pagamenti iscrizione completata con errori: {feedback}")
+        elif stats.get("riconciliati"):
+            messages.success(request, f"Riconciliazione pagamenti iscrizione completata: {feedback}")
+        else:
+            messages.info(request, "Nessun movimento selezionato per la riconciliazione pagamenti iscrizione.")
+        return redirect(next_url)
+
+    preview = anteprima_riconcilia_pagamenti_iscrizione(iscrizione)
+    request.session[RICONCILIAZIONE_RATE_PREVIEW_SESSION_KEY] = {
+        "scope": "iscrizione",
+        "scope_id": iscrizione.pk,
+        "next_url": next_url,
+        "dettagli": preview["dettagli"],
+    }
+    return render(
+        request,
+        "economia/iscrizioni/riconciliazione_rate_preview.html",
+        {
+            "titolo": "Riconciliazione pagamenti iscrizione",
+            "sottotitolo": "Controlla le proposte automatiche e deseleziona eventuali abbinamenti non corretti.",
+            "scope_label": "Iscrizione",
+            "scope_value": iscrizione,
+            "action_url": reverse("riconcilia_pagamenti_iscrizione", kwargs={"pk": iscrizione.pk}),
+            "next_url": next_url,
+            "preview": preview,
+        },
+    )
 
 
 def ritiro_anticipato_iscrizione(request, pk):
@@ -1031,6 +1101,8 @@ def _empty_verifica_rette_riepilogo():
         "pagato_senza_preiscrizioni": Decimal("0.00"),
         "totale_anno_con_preiscrizioni": Decimal("0.00"),
         "totale_anno_senza_preiscrizioni": Decimal("0.00"),
+        "rimanente_anno_con_preiscrizioni": Decimal("0.00"),
+        "rimanente_anno_senza_preiscrizioni": Decimal("0.00"),
     }
 
 
@@ -1280,6 +1352,14 @@ def verifica_situazione_rette(request):
             }
             for colonna in colonne
         ]
+        riepilogo_totali["rimanente_anno_con_preiscrizioni"] = max(
+            riepilogo_totali["totale_anno_con_preiscrizioni"] - riepilogo_totali["pagato_con_preiscrizioni"],
+            Decimal("0.00"),
+        )
+        riepilogo_totali["rimanente_anno_senza_preiscrizioni"] = max(
+            riepilogo_totali["totale_anno_senza_preiscrizioni"] - riepilogo_totali["pagato_senza_preiscrizioni"],
+            Decimal("0.00"),
+        )
 
     return render(
         request,

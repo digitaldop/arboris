@@ -24,6 +24,7 @@ from economia.models import (
     TariffaScambioRetta,
 )
 from economia.services import (
+    anteprima_riconcilia_pagamenti_rate_anno_scolastico,
     ricalcola_rate_anno_scolastico,
     riconcilia_pagamenti_iscrizione,
     riconcilia_pagamenti_rate_anno_scolastico,
@@ -265,6 +266,9 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(riepilogo_totali["pagato_senza_preiscrizioni"], Decimal("50.00"))
         self.assertEqual(riepilogo_totali["totale_anno_con_preiscrizioni"], Decimal("1100.00"))
         self.assertEqual(riepilogo_totali["totale_anno_senza_preiscrizioni"], Decimal("1000.00"))
+        self.assertEqual(riepilogo_totali["rimanente_anno_con_preiscrizioni"], Decimal("950.00"))
+        self.assertEqual(riepilogo_totali["rimanente_anno_senza_preiscrizioni"], Decimal("950.00"))
+        self.assertContains(response, "Rimanente per l'anno scolastico", count=2)
 
     def test_verifica_situazione_rette_defaults_to_alphabetical_matrix(self):
         User.objects.create_superuser(username="admin", password="admin")
@@ -410,6 +414,62 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(movimento.rata_iscrizione, rata)
         self.assertTrue(rata.pagata)
         self.assertEqual(rata.importo_pagato, rata.importo_finale)
+
+    def test_batch_reconciliation_preview_does_not_write_until_confirmed(self):
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=self.iscrizione.rate.model.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta",
+            controparte="Bianchi Luca",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        preview = anteprima_riconcilia_pagamenti_rate_anno_scolastico(self.anno)
+
+        movimento.refresh_from_db()
+        rata.refresh_from_db()
+        self.assertEqual(preview["stats"]["proposti"], 1)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertFalse(rata.pagata)
+
+    def test_batch_reconciliation_view_confirms_selected_preview_rows(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=self.iscrizione.rate.model.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta",
+            controparte="Bianchi Luca",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        url = reverse("riconcilia_pagamenti_rate_anno_scolastico")
+
+        response = self.client.post(url, {"anno_scolastico": self.anno.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Proposte di riconciliazione")
+        movimento.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        selected_key = response.context["preview"]["dettagli"][0]["key"]
+
+        response = self.client.post(
+            url,
+            {
+                "azione": "conferma",
+                "anno_scolastico": self.anno.pk,
+                "selected_items": [selected_key],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        movimento.refresh_from_db()
+        rata.refresh_from_db()
+        self.assertEqual(movimento.rata_iscrizione, rata)
+        self.assertTrue(rata.pagata)
 
     def test_batch_reconciliation_splits_cumulative_family_payment(self):
         sorella = Studente.objects.create(

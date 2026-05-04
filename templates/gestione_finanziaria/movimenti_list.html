@@ -130,6 +130,10 @@
                                     <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}" class="table-link">Modifica</a>
                                     <span class="table-muted">|</span>
                                     <a href="{% url 'riconcilia_movimento' movimento.pk %}" class="table-link">Riconcilia</a>
+                                    {% if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate_count or movimento.pagamenti_fornitori_count %}
+                                        <span class="table-muted">|</span>
+                                        <a href="{% url 'annulla_riconciliazione_movimento' movimento.pk %}?next={{ request.get_full_path|urlencode }}" class="table-link table-link-danger">Annulla riconciliazione</a>
+                                    {% endif %}
                                     <span class="table-muted">|</span>
                                     <a href="{% url 'elimina_movimento_finanziario' movimento.pk %}" class="table-link table-link-danger">Elimina</a>
                                 </td>

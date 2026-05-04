@@ -362,6 +362,9 @@ class Iscrizione(models.Model):
         return self.get_tariffa_applicabile()
 
     def get_ordine_figlio(self):
+        if hasattr(self, "_ordine_figlio_cache"):
+            return self._ordine_figlio_cache
+
         if not self.studente_id or not self.anno_scolastico_id or not self.studente.famiglia_id:
             return 1
 
@@ -380,6 +383,9 @@ class Iscrizione(models.Model):
         return len(iscrizioni_ids) + 1
 
     def get_tariffa_applicabile(self):
+        if hasattr(self, "_tariffa_applicabile_cache"):
+            return self._tariffa_applicabile_cache
+
         if not self.condizione_iscrizione_id:
             return None
 

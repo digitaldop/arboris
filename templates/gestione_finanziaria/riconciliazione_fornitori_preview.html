@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Anteprima riconciliazione fornitori - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}">Riconciliazione fornitori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Anteprima</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <section class="page-head anagrafica-page-head">
+        <div>
+            <div class="anagrafica-eyebrow">
+                <span class="anagrafica-eyebrow-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+                <span>Fatture fornitori</span>
+            </div>
+            <h1 class="page-title">Anteprima riconciliazione fornitori</h1>
+            <p class="page-subtitle">Controlla i pagamenti proposti e deseleziona eventuali abbinamenti non corretti.</p>
+        </div>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span>Annulla</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="content-card anagrafica-summary-card">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ preview.stats.movimenti_esaminati|default:0 }}</div>
+                <div class="summary-label">Movimenti esaminati</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ preview.stats.proposti|default:0 }}</div>
+                <div class="summary-label">Proposte selezionabili</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ preview.stats.ambigui|default:0 }}</div>
+                <div class="summary-label">Ambigui esclusi</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ preview.stats.score_basso|default:0 }}</div>
+                <div class="summary-label">Affidabilita bassa</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ preview.stats.senza_candidati|default:0 }}</div>
+                <div class="summary-label">Senza candidati</div>
+            </div>
+        </div>
+    </section>
+
+    <form method="post" action="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="content-card">
+        {% csrf_token %}
+        <input type="hidden" name="azione" value="conferma_auto">
+
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Proposte di pagamento</h2>
+                <p class="section-subtitle">La conferma registrera solo i pagamenti selezionati e aggiornera fatture, scadenze e movimenti bancari.</p>
+            </div>
+            {% if preview.dettagli %}
+                <label class="inline-check">
+                    <input type="checkbox" data-select-all-reconciliation checked>
+                    <span>Seleziona tutto</span>
+                </label>
+            {% endif %}
+        </div>
+
+        {% if preview.dettagli %}
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Movimento bancario</th>
+                        <th>Fattura / scadenza</th>
+                        <th>Importo</th>
+                        <th>Score</th>
+                        <th>Motivazione</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in preview.dettagli %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="selected_items" value="{{ item.key }}" checked data-reconciliation-item>
+                            </td>
+                            <td>
+                                <strong>{{ item.movimento_data|default:"-" }}</strong><br>
+                                {{ item.movimento_descrizione|truncatechars:90|default:"Movimento senza descrizione" }}
+                                {% if item.movimento_controparte %}<br><span class="table-muted">{{ item.movimento_controparte }}</span>{% endif %}
+                                {% if item.movimento_conto %}<br><span class="table-muted">{{ item.movimento_conto }}</span>{% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ item.fornitore }}</strong><br>
+                                {{ item.documento }}
+                                {% if item.scadenza_data %}<br><span class="table-muted">Scadenza {{ item.scadenza_data }}</span>{% endif %}
+                            </td>
+                            <td>{{ item.importo|euro }} &euro;</td>
+                            <td>{{ item.score }}%</td>
+                            <td>
+                                {% for motivazione in item.motivazioni %}
+                                    <div>{{ motivazione }}</div>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span>Conferma selezionati</span>
+                </button>
+                <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        {% else %}
+            <div class="empty-state">Nessuna proposta automatica affidabile trovata.</div>
+            <div class="form-actions">
+                <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="btn btn-secondary">Torna indietro</a>
+            </div>
+        {% endif %}
+    </form>
+
+    <script>
+        (function () {
+            const selectAll = document.querySelector("[data-select-all-reconciliation]");
+            if (!selectAll) {
+                return;
+            }
+            const items = Array.from(document.querySelectorAll("[data-reconciliation-item]"));
+            selectAll.addEventListener("change", function () {
+                items.forEach(function (item) {
+                    item.checked = selectAll.checked;
+                });
+            });
+            items.forEach(function (item) {
+                item.addEventListener("change", function () {
+                    selectAll.checked = items.every(function (entry) { return entry.checked; });
+                });
+            });
+        }());
+    </script>
+{% endblock %}

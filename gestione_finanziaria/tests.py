@@ -64,8 +64,11 @@ from .fatture_in_cloud import (
 from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
 from .services import (
+    annulla_pagamento_fornitore,
+    anteprima_riconcilia_fornitori_automaticamente,
     applica_regole_a_movimento,
     importo_movimento_disponibile_fornitori,
+    applica_anteprima_riconciliazione_fornitori,
     riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
     trova_scadenze_fornitori_candidate,
@@ -428,6 +431,46 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "supplier-profile-card")
         self.assertContains(response, "js/pages/fornitore-form.js")
 
+    def test_fornitore_detail_renders_view_mode_and_sidebar_cards(self):
+        categoria = crea_categoria_spesa_test("Cancelleria")
+        fornitore = Fornitore.objects.create(
+            denominazione="Carta Srl",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+            partita_iva="12345678901",
+            email="ordini@carta.test",
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            categoria_spesa=categoria,
+            numero_documento="C-001",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+        )
+
+        response = self.client.get(reverse("modifica_fornitore", kwargs={"pk": fornitore.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="fornitore-detail-form"')
+        self.assertContains(response, "is-view-mode")
+        self.assertContains(response, 'id="enable-edit-fornitore-btn"')
+        self.assertContains(response, 'id="fornitore-main-fields"')
+        self.assertContains(response, "supplier-profile-layout")
+        self.assertContains(response, "supplier-profile-sidebar")
+        self.assertContains(response, "Fatture recenti")
+        self.assertContains(response, "Scadenze aperte")
+        self.assertContains(response, "C-001")
+        self.assertContains(response, "31/05/2026")
+        self.assertContains(response, 'class="btn btn-secondary btn-icon-text js-page-back-btn"')
+        self.assertContains(response, "view-mode.js")
+
     def test_categoria_spesa_popup_create_returns_select_response(self):
         padre = crea_categoria_spesa_test("Servizi generali")
         response = self.client.get(f"{reverse('crea_categoria_spesa')}?popup=1&target_input_name=categoria_spesa")
@@ -524,6 +567,36 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-related-type="movimento_finanziario"')
         self.assertContains(response, "Gennaio")
         self.assertContains(response, "js/pages/documento-fornitore-form.js")
+
+    def test_documento_fornitore_popup_mostra_dati_effettivi(self):
+        categoria = crea_categoria_spesa_test("Cancelleria")
+        fornitore = Fornitore.objects.create(
+            denominazione="Cartoleria Test",
+            tipo_soggetto="azienda",
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="CAR-1",
+            data_documento=date(2026, 5, 2),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            importato_at=timezone.make_aware(datetime(2026, 5, 4, 12, 0)),
+        )
+        fornitore.categoria_spesa = categoria
+        fornitore.save(update_fields=["categoria_spesa", "data_aggiornamento"])
+
+        response = self.client.get(f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Data ricezione")
+        self.assertContains(response, "04 / 05 / 2026")
+        self.assertContains(response, "Cancelleria")
+        self.assertContains(response, "Maggio")
+
+        response = self.client.get(reverse("lista_documenti_fornitori"), {"categoria": str(categoria.pk)})
+        self.assertContains(response, "CAR-1")
 
     def test_documento_fornitore_popup_limits_movimento_choices_but_keeps_selected_one(self):
         fornitore = Fornitore.objects.create(denominazione="Tecnica Srl")
@@ -969,6 +1042,80 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.data_scadenza, date(2026, 6, 15))
         self.assertEqual(scadenza.importo_previsto, Decimal("122.00"))
 
+    def test_importa_documento_fatture_in_cloud_legge_fornitore_da_header_xml_standard(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 994,
+            "type": "expense",
+            "description": "Fattura elettronica standard",
+            "date": "2026-05-02",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdPaese": "IT", "IdCodice": "12345678907"},
+                            "CodiceFiscale": "ABCDEF12G34H567I",
+                            "Anagrafica": {"Denominazione": "Header Supplier Srl"},
+                        },
+                        "Sede": {
+                            "Indirizzo": "Via Header 4",
+                            "CAP": "40121",
+                            "Comune": "Bologna",
+                            "Provincia": "BO",
+                        },
+                        "Contatti": {
+                            "Telefono": "051999",
+                            "Email": "header@example.com",
+                            "PECMail": "header@examplepec.it",
+                        },
+                    },
+                },
+                "FatturaElettronicaBody": {
+                    "DatiGenerali": {
+                        "DatiGeneraliDocumento": {
+                            "Numero": "STD-55",
+                            "ImportoTotaleDocumento": "122.00",
+                        }
+                    },
+                    "DatiPagamento": [
+                        {
+                            "DettaglioPagamento": [
+                                {
+                                    "DataScadenzaPagamento": "2026-06-30",
+                                    "ImportoPagamento": "122.00",
+                                    "IBAN": "IT60X0542811101000000123456",
+                                    "IstitutoFinanziario": "Banca Header",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            },
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="994")
+        fornitore = documento.fornitore
+        self.assertEqual(fornitore.denominazione, "Header Supplier Srl")
+        self.assertEqual(fornitore.partita_iva, "12345678907")
+        self.assertEqual(fornitore.codice_fiscale, "ABCDEF12G34H567I")
+        self.assertEqual(fornitore.indirizzo, "Via Header 4 40121 Bologna BO")
+        self.assertEqual(fornitore.telefono, "051999")
+        self.assertEqual(fornitore.email, "header@example.com")
+        self.assertEqual(fornitore.pec, "header@examplepec.it")
+        self.assertEqual(fornitore.codice_sdi, "")
+        self.assertEqual(fornitore.iban, "IT60X0542811101000000123456")
+        self.assertEqual(fornitore.banca, "Banca Header")
+        self.assertEqual(documento.numero_documento, "STD-55")
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 6, 30))
+
     def test_importa_documento_fatture_in_cloud_pending_usa_supplier_name_e_scadenza(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
@@ -1341,6 +1488,86 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0.00"))
         self.assertEqual(PagamentoFornitore.objects.count(), 1)
 
+    def test_annulla_pagamento_fornitore_rende_movimento_riconciliabile(self):
+        fornitore = Fornitore.objects.create(denominazione="Energia Srl", tipo_soggetto="azienda")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="E-002",
+            data_documento=date(2026, 4, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 4, 30),
+            importo_previsto=Decimal("122.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 29),
+            importo=Decimal("-122.00"),
+            descrizione="Bonifico Energia Srl fattura E-002",
+            controparte="Energia Srl",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
+
+        annulla_pagamento_fornitore(pagamento)
+
+        movimento.refresh_from_db()
+        scadenza.refresh_from_db()
+        documento.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("122.00"))
+        self.assertEqual(scadenza.importo_pagato, Decimal("0.00"))
+        self.assertNotEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        self.assertEqual(PagamentoFornitore.objects.count(), 0)
+
+    def test_anteprima_riconciliazione_fornitori_non_scrive_prima_della_conferma(self):
+        fornitore = Fornitore.objects.create(denominazione="Energia Srl", tipo_soggetto="azienda")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="E-003",
+            data_documento=date(2026, 4, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 4, 30),
+            importo_previsto=Decimal("122.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 29),
+            importo=Decimal("-122.00"),
+            descrizione="Bonifico Energia Srl fattura E-003",
+            controparte="Energia Srl",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        preview = anteprima_riconcilia_fornitori_automaticamente()
+
+        movimento.refresh_from_db()
+        scadenza.refresh_from_db()
+        self.assertEqual(preview["stats"]["proposti"], 1)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertEqual(scadenza.importo_pagato, Decimal("0.00"))
+
+        risultato = applica_anteprima_riconciliazione_fornitori(
+            preview["dettagli"],
+            [preview["dettagli"][0]["key"]],
+            utente=self.user,
+        )
+
+        movimento.refresh_from_db()
+        scadenza.refresh_from_db()
+        self.assertEqual(risultato["stats"]["riconciliati"], 1)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(scadenza.importo_pagato, Decimal("122.00"))
+
     def test_fornitori_pages_render(self):
         categoria = crea_categoria_spesa_test("Materiali")
         fornitore = Fornitore.objects.create(
@@ -1381,6 +1608,10 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Data di scadenza")
         self.assertContains(response, "31/05/2026")
         self.assertContains(response, f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
+        self.assertContains(response, 'data-live-list-form')
+        self.assertContains(response, 'data-live-list-input')
+        self.assertContains(response, 'id="documenti-fornitori-results"')
+        self.assertContains(response, "live-list-search.js")
 
     def test_eliminazione_multipla_documenti_fornitori_con_conferma(self):
         fornitore = Fornitore.objects.create(

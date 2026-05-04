@@ -77,6 +77,9 @@
                     if (window.ArborisPopupWindowTriggers) {
                         window.ArborisPopupWindowTriggers.wire(target);
                     }
+                    if (window.ArborisBulkActions) {
+                        window.ArborisBulkActions.init(target);
+                    }
                 })
                 .catch(() => {
                     form.submit();

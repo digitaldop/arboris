@@ -275,6 +275,36 @@ class DocumentoFornitore(models.Model):
     def __str__(self):
         return f"{self.get_tipo_documento_display()} {self.numero_documento} - {self.fornitore}"
 
+    @property
+    def categoria_spesa_effettiva(self):
+        return self.categoria_spesa or getattr(self.fornitore, "categoria_spesa", None)
+
+    @property
+    def data_ricezione_effettiva(self):
+        if self.data_ricezione:
+            return self.data_ricezione
+        if self.importato_at:
+            return timezone.localtime(self.importato_at).date()
+        return None
+
+    @property
+    def mese_competenza_nome(self):
+        mesi = {
+            1: "Gennaio",
+            2: "Febbraio",
+            3: "Marzo",
+            4: "Aprile",
+            5: "Maggio",
+            6: "Giugno",
+            7: "Luglio",
+            8: "Agosto",
+            9: "Settembre",
+            10: "Ottobre",
+            11: "Novembre",
+            12: "Dicembre",
+        }
+        return mesi.get(self.mese_competenza, "")
+
     def clean(self):
         super().clean()
         if self.mese_competenza is not None and not 1 <= self.mese_competenza <= 12:

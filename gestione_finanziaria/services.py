@@ -14,9 +14,10 @@ import re
 import time
 import unicodedata
 from calendar import monthrange
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from django.core.exceptions import ValidationError
@@ -1612,6 +1613,30 @@ def importo_movimento_disponibile_fornitori(movimento):
     )
 
 
+def aggiorna_stato_riconciliazione_movimento(movimento):
+    if movimento is None or not getattr(movimento, "pk", None):
+        return movimento
+
+    from .models import StatoRiconciliazione
+
+    ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or movimento.riconciliazioni_rate.exists()
+    ha_collegamenti_fornitori = movimento.pagamenti_fornitori.exists()
+    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori
+
+    if movimento.importo is not None and movimento.importo < 0:
+        residuo = importo_movimento_disponibile_fornitori(movimento)
+    else:
+        residuo = importo_movimento_disponibile(movimento)
+
+    movimento.stato_riconciliazione = (
+        StatoRiconciliazione.RICONCILIATO
+        if ha_collegamenti and residuo <= _TOLLERANZA_IMPORTO_ESATTO
+        else StatoRiconciliazione.NON_RICONCILIATO
+    )
+    movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
+    return movimento
+
+
 def crea_notifica_finanziaria(
     *,
     titolo,
@@ -1728,8 +1753,11 @@ def registra_pagamento_fornitore(
 @transaction.atomic
 def annulla_pagamento_fornitore(pagamento):
     scadenza = pagamento.scadenza
+    movimento = pagamento.movimento_finanziario
     pagamento.delete()
     aggiorna_scadenza_da_pagamenti(scadenza)
+    if movimento:
+        aggiorna_stato_riconciliazione_movimento(movimento)
     return scadenza
 
 
@@ -1884,9 +1912,23 @@ def riconcilia_movimento_con_scadenza_fornitore(
 
 
 def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo: int = 85, limite_movimenti: int = 100):
+    anteprima = anteprima_riconcilia_fornitori_automaticamente(
+        punteggio_minimo=punteggio_minimo,
+        limite_movimenti=limite_movimenti,
+    )
+    risultato = applica_anteprima_riconciliazione_fornitori(
+        anteprima["dettagli"],
+        [item["key"] for item in anteprima["dettagli"]],
+        utente=utente,
+    )
+    return risultato["pagamenti"]
+
+
+def anteprima_riconcilia_fornitori_automaticamente(*, punteggio_minimo: int = 85, limite_movimenti: int = 100):
     from .models import MovimentoFinanziario, StatoRiconciliazione
 
-    riconciliati = []
+    stats = Counter()
+    dettagli = []
     movimenti = (
         MovimentoFinanziario.objects.select_related("conto")
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
@@ -1894,20 +1936,84 @@ def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo: int =
         .order_by("-data_contabile", "-id")[:limite_movimenti]
     )
     for movimento in movimenti:
-        if importo_movimento_disponibile_fornitori(movimento) <= _TOLLERANZA_IMPORTO_ESATTO:
+        stats["movimenti_esaminati"] += 1
+        disponibile = importo_movimento_disponibile_fornitori(movimento)
+        if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
+            stats["gia_coperti"] += 1
             continue
         candidati = trova_scadenze_fornitori_candidate(movimento, limite=3)
         if not candidati:
+            stats["senza_candidati"] += 1
             continue
         top_score = candidati[0].score
         migliori = [candidato for candidato in candidati if candidato.score == top_score]
-        if top_score < punteggio_minimo or len(migliori) != 1:
+        if top_score < punteggio_minimo:
+            stats["score_basso"] += 1
             continue
-        pagamento = riconcilia_movimento_con_scadenza_fornitore(
-            movimento,
-            migliori[0].scadenza,
-            utente=utente,
-            note="Riconciliazione automatica",
+        if len(migliori) != 1:
+            stats["ambigui"] += 1
+            continue
+        candidato = migliori[0]
+        scadenza = candidato.scadenza
+        importo = min(disponibile, candidato.importo_residuo)
+        stats["proposti"] += 1
+        dettagli.append(
+            {
+                "key": f"{movimento.pk}:{scadenza.pk}",
+                "movimento_id": movimento.pk,
+                "movimento_data": movimento.data_contabile.isoformat() if movimento.data_contabile else "",
+                "movimento_descrizione": movimento.descrizione or "",
+                "movimento_controparte": movimento.controparte or "",
+                "movimento_conto": str(movimento.conto) if movimento.conto_id else "",
+                "movimento_importo": str(abs(movimento.importo or Decimal("0.00"))),
+                "scadenza_id": scadenza.pk,
+                "scadenza_data": scadenza.data_scadenza.isoformat() if scadenza.data_scadenza else "",
+                "fornitore": str(scadenza.documento.fornitore),
+                "documento": scadenza.documento.numero_documento or str(scadenza.documento),
+                "importo": str(importo),
+                "score": candidato.score,
+                "motivazioni": candidato.motivazioni,
+            }
         )
-        riconciliati.append(pagamento)
-    return riconciliati
+    return {
+        "stats": dict(stats),
+        "dettagli": dettagli,
+    }
+
+
+def applica_anteprima_riconciliazione_fornitori(dettagli, selected_keys, *, utente=None):
+    from .models import MovimentoFinanziario, ScadenzaPagamentoFornitore
+
+    selected_keys = set(selected_keys or [])
+    stats = Counter()
+    errori = []
+    pagamenti = []
+
+    for item in dettagli:
+        if item.get("key") not in selected_keys:
+            continue
+        stats["selezionati"] += 1
+        try:
+            movimento = MovimentoFinanziario.objects.get(pk=item["movimento_id"])
+            scadenza = ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore").get(
+                pk=item["scadenza_id"]
+            )
+            pagamento = riconcilia_movimento_con_scadenza_fornitore(
+                movimento,
+                scadenza,
+                importo=Decimal(str(item["importo"])),
+                utente=utente,
+                note="Riconciliazione automatica confermata",
+            )
+        except (MovimentoFinanziario.DoesNotExist, ScadenzaPagamentoFornitore.DoesNotExist, InvalidOperation, ValidationError) as exc:
+            stats["errori"] += 1
+            errori.append(f"{item.get('movimento_descrizione') or item.get('movimento_id')}: {exc}")
+            continue
+        stats["riconciliati"] += 1
+        pagamenti.append(pagamento)
+
+    return {
+        "stats": dict(stats),
+        "errori": errori,
+        "pagamenti": pagamenti,
+    }

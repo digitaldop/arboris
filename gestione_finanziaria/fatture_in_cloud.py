@@ -169,6 +169,63 @@ def _nested_dict(data, *keys):
     return current
 
 
+def _dict_value(data, *keys):
+    data = _as_dict(data)
+    if not data:
+        return None
+    for key in keys:
+        if key in data:
+            return data.get(key)
+
+    lowered = {str(key).lower(): value for key, value in data.items()}
+    for key in keys:
+        value = lowered.get(str(key).lower())
+        if value is not None:
+            return value
+    return None
+
+
+def _e_invoice_header(e_invoice):
+    return _as_dict(
+        _dict_value(
+            e_invoice,
+            "FatturaElettronicaHeader",
+            "fattura_elettronica_header",
+            "fatturaElettronicaHeader",
+            "header",
+        )
+    )
+
+
+def _e_invoice_bodies(e_invoice):
+    body = _dict_value(
+        e_invoice,
+        "FatturaElettronicaBody",
+        "fattura_elettronica_body",
+        "fatturaElettronicaBody",
+        "body",
+    )
+    return [_as_dict(item) for item in _as_list(body) if isinstance(item, dict)]
+
+
+def _document_general_data(e_invoice):
+    candidates = [
+        _nested_dict(e_invoice, "dati_generali", "dati_generali_documento"),
+        _nested_dict(e_invoice, "DatiGenerali", "DatiGeneraliDocumento"),
+    ]
+    for body in _e_invoice_bodies(e_invoice):
+        candidates.extend(
+            [
+                _nested_dict(body, "dati_generali", "dati_generali_documento"),
+                _nested_dict(body, "DatiGenerali", "DatiGeneraliDocumento"),
+            ]
+        )
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    return {}
+
+
 def _limit_model_field(model, field_name, value):
     if value in (None, ""):
         return ""
@@ -191,18 +248,14 @@ def _normalize_entity(entity):
         return {}
 
     dati_anagrafici = _as_dict(
-        entity.get("dati_anagrafici")
-        or entity.get("DatiAnagrafici")
-        or entity.get("datiAnagrafici")
+        _dict_value(entity, "dati_anagrafici", "DatiAnagrafici", "datiAnagrafici")
     )
-    anagrafica = _as_dict(dati_anagrafici.get("anagrafica") or dati_anagrafici.get("Anagrafica"))
+    anagrafica = _as_dict(_dict_value(dati_anagrafici, "anagrafica", "Anagrafica"))
     id_fiscale_iva = _as_dict(
-        dati_anagrafici.get("id_fiscale_iva")
-        or dati_anagrafici.get("IdFiscaleIVA")
-        or dati_anagrafici.get("idFiscaleIva")
+        _dict_value(dati_anagrafici, "id_fiscale_iva", "IdFiscaleIVA", "idFiscaleIva")
     )
-    sede = _as_dict(entity.get("sede") or entity.get("Sede") or entity.get("address"))
-    contatti = _as_dict(entity.get("contatti") or entity.get("Contatti"))
+    sede = _as_dict(_dict_value(entity, "sede", "Sede", "address", "Address"))
+    contatti = _as_dict(_dict_value(entity, "contatti", "Contatti", "contacts", "Contacts"))
 
     normalized = dict(entity)
     normalized["name"] = _first_present(
@@ -265,10 +318,21 @@ def _normalize_entity(entity):
     normalized["certified_email"] = _first_present(
         entity.get("certified_email"),
         entity.get("pec"),
+        entity.get("PEC"),
         contatti.get("pec"),
+        contatti.get("Pec"),
         contatti.get("PECMail"),
+        contatti.get("EmailCertificata"),
     )
-    normalized["phone"] = _first_present(entity.get("phone"), contatti.get("telefono"), contatti.get("Telefono"))
+    normalized["phone"] = _first_present(
+        entity.get("phone"),
+        entity.get("telefono"),
+        entity.get("Telefono"),
+        contatti.get("telefono"),
+        contatti.get("Telefono"),
+        contatti.get("phone"),
+        contatti.get("Phone"),
+    )
     normalized["type"] = _first_present(entity.get("type"), entity.get("kind"), entity.get("tipo_soggetto"))
     normalized["ei_code"] = _first_present(
         entity.get("ei_code"),
@@ -294,6 +358,7 @@ def _normalize_entity(entity):
 
 def _entity_from_document(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
+    header = _e_invoice_header(e_invoice)
     entity = (
         document_data.get("entity")
         or document_data.get("supplier")
@@ -302,6 +367,7 @@ def _entity_from_document(document_data):
         or e_invoice.get("cedente_prestatore")
         or e_invoice.get("CedentePrestatore")
         or e_invoice.get("cedentePrestatore")
+        or _dict_value(header, "CedentePrestatore", "cedente_prestatore", "cedentePrestatore")
     )
     if not entity:
         entity = {
@@ -401,11 +467,7 @@ def _document_type(document_data):
 
 def _invoice_number(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
-    dati_generali_documento = _nested_dict(e_invoice, "dati_generali", "dati_generali_documento") or _nested_dict(
-        e_invoice,
-        "DatiGenerali",
-        "DatiGeneraliDocumento",
-    )
+    dati_generali_documento = _document_general_data(e_invoice)
     return (
         document_data.get("invoice_number")
         or document_data.get("invoiceNumber")
@@ -424,11 +486,7 @@ def _invoice_number(document_data):
 def _document_total(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
     amounts = _as_dict(document_data.get("amounts"))
-    dati_generali_documento = _nested_dict(e_invoice, "dati_generali", "dati_generali_documento") or _nested_dict(
-        e_invoice,
-        "DatiGenerali",
-        "DatiGeneraliDocumento",
-    )
+    dati_generali_documento = _document_general_data(e_invoice)
     return _as_decimal(
         document_data.get("amount_gross")
         or document_data.get("total")
@@ -453,13 +511,18 @@ def _payment_items(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
     payments.extend(_as_list(e_invoice.get("payments_list") or e_invoice.get("payments")))
 
-    e_invoice_payment_groups = _as_list(
+    e_invoice_payment_groups = list(_as_list(
         e_invoice.get("dati_pagamento")
         or e_invoice.get("DatiPagamento")
         or e_invoice.get("datiPagamento")
         or document_data.get("dati_pagamento")
         or document_data.get("DatiPagamento")
-    )
+    ))
+    for body in _e_invoice_bodies(e_invoice):
+        payments.extend(_as_list(_dict_value(body, "payments_list", "payments")))
+        e_invoice_payment_groups.extend(
+            _as_list(_dict_value(body, "dati_pagamento", "DatiPagamento", "datiPagamento"))
+        )
     for group in e_invoice_payment_groups:
         group = _as_dict(group)
         details = (

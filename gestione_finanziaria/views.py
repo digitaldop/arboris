@@ -124,6 +124,8 @@ from .scheduler import (
 from .services import (
     annulla_riconciliazione,
     annulla_pagamento_fornitore,
+    anteprima_riconcilia_fornitori_automaticamente,
+    applica_anteprima_riconciliazione_fornitori,
     applica_regole_a_movimento,
     aggiorna_stato_documento_da_scadenze as service_aggiorna_stato_documento_da_scadenze,
     calcola_saldo_conto_alla_data,
@@ -141,6 +143,7 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
+RICONCILIAZIONE_FORNITORI_PREVIEW_SESSION_KEY = "gestione_finanziaria_riconciliazione_fornitori_preview"
 
 
 def _oauth_redirect_uri(request, provider):
@@ -475,13 +478,14 @@ def crea_fornitore(request):
     return render(
         request,
         "gestione_finanziaria/fornitore_form.html",
-        {"form": form, "fornitore": None},
+        {"form": form, "fornitore": None, "edit_scope": "full"},
     )
 
 
 def modifica_fornitore(request, pk):
     popup = is_popup_request(request)
     fornitore = get_object_or_404(Fornitore.objects.select_related("categoria_spesa"), pk=pk)
+    edit_scope = "view"
     if request.method == "POST":
         form = FornitoreForm(request.POST, instance=fornitore)
         if form.is_valid():
@@ -490,6 +494,7 @@ def modifica_fornitore(request, pk):
                 return popup_select_response(request, "fornitore", fornitore.pk, str(fornitore))
             messages.success(request, "Fornitore aggiornato correttamente.")
             return redirect("modifica_fornitore", pk=fornitore.pk)
+        edit_scope = "full"
     else:
         form = FornitoreForm(instance=fornitore)
 
@@ -520,6 +525,7 @@ def modifica_fornitore(request, pk):
             "fornitore": fornitore,
             "documenti": documenti,
             "scadenze_aperte": scadenze_aperte,
+            "edit_scope": edit_scope,
         },
     )
 
@@ -583,7 +589,7 @@ def lista_documenti_fornitori(request):
     stato = request.GET.get("stato") or ""
 
     documenti = (
-        DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa")
+        DocumentoFornitore.objects.select_related("fornitore", "fornitore__categoria_spesa", "categoria_spesa")
         .annotate(data_scadenza_prima=Min("scadenze__data_scadenza"))
         .prefetch_related("scadenze")
         .order_by("-data_documento", "-id")
@@ -597,7 +603,11 @@ def lista_documenti_fornitori(request):
     if fornitore_id.isdigit():
         documenti = documenti.filter(fornitore_id=int(fornitore_id))
     if categoria_id.isdigit():
-        documenti = documenti.filter(categoria_spesa_id=int(categoria_id))
+        categoria_pk = int(categoria_id)
+        documenti = documenti.filter(
+            Q(categoria_spesa_id=categoria_pk)
+            | Q(categoria_spesa__isnull=True, fornitore__categoria_spesa_id=categoria_pk)
+        )
     if stato:
         documenti = documenti.filter(stato=stato)
 
@@ -641,7 +651,11 @@ def _documento_fornitore_pagamenti_queryset():
 
 
 def _documento_fornitore_detail_queryset():
-    return DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa").prefetch_related(
+    return DocumentoFornitore.objects.select_related(
+        "fornitore",
+        "fornitore__categoria_spesa",
+        "categoria_spesa",
+    ).prefetch_related(
         Prefetch(
             "scadenze",
             queryset=_documento_fornitore_scadenze_queryset().prefetch_related(
@@ -767,6 +781,17 @@ def _ids_selezionati_da_post(request):
 
 def _safe_bulk_next_url(request, fallback_url_name):
     next_url = request.POST.get("next") or ""
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse(fallback_url_name)
+
+
+def _safe_next_url(request, fallback_url_name):
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
     if next_url and url_has_allowed_host_and_scheme(
         next_url,
         allowed_hosts={request.get_host()},
@@ -1200,12 +1225,40 @@ def elimina_pagamento_fornitore(request, pk):
 
 
 def lista_movimenti_da_riconciliare_fornitori(request):
-    if request.method == "POST" and request.POST.get("azione") == "auto":
-        pagamenti = riconcilia_fornitori_automaticamente(utente=request.user)
-        if pagamenti:
-            messages.success(request, f"Riconciliazione automatica fornitori: {len(pagamenti)} pagamenti collegati.")
+    if request.method == "POST" and request.POST.get("azione") == "conferma_auto":
+        preview = request.session.get(RICONCILIAZIONE_FORNITORI_PREVIEW_SESSION_KEY) or {}
+        risultato = applica_anteprima_riconciliazione_fornitori(
+            preview.get("dettagli", []),
+            request.POST.getlist("selected_items"),
+            utente=request.user,
+        )
+        request.session.pop(RICONCILIAZIONE_FORNITORI_PREVIEW_SESSION_KEY, None)
+        stats = risultato["stats"]
+        if risultato.get("errori"):
+            messages.warning(
+                request,
+                f"Riconciliazione fornitori completata con errori: {stats.get('riconciliati', 0)} pagamento/i collegati.",
+            )
+        elif stats.get("riconciliati"):
+            messages.success(request, f"Riconciliazione fornitori: {stats['riconciliati']} pagamento/i collegati.")
         else:
-            messages.info(request, "Nessuna scadenza fornitore riconciliata automaticamente.")
+            messages.info(request, "Nessuna scadenza fornitore selezionata per la riconciliazione.")
+        return redirect("lista_movimenti_da_riconciliare_fornitori")
+
+    if request.method == "POST" and request.POST.get("azione") == "auto":
+        preview = anteprima_riconcilia_fornitori_automaticamente()
+        request.session[RICONCILIAZIONE_FORNITORI_PREVIEW_SESSION_KEY] = {
+            "dettagli": preview["dettagli"],
+        }
+        return render(
+            request,
+            "gestione_finanziaria/riconciliazione_fornitori_preview.html",
+            {
+                "preview": preview,
+            },
+        )
+
+    if request.method == "POST":
         return redirect("lista_movimenti_da_riconciliare_fornitori")
 
     movimenti = (
@@ -1908,6 +1961,10 @@ def scarica_template_saldi_conti_csv(_request):
 def lista_movimenti_finanziari(request):
     movimenti = (
         MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
+        .annotate(
+            riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
+        )
         .order_by("-data_contabile", "-id")
     )
 
@@ -2204,6 +2261,52 @@ def elimina_movimenti_finanziari_multipla(request):
             "riconciliazioni_rate_count": riconciliazioni_rate_count,
             "scadenze_collegate_count": scadenze_collegate_count,
             "pagamenti_collegati_count": pagamenti_collegati_count,
+        },
+    )
+
+
+def annulla_riconciliazione_movimento(request, pk):
+    movimento = get_object_or_404(
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione").prefetch_related(
+            "riconciliazioni_rate__rata",
+            "pagamenti_fornitori__scadenza__documento__fornitore",
+        ),
+        pk=pk,
+    )
+    next_url = _safe_next_url(request, "lista_movimenti_finanziari")
+    riconciliazioni_rate = list(movimento.riconciliazioni_rate.all())
+    pagamenti_fornitori = list(movimento.pagamenti_fornitori.all())
+    ha_riconciliazioni = bool(movimento.rata_iscrizione_id or riconciliazioni_rate or pagamenti_fornitori)
+
+    if request.method == "POST":
+        if not ha_riconciliazioni:
+            messages.info(request, "Il movimento non ha riconciliazioni da annullare.")
+            return redirect(next_url)
+
+        rate_count = len(riconciliazioni_rate) or (1 if movimento.rata_iscrizione_id else 0)
+        fornitori_count = len(pagamenti_fornitori)
+        if movimento.rata_iscrizione_id or riconciliazioni_rate:
+            annulla_riconciliazione(movimento)
+        for pagamento in pagamenti_fornitori:
+            annulla_pagamento_fornitore(pagamento)
+
+        dettagli = []
+        if rate_count:
+            dettagli.append(f"{rate_count} collegamento/i rata")
+        if fornitori_count:
+            dettagli.append(f"{fornitori_count} pagamento/i fornitore")
+        messages.success(request, "Riconciliazione annullata: " + ", ".join(dettagli) + ".")
+        return redirect(next_url)
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_annulla_riconciliazione.html",
+        {
+            "movimento": movimento,
+            "riconciliazioni_rate": riconciliazioni_rate,
+            "pagamenti_fornitori": pagamenti_fornitori,
+            "ha_riconciliazioni": ha_riconciliazioni,
+            "next_url": next_url,
         },
     )
 
@@ -3385,7 +3488,9 @@ def lista_movimenti_da_riconciliare(request):
 def riconcilia_movimento(request, pk):
     """Vista di riconciliazione di un singolo movimento."""
     movimento = get_object_or_404(
-        MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione"),
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione").prefetch_related(
+            "riconciliazioni_rate__rata"
+        ),
         pk=pk,
     )
 
@@ -3438,7 +3543,7 @@ def riconcilia_movimento(request, pk):
         {
             "movimento": movimento,
             "candidati": candidati,
-            "gia_riconciliato": movimento.rata_iscrizione_id is not None,
+            "gia_riconciliato": movimento.rata_iscrizione_id is not None or movimento.riconciliazioni_rate.exists(),
         },
     )
 

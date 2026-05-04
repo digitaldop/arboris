@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Annulla riconciliazione - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Annulla riconciliazione</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <section class="page-head anagrafica-page-head">
+        <div>
+            <div class="anagrafica-eyebrow">
+                <span class="anagrafica-eyebrow-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+                <span>Movimento bancario</span>
+            </div>
+            <h1 class="page-title">Annulla riconciliazione</h1>
+            <p class="page-subtitle">Il movimento tornera disponibile per una nuova riconciliazione e rate o fatture verranno aggiornate.</p>
+        </div>
+        <div class="page-head-actions">
+            <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span>Indietro</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="content-card">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ movimento.data_contabile|date:"d/m/Y"|default:"-" }}</div>
+                <div class="summary-label">Data movimento</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ movimento.importo|euro }} &euro;</div>
+                <div class="summary-label">Importo</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ movimento.get_stato_riconciliazione_display }}</div>
+                <div class="summary-label">Stato attuale</div>
+            </div>
+        </div>
+        <p class="help-text">{{ movimento.descrizione|default:"Movimento senza descrizione" }}</p>
+        {% if movimento.controparte %}<p class="help-text">{{ movimento.controparte }}</p>{% endif %}
+    </section>
+
+    <section class="content-card">
+        <h2 class="section-title">Collegamenti da annullare</h2>
+        {% if ha_riconciliazioni %}
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Elemento</th>
+                        <th>Importo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if movimento.rata_iscrizione and not riconciliazioni_rate %}
+                        <tr>
+                            <td>Rata</td>
+                            <td>{{ movimento.rata_iscrizione }}</td>
+                            <td>{{ movimento.importo|euro }} &euro;</td>
+                        </tr>
+                    {% endif %}
+                    {% for link in riconciliazioni_rate %}
+                        <tr>
+                            <td>Rata</td>
+                            <td>{{ link.rata }}</td>
+                            <td>{{ link.importo|euro }} &euro;</td>
+                        </tr>
+                    {% endfor %}
+                    {% for pagamento in pagamenti_fornitori %}
+                        <tr>
+                            <td>Fattura fornitore</td>
+                            <td>
+                                {{ pagamento.scadenza.documento.fornitore }}
+                                {% if pagamento.scadenza.documento.numero_documento %}
+                                    - {{ pagamento.scadenza.documento.numero_documento }}
+                                {% endif %}
+                            </td>
+                            <td>{{ pagamento.importo|euro }} &euro;</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <form method="post" class="form-actions">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span>Annulla riconciliazione</span>
+                </button>
+                <a href="{{ next_url }}" class="btn btn-secondary">Mantieni collegamento</a>
+            </form>
+        {% else %}
+            <div class="empty-state">Questo movimento non ha riconciliazioni da annullare.</div>
+            <div class="form-actions">
+                <a href="{{ next_url }}" class="btn btn-secondary">Torna indietro</a>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}
