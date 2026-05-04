@@ -96,7 +96,17 @@
                                     <a href="{% url 'lista_notifiche_finanziarie' %}">Apri</a>
                                 </div>
                                 {% for notifica in notifiche_finanziarie_recenti %}
-                                    <a class="header-notification-item" href="{% if notifica.url %}{{ notifica.url }}{% else %}{% url 'lista_notifiche_finanziarie' %}{% endif %}">
+                                    {% if notifica.documento_id %}
+                                        <a
+                                            class="header-notification-item"
+                                            href="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                            data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                    {% else %}
+                                        <a class="header-notification-item" href="{% if notifica.url %}{{ notifica.url }}{% else %}{% url 'lista_notifiche_finanziarie' %}{% endif %}">
+                                    {% endif %}
                                         <span class="header-notification-title">{{ notifica.titolo }}</span>
                                         <span class="header-notification-text">{{ notifica.messaggio|truncatechars:90 }}</span>
                                     </a>

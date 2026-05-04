@@ -258,15 +258,42 @@ def _generic_popup_delete_context(request, title, object_label, ha_vincoli=False
 
 
 def lista_categorie_spesa(request):
-    categorie = _categorie_spesa_queryset().annotate(
-        numero_fornitori=Count("fornitori", distinct=True),
-        numero_documenti=Count("documenti_fornitori", distinct=True),
-        numero_movimenti=Count("movimenti", distinct=True),
-    ).order_by("ordine", "nome")
+    categorie = list(
+        _categorie_spesa_queryset()
+        .select_related("parent")
+        .annotate(
+            numero_fornitori=Count("fornitori", distinct=True),
+            numero_documenti=Count("documenti_fornitori", distinct=True),
+            numero_movimenti=Count("movimenti", distinct=True),
+        )
+        .order_by("ordine", "nome", "id")
+    )
+    figli_by_parent = {}
+    for categoria in categorie:
+        figli_by_parent.setdefault(categoria.parent_id, []).append(categoria)
+
+    def build_node(categoria, livello=0):
+        figli = [
+            build_node(figlia, livello + 1)
+            for figlia in figli_by_parent.get(categoria.pk, [])
+        ]
+        discendenti_count = sum(1 + figlia["discendenti_count"] for figlia in figli)
+        return {
+            "categoria": categoria,
+            "figli": figli,
+            "livello": livello,
+            "row_id": f"categoria-spesa-{categoria.pk}",
+            "discendenti_count": discendenti_count,
+        }
+
+    categorie_tree = [
+        build_node(categoria)
+        for categoria in figli_by_parent.get(None, [])
+    ]
     return render(
         request,
         "gestione_finanziaria/categorie_spesa_list.html",
-        {"categorie": categorie},
+        {"categorie": categorie, "categorie_tree": categorie_tree},
     )
 
 

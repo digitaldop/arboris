@@ -101,13 +101,25 @@
                                 </td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions anagrafica-row-actions">
-                                        {% if notifica.url %}
+                                        {% if notifica.documento_id or notifica.url %}
+                                            {% if notifica.documento_id %}
+                                                <a
+                                                    class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                                    href="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                                    title="Apri"
+                                                    aria-label="Apri notifica {{ notifica.titolo }}"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                                    data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                            {% else %}
                                             <a
                                                 class="table-icon-link anagrafica-action-btn anagrafica-action-open"
                                                 href="{{ notifica.url }}"
                                                 title="Apri"
                                                 aria-label="Apri notifica {{ notifica.titolo }}"
                                             ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                            {% endif %}
                                         {% endif %}
                                         {% if notifica.pk not in lette_ids %}
                                             <form method="post" action="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}" class="inline-form">

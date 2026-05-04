@@ -309,6 +309,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(choices[1], (TipoDocumentoFornitore.PROFORMA, "Proforma"))
 
     def test_categoria_spesa_crud_pages(self):
+        response = self.client.get(reverse("crea_categoria_spesa"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "category-expense-editor-shell")
+        self.assertContains(response, "Categoria padre")
+
         response = self.client.post(
             reverse("crea_categoria_spesa"),
             {
@@ -323,8 +329,31 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         categoria = CategoriaFinanziaria.objects.get(nome="Consulenze", tipo=TipoCategoriaFinanziaria.SPESA)
         self.assertTrue(categoria.attiva)
 
+        response = self.client.post(
+            reverse("crea_categoria_spesa"),
+            {
+                "nome": "Consulenze legali",
+                "parent": str(categoria.pk),
+                "descrizione": "Sottocategoria per consulenze legali",
+                "ordine": "2",
+                "attiva": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_categorie_spesa"))
+        sottocategoria = CategoriaFinanziaria.objects.get(
+            nome="Consulenze legali",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        self.assertEqual(sottocategoria.parent, categoria)
+
         response = self.client.get(reverse("lista_categorie_spesa"))
         self.assertContains(response, "Consulenze")
+        self.assertContains(response, "Consulenze legali")
+        self.assertContains(response, 'data-report-category-toggle="categoria-spesa-')
+        self.assertContains(response, 'data-report-category-parent="categoria-spesa-')
+        self.assertContains(response, "category-tree-badge-parent")
+        self.assertContains(response, "Figlia")
 
     def test_categorie_finanziarie_list_renders_parent_child_tree(self):
         categoria_padre = CategoriaFinanziaria.objects.create(
@@ -395,15 +424,24 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'id="add-categoria-spesa-btn"')
         self.assertContains(response, 'id="edit-categoria-spesa-btn"')
         self.assertContains(response, 'id="delete-categoria-spesa-btn"')
+        self.assertContains(response, "supplier-profile-card")
         self.assertContains(response, "js/pages/fornitore-form.js")
 
     def test_categoria_spesa_popup_create_returns_select_response(self):
+        padre = crea_categoria_spesa_test("Servizi generali")
+        response = self.client.get(f"{reverse('crea_categoria_spesa')}?popup=1&target_input_name=categoria_spesa")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "category-expense-editor-shell is-popup")
+        self.assertContains(response, "Categoria padre")
+
         response = self.client.post(
             f"{reverse('crea_categoria_spesa')}?popup=1&target_input_name=categoria_spesa",
             {
                 "popup": "1",
                 "target_input_name": "categoria_spesa",
                 "nome": "Servizi",
+                "parent": str(padre.pk),
                 "descrizione": "",
                 "ordine": "",
                 "attiva": "on",
@@ -411,6 +449,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         categoria = CategoriaFinanziaria.objects.get(nome="Servizi", tipo=TipoCategoriaFinanziaria.SPESA)
+        self.assertEqual(categoria.parent, padre)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "dismissRelatedPopup")
         self.assertContains(response, "categoria_spesa")
@@ -534,6 +573,34 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "mode-edit-only-table-cell")
         self.assertContains(response, "Movimento storico collegato")
         self.assertNotContains(response, "Movimento storico non collegato")
+
+    def test_notifica_fattura_ricevuta_apre_fattura_in_popup(self):
+        fornitore = Fornitore.objects.create(denominazione="Cloud Supplier Srl")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FC-42",
+            data_documento=date(2026, 4, 20),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+        NotificaFinanziaria.objects.create(
+            titolo="Nuova fattura fornitore ricevuta",
+            messaggio="Cloud Supplier Srl - FC-42 - EUR 122.00",
+            tipo="fattura_ricevuta",
+            url=documento_url,
+            documento=documento,
+        )
+
+        response = self.client.get(reverse("lista_notifiche_finanziarie"))
+
+        popup_url = f"{documento_url}?popup=1"
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{popup_url}"', count=2)
+        self.assertContains(response, f'data-popup-url="{popup_url}"', count=2)
+        self.assertContains(response, 'data-window-popup="1"', count=2)
+        self.assertNotContains(response, f'href="{documento_url}"')
 
     def test_documento_fornitore_calculates_net_and_vat_from_total(self):
         categoria = crea_categoria_spesa_test("Servizi")

@@ -1,0 +1,62 @@
+{% load static %}
+
+{% for nodo in nodi %}
+    {% with categoria=nodo.categoria %}
+        <tr class="list-row-link report-category-row report-category-spesa{% if parent_id %} report-category-child is-hidden{% endif %}{% if not categoria.attiva %} categoria-row-inactive{% endif %}"
+            data-row-href="{% url 'modifica_categoria_spesa' categoria.pk %}"
+            data-report-category-row="{{ nodo.row_id }}"
+            {% if parent_id %}data-report-category-parent="{{ parent_id }}"{% endif %}>
+            <td class="report-category-name report-category-level-{{ nodo.livello }}">
+                <div class="report-category-name-inner">
+                    {% if nodo.figli %}
+                        <button type="button"
+                                class="report-category-toggle"
+                                data-report-category-toggle="{{ nodo.row_id }}"
+                                aria-expanded="false"
+                                aria-label="Espandi categoria {{ categoria.nome }}">&#9656;</button>
+                    {% else %}
+                        <span class="report-category-toggle-spacer"></span>
+                    {% endif %}
+                    <span class="category-tree-icon finance-record-icon-supplier" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                    </span>
+                    <span class="{% if not parent_id %}report-category-root-label{% endif %}">{{ categoria.nome }}</span>
+                    {% if not parent_id %}
+                        <span class="category-tree-badge category-tree-badge-parent">Padre</span>
+                    {% else %}
+                        <span class="category-tree-badge">Figlia</span>
+                    {% endif %}
+                    {% if nodo.discendenti_count %}
+                        <span class="table-muted">{{ nodo.discendenti_count }} sottocategorie</span>
+                    {% endif %}
+                </div>
+                {% if categoria.parent %}
+                    <div class="category-tree-path">Sotto: {{ categoria.parent.percorso_label }}</div>
+                {% endif %}
+                {% if categoria.descrizione %}
+                    <div class="table-subtext">{{ categoria.descrizione|truncatechars:90 }}</div>
+                {% endif %}
+            </td>
+            <td>{{ categoria.numero_fornitori }}</td>
+            <td>{{ categoria.numero_documenti }}</td>
+            <td>{{ categoria.numero_movimenti }}</td>
+            <td>{{ categoria.ordine|default:"-" }}</td>
+            <td>
+                {% if categoria.attiva %}
+                    <span class="category-tree-status is-active">Attiva</span>
+                {% else %}
+                    <span class="category-tree-status is-inactive">Non attiva</span>
+                {% endif %}
+            </td>
+            <td class="actions-cell">
+                <div class="table-icon-actions anagrafica-row-actions">
+                    <a class="table-icon-link anagrafica-action-btn anagrafica-action-open" href="{% url 'modifica_categoria_spesa' categoria.pk %}" title="Modifica" aria-label="Modifica categoria {{ categoria.nome }}"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></a>
+                    <a class="table-icon-link table-icon-link-danger anagrafica-action-btn anagrafica-action-delete" href="{% url 'elimina_categoria_spesa' categoria.pk %}" title="Elimina" aria-label="Elimina categoria {{ categoria.nome }}"><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
+                </div>
+            </td>
+        </tr>
+        {% if nodo.figli %}
+            {% include "gestione_finanziaria/includes/categorie_spesa_tree_rows.html" with nodi=nodo.figli parent_id=nodo.row_id only %}
+        {% endif %}
+    {% endwith %}
+{% endfor %}

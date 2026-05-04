@@ -90,7 +90,7 @@ def _rate_disponibili_queryset():
             "iscrizione__studente__famiglia",
             "iscrizione__anno_scolastico",
         )
-        .prefetch_related("iscrizione__studente__famiglia__familiari")
+        .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
         .filter(
             pagata=False,
             importo_finale__gt=0,
@@ -125,13 +125,7 @@ def _riconcilia_movimenti_con_rate(
     for movimento in movimenti:
         stats["movimenti_esaminati"] += 1
 
-        candidati = [
-            candidato
-            for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True)
-            if include_rata(candidato.rata)
-            and not candidato.rata.pagata
-            and candidato.rata.pk not in rate_pool_escluse_ids
-        ]
+        movimento._arboris_importo_disponibile_cache = abs(movimento.importo or 0)
         rate_pool_disponibili = None
         if rate_pool is not None:
             rate_pool_disponibili = [
@@ -139,6 +133,19 @@ def _riconcilia_movimenti_con_rate(
                 for rata in rate_pool
                 if rata.pk not in rate_pool_escluse_ids and not rata.pagata
             ]
+
+        candidati = [
+            candidato
+            for candidato in trova_rate_candidate(
+                movimento,
+                limite=10,
+                solo_disponibili=True,
+                rate_pool=rate_pool_disponibili,
+            )
+            if include_rata(candidato.rata)
+            and not candidato.rata.pagata
+            and candidato.rata.pk not in rate_pool_escluse_ids
+        ]
         candidati_cumulativi = trova_rate_cumulative_candidate(
             movimento,
             limite=5,

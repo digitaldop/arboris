@@ -235,7 +235,7 @@ def sistema_permissions_context(request):
         try:
             from gestione_finanziaria.models import NotificaFinanziaria
 
-            notifiche_qs = NotificaFinanziaria.objects.exclude(letture__user=user)
+            notifiche_qs = NotificaFinanziaria.objects.select_related("documento").exclude(letture__user=user)
             if not can_manage_gestione_finanziaria:
                 notifiche_qs = notifiche_qs.filter(richiede_gestione=False)
             notifiche_finanziarie_non_lette = notifiche_qs.count()

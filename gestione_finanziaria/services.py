@@ -683,6 +683,9 @@ def _importo_movimento_riconciliato(movimento):
 
 
 def importo_movimento_disponibile(movimento):
+    cached = getattr(movimento, "_arboris_importo_disponibile_cache", None)
+    if cached is not None:
+        return cached
     return max(_importo_movimento_assoluto(movimento) - _importo_movimento_riconciliato(movimento), Decimal("0.00"))
 
 
@@ -724,7 +727,15 @@ def _match_familiari_in_testo(famiglia, testo: str) -> tuple[list[str], list[str
         return [], []
 
     try:
-        familiari = famiglia.familiari.all()
+        if hasattr(famiglia, "_arboris_familiari_cache"):
+            familiari = famiglia._arboris_familiari_cache
+        else:
+            prefetched = getattr(famiglia, "_prefetched_objects_cache", {})
+            if "familiari" in prefetched:
+                familiari = list(prefetched["familiari"])
+            else:
+                familiari = list(famiglia.familiari.all())
+            famiglia._arboris_familiari_cache = familiari
     except Exception:
         return [], []
 
@@ -750,6 +761,13 @@ def _famiglia_ha_familiari(famiglia) -> bool:
     if famiglia is None:
         return False
     try:
+        if hasattr(famiglia, "_arboris_familiari_cache"):
+            return bool(famiglia._arboris_familiari_cache)
+        prefetched = getattr(famiglia, "_prefetched_objects_cache", {})
+        if "familiari" in prefetched:
+            familiari = list(prefetched["familiari"])
+            famiglia._arboris_familiari_cache = familiari
+            return bool(familiari)
         return famiglia.familiari.exists()
     except Exception:
         return False
@@ -1024,7 +1042,7 @@ def _rata_disponibile_per_auto(rata, include_rata=None, *, controlla_collegament
     return importo_rata_residuo(rata) > Decimal("0.00")
 
 
-def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False):
+def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False, rate_pool=None):
     """
     Ritorna una lista ordinata di :class:`CandidatoRiconciliazione`
     per il movimento dato. Il matching e' pensato per entrate in conto
@@ -1052,25 +1070,39 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
     # rimborsi/storni manuali.
     importo_cerca = abs(importo_mov)
 
-    qs = (
-        RataIscrizione.objects.select_related(
-            "iscrizione__studente__famiglia",
-            "iscrizione__anno_scolastico",
+    if rate_pool is None:
+        qs = (
+            RataIscrizione.objects.select_related(
+                "famiglia",
+                "iscrizione__studente__famiglia",
+                "iscrizione__anno_scolastico",
+            )
+            .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
+            .filter(
+                importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
+                importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
+            )
+            .order_by("-anno_riferimento", "-mese_riferimento")
         )
-        .prefetch_related("iscrizione__studente__famiglia__familiari")
-        .filter(
-            importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
-            importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
-        )
-        .order_by("-anno_riferimento", "-mese_riferimento")
-    )
-    if solo_disponibili:
-        qs = qs.filter(
-            pagata=False,
-            movimenti_finanziari__isnull=True,
-            riconciliazioni_movimenti__isnull=True,
-        ).distinct()
-    qs = qs[:200]
+        if solo_disponibili:
+            qs = qs.filter(
+                pagata=False,
+                movimenti_finanziari__isnull=True,
+                riconciliazioni_movimenti__isnull=True,
+            ).distinct()
+        qs = qs[:200]
+    else:
+        limite_importo_min = importo_cerca - _TOLLERANZA_IMPORTO_APPROX
+        limite_importo_max = importo_cerca + _TOLLERANZA_IMPORTO_APPROX
+        qs = [
+            rata
+            for rata in rate_pool
+            if limite_importo_min <= importo_rata_residuo(rata) <= limite_importo_max
+            and (
+                not solo_disponibili
+                or _rata_disponibile_per_auto(rata, controlla_collegamenti=False)
+            )
+        ]
 
     data_mov = movimento.data_contabile
     testo_movimento = _normalizza_testo_match(f"{movimento.descrizione or ''} {movimento.controparte or ''}")
@@ -1081,7 +1113,8 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         score = 0
         motivazioni = []
 
-        diff_importo = (rata.importo_finale - importo_cerca).copy_abs()
+        importo_rata_cerca = importo_rata_residuo(rata) if rate_pool is not None else rata.importo_finale
+        diff_importo = (importo_rata_cerca - importo_cerca).copy_abs()
         if diff_importo <= _TOLLERANZA_IMPORTO_ESATTO:
             score += 50
             motivazioni.append("Importo identico")
@@ -1150,7 +1183,7 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
                 "iscrizione__studente__famiglia",
                 "iscrizione__anno_scolastico",
             )
-            .prefetch_related("iscrizione__studente__famiglia__familiari")
+            .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
             .filter(
                 pagata=False,
                 importo_finale__gt=0,
@@ -1387,6 +1420,9 @@ def riconcilia_movimento_con_rate(
     utente=None,
 ):
     from .models import RiconciliazioneRataMovimento, StatoRiconciliazione
+
+    if hasattr(movimento, "_arboris_importo_disponibile_cache"):
+        delattr(movimento, "_arboris_importo_disponibile_cache")
 
     allocazioni = [
         (rata, importo)

@@ -201,9 +201,10 @@ class CategoriaSpesaForm(forms.ModelForm):
 
     class Meta:
         model = CategoriaFinanziaria
-        fields = ["nome", "descrizione", "ordine", "attiva"]
+        fields = ["nome", "parent", "descrizione", "ordine", "attiva"]
         labels = {
             "nome": "Nome categoria",
+            "parent": "Categoria padre",
             "descrizione": "Descrizione",
             "ordine": "Ordine",
             "attiva": "Attiva",
@@ -211,6 +212,16 @@ class CategoriaSpesaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        parent_queryset = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA).order_by(
+            "parent__nome",
+            "ordine",
+            "nome",
+        )
+        if self.instance and self.instance.pk:
+            parent_queryset = parent_queryset.exclude(pk=self.instance.pk)
+        self.fields["parent"].queryset = parent_queryset
+        self.fields["parent"].required = False
+        self.fields["parent"].empty_label = "--- nessuna (categoria radice) ---"
         self.fields["ordine"].required = False
         if self.instance and self.instance.pk and not self.is_bound:
             self.fields["descrizione"].initial = self.instance.note
