@@ -37,10 +37,14 @@ AUTHORIZATION_URL = "https://api-v2.fattureincloud.it/oauth/authorize"
 TOKEN_URL = "https://api-v2.fattureincloud.it/oauth/token"
 RECEIVED_DOCUMENT_TYPES = ("expense", "passive_credit_note")
 PENDING_DOCUMENT_TYPES = ("agyo", "mail", "browser")
-DEFAULT_SCOPES = "received_documents:r"
+DEFAULT_SCOPES = "received_documents:r entity.suppliers:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
 DEFAULT_SYNC_MAX_SECONDS = 18.0
+SUPPLIER_DETAILS_SCOPE_WARNING = (
+    "Dati anagrafici completi dei fornitori non disponibili: "
+    "ricollega Fatture in Cloud autorizzando anche la lettura dei fornitori."
+)
 
 
 class FattureInCloudError(Exception):
@@ -570,6 +574,54 @@ def _enrich_supplier_entity_from_document(entity, document_data):
     return enriched
 
 
+def _supplier_entity_id_from_document(document_data):
+    entity = _as_dict(document_data.get("entity") or document_data.get("supplier"))
+    entity_id = entity.get("id") or entity.get("supplier_id") or entity.get("supplierId")
+    return str(entity_id).strip() if entity_id not in (None, "") else ""
+
+
+def _merge_non_empty(base, extra):
+    merged = dict(base or {})
+    for key, value in _as_dict(extra).items():
+        if value not in (None, ""):
+            merged[key] = value
+    return merged
+
+
+def _document_with_supplier_detail(client, document_data, supplier_context):
+    if not isinstance(document_data, dict):
+        return document_data
+
+    entity = _as_dict(document_data.get("entity") or document_data.get("supplier"))
+    supplier_id = _supplier_entity_id_from_document(document_data)
+    if not supplier_id:
+        return document_data
+    if supplier_context is not None and supplier_context.get("supplier_detail_disabled"):
+        return document_data
+
+    cache = supplier_context.setdefault("cache", {}) if supplier_context is not None else {}
+    warnings = supplier_context.setdefault("warnings", set()) if supplier_context is not None else set()
+    if supplier_id not in cache:
+        try:
+            cache[supplier_id] = client.get_supplier(supplier_id)
+        except FattureInCloudError as exc:
+            cache[supplier_id] = None
+            if " 401" in str(exc) or " 403" in str(exc) or "NO_PERMISSION" in str(exc).upper():
+                if supplier_context is not None:
+                    supplier_context["supplier_detail_disabled"] = True
+                warnings.add(SUPPLIER_DETAILS_SCOPE_WARNING)
+            else:
+                warnings.add("Dati anagrafici completi dei fornitori non recuperati durante la sincronizzazione.")
+
+    supplier_detail = cache.get(supplier_id)
+    if not supplier_detail:
+        return document_data
+
+    enriched = dict(document_data)
+    enriched["entity"] = _merge_non_empty(entity, supplier_detail)
+    return enriched
+
+
 def _payment_amount(payment):
     amount = payment.get("amount")
     if isinstance(amount, dict):
@@ -967,6 +1019,13 @@ class FattureInCloudClient:
             params={"fieldset": "detailed"},
         ).get("data", {})
 
+    def get_supplier(self, supplier_id):
+        return self.request(
+            "GET",
+            f"/c/{self.connessione.company_id}/entities/suppliers/{supplier_id}",
+            params={"fieldset": "detailed"},
+        ).get("data", {})
+
     def list_pending_received_documents(self, doc_type, *, page=1, per_page=50):
         params = {
             "type": doc_type,
@@ -1014,16 +1073,16 @@ def _iter_paginated(fetch_page):
         page += 1
 
 
-def _document_detail_from_summary(client, summary, *, pending):
+def _document_detail_from_summary(client, summary, *, pending, supplier_context=None):
     if not isinstance(summary, dict):
         return summary
     document_id = summary.get("id")
     if not document_id:
-        return summary
+        return _document_with_supplier_detail(client, summary, supplier_context)
     detail = client.get_pending_received_document(document_id) if pending else client.get_received_document(document_id)
     if not isinstance(detail, dict) or not detail:
-        return summary
-    return {**summary, **detail}
+        return _document_with_supplier_detail(client, summary, supplier_context)
+    return _document_with_supplier_detail(client, {**summary, **detail}, supplier_context)
 
 
 def _check_sync_budget(start, max_seconds):
@@ -1064,6 +1123,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
     }
     esito = EsitoSincronizzazione.OK
     client = FattureInCloudClient(connessione)
+    supplier_context = {"cache": {}, "warnings": set()}
 
     try:
         if not connessione.company_id:
@@ -1077,7 +1137,12 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                     for summary in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
                         _check_sync_budget(start, max_seconds)
                         try:
-                            document = _document_detail_from_summary(client, summary, pending=False)
+                            document = _document_detail_from_summary(
+                                client,
+                                summary,
+                                pending=False,
+                                supplier_context=supplier_context,
+                            )
                             result = importa_documento_fatture_in_cloud(
                                 connessione,
                                 document,
@@ -1105,7 +1170,12 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                     for summary in documents:
                         _check_sync_budget(start, max_seconds)
                         try:
-                            document = _document_detail_from_summary(client, summary, pending=True)
+                            document = _document_detail_from_summary(
+                                client,
+                                summary,
+                                pending=True,
+                                supplier_context=supplier_context,
+                            )
                             result = importa_documento_fatture_in_cloud(
                                 connessione,
                                 document,
@@ -1123,6 +1193,9 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                 except FattureInCloudError as exc:
                     esito = EsitoSincronizzazione.PARZIALE
                     stats["messaggi"].append(f"{label}: {exc}")
+
+        if supplier_context.get("warnings") and esito == EsitoSincronizzazione.OK:
+            esito = EsitoSincronizzazione.PARZIALE
 
         if not stats["messaggi"]:
             stats["messaggi"].append(
@@ -1146,6 +1219,9 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
             chiave_deduplica=f"fic-sync-error-{connessione.pk}-{timezone.localdate().isoformat()}",
         )
     finally:
+        for warning in sorted(supplier_context.get("warnings") or []):
+            if warning not in stats["messaggi"]:
+                stats["messaggi"].append(warning)
         durata_ms = int((time.monotonic() - start) * 1000)
         messaggio = "\n".join(stats["messaggi"])[:4000]
         connessione.ultimo_sync_at = timezone.now()
@@ -1186,11 +1262,13 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
 
 def importa_documento_da_webhook(connessione, notification_type, document_id, *, utente=None):
     client = FattureInCloudClient(connessione)
+    supplier_context = {"cache": {}, "warnings": set()}
     pending = notification_type.endswith("received_documents.e_invoices.receive")
     if pending:
         document = client.get_pending_received_document(document_id)
     else:
         document = client.get_received_document(document_id)
+    document = _document_with_supplier_detail(client, document, supplier_context)
     result = importa_documento_fatture_in_cloud(connessione, document, pending=pending, utente=utente)
     FattureInCloudSyncLog.objects.create(
         connessione=connessione,

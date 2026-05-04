@@ -1233,6 +1233,93 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(documento.fornitore.denominazione, "Detailed Supplier Srl")
         self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 7, 1))
 
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_arricchisce_fornitore_da_entity_supplier(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_da_registrare=False,
+        )
+        Fornitore.objects.create(denominazione="Supplier Basic Srl", tipo_soggetto="azienda")
+        client = Mock()
+        client.list_received_documents.side_effect = [
+            {"data": [{"id": 995, "entity": {"id": 77, "name": "Supplier Basic Srl"}}], "pagination": {"current_page": 1, "last_page": 1}},
+            {"data": [], "pagination": {"current_page": 1, "last_page": 1}},
+        ]
+        client.get_received_document.return_value = {
+            "id": 995,
+            "type": "expense",
+            "description": "Dettaglio con fornitore minimo",
+            "invoice_number": "DET-SUP-1",
+            "date": "2026-05-04",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"id": 77, "name": "Supplier Basic Srl", "vat_number": "IT12345678909"},
+            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
+        }
+        client.get_supplier.return_value = {
+            "id": 77,
+            "name": "Supplier Basic Srl",
+            "vat_number": "IT12345678909",
+            "tax_code": "12345678909",
+            "address_street": "Via Completa 8",
+            "address_postal_code": "40122",
+            "address_city": "Bologna",
+            "address_province": "BO",
+            "email": "fornitore@example.com",
+            "certified_email": "fornitore@examplepec.it",
+            "phone": "051888",
+        }
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(stats["fornitori_creati"], 0)
+        self.assertEqual(stats["fornitori_aggiornati"], 1)
+        client.get_supplier.assert_called_once_with("77")
+        fornitore = Fornitore.objects.get(denominazione="Supplier Basic Srl")
+        self.assertEqual(fornitore.partita_iva, "12345678909")
+        self.assertEqual(fornitore.codice_fiscale, "12345678909")
+        self.assertEqual(fornitore.indirizzo, "Via Completa 8 40122 Bologna BO")
+        self.assertEqual(fornitore.email, "fornitore@example.com")
+        self.assertEqual(fornitore.pec, "fornitore@examplepec.it")
+        self.assertEqual(fornitore.telefono, "051888")
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_importa_documento_se_supplier_scope_manca(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_da_registrare=False,
+        )
+        client = Mock()
+        client.list_received_documents.side_effect = [
+            {"data": [{"id": 996, "entity": {"id": 78, "name": "Supplier Scope Srl"}}], "pagination": {"current_page": 1, "last_page": 1}},
+            {"data": [], "pagination": {"current_page": 1, "last_page": 1}},
+        ]
+        client.get_received_document.return_value = {
+            "id": 996,
+            "type": "expense",
+            "invoice_number": "NO-SCOPE-1",
+            "date": "2026-05-04",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"id": 78, "name": "Supplier Scope Srl"},
+            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
+        }
+        client.get_supplier.side_effect = FattureInCloudError("Errore API Fatture in Cloud 403")
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(stats["esito"], EsitoSincronizzazione.PARZIALE)
+        self.assertTrue(DocumentoFornitore.objects.filter(numero_documento="NO-SCOPE-1").exists())
+        self.assertTrue(any("lettura dei fornitori" in message for message in stats["messaggi"]))
+
     @override_settings(
         FATTURE_IN_CLOUD_API_CONNECT_TIMEOUT_SECONDS=2,
         FATTURE_IN_CLOUD_API_READ_TIMEOUT_SECONDS=6,
