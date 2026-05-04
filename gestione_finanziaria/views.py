@@ -26,9 +26,10 @@ from django.views.decorators.csrf import csrf_exempt
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_module_permission, user_is_operational_admin
 
 from .fatture_in_cloud import (
+    FIC_SOURCE,
     FattureInCloudError,
     FattureInCloudClient,
     authorization_url,
@@ -38,6 +39,7 @@ from .fatture_in_cloud import (
     oauth_env_configured,
     sincronizza_fatture_in_cloud,
 )
+from .fatture_in_cloud_debug import payload_debug_report_json
 from .forms import (
     CategoriaSpesaForm,
     CategoriaFinanziariaForm,
@@ -1076,6 +1078,74 @@ def sincronizza_fatture_in_cloud_view(request, pk):
     except FattureInCloudError as exc:
         messages.error(request, f"Sincronizzazione fallita: {exc}")
     return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+
+
+def diagnostica_payload_fatture_in_cloud(request, pk):
+    if not user_is_operational_admin(request.user):
+        messages.error(request, "La diagnostica Fatture in Cloud e riservata ad amministratori e superuser.")
+        return redirect("modifica_fatture_in_cloud", pk=pk)
+
+    connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
+    documenti_recenti = (
+        DocumentoFornitore.objects.select_related("fornitore")
+        .filter(external_source=FIC_SOURCE)
+        .exclude(external_id="")
+        .order_by("-data_documento", "-id")[:80]
+    )
+    selected_documento_pk = ""
+    document_id = ""
+    source_type = "registered"
+    report_json = ""
+
+    if request.method == "POST":
+        selected_documento_pk = (request.POST.get("documento_fornitore") or "").strip()
+        document_id = (request.POST.get("document_id") or "").strip()
+        source_type = request.POST.get("source_type") if request.POST.get("source_type") in {"registered", "pending"} else "registered"
+
+        if selected_documento_pk and not document_id:
+            documento = DocumentoFornitore.objects.filter(
+                pk=selected_documento_pk,
+                external_source=FIC_SOURCE,
+            ).exclude(external_id="").first()
+            if documento:
+                document_id = documento.external_id
+            else:
+                messages.error(request, "Fattura importata non trovata o senza ID Fatture in Cloud.")
+
+        if not document_id:
+            messages.error(request, "Inserisci un ID documento Fatture in Cloud o seleziona una fattura importata.")
+        else:
+            client = FattureInCloudClient(connessione)
+            try:
+                if source_type == "pending":
+                    payload = client.get_pending_received_document(document_id)
+                else:
+                    payload = client.get_received_document(document_id)
+                if not isinstance(payload, dict):
+                    raise FattureInCloudError("Il payload recuperato non e' un oggetto JSON.")
+                report_json = payload_debug_report_json(
+                    payload,
+                    source=source_type,
+                    document_id=document_id,
+                    max_depth=6,
+                    max_list_items=2,
+                )
+                messages.success(request, "Report diagnostico generato e mascherato correttamente.")
+            except FattureInCloudError as exc:
+                messages.error(request, f"Diagnostica non completata: {exc}")
+
+    return render(
+        request,
+        "gestione_finanziaria/fatture_in_cloud_diagnostica.html",
+        {
+            "connessione": connessione,
+            "documenti_recenti": documenti_recenti,
+            "selected_documento_pk": selected_documento_pk,
+            "document_id": document_id,
+            "source_type": source_type,
+            "report_json": report_json,
+        },
+    )
 
 
 @csrf_exempt

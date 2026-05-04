@@ -124,6 +124,11 @@ urlpatterns = [
         name="sincronizza_fatture_in_cloud",
     ),
     path(
+        "gestione-finanziaria/fatture-in-cloud/<int:pk>/diagnostica-payload/",
+        gf_manage(views.diagnostica_payload_fatture_in_cloud),
+        name="diagnostica_payload_fatture_in_cloud",
+    ),
+    path(
         "gestione-finanziaria/fatture-in-cloud/webhook/<uuid:webhook_key>/",
         views.webhook_fatture_in_cloud,
         name="webhook_fatture_in_cloud",

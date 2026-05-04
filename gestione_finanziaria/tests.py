@@ -1,6 +1,7 @@
+import json
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from io import BytesIO
+from io import BytesIO, StringIO
 import shutil
 import tempfile
 from unittest.mock import Mock, patch
@@ -8,6 +9,7 @@ from unittest.mock import Mock, patch
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -31,6 +33,7 @@ from .models import (
     MovimentoFinanziario,
     NotificaFinanziaria,
     PagamentoFornitore,
+    OrigineDocumentoFornitore,
     OrigineMovimento,
     ProviderBancario,
     RiconciliazioneRataMovimento,
@@ -1319,6 +1322,105 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(stats["esito"], EsitoSincronizzazione.PARZIALE)
         self.assertTrue(DocumentoFornitore.objects.filter(numero_documento="NO-SCOPE-1").exists())
         self.assertTrue(any("lettura dei fornitori" in message for message in stats["messaggi"]))
+
+    @patch("gestione_finanziaria.management.commands.debug_fatture_in_cloud_payload.FattureInCloudClient")
+    def test_debug_fatture_in_cloud_payload_maschera_dati_sensibili(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        client = Mock()
+        client.get_received_document.return_value = {
+            "id": 997,
+            "entity": {"id": 77, "name": "Fornitore Segreto Srl"},
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdCodice": "12345678901"},
+                            "Anagrafica": {"Denominazione": "Ragione Segreta Srl"},
+                        },
+                        "Sede": {"Indirizzo": "Via Segreta 1", "Comune": "Bologna"},
+                    }
+                }
+            },
+            "payments_list": [{"iban": "IT60X0000000000000000000000"}],
+        }
+        mock_client_class.return_value = client
+        output = StringIO()
+
+        call_command(
+            "debug_fatture_in_cloud_payload",
+            "--connessione",
+            str(connessione.pk),
+            "--document-id",
+            "997",
+            stdout=output,
+        )
+
+        text = output.getvalue()
+        self.assertNotIn("Fornitore Segreto", text)
+        self.assertNotIn("Ragione Segreta", text)
+        self.assertNotIn("Via Segreta", text)
+        self.assertNotIn("12345678901", text)
+        self.assertNotIn("IT60X", text)
+        report = json.loads(text)
+        self.assertTrue(report["entity_supplier_fields_present"]["name"])
+        self.assertTrue(report["e_invoice_supplier_fields_present"]["vat_number"])
+        self.assertTrue(report["e_invoice_supplier_fields_present"]["address_street"])
+        self.assertTrue(report["supplier_payment_fields_present"]["bank_iban"])
+
+    @patch("gestione_finanziaria.views.FattureInCloudClient")
+    def test_diagnostica_payload_fatture_in_cloud_via_browser_maschera_dati(self, mock_client_class):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        fornitore = Fornitore.objects.create(denominazione="Fornitore Gia Importato", tipo_soggetto="azienda")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FIC-1",
+            data_documento=date(2026, 5, 4),
+            totale=Decimal("100.00"),
+            origine=OrigineDocumentoFornitore.FATTURE_IN_CLOUD,
+            external_source="fatture_in_cloud",
+            external_id="997",
+        )
+        client = Mock()
+        client.get_received_document.return_value = {
+            "id": 997,
+            "entity": {"id": 77, "name": "Fornitore Segreto Srl"},
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdCodice": "12345678901"},
+                            "Anagrafica": {"Denominazione": "Ragione Segreta Srl"},
+                        },
+                        "Sede": {"Indirizzo": "Via Segreta 1", "Comune": "Bologna"},
+                    }
+                }
+            },
+        }
+        mock_client_class.return_value = client
+
+        response = self.client.post(
+            reverse("diagnostica_payload_fatture_in_cloud", kwargs={"pk": connessione.pk}),
+            {"documento_fornitore": str(documento.pk), "source_type": "registered"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Report mascherato")
+        self.assertContains(response, "e_invoice_supplier_fields_present")
+        self.assertNotContains(response, "Fornitore Segreto")
+        self.assertNotContains(response, "Ragione Segreta")
+        self.assertNotContains(response, "Via Segreta")
+        self.assertNotContains(response, "12345678901")
+        client.get_received_document.assert_called_once_with("997")
+
+    def test_diagnostica_payload_fatture_in_cloud_riservata_admin(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+
+        response = self.client.get(reverse("diagnostica_payload_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
 
     @override_settings(
         FATTURE_IN_CLOUD_API_CONNECT_TIMEOUT_SECONDS=2,

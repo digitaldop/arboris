@@ -54,6 +54,10 @@
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
                     <span class="btn-label">Collega OAuth</span>
                 </a>
+                <a href="{% url 'diagnostica_payload_fatture_in_cloud' connessione.pk %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                    <span class="btn-label">Diagnostica payload</span>
+                </a>
                 <a href="{% url 'elimina_fatture_in_cloud' connessione.pk %}" class="btn btn-danger btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                     <span class="btn-label">Rimuovi connessione</span>
@@ -338,6 +342,17 @@
                                 <span class="copy-inline-tooltip" role="tooltip">Copia</span>
                             </button>
                         </div>
+                    </div>
+
+                    <div class="finance-side-card">
+                        <div class="finance-side-title">Diagnostica import</div>
+                        <p class="help-text">
+                            Genera un report mascherato del payload Fatture in Cloud per capire se i dati fornitore arrivano da entity, rubrica o fattura elettronica.
+                        </p>
+                        <a href="{% url 'diagnostica_payload_fatture_in_cloud' connessione.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                            <span class="btn-label">Apri diagnostica</span>
+                        </a>
                     </div>
 
                     <div class="finance-side-card finance-side-card-danger">

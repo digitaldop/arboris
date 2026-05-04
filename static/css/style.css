@@ -23434,6 +23434,33 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     flex: 0 0 auto;
 }
 
+.module-gestione_finanziaria .finance-diagnostic-layout {
+    align-items: stretch;
+}
+
+.module-gestione_finanziaria .finance-diagnostic-form {
+    margin: 0;
+}
+
+.module-gestione_finanziaria .finance-diagnostic-report-panel .finance-section-head {
+    align-items: center;
+}
+
+.module-gestione_finanziaria .finance-debug-textarea {
+    width: 100%;
+    min-height: 460px;
+    padding: 14px;
+    border: 1px solid #d6e3ec;
+    border-radius: 8px;
+    background: #f8fbfd;
+    color: #253246;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    resize: vertical;
+    white-space: pre;
+}
+
 .module-gestione_finanziaria .finance-sticky-actions {
     gap: 8px;
 }
