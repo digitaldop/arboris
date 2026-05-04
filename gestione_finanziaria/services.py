@@ -877,22 +877,52 @@ def _giorni_distanza_rata_movimento(rata, movimento) -> int:
 
 
 def _qualita_sottoinsieme_rate(rate, movimento):
-    distanze = [_giorni_distanza_rata_movimento(rata, movimento) for rata in rate]
+    items = [_rate_cumulative_item(rata, movimento) for rata in rate]
+    items = [item for item in items if item is not None]
+    return _qualita_sottoinsieme_rate_items(items)
+
+
+def _qualita_sottoinsieme_rate_items(items):
+    distanze = [item["distanza"] for item in items]
     max_distanza = max(distanze) if distanze else 9999
     totale_distanza = sum(distanze)
-    studenti = {
-        getattr(getattr(rata.iscrizione, "studente", None), "pk", None)
-        for rata in rate
-        if getattr(getattr(rata, "iscrizione", None), "studente", None) is not None
-    }
-    periodi = {(rata.anno_riferimento, rata.mese_riferimento) for rata in rate}
+    studenti = {item["studente_key"] for item in items if item["studente_key"] is not None}
+    periodi = {item["periodo"] for item in items}
     return (
         -max_distanza,
         -totale_distanza,
         len(studenti),
         -len(periodi),
-        -len(rate),
+        -len(items),
     )
+
+
+def _rate_cumulative_item(rata, movimento):
+    residuo_cents = _decimal_to_cents(importo_rata_residuo(rata))
+    if residuo_cents <= 0:
+        return None
+
+    iscrizione = getattr(rata, "iscrizione", None)
+    studente = getattr(iscrizione, "studente", None)
+    studente_key = getattr(studente, "pk", None) if studente is not None else None
+    return {
+        "rata": rata,
+        "residuo_cents": residuo_cents,
+        "distanza": _giorni_distanza_rata_movimento(rata, movimento),
+        "data_scadenza": getattr(rata, "data_scadenza", None),
+        "periodo": (getattr(rata, "anno_riferimento", None), getattr(rata, "mese_riferimento", None)),
+        "studente_key": studente_key or (id(studente) if studente is not None else None),
+        "pk": getattr(rata, "pk", None) or 0,
+    }
+
+
+def _gruppo_items_compatibile(items, target_cents, tolleranza_cents):
+    if len(items) < 2:
+        return []
+    somma = sum(item["residuo_cents"] for item in items)
+    if abs(somma - target_cents) <= tolleranza_cents:
+        return list(items)
+    return []
 
 
 def _trova_sottoinsieme_rate_per_importo(rate, importo_target, movimento):
@@ -901,48 +931,68 @@ def _trova_sottoinsieme_rate_per_importo(rate, importo_target, movimento):
     if target_cents <= 0:
         return []
 
-    dp = {0: []}
-    rate_ordinate = sorted(
-        rate,
-        key=lambda rata: (
-            _giorni_distanza_rata_movimento(rata, movimento),
-            rata.data_scadenza or date.max,
-            rata.pk or 0,
-        ),
-    )[:18]
-
-    for rata in rate_ordinate:
-        residuo_cents = _decimal_to_cents(importo_rata_residuo(rata))
-        if residuo_cents <= 0 or residuo_cents > target_cents + tolleranza_cents:
+    items = []
+    for rata in rate:
+        item = _rate_cumulative_item(rata, movimento)
+        if item is None or item["residuo_cents"] > target_cents + tolleranza_cents:
             continue
-        for somma, sottoinsieme in list(dp.items()):
-            nuova_somma = somma + residuo_cents
-            if nuova_somma > target_cents + tolleranza_cents:
-                continue
-            nuovo_sottoinsieme = sottoinsieme + [rata]
-            if len(nuovo_sottoinsieme) > 10:
-                continue
-            esistente = dp.get(nuova_somma)
-            if (
-                esistente is None
-                or _qualita_sottoinsieme_rate(nuovo_sottoinsieme, movimento)
-                > _qualita_sottoinsieme_rate(esistente, movimento)
-            ):
-                dp[nuova_somma] = nuovo_sottoinsieme
+        items.append(item)
 
-    somme_compatibili = [
-        somma
-        for somma, sottoinsieme in dp.items()
-        if len(sottoinsieme) >= 2 and abs(somma - target_cents) <= tolleranza_cents
-    ]
-    if not somme_compatibili:
+    if len(items) < 2:
         return []
 
-    somma_migliore = max(
-        somme_compatibili,
-        key=lambda somma: _qualita_sottoinsieme_rate(dp[somma], movimento),
-    )
-    return dp[somma_migliore]
+    items.sort(key=lambda item: (item["distanza"], item["data_scadenza"] or date.max, item["pk"]))
+
+    candidati_naturali = []
+    for chiave in ("periodo", "data_scadenza"):
+        gruppi = {}
+        for item in items:
+            valore = item[chiave]
+            if valore:
+                gruppi.setdefault(valore, []).append(item)
+        for gruppo in gruppi.values():
+            candidato = _gruppo_items_compatibile(gruppo, target_cents, tolleranza_cents)
+            if candidato:
+                candidati_naturali.append(candidato)
+
+    if candidati_naturali:
+        migliore = max(candidati_naturali, key=_qualita_sottoinsieme_rate_items)
+        return [item["rata"] for item in migliore]
+
+    items = items[:12]
+    max_size = min(5, len(items))
+    max_checks = 3000
+    checks = 0
+    migliore = []
+    migliore_qualita = None
+
+    def visita(start, selezionati, somma_cents):
+        nonlocal checks, migliore, migliore_qualita
+        if checks >= max_checks:
+            return
+        if len(selezionati) >= 2 and abs(somma_cents - target_cents) <= tolleranza_cents:
+            qualita = _qualita_sottoinsieme_rate_items(selezionati)
+            if migliore_qualita is None or qualita > migliore_qualita:
+                migliore = list(selezionati)
+                migliore_qualita = qualita
+            return
+        if len(selezionati) >= max_size or somma_cents >= target_cents - tolleranza_cents:
+            return
+
+        for index in range(start, len(items)):
+            item = items[index]
+            nuova_somma = somma_cents + item["residuo_cents"]
+            if nuova_somma > target_cents + tolleranza_cents:
+                continue
+            checks += 1
+            selezionati.append(item)
+            visita(index + 1, selezionati, nuova_somma)
+            selezionati.pop()
+            if checks >= max_checks:
+                return
+
+    visita(0, [], 0)
+    return [item["rata"] for item in migliore]
 
 
 def _studenti_unici_da_rate(rate):

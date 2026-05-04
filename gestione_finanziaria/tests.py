@@ -69,6 +69,7 @@ from .services import (
     riconcilia_movimento_con_rate,
     trova_scadenze_fornitori_candidate,
     trova_movimenti_candidati_per_rate,
+    trova_rate_cumulative_candidate,
     trova_rate_candidate,
 )
 
@@ -199,6 +200,62 @@ class RiconciliazioneRateMatchingTests(TestCase):
 
         self.assertIn(movimento_corretto.pk, candidate_ids)
         self.assertNotIn(movimento_altra_famiglia.pk, candidate_ids)
+
+    def test_rate_cumulative_candidate_limits_search_on_many_open_rates(self):
+        famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=self.stato_relazione,
+        )
+        Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=self.relazione_genitore,
+            nome="Simone",
+            cognome="Rossi",
+        )
+        nomi = ["Luca", "Marta", "Anna", "Pietro", "Giulia", "Marco"]
+        for nome in nomi:
+            studente = Studente.objects.create(
+                famiglia=famiglia,
+                nome=nome,
+                cognome="Rossi",
+                data_nascita=date(2020, 5, 5),
+            )
+            iscrizione = Iscrizione.objects.create(
+                studente=studente,
+                anno_scolastico=self.anno,
+                classe=self.classe,
+                stato_iscrizione=self.stato_iscrizione,
+                condizione_iscrizione=self.condizione,
+                data_iscrizione=date(2025, 9, 1),
+                data_fine_iscrizione=date(2026, 6, 30),
+            )
+            for index, mese in enumerate(range(9, 13), start=1):
+                RataIscrizione.objects.create(
+                    iscrizione=iscrizione,
+                    famiglia=famiglia,
+                    numero_rata=index,
+                    mese_riferimento=mese,
+                    anno_riferimento=2025,
+                    importo_dovuto=Decimal("100.00"),
+                    importo_finale=Decimal("100.00"),
+                    data_scadenza=date(2025, mese, 10),
+                )
+
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("200.00"),
+            descrizione="Bonifico rette settembre Luca e Marta Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_rate_cumulative_candidate(movimento)
+
+        self.assertTrue(candidati)
+        self.assertEqual(len(candidati[0].allocazioni), 2)
+        self.assertEqual(
+            sum(importo for _rata, importo in candidati[0].allocazioni),
+            Decimal("200.00"),
+        )
 
     def test_salvataggio_riconciliazione_blocca_movimento_senza_nominativo_compatibile(self):
         _, _, rata = self._crea_rata(
