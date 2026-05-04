@@ -238,6 +238,82 @@ def _detect_header_row(rows: List[List[str]]) -> Optional[int]:
     return None
 
 
+def _find_column_index(header_map: Dict[str, int], candidates: List[str]) -> Optional[int]:
+    column = _find_column(header_map, candidates)
+    if column is None:
+        return None
+    return header_map.get(column)
+
+
+def _apply_italian_iban_metadata(detection: CsvImportDetection, rows: List[List[str]]) -> None:
+    iban_pattern = re.compile(r"\bIT\s*\d{2}\s*[A-Z]\s*(?:[A-Z0-9]\s*){22}", re.IGNORECASE)
+
+    for row in rows:
+        line = " ".join(cell for cell in row if cell).strip()
+        if not line:
+            continue
+
+        match = iban_pattern.search(line)
+        if not match:
+            continue
+
+        iban = re.sub(r"[^A-Z0-9]", "", match.group(0).upper())
+        if len(iban) >= 27:
+            detection.abi = iban[5:10]
+            detection.cab = iban[10:15]
+            detection.numero_conto = iban[15:27]
+
+        intestatario = line[match.end():].strip(" -")
+        if intestatario:
+            detection.intestatario = intestatario
+        return
+
+
+def _detect_unicredit_import_config(rows: List[List[str]], header_idx: int) -> Optional[CsvImportDetection]:
+    if len(rows) <= header_idx + 1:
+        return None
+
+    header_map = _build_header_map(rows[header_idx])
+    subheader_map = _build_header_map(rows[header_idx + 1])
+
+    data_idx = _find_column_index(header_map, ["Data"])
+    operazione_idx = _find_column_index(subheader_map, ["Operaz.", "Operaz", "Operazione"])
+    valuta_idx = _find_column_index(subheader_map, ["Valuta", "Data valuta"])
+    descrizione_idx = _find_column_index(header_map, ["Descrizione"])
+    importo_idx = _find_column_index(header_map, ["EUR", "Importo", "Importo movimento", "Amount"])
+
+    if data_idx is None or descrizione_idx is None or importo_idx is None:
+        return None
+    if operazione_idx is None or operazione_idx != data_idx:
+        return None
+
+    config = CsvImporterConfig(
+        delimiter="",
+        encoding="utf-8-sig",
+        ha_intestazione=False,
+        righe_da_saltare=header_idx + 2,
+        colonna_data_contabile=data_idx,
+        colonna_data_valuta=valuta_idx,
+        colonna_importo=importo_idx,
+        colonna_descrizione=descrizione_idx,
+        formato_data="%d/%m/%Y",
+        separatore_decimale=",",
+        separatore_migliaia=".",
+    )
+    detection = CsvImportDetection(config=config, formato_rilevato="Excel UniCredit", confidenza=92)
+    detection.colonne_rilevate.update(
+        {
+            "colonna_data_contabile": data_idx,
+            "colonna_importo": importo_idx,
+            "colonna_descrizione": descrizione_idx,
+        }
+    )
+    if valuta_idx is not None:
+        detection.colonne_rilevate["colonna_data_valuta"] = valuta_idx
+    _apply_italian_iban_metadata(detection, rows[:header_idx])
+    return detection
+
+
 def detect_excel_import_config(raw_bytes: bytes) -> CsvImportDetection:
     rows = read_excel_rows(raw_bytes)
     if not rows:
@@ -255,6 +331,10 @@ def detect_excel_import_config(raw_bytes: bytes) -> CsvImportDetection:
         )
         return detection
 
+    unicredit_detection = _detect_unicredit_import_config(rows, header_idx)
+    if unicredit_detection:
+        return unicredit_detection
+
     header = rows[header_idx]
     header_map = _build_header_map(header)
     config = CsvImporterConfig(
@@ -271,7 +351,7 @@ def detect_excel_import_config(raw_bytes: bytes) -> CsvImportDetection:
     field_candidates = {
         "colonna_data_contabile": ["Operazione", "Data operazione", "Data contabile", "Data contabilizzazione", "Data"],
         "colonna_data_valuta": ["Data valuta", "Valuta"],
-        "colonna_importo": ["Importo", "Importo movimento", "Amount"],
+        "colonna_importo": ["Importo", "Importo movimento", "Amount", "EUR", "€"],
         "colonna_entrate": ["Entrate", "Avere", "Accrediti", "Importo avere"],
         "colonna_uscite": ["Uscite", "Dare", "Addebiti", "Importo dare"],
         "colonna_controparte": ["Controparte", "Beneficiario", "Ordinante"],
@@ -317,6 +397,8 @@ def detect_excel_import_config(raw_bytes: bytes) -> CsvImportDetection:
     detection.cab = _column_value(metadata_row, _find_column(header_map, ["CAB"]), header_map)
     detection.numero_conto = _column_value(metadata_row, _find_column(header_map, ["Conto"]), header_map)
     detection.intestatario = _column_value(metadata_row, _find_column(header_map, ["Rag. Soc./ Intestatario"]), header_map)
+    if not detection.numero_conto:
+        _apply_italian_iban_metadata(detection, rows[:header_idx])
 
     mancanti = config.descrizione_campi_richiesti()
     if mancanti:

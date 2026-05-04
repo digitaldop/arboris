@@ -1549,6 +1549,38 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertIn("mensa", movimenti[0].descrizione)
         self.assertEqual(movimenti[1].importo, Decimal("-15.20"))
 
+    def test_excel_unicredit_two_line_header_autodetect_parses_movements(self):
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["Rapporto IT 40 A 02008 13030 000107342804 - SCUOLA TEST"])
+        sheet.append(["Data", "", "Descrizione", "EUR", "Caus."])
+        sheet.append(["Operaz.", "Valuta"])
+        sheet.append(["03/12/2025", "03/12/2025", "EROGAZIONE FINANZIAMENTO", "39800", "061"])
+        sheet.append(["04/12/2025", "04/12/2025", "DISPOSIZIONE DI BONIFICO", "-15005,75", "208"])
+        buffer = BytesIO()
+        workbook.save(buffer)
+        raw_excel = buffer.getvalue()
+
+        detection = detect_excel_import_config(raw_excel)
+        movimenti = list(ExcelImporter(detection.config).parse(raw_excel))
+
+        self.assertEqual(detection.formato_rilevato, "Excel UniCredit")
+        self.assertEqual(detection.config.righe_da_saltare, 3)
+        self.assertFalse(detection.config.ha_intestazione)
+        self.assertEqual(detection.config.colonna_data_contabile, 0)
+        self.assertEqual(detection.config.colonna_data_valuta, 1)
+        self.assertEqual(detection.config.colonna_importo, 3)
+        self.assertEqual(detection.abi, "02008")
+        self.assertEqual(detection.cab, "13030")
+        self.assertEqual(detection.numero_conto, "000107342804")
+        self.assertEqual(len(movimenti), 2)
+        self.assertEqual(movimenti[0].data_contabile, date(2025, 12, 3))
+        self.assertEqual(movimenti[0].data_valuta, date(2025, 12, 3))
+        self.assertEqual(movimenti[0].importo, Decimal("39800"))
+        self.assertEqual(movimenti[1].importo, Decimal("-15005.75"))
+
     def test_import_estratto_conto_preview_and_confirm_with_xlsx(self):
         from openpyxl import Workbook
 

@@ -402,6 +402,9 @@
                                                         {% for month in item.months %}
                                                             <article class="student-main-rate-month {{ month.status_class }}">
                                                                 <div>
+                                                                    {% if not month.is_preiscrizione and not month.is_unica_soluzione %}
+                                                                        <span class="student-main-rate-month-period">{{ month.label }}</span>
+                                                                    {% endif %}
                                                                     <strong>{{ month.display_label }}</strong>
                                                                     <span>{{ month.status_label }}{% if month.importo_pagato %} - EUR {{ month.importo_pagato|euro }}{% endif %}</span>
                                                                 </div>

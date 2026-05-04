@@ -2131,6 +2131,8 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertContains(response, "student-main-rate-month is-paid")
         self.assertContains(response, "student-main-rate-month is-partial")
         self.assertContains(response, "student-main-rate-month is-unpaid")
+        self.assertContains(response, '<span class="student-main-rate-month-period">Gennaio 2026</span>')
+        self.assertContains(response, '<span class="student-main-rate-month-period">Febbraio 2026</span>')
         self.assertContains(response, "Pagata parzialmente")
         self.assertContains(response, "Da pagare")
         self.assertNotContains(response, 'data-student-overdue-rate-stat="1"')
