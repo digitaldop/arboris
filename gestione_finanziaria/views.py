@@ -1129,6 +1129,7 @@ def diagnostica_payload_fatture_in_cloud(request, pk):
                     document_id=document_id,
                     max_depth=6,
                     max_list_items=2,
+                    include_attachment=True,
                 )
                 messages.success(request, "Report diagnostico generato e mascherato correttamente.")
             except FattureInCloudError as exc:

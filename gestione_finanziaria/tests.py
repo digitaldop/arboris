@@ -1422,6 +1422,59 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
 
+    @patch("gestione_finanziaria.fatture_in_cloud_debug.requests.get")
+    @patch("gestione_finanziaria.views.FattureInCloudClient")
+    def test_diagnostica_payload_fatture_in_cloud_analizza_allegato_xml_mascherato(
+        self,
+        mock_client_class,
+        mock_requests_get,
+    ):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        client = Mock()
+        client.get_pending_received_document.return_value = {
+            "id": 998,
+            "supplier_name": "Nome Visibile Solo Nel Payload Reale",
+            "attachment_url": "https://fic.example.test/download/998",
+            "filename": "fattura-segreta.xml",
+        }
+        mock_client_class.return_value = client
+        xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+<FatturaElettronica>
+  <FatturaElettronicaHeader>
+    <CedentePrestatore>
+      <DatiAnagrafici>
+        <IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>12345678901</IdCodice></IdFiscaleIVA>
+        <CodiceFiscale>12345678901</CodiceFiscale>
+        <Anagrafica><Denominazione>Ragione Segreta Srl</Denominazione></Anagrafica>
+      </DatiAnagrafici>
+      <Sede><Indirizzo>Via Segreta 1</Indirizzo><CAP>40100</CAP><Comune>Bologna</Comune><Provincia>BO</Provincia></Sede>
+      <Contatti><Telefono>051123456</Telefono><Email>segreta@example.com</Email></Contatti>
+    </CedentePrestatore>
+  </FatturaElettronicaHeader>
+</FatturaElettronica>"""
+        attachment_response = Mock(status_code=200, headers={"Content-Type": "application/xml"})
+        attachment_response.iter_content.return_value = [xml]
+        mock_requests_get.return_value = attachment_response
+
+        response = self.client.post(
+            reverse("diagnostica_payload_fatture_in_cloud", kwargs={"pk": connessione.pk}),
+            {"document_id": "998", "source_type": "pending"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "attachment_analysis")
+        self.assertContains(response, "xml_detected")
+        self.assertContains(response, "cedente_prestatore_detected")
+        self.assertContains(response, "attachment_supplier_fields_present")
+        self.assertNotContains(response, "Ragione Segreta")
+        self.assertNotContains(response, "Via Segreta")
+        self.assertNotContains(response, "12345678901")
+        self.assertNotContains(response, "segreta@example.com")
+        mock_requests_get.assert_called_once()
+        client.get_pending_received_document.assert_called_once_with("998")
+
     @override_settings(
         FATTURE_IN_CLOUD_API_CONNECT_TIMEOUT_SECONDS=2,
         FATTURE_IN_CLOUD_API_READ_TIMEOUT_SECONDS=6,

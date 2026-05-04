@@ -18,6 +18,11 @@ class Command(BaseCommand):
         parser.add_argument("--file", help="Legge un payload JSON locale invece di chiamare Fatture in Cloud.")
         parser.add_argument("--depth", type=int, default=5, help="Profondita' massima della struttura stampata.")
         parser.add_argument("--max-list-items", type=int, default=2, help="Numero massimo di elementi lista da mostrare.")
+        parser.add_argument(
+            "--download-attachment",
+            action="store_true",
+            help="Scarica l'allegato principale e ne analizza solo struttura e campi mascherati.",
+        )
 
     def handle(self, *args, **options):
         payload_file = options.get("file")
@@ -58,5 +63,6 @@ class Command(BaseCommand):
                 document_id=document_id,
                 max_depth=max(options["depth"], 1),
                 max_list_items=max(options["max_list_items"], 0),
+                include_attachment=options["download_attachment"],
             )
         )
