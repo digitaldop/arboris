@@ -1323,6 +1323,76 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertTrue(DocumentoFornitore.objects.filter(numero_documento="NO-SCOPE-1").exists())
         self.assertTrue(any("lettura dei fornitori" in message for message in stats["messaggi"]))
 
+    @patch("gestione_finanziaria.fatture_in_cloud_xml.requests.get")
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_arricchisce_fornitore_da_xml_allegato_pending(
+        self,
+        mock_client_class,
+        mock_requests_get,
+    ):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_registrati=False,
+            sincronizza_documenti_da_registrare=True,
+        )
+        client = Mock()
+
+        def list_pending(doc_type, *, page=1, per_page=50):
+            if doc_type == "agyo":
+                return {"data": [{"id": 998}], "pagination": {"current_page": 1, "last_page": 1}}
+            return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
+
+        client.list_pending_received_documents.side_effect = list_pending
+        client.get_pending_received_document.return_value = {
+            "id": 998,
+            "type": "agyo",
+            "document_type": "invoice",
+            "ei_number": "42",
+            "supplier_name": "Fornitore da XML",
+            "subject": "Documento pending con XML",
+            "filename": "fattura.xml",
+            "attachment_url": "https://fic.example.test/download/998",
+            "emission_date": "2026-05-04",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
+        }
+        mock_client_class.return_value = client
+        xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+<FatturaElettronica>
+  <FatturaElettronicaHeader>
+    <CedentePrestatore>
+      <DatiAnagrafici>
+        <IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>12345678901</IdCodice></IdFiscaleIVA>
+        <CodiceFiscale>12345678901</CodiceFiscale>
+        <Anagrafica><Nome>Mario</Nome><Cognome>Rossi</Cognome></Anagrafica>
+      </DatiAnagrafici>
+      <Sede><Indirizzo>Via Completa 9</Indirizzo><CAP>40100</CAP><Comune>Bologna</Comune><Provincia>BO</Provincia></Sede>
+      <Contatti><Email>fornitore.xml@example.com</Email></Contatti>
+    </CedentePrestatore>
+  </FatturaElettronicaHeader>
+</FatturaElettronica>"""
+        attachment_response = Mock(status_code=200, headers={"Content-Type": "text/xml"})
+        attachment_response.iter_content.return_value = [xml]
+        mock_requests_get.return_value = attachment_response
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(stats["fornitori_creati"], 1)
+        self.assertEqual(stats["fornitori_aggiornati"], 0)
+        fornitore = Fornitore.objects.get(denominazione="Fornitore da XML")
+        self.assertEqual(fornitore.partita_iva, "12345678901")
+        self.assertEqual(fornitore.codice_fiscale, "12345678901")
+        self.assertEqual(fornitore.indirizzo, "Via Completa 9 40100 Bologna BO")
+        self.assertEqual(fornitore.email, "fornitore.xml@example.com")
+        documento = DocumentoFornitore.objects.get(external_id="998")
+        self.assertEqual(documento.fornitore, fornitore)
+        self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 6, 4))
+        mock_requests_get.assert_called_once()
+
     @patch("gestione_finanziaria.management.commands.debug_fatture_in_cloud_payload.FattureInCloudClient")
     def test_debug_fatture_in_cloud_payload_maschera_dati_sensibili(self, mock_client_class):
         connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
@@ -1422,7 +1492,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
 
-    @patch("gestione_finanziaria.fatture_in_cloud_debug.requests.get")
+    @patch("gestione_finanziaria.fatture_in_cloud_xml.requests.get")
     @patch("gestione_finanziaria.views.FattureInCloudClient")
     def test_diagnostica_payload_fatture_in_cloud_analizza_allegato_xml_mascherato(
         self,

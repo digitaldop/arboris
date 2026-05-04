@@ -29,6 +29,7 @@ from .models import (
 )
 from .security import cifra_testo, decifra_testo_safe
 from .services import aggiorna_stato_documento_da_scadenze, crea_notifica_finanziaria
+from .fatture_in_cloud_xml import supplier_from_attachment_payload
 
 
 FIC_SOURCE = "fatture_in_cloud"
@@ -588,6 +589,20 @@ def _merge_non_empty(base, extra):
     return merged
 
 
+def _supplier_has_import_details(entity):
+    normalized = _normalize_entity(entity)
+    return any(
+        normalized.get(field_name)
+        for field_name in (
+            "vat_number",
+            "tax_code",
+            "address_street",
+            "email",
+            "certified_email",
+        )
+    )
+
+
 def _document_with_supplier_detail(client, document_data, supplier_context):
     if not isinstance(document_data, dict):
         return document_data
@@ -619,6 +634,43 @@ def _document_with_supplier_detail(client, document_data, supplier_context):
 
     enriched = dict(document_data)
     enriched["entity"] = _merge_non_empty(entity, supplier_detail)
+    return enriched
+
+
+def _document_with_attachment_supplier_detail(document_data, supplier_context):
+    if not isinstance(document_data, dict):
+        return document_data
+    if not document_data.get("attachment_url"):
+        return document_data
+    if _supplier_has_import_details(_entity_from_document(document_data)):
+        return document_data
+
+    cache = supplier_context.setdefault("attachment_cache", {}) if supplier_context is not None else {}
+    cache_key = str(document_data.get("attachment_url") or document_data.get("id") or "")
+    if cache_key not in cache:
+        cache[cache_key] = supplier_from_attachment_payload(document_data, timeout=_api_timeout())
+
+    supplier_detail = cache.get(cache_key)
+    if not supplier_detail:
+        return document_data
+
+    entity = _as_dict(document_data.get("entity") or document_data.get("supplier"))
+    if not entity:
+        entity = {
+            "name": _first_present(
+                document_data.get("supplier_name"),
+                document_data.get("supplierName"),
+            )
+        }
+    enriched = dict(document_data)
+    enriched["entity"] = _merge_non_empty(entity, supplier_detail)
+    return enriched
+
+
+def _document_with_external_supplier_details(client, document_data, supplier_context, *, include_attachment=False):
+    enriched = _document_with_supplier_detail(client, document_data, supplier_context)
+    if include_attachment:
+        enriched = _document_with_attachment_supplier_detail(enriched, supplier_context)
     return enriched
 
 
@@ -1078,11 +1130,26 @@ def _document_detail_from_summary(client, summary, *, pending, supplier_context=
         return summary
     document_id = summary.get("id")
     if not document_id:
-        return _document_with_supplier_detail(client, summary, supplier_context)
+        return _document_with_external_supplier_details(
+            client,
+            summary,
+            supplier_context,
+            include_attachment=pending,
+        )
     detail = client.get_pending_received_document(document_id) if pending else client.get_received_document(document_id)
     if not isinstance(detail, dict) or not detail:
-        return _document_with_supplier_detail(client, summary, supplier_context)
-    return _document_with_supplier_detail(client, {**summary, **detail}, supplier_context)
+        return _document_with_external_supplier_details(
+            client,
+            summary,
+            supplier_context,
+            include_attachment=pending,
+        )
+    return _document_with_external_supplier_details(
+        client,
+        {**summary, **detail},
+        supplier_context,
+        include_attachment=pending,
+    )
 
 
 def _check_sync_budget(start, max_seconds):
@@ -1268,7 +1335,12 @@ def importa_documento_da_webhook(connessione, notification_type, document_id, *,
         document = client.get_pending_received_document(document_id)
     else:
         document = client.get_received_document(document_id)
-    document = _document_with_supplier_detail(client, document, supplier_context)
+    document = _document_with_external_supplier_details(
+        client,
+        document,
+        supplier_context,
+        include_attachment=pending,
+    )
     result = importa_documento_fatture_in_cloud(connessione, document, pending=pending, utente=utente)
     FattureInCloudSyncLog.objects.create(
         connessione=connessione,
