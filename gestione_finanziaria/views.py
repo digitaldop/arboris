@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from scuola.models import AnnoScolastico
@@ -58,6 +59,7 @@ from .forms import (
     ProviderPsd2ConfigForm,
     RegolaCategorizzazioneForm,
     SaldoContoForm,
+    ScadenzaPagamentoFornitoreCreateFormSet,
     ScadenzaPagamentoFornitoreFormSet,
     VoceBudgetRicorrenteForm,
     movimenti_fornitore_recenti_ids,
@@ -84,6 +86,7 @@ from .models import (
     FonteSaldo,
     Fornitore,
     MovimentoFinanziario,
+    MetodoPagamentoFornitore,
     NotificaFinanziaria,
     NotificaFinanziariaLettura,
     PagamentoFornitore,
@@ -143,6 +146,7 @@ from .services import (
     riconcilia_movimento_con_rata,
     registra_pagamento_fornitore,
     sincronizza_conto_psd2,
+    trova_movimenti_candidati_per_scadenza_fornitore,
     trova_scadenze_fornitori_candidate,
     trova_rate_candidate,
 )
@@ -249,10 +253,17 @@ def budgeting_dashboard(request):
 
 
 def crea_voce_budget(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = VoceBudgetRicorrenteForm(request.POST)
         if form.is_valid():
             form.save()
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Voce di budget creata correttamente."},
+                )
             messages.success(request, "Voce di budget creata correttamente.")
             return redirect("budgeting_dashboard")
     else:
@@ -261,16 +272,23 @@ def crea_voce_budget(request):
     return render(
         request,
         "gestione_finanziaria/voce_budget_form.html",
-        {"form": form, "voce": None},
+        {"form": form, "voce": None, "popup": popup},
     )
 
 
 def modifica_voce_budget(request, pk):
     voce = get_object_or_404(VoceBudgetRicorrente, pk=pk)
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = VoceBudgetRicorrenteForm(request.POST, instance=voce)
         if form.is_valid():
             form.save()
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Voce di budget aggiornata correttamente."},
+                )
             messages.success(request, "Voce di budget aggiornata correttamente.")
             return redirect("budgeting_dashboard")
     else:
@@ -279,7 +297,7 @@ def modifica_voce_budget(request, pk):
     return render(
         request,
         "gestione_finanziaria/voce_budget_form.html",
-        {"form": form, "voce": voce},
+        {"form": form, "voce": voce, "popup": popup},
     )
 
 
@@ -295,6 +313,22 @@ def elimina_voce_budget(request, pk):
         "gestione_finanziaria/voce_budget_confirm_delete.html",
         {"voce": voce},
     )
+
+
+@require_POST
+def toggle_voce_budget(request, pk):
+    voce = get_object_or_404(VoceBudgetRicorrente, pk=pk)
+    raw_value = (request.POST.get("attiva") or "").lower()
+    voce.attiva = raw_value in {"1", "true", "on", "yes", "si"}
+    voce.save(update_fields=["attiva", "data_aggiornamento"])
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.POST.get("ajax") == "1":
+        return JsonResponse({"ok": True, "attiva": voce.attiva})
+
+    next_url = request.POST.get("next") or reverse("budgeting_dashboard")
+    if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return redirect(next_url)
+    return redirect("budgeting_dashboard")
 
 
 # =========================================================================
@@ -751,11 +785,17 @@ def _documento_fornitore_formset_kwargs(documento=None, compact_movimenti=False)
     return kwargs
 
 
+def _documento_fornitore_formset_class(documento=None):
+    if documento and documento.pk:
+        return ScadenzaPagamentoFornitoreFormSet
+    return ScadenzaPagamentoFornitoreCreateFormSet
+
+
 def crea_documento_fornitore(request):
     popup = is_popup_request(request)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES)
-        formset = ScadenzaPagamentoFornitoreFormSet(
+        formset = _documento_fornitore_formset_class()(
             request.POST,
             instance=DocumentoFornitore(),
             **_documento_fornitore_formset_kwargs(compact_movimenti=popup),
@@ -786,7 +826,7 @@ def crea_documento_fornitore(request):
                 initial["fornitore"] = fornitore
                 initial["categoria_spesa"] = fornitore.categoria_spesa
         form = DocumentoFornitoreForm(initial=initial)
-        formset = ScadenzaPagamentoFornitoreFormSet(
+        formset = _documento_fornitore_formset_class()(
             instance=DocumentoFornitore(),
             **_documento_fornitore_formset_kwargs(compact_movimenti=popup),
         )
@@ -803,7 +843,7 @@ def modifica_documento_fornitore(request, pk):
     documento = get_object_or_404(_documento_fornitore_detail_queryset(), pk=pk)
     if request.method == "POST":
         form = DocumentoFornitoreForm(request.POST, request.FILES, instance=documento)
-        formset = ScadenzaPagamentoFornitoreFormSet(
+        formset = _documento_fornitore_formset_class(documento)(
             request.POST,
             instance=documento,
             **_documento_fornitore_formset_kwargs(documento, compact_movimenti=popup),
@@ -822,7 +862,7 @@ def modifica_documento_fornitore(request, pk):
             return redirect("modifica_documento_fornitore", pk=documento.pk)
     else:
         form = DocumentoFornitoreForm(instance=documento)
-        formset = ScadenzaPagamentoFornitoreFormSet(
+        formset = _documento_fornitore_formset_class(documento)(
             instance=documento,
             **_documento_fornitore_formset_kwargs(documento, compact_movimenti=popup),
         )
@@ -1313,12 +1353,33 @@ def segna_tutte_notifiche_finanziarie_lette(request):
 
 
 def registra_pagamento_scadenza_fornitore(request, pk):
+    popup = is_popup_request(request)
     scadenza = get_object_or_404(
         ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore", "conto_bancario"),
         pk=pk,
     )
+    candidati_movimento = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=5)
     if request.method == "POST":
-        form = PagamentoFornitoreForm(request.POST)
+        post_data = request.POST.copy()
+        quick_movimento_id = post_data.get("quick_movimento")
+        if quick_movimento_id:
+            movimento = (
+                MovimentoFinanziario.objects.select_related("conto")
+                .filter(pk=quick_movimento_id, importo__lt=0)
+                .first()
+            )
+            if movimento is not None:
+                importo = min(importo_movimento_disponibile_fornitori(movimento), importo_scadenza_fornitore_residuo(scadenza))
+                post_data["movimento_finanziario"] = str(movimento.pk)
+                post_data["metodo"] = MetodoPagamentoFornitore.BANCA
+                post_data["data_pagamento"] = movimento.data_contabile.isoformat()
+                post_data["importo"] = str(importo)
+                if movimento.conto_id:
+                    post_data["conto_bancario"] = str(movimento.conto_id)
+            else:
+                messages.error(request, "Movimento bancario non valido per la riconciliazione.")
+
+        form = PagamentoFornitoreForm(post_data)
         if form.is_valid():
             movimento = form.cleaned_data.get("movimento_finanziario")
             try:
@@ -1333,6 +1394,12 @@ def registra_pagamento_scadenza_fornitore(request, pk):
                     utente=request.user,
                 )
                 messages.success(request, "Pagamento fornitore registrato correttamente.")
+                if popup:
+                    return render(
+                        request,
+                        "popup/popup_close.html",
+                        {"message": "Pagamento fornitore registrato correttamente."},
+                    )
                 return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
             except ValidationError as exc:
                 for message in exc.messages:
@@ -1349,7 +1416,7 @@ def registra_pagamento_scadenza_fornitore(request, pk):
     return render(
         request,
         "gestione_finanziaria/pagamento_fornitore_form.html",
-        {"form": form, "scadenza": scadenza},
+        {"form": form, "scadenza": scadenza, "popup": popup, "candidati_movimento": candidati_movimento},
     )
 
 
@@ -2614,14 +2681,24 @@ def lista_categorie_finanziarie(request):
 
 
 def crea_categoria_finanziaria(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = CategoriaFinanziariaForm(request.POST)
         if form.is_valid():
-            form.save()
+            categoria = form.save()
+            if popup:
+                return popup_select_response(request, "categoria_finanziaria", categoria.pk, str(categoria))
             messages.success(request, "Categoria finanziaria creata correttamente.")
             return redirect("lista_categorie_finanziarie")
     else:
-        form = CategoriaFinanziariaForm()
+        form = CategoriaFinanziariaForm(initial={"attiva": True})
+
+    if popup:
+        return render(
+            request,
+            "gestione_finanziaria/entity_popup_form.html",
+            _generic_popup_form_context(request, form, "Nuova categoria finanziaria"),
+        )
 
     return render(
         request,
@@ -2635,16 +2712,26 @@ def crea_categoria_finanziaria(request):
 
 
 def modifica_categoria_finanziaria(request, pk):
+    popup = is_popup_request(request)
     categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
 
     if request.method == "POST":
         form = CategoriaFinanziariaForm(request.POST, instance=categoria)
         if form.is_valid():
-            form.save()
+            categoria = form.save()
+            if popup:
+                return popup_select_response(request, "categoria_finanziaria", categoria.pk, str(categoria))
             messages.success(request, "Categoria finanziaria aggiornata correttamente.")
             return redirect("lista_categorie_finanziarie")
     else:
         form = CategoriaFinanziariaForm(instance=categoria)
+
+    if popup:
+        return render(
+            request,
+            "gestione_finanziaria/entity_popup_form.html",
+            _generic_popup_form_context(request, form, f"Categoria {categoria.nome}"),
+        )
 
     return render(
         request,
@@ -2658,24 +2745,56 @@ def modifica_categoria_finanziaria(request, pk):
 
 
 def elimina_categoria_finanziaria(request, pk):
+    popup = is_popup_request(request)
     categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
 
     count_movimenti = categoria.movimenti.count()
+    count_fornitori = categoria.fornitori.count()
+    count_documenti = categoria.documenti_fornitori.count()
     count_figlie = categoria.figli.count()
     count_regole = categoria.regole.count()
-    ha_vincoli = bool(count_movimenti or count_figlie or count_regole)
+    count_voci_budget = categoria.voci_budget.count()
+    ha_vincoli = bool(count_movimenti or count_fornitori or count_documenti or count_figlie or count_regole or count_voci_budget)
 
     if request.method == "POST":
         if ha_vincoli:
+            if popup:
+                return render(
+                    request,
+                    "gestione_finanziaria/entity_popup_delete.html",
+                    _generic_popup_delete_context(
+                        request,
+                        f"Elimina categoria {categoria.nome}",
+                        str(categoria),
+                        True,
+                        "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
+                    ),
+                )
             messages.error(
                 request,
                 "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
             )
             return redirect("lista_categorie_finanziarie")
 
+        object_id = categoria.pk
         categoria.delete()
+        if popup:
+            return popup_delete_response(request, "categoria_finanziaria", object_id)
         messages.success(request, "Categoria finanziaria eliminata correttamente.")
         return redirect("lista_categorie_finanziarie")
+
+    if popup:
+        return render(
+            request,
+            "gestione_finanziaria/entity_popup_delete.html",
+            _generic_popup_delete_context(
+                request,
+                f"Elimina categoria {categoria.nome}",
+                str(categoria),
+                ha_vincoli,
+                "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
+            ),
+        )
 
     return render(
         request,
@@ -2683,8 +2802,11 @@ def elimina_categoria_finanziaria(request, pk):
         {
             "categoria": categoria,
             "count_movimenti": count_movimenti,
+            "count_fornitori": count_fornitori,
+            "count_documenti": count_documenti,
             "count_figlie": count_figlie,
             "count_regole": count_regole,
+            "count_voci_budget": count_voci_budget,
             "ha_vincoli": ha_vincoli,
         },
     )

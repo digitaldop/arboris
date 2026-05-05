@@ -95,6 +95,44 @@ window.ArborisViewMode = (function () {
         });
     }
 
+    function getModalHost() {
+        try {
+            if (window.parent && window.parent !== window && window.parent.ArborisModalPopups) {
+                return window.parent.ArborisModalPopups;
+            }
+            if (window.top && window.top !== window && window.top.ArborisModalPopups) {
+                return window.top.ArborisModalPopups;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    }
+
+    function requestModalResize() {
+        const modalHost = getModalHost();
+        if (!modalHost || typeof modalHost.requestResizeForWindow !== "function") {
+            return;
+        }
+
+        modalHost.requestResizeForWindow(window);
+    }
+
+    function emitViewModeChange(form, mode) {
+        if (!form || typeof CustomEvent !== "function") {
+            return;
+        }
+
+        form.dispatchEvent(new CustomEvent("arboris:view-mode-change", {
+            bubbles: true,
+            detail: {
+                form: form,
+                mode: mode,
+                isEditing: mode !== "view",
+            },
+        }));
+    }
+
     function getButtonLabel(button, fallback) {
         if (!button) {
             return fallback || "";
@@ -226,6 +264,9 @@ window.ArborisViewMode = (function () {
             if (typeof config.onModeChange === "function") {
                 config.onModeChange(currentMode, currentMode !== "view");
             }
+
+            emitViewModeChange(form, currentMode);
+            requestModalResize();
 
             if (inlineEditButton) {
                 if (isInlineEditing) {

@@ -16,7 +16,8 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=200">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=215">
+    <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     {% if role_theme %}
         <style>
             :root {
@@ -37,7 +38,7 @@
 </head>
 <body class="popup-page">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
-    <script src="{% static 'js/core/related-entity-routes.js' %}?v=5"></script>
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-form-tools.js' %}?v=4"></script>
     <main class="popup-content-area">
         {% if messages %}
@@ -54,7 +55,7 @@
     </main>
     {{ student_terminology|json_script:"student-terminology-data" }}
     <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
-    <script src="{% static 'js/core/modal-popups.js' %}?v=4"></script>
+    <script src="{% static 'js/core/modal-popups.js' %}?v=7"></script>
     <script src="{% static 'js/core/related-popups.js' %}?v=9"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>

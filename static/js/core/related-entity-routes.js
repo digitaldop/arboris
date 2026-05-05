@@ -102,6 +102,34 @@ window.ArborisRelatedEntityRoutes = (function () {
         return elementOrId;
     }
 
+    function bindStateRefresh(select, bindKey, refresh) {
+        if (!select || typeof refresh !== "function") {
+            return;
+        }
+
+        if (select.dataset.relatedCrudStateRefreshBound === bindKey) {
+            return;
+        }
+        select.dataset.relatedCrudStateRefreshBound = bindKey;
+
+        if (window.MutationObserver) {
+            var observer = new MutationObserver(function () {
+                refresh();
+            });
+            observer.observe(select, {
+                attributes: true,
+                attributeFilter: ["disabled", "aria-disabled", "class"],
+            });
+        }
+
+        document.addEventListener("arboris:view-mode-change", function (event) {
+            var form = event.detail && event.detail.form;
+            if (!form || form.contains(select)) {
+                refresh();
+            }
+        });
+    }
+
     function initRelatedPopups() {
         var relatedPopups = window.ArborisRelatedPopups;
         if (!relatedPopups) {
@@ -201,6 +229,7 @@ window.ArborisRelatedEntityRoutes = (function () {
             select.addEventListener("change", refresh);
         }
 
+        bindStateRefresh(select, bindKey, refresh);
         refresh();
 
         return {
@@ -296,6 +325,7 @@ window.ArborisRelatedEntityRoutes = (function () {
             select.addEventListener("change", refresh);
         }
 
+        bindStateRefresh(select, bindKey, refresh);
         refresh();
 
         return {

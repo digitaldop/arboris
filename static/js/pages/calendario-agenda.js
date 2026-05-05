@@ -227,6 +227,22 @@
         return entry && entry.source === "locale" ? "Modifica evento calendario" : "Dettaglio calendario";
     }
 
+    function getEntryPopupFeatures(entry) {
+        if (entry && entry.popup_features) {
+            return entry.popup_features;
+        }
+        if (entry && entry.source === "fornitore_scadenza") {
+            return "width=1180,height=820,autoFit=no,resizable=yes,scrollbars=yes";
+        }
+        if (entry && entry.source === "rata") {
+            return "width=1080,height=760,resizable=yes,scrollbars=yes";
+        }
+        if (entry && entry.source === "famiglia_interessata") {
+            return "width=1040,height=780,resizable=yes,scrollbars=yes";
+        }
+        return "width=920,height=760,resizable=yes,scrollbars=yes";
+    }
+
     function createEntryLink(entry, className, label, meta, isBlock, state, contextDay) {
         const hasLink = Boolean(entry.url);
         const element = document.createElement(hasLink ? "a" : "div");
@@ -419,7 +435,7 @@
         openManagedCalendarPopup(
             buildPopupUrl(entry.url),
             getEntryPopupTitle(entry),
-            "width=920,height=760,resizable=yes,scrollbars=yes"
+            getEntryPopupFeatures(entry)
         );
     }
 

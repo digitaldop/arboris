@@ -100,6 +100,7 @@ def build_calendar_entry_record(
     external=False,
     open_in_popup=False,
     popup_title="Dettaglio calendario",
+    popup_features="",
     visible=True,
     active=True,
     action_label="Apri",
@@ -125,6 +126,7 @@ def build_calendar_entry_record(
         "external": external,
         "open_in_popup": open_in_popup,
         "popup_title": popup_title,
+        "popup_features": popup_features,
         "color": category.colore,
         "badge_label": category.nome,
         "visibile": visible,
@@ -164,6 +166,7 @@ def serialize_calendar_entry(record):
         "external": record["external"],
         "open_in_popup": record["open_in_popup"],
         "popup_title": record["popup_title"],
+        "popup_features": record.get("popup_features", ""),
         "color": record["color"],
         "badge_label": record["badge_label"],
     }
@@ -215,6 +218,7 @@ def build_local_calendar_occurrence_record(evento, occurrence):
         external=False,
         open_in_popup=True,
         popup_title="Modifica evento calendario",
+        popup_features="width=920,height=760,resizable=yes,scrollbars=yes",
         visible=evento.visibile,
         active=evento.attivo,
         action_label="Apri",
@@ -248,6 +252,7 @@ def build_local_calendar_list_record(evento):
         external=False,
         open_in_popup=True,
         popup_title="Modifica evento calendario",
+        popup_features="width=920,height=760,resizable=yes,scrollbars=yes",
         visible=evento.visibile,
         active=evento.attivo,
         action_label="Apri",
@@ -322,6 +327,7 @@ def build_interested_family_activity_records(system_categories=None, user=None):
                 external=False,
                 open_in_popup=True,
                 popup_title="Attivita famiglia interessata",
+                popup_features="width=1040,height=780,resizable=yes,scrollbars=yes",
                 action_label="Apri attivita",
             )
         )
@@ -368,6 +374,7 @@ def build_calendar_deadline_records(system_categories=None):
                     external=False,
                     open_in_popup=True,
                     popup_title="Scheda rata",
+                    popup_features="width=1080,height=760,resizable=yes,scrollbars=yes",
                     action_label="Apri scheda",
                 )
             )
@@ -435,7 +442,8 @@ def build_calendar_deadline_records(system_categories=None):
                     url=reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
                     external=False,
                     open_in_popup=True,
-                    popup_title="Scheda documento fornitore",
+                    popup_title="Scheda fattura fornitore",
+                    popup_features="width=1180,height=820,autoFit=no,resizable=yes,scrollbars=yes",
                     action_label="Apri scheda",
                 )
             )

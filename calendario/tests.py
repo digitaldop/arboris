@@ -43,7 +43,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="admin-section-title-btn admin-section-title-icon-btn"')
         self.assertContains(response, f'href="{reverse("lista_categorie_calendario")}?popup=1"')
-        self.assertContains(response, "js/pages/calendario-agenda.js?v=19")
+        self.assertContains(response, "js/pages/calendario-agenda.js?v=22")
         self.assertContains(response, 'id="calendar-events-card"')
         self.assertContains(response, 'data-full-create-url="{0}?popup=1"'.format(reverse("crea_evento_calendario")))
         self.assertContains(response, 'data-calendar-selected-create="1"')
@@ -174,6 +174,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "Apri scheda")
         self.assertContains(response, f'data-popup-url="{rata_url}?popup=1"')
         self.assertContains(response, 'data-popup-title="Scheda rata"')
+        self.assertContains(response, 'data-popup-window-features="width=1080,height=760,resizable=yes,scrollbars=yes"')
 
     def test_supplier_deadline_opens_supplier_document_card_in_popup(self):
         self.client.force_login(self.user)
@@ -202,7 +203,8 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "Scadenza fornitore - Carta Srl")
         self.assertContains(response, "Apri scheda")
         self.assertContains(response, f'data-popup-url="{documento_url}?popup=1"')
-        self.assertContains(response, 'data-popup-title="Scheda documento fornitore"')
+        self.assertContains(response, 'data-popup-title="Scheda fattura fornitore"')
+        self.assertContains(response, 'data-popup-window-features="width=1180,height=820,autoFit=no,resizable=yes,scrollbars=yes"')
 
         popup_response = self.client.get(f"{documento_url}?popup=1")
         self.assertEqual(popup_response.status_code, 200)

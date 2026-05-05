@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
 {% block title %}{% if voce %}Modifica voce budget{% else %}Nuova voce budget{% endif %} - Arboris School Management{% endblock %}
@@ -16,26 +16,36 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-head finance-page-head">
-    <div>
-        <h1 class="page-title">{% if voce %}{{ voce.nome }}{% else %}Nuova voce budget{% endif %}</h1>
-        <p class="family-page-address">Definisci entrate o uscite previsionali usate dal modulo Budgeting.</p>
-    </div>
-    <div class="page-actions">
-        <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
-            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-            <span class="btn-label">Indietro</span>
-        </a>
-    </div>
-</div>
+<div class="content-card related-config-popup-card budget-voice-popup-card{% if not popup %} is-standalone{% endif %}">
+    {% if popup %}
+        <button type="button" class="budget-voice-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+    {% endif %}
 
-<form method="post" class="content-card finance-modern-panel">
-    {% csrf_token %}
-    <div class="panel-body">
-        <div class="finance-section-head">
+    <form method="post" class="related-config-popup-form budget-voice-popup-form">
+        {% csrf_token %}
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+        <div class="budget-voice-popup-hero">
+            <span class="budget-voice-icon-tile" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+            </span>
+            <div class="budget-voice-popup-title-block">
+                <div class="related-config-kicker">Budgeting</div>
+                <h1 class="page-title">{% if voce %}{{ voce.nome }}{% else %}Nuova voce budget{% endif %}</h1>
+                <p>Definisci entrate o uscite previsionali usate per confrontare preventivo, consuntivo e scostamenti mensili.</p>
+            </div>
+        </div>
+
+        <div class="budget-voice-popup-info">
+            <span class="budget-voice-popup-info-icon" aria-hidden="true">i</span>
             <div>
-                <h2 class="section-title">Dati voce</h2>
-                <p class="finance-section-subtitle">Le voci attive alimentano il preventivo dei mesi in cui ricorrono.</p>
+                <p>Le voci attive alimentano il preventivo nei mesi in cui ricorrono.</p>
+                <p>Puoi spegnerle dalla dashboard budgeting per simulare scenari alternativi senza eliminarle.</p>
             </div>
         </div>
 
@@ -43,26 +53,225 @@
             <div class="message message-error">{{ form.non_field_errors }}</div>
         {% endif %}
 
-        <div class="anagrafica-form-card-grid">
-            {% for field in form %}
-                <label class="calendar-event-field{% if field.name == 'note' %} calendar-event-field-full{% endif %}" for="{{ field.id_for_label }}">
-                    <span class="calendar-event-field-label">{{ field.label }}</span>
-                    {{ field }}
-                    {% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}
-                    {{ field.errors }}
-                </label>
-            {% endfor %}
+        <div class="related-config-popup-editor budget-voice-popup-editor">
+            <div class="budget-voice-popup-grid">
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.nome }}
+                        </div>
+                    </div>
+                    {{ form.nome.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#arrows-up-down"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.tipo }}
+                        </div>
+                    </div>
+                    {{ form.tipo.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.importo.id_for_label }}">{{ form.importo.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.importo }}
+                        </div>
+                    </div>
+                    {{ form.importo.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.frequenza.id_for_label }}">{{ form.frequenza.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.frequenza }}
+                        </div>
+                    </div>
+                    {{ form.frequenza.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.giorno_previsto.id_for_label }}">{{ form.giorno_previsto.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.giorno_previsto }}
+                        </div>
+                    </div>
+                    {{ form.giorno_previsto.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.data_inizio.id_for_label }}">{{ form.data_inizio.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.data_inizio }}
+                        </div>
+                    </div>
+                    {{ form.data_inizio.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.data_fine.id_for_label }}">{{ form.data_fine.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.data_fine }}
+                        </div>
+                    </div>
+                    {{ form.data_fine.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.categoria.id_for_label }}">{{ form.categoria.label }}</label>
+                    <div class="budget-voice-related-row">
+                        <div class="budget-voice-input-shell">
+                            <span class="budget-voice-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                            </span>
+                            <div class="budget-voice-input-control">
+                                {{ form.categoria }}
+                            </div>
+                        </div>
+                        <div class="related-actions budget-voice-related-actions">
+                            <button type="button" class="related-btn related-btn-add" id="add-budget-categoria-btn" aria-label="Nuova categoria" title="Nuova categoria" data-floating-text="Nuova categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-edit" id="edit-budget-categoria-btn" aria-label="Modifica categoria" title="Modifica categoria" data-floating-text="Modifica categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-delete" id="delete-budget-categoria-btn" aria-label="Elimina categoria" title="Elimina categoria" data-floating-text="Elimina categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            </button>
+                        </div>
+                    </div>
+                    {{ form.categoria.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.fornitore.id_for_label }}">{{ form.fornitore.label }}</label>
+                    <div class="budget-voice-related-row">
+                        <div class="budget-voice-input-shell">
+                            <span class="budget-voice-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg>
+                            </span>
+                            <div class="budget-voice-input-control">
+                                {{ form.fornitore }}
+                            </div>
+                        </div>
+                        <div class="related-actions budget-voice-related-actions">
+                            <button type="button" class="related-btn related-btn-add" id="add-budget-fornitore-btn" aria-label="Nuovo fornitore" title="Nuovo fornitore" data-floating-text="Nuovo fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-edit" id="edit-budget-fornitore-btn" aria-label="Modifica fornitore" title="Modifica fornitore" data-floating-text="Modifica fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-delete" id="delete-budget-fornitore-btn" aria-label="Elimina fornitore" title="Elimina fornitore" data-floating-text="Elimina fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            </button>
+                        </div>
+                    </div>
+                    {{ form.fornitore.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label class="budget-voice-check">
+                        {{ form.attiva }}
+                        <span>Usa questa voce nei riepiloghi budgeting</span>
+                    </label>
+                    {{ form.attiva.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide budget-voice-field-notes">
+                    <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                    <div class="budget-voice-note-shell">
+                        <span class="budget-voice-note-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div class="budget-voice-note-control">
+                            {{ form.note }}
+                        </div>
+                    </div>
+                    {{ form.note.errors }}
+                </div>
+            </div>
         </div>
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-success btn-icon-text">
-            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-            <span class="btn-label">Salva voce</span>
-        </button>
-        <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text">
-            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-            <span class="btn-label">Annulla</span>
-        </a>
-    </div>
-</form>
+
+        <div class="related-config-popup-actions">
+            <button type="submit" class="btn btn-save-soft btn-icon-text">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+                <span class="btn-label">Salva voce</span>
+            </button>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            {% else %}
+                <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const routes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = routes && routes.initRelatedPopups();
+        if (!routes || !relatedPopups || typeof routes.wireCrudButtonsById !== "function") {
+            return;
+        }
+
+        routes.wireCrudButtonsById({
+            selectId: "id_categoria",
+            relatedType: "categoria_finanziaria",
+            addBtnId: "add-budget-categoria-btn",
+            editBtnId: "edit-budget-categoria-btn",
+            deleteBtnId: "delete-budget-categoria-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+
+        routes.wireCrudButtonsById({
+            selectId: "id_fornitore",
+            relatedType: "fornitore",
+            addBtnId: "add-budget-fornitore-btn",
+            editBtnId: "edit-budget-fornitore-btn",
+            deleteBtnId: "delete-budget-fornitore-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+    });
+</script>
 {% endblock %}

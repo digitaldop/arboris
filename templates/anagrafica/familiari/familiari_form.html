@@ -52,13 +52,13 @@
             </button>
             {% if familiare %}
                 {% if studenti_formset %}
-                    <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-student-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">{{ student_terminology.selected_singular }}</span>
                     </button>
                 {% endif %}
                 {% if parenti_formset %}
-                    <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
+                    <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-relative-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">Familiare</span>
                     </button>

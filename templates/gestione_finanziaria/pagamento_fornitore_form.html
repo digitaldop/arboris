@@ -1,109 +1,247 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static currency %}
 
-{% block title %}Registra pagamento fornitore - Arboris School Management{% endblock %}
+{% block title %}Conferma pagamento fornitore - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}">Documento {{ scadenza.documento.numero_documento }}</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Pagamento</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}">Fattura {{ scadenza.documento.numero_documento }}</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Pagamento</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
-        <div class="family-page-title-block">
-            <div class="family-page-title-line">
-                <h1 class="page-title">Registra pagamento fornitore</h1>
-                <span class="family-status-pill is-muted">
-                    <span class="family-status-dot" aria-hidden="true"></span>
-                    {{ scadenza.documento.numero_documento }}
-                </span>
+    <div class="supplier-payment-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero supplier-payment-hero">
+            <span class="calendar-event-hero-icon supplier-payment-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Conferma pagamento</h1>
+                <p>{{ scadenza.documento.fornitore }} - fattura {{ scadenza.documento.numero_documento|default:"-" }}</p>
             </div>
-            <div class="family-page-address">
-                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
-                {{ scadenza.documento.fornitore }} - scadenza {{ scadenza.data_scadenza|date:"d/m/Y" }}
+            <div class="calendar-category-hero-actions supplier-payment-hero-actions">
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Fattura</span>
+                    </a>
+                {% endif %}
             </div>
         </div>
-        <div class="page-head-actions family-page-actions">
-            <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                <span class="btn-label">Fattura</span>
-            </a>
-        </div>
-    </div>
 
-    <div class="finance-summary-strip">
-        <div class="summary-item">
-            <div class="summary-value">{{ scadenza.documento.fornitore }}</div>
-            <div class="summary-label">Fornitore</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value">{{ scadenza.importo_previsto|euro }} &euro;</div>
-            <div class="summary-label">Previsto</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-value">{{ scadenza.importo_residuo|euro }} &euro;</div>
-            <div class="summary-label">Residuo</div>
-        </div>
-    </div>
+        <form method="post" class="calendar-event-form supplier-payment-form detail-form" data-supplier-payment-form>
+            {% csrf_token %}
+            <input type="hidden" name="scadenza" value="{{ scadenza.pk }}">
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
 
-    <form method="post" class="detail-form finance-payment-form">
-        {% csrf_token %}
-        <input type="hidden" name="scadenza" value="{{ scadenza.pk }}">
-        <div class="admin-section">
-            <div class="admin-section-title">Dati pagamento</div>
-            <div class="panel">
-                <div class="panel-body">
-                    <div class="finance-field-grid">
-                        <div class="finance-form-field">
-                            <label for="{{ form.data_pagamento.id_for_label }}" class="finance-form-label">{{ form.data_pagamento.label }}</label>
+            {% if form.non_field_errors %}
+                <div class="settings-warning-box calendar-event-form-errors">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <section class="supplier-payment-summary-grid" aria-label="Riepilogo pagamento fornitore">
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
+                    <div>
+                        <span>Fornitore</span>
+                        <strong>{{ scadenza.documento.fornitore }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                    <div>
+                        <span>Scadenza</span>
+                        <strong>{{ scadenza.data_scadenza|it_date }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                    <div>
+                        <span>Previsto</span>
+                        <strong>EUR {{ scadenza.importo_previsto|euro }}</strong>
+                    </div>
+                </article>
+                <article class="supplier-document-summary-card">
+                    <span class="supplier-document-summary-icon is-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <div>
+                        <span>Residuo</span>
+                        <strong>EUR {{ scadenza.importo_residuo|euro }}</strong>
+                    </div>
+                </article>
+            </section>
+
+            {% if candidati_movimento %}
+                <section class="calendar-event-form-card supplier-payment-reconcile-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <span>Riconciliazione bancaria</span>
+                    </div>
+                    <p class="supplier-payment-card-note">
+                        Puoi confermare il pagamento usando direttamente uno dei movimenti bancari compatibili.
+                    </p>
+                    <div class="supplier-payment-candidate-list">
+                        {% for candidato in candidati_movimento %}
+                            <article class="supplier-payment-candidate{% if forloop.first %} is-best{% endif %}">
+                                <div class="supplier-payment-candidate-main">
+                                    <span class="supplier-payment-candidate-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                    <div>
+                                        <strong>{{ candidato.movimento.descrizione|default:"Movimento bancario"|truncatechars:95 }}</strong>
+                                        <span>
+                                            {{ candidato.movimento.data_contabile|it_date }} - disponibile EUR {{ candidato.importo_disponibile|euro }}
+                                            {% if candidato.movimento.conto %}- {{ candidato.movimento.conto }}{% endif %}
+                                        </span>
+                                        <small>
+                                            {% for motivazione in candidato.motivazioni %}
+                                                {{ motivazione }}{% if not forloop.last %}; {% endif %}
+                                            {% endfor %}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="supplier-payment-candidate-actions">
+                                    <span class="anagrafica-status-chip {% if candidato.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                        {{ candidato.score_percentuale }}%
+                                    </span>
+                                    <button
+                                        type="submit"
+                                        name="quick_movimento"
+                                        value="{{ candidato.movimento.pk }}"
+                                        class="btn btn-primary btn-sm"
+                                        onclick="return confirm('Confermi la riconciliazione con questo movimento bancario? Il pagamento verra registrato e il movimento collegato.');"
+                                    >
+                                        Riconcilia
+                                    </button>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+
+            <section class="calendar-event-form-card supplier-payment-card">
+                <div class="calendar-event-form-title">
+                    <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                    <span>Dati pagamento</span>
+                </div>
+
+                <div class="calendar-event-form-grid supplier-payment-fields">
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.data_pagamento.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.data_pagamento.label }}</span>
                             {{ form.data_pagamento }}
                             {{ form.data_pagamento.errors }}
-                        </div>
-                        <div class="finance-form-field">
-                            <label for="{{ form.importo.id_for_label }}" class="finance-form-label">{{ form.importo.label }}</label>
-                            {{ form.importo }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.importo.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.importo.label }}</span>
+                            <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                {{ form.importo }}
+                                <span class="currency-suffix">EUR</span>
+                            </div>
                             {{ form.importo.errors }}
-                        </div>
-                        <div class="finance-form-field">
-                            <label for="{{ form.metodo.id_for_label }}" class="finance-form-label">{{ form.metodo.label }}</label>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.metodo.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.metodo.label }}</span>
                             {{ form.metodo }}
                             {{ form.metodo.errors }}
-                        </div>
-                        <div class="finance-form-field">
-                            <label for="{{ form.conto_bancario.id_for_label }}" class="finance-form-label">{{ form.conto_bancario.label }}</label>
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.conto_bancario.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.conto_bancario.label }}</span>
                             {{ form.conto_bancario }}
                             {{ form.conto_bancario.errors }}
-                        </div>
-                        <div class="finance-form-field finance-form-field-wide">
-                            <label for="{{ form.movimento_finanziario.id_for_label }}" class="finance-form-label">{{ form.movimento_finanziario.label }}</label>
-                            {{ form.movimento_finanziario }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row supplier-payment-wide-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <div class="calendar-event-field">
+                            <span class="calendar-event-field-label">{{ form.movimento_finanziario.label }}</span>
+                            <div class="supplier-payment-reconcile-field">
+                                {{ form.movimento_finanziario }}
+                                <span>Selezionando un movimento bancario, la conferma pagamento registra anche la riconciliazione.</span>
+                            </div>
                             {{ form.movimento_finanziario.errors }}
                         </div>
-                        <div class="finance-form-field finance-form-field-wide">
-                            <label for="{{ form.note.id_for_label }}" class="finance-form-label">{{ form.note.label }}</label>
+                    </div>
+
+                    <div class="calendar-event-form-row supplier-payment-wide-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.note.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.note.label }}</span>
                             {{ form.note }}
                             {{ form.note.errors }}
-                        </div>
+                        </label>
                     </div>
                 </div>
+            </section>
+
+            <div class="calendar-event-actions supplier-payment-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Conferma pagamento</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
             </div>
-        </div>
-        <div class="form-actions sticky-form-actions finance-sticky-actions">
-            <button type="submit" class="btn btn-primary btn-icon-text">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                <span class="btn-label">Registra pagamento</span>
-            </button>
-            <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" class="btn btn-secondary btn-icon-text">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-                <span class="btn-label">Annulla</span>
-            </a>
-        </div>
-    </form>
+        </form>
+    </div>
+    <script>
+        (function () {
+            var form = document.querySelector("[data-supplier-payment-form]");
+            if (!form) {
+                return;
+            }
+
+            form.addEventListener("submit", function (event) {
+                var submitter = event.submitter || document.activeElement;
+                if (submitter && submitter.name === "quick_movimento") {
+                    return;
+                }
+
+                var movimento = form.querySelector("[name='movimento_finanziario']");
+                if (!movimento || !movimento.value) {
+                    return;
+                }
+
+                var confirmed = window.confirm("Confermi la riconciliazione con il movimento bancario selezionato? Il pagamento verra registrato e il movimento collegato.");
+                if (!confirmed) {
+                    event.preventDefault();
+                }
+            });
+        })();
+    </script>
 {% endblock %}

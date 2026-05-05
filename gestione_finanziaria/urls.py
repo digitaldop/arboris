@@ -36,6 +36,11 @@ urlpatterns = [
         gf_manage(views.elimina_voce_budget),
         name="elimina_voce_budget",
     ),
+    path(
+        "gestione-finanziaria/budgeting/voci/<int:pk>/toggle/",
+        gf_edit(views.toggle_voce_budget),
+        name="toggle_voce_budget",
+    ),
 
     # Fornitori e documenti passivi
     path(

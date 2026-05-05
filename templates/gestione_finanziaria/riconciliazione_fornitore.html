@@ -94,7 +94,11 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <form method="post" class="finance-inline-match-form">
+                                    <form
+                                        method="post"
+                                        class="finance-inline-match-form"
+                                        onsubmit="return confirm('Confermi il collegamento di questa scadenza al movimento bancario? Il pagamento verra registrato e il movimento collegato.');"
+                                    >
                                         {% csrf_token %}
                                         <input type="hidden" name="scadenza" value="{{ candidato.scadenza.pk }}">
                                         <input type="text" name="importo" value="{{ candidato.importo_residuo|floatformat:2 }}" aria-label="Importo da riconciliare">

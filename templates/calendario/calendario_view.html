@@ -305,7 +305,7 @@
                                     <td class="actions-cell">
                                         {% if evento.url %}
                                             {% if evento.open_in_popup %}
-                                                <a href="{{ evento.url }}?popup=1" class="btn btn-secondary btn-sm calendar-row-action-btn" data-calendar-event-popup="1" data-window-popup="1" data-popup-url="{{ evento.url }}?popup=1" data-popup-title="{{ evento.popup_title }}" data-popup-window-features="width=920,height=760,resizable=yes,scrollbars=yes">{{ evento.action_label }}</a>
+                                                <a href="{{ evento.url }}?popup=1" class="btn btn-secondary btn-sm calendar-row-action-btn" data-calendar-event-popup="1" data-window-popup="1" data-popup-url="{{ evento.url }}?popup=1" data-popup-title="{{ evento.popup_title }}" data-popup-window-features="{{ evento.popup_features|default:'width=920,height=760,resizable=yes,scrollbars=yes' }}">{{ evento.action_label }}</a>
                                             {% elif evento.external %}
                                                 <a href="{{ evento.url }}" class="btn btn-secondary btn-sm calendar-row-action-btn">{{ evento.action_label }}</a>
                                             {% else %}
@@ -350,7 +350,7 @@
 
     {{ calendar_entries|json_script:"calendar-agenda-data" }}
     {{ calendar_categories_payload|json_script:"calendar-categories-data" }}
-    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=19"></script>
+    <script src="{% static 'js/pages/calendario-agenda.js' %}?v=22"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             document.querySelectorAll("[data-calendar-category-filter]").forEach(function (select) {

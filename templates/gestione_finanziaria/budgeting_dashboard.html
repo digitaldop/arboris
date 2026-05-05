@@ -191,6 +191,107 @@
         min-width: 980px;
     }
 
+    .budget-flow-table,
+    .budget-sheet-table {
+        min-width: 1360px;
+        table-layout: fixed;
+    }
+
+    .budget-flow-table th:first-child,
+    .budget-flow-table td:first-child {
+        width: 250px;
+    }
+
+    .budget-sheet-table th:nth-child(1),
+    .budget-sheet-table td:nth-child(1) {
+        width: 70px;
+        text-align: center;
+    }
+
+    .budget-sheet-table th:nth-child(2),
+    .budget-sheet-table td:nth-child(2) {
+        width: 260px;
+    }
+
+    .budget-sheet-table th:nth-child(3),
+    .budget-sheet-table td:nth-child(3),
+    .budget-sheet-table th:nth-child(4),
+    .budget-sheet-table td:nth-child(4) {
+        width: 118px;
+    }
+
+    .budget-flow-label,
+    .budget-sheet-label {
+        color: #172131;
+        font-weight: 850;
+    }
+
+    .budget-flow-row.is-income td:first-child,
+    .budget-sheet-measure.is-income {
+        color: #1f7a4a;
+    }
+
+    .budget-flow-row.is-expense td:first-child,
+    .budget-sheet-measure.is-expense {
+        color: #ad3148;
+    }
+
+    .budget-flow-row.is-balance td:first-child,
+    .budget-flow-row.is-cash td:first-child {
+        color: #806016;
+    }
+
+    .budget-flow-value,
+    .budget-sheet-value {
+        white-space: nowrap;
+        text-align: right;
+    }
+
+    .budget-sheet-section-row td {
+        background: #eaf6fb;
+        color: #234f63;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .budget-sheet-total-row td {
+        background: #f7fbfd;
+        font-weight: 850;
+    }
+
+    .budget-sheet-diff-row td {
+        background: #fffaf0;
+        font-weight: 850;
+    }
+
+    .budget-sheet-active-chip {
+        display: inline-flex;
+        justify-content: center;
+        min-width: 34px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #e8f7ee;
+        color: #1f7a4a;
+        font-size: 11px;
+        font-weight: 850;
+    }
+
+    .budget-sheet-active-chip.is-off {
+        background: #eef2f5;
+        color: #60738d;
+    }
+
+    .budget-sheet-line {
+        display: grid;
+        gap: 3px;
+    }
+
+    .budget-sheet-line small {
+        color: #60738d;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
     .budget-month-pill {
         display: inline-flex;
         align-items: center;
@@ -232,6 +333,11 @@
         background: #f8fbfd;
     }
 
+    .budget-voice-card.is-inactive {
+        opacity: 0.72;
+        background: #f3f6f8;
+    }
+
     .budget-voice-head {
         display: flex;
         align-items: flex-start;
@@ -268,6 +374,75 @@
         color: #806016;
     }
 
+    .budget-status-chip.is-muted {
+        background: #eef2f5;
+        color: #60738d;
+    }
+
+    .budget-voice-toggle-form {
+        margin: 4px 0 0;
+    }
+
+    .budget-voice-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: fit-content;
+        color: #356f88;
+        font-size: 12px;
+        font-weight: 850;
+        cursor: pointer;
+    }
+
+    .budget-voice-toggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .budget-voice-toggle-track {
+        position: relative;
+        display: inline-flex;
+        width: 42px;
+        height: 24px;
+        flex: 0 0 42px;
+        border: 1px solid #cfe3ee;
+        border-radius: 999px;
+        background: #e9f1f5;
+        transition: background 0.18s ease, border-color 0.18s ease;
+    }
+
+    .budget-voice-toggle-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 2px 5px rgba(23, 33, 49, 0.18);
+        transition: transform 0.18s ease;
+    }
+
+    .budget-voice-toggle input:checked + .budget-voice-toggle-track {
+        border-color: #7bbdd6;
+        background: var(--primary-dark);
+    }
+
+    .budget-voice-toggle input:checked + .budget-voice-toggle-track::after {
+        transform: translateX(18px);
+    }
+
+    .budget-voice-toggle input:focus-visible + .budget-voice-toggle-track {
+        outline: 2px solid rgba(59, 111, 135, 0.26);
+        outline-offset: 2px;
+    }
+
+    .budget-sheet-row.is-inactive {
+        opacity: 0.62;
+    }
+
     @media (max-width: 1180px) {
         .budget-kpi-grid,
         .budget-layout {
@@ -296,7 +471,13 @@
         </div>
         <div class="page-actions">
             {% if can_manage_gestione_finanziaria %}
-                <a href="{% url 'crea_voce_budget' %}" class="btn btn-primary btn-icon-text">
+                <a
+                    href="{% url 'crea_voce_budget' %}?popup=1"
+                    class="btn btn-primary btn-icon-text"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'crea_voce_budget' %}?popup=1"
+                    data-popup-window-features="width=980,height=780,resizable=yes,scrollbars=yes"
+                >
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
                     <span class="btn-label">Nuova voce budget</span>
                 </a>
@@ -374,48 +555,38 @@
             <section class="budget-panel">
                 <div class="budget-panel-head">
                     <div>
-                        <h2 class="budget-panel-title">Andamento mensile</h2>
-                        <p class="budget-panel-subtitle">Preventivo e consuntivo mese per mese.</p>
+                        <h2 class="budget-panel-title">Flusso di cassa</h2>
+                        <p class="budget-panel-subtitle">Riepilogo orizzontale mese per mese, con totale annuale.</p>
                     </div>
                 </div>
                 <div class="budget-panel-body">
                     <div class="budget-table-wrapper">
-                        <table class="list-table finance-modern-table budget-table">
+                        <table class="list-table finance-modern-table budget-flow-table">
                             <thead>
                                 <tr>
-                                    <th>Mese</th>
-                                    <th>Entrate previste</th>
-                                    <th>Entrate effettive</th>
-                                    <th>Uscite previste</th>
-                                    <th>Uscite effettive</th>
-                                    <th>Saldo previsto</th>
-                                    <th>Saldo effettivo</th>
-                                    <th>Scostamento</th>
+                                    <th>Voce</th>
+                                    {% for month in budget_data.months %}
+                                        <th>{{ month.short_label }}</th>
+                                    {% endfor %}
+                                    <th>Annuale</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for month in budget_data.months %}
-                                    <tr>
-                                        <td>
-                                            <span class="budget-month-pill{% if month.is_current %} is-current{% endif %}">{{ month.short_label }}</span>
-                                            <div class="budget-table-subtext">
-                                                Rette EUR {{ month.rette_previste|euro }} - Servizi EUR {{ month.servizi_previste|euro }}
-                                            </div>
+                                {% for row in budget_data.cashflow_rows %}
+                                    <tr class="budget-flow-row is-{{ row.tone }}">
+                                        <td class="budget-flow-label">{{ row.label }}</td>
+                                        {% for cell in row.months %}
+                                            <td class="budget-flow-value {% if cell.value >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">
+                                                EUR {{ cell.value|euro }}
+                                            </td>
+                                        {% endfor %}
+                                        <td class="budget-flow-value {% if row.total >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">
+                                            EUR {{ row.total|euro }}
                                         </td>
-                                        <td>EUR {{ month.entrate_previste|euro }}</td>
-                                        <td>EUR {{ month.entrate_effettive|euro }}</td>
-                                        <td>
-                                            EUR {{ month.uscite_previste|euro }}
-                                            <div class="budget-table-subtext">Fatture EUR {{ month.fatture_previste|euro }} - Ricorrenti EUR {{ month.ricorrenti_uscite|euro }}</div>
-                                        </td>
-                                        <td>EUR {{ month.uscite_effettive|euro }}</td>
-                                        <td class="{% if month.saldo_previsto >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.saldo_previsto|euro }}</td>
-                                        <td class="{% if month.saldo_effettivo >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.saldo_effettivo|euro }}</td>
-                                        <td class="{% if month.scostamento >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.scostamento|euro }}</td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="8">Nessun mese disponibile per il periodo selezionato.</td>
+                                        <td colspan='{{ budget_data.months|length|add:"2" }}'>Nessun mese disponibile per il periodo selezionato.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -430,13 +601,13 @@
                 <div class="budget-panel-head">
                     <div>
                         <h2 class="budget-panel-title">Voci previsionali</h2>
-                        <p class="budget-panel-subtitle">{{ budget_data.voci_budget_count }} voci attive nel periodo.</p>
+                        <p class="budget-panel-subtitle">{{ budget_data.voci_budget_attive_count }} attive su {{ budget_data.voci_budget_count }} nel periodo.</p>
                     </div>
                 </div>
                 <div class="budget-panel-body">
                     <div class="budget-voice-list">
                         {% for item in budget_data.voci_budget %}
-                            <div class="budget-voice-card">
+                            <div class="budget-voice-card{% if not item.active %} is-inactive{% endif %}">
                                 <div class="budget-voice-head">
                                     <div>
                                         <strong>{{ item.voce.nome }}</strong>
@@ -451,13 +622,30 @@
                                     {% if item.voce.fornitore %} - {{ item.voce.fornitore }}{% endif %}
                                 </div>
                                 <div class="budget-table-subtext">
-                                    Nel periodo: EUR {{ item.totale_periodo|euro }}{% if item.occurrences_label %} - {{ item.occurrences_label }}{% endif %}
+                                    Nel periodo: EUR {{ item.totale_periodo|euro }}
                                 </div>
                                 {% if can_manage_gestione_finanziaria %}
+                                    <form method="post" action="{% url 'toggle_voce_budget' item.voce.pk %}" class="budget-voice-toggle-form" data-budget-toggle-form>
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <label class="budget-voice-toggle">
+                                            <input type="checkbox" name="attiva" value="1" {% if item.active %}checked{% endif %} data-budget-toggle>
+                                            <span class="budget-voice-toggle-track" aria-hidden="true"></span>
+                                            <span data-budget-toggle-label>{% if item.active %}Attiva{% else %}Non attiva{% endif %}</span>
+                                        </label>
+                                    </form>
                                     <div class="budget-voice-actions">
-                                        <a href="{% url 'modifica_voce_budget' item.voce.pk %}" class="btn btn-secondary btn-sm">Modifica</a>
+                                        <a
+                                            href="{% url 'modifica_voce_budget' item.voce.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_voce_budget' item.voce.pk %}?popup=1"
+                                            data-popup-window-features="width=980,height=780,resizable=yes,scrollbars=yes"
+                                        >Modifica</a>
                                         <a href="{% url 'elimina_voce_budget' item.voce.pk %}" class="btn btn-danger btn-sm">Elimina</a>
                                     </div>
+                                {% elif not item.active %}
+                                    <span class="budget-status-chip is-muted">Non attiva</span>
                                 {% endif %}
                             </div>
                         {% empty %}
@@ -468,5 +656,137 @@
             </section>
         </aside>
     </div>
+
+    <section class="budget-panel">
+        <div class="budget-panel-head">
+            <div>
+                <h2 class="budget-panel-title">Bilancio mese per mese</h2>
+                <p class="budget-panel-subtitle">Voci divise per categoria, con righe separate per previsto, incassato o pagato, differenza e totale annuale.</p>
+            </div>
+        </div>
+        <div class="budget-panel-body">
+            <div class="budget-table-wrapper">
+                <table class="list-table finance-modern-table budget-sheet-table">
+                    <thead>
+                        <tr>
+                            <th>Attiva</th>
+                            <th>Descrizione</th>
+                            <th>Media mensile</th>
+                            <th>Stato</th>
+                            {% for month in budget_data.months %}
+                                <th>{{ month.short_label }}</th>
+                            {% endfor %}
+                            <th>Annuale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for group in budget_data.matrix_groups %}
+                            <tr class="budget-sheet-section-row">
+                                <td colspan='{{ budget_data.months|length|add:"5" }}'>{{ group.label }}</td>
+                            </tr>
+                            {% for row in group.rows %}
+                                <tr class="budget-sheet-row{% if not row.active %} is-inactive{% endif %}">
+                                    <td rowspan="2">
+                                        <span class="budget-sheet-active-chip{% if not row.active %} is-off{% endif %}">
+                                            {% if row.active %}Si{% else %}No{% endif %}
+                                        </span>
+                                    </td>
+                                    <td rowspan="2">
+                                        <span class="budget-sheet-line">
+                                            <strong>{{ row.label }}</strong>
+                                            <small>{{ row.source_label }}{% if not row.active %} - non attiva{% endif %}</small>
+                                        </span>
+                                    </td>
+                                    <td rowspan="2" class="budget-sheet-value">EUR {{ row.media_mensile_prevista|euro }}</td>
+                                    <td class="budget-sheet-measure{% if group.tipo == 'uscita' %} is-expense{% else %} is-income{% endif %}">Previsto</td>
+                                    {% for cell in row.months %}
+                                        <td class="budget-sheet-value">EUR {{ cell.previsto|euro }}</td>
+                                    {% endfor %}
+                                    <td class="budget-sheet-value">EUR {{ row.totale_previsto|euro }}</td>
+                                </tr>
+                                <tr class="budget-sheet-row{% if not row.active %} is-inactive{% endif %}">
+                                    <td class="budget-sheet-measure{% if group.tipo == 'uscita' %} is-expense{% else %} is-income{% endif %}">
+                                        {% if group.tipo == 'uscita' %}Pagato{% else %}Incassato{% endif %}
+                                    </td>
+                                    {% for cell in row.months %}
+                                        <td class="budget-sheet-value">EUR {{ cell.effettivo|euro }}</td>
+                                    {% endfor %}
+                                    <td class="budget-sheet-value">EUR {{ row.totale_effettivo|euro }}</td>
+                                </tr>
+                            {% endfor %}
+                            <tr class="budget-sheet-total-row">
+                                <td colspan="3" rowspan="3" class="budget-sheet-label">Totale {{ group.label }}</td>
+                                <td>Previste</td>
+                                {% for cell in group.totals %}
+                                    <td class="budget-sheet-value">EUR {{ cell.previsto|euro }}</td>
+                                {% endfor %}
+                                <td class="budget-sheet-value">EUR {{ group.totale_previsto|euro }}</td>
+                            </tr>
+                            <tr class="budget-sheet-total-row">
+                                <td>{% if group.tipo == 'uscita' %}Speso{% else %}Incassate{% endif %}</td>
+                                {% for cell in group.totals %}
+                                    <td class="budget-sheet-value">EUR {{ cell.effettivo|euro }}</td>
+                                {% endfor %}
+                                <td class="budget-sheet-value">EUR {{ group.totale_effettivo|euro }}</td>
+                            </tr>
+                            <tr class="budget-sheet-diff-row">
+                                <td>Differenza</td>
+                                {% for cell in group.totals %}
+                                    <td class="budget-sheet-value {% if cell.differenza >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">
+                                        EUR {{ cell.differenza|euro }}
+                                    </td>
+                                {% endfor %}
+                                <td class="budget-sheet-value {% if group.totale_differenza >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">
+                                    EUR {{ group.totale_differenza|euro }}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan='{{ budget_data.months|length|add:"5" }}'>Nessun dato disponibile per il bilancio mensile.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("[data-budget-toggle]").forEach(function (toggle) {
+            toggle.addEventListener("change", function () {
+                const form = toggle.closest("[data-budget-toggle-form]");
+                if (!form) {
+                    return;
+                }
+                const label = toggle.closest(".budget-voice-toggle");
+                const labelText = label ? label.querySelector("[data-budget-toggle-label]") : null;
+                const data = new FormData(form);
+                data.set("attiva", toggle.checked ? "1" : "0");
+                data.set("ajax", "1");
+                toggle.disabled = true;
+                if (labelText) {
+                    labelText.textContent = toggle.checked ? "Attiva" : "Non attiva";
+                }
+
+                fetch(form.action, {
+                    method: "POST",
+                    body: data,
+                    headers: {"X-Requested-With": "XMLHttpRequest"},
+                    credentials: "same-origin"
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("Toggle non salvato");
+                        }
+                        window.location.reload();
+                    })
+                    .catch(function () {
+                        form.submit();
+                    });
+            });
+        });
+    });
+</script>
 {% endblock %}

@@ -119,7 +119,15 @@
                     </label>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" name="azione" value="collega" class="btn btn-primary">Collega movimento alla rata</button>
+                    <button
+                        type="submit"
+                        name="azione"
+                        value="collega"
+                        class="btn btn-primary"
+                        onclick="return confirm('Confermi la riconciliazione con la rata selezionata? La rata e il movimento bancario verranno aggiornati.');"
+                    >
+                        Collega movimento alla rata
+                    </button>
                     <button type="submit" name="azione" value="ignora" class="btn btn-secondary"
                             onclick="return confirm('Marcare il movimento come \"da ignorare\"? Non apparira\' piu\' tra quelli da riconciliare.');">
                         Marca come da ignorare

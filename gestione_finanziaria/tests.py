@@ -31,6 +31,7 @@ from .models import (
     FrequenzaVoceBudget,
     Fornitore,
     FonteSaldo,
+    MetodoPagamentoFornitore,
     MovimentoFinanziario,
     NotificaFinanziaria,
     PagamentoFornitore,
@@ -336,7 +337,9 @@ class BudgetingGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Budgeting")
         self.assertContains(response, "Affitto sede")
         self.assertContains(response, "EUR 1.500,00")
-        self.assertContains(response, "Andamento mensile")
+        self.assertContains(response, "Flusso di cassa")
+        self.assertContains(response, "Bilancio mese per mese")
+        self.assertContains(response, "Affitto")
 
     def test_crea_voce_budget(self):
         response = self.client.post(
@@ -351,7 +354,6 @@ class BudgetingGestioneFinanziariaTests(TestCase):
                 "data_inizio": self.today.strftime("%Y-%m-%d"),
                 "data_fine": "",
                 "giorno_previsto": str(self.today.day),
-                "mese_previsto": "",
                 "attiva": "on",
                 "note": "Prima ipotesi di budget.",
             },
@@ -361,6 +363,161 @@ class BudgetingGestioneFinanziariaTests(TestCase):
         voce = VoceBudgetRicorrente.objects.get(nome="Contributo pubblico previsto")
         self.assertEqual(voce.tipo, TipoVoceBudget.ENTRATA)
         self.assertEqual(voce.importo, Decimal("500.00"))
+        self.assertIsNone(voce.mese_previsto)
+
+    def test_crea_voce_budget_popup_chiude_dopo_salvataggio(self):
+        response = self.client.post(
+            reverse("crea_voce_budget"),
+            {
+                "popup": "1",
+                "nome": "Contributo popup",
+                "tipo": TipoVoceBudget.ENTRATA,
+                "categoria": "",
+                "fornitore": "",
+                "importo": "300.00",
+                "frequenza": FrequenzaVoceBudget.UNA_TANTUM,
+                "data_inizio": self.today.strftime("%Y-%m-%d"),
+                "data_fine": "",
+                "giorno_previsto": str(self.today.day),
+                "attiva": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertContains(response, "Voce di budget creata correttamente.")
+        self.assertTrue(VoceBudgetRicorrente.objects.filter(nome="Contributo popup").exists())
+
+    def test_dashboard_apre_voci_budget_in_popup(self):
+        voce = VoceBudgetRicorrente.objects.create(
+            nome="Canone da popup",
+            tipo=TipoVoceBudget.USCITA,
+            importo=Decimal("900.00"),
+            frequenza=FrequenzaVoceBudget.MENSILE,
+            data_inizio=date(2026, 1, 1),
+            giorno_previsto=1,
+        )
+
+        response = self.client.get(reverse("budgeting_dashboard"))
+
+        self.assertContains(response, f'{reverse("crea_voce_budget")}?popup=1')
+        self.assertContains(response, f'{reverse("modifica_voce_budget", args=[voce.pk])}?popup=1')
+        self.assertContains(response, 'data-window-popup="1"')
+
+    def test_voce_budget_inattiva_resta_visibile_e_togglabile(self):
+        categoria = CategoriaFinanziaria.objects.create(
+            nome="Utenze",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        voce = VoceBudgetRicorrente.objects.create(
+            nome="Utenza stimata",
+            tipo=TipoVoceBudget.USCITA,
+            categoria=categoria,
+            importo=Decimal("280.00"),
+            frequenza=FrequenzaVoceBudget.MENSILE,
+            data_inizio=date(self.today.year, self.today.month, 1),
+            giorno_previsto=15,
+            attiva=False,
+        )
+
+        data = build_budgeting_dashboard_data(today=self.today)
+        self.assertEqual(data["current_month"]["ricorrenti_uscite"], Decimal("0.00"))
+        self.assertEqual(data["voci_budget_count"], 1)
+        self.assertEqual(data["voci_budget_attive_count"], 0)
+
+        response = self.client.get(reverse("budgeting_dashboard"))
+        self.assertContains(response, "Utenza stimata")
+        self.assertContains(response, "Non attiva")
+
+        response = self.client.post(
+            reverse("toggle_voce_budget", args=[voce.pk]),
+            {"attiva": "1", "ajax": "1"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        voce.refresh_from_db()
+        self.assertTrue(voce.attiva)
+
+        data = build_budgeting_dashboard_data(today=self.today)
+        self.assertEqual(data["current_month"]["ricorrenti_uscite"], Decimal("280.00"))
+
+    def test_modifica_voce_budget_precompila_date_e_nasconde_mese_previsto(self):
+        voce = VoceBudgetRicorrente.objects.create(
+            nome="Canone annuale",
+            tipo=TipoVoceBudget.USCITA,
+            importo=Decimal("900.00"),
+            frequenza=FrequenzaVoceBudget.ANNUALE,
+            data_inizio=date(2026, 1, 15),
+            data_fine=date(2026, 12, 31),
+            giorno_previsto=15,
+            mese_previsto=4,
+        )
+
+        response = self.client.get(reverse("modifica_voce_budget", args=[voce.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-01-15"')
+        self.assertContains(response, 'value="2026-12-31"')
+        self.assertNotContains(response, "Mese previsto")
+        self.assertContains(response, 'id="add-budget-categoria-btn"')
+        self.assertContains(response, 'id="add-budget-fornitore-btn"')
+
+    def test_modifica_voce_budget_popup_usa_template_popup(self):
+        voce = VoceBudgetRicorrente.objects.create(
+            nome="Canone popup",
+            tipo=TipoVoceBudget.USCITA,
+            importo=Decimal("900.00"),
+            frequenza=FrequenzaVoceBudget.ANNUALE,
+            data_inizio=date(2026, 1, 15),
+            data_fine=date(2026, 12, 31),
+            giorno_previsto=15,
+        )
+
+        response = self.client.get(f'{reverse("modifica_voce_budget", args=[voce.pk])}?popup=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'body class="popup-page"')
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, "budget-voice-popup-card")
+        self.assertContains(response, "budget-voice-input-shell")
+        self.assertContains(response, 'value="2026-01-15"')
+
+    def test_modifica_voce_budget_popup_chiude_dopo_salvataggio(self):
+        voce = VoceBudgetRicorrente.objects.create(
+            nome="Canone da aggiornare",
+            tipo=TipoVoceBudget.USCITA,
+            importo=Decimal("900.00"),
+            frequenza=FrequenzaVoceBudget.ANNUALE,
+            data_inizio=date(2026, 1, 15),
+            data_fine=date(2026, 12, 31),
+            giorno_previsto=15,
+        )
+
+        response = self.client.post(
+            reverse("modifica_voce_budget", args=[voce.pk]),
+            {
+                "popup": "1",
+                "nome": "Canone aggiornato",
+                "tipo": TipoVoceBudget.USCITA,
+                "categoria": "",
+                "fornitore": "",
+                "importo": "950.00",
+                "frequenza": FrequenzaVoceBudget.ANNUALE,
+                "data_inizio": "2026-01-15",
+                "data_fine": "2026-12-31",
+                "giorno_previsto": "15",
+                "attiva": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertContains(response, "Voce di budget aggiornata correttamente.")
+        voce.refresh_from_db()
+        self.assertEqual(voce.nome, "Canone aggiornato")
+        self.assertEqual(voce.importo, Decimal("950.00"))
 
 
 class FornitoriGestioneFinanziariaTests(TestCase):
@@ -384,11 +541,72 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         shutil.rmtree(self.media_root, ignore_errors=True)
         super().tearDown()
 
+    def _crea_scadenza_pagamento_test(self, *, importo=Decimal("100.00")):
+        fornitore = Fornitore.objects.create(denominazione="Beta Servizi")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="BETA-001",
+            data_documento=timezone.localdate(),
+            totale=importo,
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=timezone.localdate(),
+            importo_previsto=importo,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=timezone.localdate(),
+            importo=-importo,
+            descrizione="Bonifico Beta Servizi",
+            controparte="Beta Servizi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        return scadenza, movimento
+
     def test_tipo_documento_fornitore_include_proforma_after_fattura(self):
         choices = list(TipoDocumentoFornitore.choices)
 
         self.assertEqual(choices[0], (TipoDocumentoFornitore.FATTURA, "Fattura"))
         self.assertEqual(choices[1], (TipoDocumentoFornitore.PROFORMA, "Proforma"))
+
+    def test_pagamento_fornitore_popup_usa_layout_senza_shell_globale(self):
+        scadenza, _movimento = self._crea_scadenza_pagamento_test()
+
+        response = self.client.get(f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="popup-page"', html=False)
+        self.assertContains(response, "supplier-payment-shell is-popup")
+        self.assertContains(response, "Riconciliazione bancaria")
+        self.assertContains(response, "Riconcilia")
+        self.assertContains(response, "Conferma pagamento")
+        self.assertContains(response, 'onclick="window.close()"')
+        self.assertContains(response, '<span class="btn-label">Annulla</span>', html=False)
+        self.assertContains(response, "Confermi la riconciliazione con questo movimento bancario")
+        self.assertNotContains(response, "NAVIGAZIONE")
+
+    def test_pagamento_fornitore_popup_riconcilia_movimento_candidato(self):
+        scadenza, movimento = self._crea_scadenza_pagamento_test()
+
+        response = self.client.post(
+            f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1",
+            {
+                "popup": "1",
+                "scadenza": str(scadenza.pk),
+                "quick_movimento": str(movimento.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pagamento fornitore registrato correttamente.")
+        pagamento = PagamentoFornitore.objects.get(scadenza=scadenza)
+        self.assertEqual(pagamento.movimento_finanziario, movimento)
+        self.assertEqual(pagamento.metodo, MetodoPagamentoFornitore.BANCA)
+        self.assertEqual(pagamento.importo, Decimal("100.00"))
+        scadenza.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
     def test_categoria_spesa_crud_pages(self):
         response = self.client.get(reverse("crea_categoria_spesa"))
@@ -725,6 +943,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "mode-edit-only-table-cell")
         self.assertContains(response, "Movimento storico collegato")
         self.assertNotContains(response, "Movimento storico non collegato")
+        pagamento_url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': documento.scadenze.first().pk})}?popup=1"
+        self.assertContains(response, f'href="{pagamento_url}"')
+        self.assertContains(response, f'data-popup-url="{pagamento_url}"')
+        self.assertContains(response, 'data-window-popup="1"')
+        self.assertContains(response, 'data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"')
 
     def test_notifica_fattura_ricevuta_apre_fattura_in_popup(self):
         fornitore = Fornitore.objects.create(denominazione="Cloud Supplier Srl")

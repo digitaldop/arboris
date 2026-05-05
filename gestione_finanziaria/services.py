@@ -332,10 +332,10 @@ def _budget_month_difference(start_month, target_month):
     return (target_month.year - start_month.year) * 12 + (target_month.month - start_month.month)
 
 
-def _budget_voice_occurs_in_month(voce, month_start):
+def _budget_voice_occurs_in_month(voce, month_start, *, respect_active=True):
     from .models import FrequenzaVoceBudget
 
-    if not voce.attiva:
+    if respect_active and not voce.attiva:
         return False
     month_end = _last_day_of_month(month_start)
     if voce.data_inizio > month_end:
@@ -351,8 +351,7 @@ def _budget_voice_occurs_in_month(voce, month_start):
     if voce.frequenza == FrequenzaVoceBudget.UNA_TANTUM:
         return _month_key(voce.data_inizio) == _month_key(month_start)
     if voce.frequenza == FrequenzaVoceBudget.ANNUALE:
-        target_month = voce.mese_previsto or voce.data_inizio.month
-        return month_start.month == target_month
+        return month_start.month == voce.data_inizio.month
 
     intervals = {
         FrequenzaVoceBudget.MENSILE: 1,
@@ -370,25 +369,120 @@ def _build_budgeting_recurring_details(voci_budget, month_rows):
     details = []
     for voce in voci_budget:
         occurrences = []
+        month_values = []
         for row in month_rows:
-            if not _budget_voice_occurs_in_month(voce, row["date"]):
+            if not _budget_voice_occurs_in_month(voce, row["date"], respect_active=False):
+                month_values.append({"key": row["key"], "amount": Decimal("0.00"), "occurs": False})
                 continue
             occurrences.append(row["short_label"])
-            if voce.tipo == TipoVoceBudget.ENTRATA:
-                row["entrate_previste"] += voce.importo
-                row["ricorrenti_entrate"] += voce.importo
-            else:
-                row["uscite_previste"] += voce.importo
-                row["ricorrenti_uscite"] += voce.importo
+            month_values.append({"key": row["key"], "amount": voce.importo, "occurs": True})
+            if voce.attiva:
+                if voce.tipo == TipoVoceBudget.ENTRATA:
+                    row["entrate_previste"] += voce.importo
+                    row["ricorrenti_entrate"] += voce.importo
+                else:
+                    row["uscite_previste"] += voce.importo
+                    row["ricorrenti_uscite"] += voce.importo
         details.append(
             {
                 "voce": voce,
+                "active": voce.attiva,
+                "month_values": month_values,
                 "occurrences_count": len(occurrences),
                 "occurrences_label": ", ".join(occurrences[:4]) + ("..." if len(occurrences) > 4 else ""),
                 "totale_periodo": voce.importo * len(occurrences),
             }
         )
     return details
+
+
+def _empty_budget_matrix_month(month_row):
+    return {
+        "key": month_row["key"],
+        "label": month_row["short_label"],
+        "previsto": Decimal("0.00"),
+        "effettivo": Decimal("0.00"),
+        "differenza": Decimal("0.00"),
+    }
+
+
+def _budget_matrix_group_key(tipo, label, categoria_id=None):
+    if categoria_id:
+        return f"{tipo}:categoria:{categoria_id}"
+    return f"{tipo}:system:{label}"
+
+
+def _get_budget_matrix_group(groups_map, ordered_groups, *, key, label, tipo):
+    if key not in groups_map:
+        group = {
+            "key": key,
+            "label": label,
+            "tipo": tipo,
+            "rows": [],
+            "totals": [],
+        }
+        groups_map[key] = group
+        ordered_groups.append(group)
+    return groups_map[key]
+
+
+def _get_budget_matrix_row(group, month_rows, *, key, label, source_label, tipo, active=True):
+    rows_map = group.setdefault("_rows_map", {})
+    if key not in rows_map:
+        row = {
+            "key": key,
+            "label": label,
+            "source_label": source_label,
+            "tipo": tipo,
+            "active": active,
+            "months": [_empty_budget_matrix_month(month) for month in month_rows],
+        }
+        rows_map[key] = row
+        group["rows"].append(row)
+    return rows_map[key]
+
+
+def _add_budget_matrix_amount(row, month_key, *, previsto=Decimal("0.00"), effettivo=Decimal("0.00")):
+    for month in row["months"]:
+        if month["key"] == month_key:
+            month["previsto"] += previsto or Decimal("0.00")
+            month["effettivo"] += effettivo or Decimal("0.00")
+            return
+
+
+def _budget_category_label(categoria, fallback):
+    if categoria is None:
+        return fallback
+    return getattr(categoria, "percorso_label", None) or str(categoria)
+
+
+def _finalize_budget_matrix(groups, month_rows):
+    for group in groups:
+        group_totals = [_empty_budget_matrix_month(month) for month in month_rows]
+        for row in group["rows"]:
+            for month in row["months"]:
+                month["differenza"] = month["effettivo"] - month["previsto"]
+            row["totale_previsto"] = sum((month["previsto"] for month in row["months"]), Decimal("0.00"))
+            row["totale_effettivo"] = sum((month["effettivo"] for month in row["months"]), Decimal("0.00"))
+            row["totale_differenza"] = row["totale_effettivo"] - row["totale_previsto"]
+            row["media_mensile_prevista"] = (
+                row["totale_previsto"] / Decimal(len(month_rows))
+                if month_rows
+                else Decimal("0.00")
+            )
+            if not row.get("active", True):
+                continue
+            for index, month in enumerate(row["months"]):
+                group_totals[index]["previsto"] += month["previsto"]
+                group_totals[index]["effettivo"] += month["effettivo"]
+        for month in group_totals:
+            month["differenza"] = month["effettivo"] - month["previsto"]
+        group["totals"] = group_totals
+        group["totale_previsto"] = sum((month["previsto"] for month in group_totals), Decimal("0.00"))
+        group["totale_effettivo"] = sum((month["effettivo"] for month in group_totals), Decimal("0.00"))
+        group["totale_differenza"] = group["totale_effettivo"] - group["totale_previsto"]
+        group.pop("_rows_map", None)
+    return groups
 
 
 def build_budgeting_dashboard_data(period_type=None, today=None):
@@ -406,6 +500,42 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
     period = resolve_budgeting_period(period_type, today=today)
     month_rows = [_empty_budget_month(month_start, today) for month_start in _iter_month_starts(period["start"], period["end"])]
     months_by_key = {_month_key(row["date"]): row for row in month_rows}
+    matrix_groups_map = {}
+    matrix_groups = []
+
+    def matrix_row(*, group_label, group_tipo, row_key, row_label, source_label, categoria_id=None, active=True):
+        group_key = _budget_matrix_group_key(group_tipo, group_label, categoria_id)
+        group = _get_budget_matrix_group(
+            matrix_groups_map,
+            matrix_groups,
+            key=group_key,
+            label=group_label,
+            tipo=group_tipo,
+        )
+        return _get_budget_matrix_row(
+            group,
+            month_rows,
+            key=row_key,
+            label=row_label,
+            source_label=source_label,
+            tipo=group_tipo,
+            active=active,
+        )
+
+    rette_row = matrix_row(
+        group_label="Entrate scolastiche",
+        group_tipo=TipoVoceBudget.ENTRATA,
+        row_key="system:rette",
+        row_label="Rette iscrizione",
+        source_label="Economia",
+    )
+    servizi_row = matrix_row(
+        group_label="Entrate scolastiche",
+        group_tipo=TipoVoceBudget.ENTRATA,
+        row_key="system:servizi-extra",
+        row_label="Servizi extra",
+        source_label="Servizi extra",
+    )
 
     rate_previste = RataIscrizione.objects.filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"]).values(
         "data_scadenza",
@@ -416,6 +546,11 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         amount = rata["importo_finale"] or rata["importo_dovuto"] or Decimal("0.00")
         _add_budget_amount(months_by_key, "entrate_previste", rata["data_scadenza"], amount)
         _add_budget_amount(months_by_key, "rette_previste", rata["data_scadenza"], amount)
+        _add_budget_matrix_amount(
+            rette_row,
+            _empty_budget_month(rata["data_scadenza"].replace(day=1), today)["key"],
+            previsto=amount,
+        )
 
     rate_incassate = RataIscrizione.objects.filter(
         data_pagamento__gte=period["start"],
@@ -426,6 +561,11 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         amount = rata["importo_pagato"] or Decimal("0.00")
         _add_budget_amount(months_by_key, "entrate_effettive", rata["data_pagamento"], amount)
         _add_budget_amount(months_by_key, "rette_incassate", rata["data_pagamento"], amount)
+        _add_budget_matrix_amount(
+            rette_row,
+            _empty_budget_month(rata["data_pagamento"].replace(day=1), today)["key"],
+            effettivo=amount,
+        )
 
     servizi_previsti = RataServizioExtra.objects.filter(
         data_scadenza__gte=period["start"],
@@ -435,6 +575,11 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         amount = rata["importo_finale"] or rata["importo_dovuto"] or Decimal("0.00")
         _add_budget_amount(months_by_key, "entrate_previste", rata["data_scadenza"], amount)
         _add_budget_amount(months_by_key, "servizi_previste", rata["data_scadenza"], amount)
+        _add_budget_matrix_amount(
+            servizi_row,
+            _empty_budget_month(rata["data_scadenza"].replace(day=1), today)["key"],
+            previsto=amount,
+        )
 
     servizi_incassati = RataServizioExtra.objects.filter(
         data_pagamento__gte=period["start"],
@@ -445,37 +590,91 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         amount = rata["importo_pagato"] or Decimal("0.00")
         _add_budget_amount(months_by_key, "entrate_effettive", rata["data_pagamento"], amount)
         _add_budget_amount(months_by_key, "servizi_incassate", rata["data_pagamento"], amount)
+        _add_budget_matrix_amount(
+            servizi_row,
+            _empty_budget_month(rata["data_pagamento"].replace(day=1), today)["key"],
+            effettivo=amount,
+        )
 
-    movimenti_uscita = MovimentoFinanziario.objects.filter(
+    movimenti_uscita = MovimentoFinanziario.objects.select_related("categoria", "categoria__parent").filter(
         data_contabile__gte=period["start"],
         data_contabile__lte=period["end"],
         importo__lt=0,
-    ).values("data_contabile", "importo")
+    )
     for movimento in movimenti_uscita:
-        _add_budget_amount(months_by_key, "uscite_effettive", movimento["data_contabile"], abs(movimento["importo"]))
+        amount = abs(movimento.importo or Decimal("0.00"))
+        _add_budget_amount(months_by_key, "uscite_effettive", movimento.data_contabile, amount)
+        categoria = movimento.categoria
+        group_label = _budget_category_label(categoria, "Uscite non categorizzate")
+        row = matrix_row(
+            group_label=group_label,
+            group_tipo=TipoVoceBudget.USCITA,
+            row_key=f"movement-expense:{categoria.pk if categoria else 'uncategorized'}",
+            row_label="Movimenti effettivi",
+            source_label="Conto bancario",
+            categoria_id=categoria.pk if categoria else None,
+        )
+        _add_budget_matrix_amount(row, _empty_budget_month(movimento.data_contabile.replace(day=1), today)["key"], effettivo=amount)
 
     scadenze_fornitori = (
-        ScadenzaPagamentoFornitore.objects.exclude(
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__categoria_spesa",
+            "documento__categoria_spesa__parent",
+            "documento__fornitore",
+            "documento__fornitore__categoria_spesa",
+            "documento__fornitore__categoria_spesa__parent",
+        )
+        .exclude(
             stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
         )
         .filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"])
-        .values("data_scadenza", "importo_previsto", "importo_pagato")
     )
     for scadenza in scadenze_fornitori:
-        amount = max((scadenza["importo_previsto"] or Decimal("0.00")) - (scadenza["importo_pagato"] or Decimal("0.00")), Decimal("0.00"))
-        _add_budget_amount(months_by_key, "uscite_previste", scadenza["data_scadenza"], amount)
-        _add_budget_amount(months_by_key, "fatture_previste", scadenza["data_scadenza"], amount)
+        amount = max((scadenza.importo_previsto or Decimal("0.00")) - (scadenza.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+        _add_budget_amount(months_by_key, "uscite_previste", scadenza.data_scadenza, amount)
+        _add_budget_amount(months_by_key, "fatture_previste", scadenza.data_scadenza, amount)
+        categoria = scadenza.documento.categoria_spesa_effettiva
+        group_label = _budget_category_label(categoria, "Fatture fornitori senza categoria")
+        row = matrix_row(
+            group_label=group_label,
+            group_tipo=TipoVoceBudget.USCITA,
+            row_key=f"supplier-dues:{categoria.pk if categoria else 'uncategorized'}",
+            row_label="Fatture fornitori",
+            source_label="Scadenzario fornitori",
+            categoria_id=categoria.pk if categoria else None,
+        )
+        _add_budget_matrix_amount(row, _empty_budget_month(scadenza.data_scadenza.replace(day=1), today)["key"], previsto=amount)
 
     voci_budget = list(
-        VoceBudgetRicorrente.objects.select_related("categoria", "fornitore")
-        .filter(attiva=True, data_inizio__lte=period["end"])
+        VoceBudgetRicorrente.objects.select_related("categoria", "categoria__parent", "fornitore")
+        .filter(data_inizio__lte=period["end"])
         .filter(Q(data_fine__isnull=True) | Q(data_fine__gte=period["start"]))
         .order_by("tipo", "categoria__nome", "nome")
     )
     voci_budget_details = _build_budgeting_recurring_details(voci_budget, month_rows)
+    for item in voci_budget_details:
+        voce = item["voce"]
+        fallback = "Entrate previsionali senza categoria" if voce.tipo == TipoVoceBudget.ENTRATA else "Uscite previsionali senza categoria"
+        group_label = _budget_category_label(voce.categoria, fallback)
+        row = matrix_row(
+            group_label=group_label,
+            group_tipo=voce.tipo,
+            row_key=f"budget-voice:{voce.pk}",
+            row_label=voce.nome,
+            source_label="Voce previsionale",
+            categoria_id=voce.categoria_id,
+            active=voce.attiva,
+        )
+        for month_value in item["month_values"]:
+            if month_value["occurs"]:
+                _add_budget_matrix_amount(row, month_value["key"], previsto=month_value["amount"])
 
+    cassa_progressiva = Decimal("0.00")
     for row in month_rows:
         _budget_row_totals(row)
+        cassa_progressiva += row["saldo_effettivo"]
+        row["cassa_progressiva"] = cassa_progressiva
 
     current_month = next((row for row in month_rows if row["is_current"]), month_rows[0] if month_rows else None)
     totals = {
@@ -487,6 +686,51 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         "saldo_effettivo": sum((row["saldo_effettivo"] for row in month_rows), Decimal("0.00")),
     }
     totals["scostamento"] = totals["saldo_effettivo"] - totals["saldo_previsto"]
+    totals["cassa_progressiva"] = cassa_progressiva
+    cashflow_rows = [
+        {
+            "label": "ENTRATE PREVISTE",
+            "tone": "income",
+            "months": [{"key": row["key"], "value": row["entrate_previste"]} for row in month_rows],
+            "total": totals["entrate_previste"],
+        },
+        {
+            "label": "ENTRATE EFFETTIVE",
+            "tone": "income",
+            "months": [{"key": row["key"], "value": row["entrate_effettive"]} for row in month_rows],
+            "total": totals["entrate_effettive"],
+        },
+        {
+            "label": "USCITE PREVISTE",
+            "tone": "expense",
+            "months": [{"key": row["key"], "value": row["uscite_previste"]} for row in month_rows],
+            "total": totals["uscite_previste"],
+        },
+        {
+            "label": "USCITE EFFETTIVE",
+            "tone": "expense",
+            "months": [{"key": row["key"], "value": row["uscite_effettive"]} for row in month_rows],
+            "total": totals["uscite_effettive"],
+        },
+        {
+            "label": "GUADAGNO / PERDITA IPOTIZZATA",
+            "tone": "balance",
+            "months": [{"key": row["key"], "value": row["saldo_previsto"]} for row in month_rows],
+            "total": totals["saldo_previsto"],
+        },
+        {
+            "label": "GUADAGNO / PERDITA EFFETTIVA",
+            "tone": "balance",
+            "months": [{"key": row["key"], "value": row["saldo_effettivo"]} for row in month_rows],
+            "total": totals["saldo_effettivo"],
+        },
+        {
+            "label": "CASSA",
+            "tone": "cash",
+            "months": [{"key": row["key"], "value": row["cassa_progressiva"]} for row in month_rows],
+            "total": totals["cassa_progressiva"],
+        },
+    ]
 
     return {
         "period": period,
@@ -497,10 +741,13 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         "months": month_rows,
         "current_month": current_month,
         "totals": totals,
+        "cashflow_rows": cashflow_rows,
+        "matrix_groups": _finalize_budget_matrix(matrix_groups, month_rows),
         "voci_budget": voci_budget_details,
         "voci_budget_count": len(voci_budget),
-        "voci_budget_entrate_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.ENTRATA),
-        "voci_budget_uscite_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.USCITA),
+        "voci_budget_attive_count": sum(1 for voce in voci_budget if voce.attiva),
+        "voci_budget_entrate_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.ENTRATA and voce.attiva),
+        "voci_budget_uscite_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.USCITA and voce.attiva),
     }
 
 
@@ -2056,7 +2303,7 @@ def registra_pagamento_fornitore(
     note="",
     utente=None,
 ):
-    from .models import PagamentoFornitore
+    from .models import PagamentoFornitore, StatoRiconciliazione
 
     importo = Decimal(importo or Decimal("0.00"))
     if importo <= Decimal("0.00"):
@@ -2083,6 +2330,9 @@ def registra_pagamento_fornitore(
     )
     applica_categoria_documento_a_movimento_fornitore(movimento, scadenza, utente=utente)
     aggiorna_scadenza_da_pagamenti(scadenza)
+    if movimento is not None and importo_movimento_disponibile_fornitori(movimento) <= _TOLLERANZA_IMPORTO_ESATTO:
+        movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
+        movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
     return pagamento
 
 
@@ -2197,6 +2447,83 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
         )
 
     candidati.sort(key=lambda candidato: (candidato.score, candidato.scadenza.data_scadenza), reverse=True)
+    return candidati[:limite]
+
+
+def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8):
+    from .models import MovimentoFinanziario, StatoRiconciliazione
+
+    if scadenza is None:
+        return []
+
+    residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
+    if residuo_scadenza <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+
+    queryset = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(importo__lt=0)
+        .order_by("-data_contabile", "-id")[:300]
+    )
+
+    fornitore = getattr(getattr(scadenza, "documento", None), "fornitore", None)
+    candidati = []
+    for movimento in queryset:
+        disponibile = importo_movimento_disponibile_fornitori(movimento)
+        if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
+            continue
+
+        score = 0
+        motivazioni = []
+        differenza = abs(disponibile - residuo_scadenza)
+        if differenza <= _TOLLERANZA_IMPORTO_ESATTO:
+            score += 45
+            motivazioni.append("Importo identico al residuo della scadenza")
+        elif differenza <= _TOLLERANZA_IMPORTO_APPROX:
+            score += 30
+            motivazioni.append("Importo molto vicino al residuo della scadenza")
+        elif disponibile < residuo_scadenza:
+            score += 10
+            motivazioni.append("Movimento utilizzabile come pagamento parziale")
+        else:
+            continue
+
+        if movimento.data_contabile and scadenza.data_scadenza:
+            delta_giorni = abs((movimento.data_contabile - scadenza.data_scadenza).days)
+            if delta_giorni <= _TOLLERANZA_GIORNI_VICINI:
+                score += 22
+                motivazioni.append(f"Data vicina alla scadenza (+/- {delta_giorni} gg)")
+            elif delta_giorni <= _TOLLERANZA_GIORNI_ESTESA:
+                score += 8
+                motivazioni.append(f"Data entro 30 giorni dalla scadenza ({delta_giorni} gg)")
+
+        if fornitore is not None:
+            testo_movimento = _normalizza_testo_match(
+                f"{movimento.descrizione or ''} {movimento.controparte or ''} {movimento.iban_controparte or ''}"
+            )
+            supplier_score, supplier_motivazioni = _supplier_match_score(fornitore, testo_movimento)
+            score += supplier_score
+            motivazioni.extend(supplier_motivazioni)
+
+            iban_fornitore = _normalizza_testo_match(getattr(fornitore, "iban", "") or "")
+            iban_movimento = _normalizza_testo_match(getattr(movimento, "iban_controparte", "") or "")
+            if iban_fornitore and iban_movimento and iban_fornitore == iban_movimento:
+                score += 24
+                motivazioni.append("IBAN fornitore corrispondente")
+
+        if score < 30:
+            continue
+        candidati.append(
+            CandidatoMovimentoRiconciliazione(
+                movimento=movimento,
+                importo_disponibile=disponibile,
+                score=score,
+                motivazioni=motivazioni or ["Movimento disponibile per riconciliazione"],
+            )
+        )
+
+    candidati.sort(key=lambda candidato: (candidato.score, candidato.movimento.data_contabile or date.min), reverse=True)
     return candidati[:limite]
 
 

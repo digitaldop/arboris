@@ -22,6 +22,7 @@ window.ArborisModalPopups = (function () {
         const result = {
             width: 900,
             height: 700,
+            autoFit: true,
         };
         String(features || "")
             .split(",")
@@ -32,7 +33,13 @@ window.ArborisModalPopups = (function () {
                     return;
                 }
                 const key = pieces[0].trim().toLowerCase();
-                const value = parseInt(pieces[1], 10);
+                const rawValue = pieces[1].trim().toLowerCase();
+                if (key === "autofit" || key === "auto_fit" || key === "fit") {
+                    result.autoFit = !["0", "false", "no", "off"].includes(rawValue);
+                    return;
+                }
+
+                const value = parseInt(rawValue, 10);
                 if (!Number.isFinite(value) || value <= 0) {
                     return;
                 }
@@ -123,6 +130,7 @@ window.ArborisModalPopups = (function () {
 
         const layersToClose = stack.splice(index);
         layersToClose.forEach(function (layer) {
+            clearScheduledFits(layer);
             if (layer.resizeHandler) {
                 window.removeEventListener("resize", layer.resizeHandler);
             }
@@ -195,7 +203,7 @@ window.ArborisModalPopups = (function () {
     }
 
     function fitLayerToContent(layer) {
-        if (!layer || !layer.windowEl) {
+        if (!layer || !layer.windowEl || layer.autoFit === false) {
             return;
         }
 
@@ -223,12 +231,36 @@ window.ArborisModalPopups = (function () {
         const desiredWidth = Math.min(viewportWidth, Math.max(620, contentWidth));
         const desiredHeight = Math.min(viewportHeight, Math.max(420, contentHeight));
 
-        layer.windowEl.style.setProperty("--app-modal-width", `${Math.ceil(desiredWidth)}px`);
-        layer.windowEl.style.setProperty("--app-modal-height", `${Math.ceil(desiredHeight)}px`);
+        const roundedWidth = Math.ceil(desiredWidth);
+        const roundedHeight = Math.ceil(desiredHeight);
+        if (Math.abs((layer.currentWidth || 0) - roundedWidth) > 1) {
+            layer.windowEl.style.setProperty("--app-modal-width", `${roundedWidth}px`);
+            layer.currentWidth = roundedWidth;
+        }
+        if (Math.abs((layer.currentHeight || 0) - roundedHeight) > 1) {
+            layer.windowEl.style.setProperty("--app-modal-height", `${roundedHeight}px`);
+            layer.currentHeight = roundedHeight;
+        }
         layer.node.classList.toggle(
             "is-content-clipped",
             contentWidth > viewportWidth + 2 || contentHeight > viewportHeight + 2
         );
+    }
+
+    function clearScheduledFits(layer) {
+        if (!layer) {
+            return;
+        }
+        if (layer.fitFrame) {
+            window.cancelAnimationFrame(layer.fitFrame);
+            layer.fitFrame = null;
+        }
+        if (layer.fitTimers && layer.fitTimers.length) {
+            layer.fitTimers.forEach(function (timerId) {
+                window.clearTimeout(timerId);
+            });
+            layer.fitTimers = [];
+        }
     }
 
     function scheduleFitLayerToContent(layer) {
@@ -236,15 +268,26 @@ window.ArborisModalPopups = (function () {
             return;
         }
 
-        window.requestAnimationFrame(function () {
+        clearScheduledFits(layer);
+        layer.fitTimers = [];
+        layer.fitFrame = window.requestAnimationFrame(function () {
+            layer.fitFrame = null;
             fitLayerToContent(layer);
         });
-        window.setTimeout(function () {
-            fitLayerToContent(layer);
-        }, 160);
-        window.setTimeout(function () {
-            fitLayerToContent(layer);
-        }, 420);
+    }
+
+    function requestResizeForWindow(sourceWindow) {
+        const layer = getCurrentLayer(sourceWindow);
+        if (layer) {
+            if (layer.autoFit === false) {
+                return;
+            }
+            if (!layer.loaded) {
+                layer.needsFitOnLoad = true;
+                return;
+            }
+            scheduleFitLayerToContent(layer);
+        }
     }
 
     function installFrameCloseBridge(layer) {
@@ -351,13 +394,22 @@ window.ArborisModalPopups = (function () {
         const layer = {
             closed: false,
             iframe: iframe,
+            currentHeight: size.height,
+            currentWidth: size.width,
+            fitFrame: null,
+            fitTimers: [],
+            autoFit: size.autoFit,
             loaded: false,
+            needsFitOnLoad: false,
             node: layerNode,
             openerWindow: cfg.openerWindow || window,
             windowEl: windowEl,
         };
 
         layer.resizeHandler = function () {
+            if (layer.autoFit === false) {
+                return;
+            }
             scheduleFitLayerToContent(layer);
         };
         window.addEventListener("resize", layer.resizeHandler);
@@ -373,8 +425,13 @@ window.ArborisModalPopups = (function () {
         iframe.addEventListener("load", function () {
             layer.loaded = true;
             installFrameCloseBridge(layer);
+            if (layer.autoFit !== false) {
+                fitLayerToContent(layer);
+            }
             layerNode.classList.add("is-loaded");
-            scheduleFitLayerToContent(layer);
+            if (layer.needsFitOnLoad) {
+                layer.needsFitOnLoad = false;
+            }
             focusLayer(layer);
         });
 
@@ -504,6 +561,7 @@ window.ArborisModalPopups = (function () {
         handleRelatedSelection: handleRelatedSelection,
         handleReload: handleReload,
         open: open,
+        requestResizeForWindow: requestResizeForWindow,
     };
 
     return api;

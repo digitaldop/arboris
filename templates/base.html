@@ -16,7 +16,8 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=202">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=215">
+    <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     {% if role_theme %}
         <style>
             :root {
@@ -38,7 +39,7 @@
 </head>
 <body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
-    <script src="{% static 'js/core/related-entity-routes.js' %}?v=5"></script>
+    <script src="{% static 'js/core/related-entity-routes.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-form-tools.js' %}?v=4"></script>
     <header class="site-header">
         <div class="site-header-inner">
@@ -1004,7 +1005,7 @@
     <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>
-    <script src="{% static 'js/core/modal-popups.js' %}?v=4"></script>
+    <script src="{% static 'js/core/modal-popups.js' %}?v=7"></script>
     <script src="{% static 'js/core/related-popups.js' %}?v=10"></script>
     <script src="{% static 'js/core/popup-window-triggers.js' %}?v=2"></script>
     <script src="{% static 'js/core/rate-recalc-actions.js' %}?v=1"></script>

@@ -206,7 +206,6 @@ class VoceBudgetRicorrenteForm(forms.ModelForm):
             "data_inizio",
             "data_fine",
             "giorno_previsto",
-            "mese_previsto",
             "attiva",
             "note",
         ]
@@ -220,13 +219,12 @@ class VoceBudgetRicorrenteForm(forms.ModelForm):
             "data_inizio": "Data inizio",
             "data_fine": "Data fine",
             "giorno_previsto": "Giorno previsto",
-            "mese_previsto": "Mese previsto",
             "attiva": "Attiva",
             "note": "Note",
         }
         widgets = {
-            "data_inizio": forms.DateInput(attrs={"type": "date"}),
-            "data_fine": forms.DateInput(attrs={"type": "date"}),
+            "data_inizio": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "data_fine": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -239,12 +237,21 @@ class VoceBudgetRicorrenteForm(forms.ModelForm):
             "nome",
         )
         self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
-        self.fields["mese_previsto"].choices = MESE_COMPETENZA_CHOICES
-        for field_name in ("categoria", "fornitore", "data_fine", "mese_previsto", "note"):
+        for field_name in ("categoria", "fornitore", "data_fine", "note"):
             self.fields[field_name].required = False
+        for field_name in ("data_inizio", "data_fine"):
+            self.fields[field_name].input_formats = ["%Y-%m-%d"]
         apply_eur_currency_widget(self.fields["importo"])
         make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.mese_previsto = None
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 # =========================================================================
@@ -400,8 +407,8 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "note": "Note",
         }
         widgets = {
-            "data_documento": forms.DateInput(attrs={"type": "date"}),
-            "data_ricezione": forms.DateInput(attrs={"type": "date"}),
+            "data_documento": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "data_ricezione": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "mese_competenza": forms.Select(choices=MESE_COMPETENZA_CHOICES),
             "descrizione": forms.TextInput(attrs={"placeholder": "Causale o descrizione sintetica"}),
             "note": forms.Textarea(attrs={"rows": 3}),
@@ -428,6 +435,8 @@ class DocumentoFornitoreForm(forms.ModelForm):
         self.fields["categoria_spesa"].queryset = categorie_spesa_queryset()
         self.fields["categoria_spesa"].empty_label = "--- usa categoria del fornitore ---"
         self.fields["mese_competenza"].choices = MESE_COMPETENZA_CHOICES
+        for field_name in ("data_documento", "data_ricezione"):
+            self.fields[field_name].input_formats = ["%Y-%m-%d"]
         for field_name in ("imponibile", "iva", "totale"):
             apply_eur_currency_widget(self.fields[field_name], compact=False)
 
@@ -491,9 +500,9 @@ class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
             "note": "Note",
         }
         widgets = {
-            "data_scadenza": forms.DateInput(attrs={"type": "date"}),
-            "data_pagamento": forms.DateInput(attrs={"type": "date"}),
-            "note": forms.Textarea(attrs={"rows": 2}),
+            "data_scadenza": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "data_pagamento": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "note": forms.TextInput(attrs={"placeholder": "Nota breve"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -502,6 +511,8 @@ class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
         optional_fields = ["data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
         for field_name in optional_fields:
             self.fields[field_name].required = False
+        for field_name in ("data_scadenza", "data_pagamento"):
+            self.fields[field_name].input_formats = ["%Y-%m-%d"]
         self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
         self.fields["conto_bancario"].empty_label = "--- nessuno ---"
         if movimento_choices_ids is None:
@@ -543,6 +554,14 @@ ScadenzaPagamentoFornitoreFormSet = inlineformset_factory(
     DocumentoFornitore,
     ScadenzaPagamentoFornitore,
     form=ScadenzaPagamentoFornitoreForm,
+    extra=0,
+    can_delete=True,
+)
+
+ScadenzaPagamentoFornitoreCreateFormSet = inlineformset_factory(
+    DocumentoFornitore,
+    ScadenzaPagamentoFornitore,
+    form=ScadenzaPagamentoFornitoreForm,
     extra=1,
     can_delete=True,
 )
@@ -570,8 +589,8 @@ class PagamentoFornitoreForm(forms.ModelForm):
             "note": "Note",
         }
         widgets = {
-            "data_pagamento": forms.DateInput(attrs={"type": "date"}),
-            "note": forms.Textarea(attrs={"rows": 2}),
+            "data_pagamento": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "note": forms.TextInput(attrs={"placeholder": "Nota breve"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -583,6 +602,7 @@ class PagamentoFornitoreForm(forms.ModelForm):
             .order_by("data_scadenza", "id")
         )
         self.fields["movimento_finanziario"].queryset = MovimentoFinanziario.objects.order_by("-data_contabile", "-id")
+        self.fields["data_pagamento"].input_formats = ["%Y-%m-%d"]
         self.fields["movimento_finanziario"].required = False
         self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
         self.fields["conto_bancario"].required = False
