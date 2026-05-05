@@ -45,6 +45,8 @@ from .restore_scheduler import schedule_restore_job
 from .models import (
     AzioneOperazioneCronologia,
     FeedbackSegnalazione,
+    LivelloPermesso,
+    MODULE_TOGGLE_DEFINITIONS,
     ModuloOperazioneCronologia,
     Scuola,
     SistemaDatabaseBackup,
@@ -64,13 +66,348 @@ from anagrafica.dati_base_import import (
     run_import_nazioni_belfiore,
 )
 
-from .permissions import authenticated_user_required, get_user_permission_profile, operational_admin_required
+from .permissions import (
+    authenticated_user_required,
+    get_user_permission_profile,
+    operational_admin_required,
+    user_has_module_permission,
+)
 
 
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
 PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
 CRONOLOGIA_RESULT_LIMIT = 250
 FEEDBACK_PER_PAGE = 20
+GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
+GLOBAL_SEARCH_MAX_RESULTS = 12
+
+
+def compact_join(parts, separator=" - "):
+    return separator.join(str(part).strip() for part in parts if str(part or "").strip())
+
+
+def search_result(category, title, url, *, subtitle="", module="", icon="search"):
+    return {
+        "category": category,
+        "title": title,
+        "subtitle": subtitle,
+        "url": url,
+        "module": module,
+        "icon": icon,
+    }
+
+
+def append_limited_results(results, items, remaining):
+    if remaining <= 0:
+        return
+    results.extend(items[:remaining])
+
+
+def build_anagrafica_global_search_results(query, remaining):
+    from anagrafica.models import Documento, Famiglia, Familiare, Studente
+
+    results = []
+    terms = [term for term in query.split() if term]
+
+    famiglia_filter = (
+        Q(cognome_famiglia__icontains=query)
+        | Q(familiari__nome__icontains=query)
+        | Q(familiari__cognome__icontains=query)
+        | Q(familiari__email__icontains=query)
+        | Q(familiari__telefono__icontains=query)
+        | Q(studenti__nome__icontains=query)
+        | Q(studenti__cognome__icontains=query)
+        | Q(studenti__codice_fiscale__icontains=query)
+    )
+    for term in terms:
+        famiglia_filter |= (
+            Q(cognome_famiglia__icontains=term)
+            | Q(familiari__nome__icontains=term)
+            | Q(familiari__cognome__icontains=term)
+            | Q(studenti__nome__icontains=term)
+            | Q(studenti__cognome__icontains=term)
+        )
+
+    famiglie = (
+        Famiglia.objects.filter(famiglia_filter)
+        .select_related("stato_relazione_famiglia")
+        .prefetch_related("familiari", "studenti")
+        .distinct()
+        .order_by("cognome_famiglia", "id")[:4]
+    )
+    results.extend(
+        search_result(
+            "Famiglia",
+            famiglia.cognome_famiglia,
+            reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}),
+            subtitle=compact_join([famiglia.stato_relazione_famiglia, famiglia.label_contesto_anagrafica()]),
+            module="Anagrafica",
+            icon="family",
+        )
+        for famiglia in famiglie
+    )
+
+    person_filter = Q(nome__icontains=query) | Q(cognome__icontains=query) | Q(codice_fiscale__icontains=query)
+    if len(terms) >= 2:
+        first, second = terms[0], terms[1]
+        person_filter |= (Q(nome__icontains=first) & Q(cognome__icontains=second))
+        person_filter |= (Q(cognome__icontains=first) & Q(nome__icontains=second))
+
+    studenti = (
+        Studente.objects.filter(person_filter | Q(famiglia__cognome_famiglia__icontains=query))
+        .select_related("famiglia")
+        .order_by("cognome", "nome", "id")[:4]
+    )
+    results.extend(
+        search_result(
+            "Studente",
+            str(studente),
+            reverse("modifica_studente", kwargs={"pk": studente.pk}),
+            subtitle=compact_join(["Famiglia", studente.famiglia.cognome_famiglia]),
+            module="Anagrafica",
+            icon="student",
+        )
+        for studente in studenti
+    )
+
+    familiari = (
+        Familiare.objects.filter(
+            person_filter
+            | Q(email__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(famiglia__cognome_famiglia__icontains=query)
+        )
+        .select_related("famiglia", "relazione_familiare")
+        .order_by("cognome", "nome", "id")[:3]
+    )
+    results.extend(
+        search_result(
+            "Familiare",
+            str(familiare),
+            reverse("modifica_familiare", kwargs={"pk": familiare.pk}),
+            subtitle=compact_join([familiare.relazione_familiare, familiare.famiglia.cognome_famiglia]),
+            module="Anagrafica",
+            icon="user",
+        )
+        for familiare in familiari
+    )
+
+    documenti = (
+        Documento.objects.filter(
+            Q(tipo_documento__tipo_documento__icontains=query)
+            | Q(descrizione__icontains=query)
+            | Q(file__icontains=query)
+            | Q(famiglia__cognome_famiglia__icontains=query)
+            | Q(familiare__nome__icontains=query)
+            | Q(familiare__cognome__icontains=query)
+            | Q(studente__nome__icontains=query)
+            | Q(studente__cognome__icontains=query)
+        )
+        .select_related("tipo_documento", "famiglia", "familiare", "studente")
+        .order_by("-data_caricamento", "-id")[:3]
+    )
+    for documento in documenti:
+        owner_label = ""
+        owner_url = documento.download_url
+        if documento.famiglia_id:
+            owner_label = f"Famiglia {documento.famiglia}"
+            owner_url = reverse("modifica_famiglia", kwargs={"pk": documento.famiglia_id})
+        elif documento.familiare_id:
+            owner_label = f"Familiare {documento.familiare}"
+            owner_url = reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
+        elif documento.studente_id:
+            owner_label = f"Studente {documento.studente}"
+            owner_url = reverse("modifica_studente", kwargs={"pk": documento.studente_id})
+        results.append(
+            search_result(
+                "Documento",
+                str(documento),
+                owner_url,
+                subtitle=compact_join([owner_label, documento.scadenza.strftime("%d/%m/%Y") if documento.scadenza else ""]),
+                module="Anagrafica",
+                icon="file-text",
+            )
+        )
+
+    return results[:remaining]
+
+
+def build_interested_families_global_search_results(query, remaining):
+    from famiglie_interessate.models import FamigliaInteressata
+
+    famiglie = (
+        FamigliaInteressata.objects.filter(
+            Q(nome__icontains=query)
+            | Q(referente_principale__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(email__icontains=query)
+            | Q(minori__nome__icontains=query)
+            | Q(minori__cognome__icontains=query)
+        )
+        .distinct()
+        .order_by("-data_aggiornamento", "-id")[:remaining]
+    )
+    return [
+        search_result(
+            "Famiglia interessata",
+            famiglia.nome_display,
+            reverse("modifica_famiglia_interessata", kwargs={"pk": famiglia.pk}),
+            subtitle=compact_join([famiglia.get_stato_display(), famiglia.contatto_display]),
+            module="Famiglie interessate",
+            icon="family",
+        )
+        for famiglia in famiglie
+    ]
+
+
+def build_calendar_global_search_results(query, remaining):
+    from calendario.models import EventoCalendario
+
+    eventi = (
+        EventoCalendario.objects.filter(
+            Q(titolo__icontains=query)
+            | Q(tipologia__icontains=query)
+            | Q(luogo__icontains=query)
+            | Q(descrizione__icontains=query)
+            | Q(categoria_evento__nome__icontains=query)
+        )
+        .select_related("categoria_evento")
+        .order_by("data_inizio", "ora_inizio", "titolo")[:remaining]
+    )
+    return [
+        search_result(
+            "Evento calendario",
+            evento.titolo,
+            reverse("modifica_evento_calendario", kwargs={"pk": evento.pk}),
+            subtitle=compact_join([evento.categoria_evento.nome, evento.data_inizio.strftime("%d/%m/%Y"), evento.luogo]),
+            module="Calendario",
+            icon="calendar",
+        )
+        for evento in eventi
+    ]
+
+
+def build_financial_global_search_results(query, remaining):
+    from gestione_finanziaria.models import DocumentoFornitore, Fornitore, MovimentoFinanziario
+
+    results = []
+    fornitori = (
+        Fornitore.objects.filter(
+            Q(denominazione__icontains=query)
+            | Q(codice_fiscale__icontains=query)
+            | Q(partita_iva__icontains=query)
+            | Q(email__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(referente__icontains=query)
+        )
+        .select_related("categoria_spesa")
+        .order_by("denominazione", "id")[:4]
+    )
+    results.extend(
+        search_result(
+            "Fornitore",
+            fornitore.denominazione,
+            reverse("modifica_fornitore", kwargs={"pk": fornitore.pk}),
+            subtitle=compact_join([getattr(fornitore.categoria_spesa, "nome", ""), fornitore.email or fornitore.telefono]),
+            module="Gestione finanziaria",
+            icon="building",
+        )
+        for fornitore in fornitori
+    )
+
+    documenti = (
+        DocumentoFornitore.objects.filter(
+            Q(numero_documento__icontains=query)
+            | Q(descrizione__icontains=query)
+            | Q(fornitore__denominazione__icontains=query)
+            | Q(external_id__icontains=query)
+            | Q(note__icontains=query)
+        )
+        .select_related("fornitore", "categoria_spesa")
+        .order_by("-data_documento", "-id")[:4]
+    )
+    results.extend(
+        search_result(
+            "Fattura fornitore",
+            compact_join([documento.get_tipo_documento_display(), documento.numero_documento]),
+            reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
+            subtitle=compact_join([
+                documento.fornitore.denominazione,
+                documento.data_documento.strftime("%d/%m/%Y"),
+                f"EUR {documento.totale}",
+            ]),
+            module="Gestione finanziaria",
+            icon="file-text",
+        )
+        for documento in documenti
+    )
+
+    movimenti = (
+        MovimentoFinanziario.objects.filter(
+            Q(descrizione__icontains=query)
+            | Q(note__icontains=query)
+            | Q(conto__nome_conto__icontains=query)
+            | Q(categoria__nome__icontains=query)
+        )
+        .select_related("conto", "categoria")
+        .order_by("-data_contabile", "-id")[:3]
+    )
+    results.extend(
+        search_result(
+            "Movimento bancario",
+            movimento.descrizione or f"Movimento {movimento.pk}",
+            reverse("modifica_movimento_finanziario", kwargs={"pk": movimento.pk}),
+            subtitle=compact_join([
+                movimento.data_contabile.strftime("%d/%m/%Y") if movimento.data_contabile else "",
+                getattr(movimento.conto, "nome_conto", ""),
+                f"EUR {movimento.importo}",
+            ]),
+            module="Gestione finanziaria",
+            icon="wallet",
+        )
+        for movimento in movimenti
+    )
+
+    return results[:remaining]
+
+
+def build_global_search_results(user, query, limit=GLOBAL_SEARCH_MAX_RESULTS):
+    results = []
+    query = (query or "").strip()
+    if len(query) < GLOBAL_SEARCH_MIN_QUERY_LENGTH:
+        return results
+
+    search_plan = (
+        ("anagrafica", build_anagrafica_global_search_results),
+        ("famiglie_interessate", build_interested_families_global_search_results),
+        ("calendario", build_calendar_global_search_results),
+        ("gestione_finanziaria", build_financial_global_search_results),
+    )
+
+    for module_name, builder in search_plan:
+        remaining = limit - len(results)
+        if remaining <= 0:
+            break
+        if not user_has_module_permission(user, module_name, LivelloPermesso.VISUALIZZAZIONE):
+            continue
+        append_limited_results(results, builder(query, remaining), remaining)
+
+    return results[:limit]
+
+
+@authenticated_user_required
+def ricerca_globale_sistema(request):
+    query = (request.GET.get("q") or "").strip()
+    results = build_global_search_results(request.user, query)
+    return JsonResponse(
+        {
+            "ok": True,
+            "query": query,
+            "min_length": GLOBAL_SEARCH_MIN_QUERY_LENGTH,
+            "count": len(results),
+            "results": results,
+        }
+    )
 
 
 def sync_user_profiles_for_role(ruolo):
@@ -358,12 +695,27 @@ def impostazioni_generali_sistema(request):
 
     p = default_gi_file_path()
     nazioni_path = default_nazioni_belfiore_file_path()
+    moduli_configurabili = []
+    for definition in MODULE_TOGGLE_DEFINITIONS:
+        field = form[definition["field"]]
+        enabled = bool(getattr(impostazioni_display, definition["field"], True))
+        moduli_configurabili.append(
+            {
+                **definition,
+                "field": field,
+                "enabled": enabled,
+            }
+        )
+
     return render(
         request,
         "sistema/impostazioni_generali_form.html",
         {
             "form": form,
             "impostazioni": impostazioni_display,
+            "moduli_configurabili": moduli_configurabili,
+            "moduli_attivi_count": sum(1 for modulo in moduli_configurabili if modulo["enabled"]),
+            "moduli_totali_count": len(moduli_configurabili),
             "dati_base_file_ready": p.is_file(),
             "dati_base_file_path": str(p),
             "nazioni_belfiore_file_ready": nazioni_path.is_file(),

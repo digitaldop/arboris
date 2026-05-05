@@ -22,7 +22,7 @@ from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -56,6 +56,74 @@ MONTH_FULL_LABELS = {
     11: "Novembre",
     12: "Dicembre",
 }
+
+PERIODO_BUDGET_ANNO_SCOLASTICO = "anno_scolastico"
+PERIODO_BUDGET_ANNO_SOLARE = "anno_solare"
+
+
+def _first_day_of_month(value):
+    return value.replace(day=1)
+
+
+def _last_day_of_month(value):
+    return value.replace(day=monthrange(value.year, value.month)[1])
+
+
+def _add_months(value, months):
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _iter_month_starts(start_date, end_date):
+    current = _first_day_of_month(start_date)
+    end_month = _first_day_of_month(end_date)
+    while current <= end_month:
+        yield current
+        current = _add_months(current, 1)
+
+
+def _month_key(value):
+    return (value.year, value.month)
+
+
+def _empty_budget_month(month_start, today):
+    month_end = _last_day_of_month(month_start)
+    is_current = month_start <= today <= month_end
+    return {
+        "key": f"{month_start.year}-{month_start.month:02d}",
+        "date": month_start,
+        "label": f"{MONTH_FULL_LABELS[month_start.month]} {month_start.year}",
+        "short_label": f"{MONTH_SHORT_LABELS[month_start.month]} {month_start.year}",
+        "is_past": month_end < today,
+        "is_current": is_current,
+        "is_future": month_start > today,
+        "tone": "current" if is_current else "past" if month_end < today else "future",
+        "entrate_previste": Decimal("0.00"),
+        "entrate_effettive": Decimal("0.00"),
+        "uscite_previste": Decimal("0.00"),
+        "uscite_effettive": Decimal("0.00"),
+        "rette_previste": Decimal("0.00"),
+        "rette_incassate": Decimal("0.00"),
+        "servizi_previste": Decimal("0.00"),
+        "servizi_incassate": Decimal("0.00"),
+        "fatture_previste": Decimal("0.00"),
+        "ricorrenti_entrate": Decimal("0.00"),
+        "ricorrenti_uscite": Decimal("0.00"),
+    }
+
+
+def _budget_row_totals(row):
+    row["saldo_previsto"] = row["entrate_previste"] - row["uscite_previste"]
+    row["saldo_effettivo"] = row["entrate_effettive"] - row["uscite_effettive"]
+    row["scostamento"] = row["saldo_effettivo"] - row["saldo_previsto"]
+    row["entrate_da_incassare"] = max(row["entrate_previste"] - row["entrate_effettive"], Decimal("0.00"))
+    row["uscite_da_sostenere"] = max(row["uscite_previste"] - row["uscite_effettive"], Decimal("0.00"))
+    row["saldo_operativo"] = row["saldo_effettivo"] if row["is_past"] else row["saldo_previsto"]
+    row["saldo_tone"] = "positive" if row["saldo_operativo"] >= 0 else "negative"
+    return row
 
 
 def _empty_financial_series(labels):
@@ -111,6 +179,47 @@ def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
     return series
 
 
+def build_current_month_supplier_due_data(monthly_start, monthly_end):
+    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+
+    scadenze = (
+        ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore")
+        .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .filter(data_scadenza__lte=monthly_end)
+        .order_by("data_scadenza", "documento__fornitore__denominazione", "id")
+    )
+    aggregates = scadenze.aggregate(
+        count_fatture=Count("documento", distinct=True),
+        totale_previsto=Sum("importo_previsto"),
+        totale_pagato=Sum("importo_pagato"),
+    )
+    totale_previsto = aggregates["totale_previsto"] or Decimal("0.00")
+    totale_pagato = aggregates["totale_pagato"] or Decimal("0.00")
+    totale_residuo = max(totale_previsto - totale_pagato, Decimal("0.00"))
+
+    return {
+        "count_fatture": aggregates["count_fatture"] or 0,
+        "count_scadenze": scadenze.count(),
+        "count_scadute": scadenze.filter(data_scadenza__lt=monthly_start).count(),
+        "totale_previsto": totale_previsto,
+        "totale_pagato": totale_pagato,
+        "totale_residuo": totale_residuo,
+        "items": [
+            {
+                "fornitore": scadenza.documento.fornitore.denominazione,
+                "documento": scadenza.documento.numero_documento or str(scadenza.documento),
+                "data_scadenza": scadenza.data_scadenza,
+                "importo_residuo": scadenza.importo_residuo,
+                "stato_label": scadenza.get_stato_display(),
+                "is_overdue": scadenza.data_scadenza < monthly_start,
+                "url": f"{reverse('modifica_documento_fornitore', kwargs={'pk': scadenza.documento_id})}?popup=1",
+                "pagamento_url": f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1",
+            }
+            for scadenza in scadenze[:5]
+        ],
+    }
+
+
 def build_home_financial_dashboard_data(today=None):
     """
     Riepilogo sintetico per la dashboard generale.
@@ -151,6 +260,10 @@ def build_home_financial_dashboard_data(today=None):
     ).count()
     current_month_label = f"{MONTH_FULL_LABELS[today.month]} {today.year}"
     current_year_label = str(today.year)
+    fatture_in_scadenza_mese = build_current_month_supplier_due_data(monthly_start, monthly_end)
+    fatture_in_scadenza_mese["period_label"] = f"Entro {current_month_label}, incluse scadute"
+    budgeting_dashboard = build_budgeting_dashboard_data(today=today)
+    budgeting_month = budgeting_dashboard.get("current_month") or {}
 
     return {
         "current_month_label": current_month_label,
@@ -159,12 +272,235 @@ def build_home_financial_dashboard_data(today=None):
         "conti_attivi": conti_attivi.count(),
         "movimenti_senza_categoria": movimenti_senza_categoria,
         "movimenti_da_riconciliare": movimenti_da_riconciliare,
+        "fatture_in_scadenza_mese": fatture_in_scadenza_mese,
+        "budgeting_month": {
+            "period_label": budgeting_dashboard["period"]["label"],
+            "month_label": budgeting_month.get("label", current_month_label),
+            "entrate_previste": budgeting_month.get("entrate_previste", Decimal("0.00")),
+            "uscite_previste": budgeting_month.get("uscite_previste", Decimal("0.00")),
+            "saldo_previsto": budgeting_month.get("saldo_previsto", Decimal("0.00")),
+            "scostamento": budgeting_month.get("scostamento", Decimal("0.00")),
+        },
         "monthly": monthly,
         "annual": annual,
         "chart_data": {
             "monthly": _serializable_financial_series(monthly, current_month_label),
             "annual": _serializable_financial_series(annual, current_year_label),
         },
+    }
+
+
+def resolve_budgeting_period(period_type=None, today=None):
+    from scuola.utils import resolve_default_anno_scolastico
+
+    today = today or timezone.localdate()
+    period_type = period_type or PERIODO_BUDGET_ANNO_SCOLASTICO
+    anno_scolastico = resolve_default_anno_scolastico()
+
+    if period_type == PERIODO_BUDGET_ANNO_SCOLASTICO and anno_scolastico:
+        start_date = anno_scolastico.data_inizio or date(today.year, 9, 1)
+        end_date = anno_scolastico.data_fine or _add_months(start_date, 11)
+        return {
+            "type": PERIODO_BUDGET_ANNO_SCOLASTICO,
+            "label": f"Anno scolastico {anno_scolastico.nome_anno_scolastico}",
+            "start": _first_day_of_month(start_date),
+            "end": _last_day_of_month(end_date),
+            "anno_scolastico": anno_scolastico,
+        }
+
+    start_date = date(today.year, 1, 1)
+    end_date = date(today.year, 12, 31)
+    return {
+        "type": PERIODO_BUDGET_ANNO_SOLARE,
+        "label": f"Anno solare {today.year}",
+        "start": start_date,
+        "end": end_date,
+        "anno_scolastico": None,
+    }
+
+
+def _add_budget_amount(months_by_key, target_key, value_date, amount):
+    if not value_date:
+        return
+    row = months_by_key.get(_month_key(value_date))
+    if row is None:
+        return
+    row[target_key] += amount or Decimal("0.00")
+
+
+def _budget_month_difference(start_month, target_month):
+    return (target_month.year - start_month.year) * 12 + (target_month.month - start_month.month)
+
+
+def _budget_voice_occurs_in_month(voce, month_start):
+    from .models import FrequenzaVoceBudget
+
+    if not voce.attiva:
+        return False
+    month_end = _last_day_of_month(month_start)
+    if voce.data_inizio > month_end:
+        return False
+    if voce.data_fine and voce.data_fine < month_start:
+        return False
+
+    first_occurrence_month = _first_day_of_month(voce.data_inizio)
+    delta = _budget_month_difference(first_occurrence_month, month_start)
+    if delta < 0:
+        return False
+
+    if voce.frequenza == FrequenzaVoceBudget.UNA_TANTUM:
+        return _month_key(voce.data_inizio) == _month_key(month_start)
+    if voce.frequenza == FrequenzaVoceBudget.ANNUALE:
+        target_month = voce.mese_previsto or voce.data_inizio.month
+        return month_start.month == target_month
+
+    intervals = {
+        FrequenzaVoceBudget.MENSILE: 1,
+        FrequenzaVoceBudget.BIMESTRALE: 2,
+        FrequenzaVoceBudget.TRIMESTRALE: 3,
+        FrequenzaVoceBudget.SEMESTRALE: 6,
+    }
+    interval = intervals.get(voce.frequenza, 1)
+    return delta % interval == 0
+
+
+def _build_budgeting_recurring_details(voci_budget, month_rows):
+    from .models import TipoVoceBudget
+
+    details = []
+    for voce in voci_budget:
+        occurrences = []
+        for row in month_rows:
+            if not _budget_voice_occurs_in_month(voce, row["date"]):
+                continue
+            occurrences.append(row["short_label"])
+            if voce.tipo == TipoVoceBudget.ENTRATA:
+                row["entrate_previste"] += voce.importo
+                row["ricorrenti_entrate"] += voce.importo
+            else:
+                row["uscite_previste"] += voce.importo
+                row["ricorrenti_uscite"] += voce.importo
+        details.append(
+            {
+                "voce": voce,
+                "occurrences_count": len(occurrences),
+                "occurrences_label": ", ".join(occurrences[:4]) + ("..." if len(occurrences) > 4 else ""),
+                "totale_periodo": voce.importo * len(occurrences),
+            }
+        )
+    return details
+
+
+def build_budgeting_dashboard_data(period_type=None, today=None):
+    from economia.models import RataIscrizione
+    from servizi_extra.models import RataServizioExtra
+    from .models import (
+        MovimentoFinanziario,
+        ScadenzaPagamentoFornitore,
+        StatoScadenzaFornitore,
+        TipoVoceBudget,
+        VoceBudgetRicorrente,
+    )
+
+    today = today or timezone.localdate()
+    period = resolve_budgeting_period(period_type, today=today)
+    month_rows = [_empty_budget_month(month_start, today) for month_start in _iter_month_starts(period["start"], period["end"])]
+    months_by_key = {_month_key(row["date"]): row for row in month_rows}
+
+    rate_previste = RataIscrizione.objects.filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"]).values(
+        "data_scadenza",
+        "importo_finale",
+        "importo_dovuto",
+    )
+    for rata in rate_previste:
+        amount = rata["importo_finale"] or rata["importo_dovuto"] or Decimal("0.00")
+        _add_budget_amount(months_by_key, "entrate_previste", rata["data_scadenza"], amount)
+        _add_budget_amount(months_by_key, "rette_previste", rata["data_scadenza"], amount)
+
+    rate_incassate = RataIscrizione.objects.filter(
+        data_pagamento__gte=period["start"],
+        data_pagamento__lte=period["end"],
+        importo_pagato__gt=0,
+    ).values("data_pagamento", "importo_pagato")
+    for rata in rate_incassate:
+        amount = rata["importo_pagato"] or Decimal("0.00")
+        _add_budget_amount(months_by_key, "entrate_effettive", rata["data_pagamento"], amount)
+        _add_budget_amount(months_by_key, "rette_incassate", rata["data_pagamento"], amount)
+
+    servizi_previsti = RataServizioExtra.objects.filter(
+        data_scadenza__gte=period["start"],
+        data_scadenza__lte=period["end"],
+    ).values("data_scadenza", "importo_finale", "importo_dovuto")
+    for rata in servizi_previsti:
+        amount = rata["importo_finale"] or rata["importo_dovuto"] or Decimal("0.00")
+        _add_budget_amount(months_by_key, "entrate_previste", rata["data_scadenza"], amount)
+        _add_budget_amount(months_by_key, "servizi_previste", rata["data_scadenza"], amount)
+
+    servizi_incassati = RataServizioExtra.objects.filter(
+        data_pagamento__gte=period["start"],
+        data_pagamento__lte=period["end"],
+        importo_pagato__gt=0,
+    ).values("data_pagamento", "importo_pagato")
+    for rata in servizi_incassati:
+        amount = rata["importo_pagato"] or Decimal("0.00")
+        _add_budget_amount(months_by_key, "entrate_effettive", rata["data_pagamento"], amount)
+        _add_budget_amount(months_by_key, "servizi_incassate", rata["data_pagamento"], amount)
+
+    movimenti_uscita = MovimentoFinanziario.objects.filter(
+        data_contabile__gte=period["start"],
+        data_contabile__lte=period["end"],
+        importo__lt=0,
+    ).values("data_contabile", "importo")
+    for movimento in movimenti_uscita:
+        _add_budget_amount(months_by_key, "uscite_effettive", movimento["data_contabile"], abs(movimento["importo"]))
+
+    scadenze_fornitori = (
+        ScadenzaPagamentoFornitore.objects.exclude(
+            stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+        )
+        .filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"])
+        .values("data_scadenza", "importo_previsto", "importo_pagato")
+    )
+    for scadenza in scadenze_fornitori:
+        amount = max((scadenza["importo_previsto"] or Decimal("0.00")) - (scadenza["importo_pagato"] or Decimal("0.00")), Decimal("0.00"))
+        _add_budget_amount(months_by_key, "uscite_previste", scadenza["data_scadenza"], amount)
+        _add_budget_amount(months_by_key, "fatture_previste", scadenza["data_scadenza"], amount)
+
+    voci_budget = list(
+        VoceBudgetRicorrente.objects.select_related("categoria", "fornitore")
+        .filter(attiva=True, data_inizio__lte=period["end"])
+        .filter(Q(data_fine__isnull=True) | Q(data_fine__gte=period["start"]))
+        .order_by("tipo", "categoria__nome", "nome")
+    )
+    voci_budget_details = _build_budgeting_recurring_details(voci_budget, month_rows)
+
+    for row in month_rows:
+        _budget_row_totals(row)
+
+    current_month = next((row for row in month_rows if row["is_current"]), month_rows[0] if month_rows else None)
+    totals = {
+        "entrate_previste": sum((row["entrate_previste"] for row in month_rows), Decimal("0.00")),
+        "entrate_effettive": sum((row["entrate_effettive"] for row in month_rows), Decimal("0.00")),
+        "uscite_previste": sum((row["uscite_previste"] for row in month_rows), Decimal("0.00")),
+        "uscite_effettive": sum((row["uscite_effettive"] for row in month_rows), Decimal("0.00")),
+        "saldo_previsto": sum((row["saldo_previsto"] for row in month_rows), Decimal("0.00")),
+        "saldo_effettivo": sum((row["saldo_effettivo"] for row in month_rows), Decimal("0.00")),
+    }
+    totals["scostamento"] = totals["saldo_effettivo"] - totals["saldo_previsto"]
+
+    return {
+        "period": period,
+        "period_options": [
+            {"value": PERIODO_BUDGET_ANNO_SCOLASTICO, "label": "Anno scolastico"},
+            {"value": PERIODO_BUDGET_ANNO_SOLARE, "label": "Anno solare"},
+        ],
+        "months": month_rows,
+        "current_month": current_month,
+        "totals": totals,
+        "voci_budget": voci_budget_details,
+        "voci_budget_count": len(voci_budget),
+        "voci_budget_entrate_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.ENTRATA),
+        "voci_budget_uscite_count": sum(1 for voce in voci_budget if voce.tipo == TipoVoceBudget.USCITA),
     }
 
 

@@ -132,6 +132,59 @@ window.ArborisDashboardLayout = (function () {
         });
     }
 
+    function initWeeklyCalendarPagination(container) {
+        container.querySelectorAll("[data-dashboard-calendar-week]").forEach((widget) => {
+            if (widget.dataset.dashboardCalendarPaginationBound === "1") {
+                return;
+            }
+
+            const entries = Array.from(widget.querySelectorAll("[data-dashboard-calendar-entry]"));
+            const pageSize = Math.max(parseInt(widget.dataset.dashboardCalendarPageSize || "3", 10) || 3, 1);
+            const previousButton = widget.querySelector("[data-dashboard-calendar-prev]");
+            const nextButton = widget.querySelector("[data-dashboard-calendar-next]");
+            const status = widget.querySelector("[data-dashboard-calendar-status]");
+            const totalPages = Math.max(Math.ceil(entries.length / pageSize), 1);
+            let currentPage = 1;
+
+            if (!entries.length || totalPages <= 1 || !previousButton || !nextButton || !status) {
+                return;
+            }
+
+            widget.dataset.dashboardCalendarPaginationBound = "1";
+
+            function renderPage() {
+                const startIndex = (currentPage - 1) * pageSize;
+                const endIndex = startIndex + pageSize;
+
+                entries.forEach((entry, index) => {
+                    entry.classList.toggle("is-dashboard-calendar-hidden", index < startIndex || index >= endIndex);
+                });
+
+                previousButton.disabled = currentPage <= 1;
+                nextButton.disabled = currentPage >= totalPages;
+                status.textContent = `Pagina ${currentPage} di ${totalPages}`;
+            }
+
+            previousButton.addEventListener("click", () => {
+                if (currentPage <= 1) {
+                    return;
+                }
+                currentPage -= 1;
+                renderPage();
+            });
+
+            nextButton.addEventListener("click", () => {
+                if (currentPage >= totalPages) {
+                    return;
+                }
+                currentPage += 1;
+                renderPage();
+            });
+
+            renderPage();
+        });
+    }
+
     function init(container = document) {
         const dashboardContainer = container.querySelector("#dashboard-sections");
         if (!dashboardContainer || dashboardContainer.dataset.dashboardLayoutBound === "1") {
@@ -142,6 +195,7 @@ window.ArborisDashboardLayout = (function () {
         const storageKey = dashboardContainer.dataset.dashboardOrderKey || "arboris-dashboard-section-order";
         applyStoredOrder(storageKey, dashboardContainer);
         bindDragAndDrop(dashboardContainer, storageKey);
+        initWeeklyCalendarPagination(dashboardContainer);
     }
 
     return {

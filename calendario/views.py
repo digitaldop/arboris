@@ -13,6 +13,7 @@ from django.utils.dateparse import parse_date, parse_time
 from anagrafica.models import Documento
 from economia.models import RataIscrizione
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore
+from sistema.permissions import module_is_enabled
 
 from .data import (
     build_calendar_agenda_bundle,
@@ -192,15 +193,15 @@ def lista_categorie_calendario(request):
     system_categories = ensure_system_calendar_categories()
     auto_counts = {}
 
-    if system_categories.get(SYSTEM_CATEGORY_RATE_DUE):
+    if system_categories.get(SYSTEM_CATEGORY_RATE_DUE) and module_is_enabled("economia"):
         auto_counts[system_categories[SYSTEM_CATEGORY_RATE_DUE].pk] = RataIscrizione.objects.filter(
             data_scadenza__isnull=False
         ).count()
-    if system_categories.get(SYSTEM_CATEGORY_DOCUMENTS):
+    if system_categories.get(SYSTEM_CATEGORY_DOCUMENTS) and module_is_enabled("anagrafica"):
         auto_counts[system_categories[SYSTEM_CATEGORY_DOCUMENTS].pk] = Documento.objects.filter(
             scadenza__isnull=False
         ).count()
-    if system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE):
+    if system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE) and module_is_enabled("gestione_finanziaria"):
         auto_counts[system_categories[SYSTEM_CATEGORY_SUPPLIER_DUE].pk] = ScadenzaPagamentoFornitore.objects.filter(
             data_scadenza__isnull=False
         ).count()

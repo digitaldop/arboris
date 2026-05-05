@@ -28,6 +28,7 @@ from .models import (
     EsitoSincronizzazione,
     FattureInCloudConnessione,
     FattureInCloudSyncLog,
+    FrequenzaVoceBudget,
     Fornitore,
     FonteSaldo,
     MovimentoFinanziario,
@@ -48,6 +49,8 @@ from .models import (
     TipoContoFinanziario,
     TipoProviderBancario,
     TipoDocumentoFornitore,
+    TipoVoceBudget,
+    VoceBudgetRicorrente,
 )
 
 
@@ -72,6 +75,7 @@ from .services import (
     applica_regole_a_movimento,
     importo_movimento_disponibile_fornitori,
     applica_anteprima_riconciliazione_fornitori,
+    build_budgeting_dashboard_data,
     riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
     trova_scadenze_fornitori_candidate,
@@ -286,6 +290,77 @@ class RiconciliazioneRateMatchingTests(TestCase):
         rata.refresh_from_db()
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
         self.assertFalse(rata.pagata)
+
+
+class BudgetingGestioneFinanziariaTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="budget@example.com",
+            email="budget@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(self.user)
+        self.today = timezone.localdate()
+        AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+
+    def test_budgeting_dashboard_renders_recurring_forecast(self):
+        categoria = CategoriaFinanziaria.objects.create(
+            nome="Affitto",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        VoceBudgetRicorrente.objects.create(
+            nome="Affitto sede",
+            tipo=TipoVoceBudget.USCITA,
+            categoria=categoria,
+            importo=Decimal("1500.00"),
+            frequenza=FrequenzaVoceBudget.MENSILE,
+            data_inizio=date(self.today.year, self.today.month, 1),
+            giorno_previsto=5,
+        )
+
+        data = build_budgeting_dashboard_data(today=self.today)
+        self.assertEqual(data["current_month"]["ricorrenti_uscite"], Decimal("1500.00"))
+        self.assertEqual(data["current_month"]["uscite_previste"], Decimal("1500.00"))
+
+        response = self.client.get(reverse("budgeting_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Budgeting")
+        self.assertContains(response, "Affitto sede")
+        self.assertContains(response, "EUR 1.500,00")
+        self.assertContains(response, "Andamento mensile")
+
+    def test_crea_voce_budget(self):
+        response = self.client.post(
+            reverse("crea_voce_budget"),
+            {
+                "nome": "Contributo pubblico previsto",
+                "tipo": TipoVoceBudget.ENTRATA,
+                "categoria": "",
+                "fornitore": "",
+                "importo": "500.00",
+                "frequenza": FrequenzaVoceBudget.UNA_TANTUM,
+                "data_inizio": self.today.strftime("%Y-%m-%d"),
+                "data_fine": "",
+                "giorno_previsto": str(self.today.day),
+                "mese_previsto": "",
+                "attiva": "on",
+                "note": "Prima ipotesi di budget.",
+            },
+        )
+
+        self.assertRedirects(response, reverse("budgeting_dashboard"))
+        voce = VoceBudgetRicorrente.objects.get(nome="Contributo pubblico previsto")
+        self.assertEqual(voce.tipo, TipoVoceBudget.ENTRATA)
+        self.assertEqual(voce.importo, Decimal("500.00"))
 
 
 class FornitoriGestioneFinanziariaTests(TestCase):

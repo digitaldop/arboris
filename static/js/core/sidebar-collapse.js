@@ -13,6 +13,10 @@ window.ArborisSidebarCollapse = (function () {
             "title",
             collapsed ? "Espandi menu laterale" : "Comprimi menu laterale"
         );
+        button.setAttribute(
+            "aria-label",
+            collapsed ? "Espandi menu laterale" : "Comprimi menu laterale"
+        );
 
         const icon = button.querySelector(".sidebar-collapse-icon");
         if (icon) {

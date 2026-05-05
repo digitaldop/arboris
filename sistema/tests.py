@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core import mail
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -17,14 +18,16 @@ from .models import (
     LivelloPermesso,
     RuoloUtente,
     SistemaDatabaseBackup,
+    SistemaImpostazioniGenerali,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
     TipoFeedbackSegnalazione,
 )
 from .popup_manifest import build_popup_manifest
-from anagrafica.models import Citta, Provincia, Regione
+from anagrafica.models import Citta, Famiglia, Provincia, Regione, StatoRelazioneFamiglia, Studente
 from anagrafica.models import Indirizzo
-from gestione_finanziaria.models import MovimentoFinanziario
+from calendario.models import CategoriaCalendario, EventoCalendario
+from gestione_finanziaria.models import DocumentoFornitore, Fornitore, MovimentoFinanziario, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
 
 
@@ -106,6 +109,61 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, "GESTIONE FINANZIARIA")
 
 
+class GlobalSearchTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="search@example.com",
+            email="search@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(self.user)
+
+    def test_header_renders_global_search_dropdown_controls(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-global-search-form")
+        self.assertContains(response, f'data-global-search-url="{reverse("ricerca_globale_sistema")}"')
+        self.assertContains(response, "data-global-search-dropdown")
+        self.assertContains(response, "js/core/global-search.js")
+
+    def test_global_search_returns_only_allowed_modules(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Attiva")
+        famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato)
+        Studente.objects.create(nome="Luca", cognome="Rossi", famiglia=famiglia)
+        Fornitore.objects.create(denominazione="Rossi Forniture")
+
+        response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "Rossi"})
+
+        self.assertEqual(response.status_code, 200)
+        categories = {item["category"] for item in response.json()["results"]}
+        self.assertIn("Famiglia", categories)
+        self.assertIn("Studente", categories)
+        self.assertNotIn("Fornitore", categories)
+
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE
+        )
+        if hasattr(self.user, "_arboris_permission_profile_cache"):
+            delattr(self.user, "_arboris_permission_profile_cache")
+
+        response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "Rossi"})
+
+        self.assertEqual(response.status_code, 200)
+        categories = {item["category"] for item in response.json()["results"]}
+        self.assertIn("Fornitore", categories)
+
+    def test_global_search_ignores_too_short_queries(self):
+        response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "R"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+
 class HomeDashboardSchoolYearTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -147,6 +205,30 @@ class HomeDashboardSchoolYearTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Anno Scolastico 2026/2027")
         self.assertContains(response, "Prossimo")
+
+    def test_home_week_calendar_uses_client_side_pagination(self):
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_calendario=LivelloPermesso.VISUALIZZAZIONE
+        )
+        categoria = CategoriaCalendario.objects.create(nome="Agenda", colore="#417690", ordine=1)
+        week_start = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+        for index in range(4):
+            EventoCalendario.objects.create(
+                titolo=f"Evento settimana {index + 1}",
+                categoria_evento=categoria,
+                data_inizio=week_start + timedelta(days=index),
+                data_fine=week_start + timedelta(days=index),
+                intera_giornata=True,
+            )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-dashboard-calendar-week')
+        self.assertContains(response, 'data-dashboard-calendar-page-size="3"')
+        self.assertContains(response, 'data-dashboard-calendar-next')
+        self.assertContains(response, 'is-dashboard-calendar-hidden', count=1)
+        self.assertNotContains(response, "dashboard_week_page")
 
 
 class SidebarEconomiaTests(TestCase):
@@ -249,9 +331,10 @@ class SidebarGestioneFinanziariaTests(TestCase):
 
         labels_in_order = [
             "Dashboard",
+            "Budgeting",
             "<span>Fornitori</span>",
             "Fornitori",
-            "Documenti fornitori",
+            "Fatture fornitori",
             "Scadenziario fornitori",
             "Categorie spesa",
             "<span>Conti correnti</span>",
@@ -288,6 +371,31 @@ class SidebarGestioneFinanziariaTests(TestCase):
             importo=Decimal("-35.00"),
             descrizione="Uscita test",
         )
+        fornitore = Fornitore.objects.create(denominazione="Fornitore dashboard")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FD-001",
+            data_documento=today,
+            totale=Decimal("230.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=today,
+            importo_previsto=Decimal("230.00"),
+            importo_pagato=Decimal("30.00"),
+        )
+        documento_scaduto = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FD-OLD",
+            data_documento=today - timedelta(days=45),
+            totale=Decimal("50.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_scaduto,
+            data_scadenza=today - timedelta(days=35),
+            importo_previsto=Decimal("50.00"),
+            importo_pagato=Decimal("0.00"),
+        )
 
         response = self.client.get(reverse("home"))
 
@@ -297,10 +405,22 @@ class SidebarGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "dashboard-finanziaria.js")
         self.assertContains(response, "EUR 120,00")
         self.assertContains(response, "EUR 35,00")
+        self.assertContains(response, "Fatture fornitori in scadenza")
+        self.assertContains(response, "incluse scadute")
+        self.assertContains(response, "Fornitore dashboard")
+        self.assertContains(response, "FD-001")
+        self.assertContains(response, "FD-OLD")
+        self.assertContains(response, "Scadenza:")
+        self.assertContains(response, "Importo:")
+        self.assertContains(response, "Conferma pagamento")
+        self.assertContains(response, "EUR 250,00")
+        self.assertContains(response, "Previsione mese corrente")
+        self.assertContains(response, "Apri budgeting")
 
 
 class SidebarSistemaTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(
             username="sistema@example.com",
             email="sistema@example.com",
@@ -310,6 +430,10 @@ class SidebarSistemaTests(TestCase):
             user=self.user,
             permesso_sistema=LivelloPermesso.GESTIONE,
         )
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_home_renders_school_settings_as_submenu_of_system(self):
         self.client.force_login(self.user)
@@ -351,6 +475,77 @@ class SidebarSistemaTests(TestCase):
             css,
             r"\.sidebar-reorder-footer\s*,\s*\.sidebar-reorder-list[^{]*\{\s*display:\s*none",
         )
+
+    def test_sidebar_collapse_toggle_lives_inside_sidebar(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        sidebar_start = content.index('<aside class="sidebar">')
+        header_end = content.index("</header>")
+        button_index = content.index('id="sidebar-collapse-btn"')
+        self.assertGreater(button_index, sidebar_start)
+        self.assertGreater(button_index, header_end)
+        self.assertContains(response, 'class="sidebar-topbar"')
+        self.assertNotContains(response, 'class="header-menu-btn" id="sidebar-collapse-btn"')
+
+    def test_general_settings_renders_module_toggles_with_new_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("impostazioni_generali_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Controllo sistema")
+        self.assertContains(response, "Moduli del software")
+        self.assertContains(response, 'name="modulo_calendario_attivo"')
+        self.assertContains(response, 'class="settings-module-grid"')
+
+    def test_general_settings_can_disable_module_globally(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("impostazioni_generali_sistema"),
+            {
+                "terminologia_studente": "studente",
+                "formato_visualizzazione_telefono": "it_plus_n3_2_2_3",
+                "gestione_iscrizione_corso_anno": "mese_iscrizione_intero",
+                "giorno_soglia_iscrizione_corso_anno": "15",
+                "osservazioni_solo_autori_modifica": "on",
+                "modulo_anagrafica_attivo": "on",
+                "modulo_famiglie_interessate_attivo": "on",
+                "modulo_economia_attivo": "on",
+                "modulo_gestione_finanziaria_attivo": "on",
+                "modulo_gestione_amministrativa_attivo": "on",
+                "modulo_servizi_extra_attivo": "on",
+                "font_principale": "manrope",
+                "font_titoli": "manrope",
+            },
+        )
+
+        self.assertRedirects(response, reverse("impostazioni_generali_sistema"))
+        impostazioni = SistemaImpostazioniGenerali.objects.get()
+        self.assertFalse(impostazioni.modulo_calendario_attivo)
+
+    def test_disabled_module_is_hidden_and_blocked_even_for_superuser(self):
+        SistemaImpostazioniGenerali.objects.create(modulo_calendario_attivo=False)
+        admin = User.objects.create_superuser(
+            username="admin@example.com",
+            email="admin@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_view_calendario"])
+        self.assertNotContains(response, 'id="sidebar-calendario-panel"')
+
+        response = self.client.get(reverse("calendario_agenda"))
+
+        self.assertRedirects(response, reverse("home"))
 
 
 class RuoliUtenteTests(TestCase):

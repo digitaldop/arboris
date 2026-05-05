@@ -8,7 +8,7 @@ from economia.models import RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 from sistema.models import LivelloPermesso
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import module_is_enabled, user_has_module_permission
 
 from .models import (
     CategoriaCalendario,
@@ -337,7 +337,7 @@ def build_calendar_deadline_records(system_categories=None):
     categoria_documenti = system_categories.get(SYSTEM_CATEGORY_DOCUMENTS)
     categoria_fornitori = system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE)
 
-    if categoria_rate:
+    if categoria_rate and module_is_enabled("economia"):
         rate = (
             RataIscrizione.objects.filter(data_scadenza__isnull=False)
             .select_related(
@@ -372,7 +372,7 @@ def build_calendar_deadline_records(system_categories=None):
                 )
             )
 
-    if categoria_documenti:
+    if categoria_documenti and module_is_enabled("anagrafica"):
         today = timezone.localdate()
         current_year_start = date(today.year, 1, 1)
         current_year_end = date(today.year, 12, 31)
@@ -405,7 +405,7 @@ def build_calendar_deadline_records(system_categories=None):
                 )
             )
 
-    if categoria_fornitori:
+    if categoria_fornitori and module_is_enabled("gestione_finanziaria"):
         scadenze = (
             ScadenzaPagamentoFornitore.objects.exclude(
                 stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
@@ -521,7 +521,7 @@ def build_calendar_list_bundle(categoria_filter="", query="", user=None):
     }
 
 
-def build_dashboard_calendar_data(today=None, user=None):
+def build_dashboard_calendar_data(today=None, user=None, week_page_size=3):
     today = today or timezone.localdate()
     agenda_bundle = build_calendar_agenda_bundle(user=user)
     records = agenda_bundle["records"]
@@ -531,6 +531,8 @@ def build_dashboard_calendar_data(today=None, user=None):
 
     today_records = [record for record in records if overlaps_calendar_day(record, today)]
     week_records = [record for record in records if overlaps_calendar_range(record, week_start, week_end)]
+    count_week_records = len(week_records)
+    week_total_pages = max(1, (count_week_records + week_page_size - 1) // week_page_size)
 
     return {
         "today": today,
@@ -540,6 +542,8 @@ def build_dashboard_calendar_data(today=None, user=None):
         "week_label": f"Dal {format_weekday_date_label(week_start)} al {format_weekday_date_label(week_end)}",
         "today_records": today_records,
         "week_records": week_records,
+        "week_page_size": week_page_size,
+        "week_total_pages": week_total_pages,
         "count_today_records": len(today_records),
-        "count_week_records": len(week_records),
+        "count_week_records": count_week_records,
     }

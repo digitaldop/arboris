@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Elimina voce budget - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'budgeting_dashboard' %}">Budgeting</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Elimina voce</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="page-head finance-page-head">
+    <div>
+        <h1 class="page-title">Elimina voce budget</h1>
+        <p class="family-page-address">Conferma la rimozione della voce previsionale.</p>
+    </div>
+</div>
+
+<div class="content-card finance-modern-panel">
+    <div class="panel-body">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">{{ voce.nome }}</h2>
+                <p class="finance-section-subtitle">{{ voce.get_tipo_display }} - {{ voce.get_frequenza_display }} - EUR {{ voce.importo|euro }}</p>
+            </div>
+        </div>
+        <p>La voce non verra piu usata nelle proiezioni del budget.</p>
+    </div>
+    <form method="post" class="form-actions">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+            <span class="btn-label">Elimina</span>
+        </button>
+        <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+            <span class="btn-label">Annulla</span>
+        </a>
+    </form>
+</div>
+{% endblock %}

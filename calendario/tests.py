@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -10,13 +11,15 @@ from anagrafica.models import Documento, Famiglia, StatoRelazioneFamiglia, TipoD
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
-from sistema.models import LivelloPermesso, SistemaUtentePermessi
+from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, SistemaUtentePermessi
 
+from .data import build_dashboard_calendar_data
 from .models import CategoriaCalendario, EventoCalendario
 
 
 class CalendarioAgendaInterfaceTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(
             username="calendario@example.com",
             email="calendario@example.com",
@@ -27,6 +30,10 @@ class CalendarioAgendaInterfaceTests(TestCase):
             permesso_calendario=LivelloPermesso.GESTIONE,
         )
         self.category = CategoriaCalendario.objects.create(nome="Didattica", colore="#417690", ordine=1)
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_agenda_exposes_category_edit_icon_and_current_script(self):
         self.client.force_login(self.user)
@@ -67,6 +74,27 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "calendar-row-action-btn")
         self.assertContains(response, 'data-calendar-event-popup="1"')
         self.assertContains(response, "width=920,height=760")
+
+    def test_dashboard_week_events_are_paginated(self):
+        start_day = date(2026, 5, 4)
+        for index in range(7):
+            EventoCalendario.objects.create(
+                titolo=f"Evento dashboard {index + 1}",
+                categoria_evento=self.category,
+                data_inizio=start_day + timedelta(days=index),
+                data_fine=start_day + timedelta(days=index),
+                intera_giornata=True,
+            )
+
+        dashboard_data = build_dashboard_calendar_data(
+            today=date(2026, 5, 5),
+            user=self.user,
+        )
+
+        self.assertEqual(dashboard_data["count_week_records"], 7)
+        self.assertEqual(dashboard_data["week_page_size"], 3)
+        self.assertEqual(dashboard_data["week_total_pages"], 3)
+        self.assertEqual(len(dashboard_data["week_records"]), 7)
 
     def test_document_deadline_links_to_owner_card_without_popup(self):
         self.client.force_login(self.user)
@@ -195,6 +223,33 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(popup_response, 'name="popup" value="1"')
         self.assertNotContains(popup_response, '<span class="btn-label">Chiudi</span>')
         self.assertNotContains(popup_response, '<div class="breadcrumb">')
+
+    def test_disabled_financial_module_hides_supplier_deadlines_from_calendar(self):
+        self.client.force_login(self.user)
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE
+        )
+        SistemaImpostazioniGenerali.objects.create(modulo_gestione_finanziaria_attivo=False)
+        fornitore = Fornitore.objects.create(denominazione="Carta Srl")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="F-001",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 20),
+            importo_previsto=Decimal("122.00"),
+        )
+
+        response = self.client.get(reverse("calendario_agenda"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Scadenza fornitore - Carta Srl")
+        self.assertNotContains(response, "fornitore-scadenza")
 
     def test_event_form_popup_closes_after_create(self):
         self.client.force_login(self.user)

@@ -59,6 +59,7 @@ from .forms import (
     RegolaCategorizzazioneForm,
     SaldoContoForm,
     ScadenzaPagamentoFornitoreFormSet,
+    VoceBudgetRicorrenteForm,
     movimenti_fornitore_recenti_ids,
 )
 from .importers import (
@@ -99,6 +100,7 @@ from .models import (
     StatoRiconciliazione,
     TipoCategoriaFinanziaria,
     TipoProviderBancario,
+    VoceBudgetRicorrente,
 )
 from .providers import (
     adapter_for_provider,
@@ -130,6 +132,7 @@ from .services import (
     applica_anteprima_riconciliazione_fornitori,
     applica_regole_a_movimento,
     aggiorna_stato_documento_da_scadenze as service_aggiorna_stato_documento_da_scadenze,
+    build_budgeting_dashboard_data,
     calcola_saldo_conto_alla_data,
     calcola_hash_deduplica_movimento,
     importo_movimento_disponibile_fornitori,
@@ -219,6 +222,78 @@ def dashboard_gestione_finanziaria(request):
             "scadenze_fornitori_scadute": scadenze_fornitori_scadute,
             "fatture_in_cloud_attive": fatture_in_cloud_attive,
         },
+    )
+
+
+# =========================================================================
+#  Budgeting
+# =========================================================================
+
+
+def budgeting_dashboard(request):
+    period_type = request.GET.get("periodo") or "anno_scolastico"
+    budget_data = build_budgeting_dashboard_data(period_type=period_type)
+    voci_budget = (
+        VoceBudgetRicorrente.objects.select_related("categoria", "fornitore")
+        .order_by("tipo", "categoria__nome", "nome")
+    )
+    return render(
+        request,
+        "gestione_finanziaria/budgeting_dashboard.html",
+        {
+            "budget_data": budget_data,
+            "voci_budget": voci_budget,
+            "periodo_corrente": budget_data["period"]["type"],
+        },
+    )
+
+
+def crea_voce_budget(request):
+    if request.method == "POST":
+        form = VoceBudgetRicorrenteForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Voce di budget creata correttamente.")
+            return redirect("budgeting_dashboard")
+    else:
+        form = VoceBudgetRicorrenteForm(initial={"data_inizio": timezone.localdate(), "attiva": True})
+
+    return render(
+        request,
+        "gestione_finanziaria/voce_budget_form.html",
+        {"form": form, "voce": None},
+    )
+
+
+def modifica_voce_budget(request, pk):
+    voce = get_object_or_404(VoceBudgetRicorrente, pk=pk)
+    if request.method == "POST":
+        form = VoceBudgetRicorrenteForm(request.POST, instance=voce)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Voce di budget aggiornata correttamente.")
+            return redirect("budgeting_dashboard")
+    else:
+        form = VoceBudgetRicorrenteForm(instance=voce)
+
+    return render(
+        request,
+        "gestione_finanziaria/voce_budget_form.html",
+        {"form": form, "voce": voce},
+    )
+
+
+def elimina_voce_budget(request, pk):
+    voce = get_object_or_404(VoceBudgetRicorrente, pk=pk)
+    if request.method == "POST":
+        voce.delete()
+        messages.success(request, "Voce di budget eliminata correttamente.")
+        return redirect("budgeting_dashboard")
+
+    return render(
+        request,
+        "gestione_finanziaria/voce_budget_confirm_delete.html",
+        {"voce": voce},
     )
 
 

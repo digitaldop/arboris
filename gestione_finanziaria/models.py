@@ -1,5 +1,6 @@
 from decimal import Decimal
 import uuid
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -169,6 +170,90 @@ class Fornitore(models.Model):
         super().clean()
         if self.categoria_spesa_id and self.categoria_spesa.tipo != TipoCategoriaFinanziaria.SPESA:
             raise ValidationError({"categoria_spesa": "Seleziona una categoria di tipo spesa."})
+
+
+class TipoVoceBudget(models.TextChoices):
+    ENTRATA = "entrata", "Entrata"
+    USCITA = "uscita", "Uscita"
+
+
+class FrequenzaVoceBudget(models.TextChoices):
+    UNA_TANTUM = "una_tantum", "Una tantum"
+    MENSILE = "mensile", "Mensile"
+    BIMESTRALE = "bimestrale", "Bimestrale"
+    TRIMESTRALE = "trimestrale", "Trimestrale"
+    SEMESTRALE = "semestrale", "Semestrale"
+    ANNUALE = "annuale", "Annuale"
+
+
+class VoceBudgetRicorrente(models.Model):
+    """
+    Voce previsionale usata dal modulo Budgeting per stimare entrate
+    e uscite non ancora presenti come movimenti, rette o fatture.
+    """
+
+    nome = models.CharField(max_length=160)
+    tipo = models.CharField(max_length=20, choices=TipoVoceBudget.choices, default=TipoVoceBudget.USCITA)
+    categoria = models.ForeignKey(
+        CategoriaFinanziaria,
+        on_delete=models.PROTECT,
+        related_name="voci_budget",
+        blank=True,
+        null=True,
+    )
+    fornitore = models.ForeignKey(
+        Fornitore,
+        on_delete=models.SET_NULL,
+        related_name="voci_budget",
+        blank=True,
+        null=True,
+    )
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    frequenza = models.CharField(
+        max_length=20,
+        choices=FrequenzaVoceBudget.choices,
+        default=FrequenzaVoceBudget.MENSILE,
+    )
+    data_inizio = models.DateField(db_index=True)
+    data_fine = models.DateField(blank=True, null=True, db_index=True)
+    giorno_previsto = models.PositiveSmallIntegerField(default=1)
+    mese_previsto = models.PositiveSmallIntegerField(blank=True, null=True)
+    attiva = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_voce_budget_ricorrente"
+        ordering = ["tipo", "categoria__nome", "nome"]
+        verbose_name = "Voce budget ricorrente"
+        verbose_name_plural = "Voci budget ricorrenti"
+        indexes = [
+            models.Index(fields=["tipo", "attiva"], name="gf_budget_tipo_attiva_idx"),
+            models.Index(fields=["data_inizio", "data_fine"], name="gf_budget_periodo_idx"),
+        ]
+
+    def __str__(self):
+        return self.nome
+
+    def clean(self):
+        super().clean()
+        if self.importo is not None and self.importo <= Decimal("0.00"):
+            raise ValidationError({"importo": "L'importo deve essere maggiore di zero."})
+        if self.giorno_previsto and not 1 <= self.giorno_previsto <= 31:
+            raise ValidationError({"giorno_previsto": "Il giorno previsto deve essere compreso tra 1 e 31."})
+        if self.mese_previsto and not 1 <= self.mese_previsto <= 12:
+            raise ValidationError({"mese_previsto": "Il mese previsto deve essere compreso tra 1 e 12."})
+        if self.data_fine and self.data_fine < self.data_inizio:
+            raise ValidationError({"data_fine": "La data di fine non puo essere precedente alla data di inizio."})
+        if self.categoria_id:
+            expected_tipo = (
+                TipoCategoriaFinanziaria.ENTRATA
+                if self.tipo == TipoVoceBudget.ENTRATA
+                else TipoCategoriaFinanziaria.SPESA
+            )
+            if self.categoria.tipo != expected_tipo:
+                raise ValidationError({"categoria": "La categoria deve essere coerente con il tipo della voce."})
 
 
 class TipoDocumentoFornitore(models.TextChoices):

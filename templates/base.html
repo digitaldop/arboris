@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=200">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=202">
     {% if role_theme %}
         <style>
             :root {
@@ -50,13 +50,34 @@
                 </a>
             </div>
 
-            <button type="button" class="header-menu-btn" id="sidebar-collapse-btn" aria-expanded="true" aria-controls="app-sidebar-content" title="Comprimi menu laterale">
-                <span class="header-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-            </button>
-
-            <form class="header-search" action="{% url 'ricerche_anagrafica' %}" method="get" role="search">
+            <form
+                class="header-search"
+                action="{% url 'ricerche_anagrafica' %}"
+                method="get"
+                role="search"
+                data-global-search-form
+                data-global-search-url="{% url 'ricerca_globale_sistema' %}"
+                autocomplete="off"
+            >
                 <span class="header-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
-                <input type="search" name="q" placeholder="Cerca famiglie, bambini, documenti..." aria-label="Cerca famiglie, bambini, documenti">
+                <input
+                    type="search"
+                    name="q"
+                    placeholder="Cerca famiglie, bambini, documenti..."
+                    aria-label="Cerca famiglie, bambini, documenti"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="global-search-results"
+                    data-global-search-input
+                >
+                <div
+                    class="header-search-dropdown"
+                    id="global-search-results"
+                    role="listbox"
+                    aria-label="Risultati ricerca globale"
+                    hidden
+                    data-global-search-dropdown
+                ></div>
             </form>
 
             <div class="header-fill" aria-hidden="true"></div>
@@ -189,8 +210,13 @@
         <!-- INIZIO CODICE DELLA SIDEBAR-->
         <aside class="sidebar">
             <div class="sidebar-content" id="app-sidebar-content">
+                <div class="sidebar-topbar">
+                    <span class="sidebar-topbar-title">Navigazione</span>
+                    <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-expanded="true" aria-controls="app-sidebar-content" aria-label="Comprimi menu laterale" title="Comprimi menu laterale">
+                        <span class="sidebar-collapse-icon" aria-hidden="true">&lsaquo;</span>
+                    </button>
+                </div>
                 <div class="sidebar-section sidebar-home-section">
-                    <div class="sidebar-title">Navigazione</div>
                     <div class="sidebar-home-row">
                         <nav class="sidebar-nav sidebar-home-nav">
                             <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
@@ -508,6 +534,10 @@
                                     <a href="{% url 'dashboard_gestione_finanziaria' %}" class="{% if request.resolver_match.url_name == 'dashboard_gestione_finanziaria' %}active{% endif %}">
                                         <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
                                         <span class="sidebar-link-text">Dashboard</span>
+                                    </a>
+                                    <a href="{% url 'budgeting_dashboard' %}" class="{% if request.resolver_match.url_name == 'budgeting_dashboard' or request.resolver_match.url_name == 'crea_voce_budget' or request.resolver_match.url_name == 'modifica_voce_budget' or request.resolver_match.url_name == 'elimina_voce_budget' %}active{% endif %}">
+                                        <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                                        <span class="sidebar-link-text">Budgeting</span>
                                     </a>
                                     <div class="sidebar-subsection">
                                         <button
@@ -981,8 +1011,9 @@
     <script src="{% static 'js/core/rich-notes.js' %}?v=5"></script>
     <script src="{% static 'js/core/button-intents.js' %}?v=2"></script>
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
-    <script src="{% static 'js/core/sidebar-collapse.js' %}?v=2"></script>
+    <script src="{% static 'js/core/sidebar-collapse.js' %}?v=3"></script>
     <script src="{% static 'js/core/sidebar-reorder.js' %}?v=1"></script>
+    <script src="{% static 'js/core/global-search.js' %}?v=1"></script>
     <script src="{% static 'js/core/beta-feedback.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {

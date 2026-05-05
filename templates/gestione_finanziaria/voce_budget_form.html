@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if voce %}Modifica voce budget{% else %}Nuova voce budget{% endif %} - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'budgeting_dashboard' %}">Budgeting</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>{% if voce %}Modifica voce{% else %}Nuova voce{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="page-head finance-page-head">
+    <div>
+        <h1 class="page-title">{% if voce %}{{ voce.nome }}{% else %}Nuova voce budget{% endif %}</h1>
+        <p class="family-page-address">Definisci entrate o uscite previsionali usate dal modulo Budgeting.</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+            <span class="btn-label">Indietro</span>
+        </a>
+    </div>
+</div>
+
+<form method="post" class="content-card finance-modern-panel">
+    {% csrf_token %}
+    <div class="panel-body">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Dati voce</h2>
+                <p class="finance-section-subtitle">Le voci attive alimentano il preventivo dei mesi in cui ricorrono.</p>
+            </div>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="message message-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="anagrafica-form-card-grid">
+            {% for field in form %}
+                <label class="calendar-event-field{% if field.name == 'note' %} calendar-event-field-full{% endif %}" for="{{ field.id_for_label }}">
+                    <span class="calendar-event-field-label">{{ field.label }}</span>
+                    {{ field }}
+                    {% if field.help_text %}<span class="field-help">{{ field.help_text }}</span>{% endif %}
+                    {{ field.errors }}
+                </label>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-success btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+            <span class="btn-label">Salva voce</span>
+        </button>
+        <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-icon-text">
+            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+            <span class="btn-label">Annulla</span>
+        </a>
+    </div>
+</form>
+{% endblock %}

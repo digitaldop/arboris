@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Max
 from django.template.defaultfilters import filesizeformat
@@ -294,6 +295,87 @@ class GestioneIscrizioneCorsoAnno(models.TextChoices):
     PRO_RATA_GIORNALIERO = "pro_rata_giornaliero", "Pro-rata giornaliero"
 
 
+MODULE_SETTINGS_CACHE_KEY = "sistema:module_enabled_map"
+GENERAL_SETTINGS_CACHE_KEY = "sistema:general_settings"
+
+MODULE_TOGGLE_DEFINITIONS = [
+    {
+        "key": "anagrafica",
+        "field": "modulo_anagrafica_attivo",
+        "label": "Anagrafica",
+        "description": "Famiglie, familiari, studenti, documenti e ricerche anagrafiche.",
+        "icon": "family",
+        "tone": "blue",
+    },
+    {
+        "key": "famiglie_interessate",
+        "field": "modulo_famiglie_interessate_attivo",
+        "label": "Famiglie interessate",
+        "description": "Prospect, contatti pre-iscrizione, bambini interessati e follow-up.",
+        "icon": "supplier",
+        "tone": "green",
+    },
+    {
+        "key": "economia",
+        "field": "modulo_economia_attivo",
+        "label": "Economia",
+        "description": "Rette, verifiche pagamenti, fondo accantonamento e impostazioni rette.",
+        "icon": "coins",
+        "tone": "emerald",
+    },
+    {
+        "key": "calendario",
+        "field": "modulo_calendario_attivo",
+        "label": "Calendario",
+        "description": "Agenda, eventi, categorie e scadenze collegate al calendario.",
+        "icon": "calendar",
+        "tone": "amber",
+    },
+    {
+        "key": "gestione_finanziaria",
+        "field": "modulo_gestione_finanziaria_attivo",
+        "label": "Gestione finanziaria",
+        "description": "Banche, movimenti, fornitori, fatture e riconciliazioni.",
+        "icon": "finance",
+        "tone": "sky",
+    },
+    {
+        "key": "gestione_amministrativa",
+        "field": "modulo_gestione_amministrativa_attivo",
+        "label": "Dipendenti e collaboratori",
+        "description": "Dipendenti, contratti, buste paga e simulazioni costo.",
+        "icon": "user",
+        "tone": "rose",
+    },
+    {
+        "key": "servizi_extra",
+        "field": "modulo_servizi_extra_attivo",
+        "label": "Servizi extra",
+        "description": "Servizi opzionali, iscrizioni, tariffe e rate dedicate.",
+        "icon": "briefcase",
+        "tone": "violet",
+    },
+]
+
+MODULE_TOGGLE_FIELDS = {
+    definition["key"]: definition["field"]
+    for definition in MODULE_TOGGLE_DEFINITIONS
+}
+MODULES_ALWAYS_ENABLED = {"sistema"}
+
+
+def get_module_enabled_map(general_settings=None):
+    impostazioni = general_settings or SistemaImpostazioniGenerali.objects.first()
+    enabled_map = {module_name: True for module_name in MODULES_ALWAYS_ENABLED}
+    for definition in MODULE_TOGGLE_DEFINITIONS:
+        enabled_map[definition["key"]] = bool(
+            getattr(impostazioni, definition["field"], True)
+            if impostazioni
+            else True
+        )
+    return enabled_map
+
+
 def get_google_font_config(font_key):
     return GOOGLE_FONT_LIBRARY.get(font_key, GOOGLE_FONT_LIBRARY[DEFAULT_SITE_BODY_FONT])
 
@@ -402,6 +484,34 @@ class SistemaImpostazioniGenerali(models.Model):
             "avviene dopo questo giorno, la prima retta parte dal mese successivo."
         ),
     )
+    modulo_anagrafica_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Anagrafica.",
+    )
+    modulo_famiglie_interessate_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Famiglie interessate.",
+    )
+    modulo_economia_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Economia.",
+    )
+    modulo_calendario_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Calendario.",
+    )
+    modulo_gestione_finanziaria_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Gestione finanziaria.",
+    )
+    modulo_gestione_amministrativa_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Dipendenti e collaboratori.",
+    )
+    modulo_servizi_extra_attivo = models.BooleanField(
+        default=True,
+        help_text="Attiva o disattiva globalmente il modulo Servizi extra.",
+    )
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
@@ -418,6 +528,15 @@ class SistemaImpostazioniGenerali(models.Model):
         super().clean()
         if SistemaImpostazioniGenerali.objects.exclude(pk=self.pk).exists():
             raise ValidationError("E possibile configurare un solo record di impostazioni generali.")
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cache.delete_many([GENERAL_SETTINGS_CACHE_KEY, MODULE_SETTINGS_CACHE_KEY])
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        cache.delete_many([GENERAL_SETTINGS_CACHE_KEY, MODULE_SETTINGS_CACHE_KEY])
+        return result
 
     @property
     def student_terminology(self):

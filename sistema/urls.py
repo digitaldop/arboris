@@ -15,6 +15,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("privacy/", views.informativa_privacy, name="informativa_privacy"),
     path("termini-e-condizioni/", views.termini_e_condizioni, name="termini_condizioni"),
+    path("sistema/ricerca-globale/", views.ricerca_globale_sistema, name="ricerca_globale_sistema"),
     path("feedback/beta/", views.crea_feedback_beta, name="crea_feedback_beta"),
     path("sistema/scuola/", sistema_edit(views.scuola_sistema), name="scuola_sistema"),
     path("sistema/scuola/indirizzi/nuovo/", sistema_edit(anagrafica_views.crea_indirizzo), name="scuola_crea_indirizzo"),

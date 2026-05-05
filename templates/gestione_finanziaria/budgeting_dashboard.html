@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Budgeting - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Budgeting</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .budget-page {
+        display: grid;
+        gap: 18px;
+    }
+
+    .budget-head {
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 0;
+    }
+
+    .budget-head-copy {
+        display: grid;
+        gap: 6px;
+    }
+
+    .budget-head-copy p {
+        margin: 0;
+        color: #60738d;
+        font-size: 14px;
+    }
+
+    .budget-period-tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .budget-period-tabs .btn.is-active {
+        border-color: var(--primary-dark);
+        background: var(--primary-dark);
+        color: #ffffff;
+    }
+
+    .budget-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(170px, 1fr));
+        gap: 14px;
+    }
+
+    .budget-kpi-card,
+    .budget-panel,
+    .budget-month-focus {
+        border: 1px solid #dfe9f1;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 14px 34px rgba(19, 42, 63, 0.06);
+    }
+
+    .budget-kpi-card {
+        display: grid;
+        gap: 9px;
+        padding: 18px;
+        border-top: 4px solid var(--budget-accent, #75a9c2);
+    }
+
+    .budget-kpi-card.is-green {
+        --budget-accent: #78bf95;
+        --budget-value: #1f7a4a;
+    }
+
+    .budget-kpi-card.is-amber {
+        --budget-accent: #d9ad48;
+        --budget-value: #806016;
+    }
+
+    .budget-kpi-card.is-rose {
+        --budget-accent: #dfa2b2;
+        --budget-value: #8a314a;
+    }
+
+    .budget-kpi-label {
+        color: #526983;
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .budget-kpi-value {
+        color: var(--budget-value, #172131);
+        font-size: clamp(25px, 2.4vw, 34px);
+        font-weight: 850;
+        line-height: 1;
+    }
+
+    .budget-kpi-note,
+    .budget-table-subtext {
+        color: #60738d;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .budget-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+        gap: 18px;
+        align-items: start;
+    }
+
+    .budget-main-column,
+    .budget-side-column {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+    }
+
+    .budget-panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 20px;
+        border-bottom: 1px solid #e8eff5;
+    }
+
+    .budget-panel-title {
+        margin: 0;
+        color: #172131;
+        font-size: 18px;
+        font-weight: 850;
+    }
+
+    .budget-panel-subtitle {
+        margin: 4px 0 0;
+        color: #60738d;
+        font-size: 13px;
+    }
+
+    .budget-panel-body {
+        padding: 18px 20px 20px;
+    }
+
+    .budget-month-focus {
+        display: grid;
+        gap: 14px;
+        padding: 20px;
+        border-top: 4px solid #75a9c2;
+        background: #f8fcfe;
+    }
+
+    .budget-month-focus-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .budget-month-focus-item {
+        padding: 12px;
+        border: 1px solid #dfe9f1;
+        border-radius: 8px;
+        background: #ffffff;
+    }
+
+    .budget-month-focus-item span {
+        display: block;
+        color: #60738d;
+        font-size: 11px;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .budget-month-focus-item strong {
+        display: block;
+        margin-top: 5px;
+        color: #172131;
+        font-size: 22px;
+    }
+
+    .budget-table-wrapper {
+        overflow-x: auto;
+    }
+
+    .budget-table {
+        min-width: 980px;
+    }
+
+    .budget-month-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: #eef7fb;
+        color: #356f88;
+        font-size: 12px;
+        font-weight: 850;
+    }
+
+    .budget-month-pill.is-current {
+        background: #fff4d8;
+        color: #806016;
+    }
+
+    .budget-money-positive {
+        color: #1f7a4a;
+        font-weight: 850;
+    }
+
+    .budget-money-negative {
+        color: #ad3148;
+        font-weight: 850;
+    }
+
+    .budget-voice-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .budget-voice-card {
+        display: grid;
+        gap: 7px;
+        padding: 13px;
+        border: 1px solid #dfe9f1;
+        border-radius: 8px;
+        background: #f8fbfd;
+    }
+
+    .budget-voice-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .budget-voice-head strong {
+        color: #172131;
+        font-size: 14px;
+    }
+
+    .budget-voice-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .budget-status-chip {
+        display: inline-flex;
+        width: fit-content;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: #e8f7ee;
+        color: #1f7a4a;
+        font-size: 11px;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .budget-status-chip.is-expense {
+        background: #fff4d8;
+        color: #806016;
+    }
+
+    @media (max-width: 1180px) {
+        .budget-kpi-grid,
+        .budget-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 760px) {
+        .budget-head,
+        .budget-panel-head {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .budget-month-focus-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="budget-page">
+    <div class="page-head budget-head">
+        <div class="budget-head-copy">
+            <h1 class="page-title">Budgeting</h1>
+            <p>{{ budget_data.period.label }}: confronto tra previsione, consuntivo e scostamento mensile.</p>
+        </div>
+        <div class="page-actions">
+            {% if can_manage_gestione_finanziaria %}
+                <a href="{% url 'crea_voce_budget' %}" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Nuova voce budget</span>
+                </a>
+            {% endif %}
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Indietro</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="budget-period-tabs" aria-label="Periodo budget">
+        {% for option in budget_data.period_options %}
+            <a
+                href="{% url 'budgeting_dashboard' %}?periodo={{ option.value }}"
+                class="btn btn-secondary{% if option.value == periodo_corrente %} is-active{% endif %}"
+            >
+                {{ option.label }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <div class="budget-kpi-grid">
+        <div class="budget-kpi-card is-green">
+            <div class="budget-kpi-label">Entrate previste</div>
+            <div class="budget-kpi-value">EUR {{ budget_data.totals.entrate_previste|euro }}</div>
+            <div class="budget-kpi-note">Rette, servizi extra e voci previsionali di entrata.</div>
+        </div>
+        <div class="budget-kpi-card is-rose">
+            <div class="budget-kpi-label">Uscite previste</div>
+            <div class="budget-kpi-value">EUR {{ budget_data.totals.uscite_previste|euro }}</div>
+            <div class="budget-kpi-note">Fatture fornitori e voci ricorrenti di spesa.</div>
+        </div>
+        <div class="budget-kpi-card">
+            <div class="budget-kpi-label">Saldo previsto</div>
+            <div class="budget-kpi-value">EUR {{ budget_data.totals.saldo_previsto|euro }}</div>
+            <div class="budget-kpi-note">Proiezione complessiva del periodo selezionato.</div>
+        </div>
+        <div class="budget-kpi-card is-amber">
+            <div class="budget-kpi-label">Scostamento</div>
+            <div class="budget-kpi-value">EUR {{ budget_data.totals.scostamento|euro }}</div>
+            <div class="budget-kpi-note">Differenza tra consuntivo e preventivo a oggi.</div>
+        </div>
+    </div>
+
+    <div class="budget-layout">
+        <div class="budget-main-column">
+            {% if budget_data.current_month %}
+                <section class="budget-month-focus">
+                    <div>
+                        <h2 class="budget-panel-title">Focus mese corrente: {{ budget_data.current_month.label }}</h2>
+                        <p class="budget-panel-subtitle">Lettura operativa del mese in corso: quanto era previsto, quanto e' gia avvenuto e cosa resta aperto.</p>
+                    </div>
+                    <div class="budget-month-focus-grid">
+                        <div class="budget-month-focus-item">
+                            <span>Entrate previste</span>
+                            <strong>EUR {{ budget_data.current_month.entrate_previste|euro }}</strong>
+                        </div>
+                        <div class="budget-month-focus-item">
+                            <span>Entrate incassate</span>
+                            <strong>EUR {{ budget_data.current_month.entrate_effettive|euro }}</strong>
+                        </div>
+                        <div class="budget-month-focus-item">
+                            <span>Uscite previste</span>
+                            <strong>EUR {{ budget_data.current_month.uscite_previste|euro }}</strong>
+                        </div>
+                        <div class="budget-month-focus-item">
+                            <span>Uscite sostenute</span>
+                            <strong>EUR {{ budget_data.current_month.uscite_effettive|euro }}</strong>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+
+            <section class="budget-panel">
+                <div class="budget-panel-head">
+                    <div>
+                        <h2 class="budget-panel-title">Andamento mensile</h2>
+                        <p class="budget-panel-subtitle">Preventivo e consuntivo mese per mese.</p>
+                    </div>
+                </div>
+                <div class="budget-panel-body">
+                    <div class="budget-table-wrapper">
+                        <table class="list-table finance-modern-table budget-table">
+                            <thead>
+                                <tr>
+                                    <th>Mese</th>
+                                    <th>Entrate previste</th>
+                                    <th>Entrate effettive</th>
+                                    <th>Uscite previste</th>
+                                    <th>Uscite effettive</th>
+                                    <th>Saldo previsto</th>
+                                    <th>Saldo effettivo</th>
+                                    <th>Scostamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month in budget_data.months %}
+                                    <tr>
+                                        <td>
+                                            <span class="budget-month-pill{% if month.is_current %} is-current{% endif %}">{{ month.short_label }}</span>
+                                            <div class="budget-table-subtext">
+                                                Rette EUR {{ month.rette_previste|euro }} - Servizi EUR {{ month.servizi_previste|euro }}
+                                            </div>
+                                        </td>
+                                        <td>EUR {{ month.entrate_previste|euro }}</td>
+                                        <td>EUR {{ month.entrate_effettive|euro }}</td>
+                                        <td>
+                                            EUR {{ month.uscite_previste|euro }}
+                                            <div class="budget-table-subtext">Fatture EUR {{ month.fatture_previste|euro }} - Ricorrenti EUR {{ month.ricorrenti_uscite|euro }}</div>
+                                        </td>
+                                        <td>EUR {{ month.uscite_effettive|euro }}</td>
+                                        <td class="{% if month.saldo_previsto >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.saldo_previsto|euro }}</td>
+                                        <td class="{% if month.saldo_effettivo >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.saldo_effettivo|euro }}</td>
+                                        <td class="{% if month.scostamento >= 0 %}budget-money-positive{% else %}budget-money-negative{% endif %}">EUR {{ month.scostamento|euro }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="8">Nessun mese disponibile per il periodo selezionato.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <aside class="budget-side-column">
+            <section class="budget-panel">
+                <div class="budget-panel-head">
+                    <div>
+                        <h2 class="budget-panel-title">Voci previsionali</h2>
+                        <p class="budget-panel-subtitle">{{ budget_data.voci_budget_count }} voci attive nel periodo.</p>
+                    </div>
+                </div>
+                <div class="budget-panel-body">
+                    <div class="budget-voice-list">
+                        {% for item in budget_data.voci_budget %}
+                            <div class="budget-voice-card">
+                                <div class="budget-voice-head">
+                                    <div>
+                                        <strong>{{ item.voce.nome }}</strong>
+                                        <div class="budget-table-subtext">
+                                            {{ item.voce.get_frequenza_display }} - EUR {{ item.voce.importo|euro }}
+                                        </div>
+                                    </div>
+                                    <span class="budget-status-chip{% if item.voce.tipo == 'uscita' %} is-expense{% endif %}">{{ item.voce.get_tipo_display }}</span>
+                                </div>
+                                <div class="budget-table-subtext">
+                                    {% if item.voce.categoria %}{{ item.voce.categoria }}{% else %}Senza categoria{% endif %}
+                                    {% if item.voce.fornitore %} - {{ item.voce.fornitore }}{% endif %}
+                                </div>
+                                <div class="budget-table-subtext">
+                                    Nel periodo: EUR {{ item.totale_periodo|euro }}{% if item.occurrences_label %} - {{ item.occurrences_label }}{% endif %}
+                                </div>
+                                {% if can_manage_gestione_finanziaria %}
+                                    <div class="budget-voice-actions">
+                                        <a href="{% url 'modifica_voce_budget' item.voce.pk %}" class="btn btn-secondary btn-sm">Modifica</a>
+                                        <a href="{% url 'elimina_voce_budget' item.voce.pk %}" class="btn btn-danger btn-sm">Elimina</a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% empty %}
+                            <div class="empty-state">Nessuna voce previsionale configurata. Aggiungi affitti, stipendi, utenze o altre ricorrenze.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+{% endblock %}

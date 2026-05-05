@@ -16,6 +16,26 @@ urlpatterns = [
         gf_view(views.dashboard_gestione_finanziaria),
         name="dashboard_gestione_finanziaria",
     ),
+    path(
+        "gestione-finanziaria/budgeting/",
+        gf_view(views.budgeting_dashboard),
+        name="budgeting_dashboard",
+    ),
+    path(
+        "gestione-finanziaria/budgeting/voci/nuova/",
+        gf_manage(views.crea_voce_budget),
+        name="crea_voce_budget",
+    ),
+    path(
+        "gestione-finanziaria/budgeting/voci/<int:pk>/modifica/",
+        gf_edit(views.modifica_voce_budget),
+        name="modifica_voce_budget",
+    ),
+    path(
+        "gestione-finanziaria/budgeting/voci/<int:pk>/elimina/",
+        gf_manage(views.elimina_voce_budget),
+        name="elimina_voce_budget",
+    ),
 
     # Fornitori e documenti passivi
     path(

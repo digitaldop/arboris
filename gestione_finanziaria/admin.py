@@ -18,6 +18,7 @@ from .models import (
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
     TipoCategoriaFinanziaria,
+    VoceBudgetRicorrente,
 )
 
 
@@ -87,6 +88,14 @@ class PagamentoFornitoreAdmin(admin.ModelAdmin):
     search_fields = ("scadenza__documento__numero_documento", "scadenza__documento__fornitore__denominazione")
     date_hierarchy = "data_pagamento"
     autocomplete_fields = ("scadenza", "movimento_finanziario", "conto_bancario", "creato_da")
+
+
+@admin.register(VoceBudgetRicorrente)
+class VoceBudgetRicorrenteAdmin(admin.ModelAdmin):
+    list_display = ("nome", "tipo", "categoria", "frequenza", "importo", "data_inizio", "data_fine", "attiva")
+    list_filter = ("tipo", "frequenza", "attiva")
+    search_fields = ("nome", "categoria__nome", "fornitore__denominazione")
+    autocomplete_fields = ("categoria", "fornitore")
 
 
 @admin.register(FattureInCloudConnessione)

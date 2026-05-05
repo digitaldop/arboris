@@ -3,9 +3,17 @@ from functools import wraps
 from django.contrib import messages
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.views import redirect_to_login
+from django.core.cache import cache
+from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import redirect
 
-from .models import LivelloPermesso, SistemaUtentePermessi
+from .models import (
+    LivelloPermesso,
+    MODULE_SETTINGS_CACHE_KEY,
+    MODULES_ALWAYS_ENABLED,
+    SistemaUtentePermessi,
+    get_module_enabled_map,
+)
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -49,6 +57,9 @@ def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZ
     if not user or not user.is_authenticated:
         return False
 
+    if not module_is_enabled(module_name):
+        return False
+
     if user.is_superuser:
         return True
 
@@ -60,6 +71,21 @@ def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZ
         return True
 
     return profilo.has_module_permission(module_name, level=level)
+
+
+def module_is_enabled(module_name):
+    if not module_name or module_name in MODULES_ALWAYS_ENABLED:
+        return True
+
+    try:
+        enabled_map = cache.get(MODULE_SETTINGS_CACHE_KEY)
+        if enabled_map is None:
+            enabled_map = get_module_enabled_map()
+            cache.set(MODULE_SETTINGS_CACHE_KEY, enabled_map, 300)
+    except (OperationalError, ProgrammingError):
+        return True
+
+    return enabled_map.get(module_name, True)
 
 
 def user_is_operational_admin(user):
@@ -100,6 +126,10 @@ def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZION
             if not getattr(request.user, "is_authenticated", False):
                 return redirect_unauthenticated_user(request)
 
+            if not module_is_enabled(module_name):
+                messages.warning(request, "Questo modulo e temporaneamente disattivato nelle impostazioni generali.")
+                return redirect("home")
+
             if not user_has_module_permission(request.user, module_name, level=level):
                 messages.error(request, "Non hai i permessi necessari per accedere a questa sezione.")
                 return redirect("home")
@@ -123,6 +153,10 @@ def module_edit_permission_required(module_name):
 
             if not getattr(request.user, "is_authenticated", False):
                 return redirect_unauthenticated_user(request)
+
+            if not module_is_enabled(module_name):
+                messages.warning(request, "Questo modulo e temporaneamente disattivato nelle impostazioni generali.")
+                return redirect("home")
 
             if not user_has_module_permission(request.user, module_name, level=required_level):
                 messages.error(request, "Non hai i permessi necessari per eseguire questa operazione.")

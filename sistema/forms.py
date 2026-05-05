@@ -169,6 +169,13 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "formato_visualizzazione_telefono",
             "gestione_iscrizione_corso_anno",
             "giorno_soglia_iscrizione_corso_anno",
+            "modulo_anagrafica_attivo",
+            "modulo_famiglie_interessate_attivo",
+            "modulo_economia_attivo",
+            "modulo_calendario_attivo",
+            "modulo_gestione_finanziaria_attivo",
+            "modulo_gestione_amministrativa_attivo",
+            "modulo_servizi_extra_attivo",
             "font_principale",
             "font_titoli",
         ]
@@ -180,6 +187,13 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "formato_visualizzazione_telefono": "Formato numeri di telefono (solo visualizzazione)",
             "gestione_iscrizione_corso_anno": "Iscrizioni in corso d'anno",
             "giorno_soglia_iscrizione_corso_anno": "Giorno soglia",
+            "modulo_anagrafica_attivo": "Anagrafica",
+            "modulo_famiglie_interessate_attivo": "Famiglie interessate",
+            "modulo_economia_attivo": "Economia",
+            "modulo_calendario_attivo": "Calendario",
+            "modulo_gestione_finanziaria_attivo": "Gestione finanziaria",
+            "modulo_gestione_amministrativa_attivo": "Dipendenti e collaboratori",
+            "modulo_servizi_extra_attivo": "Servizi extra",
             "font_principale": "Font principale",
             "font_titoli": "Titoli",
         }
@@ -193,6 +207,10 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
                 "inputmode": "numeric",
             }
         )
+        for field in self.fields.values():
+            if isinstance(field.widget, forms.CheckboxInput):
+                current_class = field.widget.attrs.get("class", "")
+                field.widget.attrs["class"] = f"{current_class} settings-switch-checkbox".strip()
 
 
 class SistemaBackupDatabaseConfigurazioneForm(forms.ModelForm):

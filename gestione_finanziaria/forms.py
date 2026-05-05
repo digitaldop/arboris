@@ -27,6 +27,7 @@ from .models import (
     ScadenzaPagamentoFornitore,
     StatoScadenzaFornitore,
     TipoCategoriaFinanziaria,
+    VoceBudgetRicorrente,
 )
 
 
@@ -185,6 +186,65 @@ class CategoriaFinanziariaForm(forms.ModelForm):
         if not self.HEX_COLOR_RE.match(value):
             raise forms.ValidationError("Inserisci un colore in formato esadecimale, ad esempio #336699.")
         return value.upper()
+
+
+# =========================================================================
+#  Budgeting
+# =========================================================================
+
+
+class VoceBudgetRicorrenteForm(forms.ModelForm):
+    class Meta:
+        model = VoceBudgetRicorrente
+        fields = [
+            "nome",
+            "tipo",
+            "categoria",
+            "fornitore",
+            "importo",
+            "frequenza",
+            "data_inizio",
+            "data_fine",
+            "giorno_previsto",
+            "mese_previsto",
+            "attiva",
+            "note",
+        ]
+        labels = {
+            "nome": "Nome voce",
+            "tipo": "Tipo",
+            "categoria": "Categoria",
+            "fornitore": "Fornitore",
+            "importo": "Importo previsto",
+            "frequenza": "Frequenza",
+            "data_inizio": "Data inizio",
+            "data_fine": "Data fine",
+            "giorno_previsto": "Giorno previsto",
+            "mese_previsto": "Mese previsto",
+            "attiva": "Attiva",
+            "note": "Note",
+        }
+        widgets = {
+            "data_inizio": forms.DateInput(attrs={"type": "date"}),
+            "data_fine": forms.DateInput(attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["categoria"].queryset = CategoriaFinanziaria.objects.filter(attiva=True).order_by(
+            "tipo",
+            "parent__nome",
+            "ordine",
+            "nome",
+        )
+        self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
+        self.fields["mese_previsto"].choices = MESE_COMPETENZA_CHOICES
+        for field_name in ("categoria", "fornitore", "data_fine", "mese_previsto", "note"):
+            self.fields[field_name].required = False
+        apply_eur_currency_widget(self.fields["importo"])
+        make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
+        make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
 
 
 # =========================================================================

@@ -358,6 +358,95 @@
                                 </div>
                             </div>
 
+                            <div class="dashboard-supplier-invoices-card">
+                                <div class="dashboard-supplier-invoices-head">
+                                    <div>
+                                        <div class="dashboard-stat-label">Fatture fornitori in scadenza</div>
+                                        <div class="dashboard-calendar-widget-meta">{{ gestione_finanziaria_dashboard.fatture_in_scadenza_mese.period_label }}</div>
+                                    </div>
+                                    <a href="{% url 'scadenziario_fornitori' %}" class="btn btn-secondary btn-sm">Apri scadenziario</a>
+                                </div>
+
+                                <div class="dashboard-supplier-invoices-summary">
+                                    <div class="dashboard-supplier-invoices-summary-item">
+                                        <span>Fatture</span>
+                                        <strong>{{ gestione_finanziaria_dashboard.fatture_in_scadenza_mese.count_fatture }}</strong>
+                                    </div>
+                                    <div class="dashboard-supplier-invoices-summary-item">
+                                        <span>Scadenze</span>
+                                        <strong>{{ gestione_finanziaria_dashboard.fatture_in_scadenza_mese.count_scadenze }}</strong>
+                                    </div>
+                                    <div class="dashboard-supplier-invoices-summary-item dashboard-supplier-invoices-summary-total">
+                                        <span>Totale pagamenti in scadenza</span>
+                                        <strong>EUR {{ gestione_finanziaria_dashboard.fatture_in_scadenza_mese.totale_residuo|euro }}</strong>
+                                    </div>
+                                </div>
+
+                                {% if gestione_finanziaria_dashboard.fatture_in_scadenza_mese.items %}
+                                    <div class="dashboard-supplier-invoices-list">
+                                        {% for item in gestione_finanziaria_dashboard.fatture_in_scadenza_mese.items %}
+                                            <div class="dashboard-supplier-invoice-row{% if item.is_overdue %} is-overdue{% endif %}">
+                                                <a
+                                                    href="{{ item.url }}"
+                                                    class="dashboard-supplier-invoice-main"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{{ item.url }}"
+                                                    data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                >
+                                                    <span>
+                                                        <strong>{{ item.fornitore }}</strong>
+                                                        <small>{{ item.documento }} - {{ item.stato_label }}</small>
+                                                    </span>
+                                                    <span class="dashboard-supplier-invoice-date">
+                                                        <span class="dashboard-supplier-invoice-label">Scadenza:</span>
+                                                        {{ item.data_scadenza|date:"d/m/Y" }}
+                                                    </span>
+                                                    <span class="dashboard-supplier-invoice-amount">
+                                                        <span class="dashboard-supplier-invoice-label">Importo:</span>
+                                                        EUR {{ item.importo_residuo|euro }}
+                                                    </span>
+                                                </a>
+                                                <a
+                                                    href="{{ item.pagamento_url }}"
+                                                    class="btn btn-primary btn-sm dashboard-supplier-invoice-pay"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{{ item.pagamento_url }}"
+                                                    data-popup-window-features="width=1040,height=760,resizable=yes,scrollbars=yes"
+                                                >
+                                                    Conferma pagamento
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessuna fattura fornitore scaduta o in scadenza entro il mese corrente.</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="dashboard-budget-preview-card">
+                                <div class="dashboard-supplier-invoices-head">
+                                    <div>
+                                        <div class="dashboard-stat-label">Previsione mese corrente</div>
+                                        <div class="dashboard-calendar-widget-meta">{{ gestione_finanziaria_dashboard.budgeting_month.month_label }} - {{ gestione_finanziaria_dashboard.budgeting_month.period_label }}</div>
+                                    </div>
+                                    <a href="{% url 'budgeting_dashboard' %}" class="btn btn-secondary btn-sm">Apri budgeting</a>
+                                </div>
+                                <div class="dashboard-supplier-invoices-summary">
+                                    <div class="dashboard-supplier-invoices-summary-item">
+                                        <span>Entrate previste</span>
+                                        <strong>EUR {{ gestione_finanziaria_dashboard.budgeting_month.entrate_previste|euro }}</strong>
+                                    </div>
+                                    <div class="dashboard-supplier-invoices-summary-item">
+                                        <span>Uscite previste</span>
+                                        <strong>EUR {{ gestione_finanziaria_dashboard.budgeting_month.uscite_previste|euro }}</strong>
+                                    </div>
+                                    <div class="dashboard-supplier-invoices-summary-item dashboard-supplier-invoices-summary-total">
+                                        <span>Saldo previsto</span>
+                                        <strong>EUR {{ gestione_finanziaria_dashboard.budgeting_month.saldo_previsto|euro }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="dashboard-finance-chart-card">
                                 <canvas class="dashboard-finance-chart" data-finance-chart aria-label="Grafico entrate e uscite"></canvas>
                             </div>
@@ -639,13 +728,27 @@
                                 {% endif %}
                             </div>
 
-                            <div class="dashboard-stat-card dashboard-stat-tone-blue">
+                            <div
+                                class="dashboard-stat-card dashboard-stat-tone-blue"
+                                data-dashboard-calendar-week
+                                data-dashboard-calendar-page-size="{{ calendario_dashboard.week_page_size }}"
+                            >
                                 <div class="dashboard-stat-label">Eventi della settimana corrente</div>
-                                <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.week_label }}</div>
+                                <div class="dashboard-calendar-widget-meta">
+                                    {{ calendario_dashboard.week_label }}
+                                    {% if calendario_dashboard.count_week_records %}
+                                        <span class="dashboard-calendar-count">
+                                            {{ calendario_dashboard.count_week_records }} event{% if calendario_dashboard.count_week_records == 1 %}o{% else %}i{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </div>
                                 {% if calendario_dashboard.week_records %}
-                                    <div class="dashboard-calendar-list">
+                                    <div class="dashboard-calendar-list" data-dashboard-calendar-list>
                                         {% for entry in calendario_dashboard.week_records %}
-                                            <div class="dashboard-calendar-entry">
+                                            <div
+                                                class="dashboard-calendar-entry{% if forloop.counter > calendario_dashboard.week_page_size %} is-dashboard-calendar-hidden{% endif %}"
+                                                data-dashboard-calendar-entry
+                                            >
                                                 <div class="dashboard-calendar-entry-head">
                                                     <span class="calendar-category-pill" style="color: {{ entry.color }}; border-color: {{ entry.color }};">
                                                         {{ entry.category_label }}
@@ -671,6 +774,28 @@
                                             </div>
                                         {% endfor %}
                                     </div>
+                                    {% if calendario_dashboard.count_week_records > calendario_dashboard.week_page_size %}
+                                        <nav class="dashboard-calendar-pagination" aria-label="Paginazione eventi della settimana corrente">
+                                            <button
+                                                type="button"
+                                                class="dashboard-calendar-page-btn"
+                                                data-dashboard-calendar-prev
+                                                disabled
+                                            >
+                                                Indietro
+                                            </button>
+                                            <span class="dashboard-calendar-page-status" data-dashboard-calendar-status>
+                                                Pagina 1 di {{ calendario_dashboard.week_total_pages }}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                class="dashboard-calendar-page-btn"
+                                                data-dashboard-calendar-next
+                                            >
+                                                Avanti
+                                            </button>
+                                        </nav>
+                                    {% endif %}
                                 {% else %}
                                     <div class="dashboard-stat-note">Nessun evento o scadenza nella settimana corrente.</div>
                                 {% endif %}
@@ -684,7 +809,7 @@
     </div>
 
     <script src="{% static 'js/core/collapsible.js' %}"></script>
-    <script src="{% static 'js/pages/dashboard-layout.js' %}?v=1"></script>
+    <script src="{% static 'js/pages/dashboard-layout.js' %}?v=2"></script>
     <script src="{% static 'js/pages/dashboard-finanziaria.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
