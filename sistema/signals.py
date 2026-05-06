@@ -14,6 +14,7 @@ from .audit import (
     serialize_instance_for_audit,
     should_track_model,
 )
+from .audit_retention import cleanup_cronologia_operazioni
 from .models import (
     AzioneOperazioneCronologia,
     SistemaOperazioneCronologia,
@@ -56,6 +57,7 @@ def create_audit_entry(instance, action, changed_field_names=None):
                 descrizione=build_operation_description(action, model_verbose_name, object_label),
                 campi_coinvolti=changed_field_labels,
             )
+            cleanup_cronologia_operazioni()
     except (OperationalError, ProgrammingError):
         return
 

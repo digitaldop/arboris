@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Classi - Arboris School Management{% endblock %}
 
@@ -47,7 +47,7 @@
                         <td>{{ classe.nome_classe }}</td>
                         <td>{{ classe.sezione_classe|default:"—" }}</td>
                         <td>{{ classe.ordine_classe }}</td>
-                        <td>{% if classe.attiva %}Sì{% else %}No{% endif %}</td>
+                        <td>{% active_toggle classe %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_classe' classe.pk %}" class="table-link">Modifica</a>
                             <span class="table-muted">|</span>

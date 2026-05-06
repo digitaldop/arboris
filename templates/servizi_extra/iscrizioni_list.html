@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}{% if servizio_filtro %}Iscrizioni {{ servizio_filtro.nome_servizio }}{% else %}Iscrizioni servizi extra{% endif %} - Arboris{% endblock %}
 
@@ -14,64 +14,230 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">
-            {% if servizio_filtro %}
-                Iscrizioni {{ servizio_filtro.nome_servizio }}
-            {% else %}
-                Iscrizioni servizi extra
-            {% endif %}
-        </h1>
-        <div class="page-head-actions">
-            {% if servizio_filtro %}
-                <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary">Scheda servizio</a>
-                <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary">Tutte le iscrizioni</a>
-            {% endif %}
-            {% if can_manage_servizi_extra %}
-                <a href="{% url 'crea_iscrizione_servizio_extra' %}" class="btn btn-primary">Nuova iscrizione</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Studente</th>
-                    <th>Servizio</th>
-                    <th>Anno scolastico</th>
-                    <th>Tariffa</th>
-                    <th>Rate</th>
-                    <th>Attiva</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for iscrizione in iscrizioni %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}">
-                        <td>{{ iscrizione.studente }}</td>
-                        <td>{{ iscrizione.servizio.nome_servizio }}</td>
-                        <td>{{ iscrizione.servizio.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>{{ iscrizione.tariffa.nome_tariffa }}</td>
-                        <td>{{ iscrizione.count_rate }}</td>
-                        <td>{% if iscrizione.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'lista_rate_servizi_extra' %}?iscrizione={{ iscrizione.pk }}" class="table-link">Rate</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}" class="table-link">Modifica</a>
-                            {% if can_manage_servizi_extra %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_iscrizione_servizio_extra' iscrizione.pk %}" class="table-link table-link-danger">Elimina</a>
+    <div class="scambio-list-shell servizi-extra-iscrizioni-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">
+                            {% if servizio_filtro %}
+                                Iscrizioni {{ servizio_filtro.nome_servizio }}
+                            {% else %}
+                                Iscrizioni servizi extra
                             {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7"><div class="empty-state">Nessuna iscrizione a servizi extra presente.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ iscrizioni_stats.totale }} {% if iscrizioni_stats.totale == 1 %}iscrizione{% else %}iscrizioni{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
+                        Studenti iscritti, tariffe collegate e rate generate
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                {% if servizio_filtro %}
+                    <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                        <span class="btn-label">Scheda servizio</span>
+                    </a>
+                    <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Tutte le iscrizioni</span>
+                    </a>
+                {% endif %}
+                {% if can_manage_servizi_extra %}
+                    <a
+                        href="{% url 'crea_iscrizione_servizio_extra' %}?popup=1{% if servizio_filtro %}&servizio={{ servizio_filtro.pk }}{% endif %}"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_iscrizione_servizio_extra' %}?popup=1{% if servizio_filtro %}&servizio={{ servizio_filtro.pk }}{% endif %}"
+                        data-popup-window-name="arboris-servizio-extra-iscrizione-popup"
+                        data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuova iscrizione</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo iscrizioni servizi extra">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Iscrizioni totali</span>
+                    <strong class="scambio-list-kpi-value">{{ iscrizioni_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">{{ iscrizioni_stats.studenti }} studenti coinvolti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ iscrizioni_stats.attive }}</strong>
+                    <span class="scambio-list-kpi-note">Abilitate nel sistema</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Rate generate</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ iscrizioni_stats.rate }}</strong>
+                    <span class="scambio-list-kpi-note">{{ iscrizioni_stats.rate_aperte }} aperte</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Servizi coperti</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ iscrizioni_stats.servizi }}</strong>
+                    <span class="scambio-list-kpi-note">{{ iscrizioni_stats.rate_pagate }} rate pagate</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="servizi-extra-iscrizioni-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="servizi-extra-iscrizioni-title">Elenco iscrizioni</h2>
+                    <p>Iscrizioni degli studenti ai servizi extra configurati.</p>
+                </div>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-servizi-extra-iscrizioni-search placeholder="Cerca studente, servizio, tariffa..." aria-label="Cerca iscrizioni servizi extra">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table servizi-extra-iscrizioni-list-table">
+                    <colgroup>
+                        <col class="servizi-extra-iscrizioni-col-student">
+                        <col class="servizi-extra-iscrizioni-col-service">
+                        <col class="servizi-extra-iscrizioni-col-tariff">
+                        <col class="servizi-extra-iscrizioni-col-rates">
+                        <col class="servizi-extra-iscrizioni-col-active">
+                        <col class="servizi-extra-iscrizioni-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Studente</th>
+                            <th>Servizio</th>
+                            <th>Tariffa</th>
+                            <th>Rate</th>
+                            <th>Attiva</th>
+                            <th class="servizi-extra-iscrizioni-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for iscrizione in iscrizioni %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}"
+                                data-row-popup-url="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                data-popup-window-name="arboris-servizio-extra-iscrizione-popup"
+                                data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes"
+                                data-popup-title="{{ iscrizione }}"
+                                data-servizi-extra-iscrizione-row
+                            >
+                                <td class="scambio-list-main-cell servizi-extra-iscrizioni-main-cell">
+                                    <a
+                                        href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                        data-popup-window-name="arboris-servizio-extra-iscrizione-popup"
+                                        data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ iscrizione.studente }}</strong>
+                                            <span>{{ iscrizione.servizio.anno_scolastico.nome_anno_scolastico }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ iscrizione.servizio.nome_servizio }}</td>
+                                <td>{{ iscrizione.tariffa.nome_tariffa }}</td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-blue">{{ iscrizione.count_rate }} rate</span>
+                                    <div class="servizi-extra-iscrizioni-rate-meta">{{ iscrizione.count_rate_aperte }} aperte</div>
+                                </td>
+                                <td class="servizi-extra-iscrizioni-toggle-cell">{% active_toggle iscrizione %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions servizi-extra-iscrizioni-actions">
+                                        <a
+                                            href="{% url 'lista_rate_servizi_extra' %}?iscrizione={{ iscrizione.pk }}"
+                                            class="table-icon-link"
+                                            title="Rate"
+                                            aria-label="Rate di {{ iscrizione.studente }}"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                        </a>
+                                        <a
+                                            href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-servizio-extra-iscrizione-popup"
+                                            data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        {% if can_manage_servizi_extra %}
+                                            <a
+                                                href="{% url 'elimina_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                                title="Elimina"
+                                                aria-label="Elimina iscrizione di {{ iscrizione.studente }}"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_iscrizione_servizio_extra' iscrizione.pk %}?popup=1"
+                                                data-popup-window-name="arboris-servizio-extra-iscrizione-delete-popup"
+                                                data-popup-window-features="width=760,height=620,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6"><div class="empty-state">Nessuna iscrizione a servizi extra presente.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="servizi-extra-iscrizioni-empty-filter-row" hidden>
+                            <td colspan="6"><div class="empty-state">Nessuna iscrizione corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-servizi-extra-iscrizioni-count>
+                    {{ iscrizioni_stats.totale }} {% if iscrizioni_stats.totale == 1 %}iscrizione{% else %}iscrizioni{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -80,6 +246,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-servizi-extra-iscrizioni-search]");
+            const rows = Array.from(document.querySelectorAll("[data-servizi-extra-iscrizione-row]"));
+            const emptyRow = document.querySelector(".servizi-extra-iscrizioni-empty-filter-row");
+            const countNode = document.querySelector("[data-servizi-extra-iscrizioni-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " iscrizione" : " iscrizioni");
+            });
         });
     </script>
 {% endblock %}

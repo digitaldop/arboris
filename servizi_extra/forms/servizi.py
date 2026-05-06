@@ -165,6 +165,8 @@ class IscrizioneServizioExtraForm(forms.ModelForm):
         )
 
         service_id = self.data.get("servizio") if self.is_bound else getattr(self.instance, "servizio_id", None)
+        if not service_id and not self.is_bound:
+            service_id = self.initial.get("servizio")
 
         if not service_id and not self.is_bound and not self.instance.pk:
             primo_servizio = self.fields["servizio"].queryset.first()

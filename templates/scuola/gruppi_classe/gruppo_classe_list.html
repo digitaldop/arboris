@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Pluriclassi - Arboris School Management{% endblock %}
 
@@ -36,7 +36,7 @@
                         <td>{{ gruppo.nome_gruppo_classe }}</td>
                         <td>{{ gruppo.anno_scolastico.nome_anno_scolastico }}</td>
                         <td>{{ gruppo.classi_label|default:"-" }}</td>
-                        <td>{% if gruppo.attivo %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle gruppo %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_gruppo_classe' gruppo.pk %}" class="table-link">Modifica</a>
                             <span class="table-muted">|</span>

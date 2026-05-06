@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Ruoli - Arboris{% endblock %}
 
@@ -14,69 +14,226 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Ruoli</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_utenti' %}" class="btn btn-secondary">Utenti</a>
-            {% if can_manage_sistema %}
-                <a href="{% url 'crea_ruolo_utente' %}" class="btn btn-primary">Nuovo ruolo</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="admin-section">
-        <div class="admin-section-title">Ruoli e permessi</div>
-        <div class="panel">
-            <div class="panel-body">
-                {% if ruoli %}
-                    <table class="list-table">
-                        <thead>
-                            <tr>
-                                <th>Ruolo</th>
-                                <th>Colore</th>
-                                <th>Utenti</th>
-                                <th>Controllo completo</th>
-                                <th>Anagrafica</th>
-                                <th>Famiglie interessate</th>
-                                <th>Economia</th>
-                                <th>Gestione finanziaria</th>
-                                <th>Sistema</th>
-                                <th>Calendario</th>
-                                <th>Stato</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for ruolo in ruoli %}
-                                <tr class="list-row-link" data-row-href="{% url 'modifica_ruolo_utente' ruolo.pk %}">
-                                    <td>
-                                        {{ ruolo.nome }}
-                                        {% if ruolo.descrizione %}
-                                            <div class="table-muted">{{ ruolo.descrizione|truncatechars:90 }}</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="role-color-swatch" style="background: {{ ruolo.colore_principale }};"></span>
-                                        {{ ruolo.colore_principale }}
-                                    </td>
-                                    <td>{{ ruolo.count_utenti }}</td>
-                                    <td>{% if ruolo.controllo_completo %}Si{% else %}No{% endif %}</td>
-                                    <td>{{ ruolo.get_permesso_anagrafica_display }}</td>
-                                    <td>{{ ruolo.get_permesso_famiglie_interessate_display }}</td>
-                                    <td>{{ ruolo.get_permesso_economia_display }}</td>
-                                    <td>{{ ruolo.get_permesso_gestione_finanziaria_display }}</td>
-                                    <td>{{ ruolo.get_permesso_sistema_display }}</td>
-                                    <td>{{ ruolo.get_permesso_calendario_display }}</td>
-                                    <td>{% if ruolo.attivo %}Attivo{% else %}Disattivo{% endif %}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <div class="empty-state">Ancora nessun ruolo configurato.</div>
+    <div class="system-roles-shell">
+        <div class="page-head family-page-head anagrafica-list-head system-roles-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon system-roles-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Ruoli</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ role_stats.totale }} {% if role_stats.totale == 1 %}ruolo{% else %}ruoli{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        Gestione ruoli, permessi e accessi ai moduli
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_utenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                    <span class="btn-label">Utenti</span>
+                </a>
+                {% if can_manage_sistema %}
+                    <a
+                        href="{% url 'crea_ruolo_utente' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_ruolo_utente' %}?popup=1"
+                        data-popup-window-name="arboris-ruolo-popup"
+                        data-popup-window-features="width=1100,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuovo ruolo</span>
+                    </a>
                 {% endif %}
             </div>
         </div>
+
+        <section class="system-roles-summary-grid" aria-label="Riepilogo ruoli">
+            <article class="system-role-kpi-card">
+                <div class="system-role-kpi-copy">
+                    <span class="system-role-kpi-label">Ruoli configurati</span>
+                    <strong class="system-role-kpi-value">{{ role_stats.totale }}</strong>
+                    <span class="system-role-kpi-note">Profili disponibili</span>
+                </div>
+                <span class="system-role-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="system-role-kpi-card">
+                <div class="system-role-kpi-copy">
+                    <span class="system-role-kpi-label">Ruoli attivi</span>
+                    <strong class="system-role-kpi-value is-green">{{ role_stats.attivi }}</strong>
+                    <span class="system-role-kpi-note">Utilizzabili dagli utenti</span>
+                </div>
+                <span class="system-role-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="system-role-kpi-card">
+                <div class="system-role-kpi-copy">
+                    <span class="system-role-kpi-label">Controllo completo</span>
+                    <strong class="system-role-kpi-value is-amber">{{ role_stats.controllo_completo }}</strong>
+                    <span class="system-role-kpi-note">Ruoli amministrativi</span>
+                </div>
+                <span class="system-role-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+            </article>
+            <article class="system-role-kpi-card">
+                <div class="system-role-kpi-copy">
+                    <span class="system-role-kpi-label">Utenti collegati</span>
+                    <strong class="system-role-kpi-value is-purple">{{ role_stats.utenti_collegati }}</strong>
+                    <span class="system-role-kpi-note">Account con ruolo assegnato</span>
+                </div>
+                <span class="system-role-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="system-role-list-card" aria-labelledby="system-roles-list-title">
+            <div class="system-role-list-card-head">
+                <div>
+                    <h2 id="system-roles-list-title">Ruoli e permessi</h2>
+                    <p>Ogni ruolo definisce visibilita, gestione e accessi speciali per le aree del software.</p>
+                </div>
+            </div>
+
+            <div class="system-role-table-wrap">
+                <table class="list-table anagrafica-list-table system-roles-table">
+                    <colgroup>
+                        <col class="system-roles-col-role">
+                        <col class="system-roles-col-users">
+                        <col class="system-roles-col-modules">
+                        <col class="system-roles-col-special">
+                        <col class="system-roles-col-status">
+                        <col class="system-roles-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Ruolo</th>
+                            <th>Utenti</th>
+                            <th>Permessi principali</th>
+                            <th>Speciali</th>
+                            <th>Stato</th>
+                            <th class="actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ruolo in ruoli %}
+                            <tr
+                                class="list-row-link"
+                                data-row-popup-url="{% url 'modifica_ruolo_utente' ruolo.pk %}?popup=1"
+                                data-popup-window-name="arboris-ruolo-popup"
+                                data-popup-window-features="width=1100,height=820,resizable=yes,scrollbars=yes"
+                            >
+                                <td class="system-role-main-cell">
+                                    <a
+                                        href="{% url 'modifica_ruolo_utente' ruolo.pk %}?popup=1"
+                                        class="system-role-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_ruolo_utente' ruolo.pk %}?popup=1"
+                                        data-popup-window-name="arboris-ruolo-popup"
+                                        data-popup-window-features="width=1100,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="system-role-swatch" style="--role-swatch-color: {{ ruolo.colore_principale }};" aria-hidden="true"></span>
+                                        <span class="system-role-main-copy">
+                                            <strong>{{ ruolo.nome }}</strong>
+                                            {% if ruolo.descrizione %}
+                                                <span>{{ ruolo.descrizione|truncatechars:100 }}</span>
+                                            {% else %}
+                                                <span class="table-muted">Nessuna descrizione inserita</span>
+                                            {% endif %}
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="system-role-count-chip">{{ ruolo.count_utenti }}</span>
+                                </td>
+                                <td>
+                                    <div class="system-role-permission-stack">
+                                        <span><strong>Anagrafica</strong> {{ ruolo.get_permesso_anagrafica_display }}</span>
+                                        <span><strong>Famiglie interessate</strong> {{ ruolo.get_permesso_famiglie_interessate_display }}</span>
+                                        <span><strong>Rette scolastiche</strong> {{ ruolo.get_permesso_economia_display }}</span>
+                                        <span><strong>Gestione finanziaria</strong> {{ ruolo.get_permesso_gestione_finanziaria_display }}</span>
+                                        <span><strong>Sistema</strong> {{ ruolo.get_permesso_sistema_display }}</span>
+                                        <span><strong>Calendario</strong> {{ ruolo.get_permesso_calendario_display }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="system-role-specials">
+                                        {% if ruolo.controllo_completo %}
+                                            <span class="system-role-chip is-red">Completo</span>
+                                        {% endif %}
+                                        {% if ruolo.amministratore_operativo %}
+                                            <span class="system-role-chip is-blue">Admin operativo</span>
+                                        {% endif %}
+                                        {% if ruolo.accesso_backup_database %}
+                                            <span class="system-role-chip is-amber">Backup</span>
+                                        {% endif %}
+                                        {% if not ruolo.controllo_completo and not ruolo.amministratore_operativo and not ruolo.accesso_backup_database %}
+                                            <span class="table-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="system-role-status-cell">{% active_toggle ruolo %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions system-role-actions">
+                                        <a
+                                            href="{% url 'modifica_ruolo_utente' ruolo.pk %}?popup=1"
+                                            class="table-icon-link table-icon-link-edit"
+                                            title="Modifica"
+                                            aria-label="Modifica ruolo"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_ruolo_utente' ruolo.pk %}?popup=1"
+                                            data-popup-window-name="arboris-ruolo-popup"
+                                            data-popup-window-features="width=1100,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                        </a>
+                                        {% if can_manage_sistema %}
+                                            <a
+                                                href="{% url 'elimina_ruolo_utente' ruolo.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger"
+                                                title="Elimina"
+                                                aria-label="Elimina ruolo"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_ruolo_utente' ruolo.pk %}?popup=1"
+                                                data-popup-window-name="arboris-ruolo-delete-popup"
+                                                data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6"><div class="empty-state">Ancora nessun ruolo configurato.</div></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                window.ArborisListRowLinks.init(document);
+            }
+        });
+    </script>
 {% endblock %}

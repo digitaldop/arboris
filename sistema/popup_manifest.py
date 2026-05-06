@@ -70,6 +70,16 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "modifica_metodo_pagamento",
             "elimina_metodo_pagamento",
         ),
+        "tariffa_scambio_retta": _crud_triplet(
+            "crea_tariffa_scambio_retta",
+            "modifica_tariffa_scambio_retta",
+            "elimina_tariffa_scambio_retta",
+        ),
+        "ruolo_permessi": _crud_triplet(
+            "crea_ruolo_utente",
+            "modifica_ruolo_utente",
+            "elimina_ruolo_utente",
+        ),
         "categoria_spesa": _crud_triplet(
             "crea_categoria_spesa",
             "modifica_categoria_spesa",

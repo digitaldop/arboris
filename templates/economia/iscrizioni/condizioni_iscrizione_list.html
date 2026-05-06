@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Condizioni economiche - Arboris School Management{% endblock %}
 
@@ -7,55 +7,221 @@
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
+        <span>Rette Scolastiche</span>
+        <span class="breadcrumb-sep">&gt;</span>
         <span>Condizioni economiche</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Condizioni economiche</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'crea_condizione_iscrizione' %}" class="btn btn-primary">Nuova condizione economica</a>
+    <div class="scambio-list-shell condizioni-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Condizioni economiche</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ condizioni_stats.totale }} {% if condizioni_stats.totale == 1 %}condizione{% else %}condizioni{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        Regole di calcolo rette, mensilita e riduzioni collegate
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a
+                    href="{% url 'crea_condizione_iscrizione' %}?popup=1"
+                    class="btn btn-primary btn-icon-text btn-add-action"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'crea_condizione_iscrizione' %}?popup=1"
+                    data-popup-window-name="arboris-condizione-iscrizione-popup"
+                    data-popup-window-features="width=900,height=760,resizable=yes,scrollbars=yes"
+                >
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Nuova condizione economica</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Anno scolastico</th>
-                    <th>Nome condizione</th>
-                    <th>Numero mensilita</th>
-                    <th>Mese prima retta</th>
-                    <th>Giorno scadenza rate</th>
-                    <th>Riduzione speciale ammessa</th>
-                    <th>Attiva</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for condizione in condizioni %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_condizione_iscrizione' condizione.pk %}">
-                        <td>{{ condizione.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>{{ condizione.nome_condizione_iscrizione }}</td>
-                        <td>{{ condizione.numero_mensilita_default }}</td>
-                        <td>{{ condizione.get_mese_prima_retta_display }}</td>
-                        <td>{% if condizione.giorno_scadenza_rate %}{{ condizione.giorno_scadenza_rate }}{% else %}-{% endif %}</td>
-                        <td>{% if condizione.riduzione_speciale_ammessa %}Si{% else %}No{% endif %}</td>
-                        <td>{% if condizione.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_condizione_iscrizione' condizione.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_condizione_iscrizione' condizione.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="8"><div class="empty-state">Nessuna condizione economica inserita.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo condizioni economiche">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Condizioni totali</span>
+                    <strong class="scambio-list-kpi-value">{{ condizioni_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Regole create</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ condizioni_stats.attive }}</strong>
+                    <span class="scambio-list-kpi-note">Influiscono sul sistema</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Riduzioni speciali</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ condizioni_stats.riduzioni }}</strong>
+                    <span class="scambio-list-kpi-note">Condizioni abilitate</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Tariffe collegate</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ condizioni_stats.tariffe }}</strong>
+                    <span class="scambio-list-kpi-note">Quote e fasce rette</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="condizioni-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="condizioni-list-title">Elenco condizioni economiche</h2>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-condizioni-iscrizione-search placeholder="Cerca condizioni..." aria-label="Cerca condizioni economiche">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table condizioni-list-table">
+                    <colgroup>
+                        <col class="condizioni-list-col-name">
+                        <col class="condizioni-list-col-year">
+                        <col class="condizioni-list-col-months">
+                        <col class="condizioni-list-col-first-rate">
+                        <col class="condizioni-list-col-due-day">
+                        <col class="condizioni-list-col-reduction">
+                        <col class="condizioni-list-col-active">
+                        <col class="condizioni-list-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Nome condizione</th>
+                            <th>Anno scolastico</th>
+                            <th>Mensilita</th>
+                            <th>Prima retta</th>
+                            <th>Scadenza rate</th>
+                            <th>Riduzione speciale</th>
+                            <th>Attiva</th>
+                            <th class="condizioni-list-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for condizione in condizioni %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_condizione_iscrizione' condizione.pk %}"
+                                data-row-popup-url="{% url 'modifica_condizione_iscrizione' condizione.pk %}?popup=1"
+                                data-popup-window-name="arboris-condizione-iscrizione-popup"
+                                data-popup-window-features="width=900,height=760,resizable=yes,scrollbars=yes"
+                                data-popup-title="Condizione economica"
+                                data-condizione-row
+                            >
+                                <td class="scambio-list-main-cell condizioni-list-main-cell">
+                                    <a
+                                        href="{% url 'modifica_condizione_iscrizione' condizione.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_condizione_iscrizione' condizione.pk %}?popup=1"
+                                        data-popup-window-name="arboris-condizione-iscrizione-popup"
+                                        data-popup-window-features="width=900,height=760,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ condizione.nome_condizione_iscrizione }}</strong>
+                                            <span>{{ condizione.tariffe_attive_count }} tariffe attive su {{ condizione.tariffe_count }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ condizione.anno_scolastico.nome_anno_scolastico }}</td>
+                                <td>{{ condizione.numero_mensilita_default }}</td>
+                                <td>{{ condizione.get_mese_prima_retta_display }}</td>
+                                <td>
+                                    {% if condizione.giorno_scadenza_rate %}
+                                        Giorno {{ condizione.giorno_scadenza_rate }}
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if condizione.riduzione_speciale_ammessa %}
+                                        <span class="scambio-list-status-chip is-success">Si</span>
+                                    {% else %}
+                                        <span class="scambio-list-status-chip is-muted">No</span>
+                                    {% endif %}
+                                </td>
+                                <td class="condizioni-list-toggle-cell">{% active_toggle condizione %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions condizioni-list-actions">
+                                        <a
+                                            href="{% url 'modifica_condizione_iscrizione' condizione.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_condizione_iscrizione' condizione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-condizione-iscrizione-popup"
+                                            data-popup-window-features="width=900,height=760,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        <a
+                                            href="{% url 'elimina_condizione_iscrizione' condizione.pk %}?popup=1"
+                                            class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                            title="Elimina"
+                                            aria-label="Elimina condizione economica"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'elimina_condizione_iscrizione' condizione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-condizione-iscrizione-delete-popup"
+                                            data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8"><div class="empty-state">Nessuna condizione economica inserita.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="condizioni-list-empty-filter-row" hidden>
+                            <td colspan="8"><div class="empty-state">Nessuna condizione corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-condizioni-iscrizione-count>
+                    {{ condizioni_stats.totale }} {% if condizioni_stats.totale == 1 %}condizione{% else %}condizioni{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -64,6 +230,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-condizioni-iscrizione-search]");
+            const rows = Array.from(document.querySelectorAll("[data-condizione-row]"));
+            const emptyRow = document.querySelector(".condizioni-list-empty-filter-row");
+            const countNode = document.querySelector("[data-condizioni-iscrizione-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " condizione" : " condizioni");
+            });
         });
     </script>
 {% endblock %}

@@ -272,6 +272,14 @@ DEFAULT_SITE_BODY_FONT = GoogleFontChoice.MANROPE
 DEFAULT_SITE_HEADING_FONT = GoogleFontChoice.MANROPE
 
 
+class CronologiaRetentionPeriodo(models.IntegerChoices):
+    SEI_MESI = 6, "6 mesi"
+    DODICI_MESI = 12, "12 mesi"
+    VENTIQUATTRO_MESI = 24, "24 mesi"
+    TRENTASEI_MESI = 36, "36 mesi"
+    SEMPRE = 0, "Conserva sempre"
+
+
 class PhoneDisplayFormat(models.TextChoices):
     """Solo visualizzazione; in database i numeri sono senza spazi (vedi anagrafica.utils)."""
 
@@ -466,6 +474,14 @@ class SistemaImpostazioniGenerali(models.Model):
         choices=PhoneDisplayFormat.choices,
         default=PhoneDisplayFormat.IT_PLUS_N3_2_2_3,
         help_text="Come mostrare i numeri di telefono in elenchi e schede (in archivio restano senza spazi).",
+    )
+    cronologia_retention_mesi = models.PositiveSmallIntegerField(
+        choices=CronologiaRetentionPeriodo.choices,
+        default=CronologiaRetentionPeriodo.VENTIQUATTRO_MESI,
+        help_text=(
+            "Periodo di conservazione della cronologia operazioni. Le operazioni piu vecchie "
+            "vengono rimosse automaticamente."
+        ),
     )
     gestione_iscrizione_corso_anno = models.CharField(
         max_length=40,

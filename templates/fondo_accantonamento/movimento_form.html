@@ -1,43 +1,188 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}{{ titolo }} - {{ piano.nome }}{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'fondo_piano_dettaglio' piano.pk %}">{{ piano.nome }}</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{{ titolo }}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'fondo_piano_lista' %}">Fondo accantonamento</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'fondo_piano_dettaglio' piano.pk %}">{{ piano.nome }}</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{{ titolo }}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{{ titolo }} — {{ piano.nome }}</h1>
-    </div>
-    {% if saldo is not None %}
-        <div class="content-card">
-            <p>Saldo disponibile: <strong>{{ saldo }} €</strong></p>
-        </div>
-    {% endif %}
-    <form method="post" class="detail-form">
-        {% csrf_token %}
-        <div class="content-card">
-            <table class="form-table">
-                {% for field in form %}
-                    <tr>
-                        <th>{{ field.label_tag }}</th>
-                        <td>{{ field }} {{ field.errors }}<br><small class="table-muted">{{ field.help_text }}</small></td>
-                    </tr>
-                {% endfor %}
-            </table>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Registra</button>
-                <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary">Annulla</a>
+    <div class="fondo-movement-popup-shell{% if popup %} is-popup{% endif %}">
+        <form method="post" class="fondo-movement-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {{ form.non_field_errors }}
+
+            <div class="fondo-movement-hero">
+                <span class="fondo-movement-hero-icon {% if tipo_label == 'Prelievo' %}is-red{% else %}is-green{% endif %}" aria-hidden="true">
+                    <svg>
+                        {% if tipo_label == "Prelievo" %}
+                            <use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use>
+                        {% else %}
+                            <use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use>
+                        {% endif %}
+                    </svg>
+                </span>
+                <div>
+                    <div class="related-config-kicker">Fondo accantonamento</div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p>{{ piano.nome }}{% if saldo is not None %} - saldo disponibile {{ saldo }} &euro;{% endif %}</p>
+                </div>
             </div>
-        </div>
-    </form>
+
+            <div class="fondo-movement-summary-grid">
+                <article class="fondo-movement-summary-card">
+                    <span class="fondo-movement-summary-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                    </span>
+                    <span>Piano</span>
+                    <strong>{{ piano.nome }}</strong>
+                </article>
+                <article class="fondo-movement-summary-card">
+                    <span class="fondo-movement-summary-icon {% if tipo_label == 'Prelievo' %}is-red{% else %}is-green{% endif %}" aria-hidden="true">
+                        <svg>
+                            {% if tipo_label == "Prelievo" %}
+                                <use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use>
+                            {% else %}
+                                <use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use>
+                            {% endif %}
+                        </svg>
+                    </span>
+                    <span>Movimento</span>
+                    <strong>{{ tipo_label }}</strong>
+                </article>
+                {% if saldo is not None %}
+                    <article class="fondo-movement-summary-card">
+                        <span class="fondo-movement-summary-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                        </span>
+                        <span>Saldo disponibile</span>
+                        <strong>{{ saldo }} &euro;</strong>
+                    </article>
+                {% endif %}
+            </div>
+
+            <section class="fondo-movement-card" aria-labelledby="fondo-movement-data-title">
+                <div class="fondo-movement-card-head">
+                    <span class="fondo-movement-card-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="fondo-movement-data-title">Dati movimento</h2>
+                        <p>Registra data, importo e dettagli contabili del movimento.</p>
+                    </div>
+                </div>
+
+                <div class="fondo-movement-grid">
+                    <div class="fondo-movement-field">
+                        <span class="fondo-movement-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
+                            {{ form.data }}
+                            {{ form.data.errors }}
+                        </div>
+                    </div>
+
+                    <div class="fondo-movement-field">
+                        <span class="fondo-movement-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.importo.id_for_label }}">{{ form.importo.label }}</label>
+                            {{ form.importo }}
+                            {{ form.importo.errors }}
+                        </div>
+                    </div>
+
+                    {% if form.richiedente %}
+                        <div class="fondo-movement-field">
+                            <span class="fondo-movement-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.richiedente.id_for_label }}">{{ form.richiedente.label }}</label>
+                                {{ form.richiedente }}
+                                {{ form.richiedente.errors }}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if form.motivo %}
+                        <div class="fondo-movement-field fondo-movement-reason-field is-wide">
+                            <span class="fondo-movement-field-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.motivo.id_for_label }}">{{ form.motivo.label }}</label>
+                                {{ form.motivo }}
+                                {{ form.motivo.errors }}
+                                {% if form.motivo.help_text %}<p class="fondo-movement-help">{{ form.motivo.help_text }}</p>{% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if tipo_label == "Prelievo" %}
+                        <details class="fondo-movement-notes-details" {% if form.note.errors or form.note.value %}open{% endif %}>
+                            <summary title="Clicca per espandere">
+                                <span class="fondo-movement-field-icon is-purple" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                                </span>
+                                <span>
+                                    <strong>{{ form.note.label }}</strong>
+                                    <small>Clicca per espandere</small>
+                                </span>
+                            </summary>
+                            <div class="fondo-movement-notes-body">
+                                <label class="sr-only" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </details>
+                    {% else %}
+                        <div class="fondo-movement-field is-wide">
+                            <span class="fondo-movement-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <div class="fondo-movement-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Registra</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 {% endblock %}

@@ -1,50 +1,90 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
 
 {% block title %}Elimina tariffa servizio extra - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina {{ tariffa.nome_tariffa }}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina {{ tariffa.nome_tariffa }}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina tariffa servizio extra</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="btn btn-secondary">Torna alla tariffa</a>
-        </div>
-    </div>
-
-    <div class="content-card">
-        <div class="settings-warning-box" style="margin-bottom: 18px;">
-            Stai per eliminare la tariffa <strong>{{ tariffa.nome_tariffa }}</strong> del servizio
-            <strong>{{ tariffa.servizio.nome_servizio }}</strong>.
-        </div>
-
-        <table class="form-table">
-            <tr>
-                <th>Numero rate configurate</th>
-                <td>{{ count_rate }}</td>
-            </tr>
-            <tr>
-                <th>Iscrizioni collegate</th>
-                <td>{{ tariffa.count_iscrizioni }}</td>
-            </tr>
-        </table>
-
-        <form method="post" style="margin-top: 18px;">
-            {% csrf_token %}
-            <div class="form-actions">
-                <button type="submit" class="btn btn-danger">Elimina tariffa</button>
-                <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="btn btn-secondary">Annulla</a>
+    <div class="scambio-retta-form-shell servizi-extra-tariffa-form-shell servizi-extra-tariffa-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon servizio-extra-delete-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Servizi extra</p>
+                <h1 class="page-title">Elimina tariffa</h1>
+                <p>Verifica i collegamenti prima di rimuovere questa tariffa.</p>
             </div>
+        </div>
+
+        <section class="scambio-retta-card tariffa-scambio-delete-card">
+            <div class="scambio-retta-card-head">
+                <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2>Conferma eliminazione</h2>
+                    {% if can_delete %}
+                        <p>Stai per eliminare la tariffa <strong>{{ tariffa.nome_tariffa }}</strong> del servizio <strong>{{ tariffa.servizio.nome_servizio }}</strong>.</p>
+                    {% else %}
+                        <p>Questa tariffa e collegata a iscrizioni esistenti e non puo essere eliminata.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="servizio-extra-delete-details servizi-extra-tariffa-delete-details">
+                <article>
+                    <span>Servizio</span>
+                    <strong>{{ tariffa.servizio.nome_servizio }}</strong>
+                </article>
+                <article>
+                    <span>Anno scolastico</span>
+                    <strong>{{ tariffa.servizio.anno_scolastico.nome_anno_scolastico }}</strong>
+                </article>
+                <article>
+                    <span>Rate configurate</span>
+                    <strong>{{ count_rate }}</strong>
+                </article>
+                <article>
+                    <span>Iscrizioni collegate</span>
+                    <strong>{{ tariffa.count_iscrizioni }}</strong>
+                </article>
+            </div>
+        </section>
+
+        <form method="post" class="scambio-retta-actions servizio-extra-delete-actions">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if can_delete %}
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina</span>
+                </button>
+            {% endif %}
+            {% if popup %}
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">{% if can_delete %}Annulla{% else %}Chiudi{% endif %}</span>
+                </button>
+            {% else %}
+                <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">{% if can_delete %}Annulla{% else %}Indietro{% endif %}</span>
+                </a>
+            {% endif %}
         </form>
     </div>
 {% endblock %}

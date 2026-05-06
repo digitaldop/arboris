@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static currency %}
+{% load static currency active_toggles %}
 
 {% block title %}Calendario agenda - Arboris{% endblock %}
 
@@ -298,9 +298,13 @@
                                     <td>{{ evento.duration_label }}</td>
                                     <td>{{ evento.location|default:"-" }}</td>
                                     <td>
-                                        <span class="calendar-state-pill {% if evento.attivo and evento.visibile %}is-active{% else %}is-muted{% endif %}">
-                                            {% if evento.attivo and evento.visibile %}Visibile{% elif not evento.attivo %}Non attivo{% else %}Nascosto{% endif %}
-                                        </span>
+                                        {% if evento.active_object %}
+                                            {% active_toggle evento.active_object %}
+                                        {% else %}
+                                            <span class="calendar-state-pill {% if evento.attivo and evento.visibile %}is-active{% else %}is-muted{% endif %}">
+                                                {% if evento.attivo and evento.visibile %}Visibile{% elif not evento.attivo %}Non attivo{% else %}Nascosto{% endif %}
+                                            </span>
+                                        {% endif %}
                                     </td>
                                     <td class="actions-cell">
                                         {% if evento.url %}

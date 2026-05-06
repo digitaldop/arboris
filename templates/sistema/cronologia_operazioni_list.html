@@ -12,119 +12,267 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Cronologia Operazioni</h1>
-    </div>
+    <div class="audit-log-shell">
+        <div class="page-head family-page-head anagrafica-list-head audit-log-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon audit-log-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Cronologia Operazioni</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ totale_operazioni }} operazioni
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        Registro consultabile delle modifiche effettuate nel software
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="family-top-layout">
-        <div class="family-main-column">
-            <div class="list-toolbar">
-                <form method="get" class="search-form">
+        <section class="audit-log-kpi-grid" aria-label="Riepilogo cronologia operazioni">
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Operazioni trovate</span>
+                    <strong class="audit-log-kpi-value">{{ totale_operazioni }}</strong>
+                    <span class="audit-log-kpi-note">{{ operazioni|length }} mostrate</span>
+                </div>
+                <span class="audit-log-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Creazioni</span>
+                    <strong class="audit-log-kpi-value is-green">{{ count_creazioni }}</strong>
+                    <span class="audit-log-kpi-note">Nuovi elementi</span>
+                </div>
+                <span class="audit-log-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                </span>
+            </article>
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Modifiche</span>
+                    <strong class="audit-log-kpi-value is-amber">{{ count_modifiche }}</strong>
+                    <span class="audit-log-kpi-note">Aggiornamenti</span>
+                </div>
+                <span class="audit-log-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                </span>
+            </article>
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Eliminazioni</span>
+                    <strong class="audit-log-kpi-value is-red">{{ count_eliminazioni }}</strong>
+                    <span class="audit-log-kpi-note">Rimozioni</span>
+                </div>
+                <span class="audit-log-kpi-icon is-red" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="audit-log-filter-card" aria-labelledby="audit-log-filter-title">
+            <div class="audit-log-filter-head">
+                <div>
+                    <h2 id="audit-log-filter-title">Filtri ricerca</h2>
+                    <p>Restringi la cronologia per modulo, operazione o testo libero.</p>
+                </div>
+            </div>
+            <form method="get" class="audit-log-filter-form">
+                <label class="audit-log-filter-field">
+                    <span class="audit-log-filter-label">Modulo</span>
                     <select name="modulo">
                         <option value="">Tutti i moduli</option>
                         {% for value, label in moduli_disponibili %}
                             <option value="{{ value }}" {% if modulo == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
+                </label>
+                <label class="audit-log-filter-field">
+                    <span class="audit-log-filter-label">Operazione</span>
                     <select name="azione">
                         <option value="">Tutte le operazioni</option>
                         {% for value, label in azioni_disponibili %}
                             <option value="{{ value }}" {% if azione == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
-                    <input
-                        type="text"
-                        name="q"
-                        value="{{ q|default:'' }}"
-                        placeholder="Cerca per utente, oggetto o descrizione..."
-                        class="search-input"
-                    >
-                    <button type="submit" class="btn btn-secondary">Filtra</button>
+                </label>
+                <label class="audit-log-filter-field is-search">
+                    <span class="audit-log-filter-label">Ricerca</span>
+                    <span class="audit-log-search-control">
+                        <span class="audit-log-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ q|default:'' }}"
+                            placeholder="Cerca per utente, oggetto o descrizione..."
+                        >
+                    </span>
+                </label>
+                <div class="audit-log-filter-actions">
+                    <button type="submit" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                        <span class="btn-label">Filtra</span>
+                    </button>
                     {% if q or azione or modulo %}
-                        <a href="{% url 'cronologia_operazioni_sistema' %}" class="btn btn-secondary">Pulisci</a>
-                    {% endif %}
-                </form>
-            </div>
-
-            <div class="panel">
-                <div class="panel-body">
-                    {% if operazioni %}
-                        {% if is_truncated %}
-                            <div class="settings-warning-box" style="margin: 0 0 14px;">
-                                Sono mostrate le ultime {{ result_limit }} operazioni sui {{ totale_operazioni }} risultati trovati. Restringi i filtri per un dettaglio piu preciso.
-                            </div>
-                        {% endif %}
-
-                        <table class="list-table">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Ora</th>
-                                    <th>Utente</th>
-                                    <th>Operazione</th>
-                                    <th>Sezione</th>
-                                    <th>Elemento</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for operazione in operazioni %}
-                                    <tr>
-                                        <td>{{ operazione.data_operazione|date:"d/m/Y" }}</td>
-                                        <td>{{ operazione.data_operazione|date:"H:i:s" }}</td>
-                                        <td>{{ operazione.utente_display }}</td>
-                                        <td>
-                                            <span class="audit-action-badge {{ operazione.azione_badge_class }}">
-                                                {{ operazione.get_azione_display }}
-                                            </span>
-                                            <div class="audit-operation-text">{{ operazione.descrizione }}</div>
-                                            {% if operazione.campi_coinvolti %}
-                                                <div class="table-muted">
-                                                    Campi coinvolti: {{ operazione.campi_coinvolti|join:", " }}
-                                                </div>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ operazione.modulo_label }}</td>
-                                        <td>
-                                            <div>{{ operazione.model_verbose_name }}</div>
-                                            <div class="table-muted">{{ operazione.oggetto_label_display }}</div>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% else %}
-                        <div class="empty-state">Nessuna operazione trovata con i filtri correnti.</div>
+                        <a href="{% url 'cronologia_operazioni_sistema' %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            <span class="btn-label">Pulisci</span>
+                        </a>
                     {% endif %}
                 </div>
-            </div>
-        </div>
+            </form>
+        </section>
 
-        <div class="family-side-column">
-            <div class="admin-section compact">
-                <div class="admin-section-title">Riepilogo</div>
-                <div class="panel">
-                    <div class="panel-body summary-panel-body">
-                        <div class="summary-grid">
-                            <div class="summary-item">
-                                <div class="summary-value">{{ totale_operazioni }}</div>
-                                <div class="summary-label">Operazioni trovate</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">{{ count_creazioni }}</div>
-                                <div class="summary-label">Creazioni</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">{{ count_modifiche }}</div>
-                                <div class="summary-label">Modifiche</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">{{ count_eliminazioni }}</div>
-                                <div class="summary-label">Eliminazioni</div>
-                            </div>
+        <div class="audit-log-layout">
+            <main class="audit-log-main">
+                <section class="audit-log-card" aria-labelledby="audit-log-table-title">
+                    <div class="audit-log-card-head">
+                        <div>
+                            <h2 id="audit-log-table-title">Registro operazioni</h2>
+                            <p>Ultime operazioni corrispondenti ai filtri impostati.</p>
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    {% if is_truncated %}
+                        <div class="audit-log-warning">
+                            <span class="audit-log-warning-icon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                            </span>
+                            <p>Sono mostrate le ultime {{ result_limit }} operazioni sui {{ totale_operazioni }} risultati trovati. Restringi i filtri per un dettaglio piu preciso.</p>
+                        </div>
+                    {% endif %}
+
+                    <div class="audit-log-table-wrap">
+                        {% if operazioni %}
+                            <table class="list-table anagrafica-list-table audit-log-table">
+                                <colgroup>
+                                    <col class="audit-log-col-date">
+                                    <col class="audit-log-col-user">
+                                    <col class="audit-log-col-action">
+                                    <col class="audit-log-col-section">
+                                    <col class="audit-log-col-object">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Quando</th>
+                                        <th>Utente</th>
+                                        <th>Operazione</th>
+                                        <th>Sezione</th>
+                                        <th>Elemento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for operazione in operazioni %}
+                                        <tr>
+                                            <td>
+                                                <div class="audit-log-date">
+                                                    <strong>{{ operazione.data_operazione|date:"d/m/Y" }}</strong>
+                                                    <span>{{ operazione.data_operazione|date:"H:i:s" }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="audit-log-user">
+                                                    <span class="audit-log-user-icon" aria-hidden="true">
+                                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                                                    </span>
+                                                    <strong>{{ operazione.utente_display }}</strong>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="audit-log-action-cell">
+                                                    <span class="audit-action-badge {{ operazione.azione_badge_class }}">
+                                                        {{ operazione.get_azione_display }}
+                                                    </span>
+                                                    <strong>{{ operazione.descrizione }}</strong>
+                                                    {% if operazione.campi_coinvolti %}
+                                                        <span class="audit-log-muted">Campi coinvolti: {{ operazione.campi_coinvolti|join:", " }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="audit-log-module-chip">{{ operazione.modulo_label }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="audit-log-object-cell">
+                                                    <strong>{{ operazione.model_verbose_name }}</strong>
+                                                    <span>{{ operazione.oggetto_label_display }}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="audit-log-empty">
+                                <span class="audit-log-empty-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                                </span>
+                                <strong>Nessuna operazione trovata</strong>
+                                <p>Modifica i filtri o pulisci la ricerca per visualizzare piu risultati.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </section>
+            </main>
+
+            <aside class="audit-log-side">
+                <section class="audit-log-card audit-log-summary-card" aria-labelledby="audit-log-summary-title">
+                    <div class="audit-log-card-head">
+                        <span class="audit-log-card-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="audit-log-summary-title">Riepilogo</h2>
+                            <p>Stato della consultazione corrente.</p>
+                        </div>
+                    </div>
+                    <div class="audit-log-summary-list">
+                        <article>
+                            <span>Operazioni trovate</span>
+                            <strong>{{ totale_operazioni }}</strong>
+                        </article>
+                        <article>
+                            <span>Operazioni mostrate</span>
+                            <strong>{{ operazioni|length }}</strong>
+                        </article>
+                        <article>
+                            <span>Modulo filtrato</span>
+                            <strong>
+                                {% if modulo %}
+                                    {% for value, label in moduli_disponibili %}{% if modulo == value %}{{ label }}{% endif %}{% endfor %}
+                                {% else %}
+                                    Tutti
+                                {% endif %}
+                            </strong>
+                        </article>
+                        <article>
+                            <span>Operazione filtrata</span>
+                            <strong>
+                                {% if azione %}
+                                    {% for value, label in azioni_disponibili %}{% if azione == value %}{{ label }}{% endif %}{% endfor %}
+                                {% else %}
+                                    Tutte
+                                {% endif %}
+                            </strong>
+                        </article>
+                        <article>
+                            <span>Ricerca testuale</span>
+                            <strong>{{ q|default:"-" }}</strong>
+                        </article>
+                    </div>
+                </section>
+            </aside>
         </div>
     </div>
 {% endblock %}

@@ -1,34 +1,74 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
 
 {% block title %}Elimina agevolazione - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-{% if not popup %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_agevolazioni' %}">Agevolazioni</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina</span>
-    </div>
-{% endif %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_agevolazioni' %}">Agevolazioni</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina agevolazione</h1>
-    </div>
-    <div class="content-card">
-        <div class="empty-state">
-            <p>Stai per eliminare l'agevolazione <strong>{{ agevolazione.nome_agevolazione }}</strong>.</p>
+    <div class="scambio-retta-form-shell agevolazione-form-shell agevolazione-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon tariffa-scambio-delete-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Rette scolastiche</p>
+                <h1 class="page-title">Elimina agevolazione</h1>
+                <p>Questa operazione rimuove la riduzione selezionata dall'elenco.</p>
+            </div>
         </div>
-        <form method="post" class="form-actions">
+
+        <section class="scambio-retta-card tariffa-scambio-delete-card agevolazione-delete-card">
+            <div class="scambio-retta-card-head">
+                <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2>Conferma eliminazione</h2>
+                    <p>Stai per eliminare l'agevolazione <strong>{{ agevolazione.nome_agevolazione }}</strong>.</p>
+                </div>
+            </div>
+            <div class="agevolazione-delete-summary">
+                <div class="scambio-retta-preview-card">
+                    <span class="scambio-retta-preview-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                    </span>
+                    <div>
+                        <span>Importo annuale</span>
+                        <strong>EUR {{ agevolazione.importo_annuale_agevolazione|euro }}</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <form method="post" class="scambio-retta-actions tariffa-scambio-delete-actions">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Conferma eliminazione</button>
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+            <button type="submit" class="btn btn-danger btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Elimina</span>
+            </button>
             {% if popup %}
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
             {% else %}
-                <a href="{% url 'lista_agevolazioni' %}" class="btn btn-secondary">Annulla</a>
+                <a href="{% url 'lista_agevolazioni' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
             {% endif %}
         </form>
     </div>

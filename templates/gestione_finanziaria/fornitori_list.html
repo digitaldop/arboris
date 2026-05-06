@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Fornitori - Arboris School Management{% endblock %}
 
@@ -110,11 +110,7 @@
                                 <td>{{ fornitore.telefono|default:"-" }}</td>
                                 <td>{{ fornitore.numero_documenti }}</td>
                                 <td>
-                                    {% if fornitore.attivo %}
-                                        <span class="anagrafica-status-chip is-success">Attivo</span>
-                                    {% else %}
-                                        <span class="anagrafica-status-chip is-muted">Non attivo</span>
-                                    {% endif %}
+                                    {% active_toggle fornitore %}
                                 </td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions anagrafica-row-actions">

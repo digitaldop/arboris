@@ -238,13 +238,38 @@ def _build_servizio_extra_overview(servizio):
     }
 
 
+def _is_popup_request(request):
+    return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
 def lista_servizi_extra(request):
-    servizi = (
+    servizi = list(
         ServizioExtra.objects.select_related("anno_scolastico")
-        .annotate(count_tariffe=Count("tariffe", distinct=True), count_iscrizioni=Count("iscrizioni", distinct=True))
+        .annotate(
+            count_tariffe=Count("tariffe", distinct=True),
+            count_tariffe_attive=Count("tariffe", filter=Q(tariffe__attiva=True), distinct=True),
+            count_iscrizioni=Count("iscrizioni", distinct=True),
+            count_iscrizioni_attive=Count("iscrizioni", filter=Q(iscrizioni__attiva=True), distinct=True),
+        )
         .all()
     )
-    return render(request, "servizi_extra/servizi_list.html", {"servizi": servizi})
+    servizi_stats = {
+        "totale": len(servizi),
+        "attivi": sum(1 for servizio in servizi if servizio.attiva),
+        "tariffe": sum(servizio.count_tariffe for servizio in servizi),
+        "tariffe_attive": sum(servizio.count_tariffe_attive for servizio in servizi),
+        "iscrizioni": sum(servizio.count_iscrizioni for servizio in servizi),
+        "iscrizioni_attive": sum(servizio.count_iscrizioni_attive for servizio in servizi),
+    }
+
+    return render(
+        request,
+        "servizi_extra/servizi_list.html",
+        {
+            "servizi": servizi,
+            "servizi_stats": servizi_stats,
+        },
+    )
 
 
 def dettaglio_servizio_extra(request, pk):
@@ -381,31 +406,56 @@ def dettaglio_servizio_extra(request, pk):
 
 
 def crea_servizio_extra(request):
+    popup = _is_popup_request(request)
+
     if request.method == "POST":
         form = ServizioExtraForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Servizio extra creato correttamente.")
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": "Servizio extra creato correttamente."})
             return redirect("lista_servizi_extra")
     else:
         form = ServizioExtraForm()
 
-    return render(request, "servizi_extra/servizio_form.html", {"form": form, "servizio": None})
+    return render(
+        request,
+        "servizi_extra/servizio_form.html",
+        {
+            "form": form,
+            "servizio": None,
+            "popup": popup,
+            "is_new": True,
+        },
+    )
 
 
 def modifica_servizio_extra(request, pk):
     servizio = get_object_or_404(ServizioExtra, pk=pk)
+    popup = _is_popup_request(request)
 
     if request.method == "POST":
         form = ServizioExtraForm(request.POST, instance=servizio)
         if form.is_valid():
             form.save()
             messages.success(request, "Servizio extra aggiornato correttamente.")
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": "Servizio extra aggiornato correttamente."})
             return redirect("lista_servizi_extra")
     else:
         form = ServizioExtraForm(instance=servizio)
 
-    return render(request, "servizi_extra/servizio_form.html", {"form": form, "servizio": servizio})
+    return render(
+        request,
+        "servizi_extra/servizio_form.html",
+        {
+            "form": form,
+            "servizio": servizio,
+            "popup": popup,
+            "is_new": False,
+        },
+    )
 
 
 def elimina_servizio_extra(request, pk):
@@ -416,18 +466,52 @@ def elimina_servizio_extra(request, pk):
         ),
         pk=pk,
     )
+    popup = _is_popup_request(request)
+    can_delete = servizio.count_iscrizioni == 0
 
     if request.method == "POST":
+        if not can_delete:
+            messages.error(request, "Non puoi eliminare questo servizio extra perche e collegato a iscrizioni esistenti.")
+            return render(
+                request,
+                "servizi_extra/servizio_confirm_delete.html",
+                {
+                    "servizio": servizio,
+                    "popup": popup,
+                    "can_delete": False,
+                },
+            )
+
         try:
             servizio.delete()
         except ProtectedError:
             messages.error(request, "Non puoi eliminare questo servizio extra perche e collegato a iscrizioni esistenti.")
+            if popup:
+                return render(
+                    request,
+                    "servizi_extra/servizio_confirm_delete.html",
+                    {
+                        "servizio": servizio,
+                        "popup": popup,
+                        "can_delete": False,
+                    },
+                )
             return redirect("modifica_servizio_extra", pk=servizio.pk)
 
         messages.success(request, "Servizio extra eliminato correttamente.")
+        if popup:
+            return render(request, "popup/popup_close.html", {"message": "Servizio extra eliminato correttamente."})
         return redirect("lista_servizi_extra")
 
-    return render(request, "servizi_extra/servizio_confirm_delete.html", {"servizio": servizio})
+    return render(
+        request,
+        "servizi_extra/servizio_confirm_delete.html",
+        {
+            "servizio": servizio,
+            "popup": popup,
+            "can_delete": can_delete,
+        },
+    )
 
 
 def lista_tariffe_servizi_extra(request):
@@ -436,7 +520,10 @@ def lista_tariffe_servizi_extra(request):
 
     tariffe = (
         TariffaServizioExtra.objects.select_related("servizio", "servizio__anno_scolastico")
-        .annotate(count_iscrizioni=Count("iscrizioni", distinct=True))
+        .annotate(
+            count_iscrizioni=Count("iscrizioni", distinct=True),
+            count_iscrizioni_attive=Count("iscrizioni", filter=Q(iscrizioni__attiva=True), distinct=True),
+        )
         .prefetch_related("rate_config")
         .all()
     )
@@ -445,18 +532,51 @@ def lista_tariffe_servizi_extra(request):
         servizio = get_object_or_404(ServizioExtra.objects.select_related("anno_scolastico"), pk=servizio_id)
         tariffe = tariffe.filter(servizio_id=servizio.pk)
 
+    tariffe = list(tariffe)
+    totale_importi = Decimal("0.00")
+    servizi_ids = set()
+    count_rate = 0
+
+    for tariffa in tariffe:
+        rate_config = list(tariffa.rate_config.all())
+        tariffa.numero_rate_lista = len(rate_config)
+        tariffa.totale_lista = sum((rata.importo for rata in rate_config), Decimal("0.00"))
+        tariffa.prima_scadenza_lista = min((rata.data_scadenza for rata in rate_config), default=None)
+        tariffa.ultima_scadenza_lista = max((rata.data_scadenza for rata in rate_config), default=None)
+        totale_importi += tariffa.totale_lista
+        count_rate += tariffa.numero_rate_lista
+        if tariffa.servizio_id:
+            servizi_ids.add(tariffa.servizio_id)
+
+    tariffe_stats = {
+        "totale": len(tariffe),
+        "attive": sum(1 for tariffa in tariffe if tariffa.attiva),
+        "servizi": len(servizi_ids),
+        "rate": count_rate,
+        "iscrizioni": sum(tariffa.count_iscrizioni for tariffa in tariffe),
+        "iscrizioni_attive": sum(tariffa.count_iscrizioni_attive for tariffa in tariffe),
+        "importo": totale_importi,
+    }
+
     return render(
         request,
         "servizi_extra/tariffe_list.html",
         {
             "tariffe": tariffe,
             "servizio_filtro": servizio,
+            "tariffe_stats": tariffe_stats,
         },
     )
 
 
 def crea_tariffa_servizio_extra(request):
+    popup = _is_popup_request(request)
     tariffa = TariffaServizioExtra()
+    servizio_id = request.GET.get("servizio") or request.POST.get("servizio") or ""
+    initial = {}
+    if servizio_id.isdigit():
+        servizio = get_object_or_404(ServizioExtra, pk=servizio_id)
+        initial["servizio"] = servizio.pk
 
     if request.method == "POST":
         form = TariffaServizioExtraForm(request.POST, instance=tariffa)
@@ -466,9 +586,11 @@ def crea_tariffa_servizio_extra(request):
             formset.instance = tariffa
             formset.save()
             messages.success(request, "Tariffa servizio extra creata correttamente.")
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": "Tariffa servizio extra creata correttamente."})
             return redirect("lista_tariffe_servizi_extra")
     else:
-        form = TariffaServizioExtraForm(instance=tariffa)
+        form = TariffaServizioExtraForm(instance=tariffa, initial=initial)
         formset = TariffaServizioExtraRataFormSet(instance=tariffa, prefix="rate")
 
     return render(
@@ -478,12 +600,15 @@ def crea_tariffa_servizio_extra(request):
             "form": form,
             "formset": formset,
             "tariffa": None,
+            "popup": popup,
+            "is_new": True,
         },
     )
 
 
 def modifica_tariffa_servizio_extra(request, pk):
-    tariffa = get_object_or_404(TariffaServizioExtra, pk=pk)
+    popup = _is_popup_request(request)
+    tariffa = get_object_or_404(TariffaServizioExtra.objects.select_related("servizio", "servizio__anno_scolastico"), pk=pk)
 
     if request.method == "POST":
         form = TariffaServizioExtraForm(request.POST, instance=tariffa)
@@ -503,6 +628,8 @@ def modifica_tariffa_servizio_extra(request, pk):
                 success_message = f"{success_message} {sync_feedback}."
 
             messages.success(request, success_message)
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": success_message})
             return redirect("lista_tariffe_servizi_extra")
     else:
         form = TariffaServizioExtraForm(instance=tariffa)
@@ -515,26 +642,57 @@ def modifica_tariffa_servizio_extra(request, pk):
             "form": form,
             "formset": formset,
             "tariffa": tariffa,
+            "popup": popup,
+            "is_new": False,
         },
     )
 
 
 def elimina_tariffa_servizio_extra(request, pk):
+    popup = _is_popup_request(request)
     tariffa = get_object_or_404(
         TariffaServizioExtra.objects.select_related("servizio", "servizio__anno_scolastico").annotate(
             count_iscrizioni=Count("iscrizioni", distinct=True)
         ),
         pk=pk,
     )
+    count_rate = tariffa.rate_config.count()
+    can_delete = tariffa.count_iscrizioni == 0
 
     if request.method == "POST":
+        if not can_delete:
+            messages.error(request, "Non puoi eliminare questa tariffa perche e collegata a iscrizioni esistenti.")
+            return render(
+                request,
+                "servizi_extra/tariffa_confirm_delete.html",
+                {
+                    "tariffa": tariffa,
+                    "count_rate": count_rate,
+                    "popup": popup,
+                    "can_delete": can_delete,
+                },
+            )
+
         try:
             tariffa.delete()
         except ProtectedError:
             messages.error(request, "Non puoi eliminare questa tariffa perche e collegata a iscrizioni esistenti.")
+            if popup:
+                return render(
+                    request,
+                    "servizi_extra/tariffa_confirm_delete.html",
+                    {
+                        "tariffa": tariffa,
+                        "count_rate": count_rate,
+                        "popup": popup,
+                        "can_delete": False,
+                    },
+                )
             return redirect("modifica_tariffa_servizio_extra", pk=tariffa.pk)
 
         messages.success(request, "Tariffa servizio extra eliminata correttamente.")
+        if popup:
+            return render(request, "popup/popup_close.html", {"message": "Tariffa servizio extra eliminata correttamente."})
         return redirect("lista_tariffe_servizi_extra")
 
     return render(
@@ -542,7 +700,9 @@ def elimina_tariffa_servizio_extra(request, pk):
         "servizi_extra/tariffa_confirm_delete.html",
         {
             "tariffa": tariffa,
-            "count_rate": tariffa.rate_config.count(),
+            "count_rate": count_rate,
+            "popup": popup,
+            "can_delete": can_delete,
         },
     )
 
@@ -558,7 +718,11 @@ def lista_iscrizioni_servizi_extra(request):
             "servizio__anno_scolastico",
             "tariffa",
         )
-        .annotate(count_rate=Count("rate", distinct=True))
+        .annotate(
+            count_rate=Count("rate", distinct=True),
+            count_rate_pagate=Count("rate", filter=Q(rate__pagata=True), distinct=True),
+            count_rate_aperte=Count("rate", filter=Q(rate__pagata=False), distinct=True),
+        )
         .all()
     )
 
@@ -566,17 +730,38 @@ def lista_iscrizioni_servizi_extra(request):
         servizio = get_object_or_404(ServizioExtra.objects.select_related("anno_scolastico"), pk=servizio_id)
         iscrizioni = iscrizioni.filter(servizio_id=servizio.pk)
 
+    iscrizioni = list(iscrizioni)
+    studenti_ids = {iscrizione.studente_id for iscrizione in iscrizioni if iscrizione.studente_id}
+    servizi_ids = {iscrizione.servizio_id for iscrizione in iscrizioni if iscrizione.servizio_id}
+    iscrizioni_stats = {
+        "totale": len(iscrizioni),
+        "attive": sum(1 for iscrizione in iscrizioni if iscrizione.attiva),
+        "studenti": len(studenti_ids),
+        "servizi": len(servizi_ids),
+        "rate": sum(iscrizione.count_rate for iscrizione in iscrizioni),
+        "rate_aperte": sum(iscrizione.count_rate_aperte for iscrizione in iscrizioni),
+        "rate_pagate": sum(iscrizione.count_rate_pagate for iscrizione in iscrizioni),
+    }
+
     return render(
         request,
         "servizi_extra/iscrizioni_list.html",
         {
             "iscrizioni": iscrizioni,
             "servizio_filtro": servizio,
+            "iscrizioni_stats": iscrizioni_stats,
         },
     )
 
 
 def crea_iscrizione_servizio_extra(request):
+    popup = _is_popup_request(request)
+    servizio_id = request.GET.get("servizio") or request.POST.get("servizio") or ""
+    initial = {}
+    if servizio_id.isdigit():
+        servizio = get_object_or_404(ServizioExtra, pk=servizio_id)
+        initial["servizio"] = servizio.pk
+
     if request.method == "POST":
         form = IscrizioneServizioExtraForm(request.POST)
         if form.is_valid():
@@ -593,9 +778,11 @@ def crea_iscrizione_servizio_extra(request):
             else:
                 messages.success(request, "Iscrizione al servizio extra creata correttamente.")
 
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": "Iscrizione al servizio extra creata correttamente."})
             return redirect("lista_iscrizioni_servizi_extra")
     else:
-        form = IscrizioneServizioExtraForm()
+        form = IscrizioneServizioExtraForm(initial=initial)
 
     return render(
         request,
@@ -604,34 +791,46 @@ def crea_iscrizione_servizio_extra(request):
             "form": form,
             "iscrizione": None,
             "riepilogo_servizio": None,
+            "popup": popup,
+            "is_new": True,
         },
     )
 
 
 def modifica_iscrizione_servizio_extra(request, pk):
-    iscrizione = get_object_or_404(IscrizioneServizioExtra, pk=pk)
+    popup = _is_popup_request(request)
+    iscrizione = get_object_or_404(
+        IscrizioneServizioExtra.objects.select_related("studente", "servizio", "servizio__anno_scolastico", "tariffa"),
+        pk=pk,
+    )
 
     if request.method == "POST":
         form = IscrizioneServizioExtraForm(request.POST, instance=iscrizione)
         if form.is_valid():
             iscrizione = form.save()
             esito_rate = iscrizione.sync_rate_schedule()
+            success_message = "Iscrizione aggiornata correttamente."
 
             if esito_rate == "regenerated":
-                messages.success(request, "Iscrizione aggiornata correttamente. Il piano rate e stato riallineato.")
+                success_message = "Iscrizione aggiornata correttamente. Il piano rate e stato riallineato."
+                messages.success(request, success_message)
             elif esito_rate == "missing":
+                success_message = "Iscrizione aggiornata correttamente, ma il piano rate non e stato generato: verifica la tariffa selezionata."
                 messages.warning(
                     request,
-                    "Iscrizione aggiornata correttamente, ma il piano rate non e stato generato: verifica la tariffa selezionata.",
+                    success_message,
                 )
             elif esito_rate == "locked":
+                success_message = "Iscrizione aggiornata correttamente. Le rate esistenti non sono state rigenerate perche contengono gia pagamenti."
                 messages.success(
                     request,
-                    "Iscrizione aggiornata correttamente. Le rate esistenti non sono state rigenerate perche contengono gia pagamenti.",
+                    success_message,
                 )
             else:
-                messages.success(request, "Iscrizione aggiornata correttamente.")
+                messages.success(request, success_message)
 
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": success_message})
             return redirect("lista_iscrizioni_servizi_extra")
     else:
         form = IscrizioneServizioExtraForm(instance=iscrizione)
@@ -643,6 +842,8 @@ def modifica_iscrizione_servizio_extra(request, pk):
             "form": form,
             "iscrizione": iscrizione,
             "riepilogo_servizio": iscrizione.get_riepilogo(),
+            "popup": popup,
+            "is_new": False,
         },
     )
 
@@ -671,7 +872,11 @@ def ricalcola_rate_iscrizione_servizio_extra(request, pk):
 
 
 def elimina_iscrizione_servizio_extra(request, pk):
-    iscrizione = get_object_or_404(IscrizioneServizioExtra, pk=pk)
+    popup = _is_popup_request(request)
+    iscrizione = get_object_or_404(
+        IscrizioneServizioExtra.objects.select_related("studente", "servizio", "servizio__anno_scolastico", "tariffa"),
+        pk=pk,
+    )
     count_rate = iscrizione.rate.count()
 
     if request.method == "POST":
@@ -686,17 +891,19 @@ def elimina_iscrizione_servizio_extra(request, pk):
             return render(
                 request,
                 "servizi_extra/iscrizione_confirm_delete.html",
-                {"iscrizione": iscrizione, "count_rate": count_rate},
+                {"iscrizione": iscrizione, "count_rate": count_rate, "popup": popup},
             )
 
         iscrizione.delete()
         messages.success(request, "Iscrizione al servizio extra eliminata correttamente.")
+        if popup:
+            return render(request, "popup/popup_close.html", {"message": "Iscrizione al servizio extra eliminata correttamente."})
         return redirect("lista_iscrizioni_servizi_extra")
 
     return render(
         request,
         "servizi_extra/iscrizione_confirm_delete.html",
-        {"iscrizione": iscrizione, "count_rate": count_rate},
+        {"iscrizione": iscrizione, "count_rate": count_rate, "popup": popup},
     )
 
 
@@ -712,6 +919,7 @@ def lista_rate_servizi_extra(request):
         "iscrizione__studente",
         "iscrizione__servizio",
         "iscrizione__servizio__anno_scolastico",
+        "iscrizione__tariffa",
     ).all()
 
     if iscrizione_id:
@@ -737,6 +945,37 @@ def lista_rate_servizi_extra(request):
         "numero_rata",
     )
 
+    rate = list(rate)
+    today = timezone.localdate()
+    totale_dovuto = Decimal("0.00")
+    totale_pagato = Decimal("0.00")
+    studenti_ids = set()
+    servizi_ids = set()
+
+    for rata in rate:
+        importo_finale = rata.importo_finale or rata.importo_dovuto or Decimal("0.00")
+        importo_pagato = rata.importo_pagato or Decimal("0.00")
+        rata.residuo_lista = max(importo_finale - importo_pagato, Decimal("0.00"))
+        rata.stato_lista = "Pagata" if rata.pagata else ("Scaduta" if rata.data_scadenza and rata.data_scadenza < today else "Da pagare")
+        totale_dovuto += importo_finale
+        totale_pagato += importo_pagato
+        if rata.iscrizione_id and rata.iscrizione.studente_id:
+            studenti_ids.add(rata.iscrizione.studente_id)
+        if rata.iscrizione_id and rata.iscrizione.servizio_id:
+            servizi_ids.add(rata.iscrizione.servizio_id)
+
+    rate_stats = {
+        "totale": len(rate),
+        "pagate": sum(1 for rata in rate if rata.pagata),
+        "aperte": sum(1 for rata in rate if not rata.pagata),
+        "scadute": sum(1 for rata in rate if not rata.pagata and rata.data_scadenza and rata.data_scadenza < today),
+        "studenti": len(studenti_ids),
+        "servizi": len(servizi_ids),
+        "totale_dovuto": totale_dovuto,
+        "totale_pagato": totale_pagato,
+        "residuo": max(totale_dovuto - totale_pagato, Decimal("0.00")),
+    }
+
     return render(
         request,
         "servizi_extra/rate_list.html",
@@ -744,6 +983,7 @@ def lista_rate_servizi_extra(request):
             "rate": rate,
             "iscrizione_filtro": iscrizione,
             "servizio_filtro": servizio,
+            "rate_stats": rate_stats,
         },
     )
 

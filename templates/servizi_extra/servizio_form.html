@@ -1,69 +1,177 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio extra{% endif %} - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio extra{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if can_manage_servizi_extra %}
-                <button type="submit" form="servizio-extra-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
+    <div class="scambio-retta-form-shell servizio-extra-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Servizi extra</p>
+                <h1 class="page-title">{% if servizio %}{{ servizio.nome_servizio }}{% else %}Nuovo servizio extra{% endif %}</h1>
+                <p>Configura disponibilita, anno scolastico e ordine del servizio.</p>
+            </div>
+            {% if not popup %}
+                <div class="scambio-retta-head-actions">
+                    <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                    {% if servizio and can_manage_servizi_extra %}
+                        <a
+                            href="{% url 'elimina_servizio_extra' servizio.pk %}?popup=1"
+                            class="btn btn-danger btn-icon-text"
+                            data-window-popup="1"
+                            data-popup-url="{% url 'elimina_servizio_extra' servizio.pk %}?popup=1"
+                            data-popup-window-name="arboris-servizio-extra-delete-popup"
+                            data-popup-window-features="width=720,height=540,resizable=yes,scrollbars=yes"
+                        >
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            <span class="btn-label">Elimina</span>
+                        </a>
+                    {% endif %}
+                </div>
             {% endif %}
-            <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary">Torna all'elenco</a>
         </div>
+
+        <form method="post" id="servizio-extra-form" class="scambio-retta-form servizio-extra-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {{ form.non_field_errors }}
+
+            <section class="scambio-retta-card servizio-extra-form-card" aria-labelledby="servizio-extra-data-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="servizio-extra-data-title">Dati servizio</h2>
+                        <p>Informazioni principali usate negli elenchi, nelle tariffe e nelle iscrizioni.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid servizio-extra-form-grid">
+                    <div class="scambio-retta-field is-wide">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.nome_servizio.id_for_label }}">{{ form.nome_servizio.label }}</label>
+                            {{ form.nome_servizio }}
+                            {{ form.nome_servizio.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.anno_scolastico.id_for_label }}">{{ form.anno_scolastico.label }}</label>
+                            {{ form.anno_scolastico }}
+                            {{ form.anno_scolastico.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field servizio-extra-order-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.ordine.id_for_label }}">{{ form.ordine.label }}</label>
+                            {{ form.ordine }}
+                            <p class="scambio-retta-help">Lascia vuoto per assegnare automaticamente il prossimo ordine disponibile.</p>
+                            {{ form.ordine.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field is-wide servizio-extra-description-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                            {{ form.descrizione }}
+                            {{ form.descrizione.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card servizio-extra-form-card" aria-labelledby="servizio-extra-state-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-green" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="servizio-extra-state-title">Stato e note</h2>
+                        <p>Determina se il servizio incide nel sistema e conserva note operative.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid servizio-extra-form-grid">
+                    <label class="scambio-retta-switch-card servizio-extra-switch-card">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.attiva.label }}</strong>
+                            <small>Abilita il servizio negli elenchi e nei calcoli collegati.</small>
+                            {{ form.attiva.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.attiva }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+
+                    <div class="scambio-retta-field is-wide servizio-extra-notes-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="scambio-retta-actions servizio-extra-form-actions">
+                {% if can_manage_servizi_extra %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">{% if servizio %}Salva modifiche{% else %}Crea servizio{% endif %}</span>
+                    </button>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
-
-    <form method="post" id="servizio-extra-form">
-        {% csrf_token %}
-
-        <div class="content-card">
-            <table class="form-table">
-                <tr>
-                    <th>{{ form.anno_scolastico.label_tag }}</th>
-                    <td>{{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.nome_servizio.label_tag }}</th>
-                    <td>{{ form.nome_servizio }} {{ form.nome_servizio.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.ordine.label_tag }}</th>
-                    <td>
-                        {{ form.ordine }} {{ form.ordine.errors }}
-                        <div class="help-text">Lascia vuoto per assegnare automaticamente il prossimo ordine disponibile.</div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.descrizione.label_tag }}</th>
-                    <td>{{ form.descrizione }} {{ form.descrizione.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.attiva.label_tag }}</th>
-                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.note.label_tag }}</th>
-                    <td>{{ form.note }} {{ form.note.errors }}</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_servizi_extra %}
-                <button type="submit" class="btn btn-primary">{% if servizio %}Salva modifiche{% else %}Crea servizio{% endif %}</button>
-            {% endif %}
-            <a href="{% url 'lista_servizi_extra' %}" class="btn btn-secondary">Annulla</a>
-        </div>
-    </form>
 {% endblock %}
-

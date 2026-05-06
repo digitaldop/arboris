@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load static currency %}
 
 {% block title %}Contabilizza scambio retta - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Rette Scolastiche</span>
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'lista_scambi_retta' %}">Scambio retta</a>
         <span class="breadcrumb-sep">&gt;</span>
@@ -14,37 +16,163 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Contabilizza scambio retta</h1>
-    </div>
-
-    <div class="content-card">
-        <table class="form-table">
-            <tr><th>Familiare</th><td>{{ scambio.familiare }}</td></tr>
-            <tr><th>Studente</th><td>{{ scambio.studente }}</td></tr>
-            <tr><th>Anno scolastico</th><td>{{ scambio.anno_scolastico.nome_anno_scolastico }}</td></tr>
-            <tr><th>Mese riferimento</th><td>{{ scambio.mese_riferimento }}</td></tr>
-            <tr><th>Ore lavorate</th><td>{{ scambio.ore_lavorate }}</td></tr>
-            <tr><th>Importo maturato</th><td>{{ scambio.importo_maturato }}</td></tr>
-            {% if prossima_rata %}
-                <tr><th>Rata destinazione</th><td>{{ prossima_rata.display_label }} - {{ prossima_rata.iscrizione }}</td></tr>
-                    <tr><th>Scadenza rata</th><td>{{ prossima_rata.data_scadenza|it_date|default:"-" }}</td></tr>
-                <tr><th>Credito gia applicato</th><td>{{ prossima_rata.credito_applicato }}</td></tr>
-            {% else %}
-                <tr><th>Rata destinazione</th><td><span class="table-link-danger">Nessuna rata successiva disponibile</span></td></tr>
-            {% endif %}
-        </table>
-
-        <div class="help-text" style="padding: 0 16px 16px 16px;">
-            La contabilizzazione applica il credito maturato alla rata successiva dello studente e registra un movimento nel credito retta.
+    <div class="scambio-retta-form-shell scambio-contabilizza-shell">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Scambio retta</p>
+                <h1 class="page-title">Contabilizza scambio retta</h1>
+                <p>Applica il credito maturato alla prossima rata disponibile dello studente.</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+            </div>
         </div>
 
-        <form method="post" class="form-actions">
+        <section class="rate-detail-summary-grid scambio-contabilizza-summary" aria-label="Riepilogo contabilizzazione">
+            <article class="rate-detail-summary-card">
+                <span class="rate-detail-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                <div>
+                    <span>Familiare</span>
+                    <strong>{{ scambio.familiare }}</strong>
+                </div>
+            </article>
+            <article class="rate-detail-summary-card">
+                <span class="rate-detail-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                <div>
+                    <span>Periodo</span>
+                    <strong>{{ scambio.periodo_riferimento|date:"F Y"|capfirst }}</strong>
+                </div>
+            </article>
+            <article class="rate-detail-summary-card">
+                <span class="rate-detail-summary-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                <div>
+                    <span>Ore lavorate</span>
+                    <strong>{{ scambio.ore_lavorate|floatformat:2 }}</strong>
+                </div>
+            </article>
+            <article class="rate-detail-summary-card">
+                <span class="rate-detail-summary-icon is-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                <div>
+                    <span>Credito maturato</span>
+                    <strong>EUR {{ scambio.importo_maturato|euro }}</strong>
+                </div>
+            </article>
+        </section>
+
+        <div class="scambio-contabilizza-grid">
+            <section class="scambio-retta-card scambio-contabilizza-card" aria-labelledby="scambio-contabilizza-source-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="scambio-contabilizza-source-title">Scambio da contabilizzare</h2>
+                        <p>Dati del credito maturato dalla prestazione familiare.</p>
+                    </div>
+                </div>
+                <div class="scambio-contabilizza-detail-grid">
+                    <div>
+                        <span>Studente</span>
+                        <strong>{{ scambio.studente }}</strong>
+                    </div>
+                    <div>
+                        <span>Famiglia</span>
+                        <strong>{{ scambio.famiglia }}</strong>
+                    </div>
+                    <div>
+                        <span>Anno scolastico</span>
+                        <strong>{{ scambio.anno_scolastico.nome_anno_scolastico }}</strong>
+                    </div>
+                    <div>
+                        <span>Tariffa</span>
+                        <strong>EUR {{ scambio.tariffa_scambio_retta.valore_orario|euro }}/h</strong>
+                    </div>
+                    <div>
+                        <span>Approvazione</span>
+                        {% if scambio.approvata %}
+                            <strong class="scambio-contabilizza-ok">Approvata</strong>
+                        {% else %}
+                            <strong class="scambio-contabilizza-warning">Da approvare</strong>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span>Contabilizzazione</span>
+                        {% if scambio.contabilizzata %}
+                            <strong class="scambio-contabilizza-ok">Gia contabilizzata</strong>
+                        {% else %}
+                            <strong>Da contabilizzare</strong>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card scambio-contabilizza-card" aria-labelledby="scambio-contabilizza-destination-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon {% if prossima_rata %}is-green{% else %}is-amber{% endif %}" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if prossima_rata %}check{% else %}alert{% endif %}"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="scambio-contabilizza-destination-title">Rata destinazione</h2>
+                        <p>La contabilizzazione aggiorna il credito applicato alla prossima rata utile.</p>
+                    </div>
+                </div>
+
+                {% if prossima_rata %}
+                    <div class="scambio-contabilizza-detail-grid">
+                        <div class="is-wide">
+                            <span>Rata</span>
+                            <strong>{{ prossima_rata.display_label }} - {{ prossima_rata.iscrizione }}</strong>
+                        </div>
+                        <div>
+                            <span>Scadenza</span>
+                            <strong>{{ prossima_rata.data_scadenza|it_date|default:"-" }}</strong>
+                        </div>
+                        <div>
+                            <span>Credito gia applicato</span>
+                            <strong>EUR {{ prossima_rata.credito_applicato|euro }}</strong>
+                        </div>
+                        <div>
+                            <span>Nuovo credito applicato</span>
+                            <strong class="scambio-contabilizza-ok">EUR {{ credito_post_contabilizzazione|euro }}</strong>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="scambio-contabilizza-empty">
+                        <strong>Nessuna rata successiva disponibile</strong>
+                        <span>Non posso applicare automaticamente il credito senza una rata destinazione.</span>
+                    </div>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="scambio-contabilizza-note" aria-label="Nota contabilizzazione">
+            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+            </span>
+            <div>
+                <strong>Effetto della contabilizzazione</strong>
+                <span>Il credito maturato viene applicato alla rata destinazione e viene registrato un movimento nel credito retta della famiglia.</span>
+            </div>
+        </section>
+
+        <form method="post" class="scambio-retta-actions scambio-contabilizza-actions">
             {% csrf_token %}
             {% if prossima_rata and scambio.approvata and not scambio.contabilizzata %}
-                <button type="submit" class="btn btn-primary">Conferma contabilizzazione</button>
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Conferma contabilizzazione</span>
+                </button>
             {% endif %}
-            <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary">Annulla</a>
+            <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span class="btn-label">Annulla</span>
+            </a>
         </form>
     </div>
 {% endblock %}

@@ -1,80 +1,284 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
 {% block title %}{% if scambio %}Scambio retta{% else %}Nuovo scambio retta{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_scambi_retta' %}">Scambio retta</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if scambio %}{{ scambio }}{% else %}Nuovo{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_scambi_retta' %}">Scambio retta</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if scambio %}{{ scambio }}{% else %}Nuovo{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if scambio %}Scambio retta{% else %}Nuovo scambio retta{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if scambio %}
-                <button type="button" class="btn btn-primary" id="enable-edit-scambio-btn">Modifica</button>
-                <a href="{% url 'elimina_scambio_retta' scambio.pk %}" class="btn btn-danger">Elimina</a>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-scambio-btn">Annulla modifiche</button>
-            {% endif %}
-            <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary">Torna all'elenco</a>
+    <div class="scambio-retta-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <span class="related-config-kicker">Economia</span>
+                <h1 class="page-title">{% if scambio %}Scambio retta{% else %}Nuovo scambio retta{% endif %}</h1>
+                <p>Registra ore lavorate, tariffa e importo maturato per il credito retta.</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if scambio %}
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-intent-edit" id="enable-edit-scambio-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-icon-text is-hidden" id="cancel-edit-scambio-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla modifiche</span>
+                    </button>
+                    <a
+                        href="{% url 'elimina_scambio_retta' scambio.pk %}?popup=1"
+                        class="btn btn-danger btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'elimina_scambio_retta' scambio.pk %}?popup=1"
+                        data-popup-window-name="arboris-scambio-retta-delete-popup"
+                        data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+                {% if not popup %}
+                    <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Torna all'elenco</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
-    </div>
 
-    <form method="post" id="scambio-detail-form" class="detail-form{% if scambio %} is-view-mode{% endif %}">
-        {% csrf_token %}
-        <fieldset id="scambio-lock-container" class="mode-lock-container" {% if scambio %}disabled{% endif %}>
-        <div class="content-card">
-            <table class="form-table">
-                <tr><th>{{ form.familiare.label_tag }}</th><td>{{ form.familiare }} {{ form.familiare.errors }}</td></tr>
-                <tr>
-                    <th>{{ form.famiglia.label_tag }}</th>
-                    <td>
-                        {{ form.famiglia }}
-                        <div class="help-text">{{ form.famiglia.help_text }}</div>
-                        {{ form.famiglia.errors }}
-                    </td>
-                </tr>
-                <tr><th>{{ form.studente.label_tag }}</th><td>{{ form.studente }} {{ form.studente.errors }}</td></tr>
-                <tr><th>{{ form.anno_scolastico.label_tag }}</th><td>{{ form.anno_scolastico }} {{ form.anno_scolastico.errors }}</td></tr>
-                <tr><th>{{ form.mese_riferimento.label_tag }}</th><td>{{ form.mese_riferimento }} {{ form.mese_riferimento.errors }}</td></tr>
-                <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
-                <tr><th>{{ form.ore_lavorate.label_tag }}</th><td>{{ form.ore_lavorate }} <div class="help-text">{{ form.ore_lavorate.help_text }}</div> {{ form.ore_lavorate.errors }}</td></tr>
-                <tr><th>{{ form.tariffa_scambio_retta.label_tag }}</th><td>{{ form.tariffa_scambio_retta }} {{ form.tariffa_scambio_retta.errors }}</td></tr>
-                <tr>
-                    <th>Importo maturato</th>
-                    <td>
-                        <div class="currency-input-group currency-preview-group">
-                            <span class="currency-prefix">EUR</span>
-                            <div class="currency-preview-value" id="scambio-retta-importo-preview">
-                                {% if scambio %}{{ scambio.importo_maturato }}{% else %}0.00{% endif %}
+        <form method="post" id="scambio-detail-form" class="scambio-retta-form detail-form{% if scambio %} is-view-mode{% endif %}">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {{ form.non_field_errors }}
+
+            <fieldset id="scambio-lock-container" class="mode-lock-container" {% if scambio %}disabled{% endif %}>
+                <section class="scambio-retta-card" aria-labelledby="scambio-retta-person-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="scambio-retta-person-title">Collegamenti</h2>
+                            <p>Associa familiare, famiglia, studente e anno scolastico.</p>
+                        </div>
+                    </div>
+                    <div class="scambio-retta-grid">
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.familiare.id_for_label }}">{{ form.familiare.label }}</label>
+                                {{ form.familiare }}
+                                {{ form.familiare.errors }}
                             </div>
                         </div>
-                        <div class="help-text">Calcolato automaticamente da ore lavorate x tariffa oraria.</div>
-                    </td>
-                </tr>
-                <tr><th>{{ form.approvata.label_tag }}</th><td>{{ form.approvata }} {{ form.approvata.errors }}</td></tr>
-                <tr><th>{{ form.contabilizzata.label_tag }}</th><td>{{ form.contabilizzata }} {{ form.contabilizzata.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="help-text" style="padding: 0 16px 16px 16px;">
-                L'importo maturato viene calcolato automaticamente in base a ore lavorate e tariffa oraria selezionata.
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.famiglia.id_for_label }}">{{ form.famiglia.label }}</label>
+                                <input
+                                    type="text"
+                                    id="scambio-retta-famiglia-display"
+                                    class="scambio-retta-readonly-display"
+                                    value="{% if scambio and scambio.famiglia %}{{ scambio.famiglia }}{% endif %}"
+                                    placeholder="Seleziona prima un familiare"
+                                    readonly
+                                    tabindex="-1"
+                                >
+                                <span class="scambio-retta-hidden-derived-select">
+                                    {{ form.famiglia }}
+                                </span>
+                                {% if form.famiglia.help_text %}<p class="scambio-retta-help">{{ form.famiglia.help_text }}</p>{% endif %}
+                                {{ form.famiglia.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.studente.id_for_label }}">{{ form.studente.label }}</label>
+                                {{ form.studente }}
+                                <p class="scambio-retta-help" id="scambio-retta-studente-help">Seleziona prima il familiare: vedrai solo i bambini collegati alla sua famiglia.</p>
+                                {{ form.studente.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.anno_scolastico.id_for_label }}">{{ form.anno_scolastico.label }}</label>
+                                {{ form.anno_scolastico }}
+                                {{ form.anno_scolastico.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="scambio-retta-card" aria-labelledby="scambio-retta-data-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="scambio-retta-data-title">Prestazione mensile</h2>
+                            <p>Definisci mese, ore, tariffa e descrizione del lavoro svolto.</p>
+                        </div>
+                    </div>
+                    <div class="scambio-retta-grid">
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.mese_riferimento.id_for_label }}">{{ form.mese_riferimento.label }}</label>
+                                {{ form.mese_riferimento }}
+                                {{ form.mese_riferimento.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.ore_lavorate.id_for_label }}">{{ form.ore_lavorate.label }}</label>
+                                {{ form.ore_lavorate }}
+                                {% if form.ore_lavorate.help_text %}<p class="scambio-retta-help">{{ form.ore_lavorate.help_text }}</p>{% endif %}
+                                {{ form.ore_lavorate.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field scambio-retta-field-compact">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.tariffa_scambio_retta.id_for_label }}">{{ form.tariffa_scambio_retta.label }}</label>
+                                <div class="popup-related-field scambio-retta-tariffa-related">
+                                    <div class="related-field-stack">
+                                        {{ form.tariffa_scambio_retta }}
+                                    </div>
+                                    <span class="related-actions inline-related-actions" aria-label="Azioni tariffa scambio retta">
+                                        <button type="button" class="related-btn related-btn-add" id="add-scambio-tariffa-btn" aria-label="Nuova tariffa" title="Nuova tariffa">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-scambio-tariffa-btn" aria-label="Modifica tariffa" title="Modifica tariffa">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-scambio-tariffa-btn" aria-label="Elimina tariffa" title="Elimina tariffa">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                        </button>
+                                    </span>
+                                </div>
+                                {{ form.tariffa_scambio_retta.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-preview-card">
+                            <span class="scambio-retta-preview-icon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                            </span>
+                            <div>
+                                <span>Importo maturato</span>
+                                <strong><span id="scambio-retta-importo-preview">{% if scambio %}{{ scambio.importo_maturato }}{% else %}0.00{% endif %}</span> &euro;</strong>
+                                <small>Calcolato automaticamente da ore lavorate x tariffa oraria.</small>
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field is-wide">
+                            <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                                {{ form.descrizione }}
+                                {{ form.descrizione.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="scambio-retta-card" aria-labelledby="scambio-retta-status-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="scambio-retta-status-title">Stato e note</h2>
+                            <p>Gestisci approvazione, contabilizzazione e annotazioni interne.</p>
+                        </div>
+                    </div>
+                    <div class="scambio-retta-grid">
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.approvata.id_for_label }}">{{ form.approvata.label }}</label>
+                                {{ form.approvata }}
+                                <small class="mode-edit-only">Abilita lo scambio per la contabilizzazione.</small>
+                                {{ form.approvata.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.contabilizzata.id_for_label }}">{{ form.contabilizzata.label }}</label>
+                                {{ form.contabilizzata }}
+                                <small class="mode-edit-only">Segna lo scambio come gia' contabilizzato.</small>
+                                {{ form.contabilizzata.errors }}
+                            </div>
+                        </div>
+                        <div class="scambio-retta-field is-wide">
+                            <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            <div class="scambio-retta-actions mode-edit-only">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
             </div>
-            <div class="form-actions mode-edit-only">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <a href="{% url 'lista_scambi_retta' %}" class="btn btn-secondary">Annulla</a>
-            </div>
-        </div>
-        </fieldset>
-    </form>
+        </form>
+    </div>
 
     <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
-    <script src="{% static 'js/pages/scambio-retta-form.js' %}?v=2"></script>
+    <script src="{% static 'js/pages/scambio-retta-form.js' %}?v=4"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisViewMode) {
@@ -83,7 +287,7 @@
                     lockContainerId: "scambio-lock-container",
                     editButtonId: "enable-edit-scambio-btn",
                     cancelButtonId: "cancel-edit-scambio-btn",
-                    startInEditMode: {% if scambio %}false{% else %}true{% endif %},
+                    startInEditMode: {% if not scambio or start_in_edit %}true{% else %}false{% endif %},
                     reloadOnCancel: true
                 });
             }

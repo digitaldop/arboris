@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Iscrizioni - Arboris School Management{% endblock %}
 
@@ -48,7 +48,7 @@
                         <td>{{ iscrizione.agevolazione|default:"-" }}</td>
                         <td>{{ iscrizione.rate.count }}</td>
                         <td>{% if iscrizione.non_pagante %}Si{% else %}No{% endif %}</td>
-                        <td>{% if iscrizione.attiva %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle iscrizione %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'lista_rate_iscrizione' %}?iscrizione={{ iscrizione.pk }}" class="table-link">Rate</a>
                             <span class="table-muted">|</span>

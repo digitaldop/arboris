@@ -14,7 +14,7 @@ from scuola.models import AnnoScolastico
 
 
 def lista_archivio_storico(request):
-    archivi = (
+    archivi = list(
         ArchivioAnnoScolastico.objects.select_related("anno_scolastico", "archiviato_da")
         .all()
     )
@@ -34,6 +34,17 @@ def lista_archivio_storico(request):
         else:
             anni_non_archiviabili.append(item)
 
+    archivio_stats = {
+        "totale_archivi": len(archivi),
+        "totale_snapshot": sum(archivio.totale_snapshot for archivio in archivi),
+        "totale_studenti": sum(archivio.totale_studenti for archivio in archivi),
+        "totale_famiglie": sum(archivio.totale_famiglie for archivio in archivi),
+        "totale_rate": sum(archivio.totale_rate for archivio in archivi),
+        "totale_documenti": sum(archivio.totale_documenti for archivio in archivi),
+        "anni_archiviabili": len(anni_archiviabili),
+        "anni_non_archiviabili": len(anni_non_archiviabili),
+    }
+
     return render(
         request,
         "archivio_storico/archivio_list.html",
@@ -41,6 +52,7 @@ def lista_archivio_storico(request):
             "archivi": archivi,
             "anni_archiviabili": anni_archiviabili,
             "anni_non_archiviabili": anni_non_archiviabili,
+            "archivio_stats": archivio_stats,
         },
     )
 

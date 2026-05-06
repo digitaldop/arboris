@@ -1,0 +1,71 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
+
+{% block title %}Elimina ruolo - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_utenti' %}">Utenti</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_ruoli_utenti' %}">Ruoli</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina</span>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="system-role-form-shell system-role-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="system-role-form-head">
+            <span class="system-role-head-icon is-danger" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="system-role-head-copy">
+                <p class="section-eyebrow">Sistema</p>
+                <h1 class="page-title">Elimina ruolo</h1>
+                <p>Conferma la rimozione del ruolo selezionato.</p>
+            </div>
+        </div>
+
+        <section class="system-role-card system-role-delete-card">
+            <div class="system-role-card-head">
+                <span class="system-role-card-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2>{{ ruolo_obj.nome }}</h2>
+                    {% if can_delete %}
+                        <p>Questa operazione elimina il ruolo dall'elenco dei profili disponibili.</p>
+                    {% else %}
+                        <p>Questo ruolo e collegato a {{ count_utenti }} {% if count_utenti == 1 %}utente{% else %}utenti{% endif %}: prima assegna un ruolo diverso agli account collegati.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <form method="post" class="system-role-form-actions">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if can_delete %}
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina</span>
+                </button>
+            {% endif %}
+            {% if popup %}
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">{% if can_delete %}Annulla{% else %}Chiudi{% endif %}</span>
+                </button>
+            {% else %}
+                <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">{% if can_delete %}Annulla{% else %}Torna ai ruoli{% endif %}</span>
+                </a>
+            {% endif %}
+        </form>
+    </div>
+{% endblock %}

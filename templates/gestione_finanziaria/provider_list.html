@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Provider bancari - Arboris School Management{% endblock %}
 
@@ -46,7 +46,7 @@
                         <td>{{ p.get_tipo_display }}</td>
                         <td>{{ p.numero_conti }}</td>
                         <td>{{ p.numero_connessioni }}</td>
-                        <td>{% if p.attivo %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle p %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_provider_bancario' p.pk %}" class="table-link">Modifica</a>
                             <span class="table-muted">|</span>

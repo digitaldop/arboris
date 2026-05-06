@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Stati iscrizione - Arboris School Management{% endblock %}
 
@@ -35,7 +35,7 @@
                     <tr class="list-row-link" data-row-href="{% url 'modifica_stato_iscrizione' stato.pk %}">
                         <td>{{ stato.stato_iscrizione }}</td>
                         <td>{{ stato.ordine }}</td>
-                        <td>{% if stato.attiva %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle stato %}</td>
                         <td>{{ stato.note|default:"-" }}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_stato_iscrizione' stato.pk %}" class="table-link">Modifica</a>

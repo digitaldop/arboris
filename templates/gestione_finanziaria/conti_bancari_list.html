@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 {% load currency %}
 
 {% block title %}Conti bancari - Arboris School Management{% endblock %}
@@ -74,7 +74,7 @@
                         </td>
                         <td class="column-right">{{ conto.saldo_calcolato|euro }} &euro;</td>
                         <td>{% if conto.saldo_corrente_aggiornato_al %}{{ conto.saldo_corrente_aggiornato_al|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-                        <td>{% if conto.attivo %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle conto %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_conto_bancario' conto.pk %}" class="table-link">Modifica</a>
                             <span class="table-muted">|</span>

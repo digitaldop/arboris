@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -204,8 +205,31 @@ def elimina_stato_iscrizione(request, pk):
 
 
 def lista_condizioni_iscrizione(request):
-    condizioni = CondizioneIscrizione.objects.select_related("anno_scolastico").all()
-    return render(request, "economia/iscrizioni/condizioni_iscrizione_list.html", {"condizioni": condizioni})
+    condizioni = (
+        CondizioneIscrizione.objects.select_related("anno_scolastico")
+        .annotate(
+            tariffe_count=Count("tariffe", distinct=True),
+            tariffe_attive_count=Count("tariffe", filter=Q(tariffe__attiva=True), distinct=True),
+        )
+        .all()
+    )
+    stats = condizioni.aggregate(
+        totale=Count("id"),
+        attive=Count("id", filter=Q(attiva=True)),
+        riduzioni=Count("id", filter=Q(riduzione_speciale_ammessa=True)),
+        tariffe=Count("tariffe", distinct=True),
+    )
+    condizioni_stats = {
+        "totale": stats.get("totale") or 0,
+        "attive": stats.get("attive") or 0,
+        "riduzioni": stats.get("riduzioni") or 0,
+        "tariffe": stats.get("tariffe") or 0,
+    }
+    return render(
+        request,
+        "economia/iscrizioni/condizioni_iscrizione_list.html",
+        {"condizioni": condizioni, "condizioni_stats": condizioni_stats},
+    )
 
 
 def crea_condizione_iscrizione(request):
@@ -294,7 +318,23 @@ def lista_tariffe_condizione_iscrizione(request):
         "condizione_iscrizione",
         "condizione_iscrizione__anno_scolastico",
     ).all()
-    return render(request, "economia/iscrizioni/tariffe_condizione_iscrizione_list.html", {"tariffe": tariffe})
+    stats = tariffe.aggregate(
+        totale=Count("id"),
+        attive=Count("id", filter=Q(attiva=True)),
+        condizioni=Count("condizione_iscrizione", distinct=True),
+        retta_annuale=Sum("retta_annuale"),
+    )
+    tariffe_stats = {
+        "totale": stats.get("totale") or 0,
+        "attive": stats.get("attive") or 0,
+        "condizioni": stats.get("condizioni") or 0,
+        "retta_annuale": stats.get("retta_annuale") or Decimal("0.00"),
+    }
+    return render(
+        request,
+        "economia/iscrizioni/tariffe_condizione_iscrizione_list.html",
+        {"tariffe": tariffe, "tariffe_stats": tariffe_stats},
+    )
 
 
 def crea_tariffa_condizione_iscrizione(request):
@@ -367,7 +407,24 @@ def elimina_tariffa_condizione_iscrizione(request, pk):
 
 def lista_agevolazioni(request):
     agevolazioni = Agevolazione.objects.all()
-    return render(request, "economia/iscrizioni/agevolazioni_list.html", {"agevolazioni": agevolazioni})
+    stats = agevolazioni.aggregate(
+        totale=Count("id"),
+        attive=Count("id", filter=Q(attiva=True)),
+        importo_annuale=Sum("importo_annuale_agevolazione"),
+    )
+    totale = stats.get("totale") or 0
+    attive = stats.get("attive") or 0
+    agevolazioni_stats = {
+        "totale": totale,
+        "attive": attive,
+        "inattive": max(totale - attive, 0),
+        "importo_annuale": stats.get("importo_annuale") or Decimal("0.00"),
+    }
+    return render(
+        request,
+        "economia/iscrizioni/agevolazioni_list.html",
+        {"agevolazioni": agevolazioni, "agevolazioni_stats": agevolazioni_stats},
+    )
 
 
 def crea_agevolazione(request):

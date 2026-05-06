@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load currency active_toggles %}
 
 {% block title %}Contratti dipendenti - Dipendenti e collaboratori{% endblock %}
 
@@ -54,6 +54,7 @@
                 <tr>
                     <th>Dipendente</th>
                     <th>Periodo</th>
+                    <th>Stato</th>
                     <th>Tipo</th>
                     <th>CCNL / livello</th>
                     <th class="column-right">Lordo mensile</th>
@@ -74,6 +75,7 @@
                             {% endif %}
                         </td>
                         <td>{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</td>
+                        <td>{% active_toggle contratto %}</td>
                         <td>{{ contratto.tipo_contratto|default:"-" }}</td>
                         <td>
                             {{ contratto.ccnl|default:"-" }}
@@ -93,7 +95,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="9">
+                        <td colspan="10">
                             <div class="empty-state">Nessun contratto trovato.</div>
                         </td>
                     </tr>

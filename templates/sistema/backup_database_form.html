@@ -12,143 +12,250 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Backup Database</h1>
-        <div class="page-head-actions">
-            {% if can_access_database_backups %}
-                <form method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="create_manual_backup">
-                    <button type="submit" class="btn btn-save-soft">Crea backup adesso</button>
-                </form>
-            {% endif %}
+    <div class="database-backup-shell">
+        <div class="page-head family-page-head anagrafica-list-head database-backup-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon database-backup-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Backup Database</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ backup_stats.backup_conservati }} backup
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        Creazione, download e ripristino protetto del database
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                {% if can_access_database_backups %}
+                    <form method="post" class="database-backup-inline-action">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="create_manual_backup">
+                        <button type="submit" class="btn btn-save-soft btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                            <span class="btn-label">Crea backup adesso</span>
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
         </div>
-    </div>
 
-    <div class="family-top-layout">
-        <div class="family-main-column">
-            <div class="admin-section">
-                <div class="admin-section-title">Configurazione backup</div>
-                <div class="panel">
-                    <div class="panel-body">
-                        <form method="post" id="backup-settings-form">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="save_backup_settings">
-                            <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
-                                <table class="form-table">
-                                    <tr>
-                                        <th>{{ configurazione_form.frequenza_backup_automatico.label_tag }}</th>
-                                        <td>
-                                            {{ configurazione_form.frequenza_backup_automatico }}
-                                            {{ configurazione_form.frequenza_backup_automatico.errors }}
-                                            {% if configurazione_form.frequenza_backup_automatico.help_text %}
-                                                <div class="help-text">{{ configurazione_form.frequenza_backup_automatico.help_text }}</div>
+        <section class="database-backup-kpi-grid" aria-label="Riepilogo backup database">
+            <article class="database-backup-kpi-card">
+                <div class="database-backup-kpi-copy">
+                    <span class="database-backup-kpi-label">Backup automatici</span>
+                    <strong class="database-backup-kpi-value is-text">{{ configurazione.frequenza_label }}</strong>
+                    <span class="database-backup-kpi-note">Configurazione attuale</span>
+                </div>
+                <span class="database-backup-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="database-backup-kpi-card">
+                <div class="database-backup-kpi-copy">
+                    <span class="database-backup-kpi-label">Ultimo backup</span>
+                    <strong class="database-backup-kpi-value is-text">{{ backup_stats.ultimo_backup_dimensione }}</strong>
+                    <span class="database-backup-kpi-note">
+                        {% if backup_stats.ultimo_backup_data %}
+                            {{ backup_stats.ultimo_backup_data|date:"d/m/Y H:i" }}
+                        {% else %}
+                            Non ancora creato
+                        {% endif %}
+                    </span>
+                </div>
+                <span class="database-backup-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="database-backup-kpi-card">
+                <div class="database-backup-kpi-copy">
+                    <span class="database-backup-kpi-label">Backup conservati</span>
+                    <strong class="database-backup-kpi-value">{{ backup_stats.backup_conservati }}</strong>
+                    <span class="database-backup-kpi-note">Massimo ultimi 10 file</span>
+                </div>
+                <span class="database-backup-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+            </article>
+            <article class="database-backup-kpi-card">
+                <div class="database-backup-kpi-copy">
+                    <span class="database-backup-kpi-label">Ripristini attivi</span>
+                    <strong class="database-backup-kpi-value is-purple">{{ backup_stats.ripristini_attivi }}</strong>
+                    <span class="database-backup-kpi-note">{{ backup_stats.ripristini_recenti }} job recenti</span>
+                </div>
+                <span class="database-backup-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <div class="database-backup-layout">
+            <main class="database-backup-main">
+                <section class="database-backup-card" aria-labelledby="backup-config-title">
+                    <div class="database-backup-card-head">
+                        <span class="database-backup-card-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="backup-config-title">Configurazione backup</h2>
+                            <p>Imposta la frequenza degli automatismi e salva la configurazione.</p>
+                        </div>
+                    </div>
+                    <form method="post" id="backup-settings-form" class="database-backup-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_backup_settings">
+                        <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
+                            <label class="database-backup-field">
+                                <span class="database-backup-field-icon is-blue" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                <span class="database-backup-field-body">
+                                    <span class="database-backup-label">{{ configurazione_form.frequenza_backup_automatico.label }}</span>
+                                    {{ configurazione_form.frequenza_backup_automatico }}
+                                    {{ configurazione_form.frequenza_backup_automatico.errors }}
+                                    {% if configurazione_form.frequenza_backup_automatico.help_text %}
+                                        <span class="database-backup-help">{{ configurazione_form.frequenza_backup_automatico.help_text }}</span>
+                                    {% endif %}
+                                </span>
+                            </label>
+                        </fieldset>
+                        {% if can_access_database_backups %}
+                            <div class="database-backup-actions">
+                                <button type="submit" class="btn btn-primary btn-icon-text">
+                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                    <span class="btn-label">Salva configurazione</span>
+                                </button>
+                            </div>
+                        {% endif %}
+                    </form>
+                </section>
+
+                <section class="database-backup-card" aria-labelledby="backup-restore-title">
+                    <div class="database-backup-card-head">
+                        <span class="database-backup-card-icon is-red" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="backup-restore-title">Ripristino database</h2>
+                            <p>Carica un file o seleziona un backup gia presente per avviare il doppio controllo.</p>
+                        </div>
+                    </div>
+                    <div class="database-backup-warning">
+                        <span class="database-backup-warning-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <p>
+                            Il ripristino sostituisce integralmente il database corrente. Prima del ripristino viene creato un backup di sicurezza e l'elaborazione viene accodata in background.
+                        </p>
+                    </div>
+
+                    {% if pending_restore %}
+                        <div class="database-backup-restore-confirm">
+                            <div class="database-backup-restore-head">
+                                <span class="database-backup-card-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                                </span>
+                                <div>
+                                    <h3>Secondo controllo prima del ripristino</h3>
+                                    <p>File selezionato: <strong>{{ pending_restore.nome_file_originale }}</strong> - {{ pending_restore.size_label }}</p>
+                                </div>
+                            </div>
+                            <form method="post" class="database-backup-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="confirm_restore">
+                                <div class="database-backup-confirm-grid">
+                                    <label class="database-backup-field">
+                                        <span class="database-backup-field-icon is-red" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                                        </span>
+                                        <span class="database-backup-field-body">
+                                            <span class="database-backup-label">{{ confirm_form.testo_conferma.label }}</span>
+                                            {{ confirm_form.testo_conferma }}
+                                            {{ confirm_form.testo_conferma.errors }}
+                                            {% if confirm_form.testo_conferma.help_text %}
+                                                <span class="database-backup-help">{{ confirm_form.testo_conferma.help_text }}</span>
                                             {% endif %}
-                                        </td>
-                                    </tr>
-                                </table>
+                                        </span>
+                                    </label>
+                                    <label class="database-backup-check-card">
+                                        <span class="database-backup-field-icon is-red" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                                        </span>
+                                        <span class="database-backup-check-copy">
+                                            <strong>{{ confirm_form.conferma_sostituzione.label }}</strong>
+                                            <span>Conferma esplicita richiesta prima di mettere in coda il job.</span>
+                                            {{ confirm_form.conferma_sostituzione.errors }}
+                                        </span>
+                                        {{ confirm_form.conferma_sostituzione }}
+                                    </label>
+                                </div>
+                                <div class="database-backup-actions">
+                                    {% if can_access_database_backups %}
+                                        <button type="submit" class="btn btn-danger btn-icon-text">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                            <span class="btn-label">Ripristina database</span>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </form>
+                            <form method="post" class="database-backup-cancel-restore">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="cancel_restore">
+                                <button type="submit" class="btn btn-secondary btn-icon-text">
+                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                    <span class="btn-label">Annulla importazione</span>
+                                </button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <form method="post" enctype="multipart/form-data" class="database-backup-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="upload_restore_file">
+                            <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
+                                <label class="database-backup-field">
+                                    <span class="database-backup-field-icon is-red" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                    </span>
+                                    <span class="database-backup-field-body">
+                                        <span class="database-backup-label">{{ upload_form.file_backup.label }}</span>
+                                        {{ upload_form.file_backup }}
+                                        {{ upload_form.file_backup.errors }}
+                                        {% if upload_form.file_backup.help_text %}
+                                            <span class="database-backup-help">{{ upload_form.file_backup.help_text }}</span>
+                                        {% endif %}
+                                    </span>
+                                </label>
                             </fieldset>
-
                             {% if can_access_database_backups %}
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-primary">Salva configurazione</button>
+                                <div class="database-backup-actions">
+                                    <button type="submit" class="btn btn-danger btn-icon-text">
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                        <span class="btn-label">Carica backup e continua</span>
+                                    </button>
                                 </div>
                             {% endif %}
                         </form>
-                    </div>
-                </div>
-            </div>
+                    {% endif %}
+                </section>
 
-            <div class="admin-section">
-                <div class="admin-section-title">Ripristino database</div>
-                <div class="panel">
-                    <div class="panel-body">
-                        <div class="settings-warning-box" style="margin-bottom: 16px;">
-                            Il ripristino sostituisce integralmente il database corrente. Dopo la conferma Arboris mette in coda l'elaborazione
-                            (Celery se <code>CELERY_BROKER_URL</code> è configurato, altrimenti un processo in background). Prima del ripristino viene creato un backup di sicurezza. Ricarica la pagina per vedere lo stato dell'ultimo job.
+                <section class="database-backup-card" aria-labelledby="restore-jobs-title">
+                    <div class="database-backup-table-head">
+                        <div>
+                            <h2 id="restore-jobs-title">Job ripristino</h2>
+                            <p>Ultime elaborazioni in background e relativo esito.</p>
                         </div>
-
-                        {% if pending_restore %}
-                            <div class="backup-restore-confirm-box">
-                                <div class="backup-restore-confirm-title">Secondo controllo prima del ripristino</div>
-                                <div class="backup-restore-confirm-meta">
-                                    File selezionato: <strong>{{ pending_restore.nome_file_originale }}</strong> - {{ pending_restore.size_label }}
-                                </div>
-                                <div class="help-text">
-                                    Confermando, il file viene letto dallo storage configurato e il ripristino viene accodato in background senza bloccare la pagina.
-                                </div>
-
-                                <form method="post" class="backup-restore-confirm-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="confirm_restore">
-                                    <table class="form-table compact-form-table">
-                                        <tr>
-                                            <th>{{ confirm_form.testo_conferma.label_tag }}</th>
-                                            <td>
-                                                {{ confirm_form.testo_conferma }}
-                                                {{ confirm_form.testo_conferma.errors }}
-                                                {% if confirm_form.testo_conferma.help_text %}
-                                                    <div class="help-text">{{ confirm_form.testo_conferma.help_text }}</div>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th>{{ confirm_form.conferma_sostituzione.label_tag }}</th>
-                                            <td>
-                                                {{ confirm_form.conferma_sostituzione }}
-                                                {{ confirm_form.conferma_sostituzione.errors }}
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    <div class="form-actions">
-                                        {% if can_access_database_backups %}
-                                            <button type="submit" class="btn btn-danger">Ripristina database</button>
-                                        {% endif %}
-                                    </div>
-                                </form>
-
-                                <form method="post" style="margin-top: 10px;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="cancel_restore">
-                                    <button type="submit" class="btn btn-secondary">Annulla importazione</button>
-                                </form>
-                            </div>
-                        {% else %}
-                            <form method="post" enctype="multipart/form-data">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="upload_restore_file">
-                                <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
-                                    <table class="form-table">
-                                        <tr>
-                                            <th>{{ upload_form.file_backup.label_tag }}</th>
-                                            <td>
-                                                {{ upload_form.file_backup }}
-                                                {{ upload_form.file_backup.errors }}
-                                                {% if upload_form.file_backup.help_text %}
-                                                    <div class="help-text">{{ upload_form.file_backup.help_text }}</div>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </fieldset>
-
-                                {% if can_access_database_backups %}
-                                    <div class="form-actions">
-                                        <button type="submit" class="btn btn-danger">Carica backup e continua</button>
-                                    </div>
-                                {% endif %}
-                            </form>
-                        {% endif %}
                     </div>
-                </div>
-            </div>
-
-            <div class="admin-section">
-                <div class="admin-section-title">Job ripristino (in background)</div>
-                <div class="panel">
-                    <div class="panel-body">
+                    <div class="database-backup-table-wrap">
                         {% if recent_restore_jobs %}
-                            <table class="list-table">
+                            <table class="list-table anagrafica-list-table database-backup-table">
                                 <thead>
                                     <tr>
                                         <th>Data</th>
@@ -161,13 +268,15 @@
                                     {% for rj in recent_restore_jobs %}
                                         <tr>
                                             <td>{{ rj.data_creazione|date:"d/m/Y H:i" }}</td>
-                                            <td>{{ rj.get_stato_display }}</td>
                                             <td>
-                                                <span class="table-muted" title="{{ rj.nome_file_originale }}">{{ rj.nome_file_originale|truncatechars:40 }}</span>
+                                                <span class="database-backup-status-chip is-{{ rj.stato }}">{{ rj.get_stato_display }}</span>
+                                            </td>
+                                            <td>
+                                                <strong class="database-backup-file-name" title="{{ rj.nome_file_originale }}">{{ rj.nome_file_originale|truncatechars:48 }}</strong>
                                             </td>
                                             <td>
                                                 {% if rj.stato == "errore" and rj.messaggio_errore %}
-                                                    <span class="table-muted" title="{{ rj.messaggio_errore }}">{{ rj.messaggio_errore|truncatechars:64 }}</span>
+                                                    <span class="table-muted" title="{{ rj.messaggio_errore }}">{{ rj.messaggio_errore|truncatechars:72 }}</span>
                                                 {% elif rj.stato == "completato" and rj.backup_sicurezza %}
                                                     Backup sicurezza: {{ rj.backup_sicurezza.nome_file }}
                                                 {% elif rj.stato == "in_corso" or rj.stato == "in_coda" %}
@@ -181,18 +290,27 @@
                                 </tbody>
                             </table>
                         {% else %}
-                            <div class="empty-state">Ancora nessun job di ripristino registrato.</div>
+                            <div class="database-backup-empty">
+                                <span class="database-backup-empty-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                                </span>
+                                <strong>Ancora nessun job di ripristino</strong>
+                                <p>I ripristini caricati o selezionati compariranno qui.</p>
+                            </div>
                         {% endif %}
                     </div>
-                </div>
-            </div>
+                </section>
 
-            <div class="admin-section">
-                <div class="admin-section-title">Storico backup</div>
-                <div class="panel">
-                    <div class="panel-body">
+                <section class="database-backup-card" aria-labelledby="backup-history-title">
+                    <div class="database-backup-table-head">
+                        <div>
+                            <h2 id="backup-history-title">Storico backup</h2>
+                            <p>Arboris conserva al massimo gli ultimi 10 backup disponibili.</p>
+                        </div>
+                    </div>
+                    <div class="database-backup-table-wrap">
                         {% if backup_records %}
-                            <table class="list-table">
+                            <table class="list-table anagrafica-list-table database-backup-table">
                                 <thead>
                                     <tr>
                                         <th>Data</th>
@@ -200,7 +318,7 @@
                                         <th>Dimensione</th>
                                         <th>File</th>
                                         <th>Creato da</th>
-                                        <th>Azioni</th>
+                                        <th class="actions-head">Azioni</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -208,13 +326,15 @@
                                         <tr>
                                             <td>{{ backup.data_creazione|date:"d/m/Y H:i" }}</td>
                                             <td>
-                                                {{ backup.tipo_label }}
+                                                <strong>{{ backup.tipo_label }}</strong>
                                                 {% if backup.note %}
                                                     <div class="table-muted">{{ backup.note }}</div>
                                                 {% endif %}
                                             </td>
                                             <td>{{ backup.dimensione_label }}</td>
-                                            <td>{{ backup.nome_file }}</td>
+                                            <td>
+                                                <strong class="database-backup-file-name">{{ backup.nome_file }}</strong>
+                                            </td>
                                             <td>
                                                 {% if backup.creato_da %}
                                                     {{ backup.creato_da.get_full_name|default:backup.creato_da.username }}
@@ -223,84 +343,99 @@
                                                 {% endif %}
                                             </td>
                                             <td class="actions-cell">
-                                                <a href="{% url 'scarica_backup_database' backup.pk %}" class="table-link" download="{{ backup.nome_file }}" data-long-wait-skip="1">Scarica</a>
-                                                {% if can_access_database_backups %}
-                                                    <span class="table-muted">|</span>
-                                                    <form method="post" style="display: inline;">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="action" value="prepare_restore_backup">
-                                                        <input type="hidden" name="backup_id" value="{{ backup.pk }}">
-                                                        <button type="submit" class="table-link table-link-danger button-link-reset">Ripristina</button>
-                                                    </form>
-                                                {% endif %}
+                                                <div class="table-icon-actions database-backup-row-actions">
+                                                    <a
+                                                        href="{% url 'scarica_backup_database' backup.pk %}"
+                                                        class="btn btn-secondary btn-sm btn-icon-text"
+                                                        download="{{ backup.nome_file }}"
+                                                        data-long-wait-skip="1"
+                                                    >
+                                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                                        <span class="btn-label">Scarica</span>
+                                                    </a>
+                                                    {% if can_access_database_backups %}
+                                                        <form method="post" class="database-backup-inline-action">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="action" value="prepare_restore_backup">
+                                                            <input type="hidden" name="backup_id" value="{{ backup.pk }}">
+                                                            <button type="submit" class="btn btn-danger btn-sm btn-icon-text">
+                                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                                                <span class="btn-label">Ripristina</span>
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
                                             </td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
-                            <div class="help-text" style="margin: 12px 14px 0;">
-                                Arboris conserva al massimo gli ultimi 10 backup. Quando viene creato un undicesimo file, il piu vecchio viene eliminato automaticamente.
-                            </div>
                         {% else %}
-                            <div class="empty-state">Ancora nessun backup disponibile.</div>
+                            <div class="database-backup-empty">
+                                <span class="database-backup-empty-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                                </span>
+                                <strong>Ancora nessun backup disponibile</strong>
+                                <p>Crea un backup manuale per popolare lo storico.</p>
+                            </div>
                         {% endif %}
                     </div>
-                </div>
-            </div>
-        </div>
+                </section>
+            </main>
 
-        <div class="family-side-column">
-            <div class="admin-section compact">
-                <div class="admin-section-title">Riepilogo</div>
-                <div class="panel">
-                    <div class="panel-body summary-panel-body">
-                        <div class="summary-grid">
-                            <div class="summary-item">
-                                <div class="summary-value">{{ configurazione.frequenza_label }}</div>
-                                <div class="summary-label">Backup automatici</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">
-                                    {% if ultimo_backup %}{{ ultimo_backup.dimensione_label }}{% else %}-{% endif %}
-                                </div>
-                                <div class="summary-label">Ultimo backup</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">
-                                    {% if configurazione.ultimo_backup_automatico_at %}
-                                        {{ configurazione.ultimo_backup_automatico_at|date:"d/m H:i" }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </div>
-                                <div class="summary-label">Ultimo automatico</div>
-                            </div>
-                            <div class="summary-item">
-                                <div class="summary-value">{{ backup_records|length }}</div>
-                                <div class="summary-label">Backup conservati</div>
-                            </div>
+            <aside class="database-backup-side">
+                <section class="database-backup-card database-backup-summary-card" aria-labelledby="backup-summary-title">
+                    <div class="database-backup-card-head">
+                        <span class="database-backup-card-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="backup-summary-title">Riepilogo</h2>
+                            <p>Stato sintetico della configurazione.</p>
                         </div>
-
-                        {% if ultimo_backup %}
-                            <div class="help-text" style="margin-top: 14px;">
-                                Ultimo backup creato il {{ ultimo_backup.data_creazione|date:"d/m/Y H:i" }}.
-                            </div>
-                        {% endif %}
-
-                        {% if configurazione.ultimo_errore_backup_automatico %}
-                            <div class="settings-warning-box" style="margin-top: 14px;">
-                                Ultimo errore backup automatico: {{ configurazione.ultimo_errore_backup_automatico }}
-                            </div>
-                        {% endif %}
-
-                        {% if pending_restore %}
-                            <div class="settings-warning-box" style="margin-top: 14px;">
-                                Ripristino in attesa di conferma per il file {{ pending_restore.nome_file_originale }}.
-                            </div>
-                        {% endif %}
                     </div>
-                </div>
-            </div>
+                    <div class="database-backup-summary-list">
+                        <article>
+                            <span>Backup automatici</span>
+                            <strong>{{ configurazione.frequenza_label }}</strong>
+                        </article>
+                        <article>
+                            <span>Ultimo backup</span>
+                            <strong>{% if ultimo_backup %}{{ ultimo_backup.data_creazione|date:"d/m/Y H:i" }}{% else %}-{% endif %}</strong>
+                        </article>
+                        <article>
+                            <span>Ultimo automatico</span>
+                            <strong>
+                                {% if configurazione.ultimo_backup_automatico_at %}
+                                    {{ configurazione.ultimo_backup_automatico_at|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </strong>
+                        </article>
+                        <article>
+                            <span>Backup conservati</span>
+                            <strong>{{ backup_stats.backup_conservati }}</strong>
+                        </article>
+                    </div>
+                    {% if configurazione.ultimo_errore_backup_automatico %}
+                        <div class="database-backup-warning is-compact">
+                            <span class="database-backup-warning-icon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                            </span>
+                            <p>Ultimo errore automatico: {{ configurazione.ultimo_errore_backup_automatico }}</p>
+                        </div>
+                    {% endif %}
+                    {% if pending_restore %}
+                        <div class="database-backup-warning is-compact">
+                            <span class="database-backup-warning-icon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                            </span>
+                            <p>Ripristino in attesa di conferma per {{ pending_restore.nome_file_originale }}.</p>
+                        </div>
+                    {% endif %}
+                </section>
+            </aside>
         </div>
     </div>
 {% endblock %}

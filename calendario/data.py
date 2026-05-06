@@ -107,6 +107,7 @@ def build_calendar_entry_record(
     delete_url="",
     recurrence_summary="",
     is_recurring=False,
+    active_object=None,
 ):
     record = {
         "id": entry_id,
@@ -135,6 +136,7 @@ def build_calendar_entry_record(
         "delete_url": delete_url,
         "recurrence_summary": recurrence_summary,
         "is_recurring": is_recurring,
+        "active_object": active_object,
     }
     record["duration_label"] = build_duration_label(
         start_date,
@@ -225,6 +227,7 @@ def build_local_calendar_occurrence_record(evento, occurrence):
         delete_url=reverse("elimina_evento_calendario", kwargs={"pk": evento.pk}),
         recurrence_summary=evento.recurrence_summary,
         is_recurring=evento.is_recurring,
+        active_object=evento,
     )
 
 
@@ -259,6 +262,7 @@ def build_local_calendar_list_record(evento):
         delete_url=reverse("elimina_evento_calendario", kwargs={"pk": evento.pk}),
         recurrence_summary=evento.recurrence_summary,
         is_recurring=evento.is_recurring,
+        active_object=evento,
     )
 
 

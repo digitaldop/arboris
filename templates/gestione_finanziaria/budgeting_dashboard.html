@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static currency %}
+{% load static currency active_toggles %}
 
 {% block title %}Budgeting - Arboris School Management{% endblock %}
 
@@ -379,66 +379,6 @@
         color: #60738d;
     }
 
-    .budget-voice-toggle-form {
-        margin: 4px 0 0;
-    }
-
-    .budget-voice-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        width: fit-content;
-        color: #356f88;
-        font-size: 12px;
-        font-weight: 850;
-        cursor: pointer;
-    }
-
-    .budget-voice-toggle input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    .budget-voice-toggle-track {
-        position: relative;
-        display: inline-flex;
-        width: 42px;
-        height: 24px;
-        flex: 0 0 42px;
-        border: 1px solid #cfe3ee;
-        border-radius: 999px;
-        background: #e9f1f5;
-        transition: background 0.18s ease, border-color 0.18s ease;
-    }
-
-    .budget-voice-toggle-track::after {
-        content: "";
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #ffffff;
-        box-shadow: 0 2px 5px rgba(23, 33, 49, 0.18);
-        transition: transform 0.18s ease;
-    }
-
-    .budget-voice-toggle input:checked + .budget-voice-toggle-track {
-        border-color: #7bbdd6;
-        background: var(--primary-dark);
-    }
-
-    .budget-voice-toggle input:checked + .budget-voice-toggle-track::after {
-        transform: translateX(18px);
-    }
-
-    .budget-voice-toggle input:focus-visible + .budget-voice-toggle-track {
-        outline: 2px solid rgba(59, 111, 135, 0.26);
-        outline-offset: 2px;
-    }
-
     .budget-sheet-row.is-inactive {
         opacity: 0.62;
     }
@@ -625,15 +565,7 @@
                                     Nel periodo: EUR {{ item.totale_periodo|euro }}
                                 </div>
                                 {% if can_manage_gestione_finanziaria %}
-                                    <form method="post" action="{% url 'toggle_voce_budget' item.voce.pk %}" class="budget-voice-toggle-form" data-budget-toggle-form>
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                        <label class="budget-voice-toggle">
-                                            <input type="checkbox" name="attiva" value="1" {% if item.active %}checked{% endif %} data-budget-toggle>
-                                            <span class="budget-voice-toggle-track" aria-hidden="true"></span>
-                                            <span data-budget-toggle-label>{% if item.active %}Attiva{% else %}Non attiva{% endif %}</span>
-                                        </label>
-                                    </form>
+                                    {% active_toggle item.voce reload=True %}
                                     <div class="budget-voice-actions">
                                         <a
                                             href="{% url 'modifica_voce_budget' item.voce.pk %}?popup=1"
@@ -752,41 +684,4 @@
     </section>
 </div>
 
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll("[data-budget-toggle]").forEach(function (toggle) {
-            toggle.addEventListener("change", function () {
-                const form = toggle.closest("[data-budget-toggle-form]");
-                if (!form) {
-                    return;
-                }
-                const label = toggle.closest(".budget-voice-toggle");
-                const labelText = label ? label.querySelector("[data-budget-toggle-label]") : null;
-                const data = new FormData(form);
-                data.set("attiva", toggle.checked ? "1" : "0");
-                data.set("ajax", "1");
-                toggle.disabled = true;
-                if (labelText) {
-                    labelText.textContent = toggle.checked ? "Attiva" : "Non attiva";
-                }
-
-                fetch(form.action, {
-                    method: "POST",
-                    body: data,
-                    headers: {"X-Requested-With": "XMLHttpRequest"},
-                    credentials: "same-origin"
-                })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error("Toggle non salvato");
-                        }
-                        window.location.reload();
-                    })
-                    .catch(function () {
-                        form.submit();
-                    });
-            });
-        });
-    });
-</script>
 {% endblock %}

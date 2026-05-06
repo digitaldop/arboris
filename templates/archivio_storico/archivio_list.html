@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load static currency %}
 
 {% block title %}Archivio storico - Arboris School Management{% endblock %}
 
@@ -12,17 +12,76 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Archivio storico</h1>
+    <div class="page-head family-page-head anagrafica-list-head archive-history-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Archivio storico</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ archivio_stats.totale_archivi }} archivi
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                Consultazione degli anni scolastici chiusi e degli snapshot storici conservati.
+            </div>
+        </div>
     </div>
 
-    <div class="admin-section">
-        <div class="admin-section-title">
-            <span class="admin-section-title-label">Anni scolastici archiviati</span>
+    <section class="family-stat-grid archive-summary-grid" aria-label="Riepilogo archivio storico">
+        <article class="family-stat-card archive-summary-card">
+            <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+            <span class="family-stat-content">
+                <span class="family-stat-label">Anni archiviati</span>
+                <strong class="family-stat-value">{{ archivio_stats.totale_archivi }}</strong>
+                <span class="family-stat-link">Schede storiche disponibili</span>
+            </span>
+        </article>
+        <article class="family-stat-card archive-summary-card">
+            <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+            <span class="family-stat-content">
+                <span class="family-stat-label">Snapshot salvati</span>
+                <strong class="family-stat-value">{{ archivio_stats.totale_snapshot }}</strong>
+                <span class="family-stat-link">Record congelati</span>
+            </span>
+        </article>
+        <article class="family-stat-card archive-summary-card">
+            <span class="family-stat-icon family-stat-purple" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+            <span class="family-stat-content">
+                <span class="family-stat-label">Studenti storicizzati</span>
+                <strong class="family-stat-value">{{ archivio_stats.totale_studenti }}</strong>
+                <span class="family-stat-link">Dagli anni chiusi</span>
+            </span>
+        </article>
+        <article class="family-stat-card archive-summary-card">
+            <span class="family-stat-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+            <span class="family-stat-content">
+                <span class="family-stat-label">Archiviabili</span>
+                <strong class="family-stat-value">{{ archivio_stats.anni_archiviabili }}</strong>
+                <span class="family-stat-link">Anni pronti alla chiusura</span>
+            </span>
+        </article>
+    </section>
+
+    <section class="panel panel-standalone anagrafica-list-panel archive-list-card">
+        <div class="archive-list-card-head">
+            <div>
+                <h2>Anni scolastici archiviati</h2>
+                <p>Consulta dati anagrafici, rette, osservazioni e documenti conservati alla chiusura dell'anno.</p>
+            </div>
         </div>
-        <div class="panel">
-            <div class="panel-body">
-                <table class="list-table">
+        <div class="panel-body">
+            {% if archivi %}
+                <table class="list-table anagrafica-list-table archive-history-table">
+                    <colgroup>
+                        <col class="archive-col-year">
+                        <col class="archive-col-period">
+                        <col class="archive-col-date">
+                        <col class="archive-col-count">
+                        <col class="archive-col-count">
+                        <col class="archive-col-count">
+                        <col class="archive-col-actions">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Anno scolastico</th>
@@ -36,105 +95,175 @@
                     </thead>
                     <tbody>
                         {% for archivio in archivi %}
-                            <tr>
-                                <td>{{ archivio.nome_anno_scolastico }}</td>
-                                <td>{{ archivio.data_inizio|it_date }} - {{ archivio.data_fine|it_date }}</td>
-                                <td>{{ archivio.data_archiviazione|date:"d/m/Y H:i" }}</td>
-                                <td>{{ archivio.totale_studenti }}</td>
-                                <td>{{ archivio.totale_iscrizioni }}</td>
-                                <td>{{ archivio.totale_rate }}</td>
-                                <td>
-                                    <a href="{% url 'dettaglio_archivio_storico' archivio.pk %}" class="table-link">Consulta</a>
+                            <tr class="list-row-link" data-row-href="{% url 'dettaglio_archivio_storico' archivio.pk %}">
+                                <td class="anagrafica-record-cell archive-record-cell">
+                                    <a href="{% url 'dettaglio_archivio_storico' archivio.pk %}" class="anagrafica-record-link anagrafica-record-link-compact">
+                                        <span class="archive-record-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ archivio.nome_anno_scolastico }}</span>
+                                            <span class="table-subtext">{{ archivio.totale_snapshot }} snapshot conservati</span>
+                                        </span>
+                                    </a>
                                 </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7">
-                                    <div class="empty-state">Nessun anno scolastico archiviato.</div>
+                                <td>
+                                    <span class="archive-period">{{ archivio.data_inizio|it_date }} - {{ archivio.data_fine|it_date }}</span>
+                                </td>
+                                <td>
+                                    <span class="archive-date">{{ archivio.data_archiviazione|date:"d/m/Y H:i" }}</span>
+                                    {% if archivio.archiviato_da %}
+                                        <span class="archive-muted-line">da {{ archivio.archiviato_da.get_username }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="archive-count-chip">{{ archivio.totale_studenti }}</span></td>
+                                <td><span class="archive-count-chip">{{ archivio.totale_iscrizioni }}</span></td>
+                                <td><span class="archive-count-chip">{{ archivio.totale_rate }}</span></td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions archive-row-actions">
+                                        <a
+                                            class="table-icon-link"
+                                            href="{% url 'dettaglio_archivio_storico' archivio.pk %}"
+                                            title="Consulta archivio"
+                                            aria-label="Consulta archivio {{ archivio.nome_anno_scolastico }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
+            {% else %}
+                <div class="empty-state archive-empty-state">
+                    <span class="archive-empty-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                    <strong>Nessun anno scolastico archiviato</strong>
+                    <span>Dopo la chiusura di un anno, lo storico viene mostrato qui per la consultazione.</span>
+                </div>
+            {% endif %}
         </div>
-    </div>
+    </section>
 
     {% if can_manage_sistema %}
-        <div class="admin-section">
-            <div class="admin-section-title">
-                <span class="admin-section-title-label">Anni scolastici archiviabili</span>
-            </div>
-            <div class="panel">
-                <div class="panel-body">
-                    <table class="list-table">
-                        <thead>
-                            <tr>
-                                <th>Anno scolastico</th>
-                                <th>Periodo</th>
-                                <th>Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in anni_archiviabili %}
-                                <tr>
-                                    <td>{{ item.anno.nome_anno_scolastico }}</td>
-                                    <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
-                                    <td>
-                                        <a href="{% url 'anteprima_archiviazione_anno' item.anno.pk %}" class="table-link">Archivia</a>
-                                    </td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="3">
-                                        <div class="empty-state">Nessun anno scolastico archiviabile in questo momento.</div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        <section class="archive-management-grid">
+            <article class="panel panel-standalone anagrafica-list-panel archive-list-card archive-management-card">
+                <div class="archive-list-card-head">
+                    <div>
+                        <h2>Anni scolastici archiviabili</h2>
+                        <p>Anni chiusi e pronti per essere congelati nello storico.</p>
+                    </div>
+                    <span class="family-status-pill{% if anni_archiviabili %}{% else %} is-muted{% endif %}">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {{ archivio_stats.anni_archiviabili }}
+                    </span>
                 </div>
-            </div>
-        </div>
+                <div class="panel-body">
+                    {% if anni_archiviabili %}
+                        <table class="list-table anagrafica-list-table archive-history-table archive-compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Anno scolastico</th>
+                                    <th>Periodo</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in anni_archiviabili %}
+                                    <tr class="list-row-link" data-row-href="{% url 'anteprima_archiviazione_anno' item.anno.pk %}">
+                                        <td class="archive-record-cell">
+                                            <a href="{% url 'anteprima_archiviazione_anno' item.anno.pk %}" class="anagrafica-record-link anagrafica-record-link-compact">
+                                                <span class="archive-record-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                <span class="anagrafica-record-main">
+                                                    <span class="table-main-text">{{ item.anno.nome_anno_scolastico }}</span>
+                                                    <span class="table-subtext">Pronto per l'anteprima</span>
+                                                </span>
+                                            </a>
+                                        </td>
+                                        <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
+                                        <td class="actions-cell">
+                                            <a href="{% url 'anteprima_archiviazione_anno' item.anno.pk %}" class="btn btn-secondary btn-icon-text archive-table-action">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                                <span class="btn-label">Archivia</span>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="empty-state archive-empty-state archive-empty-state-compact">
+                            <span class="archive-empty-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                            <strong>Nessun anno archiviabile</strong>
+                            <span>Non ci sono anni scolastici pronti per l'archiviazione.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
 
-        <div class="admin-section">
-            <div class="admin-section-title">
-                <span class="admin-section-title-label">Anni non archiviabili</span>
-            </div>
-            <div class="panel">
-                <div class="panel-body">
-                    <table class="list-table">
-                        <thead>
-                            <tr>
-                                <th>Anno scolastico</th>
-                                <th>Periodo</th>
-                                <th>Motivo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in anni_non_archiviabili %}
-                                <tr>
-                                    <td>{{ item.anno.nome_anno_scolastico }}</td>
-                                    <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
-                                    <td>
-                                        {% if item.motivi %}
-                                            {{ item.motivi|join:", " }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="3">
-                                        <div class="empty-state">Nessun blocco da mostrare.</div>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <article class="panel panel-standalone anagrafica-list-panel archive-list-card archive-management-card">
+                <div class="archive-list-card-head">
+                    <div>
+                        <h2>Anni non archiviabili</h2>
+                        <p>Blocchi o condizioni che impediscono la chiusura storica.</p>
+                    </div>
+                    <span class="family-status-pill{% if anni_non_archiviabili %} is-danger{% else %} is-muted{% endif %}">
+                        <span class="family-status-dot" aria-hidden="true"></span>
+                        {{ archivio_stats.anni_non_archiviabili }}
+                    </span>
                 </div>
-            </div>
-        </div>
+                <div class="panel-body">
+                    {% if anni_non_archiviabili %}
+                        <table class="list-table anagrafica-list-table archive-history-table archive-compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Anno scolastico</th>
+                                    <th>Periodo</th>
+                                    <th>Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in anni_non_archiviabili %}
+                                    <tr>
+                                        <td class="archive-record-cell">
+                                            <span class="anagrafica-record-link anagrafica-record-link-compact">
+                                                <span class="archive-record-icon is-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                                                <span class="anagrafica-record-main">
+                                                    <span class="table-main-text">{{ item.anno.nome_anno_scolastico }}</span>
+                                                    <span class="table-subtext">Archiviazione bloccata</span>
+                                                </span>
+                                            </span>
+                                        </td>
+                                        <td>{{ item.anno.data_inizio|it_date }} - {{ item.anno.data_fine|it_date }}</td>
+                                        <td>
+                                            {% if item.motivi %}
+                                                <div class="archive-reason-list">
+                                                    {% for motivo in item.motivi %}
+                                                        <span>{{ motivo }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="table-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div class="empty-state archive-empty-state archive-empty-state-compact">
+                            <span class="archive-empty-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                            <strong>Nessun blocco da mostrare</strong>
+                            <span>Tutti gli anni valutati sono gestibili.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+        </section>
     {% endif %}
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
 {% endblock %}

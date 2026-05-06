@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ titolo }} - Arboris School Management{% endblock %}
 
@@ -13,43 +14,244 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{{ titolo }}</h1>
-    </div>
-
-    <form method="post" class="detail-form" id="fondo-piano-form">
-        {% csrf_token %}
-        <div class="content-card">
-            <table class="form-table">
-                {% for field in form %}
-                    <tr>
-                        <th>{{ field.label_tag }}</th>
-                        <td>{{ field }} {{ field.errors }}<br><small class="table-muted">{{ field.help_text }}</small></td>
-                    </tr>
-                {% endfor %}
-            </table>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                {% if piano %}
-                    <a href="{% url 'fondo_piano_dettaglio' piano.pk %}" class="btn btn-secondary">Annulla</a>
-                {% else %}
-                    <a href="{% url 'fondo_piano_lista' %}" class="btn btn-secondary">Annulla</a>
-                {% endif %}
+    <div class="fondo-plan-form-shell">
+        <div class="page-head fondo-plan-form-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon fondo-plans-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p class="page-subtitle">Configura ambito, deposito e regole di versamento del piano.</p>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% if piano %}{% url 'fondo_piano_dettaglio' piano.pk %}{% else %}{% url 'fondo_piano_lista' %}{% endif %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+                <button type="submit" form="fondo-piano-form" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
             </div>
         </div>
-    </form>
-    <style>
-        #fondo-piano-form .fondo-piano-field--inactive {
-            opacity: 0.7;
-            background-color: #e8eaed;
-            color: #5f6368;
-            cursor: not-allowed;
-            border-color: #dadce0;
-        }
-        #fondo-piano-form select.fondo-piano-field--inactive {
-            background-color: #e8eaed;
-        }
-    </style>
+
+        <form method="post" class="fondo-plan-form" id="fondo-piano-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <section class="fondo-plan-form-card" aria-labelledby="fondo-plan-base-title">
+                <div class="fondo-plan-form-card-head">
+                    <span class="fondo-plan-form-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="fondo-plan-base-title">Dati piano</h2>
+                        <p>Nome, ambito e disponibilit&agrave; del piano di accantonamento.</p>
+                    </div>
+                </div>
+
+                <div class="fondo-plan-form-grid">
+                    <div class="fondo-plan-field is-wide">
+                        <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+                            {{ form.nome }}
+                            {{ form.nome.errors }}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.anno_scolastico.id_for_label }}">{{ form.anno_scolastico.label }}</label>
+                            {{ form.anno_scolastico }}
+                            {{ form.anno_scolastico.errors }}
+                            {% if form.anno_scolastico.help_text %}<p class="fondo-plan-help">{{ form.anno_scolastico.help_text }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <label class="fondo-plan-switch-card" for="{{ form.sempre_attivo.id_for_label }}">
+                        <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <span class="fondo-plan-switch-copy">
+                            <span>{{ form.sempre_attivo.label }}</span>
+                            {% if form.sempre_attivo.help_text %}<small>{{ form.sempre_attivo.help_text }}</small>{% endif %}
+                            {{ form.sempre_attivo.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.sempre_attivo }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+
+                    <label class="fondo-plan-switch-card" for="{{ form.attivo.id_for_label }}">
+                        <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span class="fondo-plan-switch-copy">
+                            <span>{{ form.attivo.label }}</span>
+                            <small>Se disattivato, il piano resta consultabile ma non influenza le procedure automatiche.</small>
+                            {{ form.attivo.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.attivo }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+
+                    <div class="fondo-plan-field is-wide">
+                        <span class="fondo-plan-field-icon is-sky" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                            {{ form.descrizione }}
+                            {{ form.descrizione.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fondo-plan-form-card" aria-labelledby="fondo-plan-rules-title">
+                <div class="fondo-plan-form-card-head">
+                    <span class="fondo-plan-form-card-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="fondo-plan-rules-title">Regole di versamento</h2>
+                        <p>Definisci se il piano lavora solo manualmente, sulle rette o con scadenze periodiche.</p>
+                    </div>
+                </div>
+
+                <div class="fondo-plan-form-grid">
+                    <div class="fondo-plan-field is-wide">
+                        <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.modalita.id_for_label }}">{{ form.modalita.label }}</label>
+                            {{ form.modalita }}
+                            {{ form.modalita.errors }}
+                            {% if form.modalita.help_text %}<p class="fondo-plan-help">{{ form.modalita.help_text }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.percentuale_su_rette.id_for_label }}">{{ form.percentuale_su_rette.label }}</label>
+                            {{ form.percentuale_su_rette }}
+                            {{ form.percentuale_su_rette.errors }}
+                            {% if form.percentuale_su_rette.help_text %}<p class="fondo-plan-help">{{ form.percentuale_su_rette.help_text }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.periodicita.id_for_label }}">{{ form.periodicita.label }}</label>
+                            {{ form.periodicita }}
+                            {{ form.periodicita.errors }}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.data_primo_versamento.id_for_label }}">{{ form.data_primo_versamento.label }}</label>
+                            {{ form.data_primo_versamento }}
+                            {{ form.data_primo_versamento.errors }}
+                            {% if form.data_primo_versamento.help_text %}<p class="fondo-plan-help">{{ form.data_primo_versamento.help_text }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.importo_versamento_periodico.id_for_label }}">{{ form.importo_versamento_periodico.label }}</label>
+                            {{ form.importo_versamento_periodico }}
+                            {{ form.importo_versamento_periodico.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fondo-plan-form-card" aria-labelledby="fondo-plan-deposit-title">
+                <div class="fondo-plan-form-card-head">
+                    <span class="fondo-plan-form-card-icon is-purple" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="fondo-plan-deposit-title">Deposito fondi</h2>
+                        <p>Indica dove vengono custodite le somme accantonate.</p>
+                    </div>
+                </div>
+
+                <div class="fondo-plan-form-grid">
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.tipo_deposito.id_for_label }}">{{ form.tipo_deposito.label }}</label>
+                            {{ form.tipo_deposito }}
+                            {{ form.tipo_deposito.errors }}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field">
+                        <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.descrizione_deposito.id_for_label }}">{{ form.descrizione_deposito.label }}</label>
+                            {{ form.descrizione_deposito }}
+                            {{ form.descrizione_deposito.errors }}
+                        </div>
+                    </div>
+
+                    <div class="fondo-plan-field is-wide">
+                        <span class="fondo-plan-field-icon is-rose" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <div class="fondo-plan-field-body">
+                            <label for="{{ form.coordinate_riferimento.id_for_label }}">{{ form.coordinate_riferimento.label }}</label>
+                            {{ form.coordinate_riferimento }}
+                            {{ form.coordinate_riferimento.errors }}
+                            {% if form.coordinate_riferimento.help_text %}<p class="fondo-plan-help">{{ form.coordinate_riferimento.help_text }}</p>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="fondo-plan-form-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <a href="{% if piano %}{% url 'fondo_piano_dettaglio' piano.pk %}{% else %}{% url 'fondo_piano_lista' %}{% endif %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            </div>
+        </form>
+    </div>
+
     <script>
         (function () {
             var form = document.getElementById("fondo-piano-form");
@@ -64,12 +266,15 @@
             var CL_INACTIVE = "fondo-piano-field--inactive";
             function setFieldDisabled(el, dis) {
                 if (!el) return;
+                var shell = el.closest(".fondo-plan-field");
                 el.disabled = dis;
                 el.setAttribute("aria-disabled", dis ? "true" : "false");
                 if (dis) {
                     el.classList.add(CL_INACTIVE);
+                    if (shell) shell.classList.add("is-disabled");
                 } else {
                     el.classList.remove(CL_INACTIVE);
+                    if (shell) shell.classList.remove("is-disabled");
                 }
             }
             function syncModalita() {
@@ -94,6 +299,8 @@
                     if (el && el.disabled) {
                         el.disabled = false;
                         el.classList.remove(CL_INACTIVE);
+                        var shell = el.closest(".fondo-plan-field");
+                        if (shell) shell.classList.remove("is-disabled");
                     }
                 });
             });
@@ -107,12 +314,15 @@
             var CL = "fondo-piano-field--inactive";
             function apply() {
                 var on = cb.checked;
+                var shell = sel.closest(".fondo-plan-field");
                 sel.disabled = on;
                 sel.setAttribute("aria-disabled", on ? "true" : "false");
                 if (on) {
                     sel.classList.add(CL);
+                    if (shell) shell.classList.add("is-disabled");
                 } else {
                     sel.classList.remove(CL);
+                    if (shell) shell.classList.remove("is-disabled");
                 }
             }
             cb.addEventListener("change", function () {

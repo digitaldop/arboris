@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 {% load currency %}
 
 {% block title %}Regole di categorizzazione - Arboris School Management{% endblock %}
@@ -63,7 +63,7 @@
                         </td>
                         <td>{{ r.categoria_da_assegnare }}</td>
                         <td>{{ r.volte_applicata }} volte</td>
-                        <td>{% if r.attiva %}Si{% else %}No{% endif %}</td>
+                        <td>{% active_toggle r %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_regola_categorizzazione' r.pk %}" class="table-link">Modifica</a>
                             <span class="table-muted">|</span>

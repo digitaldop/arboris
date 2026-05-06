@@ -5,11 +5,11 @@ from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -66,6 +66,8 @@ from anagrafica.dati_base_import import (
     run_import_nazioni_belfiore,
 )
 
+from .active_toggles import get_active_toggle_config, get_active_toggle_model
+from .audit_retention import cleanup_cronologia_operazioni
 from .permissions import (
     authenticated_user_required,
     get_user_permission_profile,
@@ -80,6 +82,27 @@ CRONOLOGIA_RESULT_LIMIT = 250
 FEEDBACK_PER_PAGE = 20
 GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
 GLOBAL_SEARCH_MAX_RESULTS = 12
+
+
+def parse_toggle_bool(value):
+    return str(value or "").strip().lower() in {"1", "true", "on", "yes", "si"}
+
+
+def json_or_redirect(request, payload, *, status=200, fallback_url=None, message_level=None):
+    if request.POST.get("ajax") == "1" or request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse(payload, status=status)
+
+    if message_level and payload.get("message"):
+        getattr(messages, message_level)(request, payload["message"])
+
+    redirect_url = fallback_url or request.POST.get("next") or ""
+    if not redirect_url or not url_has_allowed_host_and_scheme(
+        redirect_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        redirect_url = "home"
+    return redirect(redirect_url)
 
 
 def compact_join(parts, separator=" - "):
@@ -101,6 +124,57 @@ def append_limited_results(results, items, remaining):
     if remaining <= 0:
         return
     results.extend(items[:remaining])
+
+
+@authenticated_user_required
+@require_POST
+def toggle_active_state(request):
+    model_label = request.POST.get("model")
+    object_id = request.POST.get("pk")
+    field_name = request.POST.get("field")
+    config = get_active_toggle_config(model_label, field_name=field_name)
+    if not config:
+        return HttpResponseBadRequest("Toggle non configurato.")
+
+    if not user_has_module_permission(
+        request.user,
+        config.module_name,
+        level=LivelloPermesso.GESTIONE,
+    ):
+        raise PermissionDenied("Non hai i permessi necessari per modificare questo stato.")
+
+    model_cls = get_active_toggle_model(config)
+    if model_cls is None:
+        return HttpResponseBadRequest("Modello non disponibile.")
+
+    obj = get_object_or_404(model_cls, pk=object_id)
+    previous_value = bool(getattr(obj, config.field_name))
+    new_value = parse_toggle_bool(request.POST.get("value"))
+    setattr(obj, config.field_name, new_value)
+
+    try:
+        obj.clean()
+        update_fields = [config.field_name]
+        if any(field.name == "data_aggiornamento" for field in obj._meta.fields):
+            update_fields.append("data_aggiornamento")
+        obj.save(update_fields=update_fields)
+    except ValidationError as exc:
+        setattr(obj, config.field_name, previous_value)
+        message = "; ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+        return json_or_redirect(
+            request,
+            {"ok": False, "value": previous_value, "message": message},
+            status=400,
+            message_level="error",
+        )
+
+    label = "attivo" if new_value else "non attivo"
+    message = f"Stato aggiornato: {obj} e' ora {label}."
+    return json_or_redirect(
+        request,
+        {"ok": True, "value": new_value, "message": message},
+        message_level="success",
+    )
 
 
 def build_anagrafica_global_search_results(query, remaining):
@@ -688,7 +762,19 @@ def impostazioni_generali_sistema(request):
         if form.is_valid():
             impostazioni = form.save()
             impostazioni_display = impostazioni
+            cleanup_stats = cleanup_cronologia_operazioni(impostazioni=impostazioni, force=True)
             messages.success(request, "Impostazioni generali salvate correttamente.")
+            if cleanup_stats.get("deleted_count"):
+                extra_note = (
+                    " La pulizia proseguira automaticamente al prossimo accesso utile."
+                    if cleanup_stats.get("truncated")
+                    else ""
+                )
+                messages.info(
+                    request,
+                    f"Cronologia operazioni ripulita: {cleanup_stats['deleted_count']} operazioni rimosse."
+                    f"{extra_note}",
+                )
             return redirect("impostazioni_generali_sistema")
     else:
         form = SistemaImpostazioniGeneraliForm(instance=impostazioni)
@@ -932,11 +1018,27 @@ def backup_database_sistema(request):
                 return redirect("backup_database_sistema")
             pending_restore = job_in_attesa
 
-    backup_records = SistemaDatabaseBackup.objects.select_related("creato_da").order_by("-data_creazione", "-id")[:10]
+    backup_records = list(SistemaDatabaseBackup.objects.select_related("creato_da").order_by("-data_creazione", "-id")[:10])
     ultimo_backup = backup_records[0] if backup_records else None
-    recent_restore_jobs = SistemaDatabaseRestoreJob.objects.select_related("creato_da", "backup_sicurezza").order_by(
+    recent_restore_jobs = list(SistemaDatabaseRestoreJob.objects.select_related("creato_da", "backup_sicurezza").order_by(
         "-data_creazione", "-id"
-    )[:20]
+    )[:20])
+    backup_stats = {
+        "backup_conservati": len(backup_records),
+        "ripristini_recenti": len(recent_restore_jobs),
+        "ripristini_attivi": sum(
+            1
+            for job in recent_restore_jobs
+            if job.stato
+            in {
+                StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+                StatoRipristinoDatabase.IN_CODA,
+                StatoRipristinoDatabase.IN_CORSO,
+            }
+        ),
+        "ultimo_backup_dimensione": ultimo_backup.dimensione_label if ultimo_backup else "-",
+        "ultimo_backup_data": ultimo_backup.data_creazione if ultimo_backup else None,
+    }
 
     return render(
         request,
@@ -950,6 +1052,7 @@ def backup_database_sistema(request):
             "backup_records": backup_records,
             "ultimo_backup": ultimo_backup,
             "recent_restore_jobs": recent_restore_jobs,
+            "backup_stats": backup_stats,
         },
     )
 
@@ -1098,35 +1201,152 @@ def lista_utenti(request):
         profilo, _ = SistemaUtentePermessi.objects.get_or_create(user=utente)
         utente.profilo_permessi_safe = profilo
         utente.gestibile_da_request = request.user.is_superuser or not utente.is_superuser
+        utente.eliminabile_da_request = utente.gestibile_da_request and utente.pk != request.user.pk
+
+    utenti_stats = {
+        "totale": len(utenti),
+        "attivi": sum(1 for utente in utenti if utente.is_active),
+        "ruoli_assegnati": len(
+            {
+                utente.profilo_permessi_safe.ruolo_permessi_id
+                for utente in utenti
+                if utente.profilo_permessi_safe.ruolo_permessi_id
+            }
+        ),
+        "controllo_completo": sum(
+            1 for utente in utenti if utente.profilo_permessi_safe.controllo_completo_effettivo
+        ),
+    }
 
     return render(
         request,
         "sistema/utenti_list.html",
         {
             "utenti": utenti,
+            "utenti_stats": utenti_stats,
         },
     )
 
 
 def lista_ruoli_utenti(request):
-    ruoli = SistemaRuoloPermessi.objects.annotate(count_utenti=Count("utenti")).order_by("nome")
+    ruoli = list(SistemaRuoloPermessi.objects.annotate(count_utenti=Count("utenti")).order_by("nome"))
+    role_stats = {
+        "totale": len(ruoli),
+        "attivi": sum(1 for ruolo in ruoli if ruolo.attivo),
+        "controllo_completo": sum(1 for ruolo in ruoli if ruolo.controllo_completo),
+        "utenti_collegati": sum(ruolo.count_utenti for ruolo in ruoli),
+    }
 
     return render(
         request,
         "sistema/ruoli_list.html",
         {
             "ruoli": ruoli,
+            "role_stats": role_stats,
         },
     )
 
 
+def sistema_is_popup_request(request):
+    return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
+def sistema_popup_response(request, message="Operazione completata."):
+    return render(request, "popup/popup_close.html", {"message": message})
+
+
+def sistema_popup_select_response(request, field_name, object_id, object_label):
+    return render(
+        request,
+        "popup/popup_close_select.html",
+        {
+            "action": "select",
+            "field_name": field_name,
+            "object_id": object_id,
+            "object_label": object_label,
+            "target_input_name": request.GET.get("target_input_name")
+            or request.POST.get("target_input_name", ""),
+        },
+    )
+
+
+def sistema_popup_delete_response(request, field_name, object_id):
+    return render(
+        request,
+        "popup/popup_close_select.html",
+        {
+            "action": "delete",
+            "field_name": field_name,
+            "object_id": object_id,
+            "object_label": "",
+            "target_input_name": request.GET.get("target_input_name")
+            or request.POST.get("target_input_name", ""),
+        },
+    )
+
+
+def sistema_ruolo_form_context(request, form, ruolo_obj=None, is_new=False):
+    module_permission_fields = [
+        {"field": form["permesso_anagrafica"], "icon": "family", "tone": "blue"},
+        {"field": form["permesso_famiglie_interessate"], "icon": "family-heart", "tone": "green"},
+        {"field": form["permesso_economia"], "icon": "coins", "tone": "amber"},
+        {"field": form["permesso_gestione_finanziaria"], "icon": "finance", "tone": "blue"},
+        {"field": form["permesso_sistema"], "icon": "settings", "tone": "purple"},
+        {"field": form["permesso_calendario"], "icon": "calendar", "tone": "green"},
+        {"field": form["permesso_gestione_amministrativa"], "icon": "briefcase", "tone": "amber"},
+        {"field": form["permesso_servizi_extra"], "icon": "list", "tone": "purple"},
+    ]
+    special_permission_fields = [
+        {"field": form["controllo_completo"], "icon": "shield", "tone": "red"},
+        {"field": form["amministratore_operativo"], "icon": "settings", "tone": "blue"},
+        {"field": form["accesso_backup_database"], "icon": "archive", "tone": "amber"},
+    ]
+    context = {
+        "form": form,
+        "ruolo_obj": ruolo_obj,
+        "is_new": is_new,
+        "popup": sistema_is_popup_request(request),
+        "module_permission_fields": module_permission_fields,
+        "special_permission_fields": special_permission_fields,
+    }
+    if ruolo_obj:
+        context["count_utenti"] = ruolo_obj.utenti.count()
+    return context
+
+
+def sistema_utente_form_context(request, form, utente_obj=None, is_new=False):
+    profilo = getattr(utente_obj, "profilo_permessi", None) if utente_obj else None
+    role_summary = []
+    if profilo and profilo.ruolo_permessi_id:
+        role_summary = [
+            ("Ruolo", profilo.ruolo_display),
+            ("Controllo completo", "Si" if profilo.controllo_completo_effettivo else "No"),
+            ("Anagrafica", profilo.permesso_anagrafica_effettivo_display),
+            ("Famiglie interessate", profilo.permesso_famiglie_interessate_effettivo_display),
+            ("Rette scolastiche", profilo.permesso_economia_effettivo_display),
+            ("Gestione finanziaria", profilo.permesso_gestione_finanziaria_effettivo_display),
+            ("Sistema", profilo.permesso_sistema_effettivo_display),
+            ("Calendario", profilo.permesso_calendario_effettivo_display),
+        ]
+    return {
+        "form": form,
+        "utente_obj": utente_obj,
+        "is_new": is_new,
+        "popup": sistema_is_popup_request(request),
+        "role_summary": role_summary,
+    }
+
+
 def crea_ruolo_utente(request):
+    popup = sistema_is_popup_request(request)
     if request.method == "POST":
         form = SistemaRuoloPermessiForm(request.POST)
         if form.is_valid():
             ruolo = form.save()
             sync_user_profiles_for_role(ruolo)
             messages.success(request, f"Ruolo {ruolo.nome} creato correttamente.")
+            if popup:
+                return sistema_popup_select_response(request, "ruolo_permessi", ruolo.pk, ruolo.nome)
             return redirect("modifica_ruolo_utente", pk=ruolo.pk)
     else:
         form = SistemaRuoloPermessiForm()
@@ -1134,16 +1354,13 @@ def crea_ruolo_utente(request):
     return render(
         request,
         "sistema/ruolo_form.html",
-        {
-            "form": form,
-            "ruolo_obj": None,
-            "is_new": True,
-        },
+        sistema_ruolo_form_context(request, form, ruolo_obj=None, is_new=True),
     )
 
 
 def modifica_ruolo_utente(request, pk):
     ruolo = get_object_or_404(SistemaRuoloPermessi, pk=pk)
+    popup = sistema_is_popup_request(request)
 
     if request.method == "POST":
         form = SistemaRuoloPermessiForm(request.POST, instance=ruolo)
@@ -1151,6 +1368,8 @@ def modifica_ruolo_utente(request, pk):
             ruolo = form.save()
             sync_user_profiles_for_role(ruolo)
             messages.success(request, f"Ruolo {ruolo.nome} aggiornato correttamente.")
+            if popup:
+                return sistema_popup_select_response(request, "ruolo_permessi", ruolo.pk, ruolo.nome)
             return redirect("modifica_ruolo_utente", pk=ruolo.pk)
     else:
         form = SistemaRuoloPermessiForm(instance=ruolo)
@@ -1158,21 +1377,49 @@ def modifica_ruolo_utente(request, pk):
     return render(
         request,
         "sistema/ruolo_form.html",
+        sistema_ruolo_form_context(request, form, ruolo_obj=ruolo, is_new=False),
+    )
+
+
+def elimina_ruolo_utente(request, pk):
+    ruolo = get_object_or_404(SistemaRuoloPermessi, pk=pk)
+    popup = sistema_is_popup_request(request)
+    count_utenti = ruolo.utenti.count()
+    can_delete = count_utenti == 0
+
+    if request.method == "POST":
+        if not can_delete:
+            messages.error(request, "Non puoi eliminare un ruolo collegato a uno o piu utenti.")
+        else:
+            ruolo_id = ruolo.pk
+            nome = ruolo.nome
+            ruolo.delete()
+            messages.success(request, f"Ruolo {nome} eliminato correttamente.")
+            if popup:
+                return sistema_popup_delete_response(request, "ruolo_permessi", ruolo_id)
+            return redirect("lista_ruoli_utenti")
+
+    return render(
+        request,
+        "sistema/ruolo_confirm_delete.html",
         {
-            "form": form,
             "ruolo_obj": ruolo,
-            "is_new": False,
-            "count_utenti": ruolo.utenti.count(),
+            "popup": popup,
+            "count_utenti": count_utenti,
+            "can_delete": can_delete,
         },
     )
 
 
 def crea_utente(request):
+    popup = sistema_is_popup_request(request)
     if request.method == "POST":
         form = SistemaUtenteForm(request.POST)
         if form.is_valid():
             utente = form.save()
             messages.success(request, f"Utente {utente.get_full_name() or utente.email} creato correttamente.")
+            if popup:
+                return sistema_popup_response(request, f"Utente {utente.get_full_name() or utente.email} creato correttamente.")
             return redirect("modifica_utente", pk=utente.pk)
     else:
         form = SistemaUtenteForm()
@@ -1180,19 +1427,18 @@ def crea_utente(request):
     return render(
         request,
         "sistema/utente_form.html",
-        {
-            "form": form,
-            "utente_obj": None,
-            "is_new": True,
-        },
+        sistema_utente_form_context(request, form, utente_obj=None, is_new=True),
     )
 
 
 def modifica_utente(request, pk):
     utente = get_object_or_404(User.objects.select_related("profilo_permessi__ruolo_permessi"), pk=pk)
+    popup = sistema_is_popup_request(request)
 
     if utente.is_superuser and not request.user.is_superuser:
         messages.error(request, "Solo un superuser puo modificare un altro superuser.")
+        if popup:
+            return sistema_popup_response(request, "Solo un superuser puo modificare un altro superuser.")
         return redirect("lista_utenti")
 
     if request.method == "POST":
@@ -1200,6 +1446,8 @@ def modifica_utente(request, pk):
         if form.is_valid():
             utente = form.save()
             messages.success(request, f"Utente {utente.get_full_name() or utente.email} aggiornato correttamente.")
+            if popup:
+                return sistema_popup_response(request, f"Utente {utente.get_full_name() or utente.email} aggiornato correttamente.")
             return redirect("modifica_utente", pk=utente.pk)
     else:
         form = SistemaUtenteForm(instance=utente)
@@ -1207,29 +1455,50 @@ def modifica_utente(request, pk):
     return render(
         request,
         "sistema/utente_form.html",
-        {
-            "form": form,
-            "utente_obj": utente,
-            "is_new": False,
-        },
+        sistema_utente_form_context(request, form, utente_obj=utente, is_new=False),
     )
 
 
 def elimina_utente(request, pk):
     utente = get_object_or_404(User.objects.select_related("profilo_permessi__ruolo_permessi"), pk=pk)
+    popup = sistema_is_popup_request(request)
 
     if utente.pk == request.user.pk:
         messages.error(request, "Non puoi eliminare l'account con cui hai effettuato l'accesso.")
+        if popup:
+            return render(
+                request,
+                "sistema/utente_confirm_delete.html",
+                {
+                    "utente_obj": utente,
+                    "popup": popup,
+                    "can_delete": False,
+                    "delete_block_reason": "Non puoi eliminare l'account con cui hai effettuato l'accesso.",
+                },
+            )
         return redirect("modifica_utente", pk=utente.pk)
 
     if utente.is_superuser and not request.user.is_superuser:
         messages.error(request, "Solo un superuser puo eliminare un altro superuser.")
+        if popup:
+            return render(
+                request,
+                "sistema/utente_confirm_delete.html",
+                {
+                    "utente_obj": utente,
+                    "popup": popup,
+                    "can_delete": False,
+                    "delete_block_reason": "Solo un superuser puo eliminare un altro superuser.",
+                },
+            )
         return redirect("modifica_utente", pk=utente.pk)
 
     if request.method == "POST":
         user_label = utente.get_full_name() or utente.email or utente.username
         utente.delete()
         messages.success(request, f"Utente {user_label} eliminato correttamente.")
+        if popup:
+            return sistema_popup_response(request, f"Utente {user_label} eliminato correttamente.")
         return redirect("lista_utenti")
 
     return render(
@@ -1237,6 +1506,9 @@ def elimina_utente(request, pk):
         "sistema/utente_confirm_delete.html",
         {
             "utente_obj": utente,
+            "popup": popup,
+            "can_delete": True,
+            "delete_block_reason": "",
         },
     )
 

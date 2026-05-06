@@ -1,94 +1,201 @@
 {% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
-{% block title %}{% if tariffa %}Tariffa {{ tariffa }}{% else %}Nuova tariffa{% endif %} - Arboris School Management{% endblock %}
+{% block title %}{% if tariffa %}Tariffa condizione economica{% else %}Nuova tariffa{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-{% if not popup %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_tariffe_condizione_iscrizione' %}">Tariffe condizioni economiche</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if tariffa %}{{ tariffa }}{% else %}Nuova{% endif %}</span>
-    </div>
-{% endif %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_tariffe_condizione_iscrizione' %}">Tariffe condizioni economiche</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if tariffa %}{{ tariffa }}{% else %}Nuova{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if tariffa %}Tariffa {{ tariffa }}{% else %}Nuova tariffa{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if popup %}
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Chiudi</button>
-            {% else %}
-                {% if tariffa %}
-                    <button type="button" class="btn btn-primary" id="enable-edit-tariffa-condizione-btn">Modifica</button>
-                    <a href="{% url 'elimina_tariffa_condizione_iscrizione' tariffa.pk %}" class="btn btn-danger">Elimina</a>
-                    <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-tariffa-condizione-btn">Annulla modifiche</button>
+    <div class="scambio-retta-form-shell tariffa-condizione-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Rette scolastiche</p>
+                <h1 class="page-title">{% if tariffa %}Tariffa condizione economica{% else %}Nuova tariffa{% endif %}</h1>
+                <p>Configura fascia figli, retta annuale e quota di preiscrizione.</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if tariffa and not popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-intent-edit" id="enable-edit-tariffa-condizione-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-icon-text is-hidden" id="cancel-edit-tariffa-condizione-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla modifiche</span>
+                    </button>
+                    <a href="{% url 'elimina_tariffa_condizione_iscrizione' tariffa.pk %}" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
                 {% endif %}
-                <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="btn btn-secondary">Torna all'elenco</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <form method="post" id="tariffa-condizione-detail-form" class="detail-form{% if tariffa and not popup %} is-view-mode{% endif %}">
-        {% csrf_token %}
-        <fieldset id="tariffa-condizione-lock-container" class="mode-lock-container" {% if tariffa and not popup %}disabled{% endif %}>
-        <div class="content-card">
-            <table class="form-table">
-                <tr><th>{{ form.condizione_iscrizione.label_tag }}</th><td>{{ form.condizione_iscrizione }} {{ form.condizione_iscrizione.errors }}</td></tr>
-                <tr><th>{{ form.ordine_figlio_da.label_tag }}</th><td>{{ form.ordine_figlio_da }} {{ form.ordine_figlio_da.errors }}</td></tr>
-                <tr><th>{{ form.ordine_figlio_a.label_tag }}</th><td>{{ form.ordine_figlio_a }} {{ form.ordine_figlio_a.errors }}{% if form.ordine_figlio_a.help_text %}<div class="field-help">{{ form.ordine_figlio_a.help_text }}</div>{% endif %}</td></tr>
-                <tr>
-                    <th>{{ form.retta_annuale.label_tag }}</th>
-                    <td>
-                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                            {{ form.retta_annuale }}
-                            <span class="currency-suffix">EUR</span>
-                        </div>
-                        {{ form.retta_annuale.errors }}
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.preiscrizione.label_tag }}</th>
-                    <td>
-                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                            {{ form.preiscrizione }}
-                            <span class="currency-suffix">EUR</span>
-                        </div>
-                        {{ form.preiscrizione.errors }}
-                    </td>
-                </tr>
-                <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="form-actions{% if not popup %} mode-edit-only{% endif %}">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                {% if popup %}
-                    <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
-                {% else %}
-                    <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="btn btn-secondary">Annulla</a>
+                {% if not popup %}
+                    <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
                 {% endif %}
             </div>
         </div>
-        </fieldset>
-    </form>
-    {% if not popup %}
-        <script src="{% static 'js/core/view-mode.js' %}"></script>
-        <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                if (window.ArborisViewMode) {
-                    ArborisViewMode.init({
-                        formId: "tariffa-condizione-detail-form",
-                        lockContainerId: "tariffa-condizione-lock-container",
-                        editButtonId: "enable-edit-tariffa-condizione-btn",
-                        cancelButtonId: "cancel-edit-tariffa-condizione-btn",
-                        startInEditMode: {% if tariffa %}false{% else %}true{% endif %},
-                        reloadOnCancel: true
-                    });
-                }
-            });
-        </script>
-    {% endif %}
+
+        <form method="post" id="tariffa-condizione-detail-form" class="scambio-retta-form detail-form{% if tariffa and not popup %} is-view-mode{% endif %}">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+
+            <fieldset id="tariffa-condizione-lock-container" class="mode-lock-container" {% if tariffa and not popup %}disabled{% endif %}>
+                <section class="scambio-retta-card tariffa-condizione-form-card" aria-labelledby="tariffa-condizione-data-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="tariffa-condizione-data-title">Dati tariffa</h2>
+                            <p>Associa la tariffa a una condizione e definisci gli importi applicati.</p>
+                        </div>
+                    </div>
+
+                    {% if form.non_field_errors %}
+                        <div class="condizione-form-errors">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="scambio-retta-grid tariffa-condizione-form-grid">
+                        <div class="scambio-retta-field is-wide">
+                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.condizione_iscrizione.id_for_label }}">{{ form.condizione_iscrizione.label }}</label>
+                                {{ form.condizione_iscrizione }}
+                                {{ form.condizione_iscrizione.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field tariffa-condizione-number-field">
+                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.ordine_figlio_da.id_for_label }}">{{ form.ordine_figlio_da.label }}</label>
+                                {{ form.ordine_figlio_da }}
+                                {{ form.ordine_figlio_da.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field tariffa-condizione-number-field">
+                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.ordine_figlio_a.id_for_label }}">{{ form.ordine_figlio_a.label }}</label>
+                                {{ form.ordine_figlio_a }}
+                                {% if form.ordine_figlio_a.help_text %}<p class="scambio-retta-help">{{ form.ordine_figlio_a.help_text }}</p>{% endif %}
+                                {{ form.ordine_figlio_a.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field tariffa-condizione-currency-field">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.retta_annuale.id_for_label }}">{{ form.retta_annuale.label }}</label>
+                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                    {{ form.retta_annuale }}
+                                    <span class="currency-suffix">EUR</span>
+                                </div>
+                                {{ form.retta_annuale.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field tariffa-condizione-currency-field">
+                            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.preiscrizione.id_for_label }}">{{ form.preiscrizione.label }}</label>
+                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                    {{ form.preiscrizione }}
+                                    <span class="currency-suffix">EUR</span>
+                                </div>
+                                {{ form.preiscrizione.errors }}
+                            </div>
+                        </div>
+
+                        <label class="scambio-retta-switch-card tariffa-condizione-switch">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                            </span>
+                            <span>
+                                <strong>{{ form.attiva.label }}</strong>
+                                <small>Abilita questa fascia tariffaria nel calcolo delle rette.</small>
+                                {{ form.attiva.errors }}
+                            </span>
+                            <span class="fondo-plan-switch-control">
+                                {{ form.attiva }}
+                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                            </span>
+                        </label>
+
+                        <div class="scambio-retta-field is-wide tariffa-condizione-notes-field">
+                            <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            <div class="scambio-retta-actions mode-edit-only">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_tariffe_condizione_iscrizione' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <script src="{% static 'js/core/view-mode.js' %}"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisViewMode) {
+                ArborisViewMode.init({
+                    formId: "tariffa-condizione-detail-form",
+                    lockContainerId: "tariffa-condizione-lock-container",
+                    editButtonId: "enable-edit-tariffa-condizione-btn",
+                    cancelButtonId: "cancel-edit-tariffa-condizione-btn",
+                    startInEditMode: {% if popup or not tariffa %}true{% else %}false{% endif %},
+                    reloadOnCancel: true
+                });
+            }
+        });
+    </script>
 {% endblock %}

@@ -7,61 +7,227 @@
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
+        <span>Rette Scolastiche</span>
+        <span class="breadcrumb-sep">&gt;</span>
         <span>Scambio retta</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Scambio retta</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'crea_scambio_retta' %}" class="btn btn-primary">Nuovo scambio retta</a>
+    <div class="scambio-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Scambio retta</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ scambio_stats.totale }} {% if scambio_stats.totale == 1 %}scambio{% else %}scambi{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                        Crediti maturati dai familiari e applicabili alle rette scolastiche
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a
+                    href="{% url 'crea_scambio_retta' %}?popup=1"
+                    class="btn btn-primary btn-icon-text btn-add-action"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'crea_scambio_retta' %}?popup=1"
+                    data-popup-window-name="arboris-scambio-retta-popup"
+                    data-popup-window-features="width=980,height=820,resizable=yes,scrollbars=yes"
+                >
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Nuovo scambio retta</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Familiare</th>
-                    <th>Studente</th>
-                    <th>Anno scolastico</th>
-                    <th>Mese</th>
-                    <th>Ore lavorate</th>
-                    <th>Importo maturato</th>
-                    <th>Approvata</th>
-                    <th>Contabilizzata</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for scambio in scambi %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_scambio_retta' scambio.pk %}">
-                        <td>{{ scambio.familiare }}</td>
-                        <td>{{ scambio.studente }}</td>
-                        <td>{{ scambio.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>{{ scambio.mese_riferimento }}</td>
-                        <td>{{ scambio.ore_lavorate }}</td>
-                        <td>{{ scambio.importo_maturato }}</td>
-                        <td>{% if scambio.approvata %}Si{% else %}No{% endif %}</td>
-                        <td>{% if scambio.contabilizzata %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            {% if scambio.approvata and not scambio.contabilizzata %}
-                                <a href="{% url 'contabilizza_scambio_retta' scambio.pk %}" class="table-link">Contabilizza</a>
-                                <span class="table-muted">|</span>
-                            {% endif %}
-                            <a href="{% url 'modifica_scambio_retta' scambio.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_scambio_retta' scambio.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="9"><div class="empty-state">Nessuno scambio retta inserito.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo scambi retta">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Scambi totali</span>
+                    <strong class="scambio-list-kpi-value">{{ scambio_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Registrati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Approvati</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ scambio_stats.approvati }}</strong>
+                    <span class="scambio-list-kpi-note">Pronti per il credito</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Da contabilizzare</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ scambio_stats.da_contabilizzare }}</strong>
+                    <span class="scambio-list-kpi-note">Crediti aperti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Importo maturato</span>
+                    <strong class="scambio-list-kpi-value is-compact">&euro; {{ scambio_stats.importo_totale|floatformat:2 }}</strong>
+                    <span class="scambio-list-kpi-note">{{ scambio_stats.ore_totali|floatformat:2 }} ore totali</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="scambio-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="scambio-list-title">Elenco scambi retta</h2>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-scambio-retta-search placeholder="Cerca scambi..." aria-label="Cerca scambi retta">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table">
+                    <colgroup>
+                        <col class="scambio-list-col-family">
+                        <col class="scambio-list-col-student">
+                        <col class="scambio-list-col-year">
+                        <col class="scambio-list-col-month">
+                        <col class="scambio-list-col-hours">
+                        <col class="scambio-list-col-amount">
+                        <col class="scambio-list-col-status">
+                        <col class="scambio-list-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Familiare</th>
+                            <th>Studente</th>
+                            <th>Anno scolastico</th>
+                            <th>Mese</th>
+                            <th>Ore</th>
+                            <th>Importo</th>
+                            <th>Stato</th>
+                            <th class="scambio-list-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for scambio in scambi %}
+                            <tr
+                                class="list-row-link"
+                                data-row-popup-url="{% url 'modifica_scambio_retta' scambio.pk %}?popup=1"
+                                data-popup-window-name="arboris-scambio-retta-popup"
+                                data-popup-window-features="width=980,height=820,resizable=yes,scrollbars=yes"
+                                data-popup-title="Scambio retta"
+                                data-scambio-row
+                            >
+                                <td class="scambio-list-main-cell">
+                                    <a
+                                        href="{% url 'modifica_scambio_retta' scambio.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_scambio_retta' scambio.pk %}?popup=1"
+                                        data-popup-window-name="arboris-scambio-retta-popup"
+                                        data-popup-window-features="width=980,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ scambio.familiare }}</strong>
+                                            <span>{{ scambio.famiglia }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ scambio.studente }}</td>
+                                <td>{{ scambio.anno_scolastico.nome_anno_scolastico }}</td>
+                                <td>{{ scambio.periodo_riferimento|date:"F Y"|capfirst }}</td>
+                                <td>{{ scambio.ore_lavorate|floatformat:2 }}</td>
+                                <td class="scambio-list-amount">&euro; {{ scambio.importo_maturato|floatformat:2 }}</td>
+                                <td>
+                                    <div class="scambio-list-status-stack">
+                                        {% if scambio.approvata %}
+                                            <span class="scambio-list-status-chip is-success">Approvata</span>
+                                        {% else %}
+                                            <span class="scambio-list-status-chip is-muted">Da approvare</span>
+                                        {% endif %}
+                                        {% if scambio.contabilizzata %}
+                                            <span class="scambio-list-status-chip is-blue">Contabilizzata</span>
+                                        {% elif scambio.approvata %}
+                                            <span class="scambio-list-status-chip is-amber">Credito aperto</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions">
+                                        {% if scambio.approvata and not scambio.contabilizzata %}
+                                            <a href="{% url 'contabilizza_scambio_retta' scambio.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                <span class="btn-label">Contabilizza</span>
+                                            </a>
+                                        {% endif %}
+                                        <a
+                                            href="{% url 'modifica_scambio_retta' scambio.pk %}?popup=1&edit=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_scambio_retta' scambio.pk %}?popup=1&edit=1"
+                                            data-popup-window-name="arboris-scambio-retta-popup"
+                                            data-popup-window-features="width=980,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        <a
+                                            href="{% url 'elimina_scambio_retta' scambio.pk %}?popup=1"
+                                            class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                            title="Elimina"
+                                            aria-label="Elimina scambio retta"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'elimina_scambio_retta' scambio.pk %}?popup=1"
+                                            data-popup-window-name="arboris-scambio-retta-delete-popup"
+                                            data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8"><div class="empty-state">Nessuno scambio retta inserito.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="scambio-list-empty-filter-row" hidden>
+                            <td colspan="8"><div class="empty-state">Nessuno scambio corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-scambio-retta-count>
+                    {{ scambio_stats.totale }} {% if scambio_stats.totale == 1 %}scambio{% else %}scambi{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -70,6 +236,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-scambio-retta-search]");
+            const rows = Array.from(document.querySelectorAll("[data-scambio-row]"));
+            const emptyRow = document.querySelector(".scambio-list-empty-filter-row");
+            const countNode = document.querySelector("[data-scambio-retta-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " scambio" : " scambi");
+            });
         });
     </script>
 {% endblock %}

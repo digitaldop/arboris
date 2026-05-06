@@ -12,77 +12,234 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Utenti</h1>
-        <div class="page-head-actions">
-            {% if can_manage_sistema %}
-                <a href="{% url 'crea_utente' %}" class="btn btn-primary">Nuovo utente</a>
-            {% endif %}
-            <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary">Ruoli</a>
-        </div>
-    </div>
-
-    <div class="admin-section">
-        <div class="admin-section-title">Gestione utenti</div>
-        <div class="panel">
-            <div class="panel-body">
-                {% if utenti %}
-                    <table class="list-table">
-                        <thead>
-                            <tr>
-                                <th>Nome e cognome</th>
-                                <th>Ruolo</th>
-                                <th>Email</th>
-                                <th>Controllo completo</th>
-                                <th>Anagrafica</th>
-                                <th>Famiglie interessate</th>
-                                <th>Economia</th>
-                                <th>Gestione finanziaria</th>
-                                <th>Sistema</th>
-                                <th>Calendario</th>
-                                <th>Stato</th>
-                                {% if can_manage_sistema %}
-                                    <th>Azioni</th>
-                                {% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for utente in utenti %}
-                                <tr{% if can_manage_sistema and utente.gestibile_da_request %} class="list-row-link" data-row-href="{% url 'modifica_utente' utente.pk %}"{% endif %}>
-                                    <td>{{ utente.get_full_name|default:utente.username }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.ruolo_display|default:"-" }}</td>
-                                    <td>{{ utente.email|default:"-" }}</td>
-                                    <td>{% if utente.profilo_permessi_safe.controllo_completo_effettivo %}Si{% else %}No{% endif %}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_anagrafica_effettivo_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_famiglie_interessate_effettivo_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_economia_effettivo_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_gestione_finanziaria_effettivo_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_sistema_effettivo_display }}</td>
-                                    <td>{{ utente.profilo_permessi_safe.permesso_calendario_effettivo_display }}</td>
-                                    <td>{% if utente.is_active %}Attivo{% else %}Disattivo{% endif %}</td>
-                                    {% if can_manage_sistema %}
-                                        <td class="actions-cell">
-                                            {% if utente.gestibile_da_request %}
-                                                <a href="{% url 'modifica_utente' utente.pk %}" class="table-link">Modifica</a>
-                                                {% if utente.pk != request.user.pk %}
-                                                    <span class="table-action-separator">|</span>
-                                                    <a href="{% url 'elimina_utente' utente.pk %}" class="table-link table-link-danger">Elimina</a>
-                                                {% endif %}
-                                            {% else %}
-                                                <span class="table-muted">Protetto</span>
-                                            {% endif %}
-                                        </td>
-                                    {% endif %}
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <div class="empty-state">Ancora nessun utente inserito.</div>
+    <div class="system-users-shell">
+        <div class="page-head family-page-head anagrafica-list-head system-users-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon system-users-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Utenti</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ utenti_stats.totale }} {% if utenti_stats.totale == 1 %}account{% else %}account{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        Account, ruoli e permessi di accesso al sistema
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <span class="btn-label">Ruoli</span>
+                </a>
+                {% if can_manage_sistema %}
+                    <a
+                        href="{% url 'crea_utente' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_utente' %}?popup=1"
+                        data-popup-window-name="arboris-utente-popup"
+                        data-popup-window-features="width=1040,height=800,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuovo utente</span>
+                    </a>
                 {% endif %}
             </div>
         </div>
+
+        <section class="system-users-summary-grid" aria-label="Riepilogo utenti">
+            <article class="system-user-kpi-card">
+                <div class="system-user-kpi-copy">
+                    <span class="system-user-kpi-label">Account totali</span>
+                    <strong class="system-user-kpi-value">{{ utenti_stats.totale }}</strong>
+                    <span class="system-user-kpi-note">Utenti registrati</span>
+                </div>
+                <span class="system-user-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                </span>
+            </article>
+            <article class="system-user-kpi-card">
+                <div class="system-user-kpi-copy">
+                    <span class="system-user-kpi-label">Account attivi</span>
+                    <strong class="system-user-kpi-value is-green">{{ utenti_stats.attivi }}</strong>
+                    <span class="system-user-kpi-note">Possono accedere</span>
+                </div>
+                <span class="system-user-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="system-user-kpi-card">
+                <div class="system-user-kpi-copy">
+                    <span class="system-user-kpi-label">Ruoli usati</span>
+                    <strong class="system-user-kpi-value is-amber">{{ utenti_stats.ruoli_assegnati }}</strong>
+                    <span class="system-user-kpi-note">Profili assegnati</span>
+                </div>
+                <span class="system-user-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+            </article>
+            <article class="system-user-kpi-card">
+                <div class="system-user-kpi-copy">
+                    <span class="system-user-kpi-label">Controllo completo</span>
+                    <strong class="system-user-kpi-value is-purple">{{ utenti_stats.controllo_completo }}</strong>
+                    <span class="system-user-kpi-note">Account amministrativi</span>
+                </div>
+                <span class="system-user-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="system-user-list-card" aria-labelledby="system-users-list-title">
+            <div class="system-user-list-card-head">
+                <div>
+                    <h2 id="system-users-list-title">Gestione utenti</h2>
+                    <p>Gli account ereditano i permessi dal ruolo selezionato.</p>
+                </div>
+            </div>
+
+            <div class="system-user-table-wrap">
+                <table class="list-table anagrafica-list-table system-users-table">
+                    <colgroup>
+                        <col class="system-users-col-user">
+                        <col class="system-users-col-role">
+                        <col class="system-users-col-permissions">
+                        <col class="system-users-col-status">
+                        {% if can_manage_sistema %}<col class="system-users-col-actions">{% endif %}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Utente</th>
+                            <th>Ruolo</th>
+                            <th>Permessi principali</th>
+                            <th>Stato</th>
+                            {% if can_manage_sistema %}
+                                <th class="actions-head">Azioni</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for utente in utenti %}
+                            <tr
+                                {% if can_manage_sistema and utente.gestibile_da_request %}
+                                    class="list-row-link"
+                                    data-row-popup-url="{% url 'modifica_utente' utente.pk %}?popup=1"
+                                    data-popup-window-name="arboris-utente-popup"
+                                    data-popup-window-features="width=1040,height=800,resizable=yes,scrollbars=yes"
+                                {% endif %}
+                            >
+                                <td class="system-user-main-cell">
+                                    {% if can_manage_sistema and utente.gestibile_da_request %}
+                                        <a
+                                            href="{% url 'modifica_utente' utente.pk %}?popup=1"
+                                            class="system-user-main-link"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_utente' utente.pk %}?popup=1"
+                                            data-popup-window-name="arboris-utente-popup"
+                                            data-popup-window-features="width=1040,height=800,resizable=yes,scrollbars=yes"
+                                        >
+                                    {% else %}
+                                        <span class="system-user-main-link">
+                                    {% endif %}
+                                        <span class="system-user-avatar" aria-hidden="true">
+                                            {% if utente.first_name %}{{ utente.first_name|first }}{% elif utente.email %}{{ utente.email|first }}{% else %}U{% endif %}{% if utente.last_name %}{{ utente.last_name|first }}{% endif %}
+                                        </span>
+                                        <span class="system-user-main-copy">
+                                            <strong>{{ utente.get_full_name|default:utente.username }}</strong>
+                                            <span>{{ utente.email|default:"-" }}</span>
+                                        </span>
+                                    {% if can_manage_sistema and utente.gestibile_da_request %}
+                                        </a>
+                                    {% else %}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="system-user-role-chip">{{ utente.profilo_permessi_safe.ruolo_display|default:"-" }}</span>
+                                    {% if utente.is_superuser %}
+                                        <span class="system-user-chip is-red">Superuser</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="system-user-permission-stack">
+                                        <span><strong>Anagrafica</strong> {{ utente.profilo_permessi_safe.permesso_anagrafica_effettivo_display }}</span>
+                                        <span><strong>Famiglie interessate</strong> {{ utente.profilo_permessi_safe.permesso_famiglie_interessate_effettivo_display }}</span>
+                                        <span><strong>Rette scolastiche</strong> {{ utente.profilo_permessi_safe.permesso_economia_effettivo_display }}</span>
+                                        <span><strong>Gestione finanziaria</strong> {{ utente.profilo_permessi_safe.permesso_gestione_finanziaria_effettivo_display }}</span>
+                                        <span><strong>Sistema</strong> {{ utente.profilo_permessi_safe.permesso_sistema_effettivo_display }}</span>
+                                        <span><strong>Calendario</strong> {{ utente.profilo_permessi_safe.permesso_calendario_effettivo_display }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="system-user-status-pill{% if not utente.is_active %} is-off{% endif %}">
+                                        <span aria-hidden="true"></span>
+                                        {% if utente.is_active %}Attivo{% else %}Disattivo{% endif %}
+                                    </span>
+                                </td>
+                                {% if can_manage_sistema %}
+                                    <td class="actions-cell">
+                                        {% if utente.gestibile_da_request %}
+                                            <div class="table-icon-actions system-user-actions">
+                                                <a
+                                                    href="{% url 'modifica_utente' utente.pk %}?popup=1"
+                                                    class="table-icon-link table-icon-link-edit"
+                                                    title="Modifica"
+                                                    aria-label="Modifica utente"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'modifica_utente' utente.pk %}?popup=1"
+                                                    data-popup-window-name="arboris-utente-popup"
+                                                    data-popup-window-features="width=1040,height=800,resizable=yes,scrollbars=yes"
+                                                >
+                                                    <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                                </a>
+                                                {% if utente.eliminabile_da_request %}
+                                                    <a
+                                                        href="{% url 'elimina_utente' utente.pk %}?popup=1"
+                                                        class="table-icon-link table-icon-link-danger"
+                                                        title="Elimina"
+                                                        aria-label="Elimina utente"
+                                                        data-window-popup="1"
+                                                        data-popup-url="{% url 'elimina_utente' utente.pk %}?popup=1"
+                                                        data-popup-window-name="arboris-utente-delete-popup"
+                                                        data-popup-window-features="width=720,height=540,resizable=yes,scrollbars=yes"
+                                                    >
+                                                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="table-muted">Protetto</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="{% if can_manage_sistema %}5{% else %}4{% endif %}">
+                                    <div class="empty-state">Ancora nessun utente inserito.</div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                window.ArborisListRowLinks.init(document);
+            }
+        });
+    </script>
 {% endblock %}

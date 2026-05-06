@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Servizi extra - Arboris{% endblock %}
 
@@ -12,68 +12,245 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Servizi extra</h1>
-        <div class="page-head-actions">
-            {% if can_manage_servizi_extra %}
-                <a href="{% url 'crea_servizio_extra' %}" class="btn btn-primary">Nuovo servizio</a>
-            {% endif %}
+    <div class="scambio-list-shell servizi-extra-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Servizi extra</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ servizi_stats.totale }} {% if servizi_stats.totale == 1 %}servizio{% else %}servizi{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        Gestione servizi, tariffe, iscrizioni e rate dei servizi extra
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                    <span class="btn-label">Tariffe</span>
+                </a>
+                <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                    <span class="btn-label">Iscrizioni</span>
+                </a>
+                <a href="{% url 'lista_rate_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                    <span class="btn-label">Rate</span>
+                </a>
+                {% if can_manage_servizi_extra %}
+                    <a
+                        href="{% url 'crea_servizio_extra' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_servizio_extra' %}?popup=1"
+                        data-popup-window-name="arboris-servizio-extra-popup"
+                        data-popup-window-features="width=980,height=760,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuovo servizio</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Servizio</th>
-                    <th>Anno scolastico</th>
-                    <th>Tariffe</th>
-                    <th>Iscrizioni</th>
-                    <th>Attivo</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for servizio in servizi %}
-                    <tr class="list-row-link" data-row-href="{% url 'dettaglio_servizio_extra' servizio.pk %}">
-                        <td>{{ servizio.nome_servizio }}</td>
-                        <td>{{ servizio.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>{{ servizio.count_tariffe }}</td>
-                        <td>{{ servizio.count_iscrizioni }}</td>
-                        <td>{% if servizio.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'dettaglio_servizio_extra' servizio.pk %}" class="table-link">Apri</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'lista_tariffe_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Tariffe</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'lista_iscrizioni_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Iscrizioni</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'lista_rate_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-link">Rate</a>
-                            {% if can_manage_servizi_extra %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'modifica_servizio_extra' servizio.pk %}" class="table-link">Modifica</a>
-                            {% endif %}
-                            {% if can_manage_servizi_extra %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_servizio_extra' servizio.pk %}" class="table-link table-link-danger">Elimina</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6"><div class="empty-state">Nessun servizio extra configurato.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo servizi extra">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Servizi totali</span>
+                    <strong class="scambio-list-kpi-value">{{ servizi_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Configurati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Servizi attivi</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ servizi_stats.attivi }}</strong>
+                    <span class="scambio-list-kpi-note">Influiscono sul sistema</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Tariffe collegate</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ servizi_stats.tariffe }}</strong>
+                    <span class="scambio-list-kpi-note">{{ servizi_stats.tariffe_attive }} attive</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Iscrizioni</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ servizi_stats.iscrizioni }}</strong>
+                    <span class="scambio-list-kpi-note">{{ servizi_stats.iscrizioni_attive }} attive</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="servizi-extra-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="servizi-extra-list-title">Elenco servizi</h2>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-servizi-extra-search placeholder="Cerca servizi..." aria-label="Cerca servizi extra">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table servizi-extra-list-table">
+                    <colgroup>
+                        <col class="servizi-extra-col-name">
+                        <col class="servizi-extra-col-year">
+                        <col class="servizi-extra-col-tariffs">
+                        <col class="servizi-extra-col-subscriptions">
+                        <col class="servizi-extra-col-active">
+                        <col class="servizi-extra-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Servizio</th>
+                            <th>Anno scolastico</th>
+                            <th>Tariffe</th>
+                            <th>Iscrizioni</th>
+                            <th>Attivo</th>
+                            <th class="scambio-list-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for servizio in servizi %}
+                            <tr class="list-row-link" data-row-href="{% url 'dettaglio_servizio_extra' servizio.pk %}" data-servizio-extra-row>
+                                <td class="scambio-list-main-cell">
+                                    <a href="{% url 'dettaglio_servizio_extra' servizio.pk %}" class="scambio-list-main-link">
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ servizio.nome_servizio }}</strong>
+                                            <span>{{ servizio.descrizione|default:"Servizio extra"|striptags|truncatechars:74 }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-blue">{{ servizio.anno_scolastico.nome_anno_scolastico }}</span>
+                                </td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-amber">{{ servizio.count_tariffe }} tariffe</span>
+                                </td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-purple">{{ servizio.count_iscrizioni }} iscrizioni</span>
+                                </td>
+                                <td>{% active_toggle servizio %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions servizi-extra-list-actions">
+                                        <a href="{% url 'dettaglio_servizio_extra' servizio.pk %}" class="table-icon-link" title="Apri scheda" aria-label="Apri servizio {{ servizio.nome_servizio }}">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg>
+                                        </a>
+                                        <a href="{% url 'lista_tariffe_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-icon-link" title="Tariffe" aria-label="Tariffe di {{ servizio.nome_servizio }}">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                        </a>
+                                        <a href="{% url 'lista_iscrizioni_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-icon-link" title="Iscrizioni" aria-label="Iscrizioni di {{ servizio.nome_servizio }}">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                                        </a>
+                                        <a href="{% url 'lista_rate_servizi_extra' %}?servizio={{ servizio.pk }}" class="table-icon-link" title="Rate" aria-label="Rate di {{ servizio.nome_servizio }}">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                        </a>
+                                        {% if can_manage_servizi_extra %}
+                                            <a
+                                                href="{% url 'modifica_servizio_extra' servizio.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-edit"
+                                                title="Modifica"
+                                                aria-label="Modifica servizio {{ servizio.nome_servizio }}"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_servizio_extra' servizio.pk %}?popup=1"
+                                                data-popup-window-name="arboris-servizio-extra-popup"
+                                                data-popup-window-features="width=980,height=760,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                            </a>
+                                            <a
+                                                href="{% url 'elimina_servizio_extra' servizio.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger"
+                                                title="Elimina"
+                                                aria-label="Elimina servizio {{ servizio.nome_servizio }}"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_servizio_extra' servizio.pk %}?popup=1"
+                                                data-popup-window-name="arboris-servizio-extra-delete-popup"
+                                                data-popup-window-features="width=720,height=540,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6"><div class="empty-state">Nessun servizio extra configurato.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="servizi-extra-empty-filter-row" hidden>
+                            <td colspan="6"><div class="empty-state">Nessun servizio corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-servizi-extra-count>
+                    {{ servizi_stats.totale }} {% if servizi_stats.totale == 1 %}servizio{% else %}servizi{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {
-                ArborisListRowLinks.init();
+                window.ArborisListRowLinks.init(document);
             }
+
+            const searchInput = document.querySelector("[data-servizi-extra-search]");
+            const rows = Array.from(document.querySelectorAll("[data-servizio-extra-row]"));
+            const emptyRow = document.querySelector(".servizi-extra-empty-filter-row");
+            const countNode = document.querySelector("[data-servizi-extra-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " servizio" : " servizi");
+            });
         });
     </script>
 {% endblock %}

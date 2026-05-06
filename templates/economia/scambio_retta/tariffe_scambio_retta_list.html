@@ -7,45 +7,215 @@
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
+        <span>Rette Scolastiche</span>
+        <span class="breadcrumb-sep">&gt;</span>
         <span>Tariffe scambio retta</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Tariffe scambio retta</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'crea_tariffa_scambio_retta' %}" class="btn btn-primary">Nuova tariffa</a>
+    <div class="scambio-list-shell tariffe-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Tariffe scambio retta</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ tariffe_stats.totale }} {% if tariffe_stats.totale == 1 %}tariffa{% else %}tariffe{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
+                        Valori orari usati per calcolare i crediti dello scambio retta
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a
+                    href="{% url 'crea_tariffa_scambio_retta' %}?popup=1"
+                    class="btn btn-primary btn-icon-text btn-add-action"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'crea_tariffa_scambio_retta' %}?popup=1"
+                    data-popup-window-name="arboris-tariffa-scambio-retta-popup"
+                    data-popup-window-features="width=820,height=660,resizable=yes,scrollbars=yes"
+                >
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Nuova tariffa</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Valore orario</th>
-                    <th>Definizione</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for tariffa in tariffe %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}">
-                        <td>{{ tariffa.valore_orario }}</td>
-                        <td>{{ tariffa.definizione|default:"-" }}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="3"><div class="empty-state">Nessuna tariffa scambio retta inserita.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo tariffe scambio retta">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Tariffe totali</span>
+                    <strong class="scambio-list-kpi-value">{{ tariffe_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Configurate</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Valore minimo</span>
+                    <strong class="scambio-list-kpi-value is-green">&euro; {{ tariffe_stats.valore_min|floatformat:2 }}</strong>
+                    <span class="scambio-list-kpi-note">Orario</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Valore massimo</span>
+                    <strong class="scambio-list-kpi-value is-amber">&euro; {{ tariffe_stats.valore_max|floatformat:2 }}</strong>
+                    <span class="scambio-list-kpi-note">Orario</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Utilizzi collegati</span>
+                    <strong class="scambio-list-kpi-value is-compact">{{ tariffe_stats.scambi_collegati|add:tariffe_stats.prestazioni_collegate }}</strong>
+                    <span class="scambio-list-kpi-note">Scambi e prestazioni</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="tariffe-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="tariffe-list-title">Elenco tariffe</h2>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-tariffe-scambio-search placeholder="Cerca tariffe..." aria-label="Cerca tariffe scambio retta">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table tariffe-list-table">
+                    <colgroup>
+                        <col class="tariffe-list-col-value">
+                        <col class="tariffe-list-col-definition">
+                        <col class="tariffe-list-col-usage">
+                        <col class="tariffe-list-col-notes">
+                        <col class="tariffe-list-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Valore orario</th>
+                            <th>Definizione</th>
+                            <th>Utilizzi</th>
+                            <th>Note</th>
+                            <th class="scambio-list-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tariffa in tariffe %}
+                            <tr
+                                class="list-row-link"
+                                data-row-popup-url="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                data-popup-window-name="arboris-tariffa-scambio-retta-popup"
+                                data-popup-window-features="width=820,height=660,resizable=yes,scrollbars=yes"
+                                data-popup-title="Tariffa scambio retta"
+                                data-tariffa-row
+                            >
+                                <td class="scambio-list-main-cell tariffe-list-value-cell">
+                                    <a
+                                        href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                        data-popup-window-name="arboris-tariffa-scambio-retta-popup"
+                                        data-popup-window-features="width=820,height=660,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>&euro; {{ tariffa.valore_orario|floatformat:2 }}</strong>
+                                            <span>Valore orario</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if tariffa.definizione %}
+                                        <strong class="tariffe-list-definition">{{ tariffa.definizione }}</strong>
+                                    {% else %}
+                                        <span class="table-muted">Tariffa senza definizione</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-blue">
+                                        {{ tariffa.scambi_count|add:tariffa.prestazioni_count }} utilizzi
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if tariffa.note %}
+                                        {{ tariffa.note|striptags|truncatechars:90 }}
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions">
+                                        <a
+                                            href="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                            data-popup-window-name="arboris-tariffa-scambio-retta-popup"
+                                            data-popup-window-features="width=820,height=660,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        <a
+                                            href="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                            class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                            title="Elimina"
+                                            aria-label="Elimina tariffa scambio retta"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}?popup=1"
+                                            data-popup-window-name="arboris-tariffa-scambio-retta-delete-popup"
+                                            data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5"><div class="empty-state">Nessuna tariffa scambio retta inserita.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="tariffe-list-empty-filter-row" hidden>
+                            <td colspan="5"><div class="empty-state">Nessuna tariffa corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-tariffe-scambio-count>
+                    {{ tariffe_stats.totale }} {% if tariffe_stats.totale == 1 %}tariffa{% else %}tariffe{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -54,6 +224,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-tariffe-scambio-search]");
+            const rows = Array.from(document.querySelectorAll("[data-tariffa-row]"));
+            const emptyRow = document.querySelector(".tariffe-list-empty-filter-row");
+            const countNode = document.querySelector("[data-tariffe-scambio-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " tariffa" : " tariffe");
+            });
         });
     </script>
 {% endblock %}

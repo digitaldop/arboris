@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load active_toggles %}
 
 {% block title %}Parametri calcolo stipendi - Dipendenti e collaboratori{% endblock %}
 
@@ -47,7 +48,7 @@
                         <td>{{ parametro.aliquota_contributi_dipendente }}%</td>
                         <td>{{ parametro.aliquota_tfr }}%</td>
                         <td>{{ parametro.aliquota_inail }}%</td>
-                        <td>{% if parametro.attivo %}Attivo{% else %}Non attivo{% endif %}</td>
+                        <td>{% active_toggle parametro %}</td>
                     </tr>
                 {% empty %}
                     <tr>

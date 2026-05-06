@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load currency active_toggles %}
 
 {% block title %}{{ servizio.nome_servizio }} - Arboris{% endblock %}
 
@@ -286,11 +286,7 @@
                     <div class="dashboard-stat-label">Tariffa</div>
                     <div class="dashboard-stat-value is-text">{{ tariffa.nome_tariffa }}</div>
                     <div class="dashboard-stat-note">
-                        <span class="servizio-extra-card-status {% if tariffa.attiva %}is-attiva{% else %}is-inattiva{% endif %}">
-                            <span class="servizio-extra-card-status-label">
-                                {% if tariffa.attiva %}Attiva{% else %}Inattiva{% endif %}
-                            </span>
-                        </span>
+                        {% active_toggle tariffa compact=True %}
                     </div>
                     <div class="servizio-extra-tariffa-meta">
                         <div><strong>Totale:</strong> EUR {{ tariffa.totale_importo|euro }}</div>

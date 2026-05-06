@@ -1,3 +1,4 @@
+{% load active_toggles %}
 {% for nodo in nodi %}
     {% with categoria=nodo.categoria %}
         <tr class="list-row-link report-category-row report-category-{{ nodo.row_tone }}{% if parent_id %} report-category-child is-hidden{% endif %}{% if not categoria.attiva %} categoria-row-inactive{% endif %}"
@@ -42,11 +43,7 @@
             </td>
             <td>{{ categoria.ordine|default:"-" }}</td>
             <td>
-                {% if categoria.attiva %}
-                    <span class="category-tree-status is-active">Attiva</span>
-                {% else %}
-                    <span class="category-tree-status is-inactive">Non attiva</span>
-                {% endif %}
+                {% active_toggle categoria %}
             </td>
             <td class="actions-cell">
                 <a href="{% url 'modifica_categoria_finanziaria' categoria.pk %}" class="table-link">Modifica</a>
@@ -55,7 +52,7 @@
             </td>
         </tr>
         {% if nodo.figli %}
-            {% include "gestione_finanziaria/includes/categorie_tree_rows.html" with nodi=nodo.figli parent_id=nodo.row_id only %}
+            {% include "gestione_finanziaria/includes/categorie_tree_rows.html" with nodi=nodo.figli parent_id=nodo.row_id %}
         {% endif %}
     {% endwith %}
 {% endfor %}

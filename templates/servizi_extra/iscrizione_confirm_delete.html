@@ -1,64 +1,111 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}Elimina iscrizione servizio extra - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_iscrizioni_servizi_extra' %}">Iscrizioni</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina {{ iscrizione }}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_iscrizioni_servizi_extra' %}">Iscrizioni</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina {{ iscrizione }}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina iscrizione servizio extra</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}" class="btn btn-secondary">Torna all'iscrizione</a>
-        </div>
-    </div>
-
-    <div class="content-card">
-        <div class="settings-warning-box" style="margin-bottom: 18px;">
-            Stai per eliminare l'iscrizione di <strong>{{ iscrizione.studente }}</strong> al servizio
-            <strong>{{ iscrizione.servizio.nome_servizio }}</strong>.
-        </div>
-
-        {% if count_rate %}
-            <div class="help-text" style="margin-bottom: 18px;">
-                Questa iscrizione ha <strong>{{ count_rate }}</strong> rate collegate. Per continuare devi confermare anche la loro eliminazione.
+    <div class="scambio-retta-form-shell servizi-extra-iscrizione-form-shell servizi-extra-iscrizione-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon servizio-extra-delete-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Servizi extra</p>
+                <h1 class="page-title">Elimina iscrizione</h1>
+                <p>Questa operazione rimuove l'iscrizione e, se confermato, le rate collegate.</p>
             </div>
-        {% endif %}
+        </div>
 
-        <form method="post">
-            {% csrf_token %}
+        <section class="scambio-retta-card tariffa-scambio-delete-card">
+            <div class="scambio-retta-card-head">
+                <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2>Conferma eliminazione</h2>
+                    <p>Stai per eliminare l'iscrizione di <strong>{{ iscrizione.studente }}</strong> al servizio <strong>{{ iscrizione.servizio.nome_servizio }}</strong>.</p>
+                </div>
+            </div>
+
+            <div class="servizio-extra-delete-details servizi-extra-iscrizione-delete-details">
+                <article>
+                    <span>Studente</span>
+                    <strong>{{ iscrizione.studente }}</strong>
+                </article>
+                <article>
+                    <span>Servizio</span>
+                    <strong>{{ iscrizione.servizio.nome_servizio }}</strong>
+                </article>
+                <article>
+                    <span>Tariffa</span>
+                    <strong>{{ iscrizione.tariffa.nome_tariffa }}</strong>
+                </article>
+                <article>
+                    <span>Rate collegate</span>
+                    <strong>{{ count_rate }}</strong>
+                </article>
+            </div>
 
             {% if count_rate %}
-                <table class="form-table">
-                    <tr>
-                        <th>Conferma rate</th>
-                        <td>
-                            <label><input type="checkbox" name="confirm_delete_rates" value="1"> Confermo l'eliminazione di tutte le rate collegate</label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Testo di conferma</th>
-                        <td>
-                            <input type="text" name="confirm_delete_text" placeholder="Digita ELIMINA">
-                        </td>
-                    </tr>
-                </table>
+                <div class="servizi-extra-iscrizione-delete-confirm">
+                    <label class="scambio-retta-switch-card servizi-extra-iscrizione-delete-check">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                        </span>
+                        <span>
+                            <strong>Conferma rate</strong>
+                            <small>Confermo l'eliminazione di tutte le rate collegate.</small>
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            <input type="checkbox" name="confirm_delete_rates" value="1" form="iscrizione-delete-form">
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div>
+                            <label for="id_confirm_delete_text">Testo di conferma</label>
+                            <input id="id_confirm_delete_text" type="text" name="confirm_delete_text" placeholder="Digita ELIMINA" form="iscrizione-delete-form">
+                        </div>
+                    </div>
+                </div>
             {% endif %}
+        </section>
 
-            <div class="form-actions" style="margin-top: 18px;">
-                <button type="submit" class="btn btn-danger">Elimina iscrizione</button>
-                <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione.pk %}" class="btn btn-secondary">Annulla</a>
-            </div>
+        <form method="post" id="iscrizione-delete-form" class="scambio-retta-actions servizio-extra-delete-actions">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <button type="submit" class="btn btn-danger btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Elimina</span>
+            </button>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            {% else %}
+                <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            {% endif %}
         </form>
     </div>
 {% endblock %}
-

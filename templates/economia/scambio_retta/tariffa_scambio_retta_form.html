@@ -1,57 +1,133 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
 {% block title %}{% if tariffa %}Tariffa scambio retta{% else %}Nuova tariffa scambio retta{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_tariffe_scambio_retta' %}">Tariffe scambio retta</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if tariffa %}{{ tariffa }}{% else %}Nuova{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_tariffe_scambio_retta' %}">Tariffe scambio retta</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if tariffa %}{{ tariffa }}{% else %}Nuova{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if tariffa %}Tariffa scambio retta{% else %}Nuova tariffa scambio retta{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if tariffa %}
-                <button type="button" class="btn btn-primary" id="enable-edit-tariffa-scambio-btn">Modifica</button>
-                <a href="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}" class="btn btn-danger">Elimina</a>
-                <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-tariffa-scambio-btn">Annulla modifiche</button>
-            {% endif %}
-            <a href="{% url 'lista_tariffe_scambio_retta' %}" class="btn btn-secondary">Torna all'elenco</a>
-        </div>
-    </div>
-
-    <form method="post" id="tariffa-scambio-detail-form" class="detail-form{% if tariffa %} is-view-mode{% endif %}">
-        {% csrf_token %}
-        <fieldset id="tariffa-scambio-lock-container" class="mode-lock-container" {% if tariffa %}disabled{% endif %}>
-        <div class="content-card">
-            <table class="form-table">
-                <tr>
-                    <th>{{ form.valore_orario.label_tag }}</th>
-                    <td>
-                        <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
-                            {{ form.valore_orario }}
-                            <span class="currency-suffix">EUR</span>
-                        </div>
-                        <div class="help-text">{{ form.valore_orario.help_text }}</div>
-                        {{ form.valore_orario.errors }}
-                    </td>
-                </tr>
-                <tr><th>{{ form.definizione.label_tag }}</th><td>{{ form.definizione }} {{ form.definizione.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="form-actions mode-edit-only">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <a href="{% url 'lista_tariffe_scambio_retta' %}" class="btn btn-secondary">Annulla</a>
+    <div class="scambio-retta-form-shell tariffa-scambio-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Scambio retta</p>
+                <h1 class="page-title">{% if tariffa %}Tariffa scambio retta{% else %}Nuova tariffa scambio retta{% endif %}</h1>
+                <p>Definisci il valore orario usato per calcolare i crediti delle rette scolastiche.</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if tariffa and not popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-intent-edit" id="enable-edit-tariffa-scambio-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                        <span class="btn-label">Modifica</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-icon-text is-hidden" id="cancel-edit-tariffa-scambio-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla modifiche</span>
+                    </button>
+                    <a href="{% url 'elimina_tariffa_scambio_retta' tariffa.pk %}" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+                {% if not popup %}
+                    <a href="{% url 'lista_tariffe_scambio_retta' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                {% endif %}
             </div>
         </div>
-        </fieldset>
-    </form>
+
+        <form method="post" id="tariffa-scambio-detail-form" class="scambio-retta-form detail-form{% if tariffa and not popup %} is-view-mode{% endif %}">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+
+            <fieldset id="tariffa-scambio-lock-container" class="mode-lock-container" {% if tariffa and not popup %}disabled{% endif %}>
+                <section class="scambio-retta-card tariffa-scambio-card" aria-labelledby="tariffa-scambio-data-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="tariffa-scambio-data-title">Dati tariffa</h2>
+                            <p>Imposta valore, descrizione e note operative della tariffa.</p>
+                        </div>
+                    </div>
+
+                    <div class="tariffa-scambio-form-grid">
+                        <div class="scambio-retta-field tariffa-scambio-value-field">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.valore_orario.id_for_label }}">{{ form.valore_orario.label }}</label>
+                                <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
+                                    {{ form.valore_orario }}
+                                    <span class="currency-suffix">EUR</span>
+                                </div>
+                                {% if form.valore_orario.help_text %}<p class="scambio-retta-help">{{ form.valore_orario.help_text }}</p>{% endif %}
+                                {{ form.valore_orario.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field tariffa-scambio-definition-field">
+                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.definizione.id_for_label }}">{{ form.definizione.label }}</label>
+                                {{ form.definizione }}
+                                {{ form.definizione.errors }}
+                            </div>
+                        </div>
+
+                        <div class="scambio-retta-field is-wide tariffa-scambio-notes-field">
+                            <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {{ form.note.errors }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </fieldset>
+
+            <div class="scambio-retta-actions mode-edit-only">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_tariffe_scambio_retta' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
     <script src="{% static 'js/core/view-mode.js' %}"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -61,7 +137,7 @@
                     lockContainerId: "tariffa-scambio-lock-container",
                     editButtonId: "enable-edit-tariffa-scambio-btn",
                     cancelButtonId: "cancel-edit-tariffa-scambio-btn",
-                    startInEditMode: {% if tariffa %}false{% else %}true{% endif %},
+                    startInEditMode: {% if popup or not tariffa %}true{% else %}false{% endif %},
                     reloadOnCancel: true
                 });
             }

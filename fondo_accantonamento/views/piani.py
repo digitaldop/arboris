@@ -6,6 +6,8 @@ from django.db.models import F
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from scuola.utils import resolve_default_anno_scolastico
+
 from ..forms import PianoAccantonamentoForm, PrelievoFondoForm, VersamentoFondoForm
 from ..models import (
     MovimentoFondo,
@@ -17,8 +19,16 @@ from ..models import (
 from ..services import genera_scadenze_periodiche, soddisfa_scadenza_con_versamento
 
 
+def _is_popup_request(request) -> bool:
+    return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
+def _popup_close(request, message: str):
+    return render(request, "popup/popup_close.html", {"message": message})
+
+
 def lista_piani(request):
-    piani = (
+    piani_qs = (
         PianoAccantonamento.objects.select_related("anno_scolastico")
         .all()
         .order_by(
@@ -27,10 +37,27 @@ def lista_piani(request):
             "nome",
         )
     )
+    piani = list(piani_qs)
+    depositi = {
+        (
+            piano.tipo_deposito,
+            (piano.descrizione_deposito or "").strip().lower(),
+        )
+        for piano in piani
+        if piano.tipo_deposito or piano.descrizione_deposito
+    }
     return render(
         request,
         "fondo_accantonamento/piani_list.html",
-        {"piani": piani},
+        {
+            "piani": piani,
+            "totale_piani": len(piani),
+            "piani_attivi": sum(1 for piano in piani if piano.attivo),
+            "depositi_count": len(depositi),
+            "anno_scolastico_corrente": resolve_default_anno_scolastico(
+                today=timezone.localdate()
+            ),
+        },
     )
 
 
@@ -39,7 +66,7 @@ def dettaglio_piano(request, pk: int):
         PianoAccantonamento.objects.select_related("anno_scolastico"),
         pk=pk,
     )
-    movimenti = (
+    movimenti = list(
         piano.movimenti.select_related(
             "rata_iscrizione",
             "rata_iscrizione__iscrizione",
@@ -49,14 +76,20 @@ def dettaglio_piano(request, pk: int):
         .all()
         .order_by("-data", "-id")[:200]
     )
-    scadenze = piano.scadenze.all().order_by("data_scadenza")[:500]
+    scadenze = list(piano.scadenze.all().order_by("data_scadenza")[:500])
+    totale_versamenti = piano.totale_versamenti()
+    totale_uscite = piano.totale_uscite()
     return render(
         request,
         "fondo_accantonamento/piano_dettaglio.html",
         {
             "piano": piano,
             "movimenti": movimenti,
+            "movimenti_count": len(movimenti),
             "scadenze": scadenze,
+            "totale_versamenti": totale_versamenti,
+            "totale_uscite": totale_uscite,
+            "saldo_disponibile": totale_versamenti - totale_uscite,
             "mostra_sezione_scadenze": piano.modalita
             in (TipoModalitaPiano.VERSAMENTI_PERIODICI, TipoModalitaPiano.MISTO),
         },
@@ -123,6 +156,7 @@ def elimina_piano(request, pk: int):
 @transaction.atomic
 def aggiungi_versamento(request, piano_pk: int):
     piano = get_object_or_404(PianoAccantonamento, pk=piano_pk)
+    popup = _is_popup_request(request)
     if request.method == "POST":
         form = VersamentoFondoForm(request.POST)
         if form.is_valid():
@@ -131,6 +165,8 @@ def aggiungi_versamento(request, piano_pk: int):
             m.tipo = TipoMovimentoFondo.VERSAMENTO
             m.save()
             messages.success(request, "Versamento registrato.")
+            if popup:
+                return _popup_close(request, "Versamento registrato.")
             return redirect("fondo_piano_dettaglio", pk=piano.pk)
     else:
         form = VersamentoFondoForm()
@@ -142,6 +178,7 @@ def aggiungi_versamento(request, piano_pk: int):
             "piano": piano,
             "titolo": "Registra versamento",
             "tipo_label": "Versamento",
+            "popup": popup,
         },
     )
 
@@ -149,6 +186,7 @@ def aggiungi_versamento(request, piano_pk: int):
 @transaction.atomic
 def aggiungi_prelievo(request, piano_pk: int):
     piano = get_object_or_404(PianoAccantonamento, pk=piano_pk)
+    popup = _is_popup_request(request)
     if request.method == "POST":
         form = PrelievoFondoForm(request.POST)
         if form.is_valid():
@@ -163,6 +201,8 @@ def aggiungi_prelievo(request, piano_pk: int):
                 m.tipo = TipoMovimentoFondo.PRELIEVO
                 m.save()
                 messages.success(request, "Prelievo registrato.")
+                if popup:
+                    return _popup_close(request, "Prelievo registrato.")
                 return redirect("fondo_piano_dettaglio", pk=piano.pk)
     else:
         form = PrelievoFondoForm()
@@ -175,6 +215,7 @@ def aggiungi_prelievo(request, piano_pk: int):
             "titolo": "Registra prelievo",
             "tipo_label": "Prelievo",
             "saldo": piano.saldo_disponibile,
+            "popup": popup,
         },
     )
 

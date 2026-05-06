@@ -19,6 +19,7 @@ from .models import (
     RuoloUtente,
     SistemaDatabaseBackup,
     SistemaImpostazioniGenerali,
+    SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
     TipoFeedbackSegnalazione,
@@ -435,6 +436,26 @@ class SidebarSistemaTests(TestCase):
         cache.clear()
         super().tearDown()
 
+    def impostazioni_generali_post_data(self, **overrides):
+        data = {
+            "terminologia_studente": "studente",
+            "formato_visualizzazione_telefono": "it_plus_n3_2_2_3",
+            "cronologia_retention_mesi": "24",
+            "gestione_iscrizione_corso_anno": "mese_iscrizione_intero",
+            "giorno_soglia_iscrizione_corso_anno": "15",
+            "osservazioni_solo_autori_modifica": "on",
+            "modulo_anagrafica_attivo": "on",
+            "modulo_famiglie_interessate_attivo": "on",
+            "modulo_economia_attivo": "on",
+            "modulo_gestione_finanziaria_attivo": "on",
+            "modulo_gestione_amministrativa_attivo": "on",
+            "modulo_servizi_extra_attivo": "on",
+            "font_principale": "manrope",
+            "font_titoli": "manrope",
+        }
+        data.update(overrides)
+        return data
+
     def test_home_renders_school_settings_as_submenu_of_system(self):
         self.client.force_login(self.user)
 
@@ -499,6 +520,8 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Controllo sistema")
         self.assertContains(response, "Moduli del software")
+        self.assertContains(response, "Cronologia operazioni")
+        self.assertContains(response, 'name="cronologia_retention_mesi"')
         self.assertContains(response, 'name="modulo_calendario_attivo"')
         self.assertContains(response, 'class="settings-module-grid"')
 
@@ -507,26 +530,50 @@ class SidebarSistemaTests(TestCase):
 
         response = self.client.post(
             reverse("impostazioni_generali_sistema"),
-            {
-                "terminologia_studente": "studente",
-                "formato_visualizzazione_telefono": "it_plus_n3_2_2_3",
-                "gestione_iscrizione_corso_anno": "mese_iscrizione_intero",
-                "giorno_soglia_iscrizione_corso_anno": "15",
-                "osservazioni_solo_autori_modifica": "on",
-                "modulo_anagrafica_attivo": "on",
-                "modulo_famiglie_interessate_attivo": "on",
-                "modulo_economia_attivo": "on",
-                "modulo_gestione_finanziaria_attivo": "on",
-                "modulo_gestione_amministrativa_attivo": "on",
-                "modulo_servizi_extra_attivo": "on",
-                "font_principale": "manrope",
-                "font_titoli": "manrope",
-            },
+            self.impostazioni_generali_post_data(),
         )
 
         self.assertRedirects(response, reverse("impostazioni_generali_sistema"))
         impostazioni = SistemaImpostazioniGenerali.objects.get()
         self.assertFalse(impostazioni.modulo_calendario_attivo)
+
+    def test_general_settings_cleanup_audit_log_by_retention_period(self):
+        self.client.force_login(self.user)
+        old_entry = SistemaOperazioneCronologia.objects.create(
+            azione="update",
+            modulo="sistema",
+            app_label="sistema",
+            model_name="test",
+            model_verbose_name="Test",
+            oggetto_label="Vecchio",
+            descrizione="Vecchia operazione",
+        )
+        recent_entry = SistemaOperazioneCronologia.objects.create(
+            azione="update",
+            modulo="sistema",
+            app_label="sistema",
+            model_name="test",
+            model_verbose_name="Test",
+            oggetto_label="Recente",
+            descrizione="Operazione recente",
+        )
+        SistemaOperazioneCronologia.objects.filter(pk=old_entry.pk).update(
+            data_operazione=timezone.now() - timedelta(days=400)
+        )
+        SistemaOperazioneCronologia.objects.filter(pk=recent_entry.pk).update(
+            data_operazione=timezone.now() - timedelta(days=30)
+        )
+
+        response = self.client.post(
+            reverse("impostazioni_generali_sistema"),
+            self.impostazioni_generali_post_data(cronologia_retention_mesi="12"),
+        )
+
+        self.assertRedirects(response, reverse("impostazioni_generali_sistema"))
+        impostazioni = SistemaImpostazioniGenerali.objects.get()
+        self.assertEqual(impostazioni.cronologia_retention_mesi, 12)
+        self.assertFalse(SistemaOperazioneCronologia.objects.filter(pk=old_entry.pk).exists())
+        self.assertTrue(SistemaOperazioneCronologia.objects.filter(pk=recent_entry.pk).exists())
 
     def test_disabled_module_is_hidden_and_blocked_even_for_superuser(self):
         SistemaImpostazioniGenerali.objects.create(modulo_calendario_attivo=False)
@@ -546,6 +593,67 @@ class SidebarSistemaTests(TestCase):
         response = self.client.get(reverse("calendario_agenda"))
 
         self.assertRedirects(response, reverse("home"))
+
+
+class ActiveToggleTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="toggle-admin@example.com",
+            email="toggle-admin@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.admin,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.viewer = User.objects.create_user(
+            username="toggle-viewer@example.com",
+            email="toggle-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.viewer,
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.fornitore = Fornitore.objects.create(denominazione="Fornitore toggle")
+
+    def post_toggle(self, user, value):
+        self.client.force_login(user)
+        return self.client.post(
+            reverse("toggle_active_state"),
+            {
+                "model": "gestione_finanziaria.fornitore",
+                "pk": self.fornitore.pk,
+                "field": "attivo",
+                "value": value,
+                "ajax": "1",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+    def test_management_user_can_toggle_registered_active_field(self):
+        response = self.post_toggle(self.admin, "0")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["value"], False)
+        self.fornitore.refresh_from_db()
+        self.assertFalse(self.fornitore.attivo)
+
+    def test_view_only_user_cannot_toggle_active_field(self):
+        response = self.post_toggle(self.viewer, "0")
+
+        self.assertEqual(response.status_code, 403)
+        self.fornitore.refresh_from_db()
+        self.assertTrue(self.fornitore.attivo)
+
+    def test_financial_supplier_list_renders_global_toggle(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("lista_fornitori"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-active-toggle-form')
+        self.assertContains(response, 'name="model" value="gestione_finanziaria.fornitore"', html=False)
 
 
 class RuoliUtenteTests(TestCase):
@@ -591,6 +699,45 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(response, "Utente attivo")
         self.assertContains(response, "Gestione finanziaria")
         self.assertNotContains(response, "Modulo anagrafica")
+
+    def test_user_form_renders_role_popup_controls(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("crea_utente"), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="add-ruolo-permessi-btn"', html=False)
+        self.assertContains(response, 'id="edit-ruolo-permessi-btn"', html=False)
+        self.assertContains(response, 'id="delete-ruolo-permessi-btn"', html=False)
+        self.assertContains(response, 'data-related-type="ruolo_permessi"', html=False)
+        self.assertContains(response, 'relatedType: "ruolo_permessi"', html=False)
+
+    def test_role_popup_create_updates_user_role_select(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            f"{reverse('crea_ruolo_utente')}?popup=1&target_input_name=ruolo_permessi",
+            {
+                "nome": "Ruolo popup",
+                "descrizione": "",
+                "colore_principale": "#417690",
+                "attivo": "on",
+                "permesso_anagrafica": LivelloPermesso.NESSUNO,
+                "permesso_famiglie_interessate": LivelloPermesso.NESSUNO,
+                "permesso_economia": LivelloPermesso.NESSUNO,
+                "permesso_sistema": LivelloPermesso.GESTIONE,
+                "permesso_calendario": LivelloPermesso.NESSUNO,
+                "permesso_gestione_finanziaria": LivelloPermesso.NESSUNO,
+                "permesso_gestione_amministrativa": LivelloPermesso.NESSUNO,
+                "permesso_servizi_extra": LivelloPermesso.NESSUNO,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'const action = "select";', html=False)
+        self.assertContains(response, 'const fieldName = "ruolo_permessi";', html=False)
+        self.assertContains(response, 'const objectLabel = "Ruolo popup";', html=False)
+        self.assertContains(response, 'const targetInputName = "ruolo_permessi";', html=False)
 
     def test_user_permission_lists_include_financial_management_and_interested_families_modules(self):
         self.client.force_login(self.user)
@@ -679,6 +826,14 @@ class PopupManifestTests(TestCase):
             self.assertEqual(manifest[key]["add"], reverse(add_route))
             self.assertIn("__ID__", manifest[key]["edit"])
             self.assertIn("__ID__", manifest[key]["delete"])
+
+    def test_popup_manifest_exposes_role_crud_routes(self):
+        manifest = build_popup_manifest()
+
+        self.assertIn("ruolo_permessi", manifest)
+        self.assertEqual(manifest["ruolo_permessi"]["add"], reverse("crea_ruolo_utente"))
+        self.assertIn("__ID__", manifest["ruolo_permessi"]["edit"])
+        self.assertIn("__ID__", manifest["ruolo_permessi"]["delete"])
 
 
 class ScuolaSistemaInterfaceTests(TestCase):

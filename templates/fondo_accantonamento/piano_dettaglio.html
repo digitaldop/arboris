@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ piano.nome }} - Fondo accantonamento{% endblock %}
 
@@ -13,127 +14,324 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{{ piano.nome }}</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'fondo_piano_modifica' piano.pk %}" class="btn btn-secondary">Modifica piano</a>
-            <a href="{% url 'fondo_piano_versamento' piano.pk %}" class="btn btn-primary">Versamento</a>
-            <a href="{% url 'fondo_piano_prelievo' piano.pk %}" class="btn btn-primary">Prelievo</a>
+    <div class="fondo-plan-detail-shell">
+        <div class="page-head fondo-plan-detail-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon fondo-plans-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#hands-heart"></use></svg>
+                </span>
+                <div>
+                    <h1 class="page-title">{{ piano.nome }}</h1>
+                    <p class="page-subtitle">Scheda riepilogativa del piano di accantonamento.</p>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'fondo_piano_modifica' piano.pk %}" class="btn btn-secondary btn-icon-text btn-intent-edit">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                    <span class="btn-label">Modifica piano</span>
+                </a>
+                <a href="{% url 'fondo_piano_versamento' piano.pk %}?popup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'fondo_piano_versamento' piano.pk %}?popup=1" data-popup-window-name="arboris-fondo-versamento-popup" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Versamento</span>
+                </a>
+                <a href="{% url 'fondo_piano_prelievo' piano.pk %}?popup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'fondo_piano_prelievo' piano.pk %}?popup=1" data-popup-window-name="arboris-fondo-prelievo-popup" data-popup-window-features="width=860,height=760,resizable=yes,scrollbars=yes">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                    <span class="btn-label">Prelievo</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Riepilogo</h2>
-        <p>
-            <strong>Tipologia:</strong>
-            {% if piano.sempre_attivo %}
-                Sempre attivo (non legato a un singolo anno scolastico)
-            {% else %}
-                Anno scolastico: {{ piano.anno_scolastico }}
-            {% endif %}
-            <br>
-            <strong>Modalita' di versamento:</strong> {{ piano.get_modalita_display }}<br>
-            <strong>Deposito:</strong> {{ piano.get_tipo_deposito_display }}{% if piano.descrizione_deposito %} — {{ piano.descrizione_deposito }}{% endif %}<br>
-            {% if piano.percentuale_su_rette %}
-                <strong>Percentuale sulle rette:</strong> {{ piano.percentuale_su_rette }}%<br>
-            {% endif %}
-            {% if piano.periodicita and piano.data_primo_versamento %}
-                <strong>Periodico:</strong> {{ piano.get_periodicita_display }}, primo versamento {{ piano.data_primo_versamento|date:"d/m/Y" }}
-                ({{ piano.importo_versamento_periodico }} €)<br>
-            {% endif %}
-        </p>
-        <p>
-            <strong>Entrate (versamenti):</strong> {{ piano.totale_versamenti }} € —
-            <strong>Uscite (prelievi/sconti):</strong> {{ piano.totale_uscite }} € —
-            <strong>Saldo:</strong> {{ piano.saldo_disponibile }} €
-        </p>
-        {% if piano.percentuale_su_rette %}
-            <p class="table-muted">
-                I versamenti da percentuale sulle rette si allineano al salvataggio delle rate
-                (calcolo sull'importo pagato). Se piu' piani con percentuale competono
-                (stesso anno o piano «sempre attivo»), si usa quello con nome lessicograficamente minore.
-            </p>
-        {% endif %}
-        {% if piano.coordinate_riferimento %}
-            <p class="table-muted"><strong>Note / coordinate (riservate):</strong><br>{{ piano.coordinate_riferimento|linebreaksbr }}</p>
-        {% endif %}
-    </div>
+        <section class="fondo-plan-detail-summary" aria-labelledby="fondo-plan-summary-title">
+            <div class="fondo-plan-summary-main">
+                <span class="fondo-plan-summary-hero-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}?v=2#hands-heart"></use></svg>
+                </span>
+                <div class="fondo-plan-summary-copy">
+                    <div class="fondo-plan-summary-title-row">
+                        <h2 id="fondo-plan-summary-title">Riepilogo piano</h2>
+                        <span class="fondo-plan-status-pill {% if piano.attivo %}is-active{% else %}is-inactive{% endif %}">
+                            {% if piano.attivo %}Attivo{% else %}Non attivo{% endif %}
+                        </span>
+                    </div>
 
-    {% if mostra_sezione_scadenze %}
-        <div class="content-card">
-            <h2 class="section-title">Scadenze periodiche</h2>
-            <form method="post" action="{% url 'fondo_piano_genera_scadenze' piano.pk %}" class="form-actions" style="margin-bottom:1rem;">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-secondary">Rigenera scadenze fino a fine anno</button>
-            </form>
-            <table class="list-table">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Importo previsto</th>
-                        <th>Stato</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in scadenze %}
-                        <tr>
-                            <td>{{ s.data_scadenza|date:"d/m/Y" }}</td>
-                            <td>{{ s.importo_previsto }} €</td>
-                            <td>{{ s.get_stato_display }}</td>
-                            <td class="actions-cell">
-                                {% if s.stato == "pianificato" %}
-                                    <form method="post" action="{% url 'fondo_scadenza_soddisfa' s.pk %}" style="display:inline;">
-                                        {% csrf_token %}
-                                        <button type="submit" class="table-link" style="background:none;border:none;cursor:pointer;padding:0;">Registra versamento</button>
-                                    </form>
+                    <dl class="fondo-plan-summary-list">
+                        <div>
+                            <dt>
+                                <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                Anno scolastico
+                            </dt>
+                            <dd>
+                                {% if piano.sempre_attivo %}
+                                    Sempre attivo
+                                {% else %}
+                                    {{ piano.anno_scolastico|default:"-" }}
                                 {% endif %}
-                            </td>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>
+                                <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                                </span>
+                                Modalit&agrave; di versamento
+                            </dt>
+                            <dd>{{ piano.get_modalita_display }}</dd>
+                        </div>
+                        <div>
+                            <dt>
+                                <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                                </span>
+                                Deposito
+                            </dt>
+                            <dd>{{ piano.get_tipo_deposito_display }}{% if piano.descrizione_deposito %} - {{ piano.descrizione_deposito }}{% endif %}</dd>
+                        </div>
+                        {% if piano.percentuale_su_rette %}
+                            <div>
+                                <dt>
+                                    <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                                    </span>
+                                    Percentuale rette
+                                </dt>
+                                <dd>{{ piano.percentuale_su_rette }}%</dd>
+                            </div>
+                        {% endif %}
+                        {% if piano.periodicita %}
+                            <div>
+                                <dt>
+                                    <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg>
+                                    </span>
+                                    Periodicit&agrave;
+                                </dt>
+                                <dd>{{ piano.get_periodicita_display }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if piano.data_primo_versamento %}
+                            <div>
+                                <dt>
+                                    <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                    </span>
+                                    Primo versamento
+                                </dt>
+                                <dd>{{ piano.data_primo_versamento|date:"d/m/Y" }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if piano.importo_versamento_periodico %}
+                            <div>
+                                <dt>
+                                    <span class="fondo-plan-inline-icon" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                    </span>
+                                    Importo periodico
+                                </dt>
+                                <dd>{{ piano.importo_versamento_periodico }} &euro;</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <div class="fondo-plan-summary-totals" aria-label="Riepilogo economico del piano">
+                <div>
+                    <span>Entrate (versamenti)</span>
+                    <strong class="is-green">{{ totale_versamenti }} &euro;</strong>
+                </div>
+                <div>
+                    <span>Uscite (prelievi/sconti)</span>
+                    <strong class="is-red">{{ totale_uscite }} &euro;</strong>
+                </div>
+                <div>
+                    <span>Saldo</span>
+                    <strong>{{ saldo_disponibile }} &euro;</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="fondo-plan-kpi-grid" aria-label="Indicatori piano di accantonamento">
+            <article class="fondo-plan-kpi-card">
+                <span class="fondo-plan-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                </span>
+                <span class="fondo-plan-kpi-label">Entrate</span>
+                <strong class="fondo-plan-kpi-value is-green">{{ totale_versamenti }} &euro;</strong>
+                <span class="fondo-plan-kpi-note">Totale versamenti</span>
+            </article>
+            <article class="fondo-plan-kpi-card">
+                <span class="fondo-plan-kpi-icon is-red" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+                <span class="fondo-plan-kpi-label">Uscite</span>
+                <strong class="fondo-plan-kpi-value is-red">{{ totale_uscite }} &euro;</strong>
+                <span class="fondo-plan-kpi-note">Totale prelievi/sconti</span>
+            </article>
+            <article class="fondo-plan-kpi-card">
+                <span class="fondo-plan-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <span class="fondo-plan-kpi-label">Saldo</span>
+                <strong class="fondo-plan-kpi-value is-blue">{{ saldo_disponibile }} &euro;</strong>
+                <span class="fondo-plan-kpi-note">Saldo disponibile</span>
+            </article>
+            <article class="fondo-plan-kpi-card">
+                <span class="fondo-plan-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+                <span class="fondo-plan-kpi-label">Movimenti</span>
+                <strong class="fondo-plan-kpi-value is-purple">{{ movimenti_count }}</strong>
+                <span class="fondo-plan-kpi-note">Ultimi 200 movimenti</span>
+            </article>
+        </section>
+
+        {% if mostra_sezione_scadenze %}
+            <section class="fondo-plan-section-card" aria-labelledby="fondo-plan-scadenze-title">
+                <div class="fondo-plan-section-head">
+                    <div>
+                        <h2 id="fondo-plan-scadenze-title">Scadenze periodiche</h2>
+                        <p>Scadenze generate dalle regole periodiche del piano.</p>
+                    </div>
+                    <form method="post" action="{% url 'fondo_piano_genera_scadenze' piano.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                            <span class="btn-label">Rigenera scadenze</span>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="fondo-plan-table-wrap">
+                    <table class="list-table anagrafica-list-table fondo-plan-detail-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Importo previsto</th>
+                                <th>Stato</th>
+                                <th class="fondo-plan-actions-head">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in scadenze %}
+                                <tr>
+                                    <td>{{ s.data_scadenza|date:"d/m/Y" }}</td>
+                                    <td>{{ s.importo_previsto }} &euro;</td>
+                                    <td>{{ s.get_stato_display }}</td>
+                                    <td class="actions-cell">
+                                        {% if s.stato == "pianificato" %}
+                                            <form method="post" action="{% url 'fondo_scadenza_soddisfa' s.pk %}" class="fondo-plan-inline-form">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-secondary btn-sm btn-icon-text">
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                    <span class="btn-label">Registra versamento</span>
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="table-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4">
+                                        <div class="empty-state">Nessuna scadenza. Usa il pulsante qui sopra dopo aver impostato periodicita' e data primo versamento.</div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% endif %}
+
+        <section class="fondo-plan-section-card" aria-labelledby="fondo-plan-movements-title">
+            <div class="fondo-plan-section-head">
+                <div>
+                    <h2 id="fondo-plan-movements-title">Movimenti (ultimi 200)</h2>
+                    <p>Versamenti, prelievi e movimenti generati dalle rette.</p>
+                </div>
+            </div>
+
+            <div class="fondo-plan-table-wrap">
+                <table class="list-table anagrafica-list-table fondo-plan-detail-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Importo</th>
+                            <th>Dettagli</th>
                         </tr>
-                    {% empty %}
-                        <tr><td colspan="4" class="empty-state">Nessuna scadenza. Usa il pulsante qui sopra dopo aver impostato periodicita' e data primo versamento.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
+                    </thead>
+                    <tbody>
+                        {% for m in movimenti %}
+                            <tr>
+                                <td>{{ m.data|date:"d/m/Y" }}</td>
+                                <td>{{ m.get_tipo_display }}</td>
+                                <td>{{ m.importo }} &euro;</td>
+                                <td>
+                                    {% if m.tipo == "prelievo" %}
+                                        {{ m.richiedente }}{% if m.motivo %} - {{ m.motivo|truncatechars:60 }}{% endif %}
+                                    {% else %}
+                                        {{ m.note|truncatechars:80|default:"-" }}
+                                    {% endif %}
+                                    {% if m.rata_iscrizione_id %}
+                                        <br><a href="{% url 'modifica_rata_iscrizione' m.rata_iscrizione_id %}" class="table-link">Rata iscrizione</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">
+                                    <div class="fondo-plan-empty-state">
+                                        <span class="fondo-plan-empty-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                                        </span>
+                                        <strong>Nessun movimento registrato</strong>
+                                        <span>Non sono presenti movimenti per questo piano.</span>
+                                        <a href="{% url 'fondo_piano_versamento' piano.pk %}?popup=1" class="btn btn-primary btn-icon-text" data-window-popup="1" data-popup-url="{% url 'fondo_piano_versamento' piano.pk %}?popup=1" data-popup-window-name="arboris-fondo-versamento-popup" data-popup-window-features="width=860,height=720,resizable=yes,scrollbars=yes">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            <span class="btn-label">Registra il primo movimento</span>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <div class="content-card">
-        <h2 class="section-title">Movimenti (ultimi 200)</h2>
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Data</th>
-                    <th>Tipo</th>
-                    <th>Importo</th>
-                    <th>Dettagli</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for m in movimenti %}
-                    <tr>
-                        <td>{{ m.data|date:"d/m/Y" }}</td>
-                        <td>{{ m.get_tipo_display }}</td>
-                        <td>{{ m.importo }} €</td>
-                        <td>
-                            {% if m.tipo == "prelievo" %}
-                                {{ m.richiedente }} — {{ m.motivo|truncatechars:60 }}
-                            {% else %}
-                                {{ m.note|truncatechars:80 }}
-                            {% endif %}
-                            {% if m.rata_iscrizione_id %}
-                                <br><a href="{% url 'modifica_rata_iscrizione' m.rata_iscrizione_id %}" class="table-link">Rata iscrizione</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="4" class="empty-state">Nessun movimento.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        {% if piano.percentuale_su_rette or piano.coordinate_riferimento %}
+            <section class="fondo-plan-section-card fondo-plan-notes-card" aria-labelledby="fondo-plan-notes-title">
+                <div class="fondo-plan-section-head">
+                    <div>
+                        <h2 id="fondo-plan-notes-title">Note del piano</h2>
+                    </div>
+                </div>
+                {% if piano.percentuale_su_rette %}
+                    <p>
+                        I versamenti da percentuale sulle rette si allineano al salvataggio delle rate
+                        sul relativo importo pagato. Se piu' piani con percentuale competono nello stesso
+                        contesto, viene usato quello con nome lessicograficamente minore.
+                    </p>
+                {% endif %}
+                {% if piano.coordinate_riferimento %}
+                    <p><strong>Note / coordinate riservate:</strong><br>{{ piano.coordinate_riferimento|linebreaksbr }}</p>
+                {% endif %}
+            </section>
+        {% endif %}
 
-    <div class="content-card">
-        <a href="{% url 'fondo_piano_elimina' piano.pk %}" class="table-link table-link-danger">Elimina piano</a>
+        <section class="fondo-plan-danger-card">
+            <div>
+                <h2>Zona eliminazione</h2>
+                <p>Elimina il piano solo se non serve pi&ugrave; mantenere storico, scadenze e movimenti collegati.</p>
+            </div>
+            <a href="{% url 'fondo_piano_elimina' piano.pk %}" class="btn btn-danger btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Elimina piano</span>
+            </a>
+        </section>
     </div>
 {% endblock %}

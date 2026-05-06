@@ -1,160 +1,274 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
 {% load static %}
 
 {% block title %}{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa servizio extra{% endif %} - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_servizi_extra' %}">Servizi extra</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_tariffe_servizi_extra' %}">Tariffe</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa servizio extra{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if can_manage_servizi_extra %}
-                <button type="submit" form="tariffa-servizio-extra-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
-            {% endif %}
-            <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Torna all'elenco</a>
+    <div class="scambio-retta-form-shell servizi-extra-tariffa-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <p class="section-eyebrow">Servizi extra</p>
+                <h1 class="page-title">{% if tariffa %}{{ tariffa.nome_tariffa }}{% else %}Nuova tariffa servizio extra{% endif %}</h1>
+                <p>Configura importi, rate e scadenze della tariffa.</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if tariffa and can_manage_servizi_extra and not popup %}
+                    <a
+                        href="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                        class="btn btn-danger btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                        data-popup-window-name="arboris-servizio-extra-tariffa-delete-popup"
+                        data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+                {% if not popup %}
+                    <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
+
+        <form method="post" id="tariffa-servizio-extra-form" class="scambio-retta-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+
+            <section class="scambio-retta-card servizi-extra-tariffa-card" aria-labelledby="tariffa-servizio-extra-data-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="tariffa-servizio-extra-data-title">Dati tariffa</h2>
+                        <p>Associa la tariffa al servizio e scegli come generare le scadenze.</p>
+                    </div>
+                </div>
+
+                {% if form.non_field_errors %}
+                    <div class="condizione-form-errors">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="scambio-retta-grid servizi-extra-tariffa-form-grid">
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.servizio.id_for_label }}">{{ form.servizio.label }}</label>
+                            {{ form.servizio }}
+                            {{ form.servizio.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.nome_tariffa.id_for_label }}">{{ form.nome_tariffa.label }}</label>
+                            {{ form.nome_tariffa }}
+                            {{ form.nome_tariffa.errors }}
+                        </div>
+                    </div>
+
+                    <label class="scambio-retta-switch-card servizi-extra-tariffa-switch">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.rateizzata.label }}</strong>
+                            <small id="tariffa-rate-mode-help">{{ form.rateizzata.help_text }}</small>
+                            {{ form.rateizzata.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.rateizzata }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+
+                    <label class="scambio-retta-switch-card servizi-extra-tariffa-switch">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.attiva.label }}</strong>
+                            <small>Abilita questa tariffa nelle iscrizioni ai servizi extra.</small>
+                            {{ form.attiva.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.attiva }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card servizi-extra-tariffa-card" aria-labelledby="tariffa-servizio-extra-rate-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="tariffa-servizio-extra-rate-title">Piano rate</h2>
+                        <p>Definisci importi e date di scadenza della tariffa.</p>
+                    </div>
+                </div>
+
+                {% if formset.non_form_errors %}
+                    <div class="inline-formset-errors">{{ formset.non_form_errors }}</div>
+                {% endif %}
+
+                {{ formset.management_form }}
+                <div class="servizi-extra-rate-table-wrap">
+                    <table class="inline-table servizi-extra-rate-table" id="rate-config-table">
+                        <thead>
+                            <tr>
+                                <th>Numero</th>
+                                <th>Descrizione</th>
+                                <th>Importo</th>
+                                <th>Scadenza</th>
+                                <th>Elimina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in formset %}
+                                <tr class="inline-form-row servizi-extra-rate-row">
+                                    {{ f.id }}
+                                    <td>
+                                        <label class="sr-only" for="{{ f.numero_rata.id_for_label }}">Numero rata</label>
+                                        {{ f.numero_rata }}
+                                        {{ f.numero_rata.errors }}
+                                    </td>
+                                    <td>
+                                        <label class="sr-only" for="{{ f.descrizione.id_for_label }}">Descrizione</label>
+                                        {{ f.descrizione }}
+                                        {{ f.descrizione.errors }}
+                                    </td>
+                                    <td>
+                                        <label class="sr-only" for="{{ f.importo.id_for_label }}">Importo</label>
+                                        {{ f.importo }}
+                                        {{ f.importo.errors }}
+                                    </td>
+                                    <td>
+                                        <label class="sr-only" for="{{ f.data_scadenza.id_for_label }}">Scadenza</label>
+                                        {{ f.data_scadenza }}
+                                        {{ f.data_scadenza.errors }}
+                                    </td>
+                                    <td class="inline-delete-cell">
+                                        {% if f.instance.pk %}
+                                            <label class="delete-label servizi-extra-rate-delete-field">
+                                                {{ f.DELETE }}
+                                                <span class="delete-label-text">Elimina</span>
+                                            </label>
+                                        {% else %}
+                                            <button type="button" class="table-icon-link table-icon-link-danger js-remove-rate-row" title="Rimuovi rata" aria-label="Rimuovi rata">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if f.non_field_errors %}
+                                    <tr class="inline-errors-row">
+                                        <td colspan="5">{{ f.non_field_errors }}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="inline-add-row servizi-extra-rate-add-row">
+                    <button type="button" class="btn btn-secondary btn-icon-text" id="add-rate-config-btn">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Aggiungi rata</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card servizi-extra-tariffa-card" aria-labelledby="tariffa-servizio-extra-note-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-purple" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="tariffa-servizio-extra-note-title">Note</h2>
+                        <p class="popup-note-helper">Clicca per espandere.</p>
+                    </div>
+                </div>
+                <div class="scambio-retta-grid">
+                    <div class="scambio-retta-field is-wide servizi-extra-tariffa-notes-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="scambio-retta-actions">
+                {% if can_manage_servizi_extra %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva</span>
+                    </button>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+
+        <template id="rate-config-empty-form-template">
+            <tr class="inline-form-row servizi-extra-rate-row">
+                {{ formset.empty_form.id }}
+                <td>{{ formset.empty_form.numero_rata }}</td>
+                <td>{{ formset.empty_form.descrizione }}</td>
+                <td>{{ formset.empty_form.importo }}</td>
+                <td>{{ formset.empty_form.data_scadenza }}</td>
+                <td class="inline-delete-cell">
+                    <button type="button" class="table-icon-link table-icon-link-danger js-remove-rate-row" title="Rimuovi rata" aria-label="Rimuovi rata">
+                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                    </button>
+                </td>
+            </tr>
+        </template>
     </div>
 
-    <form method="post" id="tariffa-servizio-extra-form">
-        {% csrf_token %}
-
-        <div class="content-card">
-            <table class="form-table">
-                <tr>
-                    <th>{{ form.servizio.label_tag }}</th>
-                    <td>{{ form.servizio }} {{ form.servizio.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.nome_tariffa.label_tag }}</th>
-                    <td>{{ form.nome_tariffa }} {{ form.nome_tariffa.errors }}</td>
-                </tr>
-                <tr>
-                    <th>{{ form.rateizzata.label_tag }}</th>
-                    <td>
-                        {{ form.rateizzata }} {{ form.rateizzata.errors }}
-                        <div class="help-text">{{ form.rateizzata.help_text }}</div>
-                        <div class="help-text" id="tariffa-rate-mode-help">
-                            Se disattiva, la tariffa viene gestita come una sola scadenza.
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <th>{{ form.attiva.label_tag }}</th>
-                    <td>{{ form.attiva }} {{ form.attiva.errors }}</td>
-                </tr>
-            </table>
-
-            <div class="admin-section compact" style="margin-top: 18px;">
-                <div class="admin-section-title">Piano rate della tariffa</div>
-                <div class="panel">
-                    <div class="panel-body">
-                        {% if formset.non_form_errors %}
-                            <div class="inline-formset-errors" style="margin-bottom: 12px;">
-                                {{ formset.non_form_errors }}
-                            </div>
-                        {% endif %}
-
-                        {{ formset.management_form }}
-                        <table class="inline-table" id="rate-config-table">
-                            <thead>
-                                <tr>
-                                    <th>Numero rata</th>
-                                    <th>Descrizione</th>
-                                    <th>Importo</th>
-                                    <th>Scadenza</th>
-                                    <th>Cancellare?</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for f in formset %}
-                                    <tr class="inline-form-row">
-                                        {{ f.id }}
-                                        <td>
-                                            {{ f.numero_rata }}
-                                            {{ f.numero_rata.errors }}
-                                        </td>
-                                        <td>
-                                            {{ f.descrizione }}
-                                            {% if f.descrizione.help_text %}
-                                                <div class="help-text">{{ f.descrizione.help_text }}</div>
-                                            {% endif %}
-                                            {{ f.descrizione.errors }}
-                                        </td>
-                                        <td>
-                                            {{ f.importo }}
-                                            {{ f.importo.errors }}
-                                        </td>
-                                        <td>
-                                            {{ f.data_scadenza }}
-                                            {{ f.data_scadenza.errors }}
-                                        </td>
-                                        <td class="inline-delete-cell">
-                                            {% if f.instance.pk %}
-                                                <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
-                                            {% else %}
-                                                <button type="button" class="inline-remove-btn js-remove-rate-row">Rimuovi</button>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% if f.non_field_errors %}
-                                        <tr class="inline-errors-row">
-                                            <td colspan="5">{{ f.non_field_errors }}</td>
-                                        </tr>
-                                    {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-
-                        <div class="inline-add-row">
-                            <button type="button" class="inline-add-btn" id="add-rate-config-btn">+ Aggiungi un'altra rata</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="admin-section compact" style="margin-top: 18px;">
-                <div class="admin-section-title">Note</div>
-                <div class="panel">
-                    <div class="panel-body">
-                        {{ form.note }} {{ form.note.errors }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_servizi_extra %}
-                <button type="submit" class="btn btn-primary">{% if tariffa %}Salva modifiche{% else %}Crea tariffa{% endif %}</button>
-            {% endif %}
-            <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Annulla</a>
-        </div>
-    </form>
-
-    <template id="rate-config-empty-form-template">
-        <tr class="inline-form-row">
-            {{ formset.empty_form.id }}
-            <td>{{ formset.empty_form.numero_rata }}</td>
-            <td>{{ formset.empty_form.descrizione }}</td>
-            <td>{{ formset.empty_form.importo }}</td>
-            <td>{{ formset.empty_form.data_scadenza }}</td>
-            <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn js-remove-rate-row">Rimuovi</button>
-            </td>
-        </tr>
-    </template>
-
-    <script src="{% static 'js/pages/servizi-extra-tariffa-form.js' %}?v=2"></script>
+    <script src="{% static 'js/pages/servizi-extra-tariffa-form.js' %}?v=3"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisServiziExtraTariffaForm) {

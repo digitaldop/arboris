@@ -1,0 +1,31 @@
+{% if available %}
+    <form
+        method="post"
+        action="{{ toggle_url }}"
+        class="active-toggle-form{% if compact %} is-compact{% endif %}{% if not can_toggle %} is-readonly{% endif %}"
+        data-active-toggle-form
+        data-active-toggle-reload="{% if reload_on_success %}1{% else %}0{% endif %}"
+        onclick="event.stopPropagation();"
+    >
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        <input type="hidden" name="model" value="{{ model_label }}">
+        <input type="hidden" name="pk" value="{{ object_id }}">
+        <input type="hidden" name="field" value="{{ field_name }}">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <label class="active-toggle{% if not can_toggle %} is-readonly{% endif %}">
+            <input
+                type="checkbox"
+                name="value"
+                value="1"
+                {% if value %}checked{% endif %}
+                {% if not can_toggle %}disabled{% endif %}
+                data-active-toggle
+                data-active-label="{{ active_label }}"
+                data-inactive-label="{{ inactive_label }}"
+                aria-label="{{ label }}"
+            >
+            <span class="active-toggle-track" aria-hidden="true"></span>
+            <span class="active-toggle-label" data-active-toggle-label>{{ label }}</span>
+        </label>
+    </form>
+{% endif %}

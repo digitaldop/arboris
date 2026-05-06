@@ -40,6 +40,13 @@ for hour in range(24):
         TIME_SLOT_CHOICES.append((slot, slot))
 
 
+def tariffa_scambio_retta_choice_label(tariffa):
+    label = f"{tariffa.valore_orario} \u20ac"
+    if tariffa.definizione:
+        return f"{tariffa.definizione} - {label}"
+    return label
+
+
 class FamiliareScambioRettaSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
@@ -109,6 +116,8 @@ class ScambioRettaForm(forms.ModelForm):
             "studente": StudenteScambioRettaSelect(),
             "tariffa_scambio_retta": TariffaScambioRettaSelect(),
             "descrizione": forms.Textarea(attrs={"rows": 3}),
+            "approvata": forms.Select(choices=((False, "No"), (True, "Si"))),
+            "contabilizzata": forms.Select(choices=((False, "No"), (True, "Si"))),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -122,6 +131,7 @@ class ScambioRettaForm(forms.ModelForm):
         self.fields["studente"].queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
         self.fields["anno_scolastico"].queryset = AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id")
         self.fields["tariffa_scambio_retta"].queryset = TariffaScambioRetta.objects.order_by("valore_orario", "definizione")
+        self.fields["tariffa_scambio_retta"].label_from_instance = tariffa_scambio_retta_choice_label
         self.fields["mese_riferimento"].widget = forms.Select(choices=MONTH_CHOICES)
         self.fields["anno_scolastico"].empty_label = None
         self.fields["tariffa_scambio_retta"].empty_label = None
@@ -149,7 +159,8 @@ class ScambioRettaForm(forms.ModelForm):
         self.fields["famiglia"].help_text = "Viene proposta automaticamente quando selezioni il familiare."
 
         famiglia_id = self._resolve_famiglia_id_from_familiare()
-        self.filter_studenti_by_famiglia(famiglia_id)
+        if self.is_bound:
+            self.filter_studenti_by_famiglia(famiglia_id)
 
         if not self.instance.pk and not self.is_bound:
             if not self.initial.get("anno_scolastico"):
@@ -182,9 +193,11 @@ class ScambioRettaForm(forms.ModelForm):
         )
 
     def filter_studenti_by_famiglia(self, famiglia_id):
-        queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
-        if famiglia_id:
-            queryset = queryset.filter(famiglia_id=famiglia_id)
+        if not famiglia_id:
+            self.fields["studente"].queryset = Studente.objects.none()
+            return
+
+        queryset = Studente.objects.filter(attivo=True, famiglia_id=famiglia_id).order_by("cognome", "nome")
         self.fields["studente"].queryset = queryset
 
     def clean(self):
@@ -240,6 +253,7 @@ class PrestazioneScambioRettaForm(forms.ModelForm):
         )
         self.fields["studente"].queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
         self.fields["tariffa_scambio_retta"].queryset = TariffaScambioRetta.objects.order_by("valore_orario", "definizione")
+        self.fields["tariffa_scambio_retta"].label_from_instance = tariffa_scambio_retta_choice_label
         self.fields["tariffa_scambio_retta"].empty_label = None
         self.fields["studente"].required = False
         self.fields["ore_lavorate"].required = False

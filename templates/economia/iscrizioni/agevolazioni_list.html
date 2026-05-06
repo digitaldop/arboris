@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static currency active_toggles %}
 
 {% block title %}Agevolazioni - Arboris School Management{% endblock %}
 
@@ -7,47 +7,197 @@
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
+        <span>Rette Scolastiche</span>
+        <span class="breadcrumb-sep">&gt;</span>
         <span>Agevolazioni</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Agevolazioni</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'crea_agevolazione' %}" class="btn btn-primary">Nuova agevolazione</a>
+    <div class="scambio-list-shell agevolazioni-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Agevolazioni</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ agevolazioni_stats.totale }} {% if agevolazioni_stats.totale == 1 %}agevolazione{% else %}agevolazioni{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        Riduzioni annuali applicabili alle iscrizioni scolastiche
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a
+                    href="{% url 'crea_agevolazione' %}?popup=1"
+                    class="btn btn-primary btn-icon-text btn-add-action"
+                    data-window-popup="1"
+                    data-popup-url="{% url 'crea_agevolazione' %}?popup=1"
+                    data-popup-window-name="arboris-agevolazione-popup"
+                    data-popup-window-features="width=760,height=620,resizable=yes,scrollbars=yes"
+                >
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Nuova agevolazione</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Nome agevolazione</th>
-                    <th>Importo annuale</th>
-                    <th>Attiva</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for agevolazione in agevolazioni %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_agevolazione' agevolazione.pk %}">
-                        <td>{{ agevolazione.nome_agevolazione }}</td>
-                        <td>{{ agevolazione.importo_annuale_agevolazione }}</td>
-                        <td>{% if agevolazione.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_agevolazione' agevolazione.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_agevolazione' agevolazione.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="4"><div class="empty-state">Nessuna agevolazione inserita.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo agevolazioni">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Agevolazioni totali</span>
+                    <strong class="scambio-list-kpi-value">{{ agevolazioni_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Riduzioni create</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ agevolazioni_stats.attive }}</strong>
+                    <span class="scambio-list-kpi-note">Influiscono sul sistema</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Disattivate</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ agevolazioni_stats.inattive }}</strong>
+                    <span class="scambio-list-kpi-note">Parcheggiate nei calcoli</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Importo annuale</span>
+                    <strong class="scambio-list-kpi-value is-compact">EUR {{ agevolazioni_stats.importo_annuale|euro }}</strong>
+                    <span class="scambio-list-kpi-note">Somma agevolazioni</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="agevolazioni-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="agevolazioni-list-title">Elenco agevolazioni</h2>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-agevolazioni-search placeholder="Cerca agevolazioni..." aria-label="Cerca agevolazioni">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table agevolazioni-list-table">
+                    <colgroup>
+                        <col class="agevolazioni-col-name">
+                        <col class="agevolazioni-col-amount">
+                        <col class="agevolazioni-col-active">
+                        <col class="agevolazioni-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Nome agevolazione</th>
+                            <th>Importo annuale</th>
+                            <th>Attiva</th>
+                            <th class="agevolazioni-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agevolazione in agevolazioni %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_agevolazione' agevolazione.pk %}"
+                                data-row-popup-url="{% url 'modifica_agevolazione' agevolazione.pk %}?popup=1"
+                                data-popup-window-name="arboris-agevolazione-popup"
+                                data-popup-window-features="width=760,height=620,resizable=yes,scrollbars=yes"
+                                data-popup-title="Agevolazione"
+                                data-agevolazione-row
+                            >
+                                <td class="scambio-list-main-cell agevolazioni-main-cell">
+                                    <a
+                                        href="{% url 'modifica_agevolazione' agevolazione.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_agevolazione' agevolazione.pk %}?popup=1"
+                                        data-popup-window-name="arboris-agevolazione-popup"
+                                        data-popup-window-features="width=760,height=620,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ agevolazione.nome_agevolazione }}</strong>
+                                            <span>{% if agevolazione.attiva %}Disponibile nei calcoli{% else %}Disattivata{% endif %}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td class="scambio-list-amount">EUR {{ agevolazione.importo_annuale_agevolazione|euro }}</td>
+                                <td class="agevolazioni-toggle-cell">{% active_toggle agevolazione %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions agevolazioni-actions">
+                                        <a
+                                            href="{% url 'modifica_agevolazione' agevolazione.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_agevolazione' agevolazione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-agevolazione-popup"
+                                            data-popup-window-features="width=760,height=620,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        <a
+                                            href="{% url 'elimina_agevolazione' agevolazione.pk %}?popup=1"
+                                            class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                            title="Elimina"
+                                            aria-label="Elimina agevolazione"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'elimina_agevolazione' agevolazione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-agevolazione-delete-popup"
+                                            data-popup-window-features="width=680,height=500,resizable=yes,scrollbars=yes"
+                                        >
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4"><div class="empty-state">Nessuna agevolazione inserita.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="agevolazioni-empty-filter-row" hidden>
+                            <td colspan="4"><div class="empty-state">Nessuna agevolazione corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-agevolazioni-count>
+                    {{ agevolazioni_stats.totale }} {% if agevolazioni_stats.totale == 1 %}agevolazione{% else %}agevolazioni{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -56,6 +206,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-agevolazioni-search]");
+            const rows = Array.from(document.querySelectorAll("[data-agevolazione-row]"));
+            const emptyRow = document.querySelector(".agevolazioni-empty-filter-row");
+            const countNode = document.querySelector("[data-agevolazioni-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " agevolazione" : " agevolazioni");
+            });
         });
     </script>
 {% endblock %}

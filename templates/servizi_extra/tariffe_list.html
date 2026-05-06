@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static currency %}
+{% load static currency active_toggles %}
 
 {% block title %}{% if servizio_filtro %}Tariffe {{ servizio_filtro.nome_servizio }}{% else %}Tariffe servizi extra{% endif %} - Arboris{% endblock %}
 
@@ -14,66 +14,237 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">
-            {% if servizio_filtro %}
-                Tariffe {{ servizio_filtro.nome_servizio }}
-            {% else %}
-                Tariffe servizi extra
-            {% endif %}
-        </h1>
-        <div class="page-head-actions">
-            {% if servizio_filtro %}
-                <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary">Scheda servizio</a>
-                <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary">Tutte le tariffe</a>
-            {% endif %}
-            {% if can_manage_servizi_extra %}
-                <a href="{% url 'crea_tariffa_servizio_extra' %}" class="btn btn-primary">Nuova tariffa</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Tariffa</th>
-                    <th>Servizio</th>
-                    <th>Anno scolastico</th>
-                    <th>Totale</th>
-                    <th>Rate</th>
-                    <th>Rateizzata</th>
-                    <th>Iscrizioni</th>
-                    <th>Attiva</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for tariffa in tariffe %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}">
-                        <td>{{ tariffa.nome_tariffa }}</td>
-                        <td>{{ tariffa.servizio.nome_servizio }}</td>
-                        <td>{{ tariffa.servizio.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>EUR {{ tariffa.totale_importo|euro }}</td>
-                        <td>{{ tariffa.numero_rate }}</td>
-                        <td>{% if tariffa.rateizzata %}Si{% else %}No{% endif %}</td>
-                        <td>{{ tariffa.count_iscrizioni }}</td>
-                        <td>{% if tariffa.attiva %}Si{% else %}No{% endif %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}" class="table-link">Modifica</a>
-                            {% if can_manage_servizi_extra %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}" class="table-link table-link-danger">Elimina</a>
+    <div class="scambio-list-shell servizi-extra-tariffe-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">
+                            {% if servizio_filtro %}
+                                Tariffe {{ servizio_filtro.nome_servizio }}
+                            {% else %}
+                                Tariffe servizi extra
                             {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="9"><div class="empty-state">Nessuna tariffa configurata.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ tariffe_stats.totale }} {% if tariffe_stats.totale == 1 %}tariffa{% else %}tariffe{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                        Piani economici, scadenze e rate dei servizi extra
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                {% if servizio_filtro %}
+                    <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                        <span class="btn-label">Scheda servizio</span>
+                    </a>
+                    <a href="{% url 'lista_tariffe_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Tutte le tariffe</span>
+                    </a>
+                {% endif %}
+                {% if can_manage_servizi_extra %}
+                    <a
+                        href="{% url 'crea_tariffa_servizio_extra' %}?popup=1{% if servizio_filtro %}&servizio={{ servizio_filtro.pk }}{% endif %}"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_tariffa_servizio_extra' %}?popup=1{% if servizio_filtro %}&servizio={{ servizio_filtro.pk }}{% endif %}"
+                        data-popup-window-name="arboris-servizio-extra-tariffa-popup"
+                        data-popup-window-features="width=1080,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuova tariffa</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo tariffe servizi extra">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Tariffe totali</span>
+                    <strong class="scambio-list-kpi-value">{{ tariffe_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Piani configurati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ tariffe_stats.attive }}</strong>
+                    <span class="scambio-list-kpi-note">Utilizzabili nelle iscrizioni</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Rate configurate</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ tariffe_stats.rate }}</strong>
+                    <span class="scambio-list-kpi-note">Scadenze nei piani</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Importi tariffari</span>
+                    <strong class="scambio-list-kpi-value is-compact">EUR {{ tariffe_stats.importo|euro }}</strong>
+                    <span class="scambio-list-kpi-note">{{ tariffe_stats.servizi }} servizi collegati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="servizi-extra-tariffe-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="servizi-extra-tariffe-title">Elenco tariffe</h2>
+                    <p>Tariffe collegate ai servizi extra e relativo piano rate.</p>
+                </div>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-servizi-extra-tariffe-search placeholder="Cerca tariffa, servizio, anno..." aria-label="Cerca tariffe servizi extra">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table servizi-extra-tariffe-list-table">
+                    <colgroup>
+                        <col class="servizi-extra-tariffe-col-name">
+                        <col class="servizi-extra-tariffe-col-year">
+                        <col class="servizi-extra-tariffe-col-total">
+                        <col class="servizi-extra-tariffe-col-rates">
+                        <col class="servizi-extra-tariffe-col-subscriptions">
+                        <col class="servizi-extra-tariffe-col-active">
+                        <col class="servizi-extra-tariffe-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Tariffa</th>
+                            <th>Anno scolastico</th>
+                            <th>Totale</th>
+                            <th>Piano rate</th>
+                            <th>Iscrizioni</th>
+                            <th>Attiva</th>
+                            <th class="servizi-extra-tariffe-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tariffa in tariffe %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}"
+                                data-row-popup-url="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                data-popup-window-name="arboris-servizio-extra-tariffa-popup"
+                                data-popup-window-features="width=1080,height=820,resizable=yes,scrollbars=yes"
+                                data-popup-title="{{ tariffa.nome_tariffa }}"
+                                data-servizi-extra-tariffa-row
+                            >
+                                <td class="scambio-list-main-cell servizi-extra-tariffe-main-cell">
+                                    <a
+                                        href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                        data-popup-window-name="arboris-servizio-extra-tariffa-popup"
+                                        data-popup-window-features="width=1080,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ tariffa.nome_tariffa }}</strong>
+                                            <span>{{ tariffa.servizio.nome_servizio }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ tariffa.servizio.anno_scolastico.nome_anno_scolastico }}</td>
+                                <td class="scambio-list-amount">EUR {{ tariffa.totale_lista|euro }}</td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-blue">{{ tariffa.numero_rate_lista }} rate</span>
+                                    <div class="servizi-extra-tariffe-rate-meta">
+                                        {% if tariffa.prima_scadenza_lista %}
+                                            {{ tariffa.prima_scadenza_lista|date:"d/m/Y" }}{% if tariffa.ultima_scadenza_lista and tariffa.ultima_scadenza_lista != tariffa.prima_scadenza_lista %} - {{ tariffa.ultima_scadenza_lista|date:"d/m/Y" }}{% endif %}
+                                        {% else %}
+                                            Nessuna scadenza
+                                        {% endif %}
+                                    </div>
+                                    <div class="servizi-extra-tariffe-rate-meta">
+                                        {% if tariffa.rateizzata %}Rateizzata{% else %}Unica soluzione{% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-purple">{{ tariffa.count_iscrizioni }} iscrizioni</span>
+                                    <div class="servizi-extra-tariffe-rate-meta">{{ tariffa.count_iscrizioni_attive }} attive</div>
+                                </td>
+                                <td class="servizi-extra-tariffe-toggle-cell">{% active_toggle tariffa %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions servizi-extra-tariffe-actions">
+                                        <a
+                                            href="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                            data-popup-window-name="arboris-servizio-extra-tariffa-popup"
+                                            data-popup-window-features="width=1080,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        {% if can_manage_servizi_extra %}
+                                            <a
+                                                href="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger scambio-list-delete-btn"
+                                                title="Elimina"
+                                                aria-label="Elimina tariffa {{ tariffa.nome_tariffa }}"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_tariffa_servizio_extra' tariffa.pk %}?popup=1"
+                                                data-popup-window-name="arboris-servizio-extra-tariffa-delete-popup"
+                                                data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7"><div class="empty-state">Nessuna tariffa configurata.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="servizi-extra-tariffe-empty-filter-row" hidden>
+                            <td colspan="7"><div class="empty-state">Nessuna tariffa corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-servizi-extra-tariffe-count>
+                    {{ tariffe_stats.totale }} {% if tariffe_stats.totale == 1 %}tariffa{% else %}tariffe{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -82,6 +253,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-servizi-extra-tariffe-search]");
+            const rows = Array.from(document.querySelectorAll("[data-servizi-extra-tariffa-row]"));
+            const emptyRow = document.querySelector(".servizi-extra-tariffe-empty-filter-row");
+            const countNode = document.querySelector("[data-servizi-extra-tariffe-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " tariffa" : " tariffe");
+            });
         });
     </script>
 {% endblock %}

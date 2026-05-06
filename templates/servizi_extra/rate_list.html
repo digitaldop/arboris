@@ -23,69 +23,218 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">
-            {% if iscrizione_filtro %}
-                Rate servizio extra {{ iscrizione_filtro }}
-            {% elif servizio_filtro %}
-                Rate {{ servizio_filtro.nome_servizio }}
-            {% else %}
-                Rate servizi extra
-            {% endif %}
-        </h1>
-        <div class="page-head-actions">
-            {% if servizio_filtro %}
-                <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary">Scheda servizio</a>
-            {% endif %}
-            {% if iscrizione_filtro %}
-                <a href="{% url 'modifica_iscrizione_servizio_extra' iscrizione_filtro.pk %}" class="btn btn-secondary">Apri iscrizione</a>
-            {% endif %}
-            {% if servizio_filtro %}
-                <a href="{% url 'lista_rate_servizi_extra' %}" class="btn btn-secondary">Tutte le rate</a>
-            {% endif %}
-            <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary">Torna alle iscrizioni</a>
+    <div class="scambio-list-shell servizi-extra-rate-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">
+                            {% if iscrizione_filtro %}
+                                Rate servizio extra {{ iscrizione_filtro }}
+                            {% elif servizio_filtro %}
+                                Rate {{ servizio_filtro.nome_servizio }}
+                            {% else %}
+                                Rate servizi extra
+                            {% endif %}
+                        </h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ rate_stats.totale }} {% if rate_stats.totale == 1 %}rata{% else %}rate{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        Scadenze, importi e pagamenti dei servizi extra
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                {% if servizio_filtro %}
+                    <a href="{% url 'dettaglio_servizio_extra' servizio_filtro.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                        <span class="btn-label">Scheda servizio</span>
+                    </a>
+                {% endif %}
+                {% if iscrizione_filtro %}
+                    <a
+                        href="{% url 'modifica_iscrizione_servizio_extra' iscrizione_filtro.pk %}?popup=1"
+                        class="btn btn-secondary btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'modifica_iscrizione_servizio_extra' iscrizione_filtro.pk %}?popup=1"
+                        data-popup-window-name="arboris-servizio-extra-iscrizione-popup"
+                        data-popup-window-features="width=1040,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                        <span class="btn-label">Apri iscrizione</span>
+                    </a>
+                {% endif %}
+                {% if servizio_filtro or iscrizione_filtro %}
+                    <a href="{% url 'lista_rate_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Tutte le rate</span>
+                    </a>
+                {% endif %}
+                <a href="{% url 'lista_iscrizioni_servizi_extra' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Iscrizioni</span>
+                </a>
+            </div>
         </div>
-    </div>
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Studente</th>
-                    <th>Servizio</th>
-                    <th>Anno scolastico</th>
-                    <th>Voce piano</th>
-                    <th>Scadenza</th>
-                    <th>Importo dovuto</th>
-                    <th>Pagata</th>
-                    <th>Importo pagato</th>
-                    <th>Metodo pagamento</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for rata in rate %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_rata_servizio_extra' rata.pk %}">
-                        <td>{{ rata.iscrizione.studente }}</td>
-                        <td>{{ rata.iscrizione.servizio.nome_servizio }}</td>
-                        <td>{{ rata.iscrizione.servizio.anno_scolastico.nome_anno_scolastico }}</td>
-                        <td>{{ rata.display_label }}</td>
-                        <td>{{ rata.data_scadenza|date:"d/m/Y" }}</td>
-                        <td>EUR {{ rata.importo_dovuto|euro }}</td>
-                        <td>{% if rata.pagata %}Si{% else %}No{% endif %}</td>
-                        <td>EUR {{ rata.importo_pagato|euro }}</td>
-                        <td>{{ rata.metodo_pagamento|default:"-" }}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_rata_servizio_extra' rata.pk %}" class="table-link">Gestisci pagamento</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="10"><div class="empty-state">Nessuna rata disponibile.</div></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo rate servizi extra">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Rate totali</span>
+                    <strong class="scambio-list-kpi-value">{{ rate_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">{{ rate_stats.studenti }} studenti coinvolti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Rate pagate</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ rate_stats.pagate }}</strong>
+                    <span class="scambio-list-kpi-note">Incassato EUR {{ rate_stats.totale_pagato|euro }}</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Aperte</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ rate_stats.aperte }}</strong>
+                    <span class="scambio-list-kpi-note">{{ rate_stats.scadute }} scadute</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Residuo</span>
+                    <strong class="scambio-list-kpi-value is-compact">EUR {{ rate_stats.residuo|euro }}</strong>
+                    <span class="scambio-list-kpi-note">Su EUR {{ rate_stats.totale_dovuto|euro }}</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="servizi-extra-rate-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="servizi-extra-rate-title">Elenco rate</h2>
+                    <p>Rate generate dalle iscrizioni ai servizi extra.</p>
+                </div>
+                <div class="scambio-list-tools">
+                    <label class="scambio-list-search">
+                        <span class="scambio-list-search-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                        </span>
+                        <input type="search" data-servizi-extra-rate-search placeholder="Cerca studente, servizio, rata..." aria-label="Cerca rate servizi extra">
+                    </label>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table servizi-extra-rate-list-table">
+                    <colgroup>
+                        <col class="servizi-extra-rate-col-student">
+                        <col class="servizi-extra-rate-col-service">
+                        <col class="servizi-extra-rate-col-due">
+                        <col class="servizi-extra-rate-col-amount">
+                        <col class="servizi-extra-rate-col-paid">
+                        <col class="servizi-extra-rate-col-status">
+                        <col class="servizi-extra-rate-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Studente</th>
+                            <th>Servizio</th>
+                            <th>Scadenza</th>
+                            <th>Dovuto</th>
+                            <th>Pagato</th>
+                            <th>Stato</th>
+                            <th class="servizi-extra-rate-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rata in rate %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_rata_servizio_extra' rata.pk %}"
+                                data-servizi-extra-rate-row
+                            >
+                                <td class="scambio-list-main-cell servizi-extra-rate-main-cell">
+                                    <a href="{% url 'modifica_rata_servizio_extra' rata.pk %}" class="scambio-list-main-link">
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ rata.iscrizione.studente }}</strong>
+                                            <span>{{ rata.display_label }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    <strong class="servizi-extra-rate-service">{{ rata.iscrizione.servizio.nome_servizio }}</strong>
+                                    <div class="servizi-extra-rate-meta">{{ rata.iscrizione.servizio.anno_scolastico.nome_anno_scolastico }}</div>
+                                </td>
+                                <td>
+                                    <strong>{{ rata.data_scadenza|date:"d/m/Y" }}</strong>
+                                    <div class="servizi-extra-rate-meta">{{ rata.iscrizione.tariffa.nome_tariffa }}</div>
+                                </td>
+                                <td class="scambio-list-amount">EUR {{ rata.importo_finale|default:rata.importo_dovuto|euro }}</td>
+                                <td>
+                                    <span class="scambio-list-amount">EUR {{ rata.importo_pagato|euro }}</span>
+                                    <div class="servizi-extra-rate-meta">{{ rata.metodo_pagamento|default:"-" }}</div>
+                                </td>
+                                <td>
+                                    {% if rata.pagata %}
+                                        <span class="scambio-list-status-chip is-success">Pagata</span>
+                                    {% elif rata.stato_lista == "Scaduta" %}
+                                        <span class="scambio-list-status-chip is-danger">Scaduta</span>
+                                    {% else %}
+                                        <span class="scambio-list-status-chip is-amber">Da pagare</span>
+                                    {% endif %}
+                                    {% if rata.residuo_lista > 0 %}
+                                        <div class="servizi-extra-rate-meta">Residuo EUR {{ rata.residuo_lista|euro }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions servizi-extra-rate-actions">
+                                        <a href="{% url 'modifica_rata_servizio_extra' rata.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                                            <span class="btn-label">Pagamento</span>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7"><div class="empty-state">Nessuna rata disponibile.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="servizi-extra-rate-empty-filter-row" hidden>
+                            <td colspan="7"><div class="empty-state">Nessuna rata corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scambio-list-footer">
+                <span data-servizi-extra-rate-count>
+                    {{ rate_stats.totale }} {% if rate_stats.totale == 1 %}rata{% else %}rate{% endif %}
+                </span>
+            </div>
+        </section>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -94,6 +243,27 @@
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
             }
+
+            const searchInput = document.querySelector("[data-servizi-extra-rate-search]");
+            const rows = Array.from(document.querySelectorAll("[data-servizi-extra-rate-row]"));
+            const emptyRow = document.querySelector(".servizi-extra-rate-empty-filter-row");
+            const countNode = document.querySelector("[data-servizi-extra-rate-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            searchInput.addEventListener("input", function () {
+                const needle = searchInput.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+                    row.hidden = !matches;
+                    if (matches) visibleCount += 1;
+                });
+
+                if (emptyRow) emptyRow.hidden = visibleCount !== 0;
+                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " rata" : " rate");
+            });
         });
     </script>
 {% endblock %}

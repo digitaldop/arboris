@@ -36,13 +36,13 @@ class PianoAccantonamentoForm(forms.ModelForm):
             "data_primo_versamento": "Data primo versamento (periodici)",
             "importo_versamento_periodico": "Importo versamento periodico",
             "tipo_deposito": "Dove sono tenuti i fondi",
-            "descrizione_deposito": "Descrizione (banca, cassa, …)",
+            "descrizione_deposito": "Descrizione (banca, cassa, ...)",
             "coordinate_riferimento": "Coordinate / note accesso (sensibili)",
         }
         help_texts = {
-            "sempre_attivo": "Se abiliti questa opzione, non selezionare l'anno scolastico: le regole automatiche (percentuale rette, sconti agev., ecc.) si applicano a ogni anno. Utile per un conto/ deposito condiviso.",
+            "sempre_attivo": "Se abiliti questa opzione, non selezionare l'anno scolastico: le regole automatiche (percentuale rette, sconti agev., ecc.) si applicano a ogni anno. Utile per un conto/deposito condiviso.",
             "modalita": "Versamenti e prelievi manuali sono sempre possibili; le altre opzioni abilitano percentuale e/o scadenze periodiche.",
-            "percentuale_su_rette": "Esempio: 2,50 per il 2,5% trattenuto sulle rette. Modificabile solo con modalità su percentuale o mista.",
+            "percentuale_su_rette": "Esempio: 2,50 per il 2,5% trattenuto sulle rette. Modificabile solo con modalita' su percentuale o mista.",
             "data_primo_versamento": "Base per calcolare le scadenze. Modificabile solo con versamenti periodici o mista.",
         }
 
@@ -88,7 +88,7 @@ class PianoAccantonamentoForm(forms.ModelForm):
             if not ha_pct and not ha_period:
                 self.add_error(
                     None,
-                    "In modalita' «Percentuale sulle rette e Versamenti periodici» imposta almeno la percentuale oppure i versamenti periodici (date e importi).",
+                    "In modalita' Percentuale sulle rette e Versamenti periodici imposta almeno la percentuale oppure i versamenti periodici (date e importi).",
                 )
             if ha_pct and (data.get("percentuale_su_rette") or 0) <= 0:
                 self.add_error("percentuale_su_rette", "Percentuale non valida.")
@@ -124,6 +124,10 @@ class VersamentoFondoForm(forms.ModelForm):
             "note": "Note",
         }
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["note"].widget = forms.Textarea(attrs={"rows": 2})
+
 
 class PrelievoFondoForm(forms.ModelForm):
     """Prelievo dal fondo (manuale)."""
@@ -138,6 +142,11 @@ class PrelievoFondoForm(forms.ModelForm):
             "motivo": "Motivazione",
             "note": "Note aggiuntive",
         }
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["motivo"].widget = forms.Textarea(attrs={"rows": 1})
+        self.fields["note"].widget = forms.Textarea(attrs={"rows": 2})
 
     def clean(self):
         d = super().clean()

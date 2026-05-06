@@ -5,6 +5,7 @@ window.ArborisRichNotes = (function () {
     const BLOCK_TAGS = new Set(["DIV", "P", "LI"]);
     let observer = null;
     let refreshQueued = false;
+    let popupNotePanelId = 0;
 
     function escapeHtml(value) {
         return value
@@ -67,6 +68,108 @@ window.ArborisRichNotes = (function () {
             textarea.readOnly ||
             textarea.closest("fieldset[disabled]")
         );
+    }
+
+    function shouldUsePopupNoteCollapse(textarea) {
+        if (!textarea || textarea.dataset.popupNoteCollapse === "false") {
+            return false;
+        }
+
+        return Boolean(
+            document.body &&
+            document.body.classList.contains("popup-page") &&
+            !textarea.closest("fieldset[disabled]")
+        );
+    }
+
+    function hasNearbyErrors(textarea) {
+        if (!textarea) {
+            return false;
+        }
+
+        const field = textarea.closest([
+            ".scambio-retta-field",
+            ".calendar-event-field",
+            ".budget-voice-form-field",
+            ".supplier-document-field",
+            ".supplier-deadline-note-row",
+            ".interested-field",
+            ".inline-details-field",
+            ".form-table tr",
+        ].join(", "));
+
+        return Boolean(field && field.querySelector(".errorlist"));
+    }
+
+    function getPopupNoteLabel(textarea) {
+        if (textarea.dataset.popupNoteLabel) {
+            return textarea.dataset.popupNoteLabel;
+        }
+
+        let explicitLabel = null;
+        if (textarea.id && window.CSS && typeof window.CSS.escape === "function") {
+            explicitLabel = document.querySelector(`label[for="${CSS.escape(textarea.id)}"]`);
+        }
+
+        const fieldLabel = explicitLabel || textarea.closest("label");
+        const labelText = fieldLabel ? fieldLabel.textContent.replace(/\s+/g, " ").trim() : "";
+
+        return labelText || "Note aggiuntive";
+    }
+
+    function updatePopupNoteStatus(wrapper, textarea) {
+        const status = wrapper ? wrapper.querySelector("[data-popup-note-status]") : null;
+        if (!status || !textarea) {
+            return;
+        }
+
+        const hasContent = Boolean((textarea.value || "").trim());
+        const isOpen = wrapper.classList.contains("is-open");
+        status.textContent = hasContent ? "Note presenti" : (isOpen ? "Nessuna nota" : "Clicca per espandere");
+    }
+
+    function setPopupNoteCollapsedState(wrapper, isOpen) {
+        if (!wrapper) {
+            return;
+        }
+
+        const button = wrapper.querySelector(".popup-note-toggle");
+        const panel = wrapper.querySelector(".popup-note-panel");
+
+        if (!button || !panel) {
+            return;
+        }
+
+        wrapper.classList.toggle("is-open", isOpen);
+        button.classList.toggle("is-open", isOpen);
+        button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        button.setAttribute("title", isOpen ? "Clicca per chiudere" : "Clicca per espandere");
+        panel.hidden = !isOpen;
+        updatePopupNoteStatus(wrapper, wrapper.querySelector("textarea"));
+    }
+
+    function createPopupNoteToggle(textarea) {
+        const button = document.createElement("button");
+        const panelId = `popup-note-panel-${++popupNotePanelId}`;
+
+        button.type = "button";
+        button.className = "popup-note-toggle";
+        button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-controls", panelId);
+        button.setAttribute("title", "Clicca per espandere");
+        button.innerHTML = `
+            <span class="popup-note-toggle-copy">
+                <strong>${escapeHtml(getPopupNoteLabel(textarea))}</strong>
+                <small data-popup-note-status>Clicca per espandere</small>
+            </span>
+            <span class="popup-note-toggle-icon" aria-hidden="true"></span>
+        `;
+
+        const panel = document.createElement("div");
+        panel.className = "popup-note-panel";
+        panel.id = panelId;
+
+        return { button, panel };
     }
 
     function createToolbarButton(label, command, title) {
@@ -290,6 +393,16 @@ window.ArborisRichNotes = (function () {
     function buildField(textarea) {
         const wrapper = document.createElement("div");
         wrapper.className = "rich-note-field";
+        const collapseInPopup = shouldUsePopupNoteCollapse(textarea);
+        let popupNoteToggle = null;
+        let popupNotePanel = null;
+
+        if (collapseInPopup) {
+            wrapper.classList.add("popup-note-collapsible");
+            const popupNoteParts = createPopupNoteToggle(textarea);
+            popupNoteToggle = popupNoteParts.button;
+            popupNotePanel = popupNoteParts.panel;
+        }
 
         const toolbar = document.createElement("div");
         toolbar.className = "rich-note-toolbar";
@@ -308,10 +421,27 @@ window.ArborisRichNotes = (function () {
         preview.className = "rich-note-preview";
 
         textarea.parentNode.insertBefore(wrapper, textarea);
-        wrapper.appendChild(toolbar);
-        wrapper.appendChild(editor);
-        wrapper.appendChild(preview);
-        wrapper.appendChild(textarea);
+        if (collapseInPopup) {
+            wrapper.appendChild(popupNoteToggle);
+            wrapper.appendChild(popupNotePanel);
+            popupNotePanel.appendChild(toolbar);
+            popupNotePanel.appendChild(editor);
+            popupNotePanel.appendChild(preview);
+            popupNotePanel.appendChild(textarea);
+        } else {
+            wrapper.appendChild(toolbar);
+            wrapper.appendChild(editor);
+            wrapper.appendChild(preview);
+            wrapper.appendChild(textarea);
+        }
+
+        if (popupNoteToggle) {
+            popupNoteToggle.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setPopupNoteCollapsedState(wrapper, !wrapper.classList.contains("is-open"));
+            });
+        }
 
         toolbar.addEventListener("click", function (event) {
             const button = event.target.closest(".rich-note-toolbar-btn");
@@ -321,6 +451,7 @@ window.ArborisRichNotes = (function () {
 
             applyCommand(editor, button.dataset.command || "");
             syncTextareaFromEditor(textarea);
+            updatePopupNoteStatus(wrapper, textarea);
             updateToolbarState(wrapper);
         });
 
@@ -332,6 +463,7 @@ window.ArborisRichNotes = (function () {
 
         editor.addEventListener("input", function () {
             syncTextareaFromEditor(textarea);
+            updatePopupNoteStatus(wrapper, textarea);
             updateToolbarState(wrapper);
         });
 
@@ -344,6 +476,7 @@ window.ArborisRichNotes = (function () {
             event.preventDefault();
             applyCommand(editor, command);
             syncTextareaFromEditor(textarea);
+            updatePopupNoteStatus(wrapper, textarea);
             updateToolbarState(wrapper);
         });
 
@@ -361,6 +494,7 @@ window.ArborisRichNotes = (function () {
 
         editor.addEventListener("blur", function () {
             syncTextareaFromEditor(textarea);
+            updatePopupNoteStatus(wrapper, textarea);
             updateToolbarState(wrapper);
         });
 
@@ -380,11 +514,13 @@ window.ArborisRichNotes = (function () {
             }
 
             syncTextareaFromEditor(textarea);
+            updatePopupNoteStatus(wrapper, textarea);
             updateToolbarState(wrapper);
         });
 
         textarea.addEventListener("input", function () {
             syncEditorFromTextarea(textarea, false);
+            updatePopupNoteStatus(wrapper, textarea);
         });
 
         textarea.classList.add("rich-note-source");
@@ -392,6 +528,11 @@ window.ArborisRichNotes = (function () {
         textarea.dataset.richNotesLastValue = textarea.value || "";
         setEditorHtml(editor, textarea.value || "");
         updateToolbarState(wrapper);
+        updatePopupNoteStatus(wrapper, textarea);
+
+        if (collapseInPopup) {
+            setPopupNoteCollapsedState(wrapper, hasNearbyErrors(textarea));
+        }
     }
 
     function enhanceTextarea(textarea) {
@@ -422,6 +563,7 @@ window.ArborisRichNotes = (function () {
         }
 
         syncEditorFromTextarea(textarea, false);
+        updatePopupNoteStatus(wrapper, textarea);
 
         wrapper.classList.toggle("is-readonly", readonly);
         toolbar.hidden = readonly;

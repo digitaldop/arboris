@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load currency active_toggles %}
 
 {% block title %}Simulazioni costo - Dipendenti e collaboratori{% endblock %}
 
@@ -98,7 +98,7 @@
                                 <span class="table-muted">-</span>
                             {% endif %}
                         </td>
-                        <td>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</td>
+                        <td>{% active_toggle simulazione %}</td>
                         <td class="actions-cell">
                             <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">Modifica</a>
                             {% if can_manage_gestione_amministrativa %}

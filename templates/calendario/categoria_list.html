@@ -1,5 +1,5 @@
 {% extends base_template %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Categorie calendario - Arboris{% endblock %}
 
@@ -78,9 +78,7 @@
                                 </div>
                             </div>
                             <div class="calendar-category-row-status">
-                                <span class="calendar-state-pill {% if categoria_obj.attiva %}is-active{% else %}is-muted{% endif %}">
-                                    {% if categoria_obj.attiva %}Attiva{% else %}Non attiva{% endif %}
-                                </span>
+                                {% active_toggle categoria_obj %}
                             </div>
                             <div class="calendar-category-row-actions">
                                 <a href="{{ modifica_categoria_url }}?popup=1" class="btn btn-secondary btn-sm" data-window-popup="1" data-popup-url="{{ modifica_categoria_url }}?popup=1" data-popup-window-features="width=820,height=640,resizable=yes,scrollbars=yes">Modifica</a>

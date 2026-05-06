@@ -15,10 +15,12 @@ from economia.forms import (
     TariffaCondizioneIscrizioneForm,
 )
 from economia.models import (
+    Agevolazione,
     CondizioneIscrizione,
     Iscrizione,
     MetodoPagamento,
     RataIscrizione,
+    ScambioRetta,
     StatoIscrizione,
     TariffaCondizioneIscrizione,
     TariffaScambioRetta,
@@ -109,6 +111,150 @@ class EconomiaCurrencyWidgetTests(TestCase):
         self.assertNotContains(response, "form-table")
 
 
+class CondizioneIscrizionePopupLayoutTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+            attiva=True,
+        )
+
+    def test_condizioni_list_opens_crud_actions_in_popup(self):
+        response = self.client.get(reverse("lista_condizioni_iscrizione"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "condizioni-list-table")
+        self.assertContains(response, "data-popup-url=\"/economia/condizioni-iscrizione/nuova/?popup=1\"")
+        self.assertContains(
+            response,
+            f"data-row-popup-url=\"/economia/condizioni-iscrizione/{self.condizione.pk}/modifica/?popup=1\"",
+        )
+        self.assertContains(response, "arboris-condizione-iscrizione-delete-popup")
+
+    def test_condizione_popup_form_uses_card_layout(self):
+        response = self.client.get(reverse("modifica_condizione_iscrizione", args=[self.condizione.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "condizione-form-shell")
+        self.assertContains(response, "Dati condizione")
+        self.assertContains(response, "fondo-plan-switch-ui")
+        self.assertNotContains(response, "form-table")
+
+    def test_condizione_delete_popup_uses_card_layout(self):
+        response = self.client.get(reverse("elimina_condizione_iscrizione", args=[self.condizione.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "condizione-delete-card")
+        self.assertContains(response, "Conferma eliminazione")
+        self.assertNotContains(response, "empty-state")
+
+
+class TariffaCondizionePopupLayoutTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+            attiva=True,
+        )
+        self.tariffa = TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("2800.00"),
+            preiscrizione=Decimal("250.00"),
+            attiva=True,
+        )
+
+    def test_tariffe_list_opens_crud_actions_in_popup(self):
+        response = self.client.get(reverse("lista_tariffe_condizione_iscrizione"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tariffe-condizioni-list-table")
+        self.assertContains(response, "data-popup-url=\"/economia/tariffe-condizione-iscrizione/nuova/?popup=1\"")
+        self.assertContains(
+            response,
+            f"data-row-popup-url=\"/economia/tariffe-condizione-iscrizione/{self.tariffa.pk}/modifica/?popup=1\"",
+        )
+        self.assertContains(response, "arboris-tariffa-condizione-delete-popup")
+
+    def test_tariffa_popup_form_uses_card_layout(self):
+        response = self.client.get(reverse("modifica_tariffa_condizione_iscrizione", args=[self.tariffa.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tariffa-condizione-form-shell")
+        self.assertContains(response, "Dati tariffa")
+        self.assertContains(response, "fondo-plan-switch-ui")
+        self.assertNotContains(response, "form-table")
+
+    def test_tariffa_delete_popup_uses_card_layout(self):
+        response = self.client.get(reverse("elimina_tariffa_condizione_iscrizione", args=[self.tariffa.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tariffa-condizione-delete-card")
+        self.assertContains(response, "Conferma eliminazione")
+        self.assertNotContains(response, "empty-state")
+
+
+class AgevolazionePopupLayoutTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.agevolazione = Agevolazione.objects.create(
+            nome_agevolazione="ISEE",
+            importo_annuale_agevolazione=Decimal("500.00"),
+            attiva=True,
+        )
+
+    def test_agevolazioni_list_opens_crud_actions_in_popup(self):
+        response = self.client.get(reverse("lista_agevolazioni"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "agevolazioni-list-table")
+        self.assertContains(response, "data-popup-url=\"/economia/agevolazioni/nuova/?popup=1\"")
+        self.assertContains(
+            response,
+            f"data-row-popup-url=\"/economia/agevolazioni/{self.agevolazione.pk}/modifica/?popup=1\"",
+        )
+        self.assertContains(response, "arboris-agevolazione-delete-popup")
+
+    def test_agevolazione_popup_form_uses_card_layout(self):
+        response = self.client.get(reverse("modifica_agevolazione", args=[self.agevolazione.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "agevolazione-form-shell")
+        self.assertContains(response, "Dati agevolazione")
+        self.assertContains(response, "fondo-plan-switch-ui")
+        self.assertNotContains(response, "form-table")
+
+    def test_agevolazione_delete_popup_uses_card_layout(self):
+        response = self.client.get(reverse("elimina_agevolazione", args=[self.agevolazione.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "agevolazione-delete-card")
+        self.assertContains(response, "Conferma eliminazione")
+        self.assertNotContains(response, "empty-state")
+
+
 class ScambioRettaFormFamilySyncTests(TestCase):
     def setUp(self):
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
@@ -141,6 +287,13 @@ class ScambioRettaFormFamilySyncTests(TestCase):
         self.assertEqual(form.fields["famiglia"].widget.attrs["aria-disabled"], "true")
         self.assertEqual(form.fields["famiglia"].widget.attrs["data-keep-submitted-locked"], "1")
 
+    def test_tariffa_choice_label_shows_currency_symbol(self):
+        form = ScambioRettaForm()
+
+        label = form.fields["tariffa_scambio_retta"].label_from_instance(self.tariffa)
+
+        self.assertEqual(label, "Standard - 10.00 \u20ac")
+
     def test_famiglia_is_derived_from_selected_familiare_on_submit(self):
         form = ScambioRettaForm(
             data={
@@ -164,6 +317,70 @@ class ScambioRettaFormFamilySyncTests(TestCase):
 
         self.assertIn(self.studente, form.fields["studente"].queryset)
         self.assertNotIn(self.altro_studente, form.fields["studente"].queryset)
+
+    def test_studenti_choices_are_rendered_for_client_side_filtering(self):
+        form = ScambioRettaForm()
+
+        self.assertIn(self.studente, form.fields["studente"].queryset)
+        self.assertIn(self.altro_studente, form.fields["studente"].queryset)
+        rendered = str(form["studente"])
+        self.assertIn(f'data-famiglia-id="{self.famiglia.pk}"', rendered)
+        self.assertIn(f'data-famiglia-id="{self.altra_famiglia.pk}"', rendered)
+
+
+class ScambioRettaPopupModeTests(TestCase):
+    def setUp(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta")
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore")
+        self.famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato)
+        self.familiare = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=relazione,
+            nome="Mario",
+            cognome="Bianchi",
+            abilitato_scambio_retta=True,
+        )
+        self.studente = Studente.objects.create(famiglia=self.famiglia, nome="Luca", cognome="Bianchi")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.tariffa = TariffaScambioRetta.objects.create(valore_orario=Decimal("10.00"), definizione="Standard")
+        self.scambio = ScambioRetta.objects.create(
+            familiare=self.familiare,
+            famiglia=self.famiglia,
+            studente=self.studente,
+            anno_scolastico=self.anno,
+            mese_riferimento=9,
+            ore_lavorate=Decimal("2.00"),
+            tariffa_scambio_retta=self.tariffa,
+        )
+
+    def test_list_edit_action_opens_popup_in_edit_mode(self):
+        response = self.client.get(reverse("lista_scambi_retta"))
+
+        self.assertEqual(response.status_code, 200)
+        edit_url = f"{reverse('modifica_scambio_retta', kwargs={'pk': self.scambio.pk})}?popup=1&edit=1"
+        self.assertContains(response, edit_url)
+
+    def test_popup_detail_starts_in_edit_mode_when_requested(self):
+        url = reverse("modifica_scambio_retta", kwargs={"pk": self.scambio.pk})
+
+        view_response = self.client.get(url, {"popup": "1"})
+        edit_response = self.client.get(url, {"popup": "1", "edit": "1"})
+
+        self.assertContains(view_response, "startInEditMode: false")
+        self.assertContains(edit_response, "startInEditMode: true")
+
+    def test_popup_status_fields_do_not_render_toggle_or_checkbox(self):
+        response = self.client.get(reverse("modifica_scambio_retta", kwargs={"pk": self.scambio.pk}), {"popup": "1"})
+
+        self.assertNotContains(response, "fondo-plan-switch-control")
+        self.assertNotContains(response, 'type="checkbox"')
 
 
 class EconomiaBatchRateTests(TestCase):

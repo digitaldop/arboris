@@ -1,127 +1,227 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}{% if is_new %}Nuovo ruolo{% else %}{{ ruolo_obj.nome }}{% endif %} - Arboris{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_utenti' %}">Utenti</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_ruoli_utenti' %}">Ruoli</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if is_new %}Nuovo ruolo{% else %}{{ ruolo_obj.nome }}{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_utenti' %}">Utenti</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_ruoli_utenti' %}">Ruoli</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if is_new %}Nuovo ruolo{% else %}{{ ruolo_obj.nome }}{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if is_new %}Nuovo ruolo{% else %}{{ ruolo_obj.nome }}{% endif %}</h1>
-        <div class="page-head-actions">
-            {% if can_manage_sistema %}
-                <button type="submit" form="ruolo-form" class="btn btn-save-soft page-head-save-btn">Salva</button>
-            {% endif %}
-            <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary">Torna all'elenco</a>
-        </div>
-    </div>
-
-    <form method="post" id="ruolo-form">
-        {% csrf_token %}
-        <div class="family-top-layout">
-            <div class="family-main-column">
-                <div class="admin-section">
-                    <div class="admin-section-title">Dati ruolo</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table">
-                                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
-                                <tr>
-                                    <th>{{ form.descrizione.label_tag }}</th>
-                                    <td>{{ form.descrizione }} {{ form.descrizione.errors }}</td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.colore_principale.label_tag }}</th>
-                                    <td>
-                                        {{ form.colore_principale }} {{ form.colore_principale.errors }}
-                                        {% if form.colore_principale.help_text %}
-                                            <div class="help-text">{{ form.colore_principale.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <div class="admin-section-title">Permessi moduli</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table">
-                                <tr><th>{{ form.permesso_anagrafica.label_tag }}</th><td>{{ form.permesso_anagrafica }} {{ form.permesso_anagrafica.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_famiglie_interessate.label_tag }}</th><td>{{ form.permesso_famiglie_interessate }} {{ form.permesso_famiglie_interessate.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_economia.label_tag }}</th><td>{{ form.permesso_economia }} {{ form.permesso_economia.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_sistema.label_tag }}</th><td>{{ form.permesso_sistema }} {{ form.permesso_sistema.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_calendario.label_tag }}</th><td>{{ form.permesso_calendario }} {{ form.permesso_calendario.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_gestione_finanziaria.label_tag }}</th><td>{{ form.permesso_gestione_finanziaria }} {{ form.permesso_gestione_finanziaria.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_gestione_amministrativa.label_tag }}</th><td>{{ form.permesso_gestione_amministrativa }} {{ form.permesso_gestione_amministrativa.errors }}</td></tr>
-                                <tr><th>{{ form.permesso_servizi_extra.label_tag }}</th><td>{{ form.permesso_servizi_extra }} {{ form.permesso_servizi_extra.errors }}</td></tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+    <div class="system-role-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="system-role-form-head">
+            <span class="system-role-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+            </span>
+            <div class="system-role-head-copy">
+                <p class="section-eyebrow">Sistema</p>
+                <h1 class="page-title">{% if is_new %}Nuovo ruolo{% else %}{{ ruolo_obj.nome }}{% endif %}</h1>
+                <p>Definisci accessi, permessi e colore operativo collegato agli utenti.</p>
             </div>
+            {% if not popup %}
+                <div class="system-role-head-actions">
+                    <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                    {% if ruolo_obj and can_manage_sistema %}
+                        <a
+                            href="{% url 'elimina_ruolo_utente' ruolo_obj.pk %}?popup=1"
+                            class="btn btn-danger btn-icon-text"
+                            data-window-popup="1"
+                            data-popup-url="{% url 'elimina_ruolo_utente' ruolo_obj.pk %}?popup=1"
+                            data-popup-window-name="arboris-ruolo-delete-popup"
+                            data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                        >
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            <span class="btn-label">Elimina</span>
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
 
-            <div class="family-side-column">
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Permessi speciali</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table compact-form-table">
-                                <tr>
-                                    <th>{{ form.controllo_completo.label_tag }}</th>
-                                    <td>
-                                        {{ form.controllo_completo }} {{ form.controllo_completo.errors }}
-                                        {% if form.controllo_completo.help_text %}
-                                            <div class="help-text">{{ form.controllo_completo.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr><th>{{ form.amministratore_operativo.label_tag }}</th><td>{{ form.amministratore_operativo }} {{ form.amministratore_operativo.errors }}</td></tr>
-                                <tr><th>{{ form.accesso_backup_database.label_tag }}</th><td>{{ form.accesso_backup_database }} {{ form.accesso_backup_database.errors }}</td></tr>
-                            </table>
-                        </div>
+        <form method="post" id="ruolo-form" class="system-role-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {{ form.non_field_errors }}
+
+            <section class="system-role-card" aria-labelledby="role-data-title">
+                <div class="system-role-card-head">
+                    <span class="system-role-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="role-data-title">Dati ruolo</h2>
+                        <p>Nome, colore e stato operativo del ruolo.</p>
                     </div>
                 </div>
+                <div class="system-role-form-grid">
+                    <label class="system-role-field">
+                        <span class="system-role-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <span class="system-role-field-body">
+                            <span class="system-role-label">{{ form.nome.label }}</span>
+                            {{ form.nome }}
+                            {{ form.nome.errors }}
+                        </span>
+                    </label>
+                    <label class="system-role-field is-color-field">
+                        <span class="system-role-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <span class="system-role-field-body">
+                            <span class="system-role-label">{{ form.colore_principale.label }}</span>
+                            <span class="system-role-color-control">{{ form.colore_principale }}</span>
+                            {{ form.colore_principale.errors }}
+                            {% if form.colore_principale.help_text %}
+                                <span class="system-role-help">{{ form.colore_principale.help_text }}</span>
+                            {% endif %}
+                        </span>
+                    </label>
+                    <label class="system-role-check-card is-inline-check">
+                        <span class="system-role-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span class="system-role-check-copy">
+                            <strong>{{ form.attivo.label }}</strong>
+                            <span>Se disattivato, il ruolo non influenza piu i permessi degli utenti.</span>
+                            {{ form.attivo.errors }}
+                        </span>
+                        {{ form.attivo }}
+                    </label>
+                    <label class="system-role-field is-wide">
+                        <span class="system-role-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <span class="system-role-field-body">
+                            <span class="system-role-label">{{ form.descrizione.label }}</span>
+                            {{ form.descrizione }}
+                            {{ form.descrizione.errors }}
+                        </span>
+                    </label>
+                </div>
+            </section>
 
-                {% if ruolo_obj %}
-                    <div class="admin-section compact">
-                        <div class="admin-section-title">Riepilogo</div>
-                        <div class="panel">
-                            <div class="panel-body summary-panel-body">
-                                <div class="summary-grid">
-                                    <div class="summary-item">
-                                        <div class="summary-value">{{ count_utenti|default:0 }}</div>
-                                        <div class="summary-label">Utenti collegati</div>
-                                    </div>
-                                    <div class="summary-item">
-                                        <div class="summary-value">{% if ruolo_obj.attivo %}Si{% else %}No{% endif %}</div>
-                                        <div class="summary-label">Ruolo attivo</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <section class="system-role-card" aria-labelledby="role-modules-title">
+                <div class="system-role-card-head">
+                    <span class="system-role-card-icon is-green" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="role-modules-title">Permessi moduli</h2>
+                        <p>Scegli il livello di accesso per ogni area applicativa.</p>
                     </div>
+                </div>
+                <div class="system-role-permissions-grid">
+                    {% for item in module_permission_fields %}
+                        <label class="system-role-field">
+                            <span class="system-role-field-icon is-{{ item.tone }}" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{{ item.icon }}"></use></svg>
+                            </span>
+                            <span class="system-role-field-body">
+                                <span class="system-role-label">{{ item.field.label }}</span>
+                                {{ item.field }}
+                                {{ item.field.errors }}
+                            </span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="system-role-card" aria-labelledby="role-special-title">
+                <div class="system-role-card-head">
+                    <span class="system-role-card-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="role-special-title">Permessi speciali</h2>
+                        <p>Abilitazioni trasversali riservate ai profili autorizzati.</p>
+                    </div>
+                </div>
+                <div class="system-role-check-grid">
+                    {% for item in special_permission_fields %}
+                        <label class="system-role-check-card">
+                            <span class="system-role-field-icon is-{{ item.tone }}" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{{ item.icon }}"></use></svg>
+                            </span>
+                            <span class="system-role-check-copy">
+                                <strong>{{ item.field.label }}</strong>
+                                {% if item.field.help_text %}
+                                    <span>{{ item.field.help_text }}</span>
+                                {% else %}
+                                    <span>Attiva questa abilitazione per gli utenti collegati al ruolo.</span>
+                                {% endif %}
+                                {{ item.field.errors }}
+                            </span>
+                            {{ item.field }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% if ruolo_obj %}
+                <section class="system-role-summary-grid" aria-label="Riepilogo ruolo">
+                    <article class="system-role-summary-card">
+                        <span class="system-role-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                        </span>
+                        <div>
+                            <span>Utenti collegati</span>
+                            <strong>{{ count_utenti|default:0 }}</strong>
+                        </div>
+                    </article>
+                    <article class="system-role-summary-card">
+                        <span class="system-role-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <div>
+                            <span>Ruolo attivo</span>
+                            <strong>{% if ruolo_obj.attivo %}Si{% else %}No{% endif %}</strong>
+                        </div>
+                    </article>
+                    <article class="system-role-summary-card">
+                        <span class="system-role-field-icon is-red" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <div>
+                            <span>Controllo completo</span>
+                            <strong>{% if ruolo_obj.controllo_completo %}Si{% else %}No{% endif %}</strong>
+                        </div>
+                    </article>
+                </section>
+            {% endif %}
+
+            <div class="system-role-form-actions">
+                {% if can_manage_sistema %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">{% if is_new %}Crea ruolo{% else %}Salva modifiche{% endif %}</span>
+                    </button>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
                 {% endif %}
             </div>
-        </div>
-
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_sistema %}
-                <button type="submit" class="btn btn-primary">{% if is_new %}Crea ruolo{% else %}Salva modifiche{% endif %}</button>
-            {% endif %}
-            <a href="{% url 'lista_ruoli_utenti' %}" class="btn btn-secondary">Annulla</a>
-        </div>
-    </form>
+        </form>
+    </div>
 {% endblock %}

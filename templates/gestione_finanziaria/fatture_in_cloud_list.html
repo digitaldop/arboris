@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static currency %}
+{% load static currency active_toggles %}
 
 {% block title %}Fatture in Cloud - Arboris School Management{% endblock %}
 
@@ -59,6 +59,7 @@
                         <tr>
                             <th>Connessione</th>
                             <th>Company ID</th>
+                            <th>Attiva</th>
                             <th>Stato</th>
                             <th>Ultima sincronizzazione</th>
                             <th>Esito</th>
@@ -80,6 +81,7 @@
                                     </a>
                                 </td>
                                 <td>{{ connessione.company_id|default:"-" }}</td>
+                                <td>{% active_toggle connessione %}</td>
                                 <td>
                                     <span class="anagrafica-status-chip {% if connessione.stato == 'attiva' %}is-success{% elif connessione.stato == 'errore' %}is-danger{% else %}is-muted{% endif %}">
                                         {{ connessione.get_stato_display }}

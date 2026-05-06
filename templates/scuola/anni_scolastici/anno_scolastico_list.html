@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static active_toggles %}
 
 {% block title %}Anni scolastici - Arboris School Management{% endblock %}
 
@@ -40,7 +40,7 @@
                             <td>{{ anno.data_inizio }}</td>
                             <td>{{ anno.data_fine }}</td>
                             <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
-                            <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
+                            <td>{% active_toggle anno %}</td>
                             <td class="actions-cell">
                                 <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
                                 <span class="table-muted">|</span>
@@ -80,7 +80,7 @@
                             <td>{{ anno.data_inizio }}</td>
                             <td>{{ anno.data_fine }}</td>
                             <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
-                            <td>{% if anno.attivo %}Si{% else %}No{% endif %}</td>
+                            <td>{% active_toggle anno %}</td>
                             <td class="actions-cell">
                                 <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
                                 <span class="table-muted">|</span>

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import DisallowedHost
 from django.db import transaction
+from django.db.models import Count, Max, Min, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -18,6 +19,7 @@ from economia.models import (
     TariffaScambioRetta,
     TipoMovimentoCredito,
 )
+from economia.views.iscrizioni import popup_delete_response, popup_select_response
 from economia.scambio_retta_helpers import parse_iso_date
 from scuola.models import AnnoScolastico
 
@@ -50,6 +52,24 @@ def resolve_safe_return_url(request, default_url):
 
 def is_popup_request(request):
     return request.GET.get("popup") == "1" or request.POST.get("popup") == "1"
+
+
+def has_related_popup_target(request):
+    return bool((request.GET.get("target_input_name") or request.POST.get("target_input_name") or "").strip())
+
+
+def tariffa_popup_saved_response(request, tariffa, message):
+    if has_related_popup_target(request):
+        return popup_select_response(request, "tariffa_scambio_retta", tariffa.pk, str(tariffa))
+
+    return render(request, "popup/popup_close.html", {"message": message})
+
+
+def tariffa_popup_deleted_response(request, object_id, message):
+    if has_related_popup_target(request):
+        return popup_delete_response(request, "tariffa_scambio_retta", object_id)
+
+    return render(request, "popup/popup_close.html", {"message": message})
 
 
 def get_selected_familiare_for_prestazione_form(form):
@@ -128,15 +148,48 @@ def build_prestazione_template_context(request, form, prestazione=None):
 
 
 def lista_tariffe_scambio_retta(request):
-    tariffe = TariffaScambioRetta.objects.all()
-    return render(request, "economia/scambio_retta/tariffe_scambio_retta_list.html", {"tariffe": tariffe})
+    tariffe = TariffaScambioRetta.objects.annotate(
+        scambi_count=Count("scambi_retta", distinct=True),
+        prestazioni_count=Count("prestazioni_scambio_retta", distinct=True),
+    )
+    stats = tariffe.aggregate(
+        totale=Count("id", distinct=True),
+        valore_min=Min("valore_orario"),
+        valore_max=Max("valore_orario"),
+        scambi_collegati=Count("scambi_retta", distinct=True),
+        prestazioni_collegate=Count("prestazioni_scambio_retta", distinct=True),
+    )
+    return render(
+        request,
+        "economia/scambio_retta/tariffe_scambio_retta_list.html",
+        {
+            "tariffe": tariffe,
+            "tariffe_stats": {
+                "totale": stats["totale"] or 0,
+                "valore_min": stats["valore_min"] or 0,
+                "valore_max": stats["valore_max"] or 0,
+                "scambi_collegati": stats["scambi_collegati"] or 0,
+                "prestazioni_collegate": stats["prestazioni_collegate"] or 0,
+            },
+        },
+    )
 
 
 def crea_tariffa_scambio_retta(request):
+    popup = is_popup_request(request)
+
     if request.method == "POST":
         form = TariffaScambioRettaForm(request.POST)
         if form.is_valid():
-            form.save()
+            tariffa = form.save()
+
+            if popup:
+                return tariffa_popup_saved_response(
+                    request,
+                    tariffa,
+                    "Tariffa scambio retta creata correttamente.",
+                )
+
             messages.success(request, "Tariffa scambio retta creata correttamente.")
             return redirect("lista_tariffe_scambio_retta")
     else:
@@ -145,17 +198,26 @@ def crea_tariffa_scambio_retta(request):
     return render(
         request,
         "economia/scambio_retta/tariffa_scambio_retta_form.html",
-        {"form": form, "tariffa": None},
+        {"form": form, "tariffa": None, "popup": popup},
     )
 
 
 def modifica_tariffa_scambio_retta(request, pk):
     tariffa = get_object_or_404(TariffaScambioRetta, pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         form = TariffaScambioRettaForm(request.POST, instance=tariffa)
         if form.is_valid():
-            form.save()
+            tariffa = form.save()
+
+            if popup:
+                return tariffa_popup_saved_response(
+                    request,
+                    tariffa,
+                    "Tariffa scambio retta aggiornata correttamente.",
+                )
+
             messages.success(request, "Tariffa scambio retta aggiornata correttamente.")
             return redirect("lista_tariffe_scambio_retta")
     else:
@@ -164,22 +226,32 @@ def modifica_tariffa_scambio_retta(request, pk):
     return render(
         request,
         "economia/scambio_retta/tariffa_scambio_retta_form.html",
-        {"form": form, "tariffa": tariffa},
+        {"form": form, "tariffa": tariffa, "popup": popup},
     )
 
 
 def elimina_tariffa_scambio_retta(request, pk):
     tariffa = get_object_or_404(TariffaScambioRetta, pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
+        object_id = tariffa.pk
         tariffa.delete()
+
+        if popup:
+            return tariffa_popup_deleted_response(
+                request,
+                object_id,
+                "Tariffa scambio retta eliminata correttamente.",
+            )
+
         messages.success(request, "Tariffa scambio retta eliminata correttamente.")
         return redirect("lista_tariffe_scambio_retta")
 
     return render(
         request,
         "economia/scambio_retta/tariffa_scambio_retta_confirm_delete.html",
-        {"tariffa": tariffa},
+        {"tariffa": tariffa, "popup": popup},
     )
 
 
@@ -191,15 +263,44 @@ def lista_scambi_retta(request):
         "anno_scolastico",
         "tariffa_scambio_retta",
     ).all()
-    return render(request, "economia/scambio_retta/scambi_retta_list.html", {"scambi": scambi})
+    stats = scambi.aggregate(
+        totale=Count("id"),
+        approvati=Count("id", filter=Q(approvata=True)),
+        da_contabilizzare=Count("id", filter=Q(approvata=True, contabilizzata=False)),
+        contabilizzati=Count("id", filter=Q(contabilizzata=True)),
+        ore_totali=Sum("ore_lavorate"),
+        importo_totale=Sum("importo_maturato"),
+    )
+    return render(
+        request,
+        "economia/scambio_retta/scambi_retta_list.html",
+        {
+            "scambi": scambi,
+            "scambio_stats": {
+                "totale": stats["totale"] or 0,
+                "approvati": stats["approvati"] or 0,
+                "da_contabilizzare": stats["da_contabilizzare"] or 0,
+                "contabilizzati": stats["contabilizzati"] or 0,
+                "ore_totali": stats["ore_totali"] or 0,
+                "importo_totale": stats["importo_totale"] or 0,
+            },
+        },
+    )
 
 
 def crea_scambio_retta(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = ScambioRettaForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Scambio retta registrato correttamente.")
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Scambio retta registrato correttamente."},
+                )
             return redirect("lista_scambi_retta")
     else:
         form = ScambioRettaForm()
@@ -207,18 +308,26 @@ def crea_scambio_retta(request):
     return render(
         request,
         "economia/scambio_retta/scambio_retta_form.html",
-        {"form": form, "scambio": None},
+        {"form": form, "scambio": None, "popup": popup},
     )
 
 
 def modifica_scambio_retta(request, pk):
     scambio = get_object_or_404(ScambioRetta, pk=pk)
+    popup = is_popup_request(request)
+    start_in_edit = request.method == "POST" or request.GET.get("edit") == "1"
 
     if request.method == "POST":
         form = ScambioRettaForm(request.POST, instance=scambio)
         if form.is_valid():
             form.save()
             messages.success(request, "Scambio retta aggiornato correttamente.")
+            if popup:
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": "Scambio retta aggiornato correttamente."},
+                )
             return redirect("lista_scambi_retta")
     else:
         form = ScambioRettaForm(instance=scambio)
@@ -226,22 +335,29 @@ def modifica_scambio_retta(request, pk):
     return render(
         request,
         "economia/scambio_retta/scambio_retta_form.html",
-        {"form": form, "scambio": scambio},
+        {"form": form, "scambio": scambio, "popup": popup, "start_in_edit": start_in_edit},
     )
 
 
 def elimina_scambio_retta(request, pk):
     scambio = get_object_or_404(ScambioRetta, pk=pk)
+    popup = is_popup_request(request)
 
     if request.method == "POST":
         scambio.delete()
         messages.success(request, "Scambio retta eliminato correttamente.")
+        if popup:
+            return render(
+                request,
+                "popup/popup_close.html",
+                {"message": "Scambio retta eliminato correttamente."},
+            )
         return redirect("lista_scambi_retta")
 
     return render(
         request,
         "economia/scambio_retta/scambio_retta_confirm_delete.html",
-        {"scambio": scambio},
+        {"scambio": scambio, "popup": popup},
     )
 
 
@@ -258,6 +374,9 @@ def contabilizza_scambio_retta(request, pk):
     )
 
     prossima_rata = scambio.get_prossima_rata()
+    credito_post_contabilizzazione = None
+    if prossima_rata:
+        credito_post_contabilizzazione = (prossima_rata.credito_applicato or 0) + scambio.importo_maturato
 
     if request.method == "POST":
         if not scambio.approvata:
@@ -320,6 +439,7 @@ def contabilizza_scambio_retta(request, pk):
         {
             "scambio": scambio,
             "prossima_rata": prossima_rata,
+            "credito_post_contabilizzazione": credito_post_contabilizzazione,
         },
     )
 
