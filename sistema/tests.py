@@ -305,6 +305,7 @@ class SidebarEconomiaTests(TestCase):
         self.assertIn(f'href="{reverse("lista_iscrizioni")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_stati_iscrizione")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_rate_iscrizione")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_notifiche_finanziarie")}"', parcheggio_section)
 
 
 class SidebarGestioneFinanziariaTests(TestCase):
@@ -337,16 +338,19 @@ class SidebarGestioneFinanziariaTests(TestCase):
             "Fornitori",
             "Fatture fornitori",
             "Scadenziario fornitori",
-            "Categorie spesa",
+            "Pagamenti fornitori",
+            "<span>Impostazioni Fornitori</span>",
+            "Fatture in Cloud",
+            "Categorie di spesa",
             "<span>Conti correnti</span>",
             "Movimenti",
             "Categorie movimenti",
-            "Import estratto conto",
             "Riconciliazione",
             "Report categorie",
             "<span>Impostazioni conti correnti</span>",
             "Conti bancari",
             "Saldi conti",
+            "Import estratto conto",
             "Regole categorizzazione",
             "Connessioni PSD2",
             "Provider bancari",
@@ -358,6 +362,7 @@ class SidebarGestioneFinanziariaTests(TestCase):
             current_index = gestione_finanziaria_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+        self.assertNotIn("Notifiche", gestione_finanziaria_section)
 
     def test_home_renders_financial_dashboard_block(self):
         self.client.force_login(self.user)

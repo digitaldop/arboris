@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load static currency %}
 
 {% block title %}Dipendenti e collaboratori - Arboris School Management{% endblock %}
 
@@ -12,95 +12,249 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Dipendenti e collaboratori</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_dipendenti' %}" class="btn btn-primary">Dipendenti</a>
-            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Contratti</a>
-            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Simulazioni costo</a>
-            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Buste paga</a>
-            <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary">Parametri calcolo</a>
-        </div>
-    </div>
-
-    <div class="content-card">
-        <div class="summary-grid">
-            <div class="summary-item">
-                <div class="summary-value">{{ dipendenti_attivi }}</div>
-                <div class="summary-label">Dipendenti attivi</div>
+    <div class="scambio-list-shell ga-admin-dashboard-shell">
+        <div class="page-head scambio-list-head ga-admin-dashboard-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon ga-admin-dashboard-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Dipendenti e collaboratori</h1>
+                        <button
+                            type="button"
+                            class="ga-admin-dashboard-help-trigger"
+                            aria-label="Mostra procedura consigliata"
+                            data-floating-text="Procedura consigliata: crea la scheda dipendente, aggiungi il contratto, scegli parametro o simulazione costo, poi genera la previsione o registra la busta paga effettiva."
+                        >
+                            <span aria-hidden="true">?</span>
+                        </button>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                        Archivio personale, contratti, previsioni e buste paga
+                    </div>
+                </div>
             </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ dipendenti_totali }}</div>
-                <div class="summary-label">Dipendenti totali</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ contratti_attivi }}</div>
-                <div class="summary-label">Contratti attivi</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ simulazioni_attive }}</div>
-                <div class="summary-label">Simulazioni attive</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ buste_periodo_count }}</div>
-                <div class="summary-label">Buste {{ mese|stringformat:"02d" }}/{{ anno }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="content-card">
-        <h2 class="section-title">Confronto previsto / effettivo del mese</h2>
-        <div class="summary-grid">
-            <div class="summary-item">
-                <div class="summary-value">{{ costo_previsto|euro }} &euro;</div>
-                <div class="summary-label">Costo azienda previsto</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ costo_effettivo|euro }} &euro;</div>
-                <div class="summary-label">Costo azienda effettivo</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ netto_previsto|euro }} &euro;</div>
-                <div class="summary-label">Netti previsti</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">{{ netto_effettivo|euro }} &euro;</div>
-                <div class="summary-label">Netti effettivi</div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_dipendenti' %}" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                    <span class="btn-label">Dipendenti</span>
+                </a>
+                <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                    <span class="btn-label">Contratti</span>
+                </a>
+                <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                    <span class="btn-label">Buste paga</span>
+                </a>
+                <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                    <span class="btn-label">Parametri</span>
+                </a>
             </div>
         </div>
+
+        <section class="scambio-list-kpi-grid ga-admin-dashboard-kpi-grid" aria-label="Riepilogo gestione amministrativa">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Dipendenti attivi</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ dipendenti_attivi }}</strong>
+                    <span class="scambio-list-kpi-note">{{ dipendenti_totali }} schede totali</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Contratti attivi</span>
+                    <strong class="scambio-list-kpi-value">{{ contratti_attivi }}</strong>
+                    <span class="scambio-list-kpi-note">{{ contratti_totali }} contratti registrati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Buste {{ periodo_corrente_label }}</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ buste_periodo_count }}</strong>
+                    <span class="scambio-list-kpi-note">{{ buste_previste_periodo }} previste, {{ buste_effettive_periodo }} effettive</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Simulazioni attive</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ simulazioni_attive }}</strong>
+                    <span class="scambio-list-kpi-note">{{ parametri_attivi }} parametri disponibili</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="ga-admin-dashboard-workflow" aria-labelledby="ga-admin-workflow-title">
+            <div class="ga-admin-dashboard-workflow-head">
+                <span class="ga-admin-dashboard-workflow-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#lightbulb"></use></svg>
+                </span>
+                <div>
+                    <h2 id="ga-admin-workflow-title">Procedura consigliata</h2>
+                    <p>Sequenza operativa semplificata per inserire e gestire i dati dei dipendenti.</p>
+                </div>
+            </div>
+            <div class="ga-admin-dashboard-workflow-grid">
+                <article class="ga-admin-dashboard-step">
+                    <span class="ga-admin-dashboard-step-index">1</span>
+                    <strong>Scheda dipendente</strong>
+                    <span>Inserisci anagrafica e contatti essenziali.</span>
+                </article>
+                <article class="ga-admin-dashboard-step">
+                    <span class="ga-admin-dashboard-step-index">2</span>
+                    <strong>Contratto</strong>
+                    <span>Collega tipo contratto, periodo e retribuzione.</span>
+                </article>
+                <article class="ga-admin-dashboard-step">
+                    <span class="ga-admin-dashboard-step-index">3</span>
+                    <strong>Calcolo</strong>
+                    <span>Usa parametri standard o simulazione costo.</span>
+                </article>
+                <article class="ga-admin-dashboard-step">
+                    <span class="ga-admin-dashboard-step-index">4</span>
+                    <strong>Busta paga</strong>
+                    <span>Genera previsione o registra il dato effettivo.</span>
+                </article>
+            </div>
+        </section>
+
+        <section class="scambio-list-card ga-admin-dashboard-metrics" aria-labelledby="ga-admin-dashboard-metrics-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="ga-admin-dashboard-metrics-title">Confronto previsto / effettivo</h2>
+                    <p>Riepilogo del periodo corrente: {{ periodo_corrente_label }}.</p>
+                </div>
+                <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                    <span class="btn-label">Apri buste</span>
+                </a>
+            </div>
+            <div class="ga-admin-dashboard-money-grid">
+                <article class="ga-admin-dashboard-money-card">
+                    <span>Costo previsto</span>
+                    <strong>{{ costo_previsto|euro }} &euro;</strong>
+                </article>
+                <article class="ga-admin-dashboard-money-card">
+                    <span>Costo effettivo</span>
+                    <strong>{{ costo_effettivo|euro }} &euro;</strong>
+                </article>
+                <article class="ga-admin-dashboard-money-card">
+                    <span>Scostamento costo</span>
+                    <strong>{{ scostamento_costo|euro }} &euro;</strong>
+                </article>
+                <article class="ga-admin-dashboard-money-card">
+                    <span>Netti effettivi</span>
+                    <strong>{{ netto_effettivo|euro }} &euro;</strong>
+                    <small>Previsti {{ netto_previsto|euro }} &euro;</small>
+                </article>
+            </div>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="ga-admin-dashboard-buste-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="ga-admin-dashboard-buste-title">Ultime buste paga</h2>
+                    <p>Le registrazioni piu recenti e i relativi scostamenti.</p>
+                </div>
+                {% if can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'crea_busta_paga_dipendente' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-window-name="arboris-busta-paga-popup"
+                        data-popup-window-features="width=1180,height=860"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuova busta</span>
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table ga-admin-dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Dipendente</th>
+                            <th>Stato</th>
+                            <th class="column-right">Costo previsto</th>
+                            <th class="column-right">Costo effettivo</th>
+                            <th class="column-right">Scostamento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for busta in ultimi_cedolini %}
+                            <tr
+                                class="list-row-link"
+                                data-row-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                data-popup-window-name="arboris-busta-paga-popup"
+                                data-popup-window-features="width=1180,height=860"
+                            >
+                                <td class="scambio-list-main-cell">
+                                    <a
+                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-window-name="arboris-busta-paga-popup"
+                                        data-popup-window-features="width=1180,height=860"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ busta.periodo_label }}</strong>
+                                            <span>Busta paga</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td><strong>{{ busta.dipendente }}</strong></td>
+                                <td>
+                                    {% if busta.stato == "effettiva" or busta.stato == "verificata" %}
+                                        <span class="scambio-list-status-chip is-success">{{ busta.get_stato_display }}</span>
+                                    {% elif busta.stato == "prevista" %}
+                                        <span class="scambio-list-status-chip is-blue">{{ busta.get_stato_display }}</span>
+                                    {% else %}
+                                        <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="column-right"><strong>{{ busta.costo_azienda_previsto|euro }} &euro;</strong></td>
+                                <td class="column-right"><strong>{{ busta.costo_azienda_effettivo|euro }} &euro;</strong></td>
+                                <td class="column-right"><strong>{{ busta.scostamento_costo_azienda|euro }} &euro;</strong></td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">Nessuna busta paga registrata.</div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Ultime buste paga</h2>
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Periodo</th>
-                    <th>Dipendente</th>
-                    <th>Stato</th>
-                    <th class="column-right">Costo previsto</th>
-                    <th class="column-right">Costo effettivo</th>
-                    <th class="column-right">Scostamento</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for busta in ultimi_cedolini %}
-                    <tr>
-                        <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
-                        <td>{{ busta.dipendente }}</td>
-                        <td>{{ busta.get_stato_display }}</td>
-                        <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>
-                        <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
-                        <td class="column-right">{{ busta.scostamento_costo_azienda|euro }} &euro;</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6">
-                            <div class="empty-state">Nessuna busta paga registrata.</div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
 {% endblock %}

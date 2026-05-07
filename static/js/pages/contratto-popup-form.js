@@ -7,6 +7,15 @@ window.ArborisContrattoPopupForm = (function () {
         }
 
         routes.wireCrudButtonsById({
+            selectId: "id_tipo_contratto",
+            relatedType: "tipo_contratto",
+            addBtnId: "popup-add-tipo-contratto-btn",
+            editBtnId: "popup-edit-tipo-contratto-btn",
+            deleteBtnId: "popup-delete-tipo-contratto-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+
+        routes.wireCrudButtonsById({
             selectId: "id_parametro_calcolo",
             relatedType: "parametro_calcolo",
             addBtnId: "popup-add-parametro-calcolo-btn",

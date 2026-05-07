@@ -21,6 +21,7 @@ from .models import (
     Dipendente,
     ParametroCalcoloStipendio,
     SimulazioneCostoDipendente,
+    StatoBustaPaga,
     StatoDipendente,
     TipoContrattoDipendente,
 )
@@ -48,6 +49,10 @@ def dashboard_gestione_amministrativa(request):
         netto_previsto=Sum("netto_previsto"),
         netto_effettivo=Sum("netto_effettivo"),
     )
+    costo_previsto = aggregates["costo_previsto"] or ZERO
+    costo_effettivo = aggregates["costo_effettivo"] or ZERO
+    netto_previsto = aggregates["netto_previsto"] or ZERO
+    netto_effettivo = aggregates["netto_effettivo"] or ZERO
 
     return render(
         request,
@@ -55,22 +60,34 @@ def dashboard_gestione_amministrativa(request):
         {
             "anno": anno,
             "mese": mese,
+            "periodo_corrente_label": f"{mese:02d}/{anno}",
             "dipendenti_attivi": Dipendente.objects.filter(stato=StatoDipendente.ATTIVO).count(),
             "dipendenti_totali": Dipendente.objects.count(),
             "contratti_attivi": ContrattoDipendente.objects.filter(attivo=True).count(),
+            "contratti_totali": ContrattoDipendente.objects.count(),
             "simulazioni_attive": SimulazioneCostoDipendente.objects.filter(attiva=True).count(),
+            "parametri_attivi": ParametroCalcoloStipendio.objects.filter(attivo=True).count(),
             "buste_periodo_count": buste_periodo.count(),
-            "costo_previsto": aggregates["costo_previsto"] or ZERO,
-            "costo_effettivo": aggregates["costo_effettivo"] or ZERO,
-            "netto_previsto": aggregates["netto_previsto"] or ZERO,
-            "netto_effettivo": aggregates["netto_effettivo"] or ZERO,
+            "buste_previste_periodo": buste_periodo.filter(stato=StatoBustaPaga.PREVISTA).count(),
+            "buste_effettive_periodo": buste_periodo.filter(
+                stato__in=[StatoBustaPaga.EFFETTIVA, StatoBustaPaga.VERIFICATA]
+            ).count(),
+            "costo_previsto": costo_previsto,
+            "costo_effettivo": costo_effettivo,
+            "scostamento_costo": costo_effettivo - costo_previsto,
+            "netto_previsto": netto_previsto,
+            "netto_effettivo": netto_effettivo,
+            "scostamento_netto": netto_effettivo - netto_previsto,
             "ultimi_cedolini": ultimi_cedolini,
         },
     )
 
 
 def lista_dipendenti(request):
-    dipendenti = Dipendente.objects.all()
+    dipendenti = Dipendente.objects.annotate(
+        numero_contratti=Count("contratti", distinct=True),
+        numero_buste=Count("buste_paga", distinct=True),
+    )
     q = (request.GET.get("q") or "").strip()
     stato = (request.GET.get("stato") or "").strip()
     if q:
@@ -85,11 +102,20 @@ def lista_dipendenti(request):
         dipendenti = dipendenti.filter(stato=stato)
 
     anno, mese = _current_period()
+    dipendenti_stats = {
+        "totale": dipendenti.count(),
+        "attivi": dipendenti.filter(stato=StatoDipendente.ATTIVO).count(),
+        "sospesi": dipendenti.filter(stato=StatoDipendente.SOSPESO).count(),
+        "cessati": dipendenti.filter(stato=StatoDipendente.CESSATO).count(),
+        "contratti": dipendenti.aggregate(totale=Count("contratti", distinct=True))["totale"] or 0,
+        "buste": dipendenti.aggregate(totale=Count("buste_paga", distinct=True))["totale"] or 0,
+    }
     return render(
         request,
         "gestione_amministrativa/dipendenti/dipendente_list.html",
         {
             "dipendenti": dipendenti,
+            "dipendenti_stats": dipendenti_stats,
             "q": q,
             "stato": stato,
             "stati": StatoDipendente.choices,
@@ -111,11 +137,20 @@ def lista_contratti_dipendenti(request):
     if attivo in {"1", "0"}:
         contratti = contratti.filter(attivo=(attivo == "1"))
 
+    contratti_stats = {
+        "totale": contratti.count(),
+        "attivi": contratti.filter(attivo=True).count(),
+        "non_attivi": contratti.filter(attivo=False).count(),
+        "buste": contratti.aggregate(totale=Count("buste_paga", distinct=True))["totale"] or 0,
+        "simulazioni": contratti.aggregate(totale=Count("simulazioni_costo", distinct=True))["totale"] or 0,
+    }
+
     return render(
         request,
         "gestione_amministrativa/dipendenti/contratto_list.html",
         {
             "contratti": contratti,
+            "contratti_stats": contratti_stats,
             "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
             "dipendente_id": dipendente_id,
             "attivo": attivo,
@@ -140,11 +175,26 @@ def lista_simulazioni_costo_dipendenti(request):
     if attiva in {"1", "0"}:
         simulazioni = simulazioni.filter(attiva=(attiva == "1"))
 
+    simulazioni_aggregate = simulazioni.aggregate(
+        netto=Sum("netto_mensile"),
+        lordo=Sum("lordo_mensile"),
+        costo=Sum("costo_azienda_mensile"),
+    )
+    simulazioni_stats = {
+        "totale": simulazioni.count(),
+        "attive": simulazioni.filter(attiva=True).count(),
+        "non_attive": simulazioni.filter(attiva=False).count(),
+        "netto": simulazioni_aggregate["netto"] or ZERO,
+        "lordo": simulazioni_aggregate["lordo"] or ZERO,
+        "costo": simulazioni_aggregate["costo"] or ZERO,
+    }
+
     return render(
         request,
         "gestione_amministrativa/dipendenti/simulazione_costo_list.html",
         {
             "simulazioni": simulazioni,
+            "simulazioni_stats": simulazioni_stats,
             "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
             "contratti": ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto").order_by(
                 "dipendente__cognome", "dipendente__nome", "-data_inizio"
@@ -259,7 +309,7 @@ def crea_contratto_dipendente(request, dipendente_pk=None):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/contratto_popup_form.html" if popup else "gestione_amministrativa/dipendenti/contratto_form.html",
+        "gestione_amministrativa/dipendenti/contratto_form.html",
         {"form": form, "dipendente": dipendente, "contratto": None, "popup": popup},
     )
 
@@ -291,7 +341,7 @@ def modifica_contratto_dipendente(request, pk):
     simulazioni_costo = contratto.simulazioni_costo.order_by("-valido_dal", "-id")
     return render(
         request,
-        "gestione_amministrativa/dipendenti/contratto_popup_form.html" if popup else "gestione_amministrativa/dipendenti/contratto_form.html",
+        "gestione_amministrativa/dipendenti/contratto_form.html",
         {
             "form": form,
             "dipendente": contratto.dipendente,
@@ -315,7 +365,7 @@ def elimina_contratto_dipendente(request, pk):
             if popup:
                 return render(
                     request,
-                    "gestione_amministrativa/dipendenti/contratto_popup_delete.html",
+                    "gestione_amministrativa/dipendenti/contratto_confirm_delete.html",
                     {
                         "contratto": contratto,
                         "count_buste": count_buste,
@@ -346,7 +396,7 @@ def elimina_contratto_dipendente(request, pk):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/contratto_popup_delete.html" if popup else "gestione_amministrativa/dipendenti/contratto_confirm_delete.html",
+        "gestione_amministrativa/dipendenti/contratto_confirm_delete.html",
         {
             "contratto": contratto,
             "count_buste": count_buste,
@@ -358,6 +408,7 @@ def elimina_contratto_dipendente(request, pk):
 
 
 def crea_simulazione_costo_dipendente(request):
+    popup = is_popup_request(request)
     initial = {}
     contratto_id = (request.GET.get("contratto") or request.POST.get("contratto") or "").strip()
     if contratto_id.isdigit():
@@ -374,6 +425,13 @@ def crea_simulazione_costo_dipendente(request):
         form = SimulazioneCostoDipendenteForm(request.POST, request.FILES)
         if form.is_valid():
             simulazione = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="simulazione_costo",
+                    object_id=simulazione.pk,
+                    object_label=str(simulazione),
+                )
             messages.success(request, "Simulazione costo dipendente salvata correttamente.")
             return redirect("modifica_simulazione_costo_dipendente", pk=simulazione.pk)
     else:
@@ -382,7 +440,7 @@ def crea_simulazione_costo_dipendente(request):
     return render(
         request,
         "gestione_amministrativa/dipendenti/simulazione_costo_form.html",
-        {"form": form, "simulazione": None},
+        {"form": form, "simulazione": None, "popup": popup},
     )
 
 
@@ -391,10 +449,18 @@ def modifica_simulazione_costo_dipendente(request, pk):
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente", "contratto__tipo_contratto"),
         pk=pk,
     )
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = SimulazioneCostoDipendenteForm(request.POST, request.FILES, instance=simulazione)
         if form.is_valid():
             simulazione = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="simulazione_costo",
+                    object_id=simulazione.pk,
+                    object_label=str(simulazione),
+                )
             messages.success(request, "Simulazione costo dipendente aggiornata correttamente.")
             return redirect("modifica_simulazione_costo_dipendente", pk=simulazione.pk)
     else:
@@ -403,7 +469,7 @@ def modifica_simulazione_costo_dipendente(request, pk):
     return render(
         request,
         "gestione_amministrativa/dipendenti/simulazione_costo_form.html",
-        {"form": form, "simulazione": simulazione},
+        {"form": form, "simulazione": simulazione, "popup": popup},
     )
 
 
@@ -412,9 +478,13 @@ def elimina_simulazione_costo_dipendente(request, pk):
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente"),
         pk=pk,
     )
+    popup = is_popup_request(request)
     if request.method == "POST":
         contratto = simulazione.contratto
+        object_id = simulazione.pk
         simulazione.delete()
+        if popup:
+            return popup_delete_response(request, field_name="simulazione_costo", object_id=object_id)
         messages.success(request, "Simulazione costo dipendente eliminata correttamente.")
         if contratto and contratto.dipendente_id:
             return redirect("modifica_dipendente", pk=contratto.dipendente_id)
@@ -423,7 +493,7 @@ def elimina_simulazione_costo_dipendente(request, pk):
     return render(
         request,
         "gestione_amministrativa/dipendenti/simulazione_costo_confirm_delete.html",
-        {"simulazione": simulazione},
+        {"simulazione": simulazione, "popup": popup},
     )
 
 
@@ -553,11 +623,29 @@ def lista_buste_paga_dipendenti(request):
     if dipendente_id.isdigit():
         buste = buste.filter(dipendente_id=int(dipendente_id))
 
+    buste_aggregate = buste.aggregate(
+        netto_previsto=Sum("netto_previsto"),
+        netto_effettivo=Sum("netto_effettivo"),
+        costo_previsto=Sum("costo_azienda_previsto"),
+        costo_effettivo=Sum("costo_azienda_effettivo"),
+    )
+    buste_stats = {
+        "totale": buste.count(),
+        "previste": buste.filter(stato=StatoBustaPaga.PREVISTA).count(),
+        "effettive": buste.filter(stato__in=[StatoBustaPaga.EFFETTIVA, StatoBustaPaga.VERIFICATA]).count(),
+        "bozze": buste.filter(stato=StatoBustaPaga.BOZZA).count(),
+        "netto_previsto": buste_aggregate["netto_previsto"] or ZERO,
+        "netto_effettivo": buste_aggregate["netto_effettivo"] or ZERO,
+        "costo_previsto": buste_aggregate["costo_previsto"] or ZERO,
+        "costo_effettivo": buste_aggregate["costo_effettivo"] or ZERO,
+    }
+
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_list.html",
         {
             "buste": buste,
+            "buste_stats": buste_stats,
             "anno": anno,
             "mese": mese,
             "dipendente_id": dipendente_id,
@@ -567,6 +655,7 @@ def lista_buste_paga_dipendenti(request):
 
 
 def crea_busta_paga_dipendente(request):
+    popup = is_popup_request(request)
     initial = {}
     anno, mese = _current_period()
     initial["anno"] = anno
@@ -579,6 +668,13 @@ def crea_busta_paga_dipendente(request):
         form = BustaPagaDipendenteForm(request.POST, request.FILES)
         if form.is_valid():
             busta = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="busta_paga",
+                    object_id=busta.pk,
+                    object_label=str(busta),
+                )
             messages.success(request, "Busta paga salvata correttamente.")
             return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
     else:
@@ -587,7 +683,7 @@ def crea_busta_paga_dipendente(request):
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_form.html",
-        {"form": form, "busta": None},
+        {"form": form, "busta": None, "popup": popup},
     )
 
 
@@ -601,10 +697,18 @@ def modifica_busta_paga_dipendente(request, pk):
         ),
         pk=pk,
     )
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = BustaPagaDipendenteForm(request.POST, request.FILES, instance=busta)
         if form.is_valid():
-            form.save()
+            busta = form.save()
+            if popup:
+                return popup_select_response(
+                    request,
+                    field_name="busta_paga",
+                    object_id=busta.pk,
+                    object_label=str(busta),
+                )
             messages.success(request, "Busta paga aggiornata correttamente.")
             return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
     else:
@@ -613,30 +717,42 @@ def modifica_busta_paga_dipendente(request, pk):
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_form.html",
-        {"form": form, "busta": busta, "voci": busta.voci.all()},
+        {"form": form, "busta": busta, "voci": busta.voci.all(), "popup": popup},
     )
 
 
 def elimina_busta_paga_dipendente(request, pk):
     busta = get_object_or_404(BustaPagaDipendente.objects.select_related("dipendente"), pk=pk)
+    popup = is_popup_request(request)
     if request.method == "POST":
+        object_id = busta.pk
         busta.delete()
+        if popup:
+            return popup_delete_response(request, field_name="busta_paga", object_id=object_id)
         messages.success(request, "Busta paga eliminata correttamente.")
         return redirect("lista_buste_paga_dipendenti")
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_confirm_delete.html",
-        {"busta": busta},
+        {"busta": busta, "popup": popup},
     )
 
 
 def lista_parametri_calcolo_stipendi(request):
-    parametri = ParametroCalcoloStipendio.objects.all()
+    parametri = ParametroCalcoloStipendio.objects.annotate(
+        numero_contratti=Count("contratti", distinct=True),
+    )
+    parametri_stats = parametri.aggregate(
+        totale=Count("id"),
+        attivi=Count("id", filter=Q(attivo=True)),
+        non_attivi=Count("id", filter=Q(attivo=False)),
+        contratti_collegati=Count("contratti", distinct=True),
+    )
     return render(
         request,
         "gestione_amministrativa/dipendenti/parametri_list.html",
-        {"parametri": parametri},
+        {"parametri": parametri, "parametri_stats": parametri_stats},
     )
 
 
@@ -660,7 +776,7 @@ def crea_parametro_calcolo_stipendio(request):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/parametro_popup_form.html" if popup else "gestione_amministrativa/dipendenti/parametro_form.html",
+        "gestione_amministrativa/dipendenti/parametro_form.html",
         {"form": form, "parametro": None, "popup": popup},
     )
 
@@ -686,7 +802,7 @@ def modifica_parametro_calcolo_stipendio(request, pk):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/parametro_popup_form.html" if popup else "gestione_amministrativa/dipendenti/parametro_form.html",
+        "gestione_amministrativa/dipendenti/parametro_form.html",
         {"form": form, "parametro": parametro, "popup": popup},
     )
 
@@ -710,6 +826,6 @@ def elimina_parametro_calcolo_stipendio(request, pk):
 
     return render(
         request,
-        "gestione_amministrativa/dipendenti/parametro_popup_delete.html" if popup else "gestione_amministrativa/dipendenti/parametro_confirm_delete.html",
+        "gestione_amministrativa/dipendenti/parametro_confirm_delete.html",
         {"parametro": parametro, "popup": popup, "usage_count": usage_count},
     )

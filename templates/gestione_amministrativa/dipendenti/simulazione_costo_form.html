@@ -1,101 +1,330 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
 
 {% block title %}{% if simulazione %}Modifica simulazione costo{% else %}Nuova simulazione costo{% endif %} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_simulazioni_costo_dipendenti' %}">Simulazioni costo</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if simulazione %}Modifica{% else %}Nuova{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}">Simulazioni costo</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if simulazione %}Modifica{% else %}Nuova{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if simulazione %}Modifica simulazione costo{% else %}Nuova simulazione costo{% endif %}</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Tutte le simulazioni</a>
-            {% if simulazione and simulazione.contratto.dipendente_id %}
-                <a href="{% url 'modifica_dipendente' simulazione.contratto.dipendente_id %}" class="btn btn-secondary">Torna al dipendente</a>
-            {% endif %}
+    <div class="scambio-retta-form-shell ga-simulazione-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <span class="related-config-kicker">Dipendenti e collaboratori</span>
+                <h1 class="page-title">{% if simulazione %}Modifica simulazione costo{% else %}Nuova simulazione costo{% endif %}</h1>
+                <p>
+                    {% if simulazione and simulazione.contratto.dipendente_id %}
+                        {{ simulazione.contratto.dipendente }} - {{ simulazione.valido_dal|date:"d/m/Y" }}
+                    {% else %}
+                        Base previsionale per calcolo buste paga e costi azienda.
+                    {% endif %}
+                </p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if simulazione and can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                        class="btn btn-danger btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                        data-popup-window-name="arboris-simulazione-costo-delete-popup"
+                        data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+                {% if not popup %}
+                    <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Tutte le simulazioni</span>
+                    </a>
+                    {% if simulazione and simulazione.contratto.dipendente_id %}
+                        <a href="{% url 'modifica_dipendente' simulazione.contratto.dipendente_id %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                            <span class="btn-label">Dipendente</span>
+                        </a>
+                    {% endif %}
+                {% endif %}
+            </div>
         </div>
+
+        {% if simulazione %}
+            <section class="ga-simulazione-summary-grid" aria-label="Riepilogo simulazione costo">
+                <article class="scambio-retta-preview-card">
+                    <span class="scambio-retta-preview-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                    </span>
+                    <div>
+                        <span>Dipendente</span>
+                        <strong>{% if simulazione.contratto.dipendente_id %}{{ simulazione.contratto.dipendente }}{% else %}-{% endif %}</strong>
+                    </div>
+                </article>
+                <article class="scambio-retta-preview-card">
+                    <span class="scambio-retta-preview-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                    </span>
+                    <div>
+                        <span>Validita</span>
+                        <strong>{{ simulazione.valido_dal|date:"d/m/Y" }} - {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}</strong>
+                    </div>
+                </article>
+                <article class="scambio-retta-preview-card">
+                    <span class="scambio-retta-preview-icon is-green" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                    </span>
+                    <div>
+                        <span>Netto mensile</span>
+                        <strong>{{ simulazione.netto_mensile|euro }} &euro;</strong>
+                    </div>
+                </article>
+                <article class="scambio-retta-preview-card">
+                    <span class="scambio-retta-preview-icon is-purple" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                    </span>
+                    <div>
+                        <span>Costo azienda</span>
+                        <strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong>
+                    </div>
+                </article>
+            </section>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" id="ga-simulazione-form" class="scambio-retta-form detail-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+
+            {% if form.non_field_errors %}
+                <div class="message message-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <section class="scambio-retta-card" aria-labelledby="ga-simulazione-ref-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-simulazione-ref-title">Riferimenti</h2>
+                        <p>Collega la simulazione al contratto e definisci il periodo di validita.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-simulazione-form-grid">
+                    <div class="scambio-retta-field is-wide">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.contratto.id_for_label }}">{{ form.contratto.label }}</label>
+                            {{ form.contratto }}
+                            {{ form.contratto.errors }}
+                        </div>
+                    </div>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.titolo.id_for_label }}">{{ form.titolo.label }}</label>
+                            {{ form.titolo }}
+                            {{ form.titolo.errors }}
+                        </div>
+                    </div>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.file_simulazione.id_for_label }}">{{ form.file_simulazione.label }}</label>
+                            {{ form.file_simulazione }}
+                            {{ form.file_simulazione.errors }}
+                        </div>
+                    </div>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.data_elaborazione.id_for_label }}">{{ form.data_elaborazione.label }}</label>
+                            {{ form.data_elaborazione }}
+                            {{ form.data_elaborazione.errors }}
+                        </div>
+                    </div>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.valido_dal.id_for_label }}">{{ form.valido_dal.label }}</label>
+                            {{ form.valido_dal }}
+                            {{ form.valido_dal.errors }}
+                        </div>
+                    </div>
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-rose" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.valido_al.id_for_label }}">{{ form.valido_al.label }}</label>
+                            {{ form.valido_al }}
+                            {{ form.valido_al.errors }}
+                        </div>
+                    </div>
+                    <label class="scambio-retta-switch-card ga-simulazione-switch-card" for="{{ form.attiva.id_for_label }}">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.attiva.label }}</strong>
+                            <small>Se attiva puo essere usata per calcolare le previsioni delle buste paga.</small>
+                            {{ form.attiva.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.attiva }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card" aria-labelledby="ga-simulazione-main-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-green" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-simulazione-main-title">Valori principali</h2>
+                        <p>Netto, lordo, costo azienda, mensilita e valuta della simulazione.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-simulazione-form-grid">
+                    {% for field in form %}
+                        {% if field.name == "netto_mensile" or field.name == "lordo_mensile" or field.name == "costo_azienda_mensile" or field.name == "mensilita_annue" or field.name == "valuta" %}
+                            <div class="scambio-retta-field{% if field.name == 'valuta' %} ga-simulazione-currency-field{% endif %}">
+                                <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                </span>
+                                <div>
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="scambio-retta-card" aria-labelledby="ga-simulazione-tax-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-simulazione-tax-title">Contributi e imposte</h2>
+                        <p>Valori previdenziali, assicurativi, fiscali e bonus collegati.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-simulazione-form-grid">
+                    {% for field in form %}
+                        {% if field.name == "contributi_previdenziali_azienda" or field.name == "contributi_assicurativi_azienda" or field.name == "contributi_previdenza_complementare_azienda" or field.name == "contributi_previdenziali_dipendente" or field.name == "contributi_assicurativi_dipendente" or field.name == "contributi_previdenza_complementare_dipendente" or field.name == "irpef_lorda" or field.name == "irpef_netto" or field.name == "addizionale_regionale" or field.name == "addizionale_comunale" or field.name == "bonus_fiscali" %}
+                            <div class="scambio-retta-field">
+                                <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                </span>
+                                <div>
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="scambio-retta-card" aria-labelledby="ga-simulazione-ratei-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-purple" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-simulazione-ratei-title">Ratei e parametri</h2>
+                        <p>Dettaglio ratei, tempo lavorato e informazioni contrattuali operative.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-simulazione-form-grid">
+                    {% for field in form %}
+                        {% if field.name == "trattamento_fine_rapporto" or field.name == "costo_mensilita_aggiuntive" or field.name == "costo_rateo_ferie" or field.name == "costo_rateo_permessi" or field.name == "costo_rateo_rol" or field.name == "costo_rateo_ex_festivita" or field.name == "ore_mensili" or field.name == "giorni_mensili" or field.name == "percentuale_part_time" or field.name == "tasso_inail_per_mille" or field.name == "livello" or field.name == "qualifica" %}
+                            <div class="scambio-retta-field">
+                                <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                                </span>
+                                <div>
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <details class="ga-dipendente-notes-field ga-simulazione-notes-field" {% if form.note.errors or form.note.value %}open{% endif %}>
+                    <summary title="Clicca per espandere">
+                        <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.note.label }}</strong>
+                            <small>Clicca per espandere</small>
+                        </span>
+                    </summary>
+                    <div class="ga-dipendente-notes-body">
+                        <label class="sr-only" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                        {{ form.note }}
+                        {{ form.note.errors }}
+                    </div>
+                </details>
+            </section>
+
+            <div class="scambio-retta-actions">
+                {% if can_manage_gestione_amministrativa %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva</span>
+                    </button>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
-
-    <form method="post" enctype="multipart/form-data" class="detail-form">
-        {% csrf_token %}
-
-        <div class="content-card">
-            <h2 class="section-title">Riferimenti</h2>
-            <table class="form-table">
-                <tr><th>{{ form.contratto.label_tag }}</th><td>{{ form.contratto }} {{ form.contratto.errors }}</td></tr>
-                <tr><th>{{ form.titolo.label_tag }}</th><td>{{ form.titolo }} {{ form.titolo.errors }}</td></tr>
-                <tr><th>{{ form.data_elaborazione.label_tag }}</th><td>{{ form.data_elaborazione }} {{ form.data_elaborazione.errors }}</td></tr>
-                <tr><th>{{ form.valido_dal.label_tag }}</th><td>{{ form.valido_dal }} {{ form.valido_dal.errors }}</td></tr>
-                <tr><th>{{ form.valido_al.label_tag }}</th><td>{{ form.valido_al }} {{ form.valido_al.errors }}</td></tr>
-                <tr><th>{{ form.file_simulazione.label_tag }}</th><td>{{ form.file_simulazione }} {{ form.file_simulazione.errors }}</td></tr>
-                <tr><th>{{ form.attiva.label_tag }}</th><td>{{ form.attiva }} {{ form.attiva.errors }}</td></tr>
-            </table>
-        </div>
-
-        <div class="content-card">
-            <h2 class="section-title">Valori principali</h2>
-            <table class="form-table">
-                <tr><th>{{ form.netto_mensile.label_tag }}</th><td>{{ form.netto_mensile }} {{ form.netto_mensile.errors }}</td></tr>
-                <tr><th>{{ form.lordo_mensile.label_tag }}</th><td>{{ form.lordo_mensile }} {{ form.lordo_mensile.errors }}</td></tr>
-                <tr><th>{{ form.costo_azienda_mensile.label_tag }}</th><td>{{ form.costo_azienda_mensile }} {{ form.costo_azienda_mensile.errors }}</td></tr>
-                <tr><th>{{ form.mensilita_annue.label_tag }}</th><td>{{ form.mensilita_annue }} {{ form.mensilita_annue.errors }}</td></tr>
-                <tr><th>{{ form.valuta.label_tag }}</th><td>{{ form.valuta }} {{ form.valuta.errors }}</td></tr>
-            </table>
-        </div>
-
-        <div class="content-card">
-            <h2 class="section-title">Contributi e imposte</h2>
-            <table class="form-table">
-                <tr><th>{{ form.contributi_previdenziali_azienda.label_tag }}</th><td>{{ form.contributi_previdenziali_azienda }} {{ form.contributi_previdenziali_azienda.errors }}</td></tr>
-                <tr><th>{{ form.contributi_assicurativi_azienda.label_tag }}</th><td>{{ form.contributi_assicurativi_azienda }} {{ form.contributi_assicurativi_azienda.errors }}</td></tr>
-                <tr><th>{{ form.contributi_previdenza_complementare_azienda.label_tag }}</th><td>{{ form.contributi_previdenza_complementare_azienda }} {{ form.contributi_previdenza_complementare_azienda.errors }}</td></tr>
-                <tr><th>{{ form.contributi_previdenziali_dipendente.label_tag }}</th><td>{{ form.contributi_previdenziali_dipendente }} {{ form.contributi_previdenziali_dipendente.errors }}</td></tr>
-                <tr><th>{{ form.contributi_assicurativi_dipendente.label_tag }}</th><td>{{ form.contributi_assicurativi_dipendente }} {{ form.contributi_assicurativi_dipendente.errors }}</td></tr>
-                <tr><th>{{ form.contributi_previdenza_complementare_dipendente.label_tag }}</th><td>{{ form.contributi_previdenza_complementare_dipendente }} {{ form.contributi_previdenza_complementare_dipendente.errors }}</td></tr>
-                <tr><th>{{ form.irpef_lorda.label_tag }}</th><td>{{ form.irpef_lorda }} {{ form.irpef_lorda.errors }}</td></tr>
-                <tr><th>{{ form.irpef_netto.label_tag }}</th><td>{{ form.irpef_netto }} {{ form.irpef_netto.errors }}</td></tr>
-                <tr><th>{{ form.addizionale_regionale.label_tag }}</th><td>{{ form.addizionale_regionale }} {{ form.addizionale_regionale.errors }}</td></tr>
-                <tr><th>{{ form.addizionale_comunale.label_tag }}</th><td>{{ form.addizionale_comunale }} {{ form.addizionale_comunale.errors }}</td></tr>
-                <tr><th>{{ form.bonus_fiscali.label_tag }}</th><td>{{ form.bonus_fiscali }} {{ form.bonus_fiscali.errors }}</td></tr>
-            </table>
-        </div>
-
-        <div class="content-card">
-            <h2 class="section-title">Ratei e parametri contrattuali</h2>
-            <table class="form-table">
-                <tr><th>{{ form.trattamento_fine_rapporto.label_tag }}</th><td>{{ form.trattamento_fine_rapporto }} {{ form.trattamento_fine_rapporto.errors }}</td></tr>
-                <tr><th>{{ form.costo_mensilita_aggiuntive.label_tag }}</th><td>{{ form.costo_mensilita_aggiuntive }} {{ form.costo_mensilita_aggiuntive.errors }}</td></tr>
-                <tr><th>{{ form.costo_rateo_ferie.label_tag }}</th><td>{{ form.costo_rateo_ferie }} {{ form.costo_rateo_ferie.errors }}</td></tr>
-                <tr><th>{{ form.costo_rateo_permessi.label_tag }}</th><td>{{ form.costo_rateo_permessi }} {{ form.costo_rateo_permessi.errors }}</td></tr>
-                <tr><th>{{ form.costo_rateo_rol.label_tag }}</th><td>{{ form.costo_rateo_rol }} {{ form.costo_rateo_rol.errors }}</td></tr>
-                <tr><th>{{ form.costo_rateo_ex_festivita.label_tag }}</th><td>{{ form.costo_rateo_ex_festivita }} {{ form.costo_rateo_ex_festivita.errors }}</td></tr>
-                <tr><th>{{ form.ore_mensili.label_tag }}</th><td>{{ form.ore_mensili }} {{ form.ore_mensili.errors }}</td></tr>
-                <tr><th>{{ form.giorni_mensili.label_tag }}</th><td>{{ form.giorni_mensili }} {{ form.giorni_mensili.errors }}</td></tr>
-                <tr><th>{{ form.percentuale_part_time.label_tag }}</th><td>{{ form.percentuale_part_time }} {{ form.percentuale_part_time.errors }}</td></tr>
-                <tr><th>{{ form.tasso_inail_per_mille.label_tag }}</th><td>{{ form.tasso_inail_per_mille }} {{ form.tasso_inail_per_mille.errors }}</td></tr>
-                <tr><th>{{ form.livello.label_tag }}</th><td>{{ form.livello }} {{ form.livello.errors }}</td></tr>
-                <tr><th>{{ form.qualifica.label_tag }}</th><td>{{ form.qualifica }} {{ form.qualifica.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-        </div>
-
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_gestione_amministrativa %}
-                <button type="submit" class="btn btn-primary">Salva</button>
-            {% endif %}
-            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Annulla</a>
-            {% if simulazione and can_manage_gestione_amministrativa %}
-                <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="btn btn-danger">Elimina</a>
-            {% endif %}
-        </div>
-    </form>
 {% endblock %}

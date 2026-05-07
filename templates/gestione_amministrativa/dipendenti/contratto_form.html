@@ -1,120 +1,447 @@
-{% extends "base.html" %}
-{% load currency %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
 
 {% block title %}{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        {% if dipendente %}
-            <a href="{% url 'modifica_dipendente' dipendente.pk %}">{{ dipendente }}</a>
-        {% else %}
-            <a href="{% url 'lista_contratti_dipendenti' %}">Contratti</a>
-        {% endif %}
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if contratto %}Contratto{% else %}Nuovo contratto{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            {% if dipendente %}
+                <a href="{% url 'modifica_dipendente' dipendente.pk %}">{{ dipendente }}</a>
+            {% else %}
+                <a href="{% url 'lista_contratti_dipendenti' %}">Contratti</a>
+            {% endif %}
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if contratto %}Contratto{% else %}Nuovo contratto{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %}</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Tutti i contratti</a>
-            {% if dipendente %}
-                <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="btn btn-secondary">Torna al dipendente</a>
-            {% endif %}
+    <div class="scambio-retta-form-shell ga-contract-form-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <span class="related-config-kicker">Dipendenti e collaboratori</span>
+                <h1 class="page-title">{% if contratto %}Modifica contratto{% else %}Nuovo contratto{% endif %}</h1>
+                <p>{% if dipendente %}{{ dipendente }}{% else %}Contratto non ancora assegnato a un dipendente.{% endif %}</p>
+            </div>
+            <div class="scambio-retta-head-actions">
+                {% if contratto and can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                        class="btn btn-danger btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                        data-popup-window-name="arboris-contratto-dipendente-delete-popup"
+                        data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+                {% if not popup %}
+                    <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <span class="btn-label">Tutti i contratti</span>
+                    </a>
+                    {% if dipendente %}
+                        <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                            <span class="btn-label">Dipendente</span>
+                        </a>
+                    {% endif %}
+                {% endif %}
+            </div>
         </div>
+
+        <form method="post" id="ga-contract-form" class="scambio-retta-form detail-form">
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+            {% if dipendente %}<input type="hidden" name="dipendente" value="{{ dipendente.pk }}">{% endif %}
+
+            {% if form.non_field_errors %}
+                <div class="message message-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <section class="scambio-retta-card" aria-labelledby="ga-contract-main-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-contract-main-title">Dati contratto</h2>
+                        <p>Descrizione, tipologia, parametro di calcolo e disponibilita del contratto.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-contract-form-grid">
+                    <div class="scambio-retta-field is-wide">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                            {{ form.descrizione }}
+                            {{ form.descrizione.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.tipo_contratto.id_for_label }}">{{ form.tipo_contratto.label }}</label>
+                            <div class="popup-related-field ga-contract-related-field">
+                                <div class="related-field-stack">
+                                    {{ form.tipo_contratto }}
+                                </div>
+                                <span class="related-actions inline-related-actions" aria-label="Azioni tipo contratto">
+                                    <button type="button" class="related-btn related-btn-add" id="popup-add-tipo-contratto-btn" aria-label="Nuovo tipo contratto" title="Nuovo tipo contratto">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="related-btn related-btn-edit" id="popup-edit-tipo-contratto-btn" aria-label="Modifica tipo contratto" title="Modifica tipo contratto">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="related-btn related-btn-delete" id="popup-delete-tipo-contratto-btn" aria-label="Elimina tipo contratto" title="Elimina tipo contratto">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                    </button>
+                                </span>
+                            </div>
+                            {{ form.tipo_contratto.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.parametro_calcolo.id_for_label }}">{{ form.parametro_calcolo.label }}</label>
+                            <div class="popup-related-field ga-contract-related-field">
+                                <div class="related-field-stack">
+                                    {{ form.parametro_calcolo }}
+                                </div>
+                                <span class="related-actions inline-related-actions" aria-label="Azioni parametro di calcolo">
+                                    <button type="button" class="related-btn related-btn-add" id="popup-add-parametro-calcolo-btn" aria-label="Nuovo parametro" title="Nuovo parametro">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="related-btn related-btn-edit" id="popup-edit-parametro-calcolo-btn" aria-label="Modifica parametro" title="Modifica parametro">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                    </button>
+                                    <button type="button" class="related-btn related-btn-delete" id="popup-delete-parametro-calcolo-btn" aria-label="Elimina parametro" title="Elimina parametro">
+                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                    </button>
+                                </span>
+                            </div>
+                            {{ form.parametro_calcolo.errors }}
+                        </div>
+                    </div>
+
+                    <label class="scambio-retta-switch-card ga-contract-switch-card" for="{{ form.attivo.id_for_label }}">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <span>
+                            <strong>{{ form.attivo.label }}</strong>
+                            <small>Se disattivato resta consultabile ma non entra nelle procedure operative.</small>
+                            {{ form.attivo.errors }}
+                        </span>
+                        <span class="fondo-plan-switch-control">
+                            {{ form.attivo }}
+                            <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card" aria-labelledby="ga-contract-period-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-contract-period-title">Periodo e inquadramento</h2>
+                        <p>Definisci decorrenza, CCNL, livello, qualifica e mansione.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-contract-form-grid">
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.data_inizio.id_for_label }}">{{ form.data_inizio.label }}</label>
+                            {{ form.data_inizio }}
+                            {{ form.data_inizio.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-rose" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.data_fine.id_for_label }}">{{ form.data_fine.label }}</label>
+                            {{ form.data_fine }}
+                            {{ form.data_fine.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.ccnl.id_for_label }}">{{ form.ccnl.label }}</label>
+                            {{ form.ccnl }}
+                            {{ form.ccnl.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.livello.id_for_label }}">{{ form.livello.label }}</label>
+                            {{ form.livello }}
+                            {{ form.livello.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.qualifica.id_for_label }}">{{ form.qualifica.label }}</label>
+                            {{ form.qualifica }}
+                            {{ form.qualifica.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.mansione.id_for_label }}">{{ form.mansione.label }}</label>
+                            {{ form.mansione }}
+                            {{ form.mansione.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="scambio-retta-card" aria-labelledby="ga-contract-economics-title">
+                <div class="scambio-retta-card-head">
+                    <span class="scambio-retta-card-icon is-green" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="ga-contract-economics-title">Orario e importi</h2>
+                        <p>Regime orario, ore settimanali, retribuzione e mensilita.</p>
+                    </div>
+                </div>
+
+                <div class="scambio-retta-grid ga-contract-form-grid">
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.regime_orario.id_for_label }}">{{ form.regime_orario.label }}</label>
+                            {{ form.regime_orario }}
+                            {{ form.regime_orario.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.ore_settimanali.id_for_label }}">{{ form.ore_settimanali.label }}</label>
+                            {{ form.ore_settimanali }}
+                            {{ form.ore_settimanali.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.percentuale_part_time.id_for_label }}">{{ form.percentuale_part_time.label }}</label>
+                            {{ form.percentuale_part_time }}
+                            {{ form.percentuale_part_time.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.retribuzione_lorda_mensile.id_for_label }}">{{ form.retribuzione_lorda_mensile.label }}</label>
+                            {{ form.retribuzione_lorda_mensile }}
+                            {{ form.retribuzione_lorda_mensile.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.tariffa_oraria.id_for_label }}">{{ form.tariffa_oraria.label }}</label>
+                            {{ form.tariffa_oraria }}
+                            {{ form.tariffa_oraria.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.superminimo_mensile.id_for_label }}">{{ form.superminimo_mensile.label }}</label>
+                            {{ form.superminimo_mensile }}
+                            {{ form.superminimo_mensile.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.indennita_fisse_mensili.id_for_label }}">{{ form.indennita_fisse_mensili.label }}</label>
+                            {{ form.indennita_fisse_mensili }}
+                            {{ form.indennita_fisse_mensili.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field">
+                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.mensilita_annue.id_for_label }}">{{ form.mensilita_annue.label }}</label>
+                            {{ form.mensilita_annue }}
+                            {{ form.mensilita_annue.errors }}
+                        </div>
+                    </div>
+
+                    <div class="scambio-retta-field ga-contract-currency-field">
+                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                        </span>
+                        <div>
+                            <label for="{{ form.valuta.id_for_label }}">{{ form.valuta.label }}</label>
+                            {{ form.valuta }}
+                            {{ form.valuta.errors }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <details class="ga-dipendente-notes-field ga-contract-notes-field" {% if form.note.errors or form.note.value %}open{% endif %}>
+                <summary title="Clicca per espandere">
+                    <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                    </span>
+                    <span>
+                        <strong>{{ form.note.label }}</strong>
+                        <small>Clicca per espandere</small>
+                    </span>
+                </summary>
+                <div class="ga-dipendente-notes-body">
+                    <label class="sr-only" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                    {{ form.note }}
+                    {{ form.note.errors }}
+                </div>
+            </details>
+
+            {% if contratto %}
+                <section class="scambio-retta-card ga-contract-linked-card" aria-labelledby="ga-contract-sim-title">
+                    <div class="scambio-retta-card-head">
+                        <span class="scambio-retta-card-icon is-purple" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                        </span>
+                        <div>
+                            <h2 id="ga-contract-sim-title">Simulazioni costo collegate</h2>
+                            <p>Ultime simulazioni economiche associate al contratto.</p>
+                        </div>
+                    </div>
+                    <div class="ga-contract-linked-list">
+                        {% for simulazione in simulazioni_costo %}
+                            <article class="ga-dipendente-mini-row">
+                                <div>
+                                    <a
+                                        href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                        class="ga-dipendente-mini-title"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                        data-popup-window-name="arboris-simulazione-costo-popup"
+                                        data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                    >
+                                        {{ simulazione.valido_dal|date:"d/m/Y" }} - {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                    </a>
+                                    <span>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
+                                </div>
+                                <strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong>
+                            </article>
+                        {% empty %}
+                            <div class="ga-dipendente-empty">Nessuna simulazione costo collegata.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+
+            <div class="scambio-retta-actions">
+                {% if can_manage_gestione_amministrativa %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva</span>
+                    </button>
+                {% endif %}
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% elif dipendente %}
+                    <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% else %}
+                    <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
 
-    <form method="post" class="detail-form">
-        {% csrf_token %}
-        <div class="content-card">
-            <table class="form-table">
-                <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
-                <tr><th>{{ form.tipo_contratto.label_tag }}</th><td>{{ form.tipo_contratto }} {{ form.tipo_contratto.errors }}</td></tr>
-                <tr><th>{{ form.parametro_calcolo.label_tag }}</th><td>{{ form.parametro_calcolo }} {{ form.parametro_calcolo.errors }}</td></tr>
-                <tr><th>{{ form.data_inizio.label_tag }}</th><td>{{ form.data_inizio }} {{ form.data_inizio.errors }}</td></tr>
-                <tr><th>{{ form.data_fine.label_tag }}</th><td>{{ form.data_fine }} {{ form.data_fine.errors }}</td></tr>
-                <tr><th>{{ form.ccnl.label_tag }}</th><td>{{ form.ccnl }} {{ form.ccnl.errors }}</td></tr>
-                <tr><th>{{ form.livello.label_tag }}</th><td>{{ form.livello }} {{ form.livello.errors }}</td></tr>
-                <tr><th>{{ form.qualifica.label_tag }}</th><td>{{ form.qualifica }} {{ form.qualifica.errors }}</td></tr>
-                <tr><th>{{ form.mansione.label_tag }}</th><td>{{ form.mansione }} {{ form.mansione.errors }}</td></tr>
-                <tr><th>{{ form.regime_orario.label_tag }}</th><td>{{ form.regime_orario }} {{ form.regime_orario.errors }}</td></tr>
-                <tr><th>{{ form.ore_settimanali.label_tag }}</th><td>{{ form.ore_settimanali }} {{ form.ore_settimanali.errors }}</td></tr>
-                <tr><th>{{ form.percentuale_part_time.label_tag }}</th><td>{{ form.percentuale_part_time }} {{ form.percentuale_part_time.errors }}</td></tr>
-                <tr><th>{{ form.retribuzione_lorda_mensile.label_tag }}</th><td>{{ form.retribuzione_lorda_mensile }} {{ form.retribuzione_lorda_mensile.errors }}</td></tr>
-                <tr><th>{{ form.tariffa_oraria.label_tag }}</th><td>{{ form.tariffa_oraria }} {{ form.tariffa_oraria.errors }}</td></tr>
-                <tr><th>{{ form.superminimo_mensile.label_tag }}</th><td>{{ form.superminimo_mensile }} {{ form.superminimo_mensile.errors }}</td></tr>
-                <tr><th>{{ form.indennita_fisse_mensili.label_tag }}</th><td>{{ form.indennita_fisse_mensili }} {{ form.indennita_fisse_mensili.errors }}</td></tr>
-                <tr><th>{{ form.mensilita_annue.label_tag }}</th><td>{{ form.mensilita_annue }} {{ form.mensilita_annue.errors }}</td></tr>
-                <tr><th>{{ form.valuta.label_tag }}</th><td>{{ form.valuta }} {{ form.valuta.errors }}</td></tr>
-                <tr><th>{{ form.attivo.label_tag }}</th><td>{{ form.attivo }} {{ form.attivo.errors }}</td></tr>
-                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-            </table>
-            <div class="form-actions">
-                {% if can_manage_gestione_amministrativa %}
-                    <button type="submit" class="btn btn-primary">Salva</button>
-                {% endif %}
-                {% if dipendente %}
-                    <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="btn btn-secondary">Annulla</a>
-                {% else %}
-                    <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Annulla</a>
-                {% endif %}
-                {% if contratto and can_manage_gestione_amministrativa %}
-                    <a href="{% url 'elimina_contratto_dipendente' contratto.pk %}" class="btn btn-danger">Elimina</a>
-                {% endif %}
-            </div>
-        </div>
-    </form>
-
-    {% if contratto %}
-        <div class="content-card">
-            <div class="page-head">
-                <h2 class="section-title">Simulazioni costo collegate</h2>
-                <div class="page-head-actions">
-                    {% if can_manage_gestione_amministrativa %}
-                        <a href="{% url 'crea_simulazione_costo_dipendente' %}?contratto={{ contratto.pk }}" class="btn btn-secondary">Nuova simulazione</a>
-                    {% endif %}
-                </div>
-            </div>
-            <table class="list-table">
-                <thead>
-                    <tr>
-                        <th>Validita</th>
-                        <th class="column-right">Netto</th>
-                        <th class="column-right">Lordo</th>
-                        <th class="column-right">Costo azienda</th>
-                        <th>Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for simulazione in simulazioni_costo %}
-                        <tr>
-                            <td>
-                                {{ simulazione.valido_dal|date:"d/m/Y" }} -
-                                {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
-                                {% if not simulazione.attiva %}<br><span class="table-muted">non attiva</span>{% endif %}
-                            </td>
-                            <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
-                            <td class="column-right">{{ simulazione.lordo_mensile|euro }} &euro;</td>
-                            <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
-                            <td class="actions-cell">
-                                <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">Modifica</a>
-                                {% if can_manage_gestione_amministrativa %}
-                                    <span class="table-muted">|</span>
-                                    <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="table-link table-link-danger">Elimina</a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="5"><div class="empty-state">Nessuna simulazione costo collegata.</div></td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% endif %}
+    <script src="{% static 'js/pages/contratto-popup-form.js' %}?v=5"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisContrattoPopupForm) {
+                ArborisContrattoPopupForm.init();
+            }
+        });
+    </script>
 {% endblock %}

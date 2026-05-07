@@ -1,33 +1,73 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}Elimina busta paga - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_buste_paga_dipendenti' %}">Buste paga</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_buste_paga_dipendenti' %}">Buste paga</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina busta paga</h1>
-    </div>
+    <div class="scambio-retta-form-shell ga-busta-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon ga-contract-delete-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <span class="related-config-kicker">Dipendenti e collaboratori</span>
+                <h1 class="page-title">Elimina busta paga</h1>
+                <p>{{ busta.dipendente }} - {{ busta.periodo_label }}</p>
+            </div>
+        </div>
 
-    <div class="content-card">
-        <p>
-            Stai per eliminare la busta paga <strong>{{ busta.periodo_label }}</strong>
-            di <strong>{{ busta.dipendente }}</strong>.
-        </p>
-        <form method="post" class="form-actions">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger">Elimina</button>
-            <a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="btn btn-secondary">Annulla</a>
-        </form>
+        <section class="scambio-retta-card ga-contract-delete-card" aria-labelledby="ga-busta-delete-title">
+            <div class="scambio-retta-card-head">
+                <span class="scambio-retta-card-icon is-rose" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2 id="ga-busta-delete-title">Conferma eliminazione</h2>
+                    <p>Questa operazione rimuove il cedolino e le voci collegate.</p>
+                </div>
+            </div>
+
+            <div class="ga-contract-delete-body">
+                <p class="ga-contract-delete-copy">
+                    Vuoi eliminare la busta paga <strong>{{ busta.periodo_label }}</strong>
+                    di <strong>{{ busta.dipendente }}</strong>?
+                </p>
+
+                <form method="post" class="scambio-retta-actions ga-contract-delete-actions">
+                    {% csrf_token %}
+                    {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+                    {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+                    <button type="submit" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </button>
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </button>
+                    {% else %}
+                        <a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </a>
+                    {% endif %}
+                </form>
+            </div>
+        </section>
     </div>
 {% endblock %}

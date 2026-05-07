@@ -1,35 +1,78 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}Elimina parametro di calcolo - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_parametri_calcolo_stipendi' %}">Parametri calcolo</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_parametri_calcolo_stipendi' %}">Parametri calcolo</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Elimina</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Elimina parametro di calcolo</h1>
-    </div>
-
-    <div class="content-card">
-        {% if usage_count %}
-            <div class="message message-warning">
-                Questo parametro e' collegato a {{ usage_count }} contratti. Eliminandolo, quei contratti perderanno il collegamento diretto.
+    <div class="scambio-retta-form-shell ga-parametro-delete-shell{% if popup %} is-popup{% endif %}">
+        <div class="scambio-retta-form-head">
+            <span class="scambio-retta-head-icon ga-contract-delete-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+            </span>
+            <div class="scambio-retta-head-copy">
+                <span class="related-config-kicker">Dipendenti e collaboratori</span>
+                <h1 class="page-title">Elimina parametro di calcolo</h1>
+                <p>{{ parametro }}</p>
             </div>
-        {% endif %}
-        <p>Stai per eliminare il parametro <strong>{{ parametro }}</strong>.</p>
-        <form method="post" class="form-actions">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger">Elimina</button>
-            <a href="{% url 'modifica_parametro_calcolo_stipendio' parametro.pk %}" class="btn btn-secondary">Annulla</a>
-        </form>
+        </div>
+
+        <section class="scambio-retta-card ga-contract-delete-card" aria-labelledby="ga-parametro-delete-title">
+            <div class="scambio-retta-card-head">
+                <span class="scambio-retta-card-icon is-rose" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
+                </span>
+                <div>
+                    <h2 id="ga-parametro-delete-title">Conferma eliminazione</h2>
+                    <p>Il parametro verra rimosso dall'archivio delle configurazioni stipendio.</p>
+                </div>
+            </div>
+
+            <div class="ga-contract-delete-body">
+                {% if usage_count %}
+                    <div class="message message-warning">
+                        Questo parametro e' collegato a {{ usage_count }} {% if usage_count == 1 %}contratto{% else %}contratti{% endif %}. Eliminandolo, quei contratti perderanno il collegamento diretto.
+                    </div>
+                {% endif %}
+
+                <p class="ga-contract-delete-copy">
+                    Vuoi eliminare il parametro <strong>{{ parametro }}</strong>?
+                </p>
+
+                <form method="post" class="scambio-retta-actions ga-contract-delete-actions">
+                    {% csrf_token %}
+                    {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+                    {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+                    <button type="submit" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </button>
+                    {% if popup %}
+                        <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </button>
+                    {% else %}
+                        <a href="{% url 'modifica_parametro_calcolo_stipendio' parametro.pk %}" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                            <span class="btn-label">Annulla</span>
+                        </a>
+                    {% endif %}
+                </form>
+            </div>
+        </section>
     </div>
 {% endblock %}

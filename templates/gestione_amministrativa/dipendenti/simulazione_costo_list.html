@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency active_toggles %}
+{% load static currency active_toggles %}
 
 {% block title %}Simulazioni costo - Dipendenti e collaboratori{% endblock %}
 
@@ -14,103 +14,291 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Simulazioni costo dipendenti</h1>
-        <div class="page-head-actions">
-            {% if can_manage_gestione_amministrativa %}
-                <a href="{% url 'crea_simulazione_costo_dipendente' %}" class="btn btn-primary">Nuova simulazione</a>
-            {% endif %}
+    <div class="scambio-list-shell ga-simulazioni-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Simulazioni costo dipendenti</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ simulazioni_stats.totale }} {% if simulazioni_stats.totale == 1 %}simulazione{% else %}simulazioni{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        Previsioni elaborate da consulente, costo azienda e parametri payroll
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
+                    <span class="btn-label">Contratti</span>
+                </a>
+                {% if can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'crea_simulazione_costo_dipendente' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_simulazione_costo_dipendente' %}?popup=1"
+                        data-popup-window-name="arboris-simulazione-costo-popup"
+                        data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuova simulazione</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo simulazioni costo">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Simulazioni totali</span>
+                    <strong class="scambio-list-kpi-value">{{ simulazioni_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Record presenti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ simulazioni_stats.attive }}</strong>
+                    <span class="scambio-list-kpi-note">Usate nei calcoli</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Non attive</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ simulazioni_stats.non_attive }}</strong>
+                    <span class="scambio-list-kpi-note">Storiche o sospese</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Costo mensile</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ simulazioni_stats.costo|euro }} &euro;</strong>
+                    <span class="scambio-list-kpi-note">Totale filtrato</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-filter-card" aria-label="Filtri simulazioni costo">
+            <form method="get" class="scambio-list-filter-form">
+                <label class="scambio-list-search ga-simulazioni-search">
+                    <span class="scambio-list-search-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                    </span>
+                    <input type="search" data-ga-simulazioni-search placeholder="Cerca per dipendente, titolo, contratto..." aria-label="Cerca simulazioni costo">
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Dipendente</span>
+                    <select name="dipendente">
+                        <option value="">Tutti</option>
+                        {% for dipendente in dipendenti %}
+                            <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Contratto</span>
+                    <select name="contratto">
+                        <option value="">Tutti</option>
+                        {% for contratto in contratti %}
+                            <option value="{{ contratto.pk }}" {% if contratto_id == contratto.pk|stringformat:"s" %}selected{% endif %}>{{ contratto.label_select }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Stato</span>
+                    <select name="attiva">
+                        <option value="">Tutte</option>
+                        <option value="1" {% if attiva == "1" %}selected{% endif %}>Attive</option>
+                        <option value="0" {% if attiva == "0" %}selected{% endif %}>Non attive</option>
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                    <span class="btn-label">Filtra</span>
+                </button>
+                <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Pulisci</span>
+                </a>
+            </form>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="ga-simulazioni-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="ga-simulazioni-list-title">Elenco simulazioni</h2>
+                <div class="scambio-list-tools">
+                    <span class="scambio-list-status-chip is-muted" data-ga-simulazioni-count>
+                        {{ simulazioni_stats.totale }} {% if simulazioni_stats.totale == 1 %}simulazione{% else %}simulazioni{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table ga-simulazioni-list-table">
+                    <colgroup>
+                        <col class="ga-simulazioni-col-person">
+                        <col class="ga-simulazioni-col-period">
+                        <col class="ga-simulazioni-col-money">
+                        <col class="ga-simulazioni-col-money">
+                        <col class="ga-simulazioni-col-money">
+                        <col class="ga-simulazioni-col-file">
+                        <col class="ga-simulazioni-col-status">
+                        <col class="ga-simulazioni-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Dipendente</th>
+                            <th>Validita</th>
+                            <th class="column-right">Netto</th>
+                            <th class="column-right">Lordo</th>
+                            <th class="column-right">Costo azienda</th>
+                            <th>PDF</th>
+                            <th>Stato</th>
+                            <th class="ga-simulazioni-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for simulazione in simulazioni %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}"
+                                data-row-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                data-popup-window-name="arboris-simulazione-costo-popup"
+                                data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                data-popup-title="Simulazione costo"
+                                data-ga-simulazione-row
+                            >
+                                <td class="scambio-list-main-cell ga-simulazioni-main-cell">
+                                    <a
+                                        href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                        data-popup-window-name="arboris-simulazione-costo-popup"
+                                        data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{% if simulazione.contratto.dipendente_id %}{{ simulazione.contratto.dipendente }}{% else %}Contratto non assegnato{% endif %}</strong>
+                                            <span>{{ simulazione.titolo|default:simulazione.contratto.label_select }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    {{ simulazione.valido_dal|date:"d/m/Y" }} -
+                                    {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                </td>
+                                <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
+                                <td class="column-right">{{ simulazione.lordo_mensile|euro }} &euro;</td>
+                                <td class="column-right"><strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong></td>
+                                <td>
+                                    {% if simulazione.file_simulazione %}
+                                        <a href="{{ simulazione.file_simulazione.url }}" class="btn btn-secondary btn-sm btn-icon-text" target="_blank" rel="noopener">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                            <span class="btn-label">Apri</span>
+                                        </a>
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% active_toggle simulazione %}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions ga-simulazioni-actions">
+                                        <a
+                                            href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                            data-popup-window-name="arboris-simulazione-costo-popup"
+                                            data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        {% if can_manage_gestione_amministrativa %}
+                                            <a
+                                                href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger"
+                                                title="Elimina"
+                                                aria-label="Elimina simulazione costo"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                data-popup-window-name="arboris-simulazione-costo-delete-popup"
+                                                data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8"><div class="empty-state">Nessuna simulazione costo registrata.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="ga-simulazioni-empty-filter-row" hidden>
+                            <td colspan="8"><div class="empty-state">Nessuna simulazione corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <div class="content-card">
-        <form method="get" class="filter-bar">
-            <label>
-                Dipendente
-                <select name="dipendente">
-                    <option value="">Tutti</option>
-                    {% for dipendente in dipendenti %}
-                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>
-                Contratto
-                <select name="contratto">
-                    <option value="">Tutti</option>
-                    {% for contratto in contratti %}
-                        <option value="{{ contratto.pk }}" {% if contratto_id == contratto.pk|stringformat:"s" %}selected{% endif %}>{{ contratto.label_select }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>
-                Stato
-                <select name="attiva">
-                    <option value="">Tutte</option>
-                    <option value="1" {% if attiva == "1" %}selected{% endif %}>Attive</option>
-                    <option value="0" {% if attiva == "0" %}selected{% endif %}>Non attive</option>
-                </select>
-            </label>
-            <button type="submit" class="btn btn-secondary">Filtra</button>
-            <a href="{% url 'lista_simulazioni_costo_dipendenti' %}" class="btn btn-secondary">Reset</a>
-        </form>
-    </div>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Dipendente</th>
-                    <th>Validita</th>
-                    <th class="column-right">Netto</th>
-                    <th class="column-right">Lordo</th>
-                    <th class="column-right">Costo azienda</th>
-                    <th>PDF</th>
-                    <th>Stato</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for simulazione in simulazioni %}
-                    <tr>
-                        <td>
-                            {% if simulazione.contratto.dipendente_id %}
-                                <a href="{% url 'modifica_dipendente' simulazione.contratto.dipendente_id %}" class="table-link">{{ simulazione.contratto.dipendente }}</a>
-                            {% else %}
-                                <span class="table-muted">Contratto non assegnato</span>
-                            {% endif %}
-                            {% if simulazione.titolo %}
-                                <br><strong>{{ simulazione.titolo }}</strong>
-                            {% endif %}
-                            <br><span class="table-muted">{{ simulazione.contratto.label_select }}</span>
-                        </td>
-                        <td>
-                            {{ simulazione.valido_dal|date:"d/m/Y" }} -
-                            {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
-                        </td>
-                        <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
-                        <td class="column-right">{{ simulazione.lordo_mensile|euro }} &euro;</td>
-                        <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
-                        <td>
-                            {% if simulazione.file_simulazione %}
-                                <a href="{{ simulazione.file_simulazione.url }}" class="table-link" target="_blank" rel="noopener">Apri</a>
-                            {% else %}
-                                <span class="table-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>{% active_toggle simulazione %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">Modifica</a>
-                            {% if can_manage_gestione_amministrativa %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_simulazione_costo_dipendente' simulazione.pk %}" class="table-link table-link-danger">Elimina</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="8"><div class="empty-state">Nessuna simulazione costo registrata.</div></td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            const searchInput = document.querySelector("[data-ga-simulazioni-search]");
+            const rows = Array.from(document.querySelectorAll("[data-ga-simulazione-row]"));
+            const emptyRow = document.querySelector(".ga-simulazioni-empty-filter-row");
+            const countNode = document.querySelector("[data-ga-simulazioni-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            function label(count) {
+                return count + (count === 1 ? " simulazione" : " simulazioni");
+            }
+
+            function applySearch() {
+                const term = searchInput.value.trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(function (row) {
+                    const match = !term || row.textContent.toLowerCase().includes(term);
+                    row.hidden = !match;
+                    if (match) visible += 1;
+                });
+                if (emptyRow) emptyRow.hidden = visible !== 0;
+                if (countNode) countNode.textContent = label(visible);
+            }
+
+            searchInput.addEventListener("input", applySearch);
+        });
+    </script>
 {% endblock %}

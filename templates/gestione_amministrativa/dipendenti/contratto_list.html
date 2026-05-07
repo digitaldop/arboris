@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency active_toggles %}
+{% load static currency active_toggles %}
 
 {% block title %}Contratti dipendenti - Dipendenti e collaboratori{% endblock %}
 
@@ -14,93 +14,282 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Contratti dipendenti</h1>
-        <div class="page-head-actions">
-            {% if can_manage_gestione_amministrativa %}
-                <a href="{% url 'crea_contratto_dipendente_generico' %}" class="btn btn-primary">Nuovo contratto</a>
-            {% endif %}
-            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Dipendenti</a>
+    <div class="scambio-list-shell ga-contracts-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Contratti dipendenti</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ contratti_stats.totale }} {% if contratti_stats.totale == 1 %}contratto{% else %}contratti{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                        Inquadramento, periodo, costo mensile e collegamenti paghe
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                    <span class="btn-label">Dipendenti</span>
+                </a>
+                {% if can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'crea_contratto_dipendente_generico' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_contratto_dipendente_generico' %}?popup=1"
+                        data-popup-window-name="arboris-contratto-dipendente-popup"
+                        data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuovo contratto</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo contratti dipendenti">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Contratti totali</span>
+                    <strong class="scambio-list-kpi-value">{{ contratti_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Record presenti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attivi</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ contratti_stats.attivi }}</strong>
+                    <span class="scambio-list-kpi-note">Influiscono sulle paghe</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Non attivi</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ contratti_stats.non_attivi }}</strong>
+                    <span class="scambio-list-kpi-note">Storici o sospesi</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Paghe / simulazioni</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ contratti_stats.buste }} / {{ contratti_stats.simulazioni }}</strong>
+                    <span class="scambio-list-kpi-note">Collegamenti registrati</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-filter-card" aria-label="Filtri contratti dipendenti">
+            <form method="get" class="scambio-list-filter-form">
+                <label class="scambio-list-search ga-contracts-search">
+                    <span class="scambio-list-search-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                    </span>
+                    <input type="search" data-ga-contracts-search placeholder="Cerca per dipendente, tipo, CCNL, mansione..." aria-label="Cerca contratti dipendenti">
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Dipendente</span>
+                    <select name="dipendente">
+                        <option value="">Tutti</option>
+                        {% for dipendente in dipendenti %}
+                            <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Stato</span>
+                    <select name="attivo">
+                        <option value="">Tutti</option>
+                        <option value="1" {% if attivo == "1" %}selected{% endif %}>Attivi</option>
+                        <option value="0" {% if attivo == "0" %}selected{% endif %}>Non attivi</option>
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                    <span class="btn-label">Filtra</span>
+                </button>
+                <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Pulisci</span>
+                </a>
+            </form>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="ga-contracts-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="ga-contracts-list-title">Elenco contratti</h2>
+                <div class="scambio-list-tools">
+                    <span class="scambio-list-status-chip is-muted" data-ga-contracts-count>
+                        {{ contratti_stats.totale }} {% if contratti_stats.totale == 1 %}contratto{% else %}contratti{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table ga-contracts-list-table">
+                    <colgroup>
+                        <col class="ga-contracts-col-person">
+                        <col class="ga-contracts-col-period">
+                        <col class="ga-contracts-col-status">
+                        <col class="ga-contracts-col-type">
+                        <col class="ga-contracts-col-level">
+                        <col class="ga-contracts-col-money">
+                        <col class="ga-contracts-col-count">
+                        <col class="ga-contracts-col-count">
+                        <col class="ga-contracts-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Dipendente</th>
+                            <th>Periodo</th>
+                            <th>Stato</th>
+                            <th>Tipo</th>
+                            <th>CCNL / livello</th>
+                            <th class="column-right">Lordo mensile</th>
+                            <th>Buste</th>
+                            <th>Simulazioni</th>
+                            <th class="ga-contracts-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contratto in contratti %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_contratto_dipendente' contratto.pk %}"
+                                data-row-popup-url="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                data-popup-window-name="arboris-contratto-dipendente-popup"
+                                data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                data-popup-title="Contratto dipendente"
+                                data-ga-contract-row
+                            >
+                                <td class="scambio-list-main-cell ga-contracts-main-cell">
+                                    <a
+                                        href="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                        data-popup-window-name="arboris-contratto-dipendente-popup"
+                                        data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{% if contratto.dipendente_id %}{{ contratto.dipendente }}{% else %}Non assegnato{% endif %}</strong>
+                                            <span>{{ contratto.descrizione|default:"Contratto dipendente" }}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>
+                                    {{ contratto.data_inizio|date:"d/m/Y" }} -
+                                    {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                </td>
+                                <td>{% active_toggle contratto %}</td>
+                                <td>{{ contratto.tipo_contratto|default:"-" }}</td>
+                                <td>
+                                    {{ contratto.ccnl|default:"-" }}
+                                    {% if contratto.livello %}<br><span class="table-muted">{{ contratto.livello }}</span>{% endif %}
+                                </td>
+                                <td class="column-right">
+                                    <strong>{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</strong>
+                                    <br><span class="table-muted">{{ contratto.mensilita_annue }} mensilita</span>
+                                </td>
+                                <td>{{ contratto.numero_buste }}</td>
+                                <td>{{ contratto.numero_simulazioni }}</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions ga-contracts-actions">
+                                        <a
+                                            href="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                            data-popup-window-name="arboris-contratto-dipendente-popup"
+                                            data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        {% if can_manage_gestione_amministrativa %}
+                                            <a
+                                                href="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger"
+                                                title="Elimina"
+                                                aria-label="Elimina contratto"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                                                data-popup-window-name="arboris-contratto-dipendente-delete-popup"
+                                                data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="9"><div class="empty-state">Nessun contratto trovato.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="ga-contracts-empty-filter-row" hidden>
+                            <td colspan="9"><div class="empty-state">Nessun contratto corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <div class="content-card">
-        <form method="get" class="filter-bar">
-            <label>
-                Dipendente:
-                <select name="dipendente">
-                    <option value="">Tutti</option>
-                    {% for dipendente in dipendenti %}
-                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>
-                Stato:
-                <select name="attivo">
-                    <option value="">Tutti</option>
-                    <option value="1" {% if attivo == "1" %}selected{% endif %}>Attivi</option>
-                    <option value="0" {% if attivo == "0" %}selected{% endif %}>Non attivi</option>
-                </select>
-            </label>
-            <button type="submit" class="btn btn-secondary">Filtra</button>
-            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary">Reset</a>
-        </form>
-    </div>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Dipendente</th>
-                    <th>Periodo</th>
-                    <th>Stato</th>
-                    <th>Tipo</th>
-                    <th>CCNL / livello</th>
-                    <th class="column-right">Lordo mensile</th>
-                    <th>Mensilita</th>
-                    <th>Buste collegate</th>
-                    <th>Simulazioni</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for contratto in contratti %}
-                    <tr>
-                        <td>
-                            {% if contratto.dipendente_id %}
-                                <a href="{% url 'modifica_dipendente' contratto.dipendente_id %}" class="table-link">{{ contratto.dipendente }}</a>
-                            {% else %}
-                                <span class="table-muted">Non assegnato</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</td>
-                        <td>{% active_toggle contratto %}</td>
-                        <td>{{ contratto.tipo_contratto|default:"-" }}</td>
-                        <td>
-                            {{ contratto.ccnl|default:"-" }}
-                            {% if contratto.livello %}<br><span class="table-muted">{{ contratto.livello }}</span>{% endif %}
-                        </td>
-                        <td class="column-right">{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</td>
-                        <td>{{ contratto.mensilita_annue }}</td>
-                        <td>{{ contratto.numero_buste }}</td>
-                        <td>{{ contratto.numero_simulazioni }}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">Modifica</a>
-                            {% if can_manage_gestione_amministrativa %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_contratto_dipendente' contratto.pk %}" class="table-link table-link-danger">Elimina</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="10">
-                            <div class="empty-state">Nessun contratto trovato.</div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            const searchInput = document.querySelector("[data-ga-contracts-search]");
+            const rows = Array.from(document.querySelectorAll("[data-ga-contract-row]"));
+            const emptyRow = document.querySelector(".ga-contracts-empty-filter-row");
+            const countNode = document.querySelector("[data-ga-contracts-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            function label(count) {
+                return count + (count === 1 ? " contratto" : " contratti");
+            }
+
+            function applySearch() {
+                const term = searchInput.value.trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(function (row) {
+                    const match = !term || row.textContent.toLowerCase().includes(term);
+                    row.hidden = !match;
+                    if (match) visible += 1;
+                });
+                if (emptyRow) emptyRow.hidden = visible !== 0;
+                if (countNode) countNode.textContent = label(visible);
+            }
+
+            searchInput.addEventListener("input", applySearch);
+        });
+    </script>
 {% endblock %}

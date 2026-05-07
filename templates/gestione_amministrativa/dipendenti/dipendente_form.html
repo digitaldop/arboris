@@ -16,237 +16,478 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %}</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Torna all'elenco</a>
+    <div class="fondo-plan-form-shell ga-dipendente-form-shell">
+        <div class="page-head fondo-plan-form-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon ga-dipendente-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                </span>
+                <div>
+                    <h1 class="page-title">{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %}</h1>
+                    <p class="page-subtitle">Dati anagrafici, contatti, stato lavorativo e collegamenti amministrativi.</p>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+                {% if can_manage_gestione_amministrativa %}
+                    <button type="submit" form="dipendente-form" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva</span>
+                    </button>
+                {% endif %}
+                {% if dipendente and can_manage_gestione_amministrativa %}
+                    <a href="{% url 'elimina_dipendente' dipendente.pk %}" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
+
+        <form method="post" id="dipendente-form" class="fondo-plan-form ga-dipendente-form detail-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <div class="ga-dipendente-form-layout{% if not dipendente %} is-create{% endif %}">
+                <div class="ga-dipendente-form-main">
+                    <section class="fondo-plan-form-card" aria-labelledby="ga-dipendente-anagrafica-title">
+                        <div class="fondo-plan-form-card-head">
+                            <span class="fondo-plan-form-card-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                            </span>
+                            <div>
+                                <h2 id="ga-dipendente-anagrafica-title">Anagrafica dipendente</h2>
+                                <p>Nome, dati di nascita, codice fiscale e indirizzo collegato.</p>
+                            </div>
+                        </div>
+
+                        <div class="fondo-plan-form-grid">
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.nome.id_for_label }}">{{ form.nome.label }}</label>
+                                    {{ form.nome }}
+                                    {{ form.nome.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.cognome.id_for_label }}">{{ form.cognome.label }}</label>
+                                    {{ form.cognome }}
+                                    {{ form.cognome.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.data_nascita.id_for_label }}">{{ form.data_nascita.label }}</label>
+                                    {{ form.data_nascita }}
+                                    {{ form.data_nascita.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-sky" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.luogo_nascita.id_for_label }}">{{ form.luogo_nascita.label }}</label>
+                                    <div class="autocomplete-wrapper citta-autocomplete">
+                                        {{ form.luogo_nascita }}
+                                    </div>
+                                    {{ form.luogo_nascita.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.sesso.id_for_label }}">{{ form.sesso.label }}</label>
+                                    {{ form.sesso }}
+                                    {{ form.sesso.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.nazionalita.id_for_label }}">{{ form.nazionalita.label }}</label>
+                                    {{ form.nazionalita }}
+                                    {{ form.nazionalita.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-rose" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.codice_fiscale.id_for_label }}">{{ form.codice_fiscale.label }}</label>
+                                    {{ form.codice_fiscale }}
+                                    {{ form.codice_fiscale.errors }}
+                                    <p class="fondo-plan-help">Calcolato automaticamente quando nome, cognome, data, sesso e luogo di nascita sono completi.</p>
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.indirizzo.id_for_label }}">{{ form.indirizzo.label }}</label>
+                                    <div class="popup-related-field related-field-row ga-dipendente-related-field">
+                                        <div class="related-field-stack">
+                                            <div class="autocomplete-wrapper indirizzo-autocomplete">
+                                                {{ form.indirizzo }}
+                                            </div>
+                                        </div>
+                                        <span class="related-actions inline-related-actions" aria-label="Azioni indirizzo">
+                                            <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn" aria-label="Nuovo indirizzo" title="Nuovo indirizzo">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn" aria-label="Modifica indirizzo" title="Modifica indirizzo">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn" aria-label="Elimina indirizzo" title="Elimina indirizzo">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                            </button>
+                                        </span>
+                                    </div>
+                                    {{ form.indirizzo.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="fondo-plan-form-card" aria-labelledby="ga-dipendente-contatti-title">
+                        <div class="fondo-plan-form-card-head">
+                            <span class="fondo-plan-form-card-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg>
+                            </span>
+                            <div>
+                                <h2 id="ga-dipendente-contatti-title">Contatti e pagamento</h2>
+                                <p>Recapiti, coordinate bancarie e codici utili alla gestione amministrativa.</p>
+                            </div>
+                        </div>
+
+                        <div class="fondo-plan-form-grid">
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
+                                    {{ form.telefono }}
+                                    {{ form.telefono.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                                    {{ form.email }}
+                                    {{ form.email.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.iban.id_for_label }}">{{ form.iban.label }}</label>
+                                    {{ form.iban }}
+                                    {{ form.iban.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.codice_dipendente.id_for_label }}">{{ form.codice_dipendente.label }}</label>
+                                    {{ form.codice_dipendente }}
+                                    {{ form.codice_dipendente.errors }}
+                                    {% if form.codice_dipendente.help_text %}
+                                        <p class="fondo-plan-help">{{ form.codice_dipendente.help_text }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="fondo-plan-form-card" aria-labelledby="ga-dipendente-rapporto-title">
+                        <div class="fondo-plan-form-card-head">
+                            <span class="fondo-plan-form-card-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                            </span>
+                            <div>
+                                <h2 id="ga-dipendente-rapporto-title">Rapporto lavorativo</h2>
+                                <p>Stato, date principali, contratto corrente e note interne.</p>
+                            </div>
+                        </div>
+
+                        <div class="fondo-plan-form-grid">
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.stato.id_for_label }}">{{ form.stato.label }}</label>
+                                    {{ form.stato }}
+                                    {{ form.stato.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.contratto.id_for_label }}">{{ form.contratto.label }}</label>
+                                    <div class="popup-related-field related-field-row ga-dipendente-related-field">
+                                        <div class="related-field-stack">
+                                            <div class="autocomplete-wrapper">
+                                                {{ form.contratto }}
+                                            </div>
+                                        </div>
+                                        <span class="related-actions inline-related-actions" aria-label="Azioni contratto">
+                                            <button type="button" class="related-btn related-btn-add" id="add-contratto-btn" aria-label="Nuovo contratto" title="Nuovo contratto">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-edit" id="edit-contratto-btn" aria-label="Modifica contratto" title="Modifica contratto">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            </button>
+                                            <button type="button" class="related-btn related-btn-delete" id="delete-contratto-btn" aria-label="Elimina contratto" title="Elimina contratto">
+                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                                            </button>
+                                        </span>
+                                    </div>
+                                    {{ form.contratto.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.data_assunzione.id_for_label }}">{{ form.data_assunzione.label }}</label>
+                                    {{ form.data_assunzione }}
+                                    {{ form.data_assunzione.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-rose" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.data_cessazione.id_for_label }}">{{ form.data_cessazione.label }}</label>
+                                    {{ form.data_cessazione }}
+                                    {{ form.data_cessazione.errors }}
+                                </div>
+                            </div>
+
+                            <details class="ga-dipendente-notes-field" {% if form.note.errors or form.note.value %}open{% endif %}>
+                                <summary title="Clicca per espandere">
+                                    <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                                    </span>
+                                    <span>
+                                        <strong>{{ form.note.label }}</strong>
+                                        <small>Clicca per espandere</small>
+                                    </span>
+                                </summary>
+                                <div class="ga-dipendente-notes-body">
+                                    <label class="sr-only" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                    {{ form.note }}
+                                    {{ form.note.errors }}
+                                </div>
+                            </details>
+                        </div>
+                    </section>
+                </div>
+
+                <aside class="ga-dipendente-sidebar">
+                    {% if dipendente %}
+                        <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-contratti-title">
+                            <div class="ga-dipendente-side-card-head">
+                                <div>
+                                    <h2 id="ga-dipendente-contratti-title">Contratti</h2>
+                                    <p>Accordi collegati al dipendente.</p>
+                                </div>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <a
+                                        href="{% url 'crea_contratto_dipendente' dipendente.pk %}?popup=1"
+                                        class="btn btn-secondary btn-icon-text btn-small-action"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'crea_contratto_dipendente' dipendente.pk %}?popup=1"
+                                        data-popup-window-name="arboris-contratto-dipendente-popup"
+                                        data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        <span class="btn-label">Nuovo</span>
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="ga-dipendente-mini-list">
+                                {% for contratto in contratti %}
+                                    <article class="ga-dipendente-mini-row">
+                                        <div>
+                                            <a
+                                                href="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                                class="ga-dipendente-mini-title"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                                data-popup-window-name="arboris-contratto-dipendente-popup"
+                                                data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                            >
+                                                {{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                            </a>
+                                            <span>{{ contratto.tipo_contratto|default:"Contratto" }}</span>
+                                        </div>
+                                        <strong>{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</strong>
+                                    </article>
+                                {% empty %}
+                                    <div class="ga-dipendente-empty">Nessun contratto registrato.</div>
+                                {% endfor %}
+                            </div>
+                        </section>
+
+                        <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-simulazioni-title">
+                            <div class="ga-dipendente-side-card-head">
+                                <div>
+                                    <h2 id="ga-dipendente-simulazioni-title">Simulazioni costo</h2>
+                                    <p>Previsioni economiche recenti.</p>
+                                </div>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <a
+                                        href="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                        class="btn btn-secondary btn-icon-text btn-small-action"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                        data-popup-window-name="arboris-simulazione-costo-popup"
+                                        data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        <span class="btn-label">Nuova</span>
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="ga-dipendente-mini-list">
+                                {% for simulazione in simulazioni_costo %}
+                                    <article class="ga-dipendente-mini-row">
+                                        <div>
+                                            <a
+                                                href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                class="ga-dipendente-mini-title"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                data-popup-window-name="arboris-simulazione-costo-popup"
+                                                data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                            >
+                                                {{ simulazione.valido_dal|date:"d/m/Y" }} - {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                            </a>
+                                            <span>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
+                                        </div>
+                                        <strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong>
+                                    </article>
+                                {% empty %}
+                                    <div class="ga-dipendente-empty">Nessuna simulazione costo.</div>
+                                {% endfor %}
+                            </div>
+                        </section>
+
+                        <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-buste-title">
+                            <div class="ga-dipendente-side-card-head">
+                                <div>
+                                    <h2 id="ga-dipendente-buste-title">Buste paga recenti</h2>
+                                    <p>Ultimi cedolini registrati.</p>
+                                </div>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <a
+                                        href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                        class="btn btn-secondary btn-icon-text btn-small-action"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                        data-popup-window-name="arboris-busta-paga-popup"
+                                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        <span class="btn-label">Nuova</span>
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="ga-dipendente-mini-list">
+                                {% for busta in buste_paga %}
+                                    <article class="ga-dipendente-mini-row">
+                                        <div>
+                                            <a
+                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                class="ga-dipendente-mini-title"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                data-popup-window-name="arboris-busta-paga-popup"
+                                                data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                            >{{ busta.periodo_label }}</a>
+                                            <span>{{ busta.get_stato_display }}</span>
+                                        </div>
+                                        <strong>{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</strong>
+                                    </article>
+                                {% empty %}
+                                    <div class="ga-dipendente-empty">Nessuna busta paga.</div>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% else %}
+                        <section class="ga-dipendente-side-card ga-dipendente-guide-card" aria-labelledby="ga-dipendente-guide-title">
+                            <span class="fondo-plan-form-card-icon is-blue" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                            </span>
+                            <div>
+                                <h2 id="ga-dipendente-guide-title">Dopo il salvataggio</h2>
+                                <p>Potrai collegare contratti, simulazioni costo e buste paga direttamente dalla scheda del dipendente.</p>
+                            </div>
+                        </section>
+                    {% endif %}
+                </aside>
+            </div>
+
+            <div class="fondo-plan-form-actions">
+                {% if can_manage_gestione_amministrativa %}
+                    <button type="submit" class="btn btn-save-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                        <span class="btn-label">Salva</span>
+                    </button>
+                {% endif %}
+                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            </div>
+        </form>
     </div>
-
-    <form method="post" id="dipendente-form" class="detail-form">
-        {% csrf_token %}
-        <div class="family-top-layout">
-            <div class="family-main-column">
-                <div class="admin-section">
-                    <div class="admin-section-title">Anagrafica dipendente</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table">
-                                <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
-                                <tr><th>{{ form.cognome.label_tag }}</th><td>{{ form.cognome }} {{ form.cognome.errors }}</td></tr>
-                                <tr><th>{{ form.data_nascita.label_tag }}</th><td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td></tr>
-                                <tr>
-                                    <th>{{ form.luogo_nascita.label_tag }}</th>
-                                    <td>
-                                        <div class="autocomplete-wrapper citta-autocomplete">
-                                            {{ form.luogo_nascita }}
-                                        </div>
-                                        {{ form.luogo_nascita.errors }}
-                                    </td>
-                                </tr>
-                                <tr><th>{{ form.nazionalita.label_tag }}</th><td>{{ form.nazionalita }} {{ form.nazionalita.errors }}</td></tr>
-                                <tr><th>{{ form.sesso.label_tag }}</th><td>{{ form.sesso }} {{ form.sesso.errors }}</td></tr>
-                                <tr>
-                                    <th>{{ form.codice_fiscale.label_tag }}</th>
-                                    <td>
-                                        {{ form.codice_fiscale }} {{ form.codice_fiscale.errors }}
-                                        <div class="help-text">Calcolato automaticamente quando nome, cognome, data, sesso e luogo di nascita sono completi.</div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.indirizzo.label_tag }}</th>
-                                    <td>
-                                        <div class="related-field-row popup-related-field dipendente-address-field">
-                                            <div class="related-field-stack">
-                                                <div class="autocomplete-wrapper indirizzo-autocomplete">
-                                                    {{ form.indirizzo }}
-                                                </div>
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">&#9998;</button>
-                                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">&#10006;</button>
-                                            </div>
-                                        </div>
-                                        {{ form.indirizzo.errors }}
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="admin-section">
-                    <div class="admin-section-title">Contatti e rapporto</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table">
-                                <tr><th>{{ form.telefono.label_tag }}</th><td>{{ form.telefono }} {{ form.telefono.errors }}</td></tr>
-                                <tr><th>{{ form.email.label_tag }}</th><td>{{ form.email }} {{ form.email.errors }}</td></tr>
-                                <tr><th>{{ form.iban.label_tag }}</th><td>{{ form.iban }} {{ form.iban.errors }}</td></tr>
-                                <tr>
-                                    <th>{{ form.codice_dipendente.label_tag }}</th>
-                                    <td>
-                                        {{ form.codice_dipendente }} {{ form.codice_dipendente.errors }}
-                                        {% if form.codice_dipendente.help_text %}
-                                            <div class="help-text">{{ form.codice_dipendente.help_text }}</div>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ form.contratto.label_tag }}</th>
-                                    <td>
-                                        <div class="related-field-row popup-related-field">
-                                            <div class="related-field-stack">
-                                                <div class="autocomplete-wrapper">
-                                                    {{ form.contratto }}
-                                                </div>
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-contratto-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-contratto-btn">&#9998;</button>
-                                                <button type="button" class="related-btn related-btn-delete" id="delete-contratto-btn">&#10006;</button>
-                                            </div>
-                                        </div>
-                                        {{ form.contratto.errors }}
-                                    </td>
-                                </tr>
-                                <tr><th>{{ form.stato.label_tag }}</th><td>{{ form.stato }} {{ form.stato.errors }}</td></tr>
-                                <tr><th>{{ form.data_assunzione.label_tag }}</th><td>{{ form.data_assunzione }} {{ form.data_assunzione.errors }}</td></tr>
-                                <tr><th>{{ form.data_cessazione.label_tag }}</th><td>{{ form.data_cessazione }} {{ form.data_cessazione.errors }}</td></tr>
-                                <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="family-side-column">
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Contratti</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            {% if dipendente and can_manage_gestione_amministrativa %}
-                                <div class="form-actions form-actions-compact">
-                                    <a href="{% url 'crea_contratto_dipendente' dipendente.pk %}" class="btn btn-secondary">Nuovo contratto</a>
-                                </div>
-                            {% endif %}
-                            <table class="list-table">
-                                <thead>
-                                    <tr>
-                                        <th>Periodo</th>
-                                        <th>Tipo</th>
-                                        <th class="column-right">Lordo</th>
-                                        <th>Azioni</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for contratto in contratti %}
-                                        <tr>
-                                            <td><a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</a></td>
-                                            <td>{{ contratto.tipo_contratto|default:"-" }}</td>
-                                            <td class="column-right">{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</td>
-                                            <td class="actions-cell">
-                                                <a href="{% url 'modifica_contratto_dipendente' contratto.pk %}" class="table-link">Modifica</a>
-                                                {% if can_manage_gestione_amministrativa %}
-                                                    <span class="table-muted">|</span>
-                                                    <a href="{% url 'elimina_contratto_dipendente' contratto.pk %}" class="table-link table-link-danger">Elimina</a>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% empty %}
-                                        <tr><td colspan="4"><div class="empty-state">Nessun contratto registrato.</div></td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Simulazioni costo</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            {% if dipendente and can_manage_gestione_amministrativa %}
-                                <div class="form-actions form-actions-compact">
-                                    <a href="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}" class="btn btn-secondary">Nuova simulazione</a>
-                                </div>
-                            {% endif %}
-                            <table class="list-table">
-                                <thead>
-                                    <tr>
-                                        <th>Validita</th>
-                                        <th class="column-right">Netto</th>
-                                        <th class="column-right">Costo azienda</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for simulazione in simulazioni_costo %}
-                                        <tr>
-                                            <td>
-                                                <a href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}" class="table-link">
-                                                    {{ simulazione.valido_dal|date:"d/m/Y" }} -
-                                                    {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
-                                                </a>
-                                                {% if not simulazione.attiva %}<br><span class="table-muted">non attiva</span>{% endif %}
-                                            </td>
-                                            <td class="column-right">{{ simulazione.netto_mensile|euro }} &euro;</td>
-                                            <td class="column-right">{{ simulazione.costo_azienda_mensile|euro }} &euro;</td>
-                                        </tr>
-                                    {% empty %}
-                                        <tr><td colspan="3"><div class="empty-state">Nessuna simulazione costo.</div></td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Buste paga recenti</div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            {% if dipendente and can_manage_gestione_amministrativa %}
-                                <div class="form-actions form-actions-compact">
-                                    <a href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}" class="btn btn-secondary">Nuova busta</a>
-                                </div>
-                            {% endif %}
-                            <table class="list-table">
-                                <thead>
-                                    <tr>
-                                        <th>Periodo</th>
-                                        <th>Stato</th>
-                                        <th class="column-right">Costo</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for busta in buste_paga %}
-                                        <tr>
-                                            <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
-                                            <td>{{ busta.get_stato_display }}</td>
-                                            <td class="column-right">{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</td>
-                                        </tr>
-                                    {% empty %}
-                                        <tr><td colspan="3"><div class="empty-state">Nessuna busta paga.</div></td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="form-actions sticky-form-actions">
-            {% if can_manage_gestione_amministrativa %}
-                <button type="submit" class="btn btn-primary">Salva</button>
-            {% endif %}
-            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Annulla</a>
-            {% if dipendente and can_manage_gestione_amministrativa %}
-                <a href="{% url 'elimina_dipendente' dipendente.pk %}" class="btn btn-danger">Elimina</a>
-            {% endif %}
-        </div>
-    </form>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/pages/dipendente-form.js' %}?v=6"></script>

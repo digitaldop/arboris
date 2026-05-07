@@ -125,4 +125,9 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "modifica_parametro_calcolo_stipendio",
             "elimina_parametro_calcolo_stipendio",
         ),
+        "tipo_contratto": _crud_triplet(
+            "crea_tipo_contratto_dipendente",
+            "modifica_tipo_contratto_dipendente",
+            "elimina_tipo_contratto_dipendente",
+        ),
     }

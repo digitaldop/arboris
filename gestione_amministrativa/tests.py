@@ -11,8 +11,10 @@ from .models import (
     BustaPagaDipendente,
     ContrattoDipendente,
     Dipendente,
+    ParametroCalcoloStipendio,
     ScenarioValorePayroll,
     SimulazioneCostoDipendente,
+    StatoBustaPaga,
     TipoContrattoDipendente,
     VoceBustaPaga,
 )
@@ -38,6 +40,24 @@ class SimulazioneCostoDipendenteTests(TestCase):
             data_inizio=date(2025, 9, 1),
             retribuzione_lorda_mensile=Decimal("1000.00"),
             mensilita_annue=Decimal("13.00"),
+        )
+        self.parametro = ParametroCalcoloStipendio.objects.create(
+            nome="Standard payroll",
+            valido_dal=date(2025, 9, 1),
+            aliquota_contributi_datore=Decimal("30.00"),
+            aliquota_contributi_dipendente=Decimal("9.00"),
+            aliquota_tfr=Decimal("7.41"),
+            aliquota_inail=Decimal("1.00"),
+            aliquota_altri_oneri=Decimal("2.00"),
+        )
+        self.busta = BustaPagaDipendente.objects.create(
+            dipendente=self.dipendente,
+            contratto=self.contratto,
+            anno=2025,
+            mese=10,
+            stato=StatoBustaPaga.PREVISTA,
+            netto_previsto=Decimal("1302.00"),
+            costo_azienda_previsto=Decimal("2186.94"),
         )
         self.simulazione = SimulazioneCostoDipendente.objects.create(
             contratto=self.contratto,
@@ -84,3 +104,186 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Simulazione consulente")
         self.assertContains(response, "Rossi Mario")
+
+    def test_lista_dipendenti_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_dipendenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-dipendenti-list-shell")
+        self.assertContains(response, "data-ga-dipendenti-search")
+        self.assertContains(response, f"{reverse('crea_dipendente')}")
+        self.assertContains(response, f"{reverse('genera_previsione_busta_paga', args=[self.dipendente.pk])}")
+
+    def test_dashboard_gestione_amministrativa_renderizza_nuovo_layout_e_tooltip(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("dashboard_gestione_amministrativa"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-admin-dashboard-shell")
+        self.assertContains(response, "data-floating-text")
+        self.assertContains(response, "Procedura consigliata")
+        self.assertContains(response, "ga-admin-dashboard-workflow")
+        self.assertContains(response, f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+
+    def test_crea_dipendente_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("crea_dipendente"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-dipendente-form-shell")
+        self.assertContains(response, "ga-dipendente-related-field")
+        self.assertContains(response, 'id="add-indirizzo-btn"')
+        self.assertContains(response, 'id="add-contratto-btn"')
+
+    def test_lista_contratti_renderizza_nuovo_layout_e_popup(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_contratti_dipendenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-contracts-list-shell")
+        self.assertContains(response, "data-ga-contracts-search")
+        self.assertContains(response, f"{reverse('crea_contratto_dipendente_generico')}?popup=1")
+        self.assertContains(response, f"{reverse('modifica_contratto_dipendente', args=[self.contratto.pk])}?popup=1")
+        self.assertContains(response, f"{reverse('elimina_contratto_dipendente', args=[self.contratto.pk])}?popup=1")
+        self.assertContains(response, 'data-window-popup="1"')
+
+    def test_contratto_popup_form_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('modifica_contratto_dipendente', args=[self.contratto.pk])}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-contract-form-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, 'id="popup-add-tipo-contratto-btn"')
+        self.assertContains(response, 'id="popup-add-parametro-calcolo-btn"')
+
+    def test_contratto_delete_popup_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('elimina_contratto_dipendente', args=[self.contratto.pk])}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-contract-delete-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+
+    def test_lista_buste_paga_renderizza_nuovo_layout_e_popup(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_buste_paga_dipendenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-buste-list-shell")
+        self.assertContains(response, "data-ga-buste-search")
+        self.assertContains(response, f"{reverse('crea_busta_paga_dipendente')}?popup=1")
+        self.assertContains(response, f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+        self.assertContains(response, f"{reverse('elimina_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+
+    def test_busta_paga_popup_form_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-busta-form-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, "Periodo e dipendente")
+        self.assertContains(response, "Previsione")
+
+    def test_busta_paga_delete_popup_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('elimina_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-busta-delete-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+
+    def test_lista_simulazioni_costo_renderizza_nuovo_layout_e_popup(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_simulazioni_costo_dipendenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-simulazioni-list-shell")
+        self.assertContains(response, "data-ga-simulazioni-search")
+        self.assertContains(response, f"{reverse('crea_simulazione_costo_dipendente')}?popup=1")
+        self.assertContains(
+            response,
+            f"{reverse('modifica_simulazione_costo_dipendente', args=[self.simulazione.pk])}?popup=1",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('elimina_simulazione_costo_dipendente', args=[self.simulazione.pk])}?popup=1",
+        )
+
+    def test_simulazione_costo_popup_form_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"{reverse('modifica_simulazione_costo_dipendente', args=[self.simulazione.pk])}?popup=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-simulazione-form-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, "Riferimenti")
+        self.assertContains(response, "Contributi e imposte")
+
+    def test_simulazione_costo_delete_popup_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"{reverse('elimina_simulazione_costo_dipendente', args=[self.simulazione.pk])}?popup=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-simulazione-delete-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+
+    def test_lista_parametri_calcolo_renderizza_nuovo_layout_e_popup(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("lista_parametri_calcolo_stipendi"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-parametri-list-shell")
+        self.assertContains(response, "data-ga-parametri-search")
+        self.assertContains(response, f"{reverse('crea_parametro_calcolo_stipendio')}?popup=1")
+        self.assertContains(
+            response,
+            f"{reverse('modifica_parametro_calcolo_stipendio', args=[self.parametro.pk])}?popup=1",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('elimina_parametro_calcolo_stipendio', args=[self.parametro.pk])}?popup=1",
+        )
+
+    def test_parametro_calcolo_popup_form_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"{reverse('modifica_parametro_calcolo_stipendio', args=[self.parametro.pk])}?popup=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-parametro-form-shell")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, "Periodo e identificazione")
+        self.assertContains(response, "Aliquote")
+
+    def test_parametro_calcolo_delete_popup_renderizza_nuovo_layout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"{reverse('elimina_parametro_calcolo_stipendio', args=[self.parametro.pk])}?popup=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-parametro-delete-shell")
+        self.assertContains(response, 'name="popup" value="1"')

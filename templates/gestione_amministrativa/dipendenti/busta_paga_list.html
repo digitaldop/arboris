@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load currency %}
+{% load static currency %}
 
 {% block title %}Buste paga - Dipendenti e collaboratori{% endblock %}
 
@@ -14,80 +14,272 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Buste paga dipendenti</h1>
-        <div class="page-head-actions">
-            {% if can_manage_gestione_amministrativa %}
-                <a href="{% url 'crea_busta_paga_dipendente' %}" class="btn btn-primary">Nuova busta paga</a>
-            {% endif %}
-            <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary">Dipendenti</a>
+    <div class="scambio-list-shell ga-buste-list-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Buste paga dipendenti</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ buste_stats.totale }} {% if buste_stats.totale == 1 %}busta{% else %}buste{% endif %}
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        Cedolini, previsioni payroll, costi azienda e pagamenti collegati
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                    <span class="btn-label">Dipendenti</span>
+                </a>
+                {% if can_manage_gestione_amministrativa %}
+                    <a
+                        href="{% url 'crea_busta_paga_dipendente' %}?popup=1"
+                        class="btn btn-primary btn-icon-text btn-add-action"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'crea_busta_paga_dipendente' %}?popup=1"
+                        data-popup-window-name="arboris-busta-paga-popup"
+                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                        <span class="btn-label">Nuova busta paga</span>
+                    </a>
+                {% endif %}
+            </div>
         </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo buste paga">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Buste totali</span>
+                    <strong class="scambio-list-kpi-value">{{ buste_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Record presenti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Previsioni</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ buste_stats.previste }}</strong>
+                    <span class="scambio-list-kpi-note">Calcolate dal sistema</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Effettive</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ buste_stats.effettive }}</strong>
+                    <span class="scambio-list-kpi-note">Caricate o verificate</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Costo previsto</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ buste_stats.costo_previsto|euro }} &euro;</strong>
+                    <span class="scambio-list-kpi-note">Totale filtrato</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-filter-card" aria-label="Filtri buste paga">
+            <form method="get" class="scambio-list-filter-form">
+                <label class="scambio-list-search ga-buste-search">
+                    <span class="scambio-list-search-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                    </span>
+                    <input type="search" data-ga-buste-search placeholder="Cerca per dipendente, periodo, stato..." aria-label="Cerca buste paga">
+                </label>
+                <label class="scambio-list-filter-field ga-buste-filter-short">
+                    <span>Anno</span>
+                    <input type="number" name="anno" value="{{ anno }}" min="2000" max="2100">
+                </label>
+                <label class="scambio-list-filter-field ga-buste-filter-short">
+                    <span>Mese</span>
+                    <input type="number" name="mese" value="{{ mese }}" min="1" max="12">
+                </label>
+                <label class="scambio-list-filter-field">
+                    <span>Dipendente</span>
+                    <select name="dipendente">
+                        <option value="">Tutti</option>
+                        {% for dipendente in dipendenti %}
+                            <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                    <span class="btn-label">Filtra</span>
+                </button>
+                <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Pulisci</span>
+                </a>
+            </form>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="ga-buste-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="ga-buste-list-title">Elenco buste paga</h2>
+                <div class="scambio-list-tools">
+                    <span class="scambio-list-status-chip is-muted" data-ga-buste-count>
+                        {{ buste_stats.totale }} {% if buste_stats.totale == 1 %}busta{% else %}buste{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table ga-buste-list-table">
+                    <colgroup>
+                        <col class="ga-buste-col-period">
+                        <col class="ga-buste-col-person">
+                        <col class="ga-buste-col-status">
+                        <col class="ga-buste-col-money">
+                        <col class="ga-buste-col-money">
+                        <col class="ga-buste-col-money">
+                        <col class="ga-buste-col-money">
+                        <col class="ga-buste-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Dipendente</th>
+                            <th>Stato</th>
+                            <th class="column-right">Netto previsto</th>
+                            <th class="column-right">Netto effettivo</th>
+                            <th class="column-right">Costo previsto</th>
+                            <th class="column-right">Costo effettivo</th>
+                            <th class="ga-buste-actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for busta in buste %}
+                            <tr
+                                class="list-row-link"
+                                data-row-href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
+                                data-row-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                data-popup-window-name="arboris-busta-paga-popup"
+                                data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                data-popup-title="Busta paga"
+                                data-ga-busta-row
+                            >
+                                <td class="scambio-list-main-cell ga-buste-main-cell">
+                                    <a
+                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                        class="scambio-list-main-link"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                        data-popup-window-name="arboris-busta-paga-popup"
+                                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ busta.periodo_label }}</strong>
+                                            <span>{% if busta.contratto_id %}{{ busta.contratto.tipo_contratto|default:"Contratto" }}{% else %}Nessun contratto collegato{% endif %}</span>
+                                        </span>
+                                    </a>
+                                </td>
+                                <td>{{ busta.dipendente }}</td>
+                                <td>
+                                    <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
+                                </td>
+                                <td class="column-right">{{ busta.netto_previsto|euro }} &euro;</td>
+                                <td class="column-right">{{ busta.netto_effettivo|euro }} &euro;</td>
+                                <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>
+                                <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions scambio-list-actions ga-buste-actions">
+                                        <a
+                                            href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                            class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                            data-popup-window-name="arboris-busta-paga-popup"
+                                            data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica</span>
+                                        </a>
+                                        {% if can_manage_gestione_amministrativa %}
+                                            <a
+                                                href="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                class="table-icon-link table-icon-link-danger"
+                                                title="Elimina"
+                                                aria-label="Elimina busta paga"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                data-popup-window-name="arboris-busta-paga-delete-popup"
+                                                data-popup-window-features="width=720,height=520,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8"><div class="empty-state">Nessuna busta paga trovata.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="ga-buste-empty-filter-row" hidden>
+                            <td colspan="8"><div class="empty-state">Nessuna busta paga corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <div class="content-card">
-        <form method="get" class="filter-bar">
-            <label>
-                Anno:
-                <input type="number" name="anno" value="{{ anno }}" min="2000" max="2100">
-            </label>
-            <label>
-                Mese:
-                <input type="number" name="mese" value="{{ mese }}" min="1" max="12">
-            </label>
-            <label>
-                Dipendente:
-                <select name="dipendente">
-                    <option value="">Tutti</option>
-                    {% for dipendente in dipendenti %}
-                        <option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:"s" %}selected{% endif %}>{{ dipendente }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <button type="submit" class="btn btn-secondary">Filtra</button>
-            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary">Reset</a>
-        </form>
-    </div>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
 
-    <div class="content-card">
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Periodo</th>
-                    <th>Dipendente</th>
-                    <th>Stato</th>
-                    <th class="column-right">Netto previsto</th>
-                    <th class="column-right">Netto effettivo</th>
-                    <th class="column-right">Costo previsto</th>
-                    <th class="column-right">Costo effettivo</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for busta in buste %}
-                    <tr>
-                        <td><a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">{{ busta.periodo_label }}</a></td>
-                        <td>{{ busta.dipendente }}</td>
-                        <td>{{ busta.get_stato_display }}</td>
-                        <td class="column-right">{{ busta.netto_previsto|euro }} &euro;</td>
-                        <td class="column-right">{{ busta.netto_effettivo|euro }} &euro;</td>
-                        <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>
-                        <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_busta_paga_dipendente' busta.pk %}" class="table-link">Modifica</a>
-                            {% if can_manage_gestione_amministrativa %}
-                                <span class="table-muted">|</span>
-                                <a href="{% url 'elimina_busta_paga_dipendente' busta.pk %}" class="table-link table-link-danger">Elimina</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="8">
-                            <div class="empty-state">Nessuna busta paga trovata.</div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            const searchInput = document.querySelector("[data-ga-buste-search]");
+            const rows = Array.from(document.querySelectorAll("[data-ga-busta-row]"));
+            const emptyRow = document.querySelector(".ga-buste-empty-filter-row");
+            const countNode = document.querySelector("[data-ga-buste-count]");
+
+            if (!searchInput || !rows.length) return;
+
+            function label(count) {
+                return count + (count === 1 ? " busta" : " buste");
+            }
+
+            function applySearch() {
+                const term = searchInput.value.trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(function (row) {
+                    const match = !term || row.textContent.toLowerCase().includes(term);
+                    row.hidden = !match;
+                    if (match) visible += 1;
+                });
+                if (emptyRow) emptyRow.hidden = visible !== 0;
+                if (countNode) countNode.textContent = label(visible);
+            }
+
+            searchInput.addEventListener("input", applySearch);
+        });
+    </script>
 {% endblock %}
