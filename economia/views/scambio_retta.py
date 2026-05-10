@@ -76,14 +76,14 @@ def get_selected_familiare_for_prestazione_form(form):
     if form.is_bound:
         familiare_id = form.data.get("familiare")
         if familiare_id:
-            return Familiare.objects.select_related("famiglia").filter(pk=familiare_id).first()
+            return Familiare.objects.filter(pk=familiare_id).first()
 
     if form.instance.pk and form.instance.familiare_id:
         return form.instance.familiare
 
     initial_familiare_id = form.initial.get("familiare")
     if initial_familiare_id:
-        return Familiare.objects.select_related("famiglia").filter(pk=initial_familiare_id).first()
+        return Familiare.objects.filter(pk=initial_familiare_id).first()
 
     return None
 
@@ -136,7 +136,6 @@ def build_prestazione_template_context(request, form, prestazione=None):
         "form": form,
         "prestazione": prestazione,
         "familiare_preview": familiare_preview,
-        "famiglia_preview": familiare_preview.famiglia if familiare_preview else None,
         "anno_scolastico_preview": anno_scolastico_preview,
         "return_url": return_url,
         "return_to": return_url,
@@ -258,7 +257,6 @@ def elimina_tariffa_scambio_retta(request, pk):
 def lista_scambi_retta(request):
     scambi = ScambioRetta.objects.select_related(
         "familiare",
-        "famiglia",
         "studente",
         "anno_scolastico",
         "tariffa_scambio_retta",
@@ -365,7 +363,6 @@ def contabilizza_scambio_retta(request, pk):
     scambio = get_object_or_404(
         ScambioRetta.objects.select_related(
             "familiare",
-            "famiglia",
             "studente",
             "anno_scolastico",
             "tariffa_scambio_retta",
@@ -404,7 +401,7 @@ def contabilizza_scambio_retta(request, pk):
             )
 
             ultimo_saldo = (
-                MovimentoCreditoRetta.objects.filter(famiglia=scambio.famiglia)
+                MovimentoCreditoRetta.objects.filter(studente=scambio.studente)
                 .order_by("-data_movimento", "-id")
                 .values_list("saldo_progressivo", flat=True)
                 .first()
@@ -412,7 +409,6 @@ def contabilizza_scambio_retta(request, pk):
             )
 
             MovimentoCreditoRetta.objects.create(
-                famiglia=scambio.famiglia,
                 studente=scambio.studente,
                 iscrizione=prossima_rata.iscrizione,
                 rata_iscrizione=prossima_rata,
@@ -499,7 +495,6 @@ def modifica_prestazione_scambio_retta(request, pk):
     prestazione = get_object_or_404(
         PrestazioneScambioRetta.objects.select_related(
             "familiare",
-            "famiglia",
             "studente",
             "anno_scolastico",
             "tariffa_scambio_retta",

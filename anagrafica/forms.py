@@ -1,22 +1,31 @@
 from django import forms
+from django.contrib.contenttypes.forms import BaseGenericInlineFormSet, generic_inlineformset_factory
 from django.db import DatabaseError
-from django.db.models import Case, IntegerField, When
+from django.db.models import Case, IntegerField, Q, When
 from django.forms import HiddenInput
 from django.forms.models import BaseInlineFormSet
 from django.forms.utils import ErrorDict
 from decimal import Decimal
 import re
+from .contact_services import (
+    ensure_default_contact_labels,
+    set_familiare_studenti,
+    set_studente_familiari,
+    sync_legacy_contact_fields_from_links,
+    sync_principal_contacts,
+)
 from .utils import citta_choice_label, validate_and_normalize_phone_number
-from .models import CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 from scuola.utils import resolve_default_anno_scolastico
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from arboris.form_widgets import italian_decimal_to_python, merge_widget_classes
 
-from django.forms import inlineformset_factory
+from django.forms import inlineformset_factory, modelformset_factory
 from .models import (
-    CAP, Citta, Indirizzo, Famiglia, StatoRelazioneFamiglia,
-    Familiare, Studente, Documento, RelazioneFamiliare, TipoDocumento, Nazione
+    CAP, Citta, Indirizzo,
+    Familiare, Studente, Documento, RelazioneFamiliare, TipoDocumento, Nazione,
+    AnagraficaIndirizzo, AnagraficaTelefono, AnagraficaEmail,
+    LabelIndirizzo, LabelTelefono, LabelEmail,
 )
 
 
@@ -33,6 +42,402 @@ def make_searchable_select(field, placeholder):
     )
 
 
+def studente_direct_relation_label(studente):
+    return f"{studente.cognome} {studente.nome}".strip()
+
+
+def familiare_direct_relation_label(familiare):
+    relation = f" ({familiare.relazione_familiare})" if getattr(familiare, "relazione_familiare", None) else ""
+    return f"{familiare.cognome} {familiare.nome}{relation}".strip()
+
+
+def _active_label_queryset(label_model, selected_id=None):
+    qs_filter = Q(attiva=True)
+    if selected_id:
+        qs_filter |= Q(pk=selected_id)
+    return label_model.objects.filter(qs_filter).order_by("ordine", "nome")
+
+
+class AnagraficaContactFormMixin:
+    label_model = None
+    label_default_name = "Principale"
+    value_field_name = ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        selected_label_id = getattr(self.instance, "label_id", None)
+        if "label" in self.fields and self.label_model:
+            self.fields["label"].required = False
+            self.fields["label"].queryset = _active_label_queryset(self.label_model, selected_label_id)
+            self.fields["label"].empty_label = "--- etichetta ---"
+        if "principale" in self.fields:
+            self.fields["principale"].required = False
+            self.fields["principale"].widget.attrs.update({"class": "contact-primary-input"})
+        if "ordine" in self.fields:
+            self.fields["ordine"].required = False
+            self.fields["ordine"].widget.attrs.update({"min": "1", "inputmode": "numeric"})
+        if "note" in self.fields:
+            self.fields["note"].required = False
+            self.fields["note"].widget = forms.TextInput(
+                attrs={
+                    **self.fields["note"].widget.attrs,
+                    "placeholder": "Nota breve",
+                }
+            )
+
+    def _value_is_present(self, value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        return True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("DELETE"):
+            return cleaned_data
+
+        value = cleaned_data.get(self.value_field_name)
+        if self._value_is_present(value) and not cleaned_data.get("label") and self.label_model:
+            labels = ensure_default_contact_labels()
+            label_groups = {
+                LabelIndirizzo: "indirizzi",
+                LabelTelefono: "telefoni",
+                LabelEmail: "email",
+            }
+            group = label_groups.get(self.label_model)
+            cleaned_data["label"] = labels.get(group, {}).get(self.label_default_name)
+
+        return cleaned_data
+
+
+class AnagraficaIndirizzoForm(AnagraficaContactFormMixin, forms.ModelForm):
+    label_model = LabelIndirizzo
+    value_field_name = "indirizzo"
+
+    class Meta:
+        model = AnagraficaIndirizzo
+        fields = ["indirizzo", "label", "principale", "ordine", "note"]
+        widgets = {
+            "note": forms.TextInput(attrs={"placeholder": "Nota breve"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["indirizzo"].required = False
+        self.fields["indirizzo"].queryset = (
+            Indirizzo.objects.select_related("citta", "provincia", "regione").order_by("via", "numero_civico")
+        )
+        self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
+        self.fields["indirizzo"].empty_label = "--- indirizzo ---"
+
+
+class AnagraficaTelefonoForm(AnagraficaContactFormMixin, forms.ModelForm):
+    label_model = LabelTelefono
+    value_field_name = "numero"
+
+    class Meta:
+        model = AnagraficaTelefono
+        fields = ["numero", "label", "principale", "ordine", "note"]
+        widgets = {
+            "numero": forms.TextInput(attrs={"placeholder": "Es. 333 1234567"}),
+            "note": forms.TextInput(attrs={"placeholder": "Nota breve"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["numero"].required = False
+
+    def clean_numero(self):
+        return validate_and_normalize_phone_number(self.cleaned_data.get("numero"))
+
+
+class AnagraficaEmailForm(AnagraficaContactFormMixin, forms.ModelForm):
+    label_model = LabelEmail
+    value_field_name = "email"
+
+    class Meta:
+        model = AnagraficaEmail
+        fields = ["email", "label", "principale", "ordine", "note"]
+        widgets = {
+            "email": forms.EmailInput(attrs={"placeholder": "esempio@email.com"}),
+            "note": forms.TextInput(attrs={"placeholder": "Nota breve"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].required = False
+
+
+class BaseAnagraficaContactFormSet(BaseGenericInlineFormSet):
+    value_field_name = ""
+
+    def _form_has_value(self, form):
+        value = form.cleaned_data.get(self.value_field_name)
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        return True
+
+    def clean(self):
+        super().clean()
+        principal_count = 0
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data") or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get("DELETE") or not self._form_has_value(form):
+                continue
+            if form.cleaned_data.get("principale"):
+                principal_count += 1
+        if principal_count > 1:
+            raise forms.ValidationError("Puoi indicare un solo recapito principale per sezione.")
+
+
+class BaseAnagraficaIndirizzoFormSet(BaseAnagraficaContactFormSet):
+    value_field_name = "indirizzo"
+
+
+class BaseAnagraficaTelefonoFormSet(BaseAnagraficaContactFormSet):
+    value_field_name = "numero"
+
+
+class BaseAnagraficaEmailFormSet(BaseAnagraficaContactFormSet):
+    value_field_name = "email"
+
+
+AnagraficaIndirizzoFormSet = generic_inlineformset_factory(
+    AnagraficaIndirizzo,
+    form=AnagraficaIndirizzoForm,
+    formset=BaseAnagraficaIndirizzoFormSet,
+    extra=1,
+    can_delete=True,
+)
+
+AnagraficaTelefonoFormSet = generic_inlineformset_factory(
+    AnagraficaTelefono,
+    form=AnagraficaTelefonoForm,
+    formset=BaseAnagraficaTelefonoFormSet,
+    extra=1,
+    can_delete=True,
+)
+
+AnagraficaEmailFormSet = generic_inlineformset_factory(
+    AnagraficaEmail,
+    form=AnagraficaEmailForm,
+    formset=BaseAnagraficaEmailFormSet,
+    extra=1,
+    can_delete=True,
+)
+
+
+def build_anagrafica_contact_formsets(data=None, instance=None):
+    return {
+        "indirizzi_formset": AnagraficaIndirizzoFormSet(
+            data=data,
+            instance=instance,
+            prefix="contatti_indirizzi",
+        ),
+        "telefoni_formset": AnagraficaTelefonoFormSet(
+            data=data,
+            instance=instance,
+            prefix="contatti_telefoni",
+        ),
+        "email_formset": AnagraficaEmailFormSet(
+            data=data,
+            instance=instance,
+            prefix="contatti_email",
+        ),
+    }
+
+
+def anagrafica_contact_formsets_are_valid(contact_formsets):
+    return all(
+        _anagrafica_contact_formset_has_management_data(formset) and formset.is_valid()
+        or not _anagrafica_contact_formset_has_management_data(formset)
+        for formset in contact_formsets.values()
+    )
+
+
+def save_anagrafica_contact_formsets(instance, contact_formsets):
+    has_contact_changes = False
+    for formset in contact_formsets.values():
+        if not _anagrafica_contact_formset_has_management_data(formset):
+            continue
+        formset.instance = instance
+        if formset.has_changed():
+            formset.save()
+            has_contact_changes = True
+    if has_contact_changes:
+        sync_legacy_contact_fields_from_links(instance)
+    return has_contact_changes
+
+
+def anagrafica_contact_formsets_have_errors(contact_formsets):
+    return any(
+        _anagrafica_contact_formset_has_management_data(formset)
+        and (formset.total_error_count() or formset.non_form_errors())
+        for formset in contact_formsets.values()
+    )
+
+
+def _anagrafica_contact_formset_has_management_data(formset):
+    if not formset.is_bound:
+        return True
+    data = getattr(formset, "data", None)
+    if data is None:
+        return False
+    return f"{formset.prefix}-TOTAL_FORMS" in data
+
+
+class StudenteDirectFamiliariForm(forms.Form):
+    direct_familiari_collegati = forms.ModelMultipleChoiceField(
+        queryset=Familiare.objects.none(),
+        required=False,
+        label="Genitori e tutori collegati",
+        help_text="Seleziona i familiari collegati allo studente. Deseleziona e salva per rimuovere un collegamento.",
+        widget=forms.SelectMultiple(
+            attrs={
+                "class": "form-control direct-relation-select",
+                "size": 7,
+            }
+        ),
+    )
+
+    def __init__(self, *args, studente=None, **kwargs):
+        self.studente = studente
+        super().__init__(*args, **kwargs)
+
+        selected_ids = set()
+        if getattr(studente, "pk", None):
+            selected_ids.update(
+                studente.relazioni_familiari.filter(attivo=True).values_list("familiare_id", flat=True)
+            )
+
+        queryset = (
+            Familiare.objects.select_related("relazione_familiare")
+            .filter(Q(attivo=True) | Q(pk__in=selected_ids))
+            .order_by("cognome", "nome", "pk")
+        )
+        field = self.fields["direct_familiari_collegati"]
+        field.queryset = queryset
+        field.label_from_instance = familiare_direct_relation_label
+        if selected_ids and not self.is_bound:
+            self.initial["direct_familiari_collegati"] = list(selected_ids)
+
+    def save(self):
+        if self.studente is not None:
+            set_studente_familiari(self.studente, self.cleaned_data.get("direct_familiari_collegati", []))
+
+
+class FamiliareDirectStudentiForm(forms.Form):
+    direct_studenti_collegati = forms.ModelMultipleChoiceField(
+        queryset=Studente.objects.none(),
+        required=False,
+        label="Figli e figlie collegati",
+        help_text="Seleziona gli studenti collegati al familiare. Deseleziona e salva per rimuovere un collegamento.",
+        widget=forms.SelectMultiple(
+            attrs={
+                "class": "form-control direct-relation-select",
+                "size": 7,
+            }
+        ),
+    )
+
+    def __init__(self, *args, familiare=None, **kwargs):
+        self.familiare = familiare
+        super().__init__(*args, **kwargs)
+
+        selected_ids = set()
+        if getattr(familiare, "pk", None):
+            selected_ids.update(
+                familiare.relazioni_studenti.filter(attivo=True).values_list("studente_id", flat=True)
+            )
+
+        queryset = (
+            Studente.objects.filter(Q(attivo=True) | Q(pk__in=selected_ids))
+            .order_by("cognome", "nome", "pk")
+        )
+        field = self.fields["direct_studenti_collegati"]
+        field.queryset = queryset
+        field.label_from_instance = studente_direct_relation_label
+        if selected_ids and not self.is_bound:
+            self.initial["direct_studenti_collegati"] = list(selected_ids)
+
+    def save(self):
+        if self.familiare is not None:
+            set_familiare_studenti(self.familiare, self.cleaned_data.get("direct_studenti_collegati", []))
+
+
+def classe_principale_reference_choices(selected_classe_id=None, selected_gruppo_id=None):
+    classe_filter = Q(attiva=True)
+    gruppo_filter = Q(attivo=True)
+    if selected_classe_id:
+        classe_filter |= Q(pk=selected_classe_id)
+    if selected_gruppo_id:
+        gruppo_filter |= Q(pk=selected_gruppo_id)
+
+    classi = (
+        Classe.objects.filter(classe_filter)
+        .annotate(
+            _inactive_order=Case(
+                When(attiva=True, then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("_inactive_order", "ordine_classe", "nome_classe", "sezione_classe")
+    )
+    gruppi = (
+        GruppoClasse.objects.filter(gruppo_filter)
+        .select_related("anno_scolastico")
+        .prefetch_related("classi")
+        .annotate(
+            _inactive_order=Case(
+                When(attivo=True, then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("_inactive_order", "-anno_scolastico__data_inizio", "nome_gruppo_classe", "id")
+    )
+
+    choices = [("", "--- nessuna classe principale ---")]
+    classi_choices = [(str(classe.pk), str(classe)) for classe in classi]
+    gruppi_choices = [
+        (f"gruppo:{gruppo.pk}", f"{gruppo.nome_gruppo_classe} - {gruppo.anno_scolastico}")
+        for gruppo in gruppi
+    ]
+    if classi_choices:
+        choices.append(("Classi", classi_choices))
+    if gruppi_choices:
+        choices.append(("Gruppi classe / pluriclassi", gruppi_choices))
+    return choices
+
+
+def split_classe_principale_reference(value):
+    value = str(value or "").strip()
+    if not value:
+        return None, None
+    if value.startswith("gruppo:"):
+        gruppo_id = value.split(":", 1)[1]
+        return None, int(gruppo_id) if gruppo_id.isdigit() else None
+    if value.startswith("classe:"):
+        classe_id = value.split(":", 1)[1]
+        return int(classe_id) if classe_id.isdigit() else None, None
+    return int(value) if value.isdigit() else None, None
+
+
+def classe_principale_reference_initial(profilo):
+    if not profilo:
+        return ""
+    if getattr(profilo, "gruppo_classe_principale_id", None):
+        return f"gruppo:{profilo.gruppo_classe_principale_id}"
+    if getattr(profilo, "classe_principale_id", None):
+        return str(profilo.classe_principale_id)
+    return ""
+
+
 def prime_queryset(queryset):
     list(queryset)
     return queryset
@@ -43,74 +448,6 @@ def bind_primed_queryset(field, queryset):
     field._queryset = queryset
     field.widget.choices = field.choices
     return queryset
-
-
-def famiglia_choice_queryset():
-    return (
-        Famiglia.objects
-        .select_related(
-            "stato_relazione_famiglia",
-            "indirizzo_principale",
-            "indirizzo_principale__citta",
-            "indirizzo_principale__provincia",
-            "indirizzo_principale__regione",
-            "indirizzo_principale__cap_scelto",
-        )
-        .prefetch_related("familiari", "studenti")
-        .order_by("cognome_famiglia", "id")
-    )
-
-
-def famiglia_choice_label(famiglia):
-    if hasattr(famiglia, "label_select"):
-        return famiglia.label_select()
-    return str(famiglia)
-
-
-def _person_choice_label(person):
-    return " ".join(part for part in [person.nome, person.cognome] if part).strip()
-
-
-def _join_choice_labels(items, limit=3):
-    values = [item for item in items if item]
-    if not values:
-        return ""
-
-    visible = values[:limit]
-    label = ", ".join(visible)
-    remaining = len(values) - len(visible)
-    if remaining > 0:
-        label = f"{label} +{remaining}"
-    return label
-
-
-def famiglia_nuovo_familiare_choice_label(famiglia):
-    dettagli = []
-
-    familiari = _join_choice_labels(
-        [_person_choice_label(familiare) for familiare in famiglia.familiari.all()]
-    )
-    if familiari:
-        dettagli.append(f"Familiari: {familiari}")
-
-    bambini = _join_choice_labels(
-        [_person_choice_label(studente) for studente in famiglia.studenti.all()]
-    )
-    if bambini:
-        dettagli.append(f"Bambini: {bambini}")
-
-    if famiglia.indirizzo_principale:
-        dettagli.append(f"Indirizzo: {famiglia.indirizzo_principale.label_select()}")
-
-    if dettagli:
-        return f"{famiglia.cognome_famiglia} - {' | '.join(dettagli)}"
-    return famiglia.cognome_famiglia or str(famiglia)
-
-
-def configure_famiglia_choice_field(field):
-    field.queryset = famiglia_choice_queryset()
-    field.label_from_instance = famiglia_choice_label
-    make_searchable_select(field, "Cerca una famiglia...")
 
 
 def indirizzo_choice_queryset():
@@ -217,117 +554,6 @@ class CondizioneIscrizioneInlineSelect(forms.Select):
             option["attrs"]["data-riduzione-speciale-ammessa"] = "1" if value.instance.riduzione_speciale_ammessa else "0"
 
         return option
-
-
-class FamigliaStudenteSelect(forms.Select):
-    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
-        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
-
-        if value and hasattr(value, "instance"):
-            famiglia = value.instance
-            option["attrs"]["data-cognome-famiglia"] = famiglia.cognome_famiglia or ""
-            option["attrs"]["data-indirizzo-famiglia"] = (
-                famiglia.indirizzo_principale.label_full() if famiglia.indirizzo_principale else ""
-            )
-            option["attrs"]["data-indirizzo-famiglia-id"] = famiglia.indirizzo_principale_id or ""
-            option["attrs"]["data-search-text"] = " ".join(
-                part for part in [
-                    str(label),
-                    famiglia_choice_label(famiglia),
-                    famiglia.indirizzo_principale.label_full() if famiglia.indirizzo_principale else "",
-                ] if part
-            ).strip()
-
-        return option
-
-
-class FamigliaSearchMixin:
-    famiglia_search = forms.CharField(
-        required=False,
-        label="Famiglia",
-        widget=forms.TextInput(
-            attrs={
-                "autocomplete": "new-password",
-                "autocapitalize": "none",
-                "spellcheck": "false",
-            }
-        ),
-    )
-
-    def get_famiglia_choice_label(self, famiglia):
-        return famiglia_choice_label(famiglia)
-
-    def setup_famiglia_search(self):
-        if "famiglia_search" not in self.fields:
-            self.fields["famiglia_search"] = forms.CharField(
-                required=False,
-                label="Famiglia",
-                widget=forms.TextInput(
-                    attrs={
-                        "autocomplete": "new-password",
-                        "autocapitalize": "none",
-                        "spellcheck": "false",
-                    }
-                ),
-            )
-
-        self.fields["famiglia"].widget.attrs.update(
-            {
-                "data-famiglia-hidden": "1",
-            }
-        )
-        self.fields["famiglia_search"].widget.attrs.update(
-            {
-                "placeholder": "Cerca una famiglia...",
-                "data-famiglia-search": "1",
-                "autocomplete": "new-password",
-                "autocapitalize": "none",
-                "spellcheck": "false",
-            }
-        )
-
-        famiglia = None
-        famiglia_id = None
-        famiglia_label = ""
-
-        if self.is_bound:
-            famiglia_label = (
-                self.data.get(self.add_prefix("famiglia_search"))
-                or self.data.get("famiglia_search")
-                or ""
-            ).strip()
-            famiglia_id = self.data.get(self.add_prefix("famiglia")) or self.data.get("famiglia")
-            if famiglia_id:
-                famiglia = self.fields["famiglia"].queryset.filter(pk=famiglia_id).first()
-                if famiglia and not famiglia_label:
-                    famiglia_label = self.get_famiglia_choice_label(famiglia)
-        else:
-            famiglia = self.initial.get("famiglia") or getattr(self.instance, "famiglia", None)
-            if famiglia:
-                if hasattr(famiglia, "pk"):
-                    famiglia_id = famiglia.pk
-                    famiglia_label = self.get_famiglia_choice_label(famiglia)
-                else:
-                    famiglia_id = famiglia
-                    famiglia_obj = self.fields["famiglia"].queryset.filter(pk=famiglia).first()
-                    if famiglia_obj:
-                        famiglia = famiglia_obj
-                        famiglia_label = self.get_famiglia_choice_label(famiglia_obj)
-
-        if famiglia_id:
-            self.initial["famiglia"] = famiglia_id
-        if famiglia_label:
-            self.initial["famiglia_search"] = famiglia_label
-
-    def clean(self):
-        cleaned_data = super().clean()
-        famiglia = cleaned_data.get("famiglia")
-        famiglia_search = (cleaned_data.get("famiglia_search") or "").strip()
-
-        if famiglia_search and not famiglia:
-            self.add_error("famiglia_search", "Seleziona una famiglia valida dall'elenco.")
-
-        return cleaned_data
 
 
 class IndirizzoSearchMixin:
@@ -798,51 +1024,23 @@ class IndirizzoForm(forms.ModelForm):
     
 #FINE FORMS PER GLI INDIRIZZI
 
-#FORMS PER LE FAMIGLIE
-class FamigliaForm(forms.ModelForm):
-    class Meta:
-        model = Famiglia
-        fields = [
-            "cognome_famiglia",
-            "stato_relazione_famiglia",
-            "indirizzo_principale",
-            "attiva",
-            "note",
-        ]
+#FORMS PER LE FAMIGLIE LOGICHE
+class FamigliaForm(forms.Form):
+    cognome_famiglia = forms.CharField(required=False, disabled=True)
+    indirizzo_principale = forms.CharField(required=False, disabled=True)
+    attiva = forms.BooleanField(required=False, disabled=True)
+    note = forms.CharField(required=False, disabled=True, widget=forms.Textarea(attrs={"rows": 3}))
 
     def __init__(self, *args, **kwargs):
+        kwargs.pop("instance", None)
         super().__init__(*args, **kwargs)
-
-        self.fields["stato_relazione_famiglia"].queryset = (
-            StatoRelazioneFamiglia.objects.filter(attivo=True)
-            .order_by("ordine", "stato")
-        )
-        self.fields["stato_relazione_famiglia"].empty_label = None
-
-        self.fields["indirizzo_principale"].queryset = (
-            Indirizzo.objects.select_related("citta", "provincia", "regione")
-            .order_by("via", "numero_civico")
-        )
-
-        self.fields["indirizzo_principale"].required = False
-        self.fields["indirizzo_principale"].label_from_instance = lambda obj: obj.label_select()
-        make_searchable_select(self.fields["indirizzo_principale"], "Cerca un indirizzo...")
-
-        # DEFAULT SOLO IN CREAZIONE
-        if not self.instance.pk and not self.initial.get("stato_relazione_famiglia"):
-            primo = self.fields["stato_relazione_famiglia"].queryset.first()
-            if primo:
-                self.initial["stato_relazione_famiglia"] = primo.pk
-        if not self.instance.pk and not self.is_bound and "attiva" not in self.initial:
-            self.initial["attiva"] = True
 #FINE FORMS PER LE FAMIGLIE
 
 #INIZIO FORMS PER I FAMILIARI
-class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelForm):
+class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelForm):
     class Meta:
         model = Familiare
         fields = [
-            "famiglia",
             "relazione_familiare",
             "indirizzo",
             "nome",
@@ -863,26 +1061,25 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
             "note",
         ]
         widgets = {
-            "famiglia": FamigliaStudenteSelect(),
             "data_nascita": html5_date_input(),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
     def __init__(self, *args, **kwargs):
         shared_lookups = kwargs.pop("shared_lookups", None) or {}
-        detailed_famiglia_choices = kwargs.pop("detailed_famiglia_choices", False)
+        enable_work_profile_fields = kwargs.pop("enable_work_profile_fields", False)
+        enable_direct_relations_field = kwargs.pop("enable_direct_relations_field", False)
         super().__init__(*args, **kwargs)
+
+        if enable_work_profile_fields:
+            self.setup_work_profile_fields()
+        if enable_direct_relations_field:
+            self.setup_studenti_collegati_field()
 
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].help_text = (
-            "Se lasci vuoto, verrà usato automaticamente l'indirizzo principale della famiglia."
+            "Se lasci vuoto, verra usato automaticamente l'indirizzo principale collegato, quando disponibile."
         )
-        if "famiglia" in self.fields:
-            configure_famiglia_choice_field(self.fields["famiglia"])
-            if detailed_famiglia_choices:
-                self.fields["famiglia"].label_from_instance = famiglia_nuovo_familiare_choice_label
-            else:
-                self.fields["famiglia"].label_from_instance = lambda obj: obj.cognome_famiglia or str(obj)
         relazioni = shared_lookups.get("relazioni_familiari")
         if relazioni is None:
             self.fields["relazione_familiare"].queryset = (
@@ -893,26 +1090,6 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
         self.fields["relazione_familiare"].empty_label = None
         configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
 
-        famiglia_id = None
-        if self.is_bound and "famiglia" in self.fields:
-            famiglia_id = self.data.get(self.add_prefix("famiglia")) or self.data.get("famiglia")
-        elif getattr(self.instance, "famiglia_id", None):
-            famiglia_id = self.instance.famiglia_id
-        elif "famiglia" in self.fields:
-            famiglia_id = self.initial.get("famiglia")
-
-        if not self.is_bound and not self.initial.get("indirizzo") and not getattr(self.instance, "indirizzo_id", None) and famiglia_id:
-            try:
-                famiglia = Famiglia.objects.select_related("indirizzo_principale").get(pk=famiglia_id)
-            except (Famiglia.DoesNotExist, TypeError, ValueError):
-                famiglia = None
-
-            if famiglia and famiglia.indirizzo_principale_id:
-                self.initial["indirizzo"] = famiglia.indirizzo_principale_id
-                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
-
-        if "famiglia" in self.fields:
-            self.setup_famiglia_search()
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
         configure_nazionalita_field(self.fields["nazionalita"], shared_lookups.get("nazionalita"))
@@ -939,20 +1116,120 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
             if prima_relazione:
                 self.initial["relazione_familiare"] = prima_relazione.pk
 
+    def _submitted_pk_values(self, field_name):
+        values = []
+        if hasattr(self.data, "getlist"):
+            raw_values = self.data.getlist(self.add_prefix(field_name))
+        else:
+            raw_values = self.data.get(self.add_prefix(field_name), [])
+            if raw_values is None:
+                raw_values = []
+            elif not isinstance(raw_values, (list, tuple)):
+                raw_values = [raw_values]
+        for raw_value in raw_values:
+            try:
+                values.append(int(raw_value))
+            except (TypeError, ValueError):
+                continue
+        return values
+
+    def setup_studenti_collegati_field(self):
+        selected_ids = set()
+        if getattr(self.instance, "pk", None):
+            selected_ids.update(
+                self.instance.relazioni_studenti.filter(attivo=True).values_list("studente_id", flat=True)
+            )
+        elif not self.is_bound:
+            initial_studenti = self.initial.get("studenti_collegati") or []
+            if not isinstance(initial_studenti, (list, tuple, set)):
+                initial_studenti = [initial_studenti]
+            for studente_id in initial_studenti:
+                try:
+                    selected_ids.add(int(studente_id))
+                except (TypeError, ValueError):
+                    continue
+        if self.is_bound:
+            selected_ids.update(self._submitted_pk_values("studenti_collegati"))
+
+        queryset = (
+            Studente.objects.filter(Q(attivo=True) | Q(pk__in=selected_ids))
+            .order_by("cognome", "nome", "pk")
+        )
+        self.fields["studenti_collegati"] = forms.ModelMultipleChoiceField(
+            queryset=queryset,
+            required=False,
+            label="Figli e figlie collegati",
+            help_text="Collega direttamente il familiare agli studenti.",
+            widget=forms.SelectMultiple(
+                attrs={
+                    "class": "form-control direct-relation-select",
+                    "size": 6,
+                }
+            ),
+        )
+        self.fields["studenti_collegati"].label_from_instance = studente_direct_relation_label
+        if selected_ids and not self.is_bound:
+            self.initial["studenti_collegati"] = list(selected_ids)
+
+    def setup_work_profile_fields(self):
+        from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente
+
+        profilo = None
+        if getattr(self.instance, "pk", None):
+            try:
+                profilo = self.instance.profilo_lavorativo
+            except Dipendente.DoesNotExist:
+                profilo = None
+
+        self.fields["profilo_dipendente_attivo"] = forms.BooleanField(
+            required=False,
+            label="Anche dipendente",
+            help_text="Crea o collega il profilo amministrativo senza duplicare l'anagrafica.",
+        )
+        self.fields["profilo_educatore_attivo"] = forms.BooleanField(
+            required=False,
+            label="Anche educatore",
+            help_text="Abilita classe principale, studenti collegati, contratto, buste paga e documenti.",
+        )
+        self.fields["classe_principale_educatore"] = forms.ChoiceField(
+            choices=classe_principale_reference_choices(
+                selected_classe_id=getattr(profilo, "classe_principale_id", None),
+                selected_gruppo_id=getattr(profilo, "gruppo_classe_principale_id", None),
+            ),
+            required=False,
+            label="Classe principale",
+            help_text="Visibile nella scheda dell'educatore e usata per mostrare studenti collegati o pluriclasse.",
+        )
+        make_searchable_select(self.fields["classe_principale_educatore"], "Cerca una classe o pluriclasse...")
+
+        if not profilo:
+            return
+
+        self.initial["profilo_dipendente_attivo"] = profilo.ruolo_anagrafico in {
+            RuoloAnagraficoDipendente.DIPENDENTE,
+            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
+        }
+        self.initial["profilo_educatore_attivo"] = profilo.ruolo_anagrafico in {
+            RuoloAnagraficoDipendente.EDUCATORE,
+            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
+        }
+        self.initial["classe_principale_educatore"] = classe_principale_reference_initial(profilo)
+
     def clean(self):
-        cleaned_data = super().clean()
-        famiglia = cleaned_data.get("famiglia") or getattr(self.instance, "famiglia", None)
-        indirizzo = cleaned_data.get("indirizzo")
+        return super().clean()
 
-        if (
-            famiglia
-            and indirizzo
-            and getattr(famiglia, "indirizzo_principale_id", None)
-            and indirizzo.pk == famiglia.indirizzo_principale_id
-        ):
-            cleaned_data["indirizzo"] = None
-
-        return cleaned_data
+    def save(self, commit=True):
+        familiare = super().save(commit=commit)
+        if commit:
+            sync_principal_contacts(
+                familiare,
+                indirizzo=familiare.indirizzo,
+                telefono=familiare.telefono,
+                email=familiare.email,
+            )
+            if "studenti_collegati" in self.fields:
+                set_familiare_studenti(familiare, self.cleaned_data.get("studenti_collegati", []))
+        return familiare
 
     def clean_telefono(self):
         return validate_and_normalize_phone_number(self.cleaned_data.get("telefono"))
@@ -960,7 +1237,7 @@ class FamiliareForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCitta
 
 class FamiliareInlineForm(FamiliareForm):
     class Meta(FamiliareForm.Meta):
-        fields = [field for field in FamiliareForm.Meta.fields if field != "famiglia"]
+        fields = FamiliareForm.Meta.fields
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1055,14 +1332,13 @@ class FamiliareInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
         return kwargs
 
 
-FamiliareFormSet = inlineformset_factory(
-    Famiglia,
+LogicalFamiliareFormSet = modelformset_factory(
     Familiare,
     form=FamiliareInlineForm,
-    formset=FamiliareInlineBaseFormSet,
     extra=1,
     can_delete=True,
 )
+FamiliareFormSet = LogicalFamiliareFormSet
 
 #FINE FORMS PER I FAMILIARI
 
@@ -1204,23 +1480,6 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
 
         configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
 
-        if (
-            not self.is_bound
-            and not self.initial.get("indirizzo")
-            and not getattr(self.instance, "indirizzo_id", None)
-            and getattr(self.instance, "famiglia_id", None)
-        ):
-            famiglia = getattr(self.instance, "famiglia", None)
-            if famiglia is None:
-                famiglia = (
-                    Famiglia.objects.select_related("indirizzo_principale")
-                    .filter(pk=self.instance.famiglia_id)
-                    .first()
-                )
-            if famiglia and famiglia.indirizzo_principale_id:
-                self.initial["indirizzo"] = famiglia.indirizzo_principale_id
-                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
-
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
         configure_nazionalita_field(self.fields["nazionalita"], shared_lookups.get("nazionalita"))
@@ -1241,26 +1500,13 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
                 self.fields["nazionalita"].initial = italia_id
 
     def clean(self):
-        cleaned_data = super().clean()
-        indirizzo = cleaned_data.get("indirizzo")
-        famiglia = getattr(self.instance, "famiglia", None)
+        return super().clean()
 
-        if famiglia is None and getattr(self.instance, "famiglia_id", None):
-            famiglia = (
-                Famiglia.objects.select_related("indirizzo_principale")
-                .filter(pk=self.instance.famiglia_id)
-                .first()
-            )
-
-        if (
-            famiglia
-            and indirizzo
-            and getattr(famiglia, "indirizzo_principale_id", None)
-            and indirizzo.pk == famiglia.indirizzo_principale_id
-        ):
-            cleaned_data["indirizzo"] = None
-
-        return cleaned_data
+    def save(self, commit=True):
+        studente = super().save(commit=commit)
+        if commit:
+            sync_principal_contacts(studente, indirizzo=studente.indirizzo)
+        return studente
 
 
 class StudenteInlineForm(StudenteForm):
@@ -1306,20 +1552,18 @@ class StudenteInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
         return kwargs
 
 
-StudenteFormSet = inlineformset_factory(
-    Famiglia,
+LogicalStudenteFormSet = modelformset_factory(
     Studente,
     form=StudenteInlineForm,
-    formset=StudenteInlineBaseFormSet,
     extra=1,
     can_delete=True,
 )
+StudenteFormSet = LogicalStudenteFormSet
 
-class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelForm):
+class StudenteStandaloneForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelForm):
     class Meta:
         model = Studente
         fields = [
-            "famiglia",
             "cognome",
             "nome",
             "sesso",
@@ -1334,19 +1578,12 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
             "note",
         ]
         widgets = {
-            "famiglia": FamigliaStudenteSelect(),
             "data_nascita": html5_date_input(),
             "note": forms.Textarea(attrs={"rows": 4}),
         }
 
-    def get_famiglia_choice_label(self, famiglia):
-        return famiglia.cognome_famiglia or str(famiglia)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        configure_famiglia_choice_field(self.fields["famiglia"])
-        self.fields["famiglia"].label_from_instance = self.get_famiglia_choice_label
 
         self.fields["indirizzo"].queryset = (
             Indirizzo.objects.select_related("citta", "provincia", "regione")
@@ -1356,31 +1593,8 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].label_from_instance = lambda obj: obj.label_select()
         make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
+        self.setup_familiari_collegati_field()
 
-        famiglia_id = None
-        if self.is_bound:
-            famiglia_id = self.data.get(self.add_prefix("famiglia")) or self.data.get("famiglia")
-        elif getattr(self.instance, "famiglia_id", None):
-            famiglia_id = self.instance.famiglia_id
-        else:
-            famiglia_id = self.initial.get("famiglia")
-
-        if (
-            not self.is_bound
-            and not self.initial.get("indirizzo")
-            and not getattr(self.instance, "indirizzo_id", None)
-            and famiglia_id
-        ):
-            try:
-                famiglia = Famiglia.objects.select_related("indirizzo_principale").get(pk=famiglia_id)
-            except (Famiglia.DoesNotExist, TypeError, ValueError):
-                famiglia = None
-
-            if famiglia and famiglia.indirizzo_principale_id:
-                self.initial["indirizzo"] = famiglia.indirizzo_principale_id
-                self.fields["indirizzo"].widget.attrs["data-inherited-address"] = "1"
-
-        self.setup_famiglia_search()
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
         configure_nazionalita_field(self.fields["nazionalita"])
@@ -1400,27 +1614,75 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, FamigliaSearchMixin, LuogoNas
                 self.initial["nazionalita"] = italia_id
                 self.fields["nazionalita"].initial = italia_id
 
+    def _submitted_pk_values(self, field_name):
+        values = []
+        if hasattr(self.data, "getlist"):
+            raw_values = self.data.getlist(self.add_prefix(field_name))
+        else:
+            raw_values = self.data.get(self.add_prefix(field_name), [])
+            if raw_values is None:
+                raw_values = []
+            elif not isinstance(raw_values, (list, tuple)):
+                raw_values = [raw_values]
+        for raw_value in raw_values:
+            try:
+                values.append(int(raw_value))
+            except (TypeError, ValueError):
+                continue
+        return values
+
+    def setup_familiari_collegati_field(self):
+        selected_ids = set()
+        if getattr(self.instance, "pk", None):
+            prefetched_relations = getattr(self.instance, "relazioni_familiari_attive_prefetch", None)
+            if prefetched_relations is not None:
+                selected_ids.update(relation.familiare_id for relation in prefetched_relations)
+            else:
+                selected_ids.update(
+                    self.instance.relazioni_familiari.filter(attivo=True).values_list("familiare_id", flat=True)
+                )
+        elif not self.is_bound:
+            initial_familiari = self.initial.get("familiari_collegati") or []
+            if not isinstance(initial_familiari, (list, tuple, set)):
+                initial_familiari = [initial_familiari]
+            for familiare_id in initial_familiari:
+                try:
+                    selected_ids.add(int(familiare_id))
+                except (TypeError, ValueError):
+                    continue
+        if self.is_bound:
+            selected_ids.update(self._submitted_pk_values("familiari_collegati"))
+
+        queryset = (
+            Familiare.objects.select_related("relazione_familiare")
+            .filter(Q(attivo=True) | Q(pk__in=selected_ids))
+            .order_by("cognome", "nome", "pk")
+        )
+        self.fields["familiari_collegati"] = forms.ModelMultipleChoiceField(
+            queryset=queryset,
+            required=False,
+            label="Genitori e tutori collegati",
+            help_text="Collega direttamente lo studente ai familiari.",
+            widget=forms.SelectMultiple(
+                attrs={
+                    "class": "form-control direct-relation-select",
+                    "size": 6,
+                }
+            ),
+        )
+        self.fields["familiari_collegati"].label_from_instance = familiare_direct_relation_label
+        if selected_ids and not self.is_bound:
+            self.initial["familiari_collegati"] = list(selected_ids)
+
     def clean(self):
-        cleaned_data = super().clean()
-        indirizzo = cleaned_data.get("indirizzo")
-        famiglia = cleaned_data.get("famiglia") or getattr(self.instance, "famiglia", None)
+        return super().clean()
 
-        if famiglia is None and getattr(self.instance, "famiglia_id", None):
-            famiglia = (
-                Famiglia.objects.select_related("indirizzo_principale")
-                .filter(pk=self.instance.famiglia_id)
-                .first()
-            )
-
-        if (
-            famiglia
-            and indirizzo
-            and getattr(famiglia, "indirizzo_principale_id", None)
-            and indirizzo.pk == famiglia.indirizzo_principale_id
-        ):
-            cleaned_data["indirizzo"] = None
-
-        return cleaned_data
+    def save(self, commit=True):
+        studente = super().save(commit=commit)
+        if commit:
+            sync_principal_contacts(studente, indirizzo=studente.indirizzo)
+            set_studente_familiari(studente, self.cleaned_data.get("familiari_collegati", []))
+        return studente
 
 #FINE FORM PER GLI STUDENTI
 
@@ -1434,12 +1696,9 @@ class DocumentoFamigliaInlineForm(DocumentoInlineForm):
     pass
 
 
-DocumentoFamigliaFormSet = inlineformset_factory(
-    Famiglia,
+DocumentoFamigliaFormSet = modelformset_factory(
     Documento,
     form=DocumentoFamigliaInlineForm,
-    formset=DocumentoInlineBaseFormSet,
-    fk_name="famiglia",
     extra=1,
     can_delete=True,
 )

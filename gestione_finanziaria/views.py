@@ -3783,7 +3783,7 @@ def riconcilia_movimento(request, pk):
             from economia.models.iscrizioni import RataIscrizione
             try:
                 rata = RataIscrizione.objects.select_related(
-                    "iscrizione__studente__famiglia"
+                    "iscrizione__studente"
                 ).get(pk=int(rata_pk))
             except RataIscrizione.DoesNotExist:
                 messages.error(request, "Rata selezionata non trovata.")

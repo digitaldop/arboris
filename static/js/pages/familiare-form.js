@@ -190,8 +190,11 @@ window.ArborisFamiliareForm = (function () {
                 tabParenti.textContent = `${tabLabel} (${parentiCards})`;
             }
             const studentiHeading = document.getElementById("familiare-studenti-heading");
-            if (studentiHeading && document.getElementById("studenti-table")) {
-                const n = countPersistedRows("studenti-table");
+            if (studentiHeading) {
+                const studentCardList = document.querySelector("[data-student-card-list]");
+                const n = document.getElementById("studenti-table")
+                    ? countPersistedRows("studenti-table")
+                    : (studentCardList ? studentCardList.querySelectorAll("[data-student-card], [data-direct-student-card], .family-student-card").length : 0);
                 const tabStudenti = document.querySelector('[data-tab-target="tab-studenti"]');
                 if (tabStudenti) {
                     const tabLabel = inlineTabs.inlineLabelFromTabButton(tabStudenti);
@@ -750,7 +753,8 @@ window.ArborisFamiliareForm = (function () {
             }
         }
 
-        function appendCheckboxField(grid, root, selector, labelText, extraClass, editor) {
+        function appendCheckboxField(grid, root, selector, labelText, extraClass, editor, options) {
+            const cfg = options || {};
             const input = root ? root.querySelector(selector) : null;
             if (!input) {
                 return;
@@ -761,14 +765,91 @@ window.ArborisFamiliareForm = (function () {
             field.className = `family-student-editor-field family-student-editor-field-check${extraClass ? " " + extraClass : ""}`;
 
             const label = document.createElement("label");
-            label.className = "family-student-editor-check";
-            label.appendChild(input);
-            const text = document.createElement("span");
-            text.textContent = labelText;
-            label.appendChild(text);
+            label.className = "family-student-editor-check family-editor-switch";
+            if (input.id) {
+                label.setAttribute("for", input.id);
+            }
+
+            const copy = document.createElement("span");
+            copy.className = "family-editor-switch-copy";
+            const title = document.createElement("strong");
+            title.textContent = labelText;
+            copy.appendChild(title);
+            if (cfg.helpText) {
+                const help = document.createElement("small");
+                help.textContent = cfg.helpText;
+                copy.appendChild(help);
+            }
+
+            const control = document.createElement("span");
+            control.className = "fondo-plan-switch-control";
+            const ui = document.createElement("span");
+            ui.className = "fondo-plan-switch-ui";
+            ui.setAttribute("aria-hidden", "true");
+            control.appendChild(input);
+            control.appendChild(ui);
+
+            label.appendChild(copy);
+            label.appendChild(control);
 
             field.appendChild(label);
             grid.appendChild(field);
+        }
+
+        function setSearchableSelectDisabled(select, disabled) {
+            if (!select) {
+                return;
+            }
+
+            select.disabled = disabled;
+            if (disabled) {
+                select.setAttribute("aria-disabled", "true");
+            } else {
+                select.removeAttribute("aria-disabled");
+            }
+
+            const wrapper = select.closest(".searchable-select");
+            if (!wrapper) {
+                return;
+            }
+
+            wrapper.classList.toggle("is-disabled", disabled);
+            if (disabled) {
+                wrapper.classList.remove("is-open", "is-open-upward");
+            }
+            wrapper.querySelectorAll(".searchable-select-input, button").forEach(function (field) {
+                field.disabled = disabled;
+                field.readOnly = disabled;
+            });
+        }
+
+        function syncEducatorClassField(root) {
+            const scope = root || document;
+            const educatorToggle = scope.querySelector("#id_profilo_educatore_attivo")
+                || document.getElementById("id_profilo_educatore_attivo");
+            const classField = scope.querySelector("#id_classe_principale_educatore")
+                || document.getElementById("id_classe_principale_educatore");
+
+            if (!educatorToggle || !classField) {
+                return;
+            }
+
+            const update = function () {
+                const enabled = Boolean(educatorToggle.checked);
+                const container = classField.closest(".family-work-class-field, .family-student-editor-field, tr");
+                setSearchableSelectDisabled(classField, !enabled);
+                if (container) {
+                    container.classList.toggle("is-disabled", !enabled);
+                    container.setAttribute("aria-disabled", enabled ? "false" : "true");
+                }
+            };
+
+            if (educatorToggle.dataset.educatorClassFieldBound !== "1") {
+                educatorToggle.dataset.educatorClassFieldBound = "1";
+                educatorToggle.addEventListener("change", update);
+            }
+
+            update();
         }
 
         function initEditorEnhancements(editor) {
@@ -781,6 +862,7 @@ window.ArborisFamiliareForm = (function () {
             wireInlineRelatedButtons(editor);
             bindStandaloneSexFromRelazioneFamiliare();
             setFieldsEnabled(editor, true);
+            syncEducatorClassField(editor);
             updateMainButtons();
         }
 
@@ -816,7 +898,6 @@ window.ArborisFamiliareForm = (function () {
             const grid = document.createElement("div");
             grid.className = "family-student-editor-grid";
 
-            appendRelatedField(grid, formRoot, "#id_famiglia", "Famiglia", "family-student-editor-field-half relative-main-family-field", editor, "famiglia");
             appendRelatedField(grid, formRoot, "#id_relazione_familiare", "Parentela", "family-student-editor-field-third relative-main-parentela-field", editor, "parentela");
             appendInputField(grid, formRoot, "#id_nome", "Nome", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_cognome", "Cognome", "family-student-editor-field-half", editor);
@@ -834,6 +915,13 @@ window.ArborisFamiliareForm = (function () {
             appendCheckboxField(grid, formRoot, "#id_convivente", "Convivente", "", editor);
             appendCheckboxField(grid, formRoot, "#id_referente_principale", "Referente principale", "", editor);
             appendCheckboxField(grid, formRoot, "#id_abilitato_scambio_retta", "Scambio retta", "", editor);
+            appendCheckboxField(grid, formRoot, "#id_profilo_dipendente_attivo", "Anche dipendente", "", editor, {
+                helpText: "Crea o collega il profilo amministrativo senza duplicare l'anagrafica.",
+            });
+            appendCheckboxField(grid, formRoot, "#id_profilo_educatore_attivo", "Anche educatore", "", editor, {
+                helpText: "Abilita classe principale, studenti collegati, contratto, buste paga e documenti.",
+            });
+            appendInputField(grid, formRoot, "#id_classe_principale_educatore", "Classe principale", "family-student-editor-field-wide family-work-class-field", editor);
             appendCheckboxField(grid, formRoot, "#id_attivo", "Attivo", "", editor);
 
             editor.appendChild(grid);
@@ -1019,8 +1107,16 @@ window.ArborisFamiliareForm = (function () {
                                             ? "documenti"
                                             : "studenti"
                                 )
-                                : ""
+                            : ""
                         );
+                    let cardSubmitInput = form.querySelector('input[name="_card_inline_submit"]');
+                    if (!cardSubmitInput) {
+                        cardSubmitInput = document.createElement("input");
+                        cardSubmitInput.type = "hidden";
+                        cardSubmitInput.name = "_card_inline_submit";
+                        form.appendChild(cardSubmitInput);
+                    }
+                    cardSubmitInput.value = "";
                     const shouldUseMainScope = Boolean(
                         (submitter && (
                             submitter.dataset.relativeMainSubmit === "1"
@@ -1042,6 +1138,7 @@ window.ArborisFamiliareForm = (function () {
                         if (targetInput) {
                             targetInput.value = inlineCardSubmitTarget;
                         }
+                        cardSubmitInput.value = inlineCardSubmitTarget;
                         return;
                     }
 
@@ -1066,22 +1163,37 @@ window.ArborisFamiliareForm = (function () {
             return document.querySelector("[data-document-card-list]");
         }
 
-        function getRowFromCard(card, prefixName) {
+        function getRowFromCard(card, prefixName, idName, tableSelector) {
             const prefix = card ? card.dataset[prefixName] || "" : "";
-            if (!prefix) {
+            if (prefix) {
+                const idInput = document.getElementById(`id_${prefix}-id`);
+                return idInput ? idInput.closest("tr.inline-form-row") : null;
+            }
+
+            const instanceId = card && idName ? card.dataset[idName] || "" : "";
+            if (!instanceId || !tableSelector) {
                 return null;
             }
 
-            const idInput = document.getElementById(`id_${prefix}-id`);
-            return idInput ? idInput.closest("tr.inline-form-row") : null;
+            const rows = document.querySelectorAll(`${tableSelector} tr.inline-form-row`);
+            for (const row of rows) {
+                if ((row.dataset[idName] || "") === instanceId) {
+                    return row;
+                }
+                const idInput = row.querySelector('input[type="hidden"][name$="-id"]');
+                if (idInput && idInput.value === instanceId) {
+                    return row;
+                }
+            }
+            return null;
         }
 
         function getStudentRowFromCard(card) {
-            return getRowFromCard(card, "studentFormPrefix");
+            return getRowFromCard(card, "studentFormPrefix", "studentId", "#studenti-table");
         }
 
         function getRelativeRowFromCard(card) {
-            return getRowFromCard(card, "relativeFormPrefix");
+            return getRowFromCard(card, "relativeFormPrefix", "relativeId", "#parenti-table");
         }
 
         function getDocumentRowFromCard(card) {
@@ -1343,6 +1455,7 @@ window.ArborisFamiliareForm = (function () {
                 return;
             }
             const row = getStudentRowFromCard(card);
+            if (!row) return;
             const titleNode = card.querySelector(".family-person-heading h3");
             const title = titleNode ? `Modifica ${titleNode.textContent.trim()}` : "Modifica studente";
             focusCardEditor(buildStudentCardEditor(card, row, { title: title }));
@@ -1356,6 +1469,7 @@ window.ArborisFamiliareForm = (function () {
                 return;
             }
             const row = getRelativeRowFromCard(card);
+            if (!row) return;
             const titleNode = card.querySelector(".family-person-heading h3");
             const title = titleNode ? `Modifica ${titleNode.textContent.trim()}` : "Modifica familiare";
             focusCardEditor(buildRelativeCardEditor(card, row, { title: title }));
@@ -2120,29 +2234,17 @@ window.ArborisFamiliareForm = (function () {
             initRelativeViewSideHeightSync();
         }
 
-        const famigliaSelect = document.getElementById("id_famiglia");
         const relazioneSelect = document.getElementById("id_relazione_familiare");
         const indirizzoSelect = document.getElementById("id_indirizzo");
 
-        const addFamigliaBtn = document.getElementById("add-famiglia-btn");
-        const editFamigliaBtn = document.getElementById("edit-famiglia-btn");
         const addRelazioneBtn = document.getElementById("add-relazione-btn");
         const editRelazioneBtn = document.getElementById("edit-relazione-btn");
         const deleteRelazioneBtn = document.getElementById("delete-relazione-btn");
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
-        let refreshFamigliaNavigation = function () {};
         let refreshRelazioneButtons = function () {};
         let refreshIndirizzoButtons = function () {};
-
-        const famigliaNavigation = formTools.bindFamigliaNavigation({
-            familySelect: famigliaSelect,
-            addBtn: addFamigliaBtn,
-            editBtn: editFamigliaBtn,
-            createUrl: config.urls.creaFamiglia,
-        });
-        refreshFamigliaNavigation = famigliaNavigation.refresh;
 
         const relazioneCrud = routes.wireCrudButtonsById({
             select: relazioneSelect,
@@ -2163,18 +2265,6 @@ window.ArborisFamiliareForm = (function () {
             openRelatedPopup: relatedPopups.openRelatedPopup,
         });
         refreshIndirizzoButtons = indirizzoCrud.refresh;
-        refreshFamigliaNavigation();
-
-        formTools.bindFamilyAddressController({
-            familyLinkedAddress: familyLinkedAddress,
-            familySelect: famigliaSelect,
-            addressSelect: indirizzoSelect,
-            helpElement: document.getElementById("familiare-address-help"),
-            fallbackLabelScriptId: "familiare-famiglia-indirizzo-label",
-            onRefreshButtons: updateMainButtons,
-            unselectedFamilyPrefix: "Ereditera: ",
-        });
-
         if (relazioneSelect) {
             relazioneSelect.addEventListener("change", function () {
                 updateMainButtons();
@@ -2235,6 +2325,7 @@ window.ArborisFamiliareForm = (function () {
         }
         bindStandaloneSexFromRelazioneFamiliare();
         bindScambioRettaNavigation();
+        syncEducatorClassField(document);
         initRelativeNoteDialog();
         wireRelativeMainCardActions(document);
         bindRelativePageActionLock();

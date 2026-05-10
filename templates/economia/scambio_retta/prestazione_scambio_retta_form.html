@@ -45,18 +45,6 @@
                         <td>{{ form.familiare }} {{ form.familiare.errors }}</td>
                     </tr>
                     <tr>
-                        <th>Famiglia</th>
-                        <td>
-                            <div id="prestazione-famiglia-preview" class="system-readonly-value">
-                                {% if famiglia_preview %}
-                                    {{ famiglia_preview }}
-                                {% else %}
-                                    <span class="table-muted">Seleziona prima un familiare</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
                         <th>{{ form.studente.label_tag }}</th>
                         <td>
                             {{ form.studente }}
@@ -148,7 +136,7 @@
     {{ school_year_payload|json_script:"prestazione-scambio-school-years" }}
 
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/prestazione-scambio-retta-form.js' %}?v=1"></script>
+    <script src="{% static 'js/pages/prestazione-scambio-retta-form.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisViewMode) {

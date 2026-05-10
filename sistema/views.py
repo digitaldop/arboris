@@ -178,43 +178,37 @@ def toggle_active_state(request):
 
 
 def build_anagrafica_global_search_results(query, remaining):
-    from anagrafica.models import Documento, Famiglia, Familiare, Studente
+    from anagrafica.family_logic import (
+        iter_logical_family_snapshots,
+        logical_family_detail_url,
+        logical_family_matches,
+        logical_family_summary_for_person,
+    )
+    from anagrafica.models import Documento, Familiare, Studente
 
     results = []
     terms = [term for term in query.split() if term]
 
-    famiglia_filter = (
-        Q(cognome_famiglia__icontains=query)
-        | Q(familiari__nome__icontains=query)
-        | Q(familiari__cognome__icontains=query)
-        | Q(familiari__email__icontains=query)
-        | Q(familiari__telefono__icontains=query)
-        | Q(studenti__nome__icontains=query)
-        | Q(studenti__cognome__icontains=query)
-        | Q(studenti__codice_fiscale__icontains=query)
-    )
-    for term in terms:
-        famiglia_filter |= (
-            Q(cognome_famiglia__icontains=term)
-            | Q(familiari__nome__icontains=term)
-            | Q(familiari__cognome__icontains=term)
-            | Q(studenti__nome__icontains=term)
-            | Q(studenti__cognome__icontains=term)
-        )
+    famiglie = []
+    for snapshot in iter_logical_family_snapshots():
+        if logical_family_matches(snapshot, query) or any(
+            logical_family_matches(snapshot, term) for term in terms
+        ):
+            famiglie.append(snapshot)
+        if len(famiglie) >= 4:
+            break
 
-    famiglie = (
-        Famiglia.objects.filter(famiglia_filter)
-        .select_related("stato_relazione_famiglia")
-        .prefetch_related("familiari", "studenti")
-        .distinct()
-        .order_by("cognome_famiglia", "id")[:4]
-    )
     results.extend(
         search_result(
             "Famiglia",
             famiglia.cognome_famiglia,
-            reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}),
-            subtitle=compact_join([famiglia.stato_relazione_famiglia, famiglia.label_contesto_anagrafica()]),
+            logical_family_detail_url(famiglia),
+            subtitle=compact_join(
+                [
+                    famiglia.indirizzo_principale.label_full() if famiglia.indirizzo_principale else "",
+                    famiglia.label_contesto_anagrafica(),
+                ]
+            ),
             module="Anagrafica",
             icon="family",
         )
@@ -228,8 +222,12 @@ def build_anagrafica_global_search_results(query, remaining):
         person_filter |= (Q(cognome__icontains=first) & Q(nome__icontains=second))
 
     studenti = (
-        Studente.objects.filter(person_filter | Q(famiglia__cognome_famiglia__icontains=query))
-        .select_related("famiglia")
+        Studente.objects.filter(
+            person_filter
+            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__nome__icontains=query)
+            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__cognome__icontains=query)
+        )
+        .distinct()
         .order_by("cognome", "nome", "id")[:4]
     )
     results.extend(
@@ -237,7 +235,7 @@ def build_anagrafica_global_search_results(query, remaining):
             "Studente",
             str(studente),
             reverse("modifica_studente", kwargs={"pk": studente.pk}),
-            subtitle=compact_join(["Famiglia", studente.famiglia.cognome_famiglia]),
+            subtitle=logical_family_summary_for_person(studente)["context"],
             module="Anagrafica",
             icon="student",
         )
@@ -249,9 +247,11 @@ def build_anagrafica_global_search_results(query, remaining):
             person_filter
             | Q(email__icontains=query)
             | Q(telefono__icontains=query)
-            | Q(famiglia__cognome_famiglia__icontains=query)
+            | Q(relazioni_studenti__attivo=True, relazioni_studenti__studente__nome__icontains=query)
+            | Q(relazioni_studenti__attivo=True, relazioni_studenti__studente__cognome__icontains=query)
         )
-        .select_related("famiglia", "relazione_familiare")
+        .select_related("relazione_familiare")
+        .distinct()
         .order_by("cognome", "nome", "id")[:3]
     )
     results.extend(
@@ -259,7 +259,7 @@ def build_anagrafica_global_search_results(query, remaining):
             "Familiare",
             str(familiare),
             reverse("modifica_familiare", kwargs={"pk": familiare.pk}),
-            subtitle=compact_join([familiare.relazione_familiare, familiare.famiglia.cognome_famiglia]),
+            subtitle=compact_join([familiare.relazione_familiare, logical_family_summary_for_person(familiare)["label"]]),
             module="Anagrafica",
             icon="user",
         )
@@ -271,22 +271,18 @@ def build_anagrafica_global_search_results(query, remaining):
             Q(tipo_documento__tipo_documento__icontains=query)
             | Q(descrizione__icontains=query)
             | Q(file__icontains=query)
-            | Q(famiglia__cognome_famiglia__icontains=query)
             | Q(familiare__nome__icontains=query)
             | Q(familiare__cognome__icontains=query)
             | Q(studente__nome__icontains=query)
             | Q(studente__cognome__icontains=query)
         )
-        .select_related("tipo_documento", "famiglia", "familiare", "studente")
+        .select_related("tipo_documento", "familiare", "studente")
         .order_by("-data_caricamento", "-id")[:3]
     )
     for documento in documenti:
         owner_label = ""
         owner_url = documento.download_url
-        if documento.famiglia_id:
-            owner_label = f"Famiglia {documento.famiglia}"
-            owner_url = reverse("modifica_famiglia", kwargs={"pk": documento.famiglia_id})
-        elif documento.familiare_id:
+        if documento.familiare_id:
             owner_label = f"Familiare {documento.familiare}"
             owner_url = reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
         elif documento.studente_id:

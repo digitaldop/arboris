@@ -98,6 +98,36 @@
             </section>
         {% endif %}
 
+        <section class="scambio-list-card ga-parametri-official-card" aria-labelledby="ga-parametro-official-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="ga-parametro-official-title">Dati ufficiali e profilo previsionale</h2>
+                    <p>
+                        Questi valori restano modificabili: il sistema conserva le fonti ufficiali consultabili, ma il profilo deve sempre essere verificato con consulente del lavoro quando usato per decisioni operative.
+                    </p>
+                </div>
+                {% if not popup %}
+                    <a href="{% url 'lista_dati_payroll_ufficiali' %}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                        <span class="btn-label">Dati ufficiali</span>
+                    </a>
+                {% endif %}
+            </div>
+            {% if form.prefill_source_label %}
+                <div class="ga-parametro-prefill-note">
+                    <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                    </span>
+                    <div>
+                        <strong>{{ form.prefill_source_label }}</strong>
+                        {% if form.prefill_warning %}
+                            <p>{{ form.prefill_warning }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </section>
+
         <form method="post" id="ga-parametro-form" class="scambio-retta-form detail-form">
             {% csrf_token %}
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}

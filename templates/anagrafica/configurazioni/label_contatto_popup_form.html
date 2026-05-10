@@ -1,0 +1,82 @@
+{% extends "popup_base.html" %}
+{% load static %}
+
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card related-config-popup-card">
+        <button type="button" class="related-relation-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+
+        <form method="post" class="related-config-popup-form">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <div class="related-relation-popup-hero">
+                <span class="related-relation-icon-tile" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+                <div class="related-relation-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p>{{ descrizione }}</p>
+                </div>
+            </div>
+
+            <div class="related-config-popup-editor related-relation-popup-editor">
+                <div class="related-relation-popup-grid">
+                    <div class="related-relation-form-field related-relation-field-main">
+                        <label for="{{ form.nome.id_for_label }}">Etichetta <span class="required-marker">*</span></label>
+                        <div class="related-relation-input-shell">
+                            <span class="related-relation-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                            </span>
+                            <div class="related-relation-input-control">{{ form.nome }}</div>
+                        </div>
+                        {{ form.nome.errors }}
+                    </div>
+
+                    <div class="related-relation-order-row">
+                        <div class="related-relation-form-field related-relation-field-order">
+                            <label for="{{ form.ordine.id_for_label }}">{{ form.ordine.label }}</label>
+                            <div class="related-relation-input-shell">
+                                <span class="related-relation-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                                </span>
+                                <div class="related-relation-input-control">{{ form.ordine }}</div>
+                            </div>
+                            {{ form.ordine.errors }}
+                        </div>
+                        <label class="toggle-field compact-toggle-field">
+                            {{ form.attiva }}
+                            <span>{{ form.attiva.label }}</span>
+                        </label>
+                    </div>
+
+                    <div class="related-relation-form-field related-relation-field-notes">
+                        <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                        {{ form.note }}
+                        {{ form.note.errors }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                    </span>
+                    <span class="btn-label">Salva</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

@@ -8,7 +8,7 @@ from .permissions import (
     user_has_module_permission,
     user_is_operational_admin,
 )
-from .terminology import get_student_terminology
+from .terminology import get_educator_terminology, get_family_member_terminology, get_student_terminology
 
 
 def get_current_permission_module(request):
@@ -73,9 +73,18 @@ def general_settings_context(request):
 
     return {
         "general_settings": general_settings,
+        "gestione_dipendenti_dettagliata_attiva": bool(
+            getattr(general_settings, "gestione_dipendenti_dettagliata_attiva", False)
+        ),
         "site_fonts": get_site_font_settings(general_settings),
         "student_terminology": get_student_terminology(
             getattr(general_settings, "terminologia_studente", None)
+        ),
+        "family_member_terminology": get_family_member_terminology(
+            getattr(general_settings, "terminologia_familiare", None)
+        ),
+        "educator_terminology": get_educator_terminology(
+            getattr(general_settings, "terminologia_educatore", None)
         ),
     }
 

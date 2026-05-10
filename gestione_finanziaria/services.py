@@ -1306,22 +1306,35 @@ def _label_persona(nome: str, cognome: str) -> str:
     return " ".join(part for part in [nome or "", cognome or ""] if part).strip()
 
 
-def _match_familiari_in_testo(famiglia, testo: str) -> tuple[list[str], list[str]]:
-    if famiglia is None:
-        return [], []
+def _familiari_collegati_studenti(studenti) -> list:
+    familiari = []
+    visti = set()
+    for studente in studenti or []:
+        if studente is None:
+            continue
+        relazioni = getattr(studente, "_arboris_relazioni_familiari_cache", None)
+        if relazioni is None:
+            try:
+                relazioni = list(studente.relazioni_familiari.all())
+            except Exception:
+                relazioni = []
+            studente._arboris_relazioni_familiari_cache = relazioni
+        for relazione in relazioni:
+            if not getattr(relazione, "attivo", True):
+                continue
+            familiare = getattr(relazione, "familiare", None)
+            if familiare is None:
+                continue
+            chiave = getattr(familiare, "pk", None) or id(familiare)
+            if chiave in visti:
+                continue
+            visti.add(chiave)
+            familiari.append(familiare)
+    return familiari
 
-    try:
-        if hasattr(famiglia, "_arboris_familiari_cache"):
-            familiari = famiglia._arboris_familiari_cache
-        else:
-            prefetched = getattr(famiglia, "_prefetched_objects_cache", {})
-            if "familiari" in prefetched:
-                familiari = list(prefetched["familiari"])
-            else:
-                familiari = list(famiglia.familiari.all())
-            famiglia._arboris_familiari_cache = familiari
-    except Exception:
-        return [], []
+
+def _match_familiari_in_testo(studenti, testo: str) -> tuple[list[str], list[str]]:
+    familiari = _familiari_collegati_studenti(studenti)
 
     match_completi = []
     match_cognomi = []
@@ -1341,20 +1354,8 @@ def _match_familiari_in_testo(famiglia, testo: str) -> tuple[list[str], list[str
     return match_completi, match_cognomi
 
 
-def _famiglia_ha_familiari(famiglia) -> bool:
-    if famiglia is None:
-        return False
-    try:
-        if hasattr(famiglia, "_arboris_familiari_cache"):
-            return bool(famiglia._arboris_familiari_cache)
-        prefetched = getattr(famiglia, "_prefetched_objects_cache", {})
-        if "familiari" in prefetched:
-            familiari = list(prefetched["familiari"])
-            famiglia._arboris_familiari_cache = familiari
-            return bool(familiari)
-        return famiglia.familiari.exists()
-    except Exception:
-        return False
+def _studenti_hanno_familiari(studenti) -> bool:
+    return bool(_familiari_collegati_studenti(studenti))
 
 
 def _valuta_identita_famiglia_in_causale(famiglia, studente, testo_movimento: str) -> tuple[bool, int, list[str]]:
@@ -1370,8 +1371,9 @@ def _valuta_identita_famiglia_studenti_in_causale(famiglia, studenti, testo_movi
     motivazioni = []
     ha_match = False
 
-    familiari_completi, familiari_cognome = _match_familiari_in_testo(famiglia, testo_movimento)
-    familiari_registrati = bool(familiari_completi or familiari_cognome) or _famiglia_ha_familiari(famiglia)
+    studenti = [studente for studente in (studenti or []) if studente is not None]
+    familiari_completi, familiari_cognome = _match_familiari_in_testo(studenti, testo_movimento)
+    familiari_registrati = bool(familiari_completi or familiari_cognome) or _studenti_hanno_familiari(studenti)
     if familiari_completi:
         score += 42
         ha_match = True
@@ -1382,7 +1384,6 @@ def _valuta_identita_famiglia_studenti_in_causale(famiglia, studenti, testo_movi
         label = ", ".join(familiari_cognome[:2])
         motivazioni.append(f"Cognome di un familiare presente nella causale: {label}")
 
-    studenti = [studente for studente in (studenti or []) if studente is not None]
     studenti_completi = []
     studenti_cognome = []
     for studente in studenti:
@@ -1407,7 +1408,13 @@ def _valuta_identita_famiglia_studenti_in_causale(famiglia, studenti, testo_movi
         label = ", ".join(studenti_cognome[:2])
         motivazioni.append(f"Cognome studente presente nella causale: {label}")
 
-    cognome_famiglia = _normalizza_testo_match(getattr(famiglia, "cognome_famiglia", "") or "")
+    cognomi = [
+        _normalizza_testo_match(getattr(persona, "cognome", "") or "")
+        for persona in [*studenti, *_familiari_collegati_studenti(studenti)]
+    ]
+    cognome_famiglia = ""
+    if cognomi:
+        cognome_famiglia = max(set(cognomi), key=cognomi.count)
     if (
         not familiari_registrati
         and cognome_famiglia
@@ -1431,29 +1438,29 @@ def _famiglia_label_sicurezza(famiglia) -> str:
 
 def _valida_identita_movimento_rate(movimento, rate):
     testo_movimento = _testo_movimento_per_identita(movimento)
-    gruppi = {}
+    studenti = []
+    visti = set()
     for rata in rate or []:
         studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
-        famiglia = getattr(studente, "famiglia", None) or getattr(rata, "famiglia", None)
-        chiave = getattr(famiglia, "pk", None) or id(famiglia) or id(rata)
-        if chiave not in gruppi:
-            gruppi[chiave] = {"famiglia": famiglia, "studenti": []}
-        if studente is not None:
-            gruppi[chiave]["studenti"].append(studente)
+        if studente is None:
+            continue
+        chiave = getattr(studente, "pk", None) or id(studente)
+        if chiave in visti:
+            continue
+        visti.add(chiave)
+        studenti.append(studente)
 
-    for gruppo in gruppi.values():
-        famiglia = gruppo["famiglia"]
-        ha_match_identita, _score_identita, _motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
-            famiglia,
-            gruppo["studenti"],
-            testo_movimento,
+    ha_match_identita, _score_identita, _motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
+        None,
+        studenti,
+        testo_movimento,
+    )
+    if not ha_match_identita:
+        raise ValidationError(
+            "Controllo di sicurezza: la causale o la controparte del movimento non contiene "
+            "un nominativo compatibile con gli studenti o i familiari collegati. "
+            "Verifica il movimento bancario prima di riconciliare."
         )
-        if not ha_match_identita:
-            raise ValidationError(
-                "Controllo di sicurezza: la causale o la controparte del movimento non contiene "
-                f"un nominativo compatibile con la famiglia {_famiglia_label_sicurezza(famiglia)}. "
-                "Verifica il movimento bancario prima di riconciliare."
-            )
 
 
 def _decimal_close(a, b, tolleranza=_TOLLERANZA_IMPORTO_APPROX):
@@ -1657,11 +1664,13 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
     if rate_pool is None:
         qs = (
             RataIscrizione.objects.select_related(
-                "famiglia",
-                "iscrizione__studente__famiglia",
+                "iscrizione__studente",
                 "iscrizione__anno_scolastico",
             )
-            .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
+            .prefetch_related(
+                "iscrizione__studente__relazioni_familiari__familiare",
+                "iscrizione__studente__relazioni_familiari__relazione_familiare",
+            )
             .filter(
                 importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
                 importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
@@ -1723,9 +1732,8 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
             motivazioni.append("Rata non ancora marcata come pagata")
 
         studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
-        famiglia = getattr(studente, "famiglia", None)
         ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_in_causale(
-            famiglia,
+            None,
             studente,
             testo_movimento,
         )
@@ -1763,11 +1771,13 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
     if rate_pool is None:
         qs = (
             RataIscrizione.objects.select_related(
-                "famiglia",
-                "iscrizione__studente__famiglia",
+                "iscrizione__studente",
                 "iscrizione__anno_scolastico",
             )
-            .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
+            .prefetch_related(
+                "iscrizione__studente__relazioni_familiari__familiare",
+                "iscrizione__studente__relazioni_familiari__relazione_familiare",
+            )
             .filter(
                 pagata=False,
                 importo_finale__gt=0,
@@ -1776,7 +1786,7 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
                 riconciliazioni_movimenti__isnull=True,
             )
             .distinct()
-            .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
+            .order_by("iscrizione__studente__cognome", "iscrizione__studente__nome", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
         )
         controlla_collegamenti = False
     else:
@@ -1795,11 +1805,17 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
             controlla_collegamenti=controlla_collegamenti,
         ):
             continue
-        famiglia = getattr(rata, "famiglia", None) or getattr(getattr(rata.iscrizione, "studente", None), "famiglia", None)
-        if famiglia is None:
+        studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
+        if studente is None:
             continue
-        chiave = getattr(famiglia, "pk", None) or id(famiglia)
-        gruppi.setdefault(chiave, {"famiglia": famiglia, "rate": []})["rate"].append(rata)
+        familiari_ids = tuple(
+            sorted(
+                getattr(familiare, "pk", None) or id(familiare)
+                for familiare in _familiari_collegati_studenti([studente])
+            )
+        )
+        chiave = familiari_ids or (("studente", getattr(studente, "pk", None) or id(studente)),)
+        gruppi.setdefault(chiave, {"famiglia": None, "rate": []})["rate"].append(rata)
 
     candidati = []
     for gruppo in gruppi.values():
@@ -1877,8 +1893,7 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
     residui_rate = [importo_rata_residuo(rata) for rata in rate_aperte]
     totale_residui = sum(residui_rate, Decimal("0.00"))
 
-    famiglia = getattr(getattr(rata_principale, "iscrizione", None), "studente", None)
-    famiglia = getattr(famiglia, "famiglia", None)
+    famiglia = None
     studente = getattr(rata_principale.iscrizione, "studente", None)
     studenti_rate_aperte = []
     for rata in rate_aperte:

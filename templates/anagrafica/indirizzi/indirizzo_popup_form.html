@@ -35,6 +35,36 @@
                 </div>
             </div>
 
+            {% if duplicate_candidates %}
+                <div class="related-address-popup-info related-address-duplicate-warning">
+                    <span class="related-address-popup-info-icon" aria-hidden="true">!</span>
+                    <div>
+                        <p><strong>Possibile indirizzo gia presente.</strong></p>
+                        <p>Controlla le corrispondenze: puoi usare un indirizzo esistente oppure confermare la creazione di uno nuovo.</p>
+                        <div class="related-address-duplicate-list">
+                            {% for candidate in duplicate_candidates %}
+                                <div class="related-address-duplicate-item">
+                                    <div>
+                                        <strong>{{ candidate.label }}</strong>
+                                        {% if candidate.owners %}
+                                            <div class="help-text">
+                                                Usato da:
+                                                {% for owner in candidate.owners %}
+                                                    {{ owner.tipo }} {{ owner.nome }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="submit" name="use_existing_address" value="{{ candidate.id }}" class="btn btn-secondary btn-sm">
+                                        Usa questo
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="related-config-popup-editor related-address-popup-editor">
                 <div class="related-address-popup-grid">
                     <div class="related-address-form-field related-address-field-street">
@@ -144,6 +174,14 @@
                     </span>
                     <span class="btn-label">Salva</span>
                 </button>
+                {% if duplicate_candidates %}
+                    <button type="submit" name="force_new_address" value="1" class="btn btn-warning-soft btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
+                        </span>
+                        <span class="btn-label">Crea comunque nuovo</span>
+                    </button>
+                {% endif %}
                 <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
                     <span class="btn-icon" aria-hidden="true">
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>

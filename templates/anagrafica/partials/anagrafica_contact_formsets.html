@@ -1,0 +1,260 @@
+{% load static %}
+
+{% if indirizzi_formset and telefoni_formset and email_formset %}
+<section class="anagrafica-contact-panel mode-edit-field" aria-labelledby="anagrafica-contact-panel-title">
+    <div class="anagrafica-contact-panel-head">
+        <span class="anagrafica-contact-panel-icon" aria-hidden="true">
+            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg>
+        </span>
+        <div>
+            <h3 id="anagrafica-contact-panel-title">Recapiti e indirizzi</h3>
+            <p>Gestisci indirizzi, telefoni ed email collegati alla scheda.</p>
+        </div>
+    </div>
+
+    <div class="anagrafica-contact-sections">
+        <div class="anagrafica-contact-section" data-contact-formset data-contact-prefix="{{ indirizzi_formset.prefix }}">
+            {{ indirizzi_formset.management_form }}
+            {{ indirizzi_formset.non_form_errors }}
+            <div class="anagrafica-contact-section-head">
+                <div>
+                    <h4>Indirizzi</h4>
+                    <span>Residenza, domicilio, lavoro o altri recapiti.</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-contact-add-row>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Aggiungi indirizzo</span>
+                </button>
+            </div>
+            <div class="anagrafica-contact-rows" data-contact-rows>
+                {% for contact_form in indirizzi_formset.forms %}
+                    <article class="anagrafica-contact-row" data-contact-row>
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid is-address">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_indirizzo" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_indirizzo" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_indirizzo" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                                {{ contact_form.label.errors }}
+                            </div>
+                            <div class="anagrafica-contact-field is-main">
+                                <label for="{{ contact_form.indirizzo.id_for_label }}">Indirizzo</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.indirizzo }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo" aria-label="Nuovo indirizzo" title="Nuovo indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo" aria-label="Modifica indirizzo" title="Modifica indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo" aria-label="Elimina indirizzo" title="Elimina indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                                {{ contact_form.indirizzo.errors }}
+                            </div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">
+                                {{ contact_form.principale }}
+                                <span>Principale</span>
+                            </label>
+                            <div class="anagrafica-contact-field is-order">
+                                <label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>
+                                {{ contact_form.ordine }}
+                                {{ contact_form.ordine.errors }}
+                            </div>
+                            <div class="anagrafica-contact-field is-note">
+                                <label for="{{ contact_form.note.id_for_label }}">Nota</label>
+                                {{ contact_form.note }}
+                                {{ contact_form.note.errors }}
+                            </div>
+                            <div class="anagrafica-contact-delete-field">
+                                {{ contact_form.DELETE }}
+                                <button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi indirizzo" title="Rimuovi indirizzo">
+                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+            <template data-contact-empty-template>
+                <article class="anagrafica-contact-row" data-contact-row>
+                    {% with contact_form=indirizzi_formset.empty_form %}
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid is-address">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_indirizzo" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_indirizzo" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_indirizzo" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="anagrafica-contact-field is-main">
+                                <label for="{{ contact_form.indirizzo.id_for_label }}">Indirizzo</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.indirizzo }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo" aria-label="Nuovo indirizzo" title="Nuovo indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo" aria-label="Modifica indirizzo" title="Modifica indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo" aria-label="Elimina indirizzo" title="Elimina indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">{{ contact_form.principale }}<span>Principale</span></label>
+                            <div class="anagrafica-contact-field is-order"><label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>{{ contact_form.ordine }}</div>
+                            <div class="anagrafica-contact-field is-note"><label for="{{ contact_form.note.id_for_label }}">Nota</label>{{ contact_form.note }}</div>
+                            <div class="anagrafica-contact-delete-field">{{ contact_form.DELETE }}<button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi indirizzo" title="Rimuovi indirizzo"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button></div>
+                        </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </div>
+
+        <div class="anagrafica-contact-section" data-contact-formset data-contact-prefix="{{ telefoni_formset.prefix }}">
+            {{ telefoni_formset.management_form }}
+            {{ telefoni_formset.non_form_errors }}
+            <div class="anagrafica-contact-section-head">
+                <div>
+                    <h4>Telefoni</h4>
+                    <span>Cellulare, lavoro, emergenza o altri numeri.</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-contact-add-row>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Aggiungi telefono</span>
+                </button>
+            </div>
+            <div class="anagrafica-contact-rows" data-contact-rows>
+                {% for contact_form in telefoni_formset.forms %}
+                    <article class="anagrafica-contact-row" data-contact-row>
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_telefono" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_telefono" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_telefono" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                                {{ contact_form.label.errors }}
+                            </div>
+                            <div class="anagrafica-contact-field is-main">
+                                <label for="{{ contact_form.numero.id_for_label }}">Numero</label>
+                                {{ contact_form.numero }}
+                                {{ contact_form.numero.errors }}
+                            </div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">{{ contact_form.principale }}<span>Principale</span></label>
+                            <div class="anagrafica-contact-field is-order"><label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>{{ contact_form.ordine }}{{ contact_form.ordine.errors }}</div>
+                            <div class="anagrafica-contact-field is-note"><label for="{{ contact_form.note.id_for_label }}">Nota</label>{{ contact_form.note }}{{ contact_form.note.errors }}</div>
+                            <div class="anagrafica-contact-delete-field">{{ contact_form.DELETE }}<button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi telefono" title="Rimuovi telefono"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button></div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+            <template data-contact-empty-template>
+                <article class="anagrafica-contact-row" data-contact-row>
+                    {% with contact_form=telefoni_formset.empty_form %}
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_telefono" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_telefono" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_telefono" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="anagrafica-contact-field is-main"><label for="{{ contact_form.numero.id_for_label }}">Numero</label>{{ contact_form.numero }}</div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">{{ contact_form.principale }}<span>Principale</span></label>
+                            <div class="anagrafica-contact-field is-order"><label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>{{ contact_form.ordine }}</div>
+                            <div class="anagrafica-contact-field is-note"><label for="{{ contact_form.note.id_for_label }}">Nota</label>{{ contact_form.note }}</div>
+                            <div class="anagrafica-contact-delete-field">{{ contact_form.DELETE }}<button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi telefono" title="Rimuovi telefono"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button></div>
+                        </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </div>
+
+        <div class="anagrafica-contact-section" data-contact-formset data-contact-prefix="{{ email_formset.prefix }}">
+            {{ email_formset.management_form }}
+            {{ email_formset.non_form_errors }}
+            <div class="anagrafica-contact-section-head">
+                <div>
+                    <h4>Email</h4>
+                    <span>Personale, lavoro, PEC o altri indirizzi.</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-contact-add-row>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                    <span class="btn-label">Aggiungi email</span>
+                </button>
+            </div>
+            <div class="anagrafica-contact-rows" data-contact-rows>
+                {% for contact_form in email_formset.forms %}
+                    <article class="anagrafica-contact-row" data-contact-row>
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_email" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_email" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_email" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                                {{ contact_form.label.errors }}
+                            </div>
+                            <div class="anagrafica-contact-field is-main">
+                                <label for="{{ contact_form.email.id_for_label }}">Email</label>
+                                {{ contact_form.email }}
+                                {{ contact_form.email.errors }}
+                            </div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">{{ contact_form.principale }}<span>Principale</span></label>
+                            <div class="anagrafica-contact-field is-order"><label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>{{ contact_form.ordine }}{{ contact_form.ordine.errors }}</div>
+                            <div class="anagrafica-contact-field is-note"><label for="{{ contact_form.note.id_for_label }}">Nota</label>{{ contact_form.note }}{{ contact_form.note.errors }}</div>
+                            <div class="anagrafica-contact-delete-field">{{ contact_form.DELETE }}<button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi email" title="Rimuovi email"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button></div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+            <template data-contact-empty-template>
+                <article class="anagrafica-contact-row" data-contact-row>
+                    {% with contact_form=email_formset.empty_form %}
+                        {% for hidden in contact_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="anagrafica-contact-row-grid">
+                            <div class="anagrafica-contact-field">
+                                <label for="{{ contact_form.label.id_for_label }}">Etichetta</label>
+                                <div class="inline-related-field anagrafica-contact-related">
+                                    {{ contact_form.label }}
+                                    <div class="related-actions inline-related-actions">
+                                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="label_email" aria-label="Nuova etichetta" title="Nuova etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="label_email" aria-label="Modifica etichetta" title="Modifica etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span></button>
+                                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="label_email" aria-label="Elimina etichetta" title="Elimina etichetta"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="anagrafica-contact-field is-main"><label for="{{ contact_form.email.id_for_label }}">Email</label>{{ contact_form.email }}</div>
+                            <label class="anagrafica-contact-primary" for="{{ contact_form.principale.id_for_label }}">{{ contact_form.principale }}<span>Principale</span></label>
+                            <div class="anagrafica-contact-field is-order"><label for="{{ contact_form.ordine.id_for_label }}">Ordine</label>{{ contact_form.ordine }}</div>
+                            <div class="anagrafica-contact-field is-note"><label for="{{ contact_form.note.id_for_label }}">Nota</label>{{ contact_form.note }}</div>
+                            <div class="anagrafica-contact-delete-field">{{ contact_form.DELETE }}<button type="button" class="related-btn related-btn-delete" data-contact-delete-row aria-label="Rimuovi email" title="Rimuovi email"><span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span></button></div>
+                        </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </div>
+    </div>
+</section>
+{% endif %}

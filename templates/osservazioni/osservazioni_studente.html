@@ -60,9 +60,9 @@
                         <tr>
                             <th>Famiglia</th>
                             <td>
-                                {% if studente.famiglia %}
-                                    <a href="{% url 'modifica_famiglia' studente.famiglia.pk %}" class="osservazioni-summary-link">
-                                        {{ studente.famiglia }}
+                                {% if studente_famiglia_logica.url %}
+                                    <a href="{{ studente_famiglia_logica.url }}" class="osservazioni-summary-link">
+                                        {{ studente_famiglia_logica.label }}
                                     </a>
                                 {% else %}
                                     <span class="table-muted">Non indicata</span>

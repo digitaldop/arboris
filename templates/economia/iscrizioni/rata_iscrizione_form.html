@@ -109,11 +109,11 @@
                         </div>
                         <div class="rate-detail-readonly-item">
                             <span>Famiglia</span>
-                            {% if rata.famiglia %}
+                            {% if rata_famiglia_logica.url %}
                                 {% if popup %}
-                                    <strong>{{ rata.famiglia }}</strong>
+                                    <strong>{{ rata_famiglia_logica.label }}</strong>
                                 {% else %}
-                                    <a href="{% url 'modifica_famiglia' rata.famiglia.pk %}">{{ rata.famiglia }}</a>
+                                    <a href="{{ rata_famiglia_logica.url }}">{{ rata_famiglia_logica.label }}</a>
                                 {% endif %}
                             {% else %}
                                 <strong>Non indicata</strong>

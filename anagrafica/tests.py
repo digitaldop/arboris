@@ -2,6 +2,7 @@ import re
 from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -10,12 +11,14 @@ import pandas as pd
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
+from anagrafica.contact_services import sync_all_student_family_relations
 from anagrafica.dati_base_import import run_import_dati_base, run_import_nazioni_belfiore
 from anagrafica.forms import (
     DocumentoFamigliaFormSet,
@@ -44,6 +47,7 @@ from anagrafica.models import (
     RelazioneFamiliare,
     StatoRelazioneFamiglia,
     Studente,
+    StudenteFamiliare,
     TipoDocumento,
 )
 from economia.models import (
@@ -56,6 +60,7 @@ from economia.models import (
     TariffaScambioRetta,
     TariffaCondizioneIscrizione,
 )
+from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente, StatoDipendente
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
@@ -429,7 +434,7 @@ class AjaxCercaCittaTests(TestCase):
             attiva=True,
         )
         Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
-        Familiare.objects.create(
+        familiare = Familiare.objects.create(
             famiglia=famiglia,
             relazione_familiare=relazione,
             nome="Mario",
@@ -437,7 +442,14 @@ class AjaxCercaCittaTests(TestCase):
             referente_principale=True,
             attivo=True,
         )
-        Studente.objects.create(famiglia=famiglia, nome="Luca", cognome="Rossi", attivo=True)
+        studente = Studente.objects.create(famiglia=famiglia, nome="Luca", cognome="Rossi", attivo=True)
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            referente_principale=True,
+            attivo=True,
+        )
 
         self.assertEqual(str(famiglia), "Rossi")
         self.assertIn("Referenti: Mario Rossi", famiglia.label_select())
@@ -452,24 +464,76 @@ class AjaxCercaCittaTests(TestCase):
 
         response = self.client.get(reverse("lista_familiari"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Referenti: Mario Rossi")
-        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertContains(response, "Luca Rossi")
+        self.assertNotContains(response, "Famiglia legacy")
         self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
 
         response = self.client.get(reverse("lista_studenti"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Referenti: Mario Rossi")
-        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertContains(response, "Mario Rossi")
+        self.assertNotContains(response, "Famiglia legacy")
         self.assertNotContains(response, "Indirizzo: Via Roma 10 - Roma")
 
         form = StudenteStandaloneForm()
-        self.assertIn("Rossi - Referenti: Mario Rossi", str(form["famiglia"]))
+        self.assertNotIn("famiglia", form.fields)
 
-        nuovo_familiare_form = FamiliareForm(detailed_famiglia_choices=True)
-        rendered_famiglia_field = str(nuovo_familiare_form["famiglia"])
-        self.assertIn("Rossi - Familiari: Mario Rossi", rendered_famiglia_field)
-        self.assertIn("Bambini: Luca Rossi", rendered_famiglia_field)
-        self.assertIn("Indirizzo: Via Roma 10 - Roma", rendered_famiglia_field)
+        nuovo_familiare_form = FamiliareForm()
+        self.assertNotIn("famiglia", nuovo_familiare_form.fields)
+
+    def test_studenti_and_familiari_lists_use_direct_relations_for_context_and_search(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        famiglia_studente = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=stato,
+            attiva=True,
+        )
+        famiglia_familiare = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=stato,
+            attiva=True,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia_studente,
+            nome="Lia",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        familiare = Familiare.objects.create(
+            famiglia=famiglia_familiare,
+            relazione_familiare=relazione,
+            nome="Paola",
+            cognome="Verdi",
+            email="paola@example.com",
+            telefono="3331234567",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("lista_studenti"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Familiari collegati")
+        self.assertContains(response, "Paola Verdi (Madre)")
+        self.assertNotContains(response, "Famiglia legacy: Bianchi")
+
+        response = self.client.get(reverse("lista_familiari"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Studenti collegati")
+        self.assertContains(response, "Lia Bianchi")
+        self.assertNotContains(response, "Famiglia legacy: Verdi")
+
+        response = self.client.get(reverse("lista_studenti"), {"q": "Paola"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lia Bianchi")
+
+        response = self.client.get(reverse("lista_familiari"), {"q": "Lia"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Paola Verdi")
 
     def test_indirizzo_form_uses_updated_labels_and_placeholder(self):
         form = IndirizzoForm()
@@ -488,7 +552,7 @@ class AjaxCercaCittaTests(TestCase):
 
 
 class LuogoNascitaAutocompletePerformanceTests(TestCase):
-    def test_crea_famiglia_uses_create_dashboard_layout(self):
+    def test_crea_famiglia_redirects_to_list_after_family_entity_creation_disabled(self):
         user = User.objects.create_superuser(
             username="nuova-famiglia@example.com",
             email="nuova-famiglia@example.com",
@@ -498,45 +562,19 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
 
         response = self.client.get(reverse("crea_famiglia"))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="famiglia-detail-form" class="detail-form is-create-mode"')
-        self.assertContains(response, "family-create-dashboard")
-        self.assertContains(response, "family-general-card-editor family-create-general-editor")
-        self.assertContains(response, 'id="famiglia-lock-container" class="mode-lock-container main-fields-section family-create-main-fields"')
-        self.assertContains(response, "Dati nuova famiglia")
-        self.assertContains(response, "family-general-editor-related-control")
-        self.assertNotContains(response, 'admin-section-title-label">Dati principali')
-        self.assertContains(response, "Nuova scheda")
-        self.assertContains(response, "Salva famiglia")
-        self.assertContains(response, 'class="btn btn-intent-danger btn-icon-text js-page-back-btn"')
-        self.assertContains(response, 'id="sticky-cancel-edit-famiglia-btn" data-fallback-url="%s"' % reverse("lista_famiglie"))
-        self.assertContains(response, 'formEl.classList.contains("is-create-mode")')
-        self.assertContains(response, "ArborisAppNavigation.resolveBackUrl")
+        self.assertRedirects(response, reverse("lista_famiglie"), fetch_redirect_response=False)
 
-    def test_crea_famiglia_popup_creates_selectable_family(self):
+    def test_crea_famiglia_popup_reports_disabled_entity_creation(self):
         user = User.objects.create_superuser(
             username="nuova-famiglia-popup@example.com",
             email="nuova-famiglia-popup@example.com",
             password="Password123!",
         )
         self.client.force_login(user)
-        regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
-        provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
-        roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
-        indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="10", citta=roma)
-        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
 
         response = self.client.get(f"{reverse('crea_famiglia')}?popup=1&target_input_name=famiglia")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "related-family-popup-card")
-        self.assertContains(response, "related-family-popup-hero")
-        self.assertContains(response, "related-family-icon-tile")
-        self.assertContains(response, "related-family-popup-info")
-        self.assertContains(response, "related-family-input-shell")
-        self.assertContains(response, "dati principali")
-        self.assertContains(response, "Salva famiglia")
-        self.assertContains(response, '<button type="button" class="related-family-popup-close"')
-        self.assertContains(response, "Es. Rossi, Bianchi...")
+        self.assertContains(response, "La creazione di famiglie come entita autonoma e stata disattivata")
 
         response = self.client.post(
             f"{reverse('crea_famiglia')}?popup=1&target_input_name=famiglia",
@@ -544,19 +582,16 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
                 "popup": "1",
                 "target_input_name": "famiglia",
                 "cognome_famiglia": "Popup",
-                "stato_relazione_famiglia": stato.pk,
-                "indirizzo_principale": indirizzo.pk,
+                "stato_relazione_famiglia": "",
+                "indirizzo_principale": "",
                 "attiva": "on",
                 "note": "",
             },
         )
 
         self.assertEqual(response.status_code, 200)
-        famiglia = Famiglia.objects.get(cognome_famiglia="Popup")
-        self.assertContains(response, 'const fieldName = "famiglia"')
-        self.assertContains(response, f'const objectId = "{famiglia.pk}"')
-        self.assertContains(response, 'const targetInputName = "famiglia"')
-        self.assertContains(response, "Popup \\u002D Indirizzo: Via Roma 10 \\u002D Roma")
+        self.assertFalse(Famiglia.objects.filter(cognome_famiglia="Popup").exists())
+        self.assertContains(response, "La creazione di famiglie come entita autonoma e stata disattivata")
 
     def test_inline_forms_render_selected_birth_city_without_loading_all_cities(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
@@ -609,7 +644,7 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
         famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato, attiva=True)
         relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
-        Familiare.objects.create(
+        familiare = Familiare.objects.create(
             famiglia=famiglia,
             relazione_familiare=relazione,
             nome="Paolo",
@@ -619,7 +654,7 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             referente_principale=True,
             attivo=True,
         )
-        Studente.objects.create(
+        studente = Studente.objects.create(
             famiglia=famiglia,
             nome="Anna",
             cognome="Bianchi",
@@ -627,31 +662,47 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             attivo=True,
         )
         tipo_documento = TipoDocumento.objects.create(tipo_documento="Contratto iscrizione", ordine=1, attivo=True)
-        Documento.objects.create(
+        documento_famiglia = Documento.objects.create(
             famiglia=famiglia,
             tipo_documento=tipo_documento,
             descrizione="Documento famiglia",
             file=SimpleUploadedFile("contratto.pdf", b"contratto", content_type="application/pdf"),
         )
+        documento_familiare = Documento.objects.create(
+            familiare=familiare,
+            tipo_documento=tipo_documento,
+            descrizione="Documento familiare",
+            file=SimpleUploadedFile("familiare.pdf", b"familiare", content_type="application/pdf"),
+        )
+        documento_studente = Documento.objects.create(
+            studente=studente,
+            tipo_documento=tipo_documento,
+            descrizione="Documento studente",
+            file=SimpleUploadedFile("studente.pdf", b"studente", content_type="application/pdf"),
+        )
 
         response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["count_documenti"], 2)
         self.assertContains(response, 'name="familiari-0-luogo_nascita_search"')
         self.assertContains(response, 'name="studenti-0-luogo_nascita_search"')
         self.assertContains(response, 'id="family-card-sticky-actions"')
         self.assertContains(response, 'data-family-card-sticky-save="1"')
         self.assertContains(response, 'data-family-card-sticky-cancel="1"')
-        self.assertContains(response, 'data-family-general-action="edit"')
+        self.assertNotContains(response, 'data-family-general-action="edit"')
         self.assertContains(response, 'data-relative-card-action="add"')
         self.assertContains(response, 'data-relative-card-action="edit"')
         self.assertContains(response, 'data-relative-form-prefix="familiari-0"')
-        self.assertContains(response, 'data-document-card-action="add"')
-        self.assertContains(response, 'data-document-card-action="edit"')
+        self.assertNotContains(response, 'data-document-card-action="add"')
+        self.assertNotContains(response, 'data-document-card-action="edit"')
         self.assertContains(response, 'data-document-card-action="delete"')
-        self.assertContains(response, 'data-document-form-prefix="documenti-0"')
-        self.assertContains(response, reverse("elimina_documento", kwargs={"pk": Documento.objects.get(famiglia=famiglia).pk}))
-        self.assertContains(response, "Modifica dati generali")
+        self.assertNotContains(response, 'data-document-form-prefix="documenti-0"')
+        self.assertContains(response, reverse("elimina_documento", kwargs={"pk": documento_familiare.pk}))
+        self.assertContains(response, reverse("elimina_documento", kwargs={"pk": documento_studente.pk}))
+        self.assertNotContains(response, reverse("elimina_documento", kwargs={"pk": documento_famiglia.pk}))
+        self.assertNotContains(response, "Modifica dati generali")
+        self.assertNotContains(response, "Documento famiglia")
         self.assertContains(response, "family-relation-pill")
         self.assertContains(response, "is-male")
         self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
@@ -809,7 +860,7 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertContains(response, "Anna Verdi")
         self.assertContains(response, "Luca Verdi")
 
-    def test_modifica_famiglia_page_shows_system_audit_users(self):
+    def test_modifica_famiglia_page_shows_recent_component_activity(self):
         user = User.objects.create_superuser(
             username="audit-famiglie@example.com",
             email="audit-famiglie@example.com",
@@ -832,6 +883,14 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
 
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
         famiglia = Famiglia.objects.create(cognome_famiglia="Audit", stato_relazione_famiglia=stato, attiva=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare = Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Paola",
+            cognome="Audit",
+            attivo=True,
+        )
         base_kwargs = {
             "modulo": "anagrafica",
             "app_label": "anagrafica",
@@ -855,20 +914,154 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
             utente_label=updater.get_full_name(),
             descrizione="Modificata famiglia.",
         )
+        SistemaOperazioneCronologia.objects.create(
+            modulo="anagrafica",
+            app_label="anagrafica",
+            model_name="familiare",
+            model_verbose_name="Familiare",
+            oggetto_id=str(familiare.pk),
+            oggetto_label=str(familiare),
+            campi_coinvolti=[],
+            azione=AzioneOperazioneCronologia.MODIFICA,
+            utente=updater,
+            utente_label=updater.get_full_name(),
+            descrizione="Aggiornato familiare collegato.",
+        )
 
         response = self.client.get(reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["famiglia_creata_da_label"], "Giulia Rossi (Direzione)")
-        self.assertEqual(response.context["famiglia_aggiornata_da_label"], "Marco Bianchi (Segreteria)")
-        self.assertContains(response, "Creato da")
-        self.assertContains(response, "Giulia Rossi (Direzione)")
-        self.assertContains(response, "Aggiornato da")
-        self.assertContains(response, "Marco Bianchi (Segreteria)")
+        self.assertNotContains(response, "Informazioni di sistema")
+        self.assertNotContains(response, "Creato da")
+        self.assertNotContains(response, "Aggiornato da")
         self.assertContains(response, "Cronologia attivit")
-        self.assertContains(response, "Creata famiglia.")
-        self.assertContains(response, "Modificata famiglia.")
-        self.assertGreaterEqual(len(response.context["famiglia_activity_entries"]), 2)
+        self.assertNotContains(response, "Creata famiglia.")
+        self.assertNotContains(response, "Modificata famiglia.")
+        self.assertContains(response, "Aggiornato familiare collegato.")
+        self.assertGreaterEqual(len(response.context["famiglia_activity_entries"]), 1)
+        self.assertLessEqual(len(response.context["famiglia_activity_entries"]), 5)
+
+    def test_lista_famiglie_uses_direct_relations_without_legacy_family(self):
+        user = User.objects.create_superuser(
+            username="famiglie-logiche@example.com",
+            email="famiglie-logiche@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Maria",
+            cognome="Rossi",
+            referente_principale=True,
+            attivo=True,
+        )
+        studente = Studente.objects.create(
+            nome="Luca",
+            cognome="Rossi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            referente_principale=True,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("lista_famiglie"))
+
+        logical_url = reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Rossi")
+        self.assertContains(response, "Referenti: Maria Rossi")
+        self.assertContains(response, "Studenti: Luca Rossi")
+        self.assertContains(response, logical_url)
+
+    def test_modifica_famiglia_logica_renders_relation_group_without_legacy_family(self):
+        user = User.objects.create_superuser(
+            username="scheda-famiglia-logica@example.com",
+            email="scheda-famiglia-logica@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+
+        relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Paolo",
+            cognome="Bianchi",
+            referente_principale=True,
+            attivo=True,
+        )
+        studente = Studente.objects.create(
+            nome="Anna",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            referente_principale=True,
+            attivo=True,
+        )
+
+        response = self.client.get(
+            reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["legacy_famiglia"])
+        self.assertEqual(response.context["count_studenti"], 1)
+        self.assertEqual(response.context["count_familiari"], 1)
+        self.assertContains(response, "Famiglia Bianchi")
+        self.assertContains(response, "Anna Bianchi")
+        self.assertContains(response, "Paolo Bianchi")
+
+    def test_scheda_studente_links_to_logical_family(self):
+        user = User.objects.create_superuser(
+            username="scheda-studente-famiglia-logica@example.com",
+            email="scheda-studente-famiglia-logica@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi", famiglia=famiglia, attivo=True)
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": studente.pk}))
+
+        logical_url = reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, logical_url)
+        self.assertNotContains(response, reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+    def test_scheda_familiare_links_to_logical_family(self):
+        user = User.objects.create_superuser(
+            username="scheda-familiare-famiglia-logica@example.com",
+            email="scheda-familiare-famiglia-logica@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(user)
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Verdi", stato_relazione_famiglia=stato, attiva=True)
+        familiare = Familiare.objects.create(
+            nome="Paola",
+            cognome="Verdi",
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": familiare.pk}))
+
+        logical_url = reverse("modifica_famiglia_logica", kwargs={"key": f"f-{familiare.pk}"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, logical_url)
+        self.assertNotContains(response, reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
 
 
 class FamigliaInlineDefaultsTests(TestCase):
@@ -881,6 +1074,7 @@ class FamigliaInlineDefaultsTests(TestCase):
         self.assertEqual(familiare_form.initial["nazionalita"], italia.pk)
         self.assertEqual(studente_form.initial["nazionalita"], italia.pk)
 
+
     def test_new_familiare_forms_default_referente_principale_checked(self):
         standalone_form = FamiliareForm()
         inline_form = FamiliareInlineForm(prefix="familiari-0")
@@ -890,7 +1084,7 @@ class FamigliaInlineDefaultsTests(TestCase):
         self.assertIs(inline_form["referente_principale"].value(), True)
         self.assertIn("checked", str(inline_form["referente_principale"]))
 
-    def test_inline_forms_prefill_family_address(self):
+    def test_inline_forms_do_not_inherit_legacy_family_address(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
         roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
@@ -920,15 +1114,15 @@ class FamigliaInlineDefaultsTests(TestCase):
         familiare_form = FamiliareInlineForm(instance=familiare, prefix="familiari-0")
         studente_form = StudenteInlineForm(instance=studente, prefix="studenti-0")
 
-        self.assertEqual(str(familiare_form["indirizzo"].value()), str(indirizzo.pk))
-        self.assertEqual(familiare_form.initial["indirizzo_search"], indirizzo.label_select())
-        self.assertIn('data-inherited-address="1"', str(familiare_form["indirizzo"]))
+        self.assertIsNone(familiare_form["indirizzo"].value())
+        self.assertNotIn("indirizzo_search", familiare_form.initial)
+        self.assertNotIn('data-inherited-address="1"', str(familiare_form["indirizzo"]))
 
-        self.assertEqual(str(studente_form["indirizzo"].value()), str(indirizzo.pk))
-        self.assertEqual(studente_form.initial["indirizzo_search"], indirizzo.label_select())
-        self.assertIn('data-inherited-address="1"', str(studente_form["indirizzo"]))
+        self.assertIsNone(studente_form["indirizzo"].value())
+        self.assertNotIn("indirizzo_search", studente_form.initial)
+        self.assertNotIn('data-inherited-address="1"', str(studente_form["indirizzo"]))
 
-    def test_forms_normalize_family_address_back_to_inherited(self):
+    def test_forms_keep_explicit_address_without_legacy_family_normalization(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
         roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
@@ -964,7 +1158,7 @@ class FamigliaInlineDefaultsTests(TestCase):
             }
         )
         self.assertTrue(familiare_form.is_valid(), familiare_form.errors)
-        self.assertIsNone(familiare_form.cleaned_data["indirizzo"])
+        self.assertEqual(familiare_form.cleaned_data["indirizzo"], indirizzo)
 
         studente_form = StudenteForm(
             data={
@@ -981,7 +1175,7 @@ class FamigliaInlineDefaultsTests(TestCase):
             instance=Studente(famiglia=famiglia),
         )
         self.assertTrue(studente_form.is_valid(), studente_form.errors)
-        self.assertIsNone(studente_form.cleaned_data["indirizzo"])
+        self.assertEqual(studente_form.cleaned_data["indirizzo"], indirizzo)
 
     def test_familiare_form_accepts_custom_foreign_birthplace(self):
         stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
@@ -1064,7 +1258,7 @@ class FamigliaInlineDefaultsTests(TestCase):
         self.assertEqual(form.cleaned_data["luogo_nascita_custom"], "")
         self.assertEqual(form.cleaned_data["nazionalita"], francia)
 
-    def test_studente_standalone_form_prefills_family_address_and_cf_binding(self):
+    def test_studente_standalone_form_ignores_legacy_family_initial_and_keeps_cf_binding(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
         roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
@@ -1079,13 +1273,14 @@ class FamigliaInlineDefaultsTests(TestCase):
 
         form = StudenteStandaloneForm(initial={"famiglia": famiglia.pk})
 
-        self.assertEqual(str(form["indirizzo"].value()), str(indirizzo.pk))
-        self.assertEqual(form.initial["famiglia_search"], famiglia.cognome_famiglia)
-        self.assertEqual(form.initial["indirizzo_search"], indirizzo.label_select())
-        self.assertIn('data-inherited-address="1"', str(form["indirizzo"]))
+        self.assertNotIn("famiglia", form.fields)
+        self.assertIsNone(form["indirizzo"].value())
+        self.assertNotIn("famiglia_search", form.initial)
+        self.assertNotIn("indirizzo_search", form.initial)
+        self.assertNotIn('data-inherited-address="1"', str(form["indirizzo"]))
         self.assertIn('data-cf-luogo-id="1"', str(form["luogo_nascita"]))
 
-    def test_studente_standalone_form_normalizes_family_address_back_to_inherited(self):
+    def test_studente_standalone_form_keeps_explicit_address_without_legacy_family_normalization(self):
         regione = Regione.objects.create(nome="Lazio", ordine=1, attiva=True)
         provincia = Provincia.objects.create(sigla="RM", nome="Roma", regione=regione, ordine=1, attiva=True)
         roma = Citta.objects.create(nome="Roma", provincia=provincia, codice_catastale="H501", ordine=1, attiva=True)
@@ -1115,7 +1310,131 @@ class FamigliaInlineDefaultsTests(TestCase):
         )
 
         self.assertTrue(form.is_valid(), form.errors)
-        self.assertIsNone(form.cleaned_data["indirizzo"])
+        self.assertEqual(form.cleaned_data["indirizzo"], indirizzo)
+
+    def test_student_and_relative_forms_save_direct_relations(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        famiglia_rossi = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
+        famiglia_bianchi = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato, attiva=True)
+        familiare_rossi = Familiare.objects.create(
+            famiglia=famiglia_rossi,
+            relazione_familiare=relazione,
+            nome="Maria",
+            cognome="Rossi",
+            attivo=True,
+        )
+        familiare_bianchi = Familiare.objects.create(
+            famiglia=famiglia_bianchi,
+            relazione_familiare=relazione,
+            nome="Laura",
+            cognome="Bianchi",
+            attivo=True,
+        )
+
+        studente_form = StudenteStandaloneForm(
+            data={
+                "famiglia": famiglia_rossi.pk,
+                "cognome": "Rossi",
+                "nome": "Luca",
+                "sesso": "",
+                "data_nascita": "",
+                "luogo_nascita": "",
+                "nazione_nascita": "",
+                "luogo_nascita_custom": "",
+                "luogo_nascita_search": "",
+                "nazionalita": "",
+                "codice_fiscale": "",
+                "indirizzo": "",
+                "familiari_collegati": [str(familiare_bianchi.pk)],
+                "attivo": "on",
+                "note": "",
+            }
+        )
+
+        self.assertTrue(studente_form.is_valid(), studente_form.errors)
+        studente = studente_form.save()
+        self.assertEqual(
+            list(studente.relazioni_familiari.filter(attivo=True).values_list("familiare_id", flat=True)),
+            [familiare_bianchi.pk],
+        )
+        self.assertFalse(
+            StudenteFamiliare.objects.filter(
+                studente=studente,
+                familiare=familiare_rossi,
+                attivo=True,
+            ).exists()
+        )
+
+        studente_bianchi = Studente.objects.create(
+            famiglia=famiglia_bianchi,
+            nome="Anna",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        familiare_form = FamiliareForm(
+            data={
+                "famiglia": famiglia_rossi.pk,
+                "relazione_familiare": relazione.pk,
+                "indirizzo": "",
+                "nome": "Maria",
+                "cognome": "Rossi",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "",
+                "data_nascita": "",
+                "luogo_nascita": "",
+                "nazione_nascita": "",
+                "luogo_nascita_custom": "",
+                "luogo_nascita_search": "",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "studenti_collegati": [str(studente_bianchi.pk)],
+                "attivo": "on",
+                "note": "",
+            },
+            instance=familiare_rossi,
+            enable_direct_relations_field=True,
+        )
+
+        self.assertTrue(familiare_form.is_valid(), familiare_form.errors)
+        familiare_form.save()
+        self.assertEqual(
+            list(familiare_rossi.relazioni_studenti.filter(attivo=True).values_list("studente_id", flat=True)),
+            [studente_bianchi.pk],
+        )
+
+    def test_inline_relative_form_does_not_expose_direct_relation_field(self):
+        inline_form = FamiliareInlineForm(prefix="familiari-0")
+
+        self.assertNotIn("studenti_collegati", inline_form.fields)
+
+    def test_direct_relation_create_forms_honor_explicit_initial_links(self):
+        stato = StatoRelazioneFamiglia.objects.create(stato="Interessata", ordine=1, attivo=True)
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato, attiva=True)
+        studente = Studente.objects.create(famiglia=famiglia, nome="Luca", cognome="Rossi", attivo=True)
+        familiare = Familiare.objects.create(
+            famiglia=famiglia,
+            relazione_familiare=relazione,
+            nome="Maria",
+            cognome="Rossi",
+            attivo=True,
+        )
+
+        familiare_form = FamiliareForm(
+            initial={"studenti_collegati": [studente.pk]},
+            enable_direct_relations_field=True,
+        )
+        self.assertEqual(familiare_form.initial["studenti_collegati"], [studente.pk])
+        self.assertIn(studente, list(familiare_form.fields["studenti_collegati"].queryset))
+
+        studente_form = StudenteStandaloneForm(initial={"familiari_collegati": [familiare.pk]})
+        self.assertEqual(studente_form.initial["familiari_collegati"], [familiare.pk])
+        self.assertIn(familiare, list(studente_form.fields["familiari_collegati"].queryset))
 
     def test_iscrizione_inline_prefers_current_school_year(self):
         from datetime import date
@@ -1239,6 +1558,122 @@ class FamigliaInlineDefaultsTests(TestCase):
 
         self.assertTrue(studenti[studente_iscritto.pk].ha_iscrizione_attiva_corrente)
         self.assertFalse(studenti[studente_non_iscritto.pk].ha_iscrizione_attiva_corrente)
+
+
+class AnagraficaDirectRelationSyncTests(TestCase):
+    def setUp(self):
+        self.stato = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
+        self.relazione_madre = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.relazione_padre = RelazioneFamiliare.objects.create(relazione="Padre", ordine=2)
+        self.famiglia = Famiglia.objects.create(
+            cognome_famiglia="Rossi",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        self.altra_famiglia = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        self.studente = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Rossi",
+            attivo=True,
+        )
+        self.madre = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione_madre,
+            nome="Maria",
+            cognome="Rossi",
+            referente_principale=True,
+            convivente=True,
+            attivo=True,
+        )
+        self.padre = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=self.relazione_padre,
+            nome="Paolo",
+            cognome="Rossi",
+            referente_principale=False,
+            convivente=False,
+            attivo=False,
+        )
+
+    def test_sync_all_student_family_relations_creates_and_updates_legacy_family_pairs(self):
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.padre,
+            relazione_familiare=self.relazione_madre,
+            referente_principale=True,
+            convivente=True,
+            attivo=True,
+        )
+        familiare_esterno = Familiare.objects.create(
+            famiglia=self.altra_famiglia,
+            relazione_familiare=self.relazione_madre,
+            nome="Laura",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(studente=self.studente, familiare=familiare_esterno, attivo=True)
+
+        stats = sync_all_student_family_relations()
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["updated"], 1)
+        self.assertEqual(stats["unchanged"], 0)
+        madre_relation = StudenteFamiliare.objects.get(studente=self.studente, familiare=self.madre)
+        self.assertEqual(madre_relation.relazione_familiare, self.relazione_madre)
+        self.assertTrue(madre_relation.referente_principale)
+        self.assertTrue(madre_relation.convivente)
+        self.assertTrue(madre_relation.attivo)
+        padre_relation = StudenteFamiliare.objects.get(studente=self.studente, familiare=self.padre)
+        self.assertEqual(padre_relation.relazione_familiare, self.relazione_padre)
+        self.assertFalse(padre_relation.referente_principale)
+        self.assertFalse(padre_relation.convivente)
+        self.assertFalse(padre_relation.attivo)
+        self.assertTrue(
+            StudenteFamiliare.objects.filter(
+                studente=self.studente,
+                familiare=familiare_esterno,
+                attivo=True,
+            ).exists()
+        )
+
+    def test_sync_all_student_family_relations_dry_run_does_not_persist(self):
+        stats = sync_all_student_family_relations(dry_run=True)
+
+        self.assertEqual(stats["created"], 2)
+        self.assertFalse(StudenteFamiliare.objects.filter(studente=self.studente).exists())
+
+    def test_sync_all_student_family_relations_missing_only_keeps_existing_values(self):
+        relation = StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.madre,
+            relazione_familiare=self.relazione_padre,
+            referente_principale=False,
+            convivente=False,
+            attivo=False,
+        )
+
+        stats = sync_all_student_family_relations(update_existing=False)
+
+        self.assertEqual(stats["created"], 1)
+        self.assertEqual(stats["unchanged"], 1)
+        relation.refresh_from_db()
+        self.assertEqual(relation.relazione_familiare, self.relazione_padre)
+        self.assertFalse(relation.referente_principale)
+        self.assertFalse(relation.convivente)
+        self.assertFalse(relation.attivo)
+
+    def test_relation_sync_management_command_dry_run(self):
+        output = StringIO()
+
+        call_command("riallinea_relazioni_anagrafiche", "--dry-run", stdout=output)
+
+        self.assertIn("dry-run", output.getvalue())
+        self.assertFalse(StudenteFamiliare.objects.filter(studente=self.studente).exists())
 
 
 class FamiliareScambioRettaInlineTests(TestCase):
@@ -1484,6 +1919,8 @@ class FamiliareDetailViewTests(TestCase):
         self.assertContains(response, f'data-student-id="{studente.pk}"')
         self.assertContains(response, f'data-relative-id="{altro_familiare.pk}"')
         self.assertContains(response, 'data-document-card')
+        self.assertContains(response, "Figli e Figlie")
+        self.assertContains(response, 'name="direct_studenti_collegati"')
         self.assertContains(response, 'data-student-card-action="edit"')
         self.assertContains(response, 'data-relative-card-action="edit"')
         self.assertContains(response, 'data-document-card-action="edit"')
@@ -1494,7 +1931,86 @@ class FamiliareDetailViewTests(TestCase):
         self.assertContains(response, "is-male")
         self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
         self.assertContains(response, 'class="family-related-list mode-view-only person-student-card-list"')
-        self.assertIn(">Rossi<", str(response.context["form"]["famiglia"]))
+        self.assertNotIn("famiglia", response.context["form"].fields)
+
+    def test_modifica_familiare_uses_direct_student_relations_with_inline_editor(self):
+        famiglia_studente = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        studente = Studente.objects.create(
+            famiglia=famiglia_studente,
+            nome="Lia",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=self.familiare,
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Figli e Figlie")
+        self.assertContains(response, "Lia Bianchi")
+        self.assertContains(response, "Madre")
+        self.assertContains(response, "Vedi profilo")
+        self.assertNotContains(response, f'href="{reverse("modifica_studente", kwargs={"pk": studente.pk})}?edit=1"')
+        self.assertNotContains(response, f'href="{reverse("crea_studente")}?familiare={self.familiare.pk}"')
+        self.assertContains(response, "Aggiungi figlio o figlia")
+        self.assertContains(response, 'name="direct_studenti_collegati"')
+        self.assertContains(response, 'id="enable-inline-edit-familiare-btn"')
+        self.assertContains(response, "Modifica Figli e Figlie")
+        self.assertContains(response, 'data-student-card-action="edit"')
+        self.assertContains(response, 'data-student-card-action="add"')
+        self.assertContains(response, 'id="studenti-table"')
+
+    def test_modifica_familiare_inline_studenti_updates_direct_relations(self):
+        famiglia_alt = Famiglia.objects.create(
+            cognome_famiglia="Bianchi",
+            stato_relazione_famiglia=self.stato,
+            attiva=True,
+        )
+        studente_attuale = Studente.objects.create(
+            famiglia=self.famiglia,
+            nome="Luca",
+            cognome="Rossi",
+            attivo=True,
+        )
+        studente_nuovo = Studente.objects.create(
+            famiglia=famiglia_alt,
+            nome="Lia",
+            cognome="Bianchi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente_attuale,
+            familiare=self.familiare,
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+
+        response = self.client.post(
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            {
+                "_edit_scope": "inline",
+                "_inline_target": "studenti",
+                "_continue": "1",
+                "direct_studenti_collegati": [str(studente_nuovo.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            StudenteFamiliare.objects.get(studente=studente_attuale, familiare=self.familiare).attivo
+        )
+        self.assertTrue(
+            StudenteFamiliare.objects.get(studente=studente_nuovo, familiare=self.familiare).attivo
+        )
 
     def test_modifica_familiare_full_save_redirects_to_detail_view_with_blank_inline_rows(self):
         response = self.client.post(
@@ -1551,6 +2067,110 @@ class FamiliareDetailViewTests(TestCase):
             reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
             fetch_redirect_response=False,
         )
+
+    def test_modifica_familiare_creates_linked_work_profile_without_duplicate_person(self):
+        classe = Classe.objects.create(nome_classe="Prima", sezione_classe="A", ordine_classe=1, attiva=True)
+
+        response = self.client.post(
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            {
+                "_edit_scope": "full",
+                "famiglia": self.famiglia.pk,
+                "relazione_familiare": self.relazione.pk,
+                "indirizzo": "",
+                "nome": "Ada",
+                "cognome": "Rossi",
+                "telefono": "3331234567",
+                "email": "ada.rossi@example.com",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "1980-01-01",
+                "luogo_nascita": self.citta.pk,
+                "luogo_nascita_search": "Bologna",
+                "nazione_nascita": "",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "on",
+                "abilitato_scambio_retta": "",
+                "profilo_dipendente_attivo": "on",
+                "profilo_educatore_attivo": "on",
+                "classe_principale_educatore": classe.pk,
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            fetch_redirect_response=False,
+        )
+        profilo = Dipendente.objects.get(familiare_collegato=self.familiare)
+        self.assertEqual(profilo.ruolo_anagrafico, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE)
+        self.assertEqual(profilo.classe_principale, classe)
+        self.assertEqual(profilo.stato, StatoDipendente.ATTIVO)
+        self.assertEqual(profilo.nome, "Ada")
+        self.assertEqual(profilo.cognome, "Rossi")
+        self.assertEqual(profilo.email, "ada.rossi@example.com")
+
+        detail_response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+        self.assertContains(detail_response, 'id="profilo-lavorativo-card"')
+        self.assertContains(detail_response, "Profilo lavorativo")
+        self.assertContains(detail_response, "Educatore e dipendente")
+        self.assertContains(detail_response, "Prima A")
+
+    def test_modifica_familiare_accetta_gruppo_classe_come_classe_principale_educatore(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026 - familiare gruppo classe test",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        classe_prima = Classe.objects.create(nome_classe="Prima", sezione_classe="A", ordine_classe=1, attiva=True)
+        classe_seconda = Classe.objects.create(nome_classe="Seconda", sezione_classe="A", ordine_classe=2, attiva=True)
+        gruppo = GruppoClasse.objects.create(nome_gruppo_classe="Prima e Seconda", anno_scolastico=anno, attivo=True)
+        gruppo.classi.set([classe_prima, classe_seconda])
+
+        response = self.client.post(
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            {
+                "_edit_scope": "full",
+                "famiglia": self.famiglia.pk,
+                "relazione_familiare": self.relazione.pk,
+                "indirizzo": "",
+                "nome": "Ada",
+                "cognome": "Rossi",
+                "telefono": "3331234567",
+                "email": "ada.rossi@example.com",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "1980-01-01",
+                "luogo_nascita": self.citta.pk,
+                "luogo_nascita_search": "Bologna",
+                "nazione_nascita": "",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "on",
+                "abilitato_scambio_retta": "",
+                "profilo_dipendente_attivo": "",
+                "profilo_educatore_attivo": "on",
+                "classe_principale_educatore": f"gruppo:{gruppo.pk}",
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            fetch_redirect_response=False,
+        )
+        profilo = Dipendente.objects.get(familiare_collegato=self.familiare)
+        self.assertEqual(profilo.ruolo_anagrafico, RuoloAnagraficoDipendente.EDUCATORE)
+        self.assertIsNone(profilo.classe_principale)
+        self.assertEqual(profilo.gruppo_classe_principale, gruppo)
+
+        detail_response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+        self.assertContains(detail_response, "Prima e Seconda")
 
 
 class StudenteListTests(TestCase):
@@ -1685,6 +2305,38 @@ class RicercheAnagraficaTests(TestCase):
         self.assertContains(response, "Familiari senza Carta identita")
         self.assertContains(response, "Bianchi Mancante")
         self.assertNotContains(response, "Bianchi Completo")
+
+    def test_ricerca_famiglie_senza_tipo_documento_uses_logical_family_url(self):
+        studente = Studente.objects.create(nome="Sara", cognome="Verdi", attivo=True)
+        familiare = Familiare.objects.create(
+            relazione_familiare=self.relazione,
+            nome="Giulia",
+            cognome="Verdi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(
+            reverse("ricerche_anagrafica"),
+            {
+                "query": "documenti_mancanti",
+                "target": "famiglie",
+                "tipo_documento": self.tipo_documento.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Famiglie senza Carta identita")
+        self.assertContains(response, "Verdi")
+        self.assertContains(
+            response,
+            reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"}),
+        )
 
 
 class DocumentoStorageTests(TestCase):
@@ -2067,7 +2719,7 @@ class StudenteDetailPerformanceTests(TestCase):
         normalized = Counter(re.sub(r"\s+", " ", item["sql"]).strip()[:260] for item in queries.captured_queries)
         self.assertLess(
             len(queries),
-            90,
+            110,
             msg="\n".join(
                 [f"Total queries: {len(queries)}"]
                 + [f"{count}x {sql}" for sql, count in normalized.most_common(20)]
@@ -2236,7 +2888,7 @@ class StudenteDetailPerformanceTests(TestCase):
         self.assertContains(response, 'data-student-overdue-rate-count="1"')
         self.assertContains(response, "Rate scadute")
 
-    def test_modifica_studente_parenti_tab_uses_editable_cards(self):
+    def test_modifica_studente_parenti_tab_uses_direct_relation_editor(self):
         relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=1)
         familiare = Familiare.objects.create(
             famiglia=self.famiglia,
@@ -2254,15 +2906,121 @@ class StudenteDetailPerformanceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'data-relative-id="{familiare.pk}"')
+        self.assertContains(response, "Genitori e Tutori")
+        self.assertContains(response, 'name="direct_familiari_collegati"')
         self.assertContains(response, 'data-relative-card-action="edit"')
         self.assertContains(response, 'data-relative-card-action="add"')
-        self.assertContains(response, "Aggiungi un parente")
+        self.assertNotContains(response, "Aggiungi un parente")
         self.assertContains(response, 'id="parenti-table"')
         self.assertContains(response, 'id="parenti-empty-form-template"')
         self.assertContains(response, 'name="parenti-TOTAL_FORMS"')
         self.assertContains(response, "family-relation-pill")
         self.assertContains(response, "is-male")
         self.assertNotContains(response, 'class="family-person-chip">Referente</span>')
+
+    def test_modifica_studente_uses_direct_relatives_with_inline_editor_and_siblings_tab(self):
+        famiglia_familiare = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=self.stato_famiglia,
+            indirizzo_principale=self.indirizzo,
+            attiva=True,
+        )
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare = Familiare.objects.create(
+            famiglia=famiglia_familiare,
+            relazione_familiare=relazione,
+            nome="Paola",
+            cognome="Verdi",
+            sesso="F",
+            telefono="3331234567",
+            email="paola.verdi@example.com",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+        sorella = Studente.objects.create(
+            famiglia=famiglia_familiare,
+            nome="Lisa",
+            cognome="Verdi",
+            sesso="F",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=sorella,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Genitori e Tutori")
+        self.assertContains(response, "Fratelli e Sorelle")
+        self.assertContains(response, "Paola Verdi")
+        self.assertContains(response, "Madre")
+        self.assertContains(response, "Lisa Verdi")
+        self.assertContains(response, "Sorella")
+        self.assertContains(response, "Vedi profilo")
+        self.assertNotContains(response, f'href="{reverse("modifica_familiare", kwargs={"pk": familiare.pk})}?edit=1"')
+        self.assertNotContains(response, f'href="{reverse("crea_familiare")}?studente={self.studente.pk}"')
+        self.assertContains(response, "Aggiungi un genitore o tutore")
+        self.assertContains(response, 'name="direct_familiari_collegati"')
+        self.assertContains(response, 'id="enable-inline-edit-studente-btn"')
+        self.assertContains(response, 'data-relative-card-action="edit"')
+        self.assertContains(response, 'data-relative-card-action="add"')
+        self.assertContains(response, 'id="parenti-table"')
+        self.assertNotContains(response, "Aggiungi un parente")
+
+    def test_modifica_studente_inline_parenti_updates_direct_relations(self):
+        relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        familiare_attuale = Familiare.objects.create(
+            famiglia=self.famiglia,
+            relazione_familiare=relazione,
+            nome="Maria",
+            cognome="Bersani",
+            attivo=True,
+        )
+        famiglia_alt = Famiglia.objects.create(
+            cognome_famiglia="Verdi",
+            stato_relazione_famiglia=self.stato_famiglia,
+            attiva=True,
+        )
+        familiare_nuovo = Familiare.objects.create(
+            famiglia=famiglia_alt,
+            relazione_familiare=relazione,
+            nome="Paola",
+            cognome="Verdi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=familiare_attuale,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+
+        response = self.client.post(
+            reverse("modifica_studente", kwargs={"pk": self.studente.pk}),
+            {
+                "_edit_scope": "inline",
+                "_inline_target": "parenti",
+                "_continue": "1",
+                "direct_familiari_collegati": [str(familiare_nuovo.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            StudenteFamiliare.objects.get(studente=self.studente, familiare=familiare_attuale).attivo
+        )
+        self.assertTrue(
+            StudenteFamiliare.objects.get(studente=self.studente, familiare=familiare_nuovo).attivo
+        )
 
     def test_modifica_studente_documenti_view_shows_data_caricamento(self):
         response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))

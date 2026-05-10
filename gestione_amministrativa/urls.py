@@ -27,6 +27,16 @@ urlpatterns = [
         name="crea_dipendente",
     ),
     path(
+        "gestione-amministrativa/educatori/",
+        ga_view(views.lista_educatori),
+        name="lista_educatori",
+    ),
+    path(
+        "gestione-amministrativa/educatori/nuovo/",
+        ga_manage(views.crea_educatore),
+        name="crea_educatore",
+    ),
+    path(
         "gestione-amministrativa/dipendenti/contratti/",
         ga_view(views.lista_contratti_dipendenti),
         name="lista_contratti_dipendenti",
@@ -82,6 +92,16 @@ urlpatterns = [
         name="elimina_dipendente",
     ),
     path(
+        "gestione-amministrativa/educatori/<int:pk>/modifica/",
+        ga_edit(views.modifica_educatore),
+        name="modifica_educatore",
+    ),
+    path(
+        "gestione-amministrativa/educatori/<int:pk>/elimina/",
+        ga_manage(views.elimina_educatore),
+        name="elimina_educatore",
+    ),
+    path(
         "gestione-amministrativa/dipendenti/<int:dipendente_pk>/contratti/nuovo/",
         ga_manage(views.crea_contratto_dipendente),
         name="crea_contratto_dipendente",
@@ -125,6 +145,11 @@ urlpatterns = [
         "gestione-amministrativa/dipendenti/parametri-calcolo/",
         ga_view(views.lista_parametri_calcolo_stipendi),
         name="lista_parametri_calcolo_stipendi",
+    ),
+    path(
+        "gestione-amministrativa/dipendenti/dati-payroll-ufficiali/",
+        ga_view(views.lista_dati_payroll_ufficiali),
+        name="lista_dati_payroll_ufficiali",
     ),
     path(
         "gestione-amministrativa/dipendenti/parametri-calcolo/nuovo/",

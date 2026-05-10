@@ -300,7 +300,6 @@ def dettaglio_servizio_extra(request, pk):
                 queryset=IscrizioneServizioExtra.objects.filter(attiva=True)
                 .select_related(
                     "studente",
-                    "studente__famiglia",
                     "tariffa",
                     "servizio",
                     "servizio__anno_scolastico",

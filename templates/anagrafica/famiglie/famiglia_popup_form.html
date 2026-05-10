@@ -46,32 +46,6 @@
                         {{ form.cognome_famiglia.errors }}
                     </div>
 
-                    <div class="related-family-form-field related-family-field-state">
-                        <label for="{{ form.stato_relazione_famiglia.id_for_label }}">Stato relazione <span class="required-marker">*</span></label>
-                        <div class="related-family-related-row">
-                            <div class="related-family-input-shell">
-                                <span class="related-family-input-addon" aria-hidden="true">
-                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
-                                </span>
-                                <div class="related-family-input-control">
-                                    {{ form.stato_relazione_famiglia }}
-                                </div>
-                            </div>
-                            <div class="related-actions related-family-related-actions">
-                                <button type="button" class="related-btn related-btn-add" id="add-stato-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                </button>
-                                <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                </button>
-                                <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        {{ form.stato_relazione_famiglia.errors }}
-                    </div>
-
                     <div class="related-family-form-field related-family-field-address">
                         <label for="{{ form.indirizzo_principale.id_for_label }}">Indirizzo principale</label>
                         <div class="related-family-related-row">
@@ -138,15 +112,6 @@
             if (!routes || !relatedPopups || typeof routes.wireCrudButtonsById !== "function") {
                 return;
             }
-
-            routes.wireCrudButtonsById({
-                selectId: "id_stato_relazione_famiglia",
-                relatedType: "stato_relazione_famiglia",
-                addBtnId: "add-stato-btn",
-                editBtnId: "edit-stato-btn",
-                deleteBtnId: "delete-stato-btn",
-                openRelatedPopup: relatedPopups.openRelatedPopup,
-            });
 
             routes.wireCrudButtonsById({
                 selectId: "id_indirizzo_principale",

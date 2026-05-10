@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from anagrafica.family_logic import logical_family_summary_for_person
 from anagrafica.models import Studente
 from economia.models import Iscrizione
 from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali
@@ -123,6 +124,7 @@ def osservazioni_studente(request, studente_pk):
         "osservazioni/osservazioni_studente.html",
         {
             "studente": studente,
+            "studente_famiglia_logica": logical_family_summary_for_person(studente),
             "osservazioni": osservazioni,
             "form": form,
             "ordine": ordine,
@@ -137,7 +139,7 @@ def osservazioni_studente(request, studente_pk):
 
 def modifica_osservazione_studente(request, pk):
     osservazione = get_object_or_404(
-        OsservazioneStudente.objects.select_related("studente", "studente__famiglia"),
+        OsservazioneStudente.objects.select_related("studente"),
         pk=pk,
     )
     ordine = normalize_ordine(request.GET.get("ordine"))

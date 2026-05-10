@@ -41,7 +41,7 @@
                 </a>
                 {% if can_manage_gestione_amministrativa %}
                     <a
-                        href="{% url 'crea_busta_paga_dipendente' %}?popup=1"
+                        href="{% url 'crea_busta_paga_dipendente' %}"
                         class="btn btn-primary btn-icon-text btn-add-action"
                         data-window-popup="1"
                         data-popup-url="{% url 'crea_busta_paga_dipendente' %}?popup=1"
@@ -181,7 +181,7 @@
                             >
                                 <td class="scambio-list-main-cell ga-buste-main-cell">
                                     <a
-                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
                                         class="scambio-list-main-link"
                                         data-window-popup="1"
                                         data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
@@ -208,7 +208,7 @@
                                 <td class="actions-cell">
                                     <div class="table-icon-actions scambio-list-actions ga-buste-actions">
                                         <a
-                                            href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                            href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
                                             class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"
                                             data-window-popup="1"
                                             data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
@@ -220,7 +220,7 @@
                                         </a>
                                         {% if can_manage_gestione_amministrativa %}
                                             <a
-                                                href="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                href="{% url 'elimina_busta_paga_dipendente' busta.pk %}"
                                                 class="table-icon-link table-icon-link-danger"
                                                 title="Elimina"
                                                 aria-label="Elimina busta paga"

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Max, Sum
 
-from anagrafica.models import Famiglia, Studente
+from anagrafica.models import Studente
 from scuola.models import AnnoScolastico
 
 
@@ -155,12 +155,8 @@ class IscrizioneServizioExtra(models.Model):
     def __str__(self):
         return f"{self.studente} - {self.servizio.nome_servizio}"
 
-    @property
-    def famiglia(self):
-        return self.studente.famiglia
-
     def build_rate_plan(self):
-        if not self.tariffa_id or not self.studente_id or not self.studente.famiglia_id:
+        if not self.tariffa_id or not self.studente_id:
             return []
 
         rate_config = list(self.tariffa.rate_config.order_by("numero_rata", "data_scadenza", "id"))
@@ -174,7 +170,6 @@ class IscrizioneServizioExtra(models.Model):
 
             piano.append(
                 {
-                    "famiglia_id": self.studente.famiglia_id,
                     "numero_rata": rata_config.numero_rata,
                     "descrizione": rata_config.descrizione or f"Rata {rata_config.numero_rata}",
                     "importo_dovuto": rata_config.importo,
@@ -190,8 +185,7 @@ class IscrizioneServizioExtra(models.Model):
 
     def rate_matches_expected(self, rata, attesa):
         return (
-            rata.famiglia_id == attesa["famiglia_id"]
-            and rata.numero_rata == attesa["numero_rata"]
+            rata.numero_rata == attesa["numero_rata"]
             and (rata.descrizione or "") == attesa["descrizione"]
             and rata.importo_dovuto == attesa["importo_dovuto"]
             and rata.data_scadenza == attesa["data_scadenza"]
@@ -285,11 +279,6 @@ class RataServizioExtra(models.Model):
         on_delete=models.CASCADE,
         related_name="rate",
     )
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.PROTECT,
-        related_name="rate_servizi_extra",
-    )
     numero_rata = models.PositiveIntegerField()
     descrizione = models.CharField(max_length=255, blank=True)
     importo_dovuto = models.DecimalField(max_digits=10, decimal_places=2)
@@ -333,12 +322,8 @@ class RataServizioExtra(models.Model):
 
     def clean(self):
         super().clean()
-        if self.famiglia_id and self.iscrizione_id and self.famiglia_id != self.iscrizione.studente.famiglia_id:
-            raise ValidationError("La famiglia della rata deve coincidere con la famiglia dello studente iscritto.")
-
         self.importo_finale = self.calcola_importo_finale()
 
     def save(self, *args, **kwargs):
         self.importo_finale = self.calcola_importo_finale()
         super().save(*args, **kwargs)
-

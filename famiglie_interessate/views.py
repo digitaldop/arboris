@@ -66,7 +66,7 @@ def filtered_famiglie_interessate_queryset(request):
     ).order_by("data_programmata", "id")
 
     queryset = (
-        FamigliaInteressata.objects.select_related("anno_scolastico_interesse", "convertita_in_famiglia")
+        FamigliaInteressata.objects.select_related("anno_scolastico_interesse")
         .annotate(
             count_referenti=Count("referenti", distinct=True),
             count_minori=Count("minori", distinct=True),
@@ -234,7 +234,6 @@ def modifica_famiglia_interessata(request, pk):
     famiglia = get_object_or_404(
         FamigliaInteressata.objects.select_related(
             "anno_scolastico_interesse",
-            "convertita_in_famiglia",
             "creata_da",
             "aggiornata_da",
         ),

@@ -4,7 +4,7 @@ from datetime import date, datetime
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from anagrafica.models import Famiglia, Familiare, Studente
+from anagrafica.models import Familiare, Studente, StudenteFamiliare
 from scuola.models import AnnoScolastico
 
 
@@ -25,14 +25,19 @@ class TariffaScambioRetta(models.Model):
         return f"{self.valore_orario}"
 
 
+def _student_and_relative_are_connected(studente, familiare):
+    if not studente or not familiare:
+        return False
+    return StudenteFamiliare.objects.filter(
+        studente=studente,
+        familiare=familiare,
+        attivo=True,
+    ).exists()
+
+
 class ScambioRetta(models.Model):
     familiare = models.ForeignKey(
         Familiare,
-        on_delete=models.PROTECT,
-        related_name="scambi_retta",
-    )
-    famiglia = models.ForeignKey(
-        Famiglia,
         on_delete=models.PROTECT,
         related_name="scambi_retta",
     )
@@ -61,7 +66,7 @@ class ScambioRetta(models.Model):
 
     class Meta:
         db_table = "economia_scambio_retta"
-        ordering = ["-anno_scolastico__data_inizio", "-mese_riferimento", "famiglia__cognome_famiglia", "studente__cognome"]
+        ordering = ["-anno_scolastico__data_inizio", "-mese_riferimento", "studente__cognome", "studente__nome"]
         verbose_name = "Scambio retta"
         verbose_name_plural = "Scambi retta"
 
@@ -93,11 +98,12 @@ class ScambioRetta(models.Model):
         if self.mese_riferimento < 1 or self.mese_riferimento > 12:
             raise ValidationError("Il mese di riferimento deve essere compreso tra 1 e 12.")
 
-        if self.familiare_id and self.famiglia_id and self.familiare.famiglia_id != self.famiglia_id:
-            raise ValidationError("Il familiare selezionato non appartiene alla famiglia indicata.")
+        familiare = self.familiare if self.familiare_id else None
+        studente = self.studente if self.studente_id else None
+        direct_relation = _student_and_relative_are_connected(studente, familiare)
 
-        if self.studente_id and self.famiglia_id and self.studente.famiglia_id != self.famiglia_id:
-            raise ValidationError("Lo studente selezionato non appartiene alla famiglia indicata.")
+        if self.studente_id and self.familiare_id and not direct_relation:
+            raise ValidationError("Lo studente selezionato non e collegato al familiare indicato.")
 
         if self.familiare_id and not self.familiare.abilitato_scambio_retta:
             raise ValidationError("Il familiare selezionato non e abilitato allo scambio retta.")
@@ -130,11 +136,6 @@ class ScambioRetta(models.Model):
 class PrestazioneScambioRetta(models.Model):
     familiare = models.ForeignKey(
         Familiare,
-        on_delete=models.PROTECT,
-        related_name="prestazioni_scambio_retta",
-    )
-    famiglia = models.ForeignKey(
-        Famiglia,
         on_delete=models.PROTECT,
         related_name="prestazioni_scambio_retta",
     )
@@ -209,15 +210,15 @@ class PrestazioneScambioRetta(models.Model):
     def clean(self):
         super().clean()
         errors = {}
+        familiare = self.familiare if self.familiare_id else None
+        studente = self.studente if self.studente_id else None
 
         if self.familiare_id:
-            self.famiglia = self.familiare.famiglia
-
             if not self.familiare.abilitato_scambio_retta:
                 errors["familiare"] = "Il familiare selezionato non e abilitato allo scambio retta."
 
-        if self.studente_id and self.famiglia_id and self.studente.famiglia_id != self.famiglia_id:
-            errors["studente"] = "Lo studente selezionato non appartiene alla famiglia del familiare."
+        if self.studente_id and self.familiare_id and not _student_and_relative_are_connected(studente, familiare):
+            errors["studente"] = "Lo studente selezionato non e collegato al familiare indicato."
 
         anno_risolto = self.resolve_anno_scolastico_da_data()
         if self.data:
@@ -250,9 +251,6 @@ class PrestazioneScambioRetta(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        if self.familiare_id:
-            self.famiglia = self.familiare.famiglia
-
         if self.data and not self.anno_scolastico_id:
             anno_risolto = self.resolve_anno_scolastico_da_data()
             if anno_risolto:

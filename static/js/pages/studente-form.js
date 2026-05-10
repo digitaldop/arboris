@@ -120,7 +120,7 @@ window.ArborisStudenteForm = (function () {
         function updateInlineEditButtonLabel(tabId) {
             const inlineEditButton = document.getElementById(inlineEditButtonId);
             const scope = (tabId || "").replace(/^tab-/, "");
-            if (inlineEditButton && scope === "parenti") {
+            if (inlineEditButton && scope === "fratelli") {
                 inlineEditButton.classList.add("is-hidden");
                 return;
             }
@@ -307,12 +307,22 @@ window.ArborisStudenteForm = (function () {
             const tabDocumenti = document.querySelector('[data-tab-target="tab-documenti"]');
             const relativeList = getRelativeCardList();
             const parentiRows = relativeList
-                ? relativeList.querySelectorAll("[data-relative-card], .family-student-card").length
+                ? relativeList.querySelectorAll("[data-relative-card], [data-direct-relative-card], .family-relative-card").length
                 : inlineFormsets.countPersistedRows("parenti-table");
             const tabParenti = document.querySelector('[data-tab-target="tab-parenti"]');
+            const siblingList = document.querySelector("[data-sibling-card-list]");
+            const siblingRows = siblingList ? siblingList.querySelectorAll("[data-sibling-card], .family-student-card").length : 0;
+            const tabFratelli = document.querySelector('[data-tab-target="tab-fratelli"]');
             if (tabIscrizioni) tabIscrizioni.textContent = `Iscrizioni (${iscrizioniRows})`;
             if (tabDocumenti) tabDocumenti.textContent = `Documenti (${documentiRows})`;
-            if (tabParenti) tabParenti.textContent = `Parenti (${parentiRows})`;
+            if (tabParenti) {
+                const parentiLabel = inlineTabs.inlineLabelFromTabButton(tabParenti);
+                tabParenti.textContent = `${parentiLabel} (${parentiRows})`;
+            }
+            if (tabFratelli) {
+                const fratelliLabel = inlineTabs.inlineLabelFromTabButton(tabFratelli);
+                tabFratelli.textContent = `${fratelliLabel} (${siblingRows})`;
+            }
         }
 
         function getRateRecalcDialog() {
@@ -814,12 +824,27 @@ window.ArborisStudenteForm = (function () {
 
         function getRelativeRowFromCard(card) {
             const prefix = card ? card.dataset.relativeFormPrefix || "" : "";
-            if (!prefix) {
+            if (prefix) {
+                const idInput = document.getElementById(`id_${prefix}-id`);
+                return idInput ? idInput.closest("tr.inline-form-row") : null;
+            }
+
+            const relativeId = card ? card.dataset.relativeId || "" : "";
+            if (!relativeId) {
                 return null;
             }
 
-            const idInput = document.getElementById(`id_${prefix}-id`);
-            return idInput ? idInput.closest("tr.inline-form-row") : null;
+            const rows = document.querySelectorAll("#parenti-table tr.inline-form-row");
+            for (const row of rows) {
+                if (row.dataset.relativeId === relativeId) {
+                    return row;
+                }
+                const idInput = row.querySelector('input[type="hidden"][name$="-id"]');
+                if (idInput && idInput.value === relativeId) {
+                    return row;
+                }
+            }
+            return null;
         }
 
         function getFamiliareSubformRow(row) {
@@ -1930,7 +1955,6 @@ window.ArborisStudenteForm = (function () {
             const grid = document.createElement("div");
             grid.className = "family-student-editor-grid";
 
-            appendRelatedField(grid, formRoot, "#id_famiglia", "Famiglia", "family-student-editor-field-wide", editor, "famiglia");
             appendInputField(grid, formRoot, "#id_cognome", "Cognome", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_nome", "Nome", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_data_nascita", "Data nascita", "family-student-editor-field-half", editor);
@@ -2814,6 +2838,14 @@ window.ArborisStudenteForm = (function () {
                 const targetInput = document.getElementById("studente-inline-target");
                 const activeContext = getActiveStudentPageEditContext();
                 const cardInlineSubmit = submitter && submitter.dataset ? submitter.dataset.cardInlineSubmit || "" : "";
+                let cardSubmitInput = form.querySelector('input[name="_card_inline_submit"]');
+                if (!cardSubmitInput) {
+                    cardSubmitInput = document.createElement("input");
+                    cardSubmitInput.type = "hidden";
+                    cardSubmitInput.name = "_card_inline_submit";
+                    form.appendChild(cardSubmitInput);
+                }
+                cardSubmitInput.value = "";
 
                 if (submitter && submitter.dataset && submitter.dataset.studentMainSubmit === "1") {
                     if (modeInput) modeInput.value = "full";
@@ -2823,6 +2855,7 @@ window.ArborisStudenteForm = (function () {
                 if (cardInlineSubmit) {
                     if (modeInput) modeInput.value = "inline";
                     if (targetInput) targetInput.value = cardInlineSubmit;
+                    cardSubmitInput.value = cardInlineSubmit;
                     return;
                 }
 
@@ -2834,6 +2867,7 @@ window.ArborisStudenteForm = (function () {
                 if (activeContext && activeContext.target && activeContext.target !== "main") {
                     if (modeInput) modeInput.value = "inline";
                     if (targetInput) targetInput.value = activeContext.target;
+                    cardSubmitInput.value = activeContext.target;
                 }
             });
         }
@@ -3187,39 +3221,14 @@ window.ArborisStudenteForm = (function () {
             refreshTabCounts();
         }
 
-        const famigliaSelect = document.getElementById("id_famiglia");
         const indirizzoSelect = document.getElementById("id_indirizzo");
 
-        const addFamigliaBtn = document.getElementById("add-famiglia-btn");
-        const editFamigliaBtn = document.getElementById("edit-famiglia-btn");
         let refreshFamigliaNavigation = function () {};
 
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
         let refreshIndirizzoButtons = function () {};
-        if (formTools && familyLinkedAddress && typeof formTools.bindFamilyAddressController === "function") {
-            formTools.bindFamilyAddressController({
-                familyLinkedAddress: familyLinkedAddress,
-                familySelect: famigliaSelect,
-                addressSelect: indirizzoSelect,
-                surnameInput: document.getElementById("id_cognome"),
-                helpElement: document.getElementById("studente-address-help"),
-                fallbackLabelScriptId: "studente-famiglia-indirizzo-label",
-                onRefreshButtons: updateMainButtons,
-            });
-        }
-
-        if (formTools && typeof formTools.bindFamigliaNavigation === "function") {
-            const famigliaNavigation = formTools.bindFamigliaNavigation({
-                familySelect: famigliaSelect,
-                addBtn: addFamigliaBtn,
-                editBtn: editFamigliaBtn,
-                createUrl: config.urls.creaFamiglia,
-            });
-            refreshFamigliaNavigation = famigliaNavigation.refresh;
-        }
-
         if (routes && typeof routes.wireCrudButtonsById === "function" && relatedPopups && typeof relatedPopups.openRelatedPopup === "function") {
             const indirizzoCrud = routes.wireCrudButtonsById({
                 select: indirizzoSelect,

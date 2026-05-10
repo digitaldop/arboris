@@ -16,6 +16,20 @@ def _crud_triplet(crea_name: str, modifica_name: str, elimina_name: str) -> dict
     }
 
 
+def _contact_label_triplet(kind: str) -> dict[str, str]:
+    return {
+        "add": reverse("crea_label_contatto", kwargs={"kind": kind}),
+        "edit": reverse("modifica_label_contatto", kwargs={"kind": kind, "pk": 0}).replace(
+            "/0/",
+            f"/{ID_PLACEHOLDER}/",
+        ),
+        "delete": reverse("elimina_label_contatto", kwargs={"kind": kind, "pk": 0}).replace(
+            "/0/",
+            f"/{ID_PLACEHOLDER}/",
+        ),
+    }
+
+
 @lru_cache(maxsize=1)
 def build_popup_manifest() -> dict[str, dict[str, str]]:
     """Keys match data-related-type / logical entity names used in form JavaScript."""
@@ -35,6 +49,9 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "modifica_indirizzo",
             "elimina_indirizzo",
         ),
+        "label_indirizzo": _contact_label_triplet("indirizzo"),
+        "label_telefono": _contact_label_triplet("telefono"),
+        "label_email": _contact_label_triplet("email"),
         "anno_scolastico": _crud_triplet(
             "crea_anno_scolastico",
             "modifica_anno_scolastico",
@@ -109,16 +126,6 @@ def build_popup_manifest() -> dict[str, dict[str, str]]:
             "crea_studente",
             "modifica_studente",
             "elimina_studente",
-        ),
-        "famiglia": _crud_triplet(
-            "crea_famiglia",
-            "modifica_famiglia",
-            "elimina_famiglia",
-        ),
-        "stato_relazione_famiglia": _crud_triplet(
-            "crea_stato_relazione_famiglia",
-            "modifica_stato_relazione_famiglia",
-            "elimina_stato_relazione_famiglia",
         ),
         "parametro_calcolo": _crud_triplet(
             "crea_parametro_calcolo_stipendio",

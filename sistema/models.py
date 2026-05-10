@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.utils.text import get_valid_filename
 
 from anagrafica.models import Indirizzo
-from .terminology import get_student_terminology
+from .terminology import get_educator_terminology, get_family_member_terminology, get_student_terminology
 
 
 def next_order_value(model_cls):
@@ -210,6 +210,18 @@ class TerminologiaStudente(models.TextChoices):
     STUDENTE = "studente", "STUDENTE"
     ALUNNO = "alunno", "ALUNNO"
     BAMBINO = "bambino", "BAMBINO"
+
+
+class TerminologiaFamiliare(models.TextChoices):
+    FAMILIARE = "familiare", "FAMILIARE"
+    GENITORE = "genitore", "GENITORE"
+    PARENTE = "parente", "PARENTE"
+
+
+class TerminologiaEducatore(models.TextChoices):
+    EDUCATORE = "educatore", "EDUCATORE"
+    MAESTRO = "maestro", "MAESTRO"
+    INSEGNANTE = "insegnante", "INSEGNANTE"
 
 
 class GoogleFontChoice(models.TextChoices):
@@ -436,6 +448,18 @@ class SistemaImpostazioniGenerali(models.Model):
             "La modifica agisce solo sulle etichette mostrate a video."
         ),
     )
+    terminologia_familiare = models.CharField(
+        max_length=20,
+        choices=TerminologiaFamiliare.choices,
+        default=TerminologiaFamiliare.FAMILIARE,
+        help_text="Scegli la dicitura da visualizzare per i familiari nelle interfacce anagrafiche.",
+    )
+    terminologia_educatore = models.CharField(
+        max_length=20,
+        choices=TerminologiaEducatore.choices,
+        default=TerminologiaEducatore.EDUCATORE,
+        help_text="Scegli la dicitura da visualizzare per educatori, maestri o insegnanti.",
+    )
     mostra_dashboard_prossimo_anno_scolastico = models.BooleanField(
         default=False,
         help_text=(
@@ -524,6 +548,13 @@ class SistemaImpostazioniGenerali(models.Model):
         default=True,
         help_text="Attiva o disattiva globalmente il modulo Dipendenti e collaboratori.",
     )
+    gestione_dipendenti_dettagliata_attiva = models.BooleanField(
+        default=False,
+        help_text=(
+            "Se attiva mostra parametri payroll, simulazioni costo dettagliate e campi contrattuali tecnici. "
+            "Se disattiva mantiene una gestione semplificata con dipendenti, contratti e buste paga."
+        ),
+    )
     modulo_servizi_extra_attivo = models.BooleanField(
         default=True,
         help_text="Attiva o disattiva globalmente il modulo Servizi extra.",
@@ -559,12 +590,36 @@ class SistemaImpostazioniGenerali(models.Model):
         return get_student_terminology(self.terminologia_studente)
 
     @property
+    def family_member_terminology(self):
+        return get_family_member_terminology(self.terminologia_familiare)
+
+    @property
+    def educator_terminology(self):
+        return get_educator_terminology(self.terminologia_educatore)
+
+    @property
     def termine_studente_singolare(self):
         return self.student_terminology["selected_singular"]
 
     @property
     def termine_studente_plurale(self):
         return self.student_terminology["selected_plural"]
+
+    @property
+    def termine_familiare_singolare(self):
+        return self.family_member_terminology["selected_singular"]
+
+    @property
+    def termine_familiare_plurale(self):
+        return self.family_member_terminology["selected_plural"]
+
+    @property
+    def termine_educatore_singolare(self):
+        return self.educator_terminology["selected_singular"]
+
+    @property
+    def termine_educatore_plurale(self):
+        return self.educator_terminology["selected_plural"]
 
 
 class FrequenzaBackupAutomatico(models.TextChoices):

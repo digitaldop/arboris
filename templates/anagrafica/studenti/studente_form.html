@@ -150,13 +150,31 @@
                                         <div>
                                             <div class="family-detail-label">Famiglia</div>
                                             <div class="family-detail-value student-overview-value">
-                                                {% if studente.famiglia %}
-                                                    <a href="{% url 'modifica_famiglia' studente.famiglia.pk %}">Famiglia {{ studente.famiglia.cognome_famiglia }}</a>
-                                                    {% with referenti=studente.famiglia.referenti_label %}
+                                                {% if studente_famiglia_logica.url %}
+                                                    <a href="{{ studente_famiglia_logica.url }}">{{ studente_famiglia_logica.label }}</a>
+                                                    {% with referenti=studente_famiglia_logica.referenti %}
                                                         {% if referenti %}<span class="family-muted-value">{{ referenti }}</span>{% endif %}
                                                     {% endwith %}
                                                 {% else %}
                                                     <span class="family-muted-value">Non indicata</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="family-overview-detail">
+                                        <span class="family-detail-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family-heart"></use></svg></span>
+                                        <div>
+                                            <div class="family-detail-label">Genitori e tutori collegati</div>
+                                            <div class="family-detail-value student-overview-value">
+                                                {% if familiari_collegati_diretti %}
+                                                    {% for relazione in familiari_collegati_diretti %}
+                                                        <a href="{% url 'modifica_familiare' relazione.familiare.pk %}">
+                                                            {{ relazione.familiare.nome }} {{ relazione.familiare.cognome }}
+                                                        </a>
+                                                        {% if relazione.relazione_familiare %}<span class="family-muted-value">{{ relazione.relazione_familiare }}</span>{% endif %}
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="family-muted-value">Nessun familiare collegato direttamente</span>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -222,8 +240,16 @@
                             <a href="#tab-parenti" class="family-stat-card">
                                 <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
                                 <span class="family-stat-content">
-                                    <span class="family-stat-value">{{ count_parenti }}</span>
-                                    <span class="family-stat-label">Parenti</span>
+                                    <span class="family-stat-value">{{ count_genitori_tutori }}</span>
+                                    <span class="family-stat-label">Genitori e tutori</span>
+                                    <span class="family-stat-link">Vedi dettagli</span>
+                                </span>
+                            </a>
+                            <a href="#tab-fratelli" class="family-stat-card">
+                                <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                                <span class="family-stat-content">
+                                    <span class="family-stat-value">{{ count_fratelli_sorelle|default:0 }}</span>
+                                    <span class="family-stat-label">Fratelli e sorelle</span>
                                     <span class="family-stat-link">Vedi dettagli</span>
                                 </span>
                             </a>
@@ -693,23 +719,16 @@
                                 </div>
 
                                 <div class="family-student-editor-grid">
-                                    <div class="family-student-editor-field family-student-editor-field-wide student-main-family-field">
-                                        <label for="{{ form.famiglia.id_for_label }}">Famiglia</label>
-                                        <div class="related-field-row mode-edit-field family-card-editor-related-control">
-                                            <div class="autocomplete-wrapper famiglia-autocomplete">
-                                                {{ form.famiglia }}
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-famiglia-btn" aria-label="Nuova famiglia" title="Nuova famiglia" data-floating-text="Nuova famiglia">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                                </button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-famiglia-btn" aria-label="Modifica famiglia" title="Modifica famiglia" data-floating-text="Modifica famiglia">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {{ form.famiglia.errors }}
+                                    {% if form.familiari_collegati %}
+                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                        <label for="{{ form.familiari_collegati.id_for_label }}">Genitori e tutori collegati</label>
+                                        {{ form.familiari_collegati }}
+                                        {% if form.familiari_collegati.help_text %}
+                                            <div class="field-help">{{ form.familiari_collegati.help_text }}</div>
+                                        {% endif %}
+                                        {{ form.familiari_collegati.errors }}
                                     </div>
+                                    {% endif %}
 
                                     <div class="family-student-editor-field family-student-editor-field-half">
                                         <label for="{{ form.cognome.id_for_label }}">Cognome</label>
@@ -803,6 +822,7 @@
                                 </div>
                             </div>
                         </section>
+                        {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
                     </div>
 
                     <div class="family-stat-grid family-create-stat-grid student-stat-grid student-create-stat-grid is-hidden" aria-hidden="true">
@@ -818,7 +838,7 @@
                             <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
                             <span class="family-stat-content">
                                 <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">Parenti</span>
+                                <span class="family-stat-label">Genitori e tutori</span>
                                 <span class="family-stat-link">Da collegare</span>
                             </span>
                         </a>
@@ -957,13 +977,13 @@
                     <div class="panel">
                         <div class="panel-body">
                             <table class="form-table">
-                                <tr{% if studente and studente.famiglia %} class="list-row-link" data-row-href="{% url 'modifica_famiglia' studente.famiglia.pk %}"{% endif %}>
-                                    <th>{{ form.famiglia.label_tag }}</th>
+                                <tr{% if studente_famiglia_logica.url %} class="list-row-link" data-row-href="{{ studente_famiglia_logica.url }}"{% endif %}>
+                                    <th>Famiglia logica</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if studente and studente.famiglia %}
-                                                <div class="table-main-text">{{ studente.famiglia.cognome_famiglia }}</div>
-                                                {% with referenti=studente.famiglia.referenti_label %}
+                                            {% if studente_famiglia_logica.url %}
+                                                <div class="table-main-text">{{ studente_famiglia_logica.label }}</div>
+                                                {% with referenti=studente_famiglia_logica.referenti %}
                                                     {% if referenti %}
                                                         <div class="table-subtext">Referenti: {{ referenti }}</div>
                                                     {% endif %}
@@ -972,20 +992,46 @@
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
                                         </div>
-                                        <div class="related-field-row popup-related-field mode-edit-field">
-                                            <div class="related-field-stack">
-                                                <div class="autocomplete-wrapper famiglia-autocomplete">
-                                                    {{ form.famiglia }}
-                                                </div>
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-famiglia-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-famiglia-btn">&#9998;</button>
-                                            </div>
+                                        <div class="mode-edit-field readonly-display readonly-display-plain">
+                                            {% if studente_famiglia_logica.url %}
+                                                <div class="table-main-text">{{ studente_famiglia_logica.label }}</div>
+                                                <div class="table-subtext">Derivata dai genitori, tutori, fratelli e sorelle collegati.</div>
+                                            {% else %}
+                                                <span class="table-muted">Collega genitori e tutori per creare la famiglia logica.</span>
+                                            {% endif %}
                                         </div>
-                                        {{ form.famiglia.errors }}
                                     </td>
                                 </tr>
+                                {% if form.familiari_collegati %}
+                                <tr>
+                                    <th>{{ form.familiari_collegati.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiari_collegati_diretti %}
+                                                {% for relazione in familiari_collegati_diretti %}
+                                                    <div class="table-main-text">
+                                                        <a href="{% url 'modifica_familiare' relazione.familiare.pk %}">
+                                                            {{ relazione.familiare.nome }} {{ relazione.familiare.cognome }}
+                                                        </a>
+                                                    </div>
+                                                    {% if relazione.relazione_familiare %}
+                                                        <div class="table-subtext">{{ relazione.relazione_familiare }}</div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="table-muted">Nessun familiare collegato direttamente</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.familiari_collegati }}
+                                            {% if form.familiari_collegati.help_text %}
+                                                <div class="field-help">{{ form.familiari_collegati.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {{ form.familiari_collegati.errors }}
+                                    </td>
+                                </tr>
+                                {% endif %}
                                 <tr>
                                     <th>{{ form.nome.label_tag }}</th>
                                     <td>
@@ -1151,6 +1197,7 @@
                         </div>
                     </div>
                 </div>
+                {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
             </div>
 
             <div class="family-side-column">
@@ -1942,7 +1989,7 @@
             </div>
 
             <div class="tab-panel{% if inline_target == 'parenti' %} is-active{% endif %}" id="tab-parenti" data-inline-scope="parenti">
-                <div class="admin-section-title inline-section-title-static">Parenti ({{ count_parenti }})</div>
+                <div class="admin-section-title inline-section-title-static">Genitori e Tutori ({{ count_genitori_tutori }})</div>
                 <div class="panel">
                     <div class="panel-body">
                         {% if parenti_formset %}
@@ -1953,13 +2000,73 @@
                             {% endif %}
                             {{ parenti_formset.management_form }}
                         {% endif %}
+                        {% if familiari_diretti_form %}
+                            <div class="mode-edit-field direct-relation-inline-editor">
+                                <div class="form-group">
+                                    <label for="{{ familiari_diretti_form.direct_familiari_collegati.id_for_label }}">{{ familiari_diretti_form.direct_familiari_collegati.label }}</label>
+                                    {{ familiari_diretti_form.direct_familiari_collegati }}
+                                    {% if familiari_diretti_form.direct_familiari_collegati.help_text %}
+                                        <div class="field-help">{{ familiari_diretti_form.direct_familiari_collegati.help_text }}</div>
+                                    {% endif %}
+                                    {{ familiari_diretti_form.direct_familiari_collegati.errors }}
+                                </div>
+                            </div>
+                        {% endif %}
                         <div
                             class="family-related-list mode-view-only student-relatives-card-list person-relative-card-list"
                             data-relative-card-list
                             data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
                             data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
-                            data-relative-new-title="Nuovo parente"
+                            data-relative-new-title="Nuovo genitore o tutore"
                         >
+                            {% if usa_parenti_diretti %}
+                                {% for relazione in familiari_collegati_diretti %}
+                                    {% with parente=relazione.familiare %}
+                                    <article class="family-person-card family-relative-card" data-relative-card data-direct-relative-card data-relative-id="{{ parente.pk }}">
+                                        <a href="{% url 'modifica_familiare' parente.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ parente.nome }} {{ parente.cognome }}">
+                                            <svg viewBox="0 0 96 96" focusable="false">
+                                                {% with relazione_label=relazione.relazione_familiare.relazione|default:parente.relazione_familiare.relazione|lower %}
+                                                    {% if parente.sesso == 'F' or relazione_label == 'madre' %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-woman"></use>
+                                                    {% elif parente.sesso == 'M' or relazione_label == 'padre' %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-man"></use>
+                                                    {% else %}
+                                                        <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </svg>
+                                        </a>
+                                        <div class="family-person-main">
+                                            <div class="family-person-heading">
+                                                <h3>{{ parente.nome }} {{ parente.cognome }}</h3>
+                                            </div>
+                                            <div class="family-person-meta">
+                                                {% if relazione.relazione_familiare %}
+                                                    <span class="family-relation-pill{% if parente.sesso == 'M' %} is-male{% elif parente.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ relazione.relazione_familiare }}</span>
+                                                {% elif parente.relazione_familiare %}
+                                                    <span class="family-relation-pill{% if parente.sesso == 'M' %} is-male{% elif parente.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ parente.relazione_familiare }}</span>
+                                                {% endif %}
+                                                {% if parente.formatted_telefono %}<span class="family-person-contact readonly-display-link"><span class="readonly-action-group"><a href="{{ parente.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ parente.formatted_telefono }}</a></span></span>{% endif %}
+                                                {% if parente.email %}<span class="family-person-contact readonly-display-link"><span class="readonly-action-group"><a href="mailto:{{ parente.email }}">{{ parente.email }}</a></span></span>{% endif %}
+                                            </div>
+                                            {% if parente.indirizzo_effettivo %}
+                                                <div class="family-person-submeta">{{ parente.indirizzo_effettivo.label_full }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="family-person-actions">
+                                            <a href="{% url 'modifica_familiare' parente.pk %}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                <span class="btn-label">Vedi profilo</span>
+                                            </a>
+                                            <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-relative-card-action="edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                <span class="btn-label">Modifica</span>
+                                            </button>
+                                        </div>
+                                    </article>
+                                    {% endwith %}
+                                {% endfor %}
+                            {% else %}
                             {% if parenti_formset %}
                                 {% for f in parenti_formset %}
                                     {% if f.instance.pk %}
@@ -2081,66 +2188,14 @@
                                     </article>
                                 {% endfor %}
                             {% endif %}
-                            {% for studente_parente in studenti_parenti_famiglia %}
-                                <article class="family-person-card family-student-card">
-                                    <a href="{% url 'modifica_studente' studente_parente.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ studente_parente.nome }} {{ studente_parente.cognome }}">
-                                        <svg viewBox="0 0 96 96" focusable="false">
-                                            {% if studente_parente.sesso == 'F' %}
-                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
-                                            {% elif studente_parente.sesso == 'M' %}
-                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
-                                            {% else %}
-                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
-                                            {% endif %}
-                                        </svg>
-                                    </a>
-                                    <div class="family-person-main">
-                                        <div class="family-person-heading">
-                                            <h3>{{ studente_parente.nome }} {{ studente_parente.cognome }}</h3>
-                                            <span class="family-person-chip">Studente</span>
-                                        </div>
-                                        <div class="family-person-meta">
-                                            {% if studente_parente.data_nascita %}
-                                                <span>{{ studente_parente.data_nascita|it_date_with_age }}</span>
-                                            {% endif %}
-                                            {% if studente_parente.luogo_nascita_display %}
-                                                <span>{{ studente_parente.luogo_nascita_display }}</span>
-                                            {% endif %}
-                                            {% if studente_parente.ha_iscrizione_attiva_corrente and studente_parente.classe_corrente_famiglia_label %}
-                                                <span>{{ studente_parente.classe_corrente_famiglia_tipo }}: {{ studente_parente.classe_corrente_famiglia_label }}</span>
-                                            {% endif %}
-                                        </div>
-                                        {% if studente_parente.codice_fiscale %}
-                                            <div class="family-person-submeta family-person-tax-code">
-                                                <span>Codice fiscale:</span>
-                                                <span class="readonly-action-group">
-                                                    <span>{{ studente_parente.codice_fiscale }}</span>
-                                                    <button type="button" class="copy-inline-btn" data-copy-text="{{ studente_parente.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
-                                                        <span class="copy-inline-icon" aria-hidden="true">
-                                                            <span class="copy-inline-icon-back"></span>
-                                                            <span class="copy-inline-icon-front"></span>
-                                                        </span>
-                                                        <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                                    </button>
-                                                </span>
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="family-person-actions">
-                                        <a href="{% url 'modifica_studente' studente_parente.pk %}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
-                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
-                                            <span class="btn-label">Vedi profilo</span>
-                                        </a>
-                                    </div>
-                                </article>
-                            {% endfor %}
-                            {% if not count_parenti %}
-                                <div class="family-card-empty">Nessun parente collegato alla famiglia dello studente.</div>
+                            {% endif %}
+                            {% if not count_genitori_tutori %}
+                                <div class="family-card-empty">Nessun genitore o tutore collegato allo studente.</div>
                             {% endif %}
                             {% if parenti_formset %}
                                 <button type="button" class="family-dashed-add" data-relative-card-action="add">
                                     <span aria-hidden="true">+</span>
-                                    Aggiungi un parente
+                                    Aggiungi un genitore o tutore
                                 </button>
                             {% endif %}
                         </div>
@@ -2166,7 +2221,7 @@
                                 </thead>
                                 <tbody>
                                     {% for f in parenti_formset %}
-                                        <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                        <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}" data-relative-id="{{ f.instance.pk }}"{% endif %}>
                                             <td>
                                                 {{ f.id }}
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if f.instance.pk and f.instance.cognome %}{{ f.instance.cognome }}{% else %}<span class="table-muted">Non indicato</span>{% endif %}</div>
@@ -2200,10 +2255,8 @@
                                                 <div class="inline-address-help" data-role="address-help">
                                                     {% if f.instance.pk and f.instance.indirizzo %}
                                                         Indirizzo specifico
-                                                    {% elif studente and studente.famiglia and studente.famiglia.indirizzo_principale %}
-                                                        Ereditera: {{ studente.famiglia.indirizzo_principale.label_select }}
                                                     {% else %}
-                                                        Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                                                        Se lasci vuoto, potrai collegare un indirizzo principale dalla sezione contatti.
                                                     {% endif %}
                                                 </div>
                                             </td>
@@ -2253,10 +2306,119 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
-                            {% if not count_parenti %}
-                                <div class="empty-state compact-empty-state inline-empty-state">Nessun parente collegato alla famiglia dello studente.</div>
+                            {% if not count_genitori_tutori %}
+                                <div class="empty-state compact-empty-state inline-empty-state">Nessun genitore o tutore collegato allo studente.</div>
                             {% endif %}
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-panel{% if inline_target == 'fratelli' %} is-active{% endif %}" id="tab-fratelli" data-inline-scope="fratelli">
+                <div class="admin-section-title inline-section-title-static">Fratelli e Sorelle ({{ count_fratelli_sorelle }})</div>
+                <div class="panel">
+                    <div class="panel-body">
+                        <div
+                            class="family-related-list mode-view-only student-siblings-card-list person-student-card-list"
+                            data-sibling-card-list
+                            data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
+                            data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
+                        >
+                            {% if usa_fratelli_diretti %}
+                                {% for studente_parente in studenti_parenti_diretti %}
+                                    <article class="family-person-card family-student-card" data-sibling-card>
+                                        <a href="{% url 'modifica_studente' studente_parente.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ studente_parente.nome }} {{ studente_parente.cognome }}">
+                                            <svg viewBox="0 0 96 96" focusable="false">
+                                                {% if studente_parente.sesso == 'F' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
+                                                {% elif studente_parente.sesso == 'M' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
+                                                {% else %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                {% endif %}
+                                            </svg>
+                                        </a>
+                                        <div class="family-person-main">
+                                            <div class="family-person-heading">
+                                                <h3>{{ studente_parente.nome }} {{ studente_parente.cognome }}</h3>
+                                                <span class="family-person-chip">{% if studente_parente.sesso == 'F' %}Sorella{% elif studente_parente.sesso == 'M' %}Fratello{% else %}Fratello/Sorella{% endif %}</span>
+                                            </div>
+                                            <div class="family-person-meta">
+                                                {% if studente_parente.data_nascita %}<span>{{ studente_parente.data_nascita|it_date_with_age }}</span>{% endif %}
+                                                {% if studente_parente.classe_corrente_famiglia_label %}<span>{{ studente_parente.classe_corrente_famiglia_tipo }}: {{ studente_parente.classe_corrente_famiglia_label }}</span>{% endif %}
+                                            </div>
+                                            {% if studente_parente.codice_fiscale %}
+                                                <div class="family-person-submeta family-person-tax-code">
+                                                    <span>Codice fiscale:</span>
+                                                    <span class="readonly-action-group">
+                                                        <span>{{ studente_parente.codice_fiscale }}</span>
+                                                        <button type="button" class="copy-inline-btn" data-copy-text="{{ studente_parente.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span class="copy-inline-icon" aria-hidden="true">
+                                                                <span class="copy-inline-icon-back"></span>
+                                                                <span class="copy-inline-icon-front"></span>
+                                                            </span>
+                                                            <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="family-person-actions">
+                                            <a href="{% url 'modifica_studente' studente_parente.pk %}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                <span class="btn-label">Vedi profilo</span>
+                                            </a>
+                                            <a href="{% url 'modifica_studente' studente_parente.pk %}?edit=1" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                <span class="btn-label">Modifica</span>
+                                            </a>
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            {% else %}
+                                {% for studente_parente in studenti_parenti_famiglia %}
+                                    <article class="family-person-card family-student-card" data-sibling-card>
+                                        <a href="{% url 'modifica_studente' studente_parente.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ studente_parente.nome }} {{ studente_parente.cognome }}">
+                                            <svg viewBox="0 0 96 96" focusable="false">
+                                                {% if studente_parente.sesso == 'F' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
+                                                {% elif studente_parente.sesso == 'M' %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
+                                                {% else %}
+                                                    <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                {% endif %}
+                                            </svg>
+                                        </a>
+                                        <div class="family-person-main">
+                                            <div class="family-person-heading">
+                                                <h3>{{ studente_parente.nome }} {{ studente_parente.cognome }}</h3>
+                                                <span class="family-person-chip">{% if studente_parente.sesso == 'F' %}Sorella{% elif studente_parente.sesso == 'M' %}Fratello{% else %}Fratello/Sorella{% endif %}</span>
+                                            </div>
+                                            <div class="family-person-meta">
+                                                {% if studente_parente.data_nascita %}<span>{{ studente_parente.data_nascita|it_date_with_age }}</span>{% endif %}
+                                                {% if studente_parente.luogo_nascita_display %}<span>{{ studente_parente.luogo_nascita_display }}</span>{% endif %}
+                                                {% if studente_parente.ha_iscrizione_attiva_corrente and studente_parente.classe_corrente_famiglia_label %}
+                                                    <span>{{ studente_parente.classe_corrente_famiglia_tipo }}: {{ studente_parente.classe_corrente_famiglia_label }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="family-person-actions">
+                                            <a href="{% url 'modifica_studente' studente_parente.pk %}" class="btn btn-secondary btn-sm btn-icon-text btn-intent-profile">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                <span class="btn-label">Vedi profilo</span>
+                                            </a>
+                                            <a href="{% url 'modifica_studente' studente_parente.pk %}?edit=1" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit">
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                <span class="btn-label">Modifica</span>
+                                            </a>
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            {% endif %}
+                            {% if not count_fratelli_sorelle %}
+                                <div class="family-card-empty">Nessun fratello o sorella collegato.</div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2361,11 +2523,7 @@
                         </div>
                     </div>
                     <div class="inline-address-help" data-role="address-help">
-                        {% if studente and studente.famiglia and studente.famiglia.indirizzo_principale %}
-                            Ereditera: {{ studente.famiglia.indirizzo_principale.label_select }}
-                        {% else %}
-                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
-                        {% endif %}
+                        Se lasci vuoto, potrai collegare un indirizzo principale dalla sezione contatti.
                     </div>
                 </td>
                 <td class="inline-phone-cell inline-family-phone-cell"><div class="mode-edit-field">{{ parenti_formset.empty_form.telefono }}</div></td>
@@ -2749,11 +2907,7 @@
         </tr>
     </template>
 
-    {% if studente and studente.famiglia and studente.famiglia.indirizzo_principale %}
-        {{ studente.famiglia.indirizzo_principale.label_full|json_script:"studente-famiglia-indirizzo-label" }}
-    {% else %}
-        <script id="studente-famiglia-indirizzo-label" type="application/json">""</script>
-    {% endif %}
+    <script id="studente-famiglia-indirizzo-label" type="application/json">""</script>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
@@ -2826,7 +2980,6 @@
                 defaultInlineTab: "iscrizioni",
                 preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
                 urls: {
-                    creaFamiglia: "{% url 'crea_famiglia' %}",
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
                     creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
                 }

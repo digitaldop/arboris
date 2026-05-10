@@ -40,8 +40,15 @@ def scuola_inline_head(*, inline_target, count_telefoni, count_email, count_soci
     }
 
 
-def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti, count_parenti=0):
-    valid = {"iscrizioni", "documenti", "parenti"}
+def studente_inline_head(
+    *,
+    inline_target,
+    count_iscrizioni,
+    count_documenti,
+    count_parenti=0,
+    count_fratelli_sorelle=0,
+):
+    valid = {"iscrizioni", "documenti", "parenti", "fratelli"}
     active = inline_target if inline_target in valid else "iscrizioni"
     tabs = [
         {
@@ -54,9 +61,16 @@ def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti, co
         {
             "tab_id": "tab-parenti",
             "scope": "parenti",
-            "label": "Parenti",
+            "label": "Genitori e Tutori",
             "count": count_parenti,
-            "base_label": "Parenti",
+            "base_label": "Genitori e Tutori",
+        },
+        {
+            "tab_id": "tab-fratelli",
+            "scope": "fratelli",
+            "label": "Fratelli e Sorelle",
+            "count": count_fratelli_sorelle,
+            "base_label": "Fratelli e Sorelle",
         },
         {
             "tab_id": "tab-documenti",
@@ -71,7 +85,9 @@ def studente_inline_head(*, inline_target, count_iscrizioni, count_documenti, co
     if active == "documenti":
         edit_label = "Modifica Documenti"
     elif active == "parenti":
-        edit_label = "Parenti"
+        edit_label = "Modifica Genitori e Tutori"
+    elif active == "fratelli":
+        edit_label = "Fratelli e Sorelle"
     else:
         edit_label = "Modifica Iscrizioni"
     return {

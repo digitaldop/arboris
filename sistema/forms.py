@@ -163,6 +163,8 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
         model = SistemaImpostazioniGenerali
         fields = [
             "terminologia_studente",
+            "terminologia_familiare",
+            "terminologia_educatore",
             "mostra_dashboard_prossimo_anno_scolastico",
             "osservazioni_solo_autori_visualizzazione",
             "osservazioni_solo_autori_modifica",
@@ -176,12 +178,15 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "modulo_calendario_attivo",
             "modulo_gestione_finanziaria_attivo",
             "modulo_gestione_amministrativa_attivo",
+            "gestione_dipendenti_dettagliata_attiva",
             "modulo_servizi_extra_attivo",
             "font_principale",
             "font_titoli",
         ]
         labels = {
             "terminologia_studente": "Dicitura visualizzata per gli studenti",
+            "terminologia_familiare": "Dicitura visualizzata per familiari/genitori",
+            "terminologia_educatore": "Dicitura visualizzata per educatori/insegnanti",
             "mostra_dashboard_prossimo_anno_scolastico": "Mostra in Dashboard i riepiloghi del prossimo anno scolastico",
             "osservazioni_solo_autori_visualizzazione": "Solo gli autori possono vedere le loro osservazioni",
             "osservazioni_solo_autori_modifica": "Solo gli autori possono modificare o cancellare",
@@ -195,6 +200,7 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             "modulo_calendario_attivo": "Calendario",
             "modulo_gestione_finanziaria_attivo": "Gestione finanziaria",
             "modulo_gestione_amministrativa_attivo": "Dipendenti e collaboratori",
+            "gestione_dipendenti_dettagliata_attiva": "Gestione dettagliata dipendenti",
             "modulo_servizi_extra_attivo": "Servizi extra",
             "font_principale": "Font principale",
             "font_titoli": "Titoli",
@@ -202,6 +208,8 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for terminology_field in ("terminologia_familiare", "terminologia_educatore"):
+            self.fields[terminology_field].required = False
         self.fields["giorno_soglia_iscrizione_corso_anno"].widget.attrs.update(
             {
                 "min": "1",
@@ -213,6 +221,12 @@ class SistemaImpostazioniGeneraliForm(forms.ModelForm):
             if isinstance(field.widget, forms.CheckboxInput):
                 current_class = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = f"{current_class} settings-switch-checkbox".strip()
+
+    def clean_terminologia_familiare(self):
+        return self.cleaned_data.get("terminologia_familiare") or "familiare"
+
+    def clean_terminologia_educatore(self):
+        return self.cleaned_data.get("terminologia_educatore") or "educatore"
 
 
 class SistemaBackupDatabaseConfigurazioneForm(forms.ModelForm):

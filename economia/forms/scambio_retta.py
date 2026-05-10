@@ -1,8 +1,7 @@
 from datetime import datetime, time
 
 from django import forms
-
-from anagrafica.models import Famiglia, Familiare, Studente
+from anagrafica.models import Familiare, Studente, StudenteFamiliare
 from anagrafica.forms import make_searchable_select
 from arboris.form_widgets import apply_eur_currency_widget
 from scuola.models import AnnoScolastico
@@ -47,14 +46,71 @@ def tariffa_scambio_retta_choice_label(tariffa):
     return label
 
 
+def _csv(values):
+    return ",".join(str(value) for value in values if value)
+
+
+def student_ids_for_familiare(familiare):
+    if not familiare or not getattr(familiare, "pk", None):
+        return []
+
+    direct_ids = list(
+        StudenteFamiliare.objects.filter(
+            familiare_id=familiare.pk,
+            attivo=True,
+            studente__attivo=True,
+        )
+        .order_by("studente__cognome", "studente__nome", "studente_id")
+        .values_list("studente_id", flat=True)
+    )
+    return direct_ids
+
+
+def familiare_ids_for_studente(studente):
+    if not studente or not getattr(studente, "pk", None):
+        return []
+
+    direct_ids = list(
+        StudenteFamiliare.objects.filter(
+            studente_id=studente.pk,
+            attivo=True,
+            familiare__attivo=True,
+            familiare__abilitato_scambio_retta=True,
+        )
+        .order_by("familiare__cognome", "familiare__nome", "familiare_id")
+        .values_list("familiare_id", flat=True)
+    )
+    return direct_ids
+
+
+def studenti_queryset_for_familiare(familiare):
+    if not familiare:
+        return Studente.objects.none()
+
+    student_ids = student_ids_for_familiare(familiare)
+    if not student_ids:
+        return Studente.objects.none()
+
+    return Studente.objects.filter(pk__in=student_ids, attivo=True).order_by("cognome", "nome", "id")
+
+
+def has_direct_student_familiare_relation(studente, familiare):
+    if not studente or not familiare:
+        return False
+    return StudenteFamiliare.objects.filter(
+        studente=studente,
+        familiare=familiare,
+        attivo=True,
+    ).exists()
+
+
 class FamiliareScambioRettaSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
 
         if value and hasattr(value, "instance"):
             familiare = value.instance
-            option["attrs"]["data-famiglia-id"] = familiare.famiglia_id
-            option["attrs"]["data-famiglia-label"] = str(familiare.famiglia)
+            option["attrs"]["data-studente-ids"] = _csv(student_ids_for_familiare(familiare))
 
         return option
 
@@ -65,7 +121,7 @@ class StudenteScambioRettaSelect(forms.Select):
 
         if value and hasattr(value, "instance"):
             studente = value.instance
-            option["attrs"]["data-famiglia-id"] = studente.famiglia_id
+            option["attrs"]["data-familiare-ids"] = _csv(familiare_ids_for_studente(studente))
 
         return option
 
@@ -100,7 +156,6 @@ class ScambioRettaForm(forms.ModelForm):
         model = ScambioRetta
         fields = [
             "familiare",
-            "famiglia",
             "studente",
             "anno_scolastico",
             "mese_riferimento",
@@ -127,7 +182,6 @@ class ScambioRettaForm(forms.ModelForm):
         self.fields["familiare"].queryset = Familiare.objects.filter(attivo=True, abilitato_scambio_retta=True).order_by(
             "cognome", "nome"
         )
-        self.fields["famiglia"].queryset = Famiglia.objects.filter(attiva=True).order_by("cognome_famiglia")
         self.fields["studente"].queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
         self.fields["anno_scolastico"].queryset = AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id")
         self.fields["tariffa_scambio_retta"].queryset = TariffaScambioRetta.objects.order_by("valore_orario", "definizione")
@@ -135,17 +189,7 @@ class ScambioRettaForm(forms.ModelForm):
         self.fields["mese_riferimento"].widget = forms.Select(choices=MONTH_CHOICES)
         self.fields["anno_scolastico"].empty_label = None
         self.fields["tariffa_scambio_retta"].empty_label = None
-        self.fields["famiglia"].required = False
-        self.fields["famiglia"].widget.attrs.update(
-            {
-                "class": f"{self.fields['famiglia'].widget.attrs.get('class', '')} submit-safe-locked".strip(),
-                "aria-disabled": "true",
-                "tabindex": "-1",
-                "data-keep-submitted-locked": "1",
-            }
-        )
         make_searchable_select(self.fields["familiare"], "Cerca un familiare...")
-        make_searchable_select(self.fields["famiglia"], "Cerca una famiglia...")
 
         self.fields["ore_lavorate"].help_text = "Numero ore lavorate per il mese selezionato."
         self.fields["ore_lavorate"].widget.attrs.update(
@@ -156,11 +200,9 @@ class ScambioRettaForm(forms.ModelForm):
             }
         )
 
-        self.fields["famiglia"].help_text = "Viene proposta automaticamente quando selezioni il familiare."
-
-        famiglia_id = self._resolve_famiglia_id_from_familiare()
+        familiare = self._resolve_selected_familiare()
         if self.is_bound:
-            self.filter_studenti_by_famiglia(famiglia_id)
+            self.filter_studenti_by_familiare(familiare)
 
         if not self.instance.pk and not self.is_bound:
             if not self.initial.get("anno_scolastico"):
@@ -173,7 +215,7 @@ class ScambioRettaForm(forms.ModelForm):
                 if prima_tariffa:
                     self.initial["tariffa_scambio_retta"] = prima_tariffa.pk
 
-    def _resolve_famiglia_id_from_familiare(self):
+    def _resolve_selected_familiare(self):
         familiare_pk = None
         if self.is_bound:
             familiare_pk = self.data.get(self.add_prefix("familiare")) or self.data.get("familiare")
@@ -183,28 +225,21 @@ class ScambioRettaForm(forms.ModelForm):
             familiare_pk = self.initial["familiare"]
 
         if not familiare_pk:
-            return self.instance.famiglia_id if self.instance.pk else None
+            return self.instance.familiare if self.instance.pk and self.instance.familiare_id else None
 
-        return (
-            self.fields["familiare"]
-            .queryset.filter(pk=familiare_pk)
-            .values_list("famiglia_id", flat=True)
-            .first()
-        )
+        return self.fields["familiare"].queryset.filter(pk=familiare_pk).first()
 
-    def filter_studenti_by_famiglia(self, famiglia_id):
-        if not famiglia_id:
-            self.fields["studente"].queryset = Studente.objects.none()
-            return
-
-        queryset = Studente.objects.filter(attivo=True, famiglia_id=famiglia_id).order_by("cognome", "nome")
-        self.fields["studente"].queryset = queryset
+    def filter_studenti_by_familiare(self, familiare):
+        self.fields["studente"].queryset = studenti_queryset_for_familiare(familiare)
 
     def clean(self):
         cleaned_data = super().clean()
         familiare = cleaned_data.get("familiare")
-        if familiare:
-            cleaned_data["famiglia"] = familiare.famiglia
+        studente = cleaned_data.get("studente")
+
+        if familiare and studente and not has_direct_student_familiare_relation(studente, familiare):
+            self.add_error("studente", "Seleziona uno studente collegato al familiare indicato.")
+
         return cleaned_data
 
 
@@ -269,7 +304,7 @@ class PrestazioneScambioRettaForm(forms.ModelForm):
             }
         )
         self.fields["descrizione"].help_text = "Mansione svolta."
-        self.fields["studente"].help_text = "Facoltativo. Se selezionato deve appartenere alla stessa famiglia del familiare."
+        self.fields["studente"].help_text = "Facoltativo. Se selezionato deve essere collegato al familiare."
         make_searchable_select(self.fields["familiare"], "Cerca un familiare...")
         make_searchable_select(self.fields["studente"], "Cerca uno studente...")
 
@@ -287,23 +322,23 @@ class PrestazioneScambioRettaForm(forms.ModelForm):
                 if prima_tariffa:
                     self.initial["tariffa_scambio_retta"] = prima_tariffa.pk
 
-        famiglia_id = None
+        familiare = None
         if self.is_bound:
             familiare_pk = self.data.get("familiare")
             if familiare_pk:
-                famiglia_id = (
-                    self.fields["familiare"].queryset.filter(pk=familiare_pk).values_list("famiglia_id", flat=True).first()
-                )
-        elif self.instance.pk and self.instance.famiglia_id:
-            famiglia_id = self.instance.famiglia_id
+                familiare = self.fields["familiare"].queryset.filter(pk=familiare_pk).first()
+        elif self.instance.pk and self.instance.familiare_id:
+            familiare = self.instance.familiare if self.instance.familiare_id else None
         elif familiare_id:
-            familiare = self.fields["familiare"].queryset.filter(pk=familiare_id).select_related("famiglia").first()
-            famiglia_id = familiare.famiglia_id if familiare else None
+            familiare = self.fields["familiare"].queryset.filter(pk=familiare_id).first()
 
-        self.filter_studenti_by_famiglia(famiglia_id)
+        if familiare:
+            self.filter_studenti_by_familiare(familiare)
+        elif self.is_bound:
+            self.fields["studente"].queryset = Studente.objects.none()
 
-    def filter_studenti_by_famiglia(self, famiglia_id):
-        queryset = Studente.objects.filter(attivo=True).order_by("cognome", "nome")
-        if famiglia_id:
-            queryset = queryset.filter(famiglia_id=famiglia_id)
-        self.fields["studente"].queryset = queryset
+    def filter_studenti_by_familiare(self, familiare):
+        if not familiare:
+            self.fields["studente"].queryset = Studente.objects.none()
+            return
+        self.fields["studente"].queryset = studenti_queryset_for_familiare(familiare)

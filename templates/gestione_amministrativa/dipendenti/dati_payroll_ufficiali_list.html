@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dati payroll ufficiali - Dipendenti e collaboratori{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Dati payroll ufficiali</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="scambio-list-shell ga-payroll-data-shell">
+        <div class="page-head scambio-list-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                </span>
+                <div>
+                    <div class="family-page-title-line">
+                        <h1 class="page-title">Dati payroll ufficiali</h1>
+                        <span class="family-status-pill is-muted">
+                            <span class="family-status-dot" aria-hidden="true"></span>
+                            {{ dati_payroll_stats.totale }} record
+                        </span>
+                    </div>
+                    <div class="family-page-address">
+                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                        Fonti e valori importabili per rendere piu guidati i profili di costo dipendente
+                    </div>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'lista_parametri_calcolo_stipendi' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                    <span class="btn-label">Parametri</span>
+                </a>
+            </div>
+        </div>
+
+        <section class="scambio-list-kpi-grid" aria-label="Riepilogo dati payroll ufficiali">
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Record totali</span>
+                    <strong class="scambio-list-kpi-value">{{ dati_payroll_stats.totale }}</strong>
+                    <span class="scambio-list-kpi-note">Fonti e dati presenti</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Fonti ufficiali</span>
+                    <strong class="scambio-list-kpi-value is-green">{{ dati_payroll_stats.fonti }}</strong>
+                    <span class="scambio-list-kpi-note">Pagine o archivi da monitorare</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Valori importati</span>
+                    <strong class="scambio-list-kpi-value is-amber">{{ dati_payroll_stats.valori }}</strong>
+                    <span class="scambio-list-kpi-note">Record strutturati usabili</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+            </article>
+            <article class="scambio-list-kpi-card">
+                <div class="scambio-list-kpi-copy">
+                    <span class="scambio-list-kpi-label">Attivi</span>
+                    <strong class="scambio-list-kpi-value is-purple">{{ dati_payroll_stats.attivi }}</strong>
+                    <span class="scambio-list-kpi-note">Disponibili per i profili</span>
+                </div>
+                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+            </article>
+        </section>
+
+        <section class="scambio-list-card ga-payroll-data-help-card">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2>Come si aggiornano</h2>
+                    <p>
+                        Il comando <code>python manage.py aggiorna_dati_payroll_ufficiali</code> aggiorna il catalogo fonti e importa i dati strutturati disponibili.
+                        Su Render puo essere eseguito da un cron job. I dati restano sempre tracciati con ente, URL fonte e data di rilevazione.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="scambio-list-filter-card" aria-label="Ricerca dati payroll ufficiali">
+            <div class="scambio-list-filter-form">
+                <label class="scambio-list-search ga-payroll-data-search">
+                    <span class="scambio-list-search-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
+                    </span>
+                    <input type="search" data-ga-payroll-data-search placeholder="Cerca per ente, categoria, codice o nome..." aria-label="Cerca dati payroll ufficiali">
+                </label>
+            </div>
+        </section>
+
+        <section class="scambio-list-card" aria-labelledby="ga-payroll-data-list-title">
+            <div class="scambio-list-card-head">
+                <h2 id="ga-payroll-data-list-title">Ultimi dati e fonti</h2>
+                <span class="scambio-list-status-chip is-muted" data-ga-payroll-data-count>{{ dati_payroll_stats.totale }} record</span>
+            </div>
+            <div class="scambio-list-table-wrap">
+                <table class="list-table anagrafica-list-table scambio-list-table ga-payroll-data-table">
+                    <thead>
+                        <tr>
+                            <th>Dato</th>
+                            <th>Categoria</th>
+                            <th>Valore</th>
+                            <th>Anno</th>
+                            <th>Ente</th>
+                            <th>Rilevato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dato in dati_payroll %}
+                            <tr data-ga-payroll-data-row>
+                                <td class="scambio-list-main-cell">
+                                    <span class="scambio-list-main-link is-static">
+                                        <span class="scambio-list-row-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if dato.categoria == categoria_fonte %}shield{% else %}coins{% endif %}"></use></svg>
+                                        </span>
+                                        <span class="scambio-list-row-copy">
+                                            <strong>{{ dato.nome }}</strong>
+                                            <span>{{ dato.codice }}</span>
+                                            {% if dato.fonte_url %}
+                                                <a href="{{ dato.fonte_url }}" target="_blank" rel="noopener noreferrer">Fonte ufficiale</a>
+                                            {% endif %}
+                                        </span>
+                                    </span>
+                                </td>
+                                <td>{{ dato.get_categoria_display }}</td>
+                                <td>{{ dato.valore_display }}</td>
+                                <td>{% if dato.anno %}{{ dato.anno }}{% else %}-{% endif %}</td>
+                                <td>{{ dato.ente|default:"-" }}</td>
+                                <td>{{ dato.data_rilevazione|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6"><div class="empty-state">Nessun dato payroll ufficiale registrato.</div></td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="ga-payroll-data-empty-filter-row" hidden>
+                            <td colspan="6"><div class="empty-state">Nessun dato corrisponde alla ricerca.</div></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.querySelector("[data-ga-payroll-data-search]");
+            const rows = Array.from(document.querySelectorAll("[data-ga-payroll-data-row]"));
+            const emptyRow = document.querySelector(".ga-payroll-data-empty-filter-row");
+            const countNode = document.querySelector("[data-ga-payroll-data-count]");
+            if (!searchInput || !rows.length) return;
+
+            function label(count) {
+                return count + (count === 1 ? " record" : " record");
+            }
+
+            function applySearch() {
+                const term = searchInput.value.trim().toLowerCase();
+                let visible = 0;
+                rows.forEach(function (row) {
+                    const match = !term || row.textContent.toLowerCase().includes(term);
+                    row.hidden = !match;
+                    if (match) visible += 1;
+                });
+                if (emptyRow) emptyRow.hidden = visible !== 0;
+                if (countNode) countNode.textContent = label(visible);
+            }
+
+            searchInput.addEventListener("input", applySearch);
+        });
+    </script>
+{% endblock %}

@@ -11,6 +11,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from anagrafica.family_logic import logical_family_summary_for_person
+from anagrafica.models import StudenteFamiliare
 from economia.forms import (
     StatoIscrizioneForm,
     CondizioneIscrizioneForm,
@@ -578,7 +580,6 @@ def modifica_iscrizione(request, pk):
     iscrizione = get_object_or_404(
         Iscrizione.objects.select_related(
             "studente",
-            "studente__famiglia",
             "anno_scolastico",
             "classe",
             "gruppo_classe",
@@ -938,7 +939,14 @@ def modifica_rata_iscrizione(request, pk):
     return render(
         request,
         "economia/iscrizioni/rata_iscrizione_form.html",
-        {"form": form, "rata": rata, "back_url": back_url, "popup": popup, "rata_residuo": rata_residuo},
+        {
+            "form": form,
+            "rata": rata,
+            "rata_famiglia_logica": logical_family_summary_for_person(rata.iscrizione.studente),
+            "back_url": back_url,
+            "popup": popup,
+            "rata_residuo": rata_residuo,
+        },
     )
 
 
@@ -1014,16 +1022,24 @@ def pagamento_rapido_rata_iscrizione(request, pk):
 def riconcilia_rata_iscrizione(request, pk):
     rata = get_object_or_404(
         RataIscrizione.objects.select_related(
-            "famiglia",
             "iscrizione",
             "iscrizione__studente",
-            "iscrizione__studente__famiglia",
             "iscrizione__anno_scolastico",
         ),
         pk=pk,
     )
     popup = is_popup_request(request)
-    famiglia = rata.famiglia or rata.iscrizione.studente.famiglia
+    studente = rata.iscrizione.studente
+    familiari_ids = list(
+        StudenteFamiliare.objects.filter(studente=studente, attivo=True)
+        .values_list("familiare_id", flat=True)
+    )
+    studenti_ids = {studente.pk}
+    if familiari_ids:
+        studenti_ids.update(
+            StudenteFamiliare.objects.filter(familiare_id__in=familiari_ids, attivo=True)
+            .values_list("studente_id", flat=True)
+        )
     rate_aperte_queryset = (
         RataIscrizione.objects.select_related(
             "iscrizione",
@@ -1031,7 +1047,7 @@ def riconcilia_rata_iscrizione(request, pk):
             "iscrizione__anno_scolastico",
         )
         .filter(
-            famiglia=famiglia,
+            iscrizione__studente_id__in=studenti_ids,
             iscrizione__anno_scolastico=rata.iscrizione.anno_scolastico,
             importo_finale__gt=models.F("importo_pagato"),
         )

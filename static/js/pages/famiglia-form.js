@@ -885,7 +885,6 @@ window.ArborisFamigliaForm = (function () {
         function getFamilyGeneralFields() {
             return [
                 document.getElementById("id_cognome_famiglia"),
-                document.getElementById("id_stato_relazione_famiglia"),
                 document.getElementById("id_indirizzo_principale"),
                 document.getElementById("id_attiva"),
             ].filter(Boolean);
@@ -1073,11 +1072,9 @@ window.ArborisFamigliaForm = (function () {
             grid.className = "family-general-editor-grid";
 
             const cognomeInput = document.getElementById("id_cognome_famiglia");
-            const statoSelect = document.getElementById("id_stato_relazione_famiglia");
             const indirizzoSelect = document.getElementById("id_indirizzo_principale");
             const attivaInput = document.getElementById("id_attiva");
             const cognomeNode = cognomeInput ? cognomeInput.closest(".mode-edit-field") || cognomeInput : null;
-            const statoNode = statoSelect ? statoSelect.closest(".related-field-row") || statoSelect : null;
             const indirizzoNode = indirizzoSelect ? indirizzoSelect.closest(".related-field-row") || indirizzoSelect : null;
             const indirizzoHelp = indirizzoNode && indirizzoNode.parentElement
                 ? indirizzoNode.parentElement.querySelector(".help-text.mode-edit-field")
@@ -1085,7 +1082,6 @@ window.ArborisFamigliaForm = (function () {
 
             [
                 createFamilyGeneralEditorField("Cognome famiglia", cognomeNode, "family-general-editor-field-half", editor),
-                createFamilyGeneralEditorField("Stato relazione", statoNode, "family-general-editor-field-half family-general-editor-field-related family-general-editor-field-state", editor),
                 createFamilyGeneralEditorField("Indirizzo principale", [indirizzoNode, indirizzoHelp], "family-general-editor-field-wide family-general-editor-field-related family-general-editor-field-address", editor),
             ].forEach(function (field) {
                 if (field) {
@@ -3801,34 +3797,17 @@ window.ArborisFamigliaForm = (function () {
             }, 0);
         }
 
-        const statoSelect = document.getElementById("id_stato_relazione_famiglia");
         const indirizzoSelect = document.getElementById("id_indirizzo_principale");
         const cognomeFamigliaInput = document.getElementById("id_cognome_famiglia");
-
-        const addStatoBtn = document.getElementById("add-stato-btn");
-        const editStatoBtn = document.getElementById("edit-stato-btn");
-        const deleteStatoBtn = document.getElementById("delete-stato-btn");
 
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");
         const editIndirizzoBtn = document.getElementById("edit-indirizzo-btn");
         const deleteIndirizzoBtn = document.getElementById("delete-indirizzo-btn");
-        let refreshStatoButtons = function () {};
         let refreshIndirizzoButtons = function () {};
 
         function updateMainRelatedButtons() {
-            refreshStatoButtons();
             refreshIndirizzoButtons();
         }
-
-        const statoCrud = entityRoutes.wireCrudButtonsById({
-            select: statoSelect,
-            relatedType: "stato_relazione_famiglia",
-            addBtn: addStatoBtn,
-            editBtn: editStatoBtn,
-            deleteBtn: deleteStatoBtn,
-            openRelatedPopup: openRelatedPopup,
-        });
-        refreshStatoButtons = statoCrud.refresh;
 
         const indirizzoCrud = entityRoutes.wireCrudButtonsById({
             select: indirizzoSelect,

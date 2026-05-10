@@ -17,7 +17,7 @@
     </thead>
     <tbody>
         {% for f in studenti_formset %}
-            <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+            <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}" data-student-id="{{ f.instance.pk }}"{% endif %}>
                 <td>
                     {{ f.id }}
                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">

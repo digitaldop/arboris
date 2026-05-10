@@ -93,9 +93,9 @@ class RataIscrizioneAdmin(admin.ModelAdmin):
 
 @admin.register(MovimentoCreditoRetta)
 class MovimentoCreditoRettaAdmin(admin.ModelAdmin):
-    list_display = ("famiglia", "studente", "scambio_retta", "data_movimento", "tipo_movimento_credito", "importo", "saldo_progressivo")
+    list_display = ("studente", "scambio_retta", "data_movimento", "tipo_movimento_credito", "importo", "saldo_progressivo")
     list_filter = ("tipo_movimento_credito",)
-    search_fields = ("famiglia__cognome_famiglia", "studente__cognome", "studente__nome", "descrizione")
+    search_fields = ("studente__cognome", "studente__nome", "descrizione")
 
 
 @admin.register(TariffaScambioRetta)
@@ -108,7 +108,6 @@ class TariffaScambioRettaAdmin(admin.ModelAdmin):
 class ScambioRettaAdmin(admin.ModelAdmin):
     list_display = (
         "familiare",
-        "famiglia",
         "studente",
         "anno_scolastico",
         "mese_riferimento",
@@ -121,7 +120,6 @@ class ScambioRettaAdmin(admin.ModelAdmin):
     search_fields = (
         "familiare__cognome",
         "familiare__nome",
-        "famiglia__cognome_famiglia",
         "studente__cognome",
         "studente__nome",
         "descrizione",
@@ -144,7 +142,6 @@ class PrestazioneScambioRettaAdmin(admin.ModelAdmin):
     search_fields = (
         "familiare__cognome",
         "familiare__nome",
-        "famiglia__cognome_famiglia",
         "studente__cognome",
         "studente__nome",
         "descrizione",

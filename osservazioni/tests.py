@@ -71,7 +71,7 @@ class OsservazioniStudenteTests(TestCase):
         response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Anamnesi e Osservazioni")
+        self.assertContains(response, "Osservazioni Pedagogiche")
         self.assertContains(response, reverse("osservazioni_studente", kwargs={"studente_pk": self.studente.pk}))
 
     def test_osservazioni_page_orders_oldest_first_by_default_and_can_reverse(self):
@@ -308,7 +308,7 @@ class OsservazioniStudenteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dati generali dello studente")
         self.assertContains(response, reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
-        self.assertContains(response, reverse("modifica_famiglia", kwargs={"pk": self.famiglia.pk}))
+        self.assertContains(response, reverse("modifica_famiglia_logica", kwargs={"key": f"s-{self.studente.pk}"}))
         self.assertContains(response, "10 / 05 / 2020")
         self.assertContains(response, "Ancora non assegnata")
         self.assertContains(response, "Solo lettura")

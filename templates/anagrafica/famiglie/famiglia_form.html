@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static currency rich_notes %}
 
 {% block title %}
@@ -8,9 +8,9 @@
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-sep">â€º</span>
         <a href="{% url 'lista_famiglie' %}">Famiglie</a>
-        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-sep">â€º</span>
         <span>{% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova{% endif %}</span>
     </div>
 {% endblock %}
@@ -22,12 +22,7 @@
                 <h1 class="page-title">
                     {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
                 </h1>
-                {% if famiglia %}
-                    <span class="family-status-pill{% if not famiglia.attiva %} is-muted{% endif %}">
-                        <span class="family-status-dot" aria-hidden="true"></span>
-                        {% if famiglia.stato_relazione_famiglia %}{{ famiglia.stato_relazione_famiglia }}{% elif famiglia.attiva %}Attiva{% else %}Non attiva{% endif %}
-                    </span>
-                {% else %}
+                {% if not famiglia %}
                     <span class="family-status-pill is-muted">
                         <span class="family-status-dot" aria-hidden="true"></span>
                         Nuova scheda
@@ -64,21 +59,13 @@
                     <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                     <span class="btn-label">Familiare</span>
                 </button>
-                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Documento</span>
-                </button>
-                <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia' famiglia.pk %}">
+                <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia_logica' famiglia.logical_key %}">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#printer"></use></svg></span>
                     <span class="btn-label">Stampa</span>
                 </button>
                 <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
                     <span class="btn-label">Elenco</span>
-                </a>
-                <a href="{% url 'elimina_famiglia' famiglia.pk %}" class="btn btn-danger btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                    <span class="btn-label">Elimina</span>
                 </a>
             {% else %}
                 <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
@@ -92,10 +79,6 @@
                 <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
                     <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                     <span class="btn-label">Familiare</span>
-                </button>
-                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Documento</span>
                 </button>
                 <button type="submit" form="famiglia-detail-form" name="_save" class="btn btn-save-soft btn-icon-text" data-auto-save-for="famiglia-detail-form">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
@@ -130,14 +113,6 @@
                             <div class="family-overview-content">
                                 <div class="family-overview-title-row">
                                     <h2>Famiglia {{ famiglia.cognome_famiglia }}</h2>
-                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-family-general-action="edit">
-                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                        <span class="btn-label">Modifica dati generali</span>
-                                    </button>
-                                </div>
-                                <div class="family-overview-status">
-                                    Stato relazione:
-                                    <span>{% if famiglia.stato_relazione_famiglia %}{{ famiglia.stato_relazione_famiglia }}{% elif famiglia.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
                                 </div>
                                 <div class="family-overview-details">
                                     <div class="family-overview-detail">
@@ -202,54 +177,6 @@
                     </div>
 
                     <aside class="family-dashboard-side" data-family-side-reorder data-family-side-order-key="arboris-family-side-card-order">
-                        {% if can_view_system_tables %}
-                            <section class="family-side-card" data-family-side-card data-family-side-card-key="system">
-                                <div class="family-side-card-head">
-                                    <h2>Informazioni di sistema</h2>
-                                    <div class="family-side-card-tools">
-                                        <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Informazioni di sistema" title="Trascina per riordinare">
-                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-                                        </button>
-                                        <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Informazioni di sistema" title="Comprimi card">
-                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="family-side-card-body" data-family-side-card-body>
-                                    <div class="family-system-list">
-                                        <div class="family-system-item">
-                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                            <div>
-                                                <div>Data creazione</div>
-                                                <strong>{{ famiglia.data_creazione|date:"d F Y H:i" }}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="family-system-item">
-                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                                            <div>
-                                                <div>Creato da</div>
-                                                <strong>{{ famiglia_creata_da_label|default:"-" }}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="family-system-item">
-                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
-                                            <div>
-                                                <div>Ultimo aggiornamento</div>
-                                                <strong>{{ famiglia.data_aggiornamento|date:"d F Y H:i" }}</strong>
-                                            </div>
-                                        </div>
-                                        <div class="family-system-item">
-                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
-                                            <div>
-                                                <div>Aggiornato da</div>
-                                                <strong>{{ famiglia_aggiornata_da_label|default:"-" }}</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-                        {% endif %}
-
                         <section class="family-side-card family-rate-summary-card" data-family-side-card data-family-side-card-key="rette">
                             <div class="family-side-card-head">
                                 <h2>Rette mensili</h2>
@@ -374,15 +301,19 @@
                                 </div>
                             </div>
                             <div class="family-side-card-body" data-family-side-card-body>
-                                {% if famiglia.note %}
-                                    <div class="family-note-box family-note-rich">{{ famiglia.note|render_rich_notes }}</div>
+                                {% if famiglia_note_entries %}
+                                    <div class="family-note-list">
+                                        {% for item in famiglia_note_entries %}
+                                            <article class="family-note-box family-note-rich">
+                                                <strong>{{ item.owner_label }}</strong>
+                                                <small>{{ item.owner_type }}</small>
+                                                <div>{{ item.note|render_rich_notes }}</div>
+                                            </article>
+                                        {% endfor %}
+                                    </div>
                                 {% else %}
                                     <div class="family-note-box">Nessuna nota presente.</div>
                                 {% endif %}
-                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" id="family-note-edit-shortcut">
-                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                    Modifica note
-                                </button>
                             </div>
                         </section>
 
@@ -401,7 +332,7 @@
                             <div class="family-side-card-body" data-family-side-card-body>
                                 {% if famiglia_activity_entries %}
                                     <ol class="family-activity-list">
-                                        {% for activity in famiglia_activity_entries|slice:":3" %}
+                                        {% for activity in famiglia_activity_entries|slice:":5" %}
                                             <li class="family-activity-item {{ activity.azione_badge_class }}">
                                                 <span class="family-activity-dot" aria-hidden="true"></span>
                                                 <div>
@@ -446,25 +377,6 @@
                                         {{ form.cognome_famiglia }}
                                     </div>
                                     {{ form.cognome_famiglia.errors }}
-                                </div>
-
-                                <div class="family-general-editor-field family-general-editor-field-half family-general-editor-field-related family-general-editor-field-state">
-                                    <label for="{{ form.stato_relazione_famiglia.id_for_label }}">Stato relazione</label>
-                                    <div class="related-field-row mode-edit-field family-general-editor-related-control">
-                                        {{ form.stato_relazione_famiglia }}
-                                        <div class="related-actions">
-                                            <button type="button" class="related-btn related-btn-add" id="add-stato-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                            </button>
-                                            <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                            </button>
-                                            <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    {{ form.stato_relazione_famiglia.errors }}
                                 </div>
 
                                 <div class="family-general-editor-field family-general-editor-field-wide family-general-editor-field-related family-general-editor-field-address">
@@ -648,243 +560,9 @@
             </div>
         {% endif %}
         {% if famiglia %}
-        <div id="famiglia-lock-container" class="mode-lock-container" data-mode-lock-scope="main">
-
-        <!-- INIZIO SEZIONE DATI PRINCIPALI -->
-        <div class="family-top-layout main-fields-section">
-            <div class="family-main-column">
-                <div class="admin-section">
-                    <div class="admin-section-title admin-section-title-actionbar">
-                        <span class="admin-section-title-label">Dati principali</span>
-                        {% if famiglia %}
-                            <div class="admin-section-title-actions">
-                                <button type="button" class="admin-section-title-btn family-legacy-edit-btn">Modifica dati principali</button>
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="panel">
-                        <div class="panel-body">
-                            <table class="form-table">
-                                <tr>
-                                    <th>{{ form.cognome_famiglia.label_tag }}</th>
-                                    <td>
-                                        <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if famiglia and famiglia.cognome_famiglia %}
-                                                {{ famiglia.cognome_famiglia }}
-                                            {% else %}
-                                                <span class="table-muted">Nessun cognome famiglia impostato</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="mode-edit-field">
-                                            {{ form.cognome_famiglia }}
-                                        </div>
-                                        {{ form.cognome_famiglia.errors }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th>{{ form.stato_relazione_famiglia.label_tag }}</th>
-                                    <td>
-                                        <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if famiglia and famiglia.stato_relazione_famiglia %}
-                                                {{ famiglia.stato_relazione_famiglia }}
-                                            {% else %}
-                                                <span class="table-muted">Nessuno stato impostato</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="related-field-row mode-edit-field">
-                                            {{ form.stato_relazione_famiglia }}
-
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-stato-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-stato-btn">✎</button>
-                                                <button type="button" class="related-btn related-btn-delete" id="delete-stato-btn">✖</button>
-                                            </div>
-                                        </div>
-                                        {{ form.stato_relazione_famiglia.errors }}
-                                    </td>
-                                </tr>
-
-                                <tr>
-                                    <th>{{ form.indirizzo_principale.label_tag }}</th>
-                                    <td>
-                                        <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if famiglia and famiglia.indirizzo_principale %}
-                                                {{ famiglia.indirizzo_principale.label_full }}
-                                            {% else %}
-                                                <span class="table-muted">Nessun indirizzo impostato</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="related-field-row mode-edit-field">
-                                            {{ form.indirizzo_principale }}
-
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">✎</button>
-                                                <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">✖</button>
-                                            </div>
-                                        </div>
-                                        <div class="help-text mode-edit-field">
-                                            Questo indirizzo verrà usato come riferimento per familiari e {{ student_terminology.selected_plural_lower }} quando il loro indirizzo specifico è vuoto.
-                                        </div>
-                                        {{ form.indirizzo_principale.errors }}
-                                    </td>
-                                </tr>
-
-                                <tr class="family-attiva-row">
-                                    <th>{{ form.attiva.label_tag }}</th>
-                                    <td>
-                                        {{ form.attiva }}
-                                        {{ form.attiva.errors }}
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                <div class="admin-section compact family-notes-section" id="family-notes-section">
-                    <button type="button" class="admin-section-title collapsible-title" data-target="section-note" data-default-open="false">
-                        <span>Note</span>
-                    </button>
-                    <div class="panel collapsible-panel" id="section-note">
-                        <div class="panel-body family-notes-panel-body">
-                            {{ form.note }}
-                            {{ form.note.errors }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- FINE SEZIONE DATI PRINCIPALI -->
-
-            <!-- INIZIO SEZIONE LATERALE DESTRA -->
-            <div class="family-side-column">
-                {% if can_view_system_tables %}
-                    <!-- INIZIO SEZIONE LATERALE DATI SISTEMA -->
-                    <div class="admin-section compact">
-                        <div class="admin-section-title">Sistema</div>
-                        <div class="panel">
-                            <div class="panel-body">
-                                <table class="form-table compact-form-table">
-                                    <tr>
-                                        <th>Data creazione</th>
-                                        <td class="system-readonly-value">
-                                            {% if famiglia %}{{ famiglia.data_creazione }}{% else %}-{% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Creato da</th>
-                                        <td class="system-readonly-value">
-                                            {% if famiglia %}{{ famiglia_creata_da_label|default:"-" }}{% else %}-{% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Data aggiornamento</th>
-                                        <td class="system-readonly-value">
-                                            {% if famiglia %}{{ famiglia.data_aggiornamento }}{% else %}-{% endif %}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <th>Aggiornato da</th>
-                                        <td class="system-readonly-value">
-                                            {% if famiglia %}{{ famiglia_aggiornata_da_label|default:"-" }}{% else %}-{% endif %}
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- FINE SEZIONE LATERALE DATI SISTEMA -->
-                {% endif %}
-
-                <!-- INIZIO SEZIONE LATERALE DI RIEPILOGO -->
-                <div class="admin-section compact">
-                    <div class="admin-section-title">Riepilogo</div>
-                    <div class="panel">
-                        <div class="panel-body summary-panel-body">
-                            <div class="summary-grid">
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_familiari }}</div>
-                                    <div class="summary-label">Familiari</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_studenti }}</div>
-                                    <div class="summary-label">{{ student_terminology.selected_plural }}</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_documenti }}</div>
-                                    <div class="summary-label">Documenti</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_documenti_in_scadenza }}</div>
-                                    <div class="summary-label">In scadenza 30 gg</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_documenti_scaduti }}</div>
-                                    <div class="summary-label">Scaduti</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_documenti_familiari }}</div>
-                                    <div class="summary-label">Doc. familiari</div>
-                                </div>
-
-                                <div class="summary-item">
-                                    <div class="summary-value">{{ count_documenti_studenti }}</div>
-                                    <div class="summary-label">Doc. {{ student_terminology.selected_plural_lower }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- FINE SEZIONE LATERALE DI RIEPILOGO -->
-
-                <!-- INIZIO SEZIONE LATERALE CRONOLOGIA ATTIVITA -->
-                <div class="admin-section compact family-activity-section">
-                    <div class="admin-section-title">Cronologia attivit&agrave;</div>
-                    <div class="panel">
-                        <div class="panel-body activity-panel-body">
-                            {% if famiglia_activity_entries %}
-                                <ol class="activity-timeline">
-                                    {% for activity in famiglia_activity_entries %}
-                                        <li class="activity-timeline-item {{ activity.azione_badge_class }}">
-                                            <div class="activity-timeline-marker" aria-hidden="true"></div>
-                                            <div class="activity-timeline-content">
-                                                <div class="activity-timeline-title">{{ activity.descrizione }}</div>
-                                                <div class="activity-timeline-meta">
-                                                    {{ activity.data_operazione|date:"d/m/Y H:i" }}
-                                                    {% if activity.utente_display %}
-                                                        &middot; {{ activity.utente_display }}
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </li>
-                                    {% endfor %}
-                                </ol>
-                            {% else %}
-                                <div class="empty-state compact-empty-state">Nessuna attivit&agrave; registrata.</div>
-                            {% endif %}
-                            {% if can_view_operation_history %}
-                                <a href="{% url 'cronologia_operazioni_sistema' %}?q={{ famiglia.cognome_famiglia|urlencode }}" class="btn btn-secondary btn-sm activity-timeline-link">
-                                    Vedi tutta la cronologia
-                                </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <!-- FINE SEZIONE LATERALE CRONOLOGIA ATTIVITA -->
-
-            </div>
-            <!-- FINE SEZIONE LATERALE DESTRA -->
-        </div>
-        <!-- FINE SEZIONE DATI PRINCIPALI -->
-
-        </div>
+            <div id="famiglia-lock-container" class="mode-lock-container family-derived-lock-container" data-mode-lock-scope="main" hidden></div>
         {% endif %}
-        
+
 
         <!-- INIZIO CODICE GENERICO DEGLI INLINE-->
 
@@ -1098,8 +776,8 @@
                                                 {{ f.relazione_familiare }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
                                                 </div>
                                             </div>
                                         </td>
@@ -1117,8 +795,8 @@
                                                 </div>
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
                                                 </div>
                                             </div>
 
@@ -1126,9 +804,9 @@
                                                 {% if f.instance.pk and f.instance.indirizzo %}
                                                     Indirizzo specifico
                                                 {% elif famiglia and famiglia.indirizzo_principale %}
-                                                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                                    ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
                                                 {% else %}
-                                                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                                    Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -1291,8 +969,8 @@
                                                         {{ f.relazione_familiare }}
                                                         <div class="related-actions inline-related-actions">
                                                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
-                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
                                                         </div>
                                                     </div>
                                                     {{ f.relazione_familiare.errors }}
@@ -1305,15 +983,15 @@
                                                         </div>
                                                         <div class="related-actions inline-related-actions">
                                                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
                                                         </div>
                                                     </div>
                                                     <div class="inline-address-help" data-role="address-help">
                                                         {% if famiglia and famiglia.indirizzo_principale %}
-                                                            Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                                            ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
                                                         {% else %}
-                                                            Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                                            Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
                                                         {% endif %}
                                                     </div>
                                                     {{ f.indirizzo.errors }}
@@ -1635,10 +1313,6 @@
                             {% if not count_documenti %}
                                 <div class="family-card-empty">Ancora nessun documento caricato.</div>
                             {% endif %}
-                            <button type="button" class="family-dashed-add" data-document-card-action="add">
-                                <span aria-hidden="true">+</span>
-                                Aggiungi documento
-                            </button>
                         </div>
                         <table class="inline-table" id="documenti-table">
                             <thead>
@@ -1669,8 +1343,8 @@
                                                 {{ f.tipo_documento }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">✎</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">✖</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">âœŽ</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">âœ–</button>
                                                 </div>
                                             </div>
                                         </td>
@@ -1786,15 +1460,15 @@
                                                 <tr>
                                                     <td>{{ doc.familiare }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
-                                                    <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{{ doc.descrizione|default:"â€”" }}</td>
                                                     <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
-                                                    <td>{{ doc.scadenza|default:"—" }}</td>
-                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
+                                                    <td>{{ doc.scadenza|default:"â€”" }}</td>
+                                                    <td>{% if doc.visibile %}SÃ¬{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
                                                             <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
-                                                            <span class="table-muted">—</span>
+                                                            <span class="table-muted">â€”</span>
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -1829,15 +1503,15 @@
                                                 <tr>
                                                     <td>{{ doc.studente }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
-                                                    <td>{{ doc.descrizione|default:"—" }}</td>
+                                                    <td>{{ doc.descrizione|default:"â€”" }}</td>
                                                     <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
-                                                    <td>{{ doc.scadenza|default:"—" }}</td>
-                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
+                                                    <td>{{ doc.scadenza|default:"â€”" }}</td>
+                                                    <td>{% if doc.visibile %}SÃ¬{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
                                                             <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
-                                                            <span class="table-muted">—</span>
+                                                            <span class="table-muted">â€”</span>
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -1908,6 +1582,7 @@
         <!-- FINE PULSANTI DI AZIONE DEL FORM -->
     </form>
 
+    {% if not famiglia %}
     {% if famiglia %}
         <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="family-note-dialog-overlay" aria-hidden="true">
             <form method="post" class="app-dialog family-note-dialog" id="family-note-popup-form" role="dialog" aria-modal="true" aria-labelledby="family-note-dialog-title">
@@ -1931,6 +1606,7 @@
             </form>
         </div>
     {% endif %}
+    {% endif %}
 
     <!-- TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
     <template id="familiari-empty-form-template">
@@ -1952,8 +1628,8 @@
                             {{ familiari_formset.empty_form.relazione_familiare }}
                             <div class="related-actions inline-related-actions">
                                 <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
-                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
                             </div>
                         </div>
                     </div>
@@ -1965,15 +1641,15 @@
                             </div>
                             <div class="related-actions inline-related-actions">
                                 <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
-                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
                             </div>
                         </div>
                         <div class="inline-address-help" data-role="address-help">
                             {% if famiglia and famiglia.indirizzo_principale %}
-                                Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                                ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
                             {% else %}
-                                Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                                Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
                             {% endif %}
                         </div>
                     </div>
@@ -2063,8 +1739,8 @@
                     {{ documenti_formset.empty_form.tipo_documento }}
                     <div class="related-actions inline-related-actions">
                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">✎</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">✖</button>
+                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">âœŽ</button>
+                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">âœ–</button>
                     </div>
                 </div>
             </td>
@@ -2094,13 +1770,13 @@
             </header>
 
             <section class="print-sheet-section">
-                <h2 class="print-sheet-section-title">Dati principali</h2>
+                <h2 class="print-sheet-section-title">Dati derivati</h2>
                 <div class="print-sheet-grid">
                     <div class="print-sheet-item">
-                        <div class="print-sheet-label">Stato relazione famiglia</div>
+                        <div class="print-sheet-label">Nome famiglia</div>
                         <div class="print-sheet-value">
-                            {% if famiglia.stato_relazione_famiglia %}
-                                {{ famiglia.stato_relazione_famiglia }}
+                            {% if famiglia.cognome_famiglia %}
+                                Famiglia {{ famiglia.cognome_famiglia }}
                             {% else %}
                                 <span class="table-muted">Non indicato</span>
                             {% endif %}
@@ -2119,10 +1795,15 @@
                 </div>
             </section>
 
-            {% if famiglia.note %}
+            {% if famiglia_note_entries %}
                 <section class="print-sheet-section">
                     <h2 class="print-sheet-section-title">Note</h2>
-                    <div class="print-sheet-notes">{{ famiglia.note|render_rich_notes }}</div>
+                    {% for note_entry in famiglia_note_entries %}
+                        <div class="print-sheet-notes">
+                            <strong>{{ note_entry.owner_label }}</strong><br>
+                            {{ note_entry.note|render_rich_notes }}
+                        </div>
+                    {% endfor %}
                 </section>
             {% endif %}
 
@@ -2210,7 +1891,7 @@
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const famigliaId = "{{ famiglia.pk|default:'new' }}";
+        const famigliaId = "{{ famiglia.logical_key|default:'new' }}";
         const printButton = document.getElementById("print-famiglia-btn");
         const stickyCancelButton = document.getElementById("sticky-cancel-edit-famiglia-btn");
 
@@ -2286,7 +1967,6 @@
                 defaultInlineTab: "studenti",
                 preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
                 urls: {
-                    creaStatoRelazioneFamiglia: "{% url 'crea_stato_relazione_famiglia' %}",
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
                     creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
                     creaTipoDocumento: "{% url 'crea_tipo_documento' %}"
@@ -2328,3 +2008,5 @@
     });
     </script>
 {% endblock %}
+
+

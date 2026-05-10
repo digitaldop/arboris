@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <div>
+            <h1 class="page-title">{{ titolo }}</h1>
+            <p class="page-subtitle">{{ descrizione }}</p>
+        </div>
+        <div class="page-head-actions">
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'home' %}">Indietro</button>
+        </div>
+    </div>
+
+    <div class="content-card form-card">
+        <form method="post" class="stacked-form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-save-soft">Salva</button>
+                <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'home' %}">Annulla</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

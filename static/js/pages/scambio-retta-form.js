@@ -1,15 +1,13 @@
 window.ArborisScambioRettaForm = (function () {
     function init() {
         const familiareSelect = document.getElementById("id_familiare");
-        const famigliaSelect = document.getElementById("id_famiglia");
-        const famigliaDisplay = document.getElementById("scambio-retta-famiglia-display");
         const studenteSelect = document.getElementById("id_studente");
         const oreInput = document.getElementById("id_ore_lavorate");
         const tariffaSelect = document.getElementById("id_tariffa_scambio_retta");
         const importoPreview = document.getElementById("scambio-retta-importo-preview");
         const form = document.getElementById("scambio-detail-form");
 
-        if (!familiareSelect || !famigliaSelect || !famigliaDisplay || !studenteSelect || !oreInput || !tariffaSelect || !importoPreview) {
+        if (!familiareSelect || !studenteSelect || !oreInput || !tariffaSelect || !importoPreview) {
             return;
         }
 
@@ -45,22 +43,21 @@ window.ArborisScambioRettaForm = (function () {
             select.dispatchEvent(new Event("change", { bubbles: true }));
         }
 
-        function syncFamilyFromFamiliare() {
-            const selectedOption = getSelectedOption(familiareSelect);
-            const famigliaId = selectedOption ? selectedOption.dataset.famigliaId || "" : "";
-            const famigliaLabel = selectedOption ? selectedOption.dataset.famigliaLabel || "" : "";
-
-            if (famigliaSelect.value !== famigliaId) {
-                famigliaSelect.value = famigliaId;
-                notifySelectChanged(famigliaSelect);
+        function csvIncludes(csvValue, needle) {
+            if (!csvValue || !needle) {
+                return false;
             }
-
-            famigliaDisplay.value = famigliaLabel;
+            return String(csvValue)
+                .split(",")
+                .map(value => value.trim())
+                .filter(Boolean)
+                .includes(String(needle));
         }
 
-        function filterStudentiByFamiglia() {
-            const famigliaId = famigliaSelect.value;
-            const hasFamily = Boolean(famigliaId);
+        function filterStudentiByFamiliare() {
+            const selectedFamiliareOption = getSelectedOption(familiareSelect);
+            const selectedStudentIds = selectedFamiliareOption ? selectedFamiliareOption.dataset.studenteIds || "" : "";
+            const hasDirectStudents = Boolean(selectedStudentIds);
             let hasSelectedVisibleOption = false;
 
             Array.from(studenteSelect.options).forEach(option => {
@@ -70,7 +67,7 @@ window.ArborisScambioRettaForm = (function () {
                     return;
                 }
 
-                const isVisible = hasFamily && option.dataset.famigliaId === famigliaId;
+                const isVisible = hasDirectStudents && csvIncludes(selectedStudentIds, option.value);
                 option.hidden = !isVisible;
                 option.disabled = !isVisible;
 
@@ -83,7 +80,7 @@ window.ArborisScambioRettaForm = (function () {
                 studenteSelect.value = "";
             }
 
-            studenteSelect.disabled = !hasFamily || isViewModeLocked();
+            studenteSelect.disabled = !hasDirectStudents || isViewModeLocked();
             notifySelectChanged(studenteSelect);
         }
 
@@ -98,17 +95,12 @@ window.ArborisScambioRettaForm = (function () {
         }
 
         familiareSelect.addEventListener("change", function () {
-            syncFamilyFromFamiliare();
-            filterStudentiByFamiglia();
-        });
-
-        famigliaSelect.addEventListener("change", function () {
-            filterStudentiByFamiglia();
+            filterStudentiByFamiliare();
         });
         oreInput.addEventListener("input", refreshImportoPreview);
         tariffaSelect.addEventListener("change", refreshImportoPreview);
         if (form) {
-            form.addEventListener("arboris:view-mode-change", filterStudentiByFamiglia);
+            form.addEventListener("arboris:view-mode-change", filterStudentiByFamiliare);
         }
 
         if (
@@ -124,8 +116,7 @@ window.ArborisScambioRettaForm = (function () {
             });
         }
 
-        syncFamilyFromFamiliare();
-        filterStudentiByFamiglia();
+        filterStudentiByFamiliare();
         refreshImportoPreview();
     }
 

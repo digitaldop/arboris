@@ -28,12 +28,6 @@ ACTIVE_TOGGLE_REGISTRY = {
     "anagrafica.citta": ActiveToggleConfig("anagrafica.Citta", "attiva", "anagrafica"),
     "anagrafica.nazione": ActiveToggleConfig("anagrafica.Nazione", "attiva", "anagrafica"),
     "anagrafica.cap": ActiveToggleConfig("anagrafica.CAP", "attivo", "anagrafica"),
-    "anagrafica.statorelazionefamiglia": ActiveToggleConfig(
-        "anagrafica.StatoRelazioneFamiglia",
-        "attivo",
-        "anagrafica",
-    ),
-    "anagrafica.famiglia": ActiveToggleConfig("anagrafica.Famiglia", "attiva", "anagrafica"),
     "anagrafica.familiare": ActiveToggleConfig("anagrafica.Familiare", "attivo", "anagrafica"),
     "anagrafica.studente": ActiveToggleConfig("anagrafica.Studente", "attivo", "anagrafica"),
     "anagrafica.tipodocumento": ActiveToggleConfig("anagrafica.TipoDocumento", "attivo", "anagrafica"),

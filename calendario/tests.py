@@ -121,7 +121,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
 
         response = self.client.get(reverse("calendario_agenda"))
 
-        owner_url = reverse("modifica_famiglia", kwargs={"pk": famiglia.pk})
+        owner_url = reverse("modifica_famiglia_logica", kwargs={"key": f"legacy-{famiglia.pk}"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vai alla scheda")
         self.assertContains(response, f'href="{owner_url}?next=')

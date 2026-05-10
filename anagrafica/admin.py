@@ -5,59 +5,22 @@ from .models import (
     Citta,
     Nazione,
     CAP,
-    StatoRelazioneFamiglia,
     RelazioneFamiliare,
     TipoDocumento,
-    Famiglia,
     Familiare,
     Studente,
+    StudenteFamiliare,
     Indirizzo,
+    LabelIndirizzo,
+    LabelTelefono,
+    LabelEmail,
+    AnagraficaIndirizzo,
+    AnagraficaTelefono,
+    AnagraficaEmail,
     Documento,
 )
 
 ################### INIZIO DEFINIZIONE DEGLI INLINE ###################
-
-'''class IndirizzoFamigliaInline(admin.TabularInline):
-    model = Indirizzo
-    fk_name = "famiglia"
-    extra = 0
-    fields = ("indirizzo", "cap", "citta", "provincia", "nazione", "note")'''
-
-
-class DocumentoFamigliaInline(admin.TabularInline):
-    model = Documento
-    fk_name = "famiglia"
-    extra = 0
-    fields = ("tipo_documento", "descrizione", "file", "scadenza", "visibile", "note")
-
-
-class FamiliareInline(admin.TabularInline):
-    model = Familiare
-    extra = 0
-    fields = (
-        "cognome",
-        "nome",
-        "relazione_familiare",
-        "telefono",
-        "email",
-        "convivente",
-        "referente_principale",
-        "abilitato_scambio_retta",
-        "attivo",
-    )
-
-
-class StudenteInline(admin.TabularInline):
-    model = Studente
-    extra = 0
-    fields = (
-        "cognome",
-        "nome",
-        "data_nascita",
-        "codice_fiscale",
-        "attivo",
-    )
-
 
 '''class IndirizzoFamiliareInline(admin.TabularInline):
     model = Indirizzo
@@ -85,6 +48,20 @@ class DocumentoStudenteInline(admin.TabularInline):
     fk_name = "studente"
     extra = 0
     fields = ("tipo_documento", "descrizione", "file", "scadenza", "visibile", "note")
+
+
+class StudenteFamiliareInline(admin.TabularInline):
+    model = StudenteFamiliare
+    extra = 0
+    autocomplete_fields = ("familiare", "relazione_familiare")
+    fields = ("familiare", "relazione_familiare", "referente_principale", "convivente", "attivo")
+
+
+class FamiliareStudenteInline(admin.TabularInline):
+    model = StudenteFamiliare
+    extra = 0
+    autocomplete_fields = ("studente", "relazione_familiare")
+    fields = ("studente", "relazione_familiare", "referente_principale", "convivente", "attivo")
 
 
 ################### FINE DEFINIZIONE DEGLI INLINE ###################
@@ -138,72 +115,58 @@ class IndirizzoAdmin(admin.ModelAdmin):
     search_fields = ("via", "numero_civico", "cap", "citta__nome")
     ordering = ("via", "numero_civico")
 
+
+@admin.register(LabelIndirizzo)
+class LabelIndirizzoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ordine", "attiva")
+    list_editable = ("ordine", "attiva")
+    search_fields = ("nome",)
+    ordering = ("ordine", "nome")
+
+
+@admin.register(LabelTelefono)
+class LabelTelefonoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ordine", "attiva")
+    list_editable = ("ordine", "attiva")
+    search_fields = ("nome",)
+    ordering = ("ordine", "nome")
+
+
+@admin.register(LabelEmail)
+class LabelEmailAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ordine", "attiva")
+    list_editable = ("ordine", "attiva")
+    search_fields = ("nome",)
+    ordering = ("ordine", "nome")
+
+
+@admin.register(AnagraficaIndirizzo)
+class AnagraficaIndirizzoAdmin(admin.ModelAdmin):
+    list_display = ("content_object", "label", "indirizzo", "principale", "ordine")
+    list_filter = ("label", "principale", "content_type")
+    search_fields = ("indirizzo__via", "indirizzo__numero_civico", "indirizzo__citta__nome")
+    autocomplete_fields = ("indirizzo", "label")
+    ordering = ("content_type", "object_id", "ordine")
+
+
+@admin.register(AnagraficaTelefono)
+class AnagraficaTelefonoAdmin(admin.ModelAdmin):
+    list_display = ("content_object", "label", "numero", "principale", "ordine")
+    list_filter = ("label", "principale", "content_type")
+    search_fields = ("numero",)
+    autocomplete_fields = ("label",)
+    ordering = ("content_type", "object_id", "ordine")
+
+
+@admin.register(AnagraficaEmail)
+class AnagraficaEmailAdmin(admin.ModelAdmin):
+    list_display = ("content_object", "label", "email", "principale", "ordine")
+    list_filter = ("label", "principale", "content_type")
+    search_fields = ("email",)
+    autocomplete_fields = ("label",)
+    ordering = ("content_type", "object_id", "ordine")
+
 #FINE ADMIN DEGLI INDIRIZZI
-
-
-#INIZIO ADMIN DELLE FAMIGLIE
-
-@admin.register(Famiglia)
-class FamigliaAdmin(admin.ModelAdmin):
-    list_display = (
-        "cognome_famiglia",
-        "stato_relazione_famiglia",
-        "indirizzo_principale",
-        "attiva",
-        "data_creazione",
-    )
-    list_filter = ("stato_relazione_famiglia", "attiva")
-    search_fields = ("cognome_famiglia", "note")
-    ordering = ("cognome_famiglia",)
-    inlines = [
-        FamiliareInline,
-        StudenteInline,
-        DocumentoFamigliaInline,
-    ]
-
-    fieldsets = (
-        (
-            "Dati principali",
-            {
-                "fields": (
-                    "cognome_famiglia",
-                    "stato_relazione_famiglia",
-                    "indirizzo_principale",
-                    "attiva",
-                )
-            },
-        ),
-        (
-            "Sistema",
-            {
-                "fields": (
-                    "data_creazione",
-                    "data_aggiornamento",
-                )
-            },
-        ),
-        (
-            "Note",
-            {
-                "fields": ("note",),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    readonly_fields = ("data_creazione", "data_aggiornamento")
-
-    autocomplete_fields = ("indirizzo_principale",)
-
-
-@admin.register(StatoRelazioneFamiglia)
-class StatoRelazioneFamigliaAdmin(admin.ModelAdmin):
-    list_display = ("stato", "ordine", "attivo")
-    list_editable = ("ordine", "attivo")
-    search_fields = ("stato",)
-    ordering = ("ordine", "stato")
-
-#FINE ADMIN DELLE FAMIGLIE
 
 
 @admin.register(Familiare)
@@ -211,7 +174,6 @@ class FamiliareAdmin(admin.ModelAdmin):
     list_display = (
         "cognome",
         "nome",
-        "famiglia",
         "relazione_familiare",
         "telefono",
         "email",
@@ -236,17 +198,15 @@ class FamiliareAdmin(admin.ModelAdmin):
         "luogo_nascita__nome",
         "nazione_nascita__nome",
         "luogo_nascita_custom",
-        "famiglia__cognome_famiglia",
     )
     ordering = ("cognome", "nome")
-    inlines = [DocumentoFamiliareInline]
+    inlines = [FamiliareStudenteInline, DocumentoFamiliareInline]
 
     fieldsets = (
         (
             "Dati principali",
             {
                 "fields": (
-                    "famiglia",
                     "relazione_familiare",
                     "cognome",
                     "nome",
@@ -303,7 +263,7 @@ class FamiliareAdmin(admin.ModelAdmin):
         indirizzo = obj.indirizzo_effettivo
         return str(indirizzo) if indirizzo else "-"
     
-    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
+    autocomplete_fields = ("indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
 
 
 @admin.register(Studente)
@@ -311,7 +271,6 @@ class StudenteAdmin(admin.ModelAdmin):
     list_display = (
         "cognome",
         "nome",
-        "famiglia",
         "indirizzo",
         "data_nascita",
         "attivo",
@@ -324,17 +283,15 @@ class StudenteAdmin(admin.ModelAdmin):
         "luogo_nascita__nome",
         "nazione_nascita__nome",
         "luogo_nascita_custom",
-        "famiglia__cognome_famiglia",
     )
     ordering = ("cognome", "nome")
-    inlines = [DocumentoStudenteInline]
+    inlines = [StudenteFamiliareInline, DocumentoStudenteInline]
 
     fieldsets = (
         (
             "Dati principali",
             {
                 "fields": (
-                    "famiglia",
                     "cognome",
                     "nome",
                     "indirizzo",
@@ -371,7 +328,21 @@ class StudenteAdmin(admin.ModelAdmin):
         indirizzo = obj.indirizzo_effettivo
         return str(indirizzo) if indirizzo else "-"
     
-    autocomplete_fields = ("famiglia", "indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
+    autocomplete_fields = ("indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
+
+
+@admin.register(StudenteFamiliare)
+class StudenteFamiliareAdmin(admin.ModelAdmin):
+    list_display = ("studente", "familiare", "relazione_familiare", "referente_principale", "convivente", "attivo")
+    list_filter = ("relazione_familiare", "referente_principale", "convivente", "attivo")
+    search_fields = (
+        "studente__cognome",
+        "studente__nome",
+        "familiare__cognome",
+        "familiare__nome",
+    )
+    autocomplete_fields = ("studente", "familiare", "relazione_familiare")
+    ordering = ("studente__cognome", "studente__nome", "familiare__cognome", "familiare__nome")
 
 #Visualizzazione del modulo indirizzo dalla Home dell'Admin
 '''@admin.register(Indirizzo)

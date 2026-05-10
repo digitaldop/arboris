@@ -36,8 +36,8 @@
             </div>
             <div class="family-page-address">
                 <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                {% if familiare and familiare.famiglia %}
-                    Famiglia {{ familiare.famiglia.cognome_famiglia }}
+                {% if familiare_famiglia_logica.url %}
+                    {{ familiare_famiglia_logica.label }}
                 {% elif familiare %}
                     Nessuna famiglia collegata
                 {% else %}
@@ -51,13 +51,13 @@
                 <span class="btn-label">Indietro</span>
             </button>
             {% if familiare %}
-                {% if studenti_formset %}
+                {% if studenti_formset and not usa_studenti_diretti and not studenti_diretti_form %}
                     <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-student-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">{{ student_terminology.selected_singular }}</span>
                     </button>
                 {% endif %}
-                {% if parenti_formset %}
+                {% if parenti_formset and not usa_parenti_diretti %}
                     <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-relative-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">Familiare</span>
@@ -126,13 +126,30 @@
                                         <div>
                                             <div class="family-detail-label">Famiglia</div>
                                             <div class="family-detail-value relative-overview-value">
-                                                {% if familiare.famiglia %}
-                                                    <a href="{% url 'modifica_famiglia' familiare.famiglia.pk %}">Famiglia {{ familiare.famiglia.cognome_famiglia }}</a>
-                                                    {% with referenti=familiare.famiglia.referenti_label %}
+                                                {% if familiare_famiglia_logica.url %}
+                                                    <a href="{{ familiare_famiglia_logica.url }}">{{ familiare_famiglia_logica.label }}</a>
+                                                    {% with referenti=familiare_famiglia_logica.referenti %}
                                                         {% if referenti %}<span class="family-muted-value">{{ referenti }}</span>{% endif %}
                                                     {% endwith %}
                                                 {% else %}
                                                     <span class="family-muted-value">Non collegata</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="family-overview-detail">
+                                        <span class="family-detail-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                                        <div>
+                                            <div class="family-detail-label">Figli e figlie collegati</div>
+                                            <div class="family-detail-value relative-overview-value">
+                                                {% if studenti_collegati_diretti %}
+                                                    {% for relazione in studenti_collegati_diretti %}
+                                                        <a href="{% url 'modifica_studente' relazione.studente.pk %}">
+                                                            {{ relazione.studente.nome }} {{ relazione.studente.cognome }}
+                                                        </a>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="family-muted-value">Nessuno studente collegato direttamente</span>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -225,8 +242,10 @@
                                                 {% if familiare.referente_principale %}<span class="family-status-pill is-muted">Referente</span>{% endif %}
                                                 {% if familiare.convivente %}<span class="family-status-pill is-muted">Convivente</span>{% endif %}
                                                 {% if familiare.abilitato_scambio_retta %}<span class="family-status-pill is-muted">Scambio retta</span>{% endif %}
+                                                {% if profilo_lavorativo and profilo_lavorativo.is_dipendente_operativo %}<span class="family-status-pill is-muted">Dipendente</span>{% endif %}
+                                                {% if profilo_lavorativo and profilo_lavorativo.is_educatore %}<span class="family-status-pill is-muted">{{ educator_terminology.selected_singular }}</span>{% endif %}
                                                 {% if not familiare.attivo %}<span class="family-status-pill is-danger">Non attivo</span>{% endif %}
-                                                {% if not familiare.referente_principale and not familiare.convivente and not familiare.abilitato_scambio_retta and familiare.attivo %}
+                                                {% if not familiare.referente_principale and not familiare.convivente and not familiare.abilitato_scambio_retta and not profilo_lavorativo and familiare.attivo %}
                                                     <span class="family-muted-value">Nessun ruolo aggiuntivo</span>
                                                 {% endif %}
                                             </div>
@@ -237,12 +256,12 @@
                         </section>
 
                         <div class="family-stat-grid relative-stat-grid">
-                            {% if studenti_formset and studenti_famiglia %}
+                            {% if studenti_formset or usa_studenti_diretti or studenti_diretti_form %}
                                 <a href="#tab-studenti" class="family-stat-card">
                                     <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
                                     <span class="family-stat-content">
                                         <span class="family-stat-value">{{ count_studenti }}</span>
-                                        <span class="family-stat-label">{{ student_terminology.selected_plural }}</span>
+                                        <span class="family-stat-label">Figli e figlie</span>
                                         <span class="family-stat-link">Vedi dettagli</span>
                                     </span>
                                 </a>
@@ -289,6 +308,16 @@
                                     <span class="family-stat-link">Vedi dettagli</span>
                                 </span>
                             </a>
+                            {% if profilo_lavorativo %}
+                                <a href="#profilo-lavorativo-card" class="family-stat-card">
+                                    <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                    <span class="family-stat-content">
+                                        <span class="family-stat-value">{% if profilo_lavorativo.is_educatore and profilo_lavorativo.is_dipendente_operativo %}2{% else %}1{% endif %}</span>
+                                        <span class="family-stat-label">Profilo lavorativo</span>
+                                        <span class="family-stat-link">{{ profilo_contratti|length }} contratti, {{ profilo_buste_paga|length }} buste</span>
+                                    </span>
+                                </a>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -337,6 +366,102 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </section>
+                        {% endif %}
+
+                        {% if profilo_lavorativo %}
+                            <section id="profilo-lavorativo-card" class="family-side-card" data-family-side-card data-family-side-card-key="work-profile">
+                                <div class="family-side-card-head">
+                                    <h2>Profilo lavorativo</h2>
+                                    <div class="family-side-card-tools">
+                                        <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Profilo lavorativo" title="Trascina per riordinare">
+                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Profilo lavorativo" title="Comprimi card">
+                                            <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="family-side-card-body" data-family-side-card-body>
+                                    <div class="family-system-list">
+                                        <div class="family-system-item">
+                                            <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                            <div>
+                                                <div>Ruolo</div>
+                                                <strong>
+                                                    {% if profilo_lavorativo.is_educatore and profilo_lavorativo.is_dipendente_operativo %}
+                                                        {{ educator_terminology.selected_singular }} e dipendente
+                                                    {% elif profilo_lavorativo.is_educatore %}
+                                                        {{ educator_terminology.selected_singular }}
+                                                    {% else %}
+                                                        Dipendente
+                                                    {% endif %}
+                                                </strong>
+                                            </div>
+                                        </div>
+                                        {% if profilo_lavorativo.classe_principale_label %}
+                                            <div class="family-system-item">
+                                                <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                                <div>
+                                                    <div>Classe principale</div>
+                                                    <strong>{{ profilo_lavorativo.classe_principale_label }}</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                        {% if profilo_lavorativo.contratto_corrente %}
+                                            <div class="family-system-item">
+                                                <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                                <div>
+                                                    <div>Contratto corrente</div>
+                                                    <strong>{{ profilo_lavorativo.contratto_corrente.label_select }}</strong>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="family-card-inline-list">
+                                        {% if profilo_buste_paga %}
+                                            <h3>Buste paga recenti</h3>
+                                            {% for busta in profilo_buste_paga %}
+                                                <div class="family-card-inline-row">
+                                                    <span>{{ busta.periodo_label }}</span>
+                                                    <strong>{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto }} {{ busta.valuta }}</strong>
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if profilo_documenti %}
+                                            <h3>Documenti</h3>
+                                            {% for documento in profilo_documenti %}
+                                                <div class="family-card-inline-row">
+                                                    <span>{{ documento.titolo }}</span>
+                                                    <strong>{% if documento.data_documento %}{{ documento.data_documento|date:"d/m/Y" }}{% else %}-{% endif %}</strong>
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if profilo_lavorativo.is_educatore %}
+                                            <h3>{{ student_terminology.selected_plural }} classe</h3>
+                                            {% if profilo_studenti_classe %}
+                                                {% for studente in profilo_studenti_classe %}
+                                                    <div class="family-card-inline-row">
+                                                        <span>{{ studente.cognome }} {{ studente.nome }}</span>
+                                                    </div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="empty-state compact-empty-state">Nessun {{ student_terminology.selected_singular_lower }} collegato alla classe principale.</div>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                    {% if profilo_lavorativo.is_educatore %}
+                                        <a href="{% url 'modifica_educatore' profilo_lavorativo.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Apri profilo</span>
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'modifica_dipendente' profilo_lavorativo.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Apri profilo</span>
+                                        </a>
+                                    {% endif %}
                                 </div>
                             </section>
                         {% endif %}
@@ -420,23 +545,16 @@
                                 </div>
 
                                 <div class="family-student-editor-grid">
-                                    <div class="family-student-editor-field family-student-editor-field-wide relative-main-family-field">
-                                        <label for="{{ form.famiglia.id_for_label }}">Famiglia</label>
-                                        <div class="related-field-row mode-edit-field family-card-editor-related-control">
-                                            <div class="autocomplete-wrapper famiglia-autocomplete">
-                                                {{ form.famiglia }}
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-famiglia-btn" aria-label="Nuova famiglia" title="Nuova famiglia" data-floating-text="Nuova famiglia">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                                </button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-famiglia-btn" aria-label="Modifica famiglia" title="Modifica famiglia" data-floating-text="Modifica famiglia">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        {{ form.famiglia.errors }}
+                                    {% if form.studenti_collegati %}
+                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                        <label for="{{ form.studenti_collegati.id_for_label }}">Figli e figlie collegati</label>
+                                        {{ form.studenti_collegati }}
+                                        {% if form.studenti_collegati.help_text %}
+                                            <div class="field-help">{{ form.studenti_collegati.help_text }}</div>
+                                        {% endif %}
+                                        {{ form.studenti_collegati.errors }}
                                     </div>
+                                    {% endif %}
 
                                     <div class="family-student-editor-field family-student-editor-field-half">
                                         <label for="{{ form.cognome.id_for_label }}">Cognome</label>
@@ -539,30 +657,90 @@
                                     </div>
 
                                     <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check">
-                                            {{ form.convivente }}
-                                            <span>Convivente</span>
+                                        <label class="family-student-editor-check family-editor-switch" for="{{ form.convivente.id_for_label }}">
+                                            <span class="family-editor-switch-copy">
+                                                <strong>Convivente</strong>
+                                            </span>
+                                            <span class="fondo-plan-switch-control">
+                                                {{ form.convivente }}
+                                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                            </span>
                                         </label>
                                         {{ form.convivente.errors }}
                                     </div>
                                     <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check">
-                                            {{ form.referente_principale }}
-                                            <span>Referente principale</span>
+                                        <label class="family-student-editor-check family-editor-switch" for="{{ form.referente_principale.id_for_label }}">
+                                            <span class="family-editor-switch-copy">
+                                                <strong>Referente principale</strong>
+                                            </span>
+                                            <span class="fondo-plan-switch-control">
+                                                {{ form.referente_principale }}
+                                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                            </span>
                                         </label>
                                         {{ form.referente_principale.errors }}
                                     </div>
                                     <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check">
-                                            {{ form.abilitato_scambio_retta }}
-                                            <span>Scambio retta</span>
+                                        <label class="family-student-editor-check family-editor-switch" for="{{ form.abilitato_scambio_retta.id_for_label }}">
+                                            <span class="family-editor-switch-copy">
+                                                <strong>Scambio retta</strong>
+                                            </span>
+                                            <span class="fondo-plan-switch-control">
+                                                {{ form.abilitato_scambio_retta }}
+                                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                            </span>
                                         </label>
                                         {{ form.abilitato_scambio_retta.errors }}
                                     </div>
+                                    {% if form.profilo_dipendente_attivo %}
+                                        <div class="family-student-editor-field family-student-editor-field-check">
+                                            <label class="family-student-editor-check family-editor-switch" for="{{ form.profilo_dipendente_attivo.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>{{ form.profilo_dipendente_attivo.label }}</strong>
+                                                    <small>{{ form.profilo_dipendente_attivo.help_text }}</small>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.profilo_dipendente_attivo }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                            {{ form.profilo_dipendente_attivo.errors }}
+                                        </div>
+                                    {% endif %}
+                                    {% if form.profilo_educatore_attivo %}
+                                        <div class="family-student-editor-field family-student-editor-field-check">
+                                            <label class="family-student-editor-check family-editor-switch" for="{{ form.profilo_educatore_attivo.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>{{ form.profilo_educatore_attivo.label }}</strong>
+                                                    <small>{{ form.profilo_educatore_attivo.help_text }}</small>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.profilo_educatore_attivo }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                            {{ form.profilo_educatore_attivo.errors }}
+                                        </div>
+                                    {% endif %}
+                                    {% if form.classe_principale_educatore %}
+                                        <div class="family-student-editor-field family-student-editor-field-wide family-work-class-field">
+                                            <label for="{{ form.classe_principale_educatore.id_for_label }}">{{ form.classe_principale_educatore.label }}</label>
+                                            <div class="autocomplete-wrapper">
+                                                {{ form.classe_principale_educatore }}
+                                            </div>
+                                            <div class="inline-address-help">{{ form.classe_principale_educatore.help_text }}</div>
+                                            {{ form.classe_principale_educatore.errors }}
+                                        </div>
+                                    {% endif %}
                                     <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check">
-                                            {{ form.attivo }}
-                                            <span>Familiare attivo</span>
+                                        <label class="family-student-editor-check family-editor-switch" for="{{ form.attivo.id_for_label }}">
+                                            <span class="family-editor-switch-copy">
+                                                <strong>Familiare attivo</strong>
+                                            </span>
+                                            <span class="fondo-plan-switch-control">
+                                                {{ form.attivo }}
+                                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                            </span>
                                         </label>
                                         {{ form.attivo.errors }}
                                     </div>
@@ -580,6 +758,7 @@
                                 </div>
                             </div>
                         </section>
+                        {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
                     </div>
 
                     <div class="family-stat-grid family-create-stat-grid relative-stat-grid relative-create-stat-grid is-hidden" aria-hidden="true">
@@ -715,13 +894,13 @@
                     <div class="panel">
                         <div class="panel-body">
                             <table class="form-table">
-                                <tr{% if familiare and familiare.famiglia %} class="list-row-link" data-row-href="{% url 'modifica_famiglia' familiare.famiglia.pk %}"{% endif %}>
-                                    <th>{{ form.famiglia.label_tag }}</th>
+                                <tr{% if familiare_famiglia_logica.url %} class="list-row-link" data-row-href="{{ familiare_famiglia_logica.url }}"{% endif %}>
+                                    <th>Famiglia logica</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if familiare and familiare.famiglia %}
-                                                <div class="table-main-text">{{ familiare.famiglia.cognome_famiglia }}</div>
-                                                {% with referenti=familiare.famiglia.referenti_label %}
+                                            {% if familiare_famiglia_logica.url %}
+                                                <div class="table-main-text">{{ familiare_famiglia_logica.label }}</div>
+                                                {% with referenti=familiare_famiglia_logica.referenti %}
                                                     {% if referenti %}
                                                         <div class="table-subtext">Referenti: {{ referenti }}</div>
                                                     {% endif %}
@@ -730,20 +909,44 @@
                                                 <span class="table-muted">Non indicata</span>
                                             {% endif %}
                                         </div>
-                                        <div class="related-field-row mode-edit-field">
-                                            <div class="related-field-stack">
-                                                <div class="autocomplete-wrapper famiglia-autocomplete">
-                                                    {{ form.famiglia }}
-                                                </div>
-                                            </div>
-                                            <div class="related-actions">
-                                                <button type="button" class="related-btn related-btn-add" id="add-famiglia-btn">+</button>
-                                                <button type="button" class="related-btn related-btn-edit" id="edit-famiglia-btn">E</button>
-                                            </div>
+                                        <div class="mode-edit-field readonly-display readonly-display-plain">
+                                            {% if familiare_famiglia_logica.url %}
+                                                <div class="table-main-text">{{ familiare_famiglia_logica.label }}</div>
+                                                <div class="table-subtext">Derivata da figli, figlie e parenti collegati.</div>
+                                            {% else %}
+                                                <span class="table-muted">Collega figli e figlie per creare la famiglia logica.</span>
+                                            {% endif %}
                                         </div>
-                                        {{ form.famiglia.errors }}
                                     </td>
                                 </tr>
+
+                                {% if form.studenti_collegati %}
+                                <tr>
+                                    <th>{{ form.studenti_collegati.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if studenti_collegati_diretti %}
+                                                {% for relazione in studenti_collegati_diretti %}
+                                                    <div class="table-main-text">
+                                                        <a href="{% url 'modifica_studente' relazione.studente.pk %}">
+                                                            {{ relazione.studente.nome }} {{ relazione.studente.cognome }}
+                                                        </a>
+                                                    </div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="table-muted">Nessuno studente collegato direttamente</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.studenti_collegati }}
+                                            {% if form.studenti_collegati.help_text %}
+                                                <div class="field-help">{{ form.studenti_collegati.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {{ form.studenti_collegati.errors }}
+                                    </td>
+                                </tr>
+                                {% endif %}
 
                                 <tr>
                                     <th>{{ form.relazione_familiare.label_tag }}</th>
@@ -975,7 +1178,17 @@
                                     <th>{{ form.convivente.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.convivente|si_no }}</div>
-                                        <div class="mode-edit-field">{{ form.convivente }}</div>
+                                        <div class="mode-edit-field family-editor-switch-wrap">
+                                            <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.convivente.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>Convivente</strong>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.convivente }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                        </div>
                                         {{ form.convivente.errors }}
                                     </td>
                                 </tr>
@@ -984,7 +1197,17 @@
                                     <th>{{ form.referente_principale.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.referente_principale|si_no }}</div>
-                                        <div class="mode-edit-field">{{ form.referente_principale }}</div>
+                                        <div class="mode-edit-field family-editor-switch-wrap">
+                                            <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.referente_principale.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>Referente principale</strong>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.referente_principale }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                        </div>
                                         {{ form.referente_principale.errors }}
                                     </td>
                                 </tr>
@@ -993,16 +1216,92 @@
                                     <th>{{ form.abilitato_scambio_retta.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.abilitato_scambio_retta|si_no }}</div>
-                                        <div class="mode-edit-field">{{ form.abilitato_scambio_retta }}</div>
+                                        <div class="mode-edit-field family-editor-switch-wrap">
+                                            <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.abilitato_scambio_retta.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>Scambio retta</strong>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.abilitato_scambio_retta }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                        </div>
                                         {{ form.abilitato_scambio_retta.errors }}
                                     </td>
                                 </tr>
+
+                                {% if form.profilo_dipendente_attivo %}
+                                    <tr>
+                                        <th>{{ form.profilo_dipendente_attivo.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.is_dipendente_operativo %}Si{% else %}No{% endif %}</div>
+                                            <div class="mode-edit-field family-editor-switch-wrap">
+                                                <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.profilo_dipendente_attivo.id_for_label }}">
+                                                    <span class="family-editor-switch-copy">
+                                                        <strong>{{ form.profilo_dipendente_attivo.label }}</strong>
+                                                        <small>{{ form.profilo_dipendente_attivo.help_text }}</small>
+                                                    </span>
+                                                    <span class="fondo-plan-switch-control">
+                                                        {{ form.profilo_dipendente_attivo }}
+                                                        <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                            {{ form.profilo_dipendente_attivo.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+
+                                {% if form.profilo_educatore_attivo %}
+                                    <tr>
+                                        <th>{{ form.profilo_educatore_attivo.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.is_educatore %}Si{% else %}No{% endif %}</div>
+                                            <div class="mode-edit-field family-editor-switch-wrap">
+                                                <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.profilo_educatore_attivo.id_for_label }}">
+                                                    <span class="family-editor-switch-copy">
+                                                        <strong>{{ form.profilo_educatore_attivo.label }}</strong>
+                                                        <small>{{ form.profilo_educatore_attivo.help_text }}</small>
+                                                    </span>
+                                                    <span class="fondo-plan-switch-control">
+                                                        {{ form.profilo_educatore_attivo }}
+                                                        <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                            {{ form.profilo_educatore_attivo.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+
+                                {% if form.classe_principale_educatore %}
+                                    <tr>
+                                        <th>{{ form.classe_principale_educatore.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.classe_principale_label %}{{ profilo_lavorativo.classe_principale_label }}{% else %}-{% endif %}</div>
+                                            <div class="mode-edit-field autocomplete-wrapper family-work-class-field">{{ form.classe_principale_educatore }}</div>
+                                            <div class="inline-address-help mode-edit-field">{{ form.classe_principale_educatore.help_text }}</div>
+                                            {{ form.classe_principale_educatore.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
 
                                 <tr>
                                     <th>{{ form.attivo.label_tag }}</th>
                                     <td>
                                         <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.attivo|si_no }}</div>
-                                        <div class="mode-edit-field">{{ form.attivo }}</div>
+                                        <div class="mode-edit-field family-editor-switch-wrap">
+                                            <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.attivo.id_for_label }}">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>Familiare attivo</strong>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    {{ form.attivo }}
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                        </div>
                                         {{ form.attivo.errors }}
                                     </td>
                                 </tr>
@@ -1010,6 +1309,7 @@
                         </div>
                     </div>
                 </div>
+                {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
             </div>
 
             <div class="family-side-column">
@@ -1084,16 +1384,28 @@
                 {% if familiare_inline_tabs %}
                     {% include "common/inline_tab_nav.html" with tabs=familiare_inline_tabs only %}
                 {% endif %}
-                {% if familiare %}
+                {% if familiare and familiare_inline_can_edit %}
                     <button type="button" class="btn btn-primary btn-sm" id="enable-inline-edit-familiare-btn">{{ familiare_inline_edit_label|default:"Modifica" }}</button>
                 {% endif %}
             </div>
 
-            {% if studenti_formset %}
+            {% if studenti_formset or usa_studenti_diretti or studenti_diretti_form %}
                 <div class="tab-panel{% if inline_target == 'studenti' %} is-active{% endif %}" id="tab-studenti" data-inline-scope="studenti">
-                    <div class="admin-section-title inline-section-title-static" id="familiare-studenti-heading">{{ student_terminology.selected_plural }} ({{ count_studenti }})</div>
+                    <div class="admin-section-title inline-section-title-static" id="familiare-studenti-heading">Figli e Figlie ({{ count_studenti }})</div>
                     <div class="panel">
                         <div class="panel-body">
+                            {% if studenti_diretti_form %}
+                                <div class="mode-edit-field direct-relation-inline-editor">
+                                    <div class="form-group">
+                                        <label for="{{ studenti_diretti_form.direct_studenti_collegati.id_for_label }}">{{ studenti_diretti_form.direct_studenti_collegati.label }}</label>
+                                        {{ studenti_diretti_form.direct_studenti_collegati }}
+                                        {% if studenti_diretti_form.direct_studenti_collegati.help_text %}
+                                            <div class="field-help">{{ studenti_diretti_form.direct_studenti_collegati.help_text }}</div>
+                                        {% endif %}
+                                        {{ studenti_diretti_form.direct_studenti_collegati.errors }}
+                                    </div>
+                                </div>
+                            {% endif %}
                             <div
                                 class="family-related-list mode-view-only person-student-card-list"
                                 data-student-card-list
@@ -1102,14 +1414,15 @@
                                 data-student-singular="{{ student_terminology.selected_singular }}"
                                 data-student-new-title="Nuovo {{ student_terminology.selected_singular_lower }}"
                             >
-                                {% for f in studenti_formset %}
-                                    {% if f.instance.pk %}
-                                        <article class="family-person-card family-student-card" data-student-card data-student-form-prefix="{{ f.prefix }}" data-student-id="{{ f.instance.pk }}">
-                                            <a href="{% url 'modifica_studente' f.instance.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                {% if usa_studenti_diretti %}
+                                    {% for relazione in studenti_collegati_diretti %}
+                                        {% with studente_collegato=relazione.studente %}
+                                        <article class="family-person-card family-student-card" data-student-card data-direct-student-card data-student-id="{{ studente_collegato.pk }}">
+                                            <a href="{% url 'modifica_studente' studente_collegato.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ studente_collegato.nome }} {{ studente_collegato.cognome }}">
                                                 <svg viewBox="0 0 96 96" focusable="false">
-                                                    {% if f.instance.sesso == 'F' %}
+                                                    {% if studente_collegato.sesso == 'F' %}
                                                         <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
-                                                    {% elif f.instance.sesso == 'M' %}
+                                                    {% elif studente_collegato.sesso == 'M' %}
                                                         <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
                                                     {% else %}
                                                         <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
@@ -1118,20 +1431,20 @@
                                             </a>
                                             <div class="family-person-main">
                                                 <div class="family-person-heading">
-                                                    <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
-                                                    {% include "common/badges/student_iscrizione_status.html" with studente=f.instance only %}
+                                                    <h3>{{ studente_collegato.nome }} {{ studente_collegato.cognome }}</h3>
+                                                    {% include "common/badges/student_iscrizione_status.html" with studente=studente_collegato only %}
                                                 </div>
                                                 <div class="family-person-meta">
-                                                    {% if f.instance.data_nascita %}<span>{{ f.instance.data_nascita|it_date_with_age }}</span>{% endif %}
-                                                    {% if f.instance.luogo_nascita_display %}<span>{{ f.instance.luogo_nascita_display }}</span>{% endif %}
-                                                    {% if f.instance.classe_corrente_famiglia_label %}<span>{{ f.instance.classe_corrente_famiglia_tipo }}: {{ f.instance.classe_corrente_famiglia_label }}</span>{% endif %}
+                                                    {% if studente_collegato.data_nascita %}<span>{{ studente_collegato.data_nascita|it_date_with_age }}</span>{% endif %}
+                                                    {% if studente_collegato.luogo_nascita_display %}<span>{{ studente_collegato.luogo_nascita_display }}</span>{% endif %}
+                                                    {% if relazione.relazione_familiare %}<span class="family-person-chip">{{ relazione.relazione_familiare }}</span>{% endif %}
                                                 </div>
-                                                {% if f.instance.codice_fiscale %}
+                                                {% if studente_collegato.codice_fiscale %}
                                                     <div class="family-person-submeta family-person-tax-code">
                                                         <span>Codice fiscale:</span>
                                                         <span class="readonly-action-group">
-                                                            <span>{{ f.instance.codice_fiscale }}</span>
-                                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                            <span>{{ studente_collegato.codice_fiscale }}</span>
+                                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ studente_collegato.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
                                                                 <span class="copy-inline-icon" aria-hidden="true">
                                                                     <span class="copy-inline-icon-back"></span>
                                                                     <span class="copy-inline-icon-front"></span>
@@ -1142,59 +1455,120 @@
                                                     </div>
                                                 {% endif %}
                                             </div>
-                                            <div class="family-person-actions">
-                                                <a href="{% url 'modifica_studente' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
-                                                    <span class="btn-label">Vedi profilo</span>
+                                             <div class="family-person-actions">
+                                                 <a href="{% url 'modifica_studente' studente_collegato.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                     <span class="btn-label">Vedi profilo</span>
+                                                 </a>
+                                                  <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-student-card-action="edit">
+                                                      <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                      <span class="btn-label">Modifica</span>
+                                                  </button>
+                                             </div>
+                                         </article>
+                                         {% endwith %}
+                                     {% endfor %}
+                                {% else %}
+                                    {% for f in studenti_formset %}
+                                        {% if f.instance.pk %}
+                                            <article class="family-person-card family-student-card" data-student-card data-student-form-prefix="{{ f.prefix }}" data-student-id="{{ f.instance.pk }}">
+                                                <a href="{% url 'modifica_studente' f.instance.pk %}" class="family-person-avatar family-person-avatar-student" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                                    <svg viewBox="0 0 96 96" focusable="false">
+                                                        {% if f.instance.sesso == 'F' %}
+                                                            <use href="{% static 'images/arboris-avatars.svg' %}#avatar-girl"></use>
+                                                        {% elif f.instance.sesso == 'M' %}
+                                                            <use href="{% static 'images/arboris-avatars.svg' %}#avatar-boy"></use>
+                                                        {% else %}
+                                                            <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                        {% endif %}
+                                                    </svg>
                                                 </a>
-                                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-student-card-action="edit">
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                    <span class="btn-label">Modifica</span>
-                                                </button>
+                                                <div class="family-person-main">
+                                                    <div class="family-person-heading">
+                                                        <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
+                                                        {% include "common/badges/student_iscrizione_status.html" with studente=f.instance only %}
+                                                    </div>
+                                                    <div class="family-person-meta">
+                                                        {% if f.instance.data_nascita %}<span>{{ f.instance.data_nascita|it_date_with_age }}</span>{% endif %}
+                                                        {% if f.instance.luogo_nascita_display %}<span>{{ f.instance.luogo_nascita_display }}</span>{% endif %}
+                                                        {% if f.instance.classe_corrente_famiglia_label %}<span>{{ f.instance.classe_corrente_famiglia_tipo }}: {{ f.instance.classe_corrente_famiglia_label }}</span>{% endif %}
+                                                    </div>
+                                                    {% if f.instance.codice_fiscale %}
+                                                        <div class="family-person-submeta family-person-tax-code">
+                                                            <span>Codice fiscale:</span>
+                                                            <span class="readonly-action-group">
+                                                                <span>{{ f.instance.codice_fiscale }}</span>
+                                                                <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
+                                                                    <span class="copy-inline-icon" aria-hidden="true">
+                                                                        <span class="copy-inline-icon-back"></span>
+                                                                        <span class="copy-inline-icon-front"></span>
+                                                                    </span>
+                                                                    <span class="copy-inline-tooltip" role="tooltip">Copia</span>
+                                                                </button>
+                                                            </span>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="family-person-actions">
+                                                    <a href="{% url 'modifica_studente' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                        <span class="btn-label">Vedi profilo</span>
+                                                    </a>
+                                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-student-card-action="edit">
+                                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                        <span class="btn-label">Modifica</span>
+                                                    </button>
                                             </div>
                                         </article>
-                                    {% endif %}
-                                {% endfor %}
-                                {% if not count_studenti %}
-                                    <div class="family-card-empty">Ancora nessun {{ student_terminology.selected_singular_lower }} collegato.</div>
+                                        {% endif %}
+                                    {% endfor %}
                                 {% endif %}
-                                <button type="button" class="family-dashed-add" data-student-card-action="add">
-                                    <span aria-hidden="true">+</span>
-                                    Aggiungi {{ student_terminology.selected_singular_lower }}
-                                </button>
-                            </div>
-                            {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_action="add" studenti_add_prefix="studenti" %}
+                                 {% if not count_studenti %}
+                                     <div class="family-card-empty">Ancora nessun {{ student_terminology.selected_singular_lower }} collegato.</div>
+                                 {% endif %}
+                                 {% if studenti_formset %}
+                                     <button type="button" class="family-dashed-add" data-student-card-action="add">
+                                         <span aria-hidden="true">+</span>
+                                         Aggiungi figlio o figlia
+                                     </button>
+                                 {% endif %}
+                             </div>
+                             {% if studenti_formset %}
+                                 {% include "common/inlines/studenti_famiglia_formset_table.html" with famiglia=studenti_famiglia studenti_add_action="add" studenti_add_prefix="studenti" %}
+                             {% endif %}
                         </div>
                     </div>
                 </div>
             {% endif %}
 
-            {% if parenti_formset %}
+            {% if parenti_formset or usa_parenti_diretti %}
                 <div class="tab-panel{% if inline_target == 'parenti' %} is-active{% endif %}" id="tab-parenti" data-inline-scope="parenti">
                     <div class="admin-section-title inline-section-title-static">{% if familiare %}Parenti{% else %}Familiari{% endif %} ({{ count_parenti }})</div>
                     <div class="panel">
                         <div class="panel-body">
-                            {% if parenti_formset.non_form_errors %}
-                                <div class="inline-formset-errors">
-                                    {{ parenti_formset.non_form_errors }}
-                                </div>
+                            {% if parenti_formset %}
+                                {% if parenti_formset.non_form_errors %}
+                                    <div class="inline-formset-errors">
+                                        {{ parenti_formset.non_form_errors }}
+                                    </div>
+                                {% endif %}
+                                {{ parenti_formset.management_form }}
                             {% endif %}
-                            {{ parenti_formset.management_form }}
                             <div
                                 class="family-related-list mode-view-only person-relative-card-list"
                                 data-relative-card-list
                                 data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
                                 data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
                             >
-                                {% for f in parenti_formset %}
-                                    {% if f.instance.pk and f.instance.pk != familiare.pk %}
-                                        <article class="family-person-card family-relative-card" data-relative-card data-relative-form-prefix="{{ f.prefix }}" data-relative-id="{{ f.instance.pk }}">
-                                            <a href="{% url 'modifica_familiare' f.instance.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                {% if usa_parenti_diretti %}
+                                    {% for parente in parenti_collegati_diretti %}
+                                        <article class="family-person-card family-relative-card" data-relative-card data-direct-relative-card data-relative-id="{{ parente.pk }}">
+                                            <a href="{% url 'modifica_familiare' parente.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ parente.nome }} {{ parente.cognome }}">
                                                 <svg viewBox="0 0 96 96" focusable="false">
-                                                    {% with relazione=f.instance.relazione_familiare.relazione|lower %}
-                                                        {% if f.instance.sesso == 'F' or relazione == 'madre' %}
+                                                    {% with relazione=parente.relazione_familiare.relazione|lower %}
+                                                        {% if parente.sesso == 'F' or relazione == 'madre' %}
                                                             <use href="{% static 'images/arboris-avatars.svg' %}#avatar-woman"></use>
-                                                        {% elif f.instance.sesso == 'M' or relazione == 'padre' %}
+                                                        {% elif parente.sesso == 'M' or relazione == 'padre' %}
                                                             <use href="{% static 'images/arboris-avatars.svg' %}#avatar-man"></use>
                                                         {% else %}
                                                             <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
@@ -1204,79 +1578,122 @@
                                             </a>
                                             <div class="family-person-main">
                                                 <div class="family-person-heading">
-                                                    <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
+                                                    <h3>{{ parente.nome }} {{ parente.cognome }}</h3>
                                                 </div>
                                                 <div class="family-person-meta">
-                                                    {% if f.instance.relazione_familiare %}<span class="family-relation-pill{% if f.instance.sesso == 'M' %} is-male{% elif f.instance.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ f.instance.relazione_familiare }}</span>{% endif %}
-                                                    {% if f.instance.formatted_telefono %}
+                                                    {% if parente.relazione_familiare %}<span class="family-relation-pill{% if parente.sesso == 'M' %} is-male{% elif parente.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ parente.relazione_familiare }}</span>{% endif %}
+                                                    {% if parente.formatted_telefono %}
                                                         <span class="family-person-contact readonly-display-link">
                                                             <span class="readonly-action-group">
-                                                                <a href="{{ f.instance.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.formatted_telefono }}</a>
-                                                                <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.formatted_telefono }}" data-floating-text="Copia" aria-label="Copia numero di telefono">
-                                                                    <span class="copy-inline-icon" aria-hidden="true">
-                                                                        <span class="copy-inline-icon-back"></span>
-                                                                        <span class="copy-inline-icon-front"></span>
-                                                                    </span>
-                                                                    <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                                                </button>
+                                                                <a href="{{ parente.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ parente.formatted_telefono }}</a>
                                                             </span>
                                                         </span>
                                                     {% endif %}
-                                                    {% if f.instance.email %}
+                                                    {% if parente.email %}
                                                         <span class="family-person-contact readonly-display-link">
                                                             <span class="readonly-action-group">
-                                                                <a href="mailto:{{ f.instance.email }}">{{ f.instance.email }}</a>
-                                                                <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.email }}" data-floating-text="Copia" aria-label="Copia email">
-                                                                    <span class="copy-inline-icon" aria-hidden="true">
-                                                                        <span class="copy-inline-icon-back"></span>
-                                                                        <span class="copy-inline-icon-front"></span>
-                                                                    </span>
-                                                                    <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                                                </button>
+                                                                <a href="mailto:{{ parente.email }}">{{ parente.email }}</a>
                                                             </span>
                                                         </span>
                                                     {% endif %}
                                                 </div>
-                                                {% if f.instance.codice_fiscale %}
+                                                {% if parente.codice_fiscale %}
                                                     <div class="family-person-submeta family-person-tax-code">
                                                         <span>Codice fiscale:</span>
                                                         <span class="readonly-action-group">
-                                                            <span>{{ f.instance.codice_fiscale }}</span>
-                                                            <button type="button" class="copy-inline-btn" data-copy-text="{{ f.instance.codice_fiscale }}" data-floating-text="Copia" aria-label="Copia codice fiscale">
-                                                                <span class="copy-inline-icon" aria-hidden="true">
-                                                                    <span class="copy-inline-icon-back"></span>
-                                                                    <span class="copy-inline-icon-front"></span>
-                                                                </span>
-                                                                <span class="copy-inline-tooltip" role="tooltip">Copia</span>
-                                                            </button>
+                                                            <span>{{ parente.codice_fiscale }}</span>
                                                         </span>
                                                     </div>
                                                 {% endif %}
-                                                {% if f.instance.indirizzo_effettivo %}
-                                                    <div class="family-person-submeta">{{ f.instance.indirizzo_effettivo.label_full }}</div>
+                                                {% if parente.indirizzo_effettivo %}
+                                                    <div class="family-person-submeta">{{ parente.indirizzo_effettivo.label_full }}</div>
                                                 {% endif %}
                                             </div>
                                             <div class="family-person-actions">
-                                                <a href="{% url 'modifica_familiare' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                <a href="{% url 'modifica_familiare' parente.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
                                                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
                                                     <span class="btn-label">Vedi profilo</span>
                                                 </a>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" data-relative-card-action="edit">
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                    <span class="btn-label">Modifica</span>
+                                                </button>
+                                            </div>
+                                        </article>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for f in parenti_formset %}
+                                        {% if f.instance.pk and f.instance.pk != familiare.pk %}
+                                            <article class="family-person-card family-relative-card" data-relative-card data-relative-form-prefix="{{ f.prefix }}" data-relative-id="{{ f.instance.pk }}">
+                                                <a href="{% url 'modifica_familiare' f.instance.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ f.instance.nome }} {{ f.instance.cognome }}">
+                                                    <svg viewBox="0 0 96 96" focusable="false">
+                                                        {% with relazione=f.instance.relazione_familiare.relazione|lower %}
+                                                            {% if f.instance.sesso == 'F' or relazione == 'madre' %}
+                                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-woman"></use>
+                                                            {% elif f.instance.sesso == 'M' or relazione == 'padre' %}
+                                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-man"></use>
+                                                            {% else %}
+                                                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-child"></use>
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    </svg>
+                                                </a>
+                                                <div class="family-person-main">
+                                                    <div class="family-person-heading">
+                                                        <h3>{{ f.instance.nome }} {{ f.instance.cognome }}</h3>
+                                                    </div>
+                                                    <div class="family-person-meta">
+                                                        {% if f.instance.relazione_familiare %}<span class="family-relation-pill{% if f.instance.sesso == 'M' %} is-male{% elif f.instance.sesso == 'F' %} is-female{% else %} is-neutral{% endif %}">{{ f.instance.relazione_familiare }}</span>{% endif %}
+                                                        {% if f.instance.formatted_telefono %}
+                                                            <span class="family-person-contact readonly-display-link">
+                                                                <span class="readonly-action-group">
+                                                                    <a href="{{ f.instance.telefono_whatsapp_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.formatted_telefono }}</a>
+                                                                </span>
+                                                            </span>
+                                                        {% endif %}
+                                                        {% if f.instance.email %}
+                                                            <span class="family-person-contact readonly-display-link">
+                                                                <span class="readonly-action-group">
+                                                                    <a href="mailto:{{ f.instance.email }}">{{ f.instance.email }}</a>
+                                                                </span>
+                                                            </span>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% if f.instance.codice_fiscale %}
+                                                        <div class="family-person-submeta family-person-tax-code">
+                                                            <span>Codice fiscale:</span>
+                                                            <span class="readonly-action-group"><span>{{ f.instance.codice_fiscale }}</span></span>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if f.instance.indirizzo_effettivo %}
+                                                        <div class="family-person-submeta">{{ f.instance.indirizzo_effettivo.label_full }}</div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="family-person-actions">
+                                                    <a href="{% url 'modifica_familiare' f.instance.pk %}" class="btn btn-secondary btn-sm btn-icon-text">
+                                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
+                                                        <span class="btn-label">Vedi profilo</span>
+                                                    </a>
                                                 <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-relative-card-action="edit">
                                                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
                                                     <span class="btn-label">Modifica</span>
                                                 </button>
                                             </div>
                                         </article>
-                                    {% endif %}
-                                {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
                                 {% if not count_parenti %}
                                     <div class="family-card-empty">Ancora nessun parente collegato.</div>
                                 {% endif %}
-                                <button type="button" class="family-dashed-add" data-relative-card-action="add">
-                                    <span aria-hidden="true">+</span>
-                                    Aggiungi familiare
-                                </button>
+                                {% if parenti_formset %}
+                                    <button type="button" class="family-dashed-add" data-relative-card-action="add">
+                                        <span aria-hidden="true">+</span>
+                                        Aggiungi familiare
+                                    </button>
+                                {% endif %}
                             </div>
+                            {% if parenti_formset %}
                             <table class="inline-table" id="parenti-table">
                                 <thead>
                                     <tr>
@@ -1298,7 +1715,7 @@
                                 </thead>
                                 <tbody>
                                     {% for f in parenti_formset %}
-                                        <tr class="inline-form-row{% if studenti_famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                        <tr class="inline-form-row{% if studenti_famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}" data-relative-id="{{ f.instance.pk }}"{% endif %}>
                                             <td>
                                                 {{ f.id }}
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if f.instance.pk and f.instance.cognome %}{{ f.instance.cognome }}{% else %}<span class="table-muted">Non indicato</span>{% endif %}</div>
@@ -1391,6 +1808,7 @@
                             <div class="inline-add-row inline-add-row-view-enabled">
                                 <button type="button" class="inline-add-btn" data-inline-action="add" data-inline-prefix="parenti">+ Aggiungi un altro familiare</button>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -1768,11 +2186,7 @@
         </tr>
     </template>
 
-    {% if familiare and familiare.famiglia and familiare.famiglia.indirizzo_principale %}
-        {{ familiare.famiglia.indirizzo_principale.label_select|json_script:"familiare-famiglia-indirizzo-label" }}
-    {% else %}
-        <script id="familiare-famiglia-indirizzo-label" type="application/json">""</script>
-    {% endif %}
+    <script id="familiare-famiglia-indirizzo-label" type="application/json">""</script>
 
     {% if familiare %}
         <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="relative-note-dialog-overlay" aria-hidden="true">
@@ -1833,7 +2247,6 @@
             ArborisFamiliareForm.init({
                 familiareId: "{{ familiare.pk|default:'new' }}",
                 urls: {
-                    creaFamiglia: "{% url 'crea_famiglia' %}",
                     creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
                     creaTipoDocumento: "{% url 'crea_tipo_documento' %}"

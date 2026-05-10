@@ -89,13 +89,6 @@ class FamigliaInteressata(models.Model):
     classe_eta_interesse = models.CharField(max_length=120, blank=True)
     note = models.TextField(blank=True)
     privacy_consenso = models.BooleanField(default=False)
-    convertita_in_famiglia = models.ForeignKey(
-        "anagrafica.Famiglia",
-        on_delete=models.SET_NULL,
-        related_name="origini_interesse",
-        blank=True,
-        null=True,
-    )
     creata_da = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

@@ -35,6 +35,10 @@
                 </div>
             </div>
             <div class="page-head-actions">
+                <a href="{% url 'lista_dati_payroll_ufficiali' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <span class="btn-label">Dati ufficiali</span>
+                </a>
                 <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
                     <span class="btn-label">Contratti</span>
@@ -96,6 +100,22 @@
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
                 </span>
             </article>
+        </section>
+
+        <section class="scambio-list-card ga-parametri-official-card" aria-labelledby="ga-parametri-official-title">
+            <div class="scambio-list-card-head">
+                <div>
+                    <h2 id="ga-parametri-official-title">Fonti ufficiali payroll</h2>
+                    <p>
+                        {{ fonti_payroll_count }} fonti monitorabili e {{ dati_payroll_count }} valori strutturati importati.
+                        {% if ultimo_dato_payroll %}Ultimo aggiornamento: {{ ultimo_dato_payroll.data_rilevazione|date:"d/m/Y H:i" }}.{% endif %}
+                    </p>
+                </div>
+                <a href="{% url 'lista_dati_payroll_ufficiali' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                    <span class="btn-label">Apri archivio</span>
+                </a>
+            </div>
         </section>
 
         <section class="scambio-list-filter-card" aria-label="Ricerca parametri calcolo">

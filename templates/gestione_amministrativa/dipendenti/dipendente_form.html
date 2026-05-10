@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static currency %}
 
-{% block title %}{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %} - Dipendenti e collaboratori{% endblock %}
+{% block title %}{% if dipendente %}{{ dipendente }}{% else %}{{ dipendenti_labels.new_label|default:"Nuovo dipendente" }}{% endif %} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -9,7 +9,7 @@
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_dipendenti' %}">Dipendenti</a>
+        <a href="{% url dipendenti_labels.list_url %}">{{ dipendenti_labels.title|default:"Dipendenti" }}</a>
         <span class="breadcrumb-sep">&gt;</span>
         <span>{% if dipendente %}{{ dipendente }}{% else %}Nuovo{% endif %}</span>
     </div>
@@ -23,14 +23,14 @@
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
                 </span>
                 <div>
-                    <h1 class="page-title">{% if dipendente %}{{ dipendente }}{% else %}Nuovo dipendente{% endif %}</h1>
-                    <p class="page-subtitle">Dati anagrafici, contatti, stato lavorativo e collegamenti amministrativi.</p>
+                    <h1 class="page-title">{% if dipendente %}{{ dipendente }}{% else %}{{ dipendenti_labels.new_label|default:"Nuovo dipendente" }}{% endif %}</h1>
+                    <p class="page-subtitle">Dati anagrafici, contatti, stato lavorativo, documenti e collegamenti amministrativi.</p>
                 </div>
             </div>
             <div class="page-head-actions">
-                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Indietro</span>
+                <a href="{% url dipendenti_labels.list_url %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
                 </a>
                 {% if can_manage_gestione_amministrativa %}
                     <button type="submit" form="dipendente-form" class="btn btn-save-soft btn-icon-text">
@@ -39,7 +39,7 @@
                     </button>
                 {% endif %}
                 {% if dipendente and can_manage_gestione_amministrativa %}
-                    <a href="{% url 'elimina_dipendente' dipendente.pk %}" class="btn btn-danger btn-icon-text">
+                    <a href="{% url dipendenti_labels.delete_url dipendente.pk %}" class="btn btn-danger btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                         <span class="btn-label">Elimina</span>
                     </a>
@@ -59,12 +59,63 @@
                                 <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
                             </span>
                             <div>
-                                <h2 id="ga-dipendente-anagrafica-title">Anagrafica dipendente</h2>
-                                <p>Nome, dati di nascita, codice fiscale e indirizzo collegato.</p>
+                                <h2 id="ga-dipendente-anagrafica-title">Profilo anagrafico</h2>
+                                <p>Ruolo nel sistema, collegamento a familiari esistenti e dati personali.</p>
                             </div>
                         </div>
 
                         <div class="fondo-plan-form-grid">
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.ruolo_anagrafico.id_for_label }}">{{ form.ruolo_anagrafico.label }}</label>
+                                    {{ form.ruolo_anagrafico }}
+                                    {{ form.ruolo_anagrafico.errors }}
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field">
+                                <span class="fondo-plan-field-icon is-green" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.familiare_collegato.id_for_label }}">{{ form.familiare_collegato.label }}</label>
+                                    <div class="autocomplete-wrapper">
+                                        {{ form.familiare_collegato }}
+                                    </div>
+                                    {{ form.familiare_collegato.errors }}
+                                    <p class="fondo-plan-help">Usalo quando la stessa persona e gia presente tra i familiari: evita duplicati anagrafici.</p>
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field" data-role-field="educator-class">
+                                <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.classe_principale_ref.id_for_label }}">{{ form.classe_principale_ref.label }}</label>
+                                    <div class="autocomplete-wrapper">
+                                        {{ form.classe_principale_ref }}
+                                    </div>
+                                    {{ form.classe_principale_ref.errors }}
+                                    <p class="fondo-plan-help">{{ form.classe_principale_ref.help_text }}</p>
+                                </div>
+                            </div>
+
+                            <div class="fondo-plan-field" data-role-field="employee-mansione">
+                                <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.mansione.id_for_label }}">{{ form.mansione.label }}</label>
+                                    {{ form.mansione }}
+                                    {{ form.mansione.errors }}
+                                    <p class="fondo-plan-help">Per i profili dipendente indica la mansione operativa svolta.</p>
+                                </div>
+                            </div>
+
                             <div class="fondo-plan-field">
                                 <span class="fondo-plan-field-icon is-blue" aria-hidden="true">
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
@@ -236,6 +287,8 @@
                         </div>
                     </section>
 
+                    {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
+
                     <section class="fondo-plan-form-card" aria-labelledby="ga-dipendente-rapporto-title">
                         <div class="fondo-plan-form-card-head">
                             <span class="fondo-plan-form-card-icon is-amber" aria-hidden="true">
@@ -303,7 +356,15 @@
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
                                 </span>
                                 <div class="fondo-plan-field-body">
-                                    <label for="{{ form.data_cessazione.id_for_label }}">{{ form.data_cessazione.label }}</label>
+                                    <span class="ga-dipendente-label-with-help">
+                                        <label for="{{ form.data_cessazione.id_for_label }}">{{ form.data_cessazione.label }}</label>
+                                        <button
+                                            type="button"
+                                            class="ga-dipendente-field-help"
+                                            aria-label="Informazioni data cessazione"
+                                            data-floating-text="Se ancora in essere, non compilare"
+                                        >?</button>
+                                    </span>
                                     {{ form.data_cessazione }}
                                     {{ form.data_cessazione.errors }}
                                 </div>
@@ -331,6 +392,39 @@
 
                 <aside class="ga-dipendente-sidebar">
                     {% if dipendente %}
+                        {% if dipendente.is_educatore %}
+                            <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-classe-title">
+                                <div class="ga-dipendente-side-card-head">
+                                    <div>
+                                        <h2 id="ga-dipendente-classe-title">Classe principale</h2>
+                                        <p>Studenti collegati alla classe di riferimento.</p>
+                                    </div>
+                                </div>
+                                {% if dipendente.classe_principale_label %}
+                                    <div class="ga-dipendente-mini-list">
+                                        <article class="ga-dipendente-mini-row">
+                                            <div>
+                                                <strong>{{ dipendente.classe_principale_label }}</strong>
+                                                <span>{{ dipendente.classe_principale_tipo_label }} assegnata</span>
+                                            </div>
+                                            <strong>{{ studenti_classe_principale|length }}</strong>
+                                        </article>
+                                        {% for studente in studenti_classe_principale %}
+                                            <article class="ga-dipendente-mini-row">
+                                                <div>
+                                                    <a href="{% url 'modifica_studente' studente.pk %}" class="ga-dipendente-mini-title">{{ studente }}</a>
+                                                </div>
+                                            </article>
+                                        {% empty %}
+                                            <div class="ga-dipendente-empty">Nessuno studente attivo per questa classe.</div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="ga-dipendente-empty">Nessuna classe o pluriclasse principale impostata.</div>
+                                {% endif %}
+                            </section>
+                        {% endif %}
+
                         <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-contratti-title">
                             <div class="ga-dipendente-side-card-head">
                                 <div>
@@ -375,49 +469,51 @@
                             </div>
                         </section>
 
-                        <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-simulazioni-title">
-                            <div class="ga-dipendente-side-card-head">
-                                <div>
-                                    <h2 id="ga-dipendente-simulazioni-title">Simulazioni costo</h2>
-                                    <p>Previsioni economiche recenti.</p>
+                        {% if gestione_dipendenti_dettagliata_attiva %}
+                            <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-simulazioni-title">
+                                <div class="ga-dipendente-side-card-head">
+                                    <div>
+                                        <h2 id="ga-dipendente-simulazioni-title">Simulazioni costo</h2>
+                                        <p>Previsioni economiche recenti.</p>
+                                    </div>
+                                    {% if can_manage_gestione_amministrativa %}
+                                        <a
+                                            href="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                            class="btn btn-secondary btn-icon-text btn-small-action"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                            data-popup-window-name="arboris-simulazione-costo-popup"
+                                            data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                        >
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                            <span class="btn-label">Nuova</span>
+                                        </a>
+                                    {% endif %}
                                 </div>
-                                {% if can_manage_gestione_amministrativa %}
-                                    <a
-                                        href="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
-                                        class="btn btn-secondary btn-icon-text btn-small-action"
-                                        data-window-popup="1"
-                                        data-popup-url="{% url 'crea_simulazione_costo_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
-                                        data-popup-window-name="arboris-simulazione-costo-popup"
-                                        data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
-                                    >
-                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                        <span class="btn-label">Nuova</span>
-                                    </a>
-                                {% endif %}
-                            </div>
-                            <div class="ga-dipendente-mini-list">
-                                {% for simulazione in simulazioni_costo %}
-                                    <article class="ga-dipendente-mini-row">
-                                        <div>
-                                            <a
-                                                href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
-                                                class="ga-dipendente-mini-title"
-                                                data-window-popup="1"
-                                                data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
-                                                data-popup-window-name="arboris-simulazione-costo-popup"
-                                                data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
-                                            >
-                                                {{ simulazione.valido_dal|date:"d/m/Y" }} - {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
-                                            </a>
-                                            <span>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
-                                        </div>
-                                        <strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong>
-                                    </article>
-                                {% empty %}
-                                    <div class="ga-dipendente-empty">Nessuna simulazione costo.</div>
-                                {% endfor %}
-                            </div>
-                        </section>
+                                <div class="ga-dipendente-mini-list">
+                                    {% for simulazione in simulazioni_costo %}
+                                        <article class="ga-dipendente-mini-row">
+                                            <div>
+                                                <a
+                                                    href="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                    class="ga-dipendente-mini-title"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'modifica_simulazione_costo_dipendente' simulazione.pk %}?popup=1"
+                                                    data-popup-window-name="arboris-simulazione-costo-popup"
+                                                    data-popup-window-features="width=1180,height=880,resizable=yes,scrollbars=yes"
+                                                >
+                                                    {{ simulazione.valido_dal|date:"d/m/Y" }} - {% if simulazione.valido_al %}{{ simulazione.valido_al|date:"d/m/Y" }}{% else %}oggi{% endif %}
+                                                </a>
+                                                <span>{% if simulazione.attiva %}Attiva{% else %}Non attiva{% endif %}</span>
+                                            </div>
+                                            <strong>{{ simulazione.costo_azienda_mensile|euro }} &euro;</strong>
+                                        </article>
+                                    {% empty %}
+                                        <div class="ga-dipendente-empty">Nessuna simulazione costo.</div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+                        {% endif %}
 
                         <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-buste-title">
                             <div class="ga-dipendente-side-card-head">
@@ -427,7 +523,7 @@
                                 </div>
                                 {% if can_manage_gestione_amministrativa %}
                                     <a
-                                        href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
+                                        href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}"
                                         class="btn btn-secondary btn-icon-text btn-small-action"
                                         data-window-popup="1"
                                         data-popup-url="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ dipendente.pk }}&popup=1"
@@ -444,7 +540,7 @@
                                     <article class="ga-dipendente-mini-row">
                                         <div>
                                             <a
-                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
                                                 class="ga-dipendente-mini-title"
                                                 data-window-popup="1"
                                                 data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
@@ -460,6 +556,27 @@
                                 {% endfor %}
                             </div>
                         </section>
+
+                        <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-documenti-title">
+                            <div class="ga-dipendente-side-card-head">
+                                <div>
+                                    <h2 id="ga-dipendente-documenti-title">Documenti</h2>
+                                    <p>Contratti, documenti personali e comunicazioni collegate.</p>
+                                </div>
+                            </div>
+                            <div class="ga-dipendente-mini-list">
+                                {% for documento in documenti %}
+                                    <article class="ga-dipendente-mini-row">
+                                        <div>
+                                            <a href="{{ documento.file.url }}" class="ga-dipendente-mini-title" target="_blank" rel="noopener">{{ documento.titolo }}</a>
+                                            <span>{{ documento.get_tipo_documento_display }}{% if documento.data_documento %} - {{ documento.data_documento|date:"d/m/Y" }}{% endif %}</span>
+                                        </div>
+                                    </article>
+                                {% empty %}
+                                    <div class="ga-dipendente-empty">Nessun documento registrato.</div>
+                                {% endfor %}
+                            </div>
+                        </section>
                     {% else %}
                         <section class="ga-dipendente-side-card ga-dipendente-guide-card" aria-labelledby="ga-dipendente-guide-title">
                             <span class="fondo-plan-form-card-icon is-blue" aria-hidden="true">
@@ -467,30 +584,31 @@
                             </span>
                             <div>
                                 <h2 id="ga-dipendente-guide-title">Dopo il salvataggio</h2>
-                                <p>Potrai collegare contratti, simulazioni costo e buste paga direttamente dalla scheda del dipendente.</p>
+                                <p>Potrai collegare contratti, buste paga e documenti direttamente dalla scheda.</p>
                             </div>
                         </section>
                     {% endif %}
                 </aside>
             </div>
 
-            <div class="fondo-plan-form-actions">
+            <div class="fondo-plan-form-actions sticky-form-actions ga-dipendente-sticky-actions">
                 {% if can_manage_gestione_amministrativa %}
                     <button type="submit" class="btn btn-save-soft btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                         <span class="btn-label">Salva</span>
                     </button>
                 {% endif %}
-                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                <a href="{% url dipendenti_labels.list_url %}" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
                     <span class="btn-label">Annulla</span>
                 </a>
             </div>
+            <div class="sticky-actions-spacer"></div>
         </form>
     </div>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
-    <script src="{% static 'js/pages/dipendente-form.js' %}?v=6"></script>
+    <script src="{% static 'js/pages/dipendente-form.js' %}?v=8"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisDipendenteForm) {

@@ -25,7 +25,17 @@ from .models import (
     TipoFeedbackSegnalazione,
 )
 from .popup_manifest import build_popup_manifest
-from anagrafica.models import Citta, Famiglia, Provincia, Regione, StatoRelazioneFamiglia, Studente
+from anagrafica.models import (
+    Citta,
+    Famiglia,
+    Familiare,
+    Provincia,
+    Regione,
+    RelazioneFamiliare,
+    StatoRelazioneFamiglia,
+    Studente,
+    StudenteFamiliare,
+)
 from anagrafica.models import Indirizzo
 from calendario.models import CategoriaCalendario, EventoCalendario
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, MovimentoFinanziario, ScadenzaPagamentoFornitore
@@ -157,6 +167,34 @@ class GlobalSearchTests(TestCase):
         self.assertEqual(response.status_code, 200)
         categories = {item["category"] for item in response.json()["results"]}
         self.assertIn("Fornitore", categories)
+
+    def test_global_search_finds_logical_family_without_legacy_family(self):
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore")
+        studente = Studente.objects.create(nome="Sara", cognome="Verdi", attivo=True)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Giulia",
+            cognome="Verdi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+
+        response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "Verdi"})
+
+        self.assertEqual(response.status_code, 200)
+        famiglia_results = [
+            item for item in response.json()["results"] if item["category"] == "Famiglia"
+        ]
+        self.assertTrue(famiglia_results)
+        self.assertEqual(
+            famiglia_results[0]["url"],
+            reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"}),
+        )
 
     def test_global_search_ignores_too_short_queries(self):
         response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "R"})

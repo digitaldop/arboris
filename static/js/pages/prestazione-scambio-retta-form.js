@@ -8,7 +8,6 @@ window.ArborisPrestazioneScambioRettaForm = (function () {
         const oreInput = document.getElementById("id_ore_lavorate");
         const tariffaSelect = document.getElementById("id_tariffa_scambio_retta");
         const importoPreview = document.getElementById("prestazione-scambio-importo-preview");
-        const famigliaPreview = document.getElementById("prestazione-famiglia-preview");
         const annoPreview = document.getElementById("prestazione-anno-preview");
         const schoolYearsNode = document.getElementById("prestazione-scambio-school-years");
 
@@ -63,19 +62,21 @@ window.ArborisPrestazioneScambioRettaForm = (function () {
             return (hours * 60) + minutes;
         }
 
-        function refreshFamigliaPreview() {
-            if (!famigliaPreview) {
-                return;
+        function csvIncludes(csvValue, needle) {
+            if (!csvValue || !needle) {
+                return false;
             }
-
-            const selectedOption = getSelectedOption(familiareSelect);
-            const famigliaLabel = selectedOption ? selectedOption.dataset.famigliaLabel || "" : "";
-            famigliaPreview.textContent = famigliaLabel || "Seleziona prima un familiare";
+            return String(csvValue)
+                .split(",")
+                .map(value => value.trim())
+                .filter(Boolean)
+                .includes(String(needle));
         }
 
-        function filterStudentiByFamiglia() {
+        function filterStudentiByFamiliare() {
             const selectedOption = getSelectedOption(familiareSelect);
-            const famigliaId = selectedOption ? selectedOption.dataset.famigliaId || "" : "";
+            const selectedStudentIds = selectedOption ? selectedOption.dataset.studenteIds || "" : "";
+            const hasDirectStudents = Boolean(selectedStudentIds);
             let hasSelectedVisibleOption = false;
 
             Array.from(studenteSelect.options).forEach(option => {
@@ -85,7 +86,7 @@ window.ArborisPrestazioneScambioRettaForm = (function () {
                     return;
                 }
 
-                const isVisible = !famigliaId || option.dataset.famigliaId === famigliaId;
+                const isVisible = hasDirectStudents && csvIncludes(selectedStudentIds, option.value);
                 option.hidden = !isVisible;
                 option.disabled = !isVisible;
 
@@ -135,8 +136,7 @@ window.ArborisPrestazioneScambioRettaForm = (function () {
         }
 
         familiareSelect.addEventListener("change", function () {
-            refreshFamigliaPreview();
-            filterStudentiByFamiglia();
+            filterStudentiByFamiliare();
         });
         dataInput.addEventListener("change", refreshAnnoPreview);
         ingressoSelect.addEventListener("change", refreshOreAndImporto);
@@ -144,8 +144,7 @@ window.ArborisPrestazioneScambioRettaForm = (function () {
         oreInput.addEventListener("input", refreshOreAndImporto);
         tariffaSelect.addEventListener("change", refreshOreAndImporto);
 
-        refreshFamigliaPreview();
-        filterStudentiByFamiglia();
+        filterStudentiByFamiliare();
         refreshAnnoPreview();
         refreshOreAndImporto();
     }

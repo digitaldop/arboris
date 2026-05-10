@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     BustaPagaDipendente,
     ContrattoDipendente,
+    DatoPayrollUfficiale,
     Dipendente,
     DocumentoDipendente,
     ParametroCalcoloStipendio,
@@ -49,16 +50,20 @@ class DipendenteAdmin(admin.ModelAdmin):
     list_display = (
         "cognome",
         "nome",
+        "ruolo_anagrafico",
         "codice_dipendente",
         "codice_fiscale",
+        "classe_principale",
+        "gruppo_classe_principale",
+        "mansione",
         "sesso",
         "stato",
         "data_assunzione",
         "data_cessazione",
     )
-    list_filter = ("stato",)
+    list_filter = ("ruolo_anagrafico", "stato", "classe_principale", "gruppo_classe_principale")
     search_fields = ("nome", "cognome", "codice_dipendente", "codice_fiscale", "email")
-    autocomplete_fields = ("indirizzo",)
+    autocomplete_fields = ("indirizzo", "familiare_collegato", "classe_principale", "gruppo_classe_principale")
     inlines = [ContrattoDipendenteInline]
 
 
@@ -126,6 +131,24 @@ class ParametroCalcoloStipendioAdmin(admin.ModelAdmin):
     )
     list_filter = ("attivo",)
     search_fields = ("nome",)
+
+
+@admin.register(DatoPayrollUfficiale)
+class DatoPayrollUfficialeAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome",
+        "categoria",
+        "codice",
+        "anno",
+        "valore_percentuale",
+        "valore_importo",
+        "ente",
+        "attivo",
+        "data_rilevazione",
+    )
+    list_filter = ("categoria", "anno", "attivo", "ente")
+    search_fields = ("nome", "codice", "descrizione", "ente")
+    readonly_fields = ("data_rilevazione",)
 
 
 class VoceBustaPagaInline(admin.TabularInline):

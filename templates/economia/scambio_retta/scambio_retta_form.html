@@ -70,7 +70,7 @@
                         </span>
                         <div>
                             <h2 id="scambio-retta-person-title">Collegamenti</h2>
-                            <p>Associa familiare, famiglia, studente e anno scolastico.</p>
+                            <p>Associa familiare, studente e anno scolastico.</p>
                         </div>
                     </div>
                     <div class="scambio-retta-grid">
@@ -85,35 +85,13 @@
                             </div>
                         </div>
                         <div class="scambio-retta-field">
-                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
-                            </span>
-                            <div>
-                                <label for="{{ form.famiglia.id_for_label }}">{{ form.famiglia.label }}</label>
-                                <input
-                                    type="text"
-                                    id="scambio-retta-famiglia-display"
-                                    class="scambio-retta-readonly-display"
-                                    value="{% if scambio and scambio.famiglia %}{{ scambio.famiglia }}{% endif %}"
-                                    placeholder="Seleziona prima un familiare"
-                                    readonly
-                                    tabindex="-1"
-                                >
-                                <span class="scambio-retta-hidden-derived-select">
-                                    {{ form.famiglia }}
-                                </span>
-                                {% if form.famiglia.help_text %}<p class="scambio-retta-help">{{ form.famiglia.help_text }}</p>{% endif %}
-                                {{ form.famiglia.errors }}
-                            </div>
-                        </div>
-                        <div class="scambio-retta-field">
                             <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
                                 <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg>
                             </span>
                             <div>
                                 <label for="{{ form.studente.id_for_label }}">{{ form.studente.label }}</label>
                                 {{ form.studente }}
-                                <p class="scambio-retta-help" id="scambio-retta-studente-help">Seleziona prima il familiare: vedrai solo i bambini collegati alla sua famiglia.</p>
+                                <p class="scambio-retta-help" id="scambio-retta-studente-help">Seleziona prima il familiare: vedrai solo i bambini collegati a lui.</p>
                                 {{ form.studente.errors }}
                             </div>
                         </div>
@@ -278,7 +256,7 @@
     </div>
 
     <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
-    <script src="{% static 'js/pages/scambio-retta-form.js' %}?v=4"></script>
+    <script src="{% static 'js/pages/scambio-retta-form.js' %}?v=5"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisViewMode) {

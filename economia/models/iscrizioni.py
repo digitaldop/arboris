@@ -7,7 +7,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Max
 
-from anagrafica.models import Famiglia, Studente
+from anagrafica.models import Studente, StudenteFamiliare
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 
 
@@ -354,10 +354,6 @@ class Iscrizione(models.Model):
         return f"{self.studente} - {self.anno_scolastico}"
 
     @property
-    def famiglia(self):
-        return self.studente.famiglia
-
-    @property
     def tariffa_applicabile(self):
         return self.get_tariffa_applicabile()
 
@@ -365,12 +361,30 @@ class Iscrizione(models.Model):
         if hasattr(self, "_ordine_figlio_cache"):
             return self._ordine_figlio_cache
 
-        if not self.studente_id or not self.anno_scolastico_id or not self.studente.famiglia_id:
+        if not self.studente_id or not self.anno_scolastico_id:
             return 1
+
+        familiare_ids = list(
+            StudenteFamiliare.objects.filter(
+                studente_id=self.studente_id,
+                attivo=True,
+            ).values_list("familiare_id", flat=True)
+        )
+        sibling_ids = list(
+            StudenteFamiliare.objects.filter(
+                familiare_id__in=familiare_ids,
+                attivo=True,
+                studente__attivo=True,
+            )
+            .values_list("studente_id", flat=True)
+            .distinct()
+        )
+        if self.studente_id not in sibling_ids:
+            sibling_ids.append(self.studente_id)
 
         iscrizioni_ids = list(
             Iscrizione.objects.filter(
-                studente__famiglia_id=self.studente.famiglia_id,
+                studente_id__in=sibling_ids,
                 anno_scolastico_id=self.anno_scolastico_id,
             )
             .order_by("studente__data_nascita", "studente__cognome", "studente__nome", "studente_id", "id")
@@ -535,7 +549,7 @@ class Iscrizione(models.Model):
         return mese_iscrizione, regola == MID_YEAR_RULE_DAILY_PRORATA
 
     def build_rate_mensili_entries_for_importo(self, importo_annuo):
-        if not self.condizione_iscrizione_id or not self.studente_id or not self.studente.famiglia_id:
+        if not self.condizione_iscrizione_id or not self.studente_id:
             return []
 
         prima_scadenza = self.get_prima_scadenza_rate()
@@ -586,7 +600,6 @@ class Iscrizione(models.Model):
 
             piano.append(
                 {
-                    "famiglia_id": self.studente.famiglia_id,
                     "tipo_rata": RATE_TYPE_MENSILE,
                     "numero_rata": indice + 1,
                     "mese_riferimento": mese_rata.month,
@@ -640,7 +653,6 @@ class Iscrizione(models.Model):
         )
 
         return {
-            "famiglia_id": self.studente.famiglia_id,
             "tipo_rata": RATE_TYPE_PREISCRIZIONE,
             "numero_rata": 0,
             "mese_riferimento": 1,
@@ -672,7 +684,6 @@ class Iscrizione(models.Model):
         )
 
         return {
-            "famiglia_id": self.studente.famiglia_id,
             "tipo_rata": RATE_TYPE_UNICA_SOLUZIONE,
             "numero_rata": 1,
             "mese_riferimento": data_scadenza.month,
@@ -686,7 +697,7 @@ class Iscrizione(models.Model):
         }
 
     def build_rate_plan(self):
-        if not self.condizione_iscrizione_id or not self.studente_id or not self.studente.famiglia_id:
+        if not self.condizione_iscrizione_id or not self.studente_id:
             return []
 
         piano_mensile = self.build_rate_mensili_base_entries()
@@ -716,8 +727,7 @@ class Iscrizione(models.Model):
 
     def rate_matches_expected(self, rata, attesa):
         return (
-            rata.famiglia_id == attesa["famiglia_id"]
-            and (rata.tipo_rata or RATE_TYPE_MENSILE) == attesa.get("tipo_rata", RATE_TYPE_MENSILE)
+            (rata.tipo_rata or RATE_TYPE_MENSILE) == attesa.get("tipo_rata", RATE_TYPE_MENSILE)
             and rata.numero_rata == attesa["numero_rata"]
             and rata.mese_riferimento == attesa["mese_riferimento"]
             and rata.anno_riferimento == attesa["anno_riferimento"]
@@ -928,11 +938,6 @@ class RataIscrizione(models.Model):
         on_delete=models.CASCADE,
         related_name="rate",
     )
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.PROTECT,
-        related_name="rate_iscrizione",
-    )
     tipo_rata = models.CharField(max_length=20, choices=RATE_TYPE_CHOICES, default=RATE_TYPE_MENSILE)
     numero_rata = models.PositiveIntegerField()
     mese_riferimento = models.PositiveIntegerField()
@@ -1016,9 +1021,6 @@ class RataIscrizione(models.Model):
     def clean(self):
         super().clean()
 
-        if self.famiglia_id and self.iscrizione_id and self.famiglia_id != self.iscrizione.studente.famiglia_id:
-            raise ValidationError("La famiglia della rata deve coincidere con la famiglia dello studente iscritto.")
-
         if self.is_preiscrizione:
             self.data_scadenza = None
 
@@ -1032,11 +1034,6 @@ class RataIscrizione(models.Model):
 
 
 class MovimentoCreditoRetta(models.Model):
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.PROTECT,
-        related_name="movimenti_credito_retta",
-    )
     studente = models.ForeignKey(
         Studente,
         on_delete=models.SET_NULL,

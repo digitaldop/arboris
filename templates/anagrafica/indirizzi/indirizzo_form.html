@@ -33,6 +33,33 @@
         Se la città ha un solo CAP, verrà selezionato automaticamente. Se ha più CAP, potrai scegliere quello corretto dall'elenco.
     </div>
 
+    {% if duplicate_candidates %}
+        <div class="info-box warning">
+            <strong>Possibile indirizzo gia presente.</strong>
+            <div>Controlla le corrispondenze: puoi usare un indirizzo esistente oppure confermare la creazione di uno nuovo.</div>
+            <div class="duplicate-address-list">
+                {% for candidate in duplicate_candidates %}
+                    <div class="duplicate-address-item">
+                        <div>
+                            <strong>{{ candidate.label }}</strong>
+                            {% if candidate.owners %}
+                                <div class="help-text">
+                                    Usato da:
+                                    {% for owner in candidate.owners %}
+                                        {{ owner.tipo }} {{ owner.nome }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button type="submit" form="indirizzo-detail-form" name="use_existing_address" value="{{ candidate.id }}" class="btn btn-secondary btn-sm">
+                            Usa questo
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <div class="admin-section">
         <div class="admin-section-title admin-section-title-actionbar">
             <span class="admin-section-title-label">Dati principali</span>
@@ -121,6 +148,9 @@
 
             <div class="form-actions mode-edit-only">
                 <button type="submit" class="btn btn-save-soft">Salva</button>
+                {% if duplicate_candidates %}
+                    <button type="submit" name="force_new_address" value="1" class="btn btn-warning-soft">Crea comunque nuovo</button>
+                {% endif %}
                 <button type="button" class="btn btn-secondary" id="sticky-cancel-edit-indirizzo-btn">Annulla</button>
             </div>
         </form>

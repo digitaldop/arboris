@@ -18,7 +18,6 @@ def ricalcola_rate_anno_scolastico(anno_scolastico):
         Iscrizione.objects.filter(anno_scolastico=anno_scolastico, attiva=True)
         .select_related(
             "studente",
-            "studente__famiglia",
             "anno_scolastico",
             "condizione_iscrizione",
             "agevolazione",
@@ -87,11 +86,13 @@ def _rate_disponibili_queryset():
 
     return (
         RataIscrizione.objects.select_related(
-            "famiglia",
-            "iscrizione__studente__famiglia",
+            "iscrizione__studente",
             "iscrizione__anno_scolastico",
         )
-        .prefetch_related("famiglia__familiari", "iscrizione__studente__famiglia__familiari")
+        .prefetch_related(
+            "iscrizione__studente__relazioni_familiari__familiare",
+            "iscrizione__studente__relazioni_familiari__relazione_familiare",
+        )
         .filter(
             pagata=False,
             importo_finale__gt=0,
@@ -99,7 +100,7 @@ def _rate_disponibili_queryset():
             riconciliazioni_movimenti__isnull=True,
         )
         .distinct()
-        .order_by("famiglia_id", "anno_riferimento", "mese_riferimento", "numero_rata", "id")
+        .order_by("iscrizione__studente__cognome", "iscrizione__studente__nome", "anno_riferimento", "mese_riferimento", "numero_rata", "id")
     )
 
 
@@ -285,7 +286,7 @@ def _serializza_anteprima_riconciliazione_rate(anteprima):
                         "rata_id": allocazione["rata"].pk,
                         "rata_label": str(allocazione["rata"]),
                         "studente": str(getattr(allocazione["rata"].iscrizione, "studente", "") or ""),
-                        "famiglia": str(getattr(allocazione["rata"], "famiglia", "") or ""),
+                        "famiglia": "",
                         "importo": str(allocazione["importo"]),
                     }
                     for allocazione in item["allocazioni"]
@@ -318,7 +319,7 @@ def _applica_anteprima_riconciliazione_rate(dettagli, selected_keys, *, utente=N
             allocazioni = []
             for allocazione in item.get("allocazioni", []):
                 rata = RataIscrizione.objects.select_related(
-                    "iscrizione__studente__famiglia",
+                    "iscrizione__studente",
                     "iscrizione__anno_scolastico",
                 ).get(pk=allocazione["rata_id"])
                 allocazioni.append((rata, Decimal(str(allocazione["importo"]))))

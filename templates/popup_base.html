@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=258">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=261">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
     {% if role_theme %}
@@ -39,6 +39,30 @@
 </head>
 <body class="popup-page">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
+    <script>
+        (function () {
+            try {
+                var params = new URLSearchParams(window.location.search || "");
+                if (!params.has("popup")) {
+                    return;
+                }
+
+                var hasOpener = Boolean(window.opener && !window.opener.closed);
+                var isEmbeddedPopup = Boolean(window.parent && window.parent !== window);
+                if (hasOpener || isEmbeddedPopup) {
+                    return;
+                }
+
+                params.delete("popup");
+                var queryString = params.toString();
+                window.location.replace(
+                    window.location.pathname + (queryString ? "?" + queryString : "") + window.location.hash
+                );
+            } catch (error) {
+                // Keep the popup page usable if the browser blocks URL inspection.
+            }
+        })();
+    </script>
     <script src="{% static 'js/core/related-entity-routes.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-form-tools.js' %}?v=4"></script>
     <main class="popup-content-area">

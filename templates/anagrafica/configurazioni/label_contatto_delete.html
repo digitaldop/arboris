@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <div>
+            <h1 class="page-title">{{ titolo }}</h1>
+            <p class="page-subtitle">{{ descrizione }}</p>
+        </div>
+    </div>
+
+    <div class="content-card form-card">
+        <p>Confermi l'eliminazione di <strong>{{ oggetto }}</strong>?</p>
+        <form method="post" class="form-actions">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Elimina</button>
+            <button type="button" class="btn btn-secondary js-page-back-btn" data-fallback-url="{% url 'home' %}">Annulla</button>
+        </form>
+    </div>
+{% endblock %}

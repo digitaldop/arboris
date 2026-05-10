@@ -1,0 +1,48 @@
+{% extends "popup_base.html" %}
+{% load static %}
+
+{% block title %}{{ titolo }} - Arboris School Management{% endblock %}
+
+{% block content %}
+    <div class="content-card related-config-popup-card">
+        <form method="post" class="related-config-popup-form">
+            {% csrf_token %}
+            <input type="hidden" name="popup" value="1">
+            <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
+
+            <div class="related-relation-popup-hero">
+                <span class="related-relation-icon-tile danger" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                </span>
+                <div class="related-relation-popup-title-block">
+                    <div class="related-config-kicker">Anagrafica</div>
+                    <h1 class="page-title">{{ titolo }}</h1>
+                    <p>{{ descrizione }}</p>
+                </div>
+            </div>
+
+            <div class="related-address-popup-info related-address-duplicate-warning">
+                <span class="related-address-popup-info-icon" aria-hidden="true">!</span>
+                <div>
+                    <p>Confermi l'eliminazione di <strong>{{ oggetto }}</strong>?</p>
+                    <p>Se l'etichetta e' gia usata da un contatto, il sistema potrebbe impedire l'eliminazione.</p>
+                </div>
+            </div>
+
+            <div class="related-config-popup-actions">
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                    </span>
+                    <span class="btn-label">Elimina</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Dipendenti - Dipendenti e collaboratori{% endblock %}
+{% block title %}{{ dipendenti_labels.title|default:"Dipendenti" }} - Dipendenti e collaboratori{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -9,210 +9,204 @@
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'dashboard_gestione_amministrativa' %}">Dipendenti e collaboratori</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <span>Dipendenti</span>
+        <span>{{ dipendenti_labels.title|default:"Dipendenti" }}</span>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="scambio-list-shell ga-dipendenti-list-shell">
-        <div class="page-head scambio-list-head">
-            <div class="page-head-title-block">
-                <span class="page-head-icon scambio-list-title-icon" aria-hidden="true">
-                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+    <div class="page-head family-page-head anagrafica-list-head ga-dipendenti-list-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">{{ dipendenti_labels.title|default:"Dipendenti" }}</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ dipendenti_stats.totale }} {% if dipendenti_stats.totale == 1 %}scheda{% else %}schede{% endif %}
                 </span>
-                <div>
-                    <div class="family-page-title-line">
-                        <h1 class="page-title">Dipendenti</h1>
-                        <span class="family-status-pill is-muted">
-                            <span class="family-status-dot" aria-hidden="true"></span>
-                            {{ dipendenti_stats.totale }} {% if dipendenti_stats.totale == 1 %}scheda{% else %}schede{% endif %}
-                        </span>
-                    </div>
-                    <div class="family-page-address">
-                        <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
-                        Archivio dipendenti, contratti e previsioni retributive
-                    </div>
-                </div>
             </div>
-            <div class="page-head-actions">
-                <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                    <span class="btn-label">Contratti</span>
-                </a>
-                <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
-                    <span class="btn-label">Buste paga</span>
-                </a>
-                {% if can_manage_gestione_amministrativa %}
-                    <a href="{% url 'crea_dipendente' %}" class="btn btn-primary btn-icon-text btn-add-action">
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                        <span class="btn-label">Nuovo dipendente</span>
-                    </a>
-                {% endif %}
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true">
+                    <svg>
+                        {% if dipendenti_labels.scope == "educatori" %}
+                            <use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use>
+                        {% else %}
+                            <use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use>
+                        {% endif %}
+                    </svg>
+                </span>
+                {{ dipendenti_labels.subtitle|default:"Archivio dipendenti, contratti e previsioni retributive" }}
             </div>
         </div>
-
-        <section class="scambio-list-kpi-grid" aria-label="Riepilogo dipendenti">
-            <article class="scambio-list-kpi-card">
-                <div class="scambio-list-kpi-copy">
-                    <span class="scambio-list-kpi-label">Dipendenti totali</span>
-                    <strong class="scambio-list-kpi-value">{{ dipendenti_stats.totale }}</strong>
-                    <span class="scambio-list-kpi-note">Schede presenti</span>
-                </div>
-                <span class="scambio-list-kpi-icon is-blue" aria-hidden="true">
-                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
-                </span>
-            </article>
-            <article class="scambio-list-kpi-card">
-                <div class="scambio-list-kpi-copy">
-                    <span class="scambio-list-kpi-label">Attivi</span>
-                    <strong class="scambio-list-kpi-value is-green">{{ dipendenti_stats.attivi }}</strong>
-                    <span class="scambio-list-kpi-note">Operativi nel sistema</span>
-                </div>
-                <span class="scambio-list-kpi-icon is-green" aria-hidden="true">
-                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
-                </span>
-            </article>
-            <article class="scambio-list-kpi-card">
-                <div class="scambio-list-kpi-copy">
-                    <span class="scambio-list-kpi-label">Sospesi / cessati</span>
-                    <strong class="scambio-list-kpi-value is-amber">{{ dipendenti_stats.sospesi }}</strong>
-                    <span class="scambio-list-kpi-note">{{ dipendenti_stats.cessati }} cessati</span>
-                </div>
-                <span class="scambio-list-kpi-icon is-amber" aria-hidden="true">
-                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
-                </span>
-            </article>
-            <article class="scambio-list-kpi-card">
-                <div class="scambio-list-kpi-copy">
-                    <span class="scambio-list-kpi-label">Contratti e buste</span>
-                    <strong class="scambio-list-kpi-value is-purple">{{ dipendenti_stats.contratti }}</strong>
-                    <span class="scambio-list-kpi-note">{{ dipendenti_stats.buste }} buste collegate</span>
-                </div>
-                <span class="scambio-list-kpi-icon is-purple" aria-hidden="true">
-                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
-                </span>
-            </article>
-        </section>
-
-        <section class="scambio-list-card" aria-label="Filtri dipendenti">
-            <form method="get" class="scambio-list-filter-form">
-                <label class="scambio-list-search ga-dipendenti-search">
-                    <span class="scambio-list-search-icon" aria-hidden="true">
-                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg>
-                    </span>
-                    <input type="search" name="q" value="{{ q }}" data-ga-dipendenti-search placeholder="Cerca nome, codice, email..." aria-label="Cerca dipendenti">
-                </label>
-                <label class="scambio-list-filter-field">
-                    <span>Stato</span>
-                    <select name="stato">
-                        <option value="">Tutti</option>
-                        {% for value, label in stati %}
-                            <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <button type="submit" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
-                    <span class="btn-label">Filtra</span>
-                </button>
-                <a href="{% url 'lista_dipendenti' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                    <span class="btn-label">Pulisci</span>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'lista_contratti_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                <span class="btn-label">Contratti</span>
+            </a>
+            <a href="{% url 'lista_buste_paga_dipendenti' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                <span class="btn-label">Buste paga</span>
+            </a>
+            {% if can_manage_gestione_amministrativa %}
+                <a href="{% url dipendenti_labels.create_url %}" class="btn btn-primary btn-icon-text btn-add-action">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">{{ dipendenti_labels.new_label|default:"Nuovo dipendente" }}</span>
                 </a>
-            </form>
-        </section>
+            {% endif %}
+        </div>
+    </div>
 
-        <section class="scambio-list-card" aria-labelledby="ga-dipendenti-list-title">
-            <div class="scambio-list-card-head">
-                <div>
-                    <h2 id="ga-dipendenti-list-title">Elenco dipendenti</h2>
-                    <p>Contatti, stato amministrativo e documenti collegati.</p>
-                </div>
-            </div>
+    <div class="list-toolbar anagrafica-list-toolbar-card ga-dipendenti-toolbar">
+        <form method="get" class="search-form anagrafica-search-form ga-dipendenti-search-form">
+            <label class="anagrafica-search-field">
+                <span class="anagrafica-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ q }}"
+                    data-ga-dipendenti-search
+                    placeholder="Cerca per nome, codice, email, telefono..."
+                    class="search-input"
+                    aria-label="Cerca {{ dipendenti_labels.plural|default:'dipendenti' }}"
+                >
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Stato</span>
+                <select name="stato" aria-label="Filtra per stato">
+                    <option value="">Tutti</option>
+                    {% for value, label in stati %}
+                        <option value="{{ value }}" {% if stato == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <span class="btn-label">Cerca</span>
+            </button>
+            <a href="{% url dipendenti_labels.list_url %}" class="btn btn-secondary btn-icon-text"{% if not q and not stato %} hidden{% endif %}>
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Pulisci</span>
+            </a>
+        </form>
+    </div>
 
-            <div class="scambio-list-table-wrap">
-                <table class="list-table anagrafica-list-table scambio-list-table ga-dipendenti-list-table">
+    <div class="panel panel-standalone list-live-search-results anagrafica-list-panel ga-dipendenti-list-panel" id="ga-dipendenti-results">
+        <div class="panel-body">
+            {% if dipendenti %}
+                <table class="list-table anagrafica-list-table ga-dipendenti-list-table">
                     <colgroup>
                         <col class="ga-dipendenti-col-person">
-                        <col class="ga-dipendenti-col-code">
-                        <col class="ga-dipendenti-col-status">
-                        <col class="ga-dipendenti-col-hiring">
+                        <col class="ga-dipendenti-col-role">
                         <col class="ga-dipendenti-col-links">
-                        <col class="ga-dipendenti-col-contact">
+                        <col class="ga-dipendenti-col-phone">
+                        <col class="ga-dipendenti-col-email">
+                        <col class="ga-dipendenti-col-status">
                         <col class="ga-dipendenti-col-actions">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th>Dipendente</th>
-                            <th>Codici</th>
-                            <th>Stato</th>
-                            <th>Assunzione</th>
+                            <th>{{ dipendenti_labels.singular_cap|default:"Dipendente" }}</th>
+                            <th>Ruolo</th>
                             <th>Collegamenti</th>
-                            <th>Contatti</th>
-                            <th class="ga-dipendenti-actions-head">Azioni</th>
+                            <th>Telefono</th>
+                            <th>Email</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for dipendente in dipendenti %}
-                            <tr class="list-row-link" data-row-href="{% url 'modifica_dipendente' dipendente.pk %}" data-ga-dipendente-row>
-                                <td class="scambio-list-main-cell ga-dipendenti-main-cell">
-                                    <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="scambio-list-main-link">
-                                        <span class="scambio-list-row-icon" aria-hidden="true">
-                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                            <tr class="list-row-link" data-row-href="{% url dipendenti_labels.detail_url dipendente.pk %}" data-ga-dipendente-row>
+                                <td class="anagrafica-record-cell">
+                                    <a href="{% url dipendenti_labels.detail_url dipendente.pk %}" class="anagrafica-record-link">
+                                        <span class="anagrafica-record-avatar anagrafica-record-avatar-work {% if dipendenti_labels.scope == 'educatori' and dipendente.is_educatore %}anagrafica-record-avatar-educator{% else %}anagrafica-record-avatar-employee{% endif %}" aria-hidden="true">
+                                            <svg>
+                                                {% if dipendenti_labels.scope == "educatori" and dipendente.is_educatore %}
+                                                    <use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use>
+                                                {% else %}
+                                                    <use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use>
+                                                {% endif %}
+                                            </svg>
                                         </span>
-                                        <span class="scambio-list-row-copy">
-                                            <strong>{{ dipendente }}</strong>
-                                            <span>{{ dipendente.codice_fiscale|default:"Codice fiscale non indicato" }}</span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ dipendente }}</span>
+                                            <span class="table-subtext">
+                                                {% if dipendente.codice_dipendente %}
+                                                    Matricola {{ dipendente.codice_dipendente }}
+                                                {% elif dipendente.codice_fiscale %}
+                                                    CF {{ dipendente.codice_fiscale }}
+                                                {% else %}
+                                                    Dati anagrafici essenziali
+                                                {% endif %}
+                                            </span>
                                         </span>
                                     </a>
                                 </td>
-                                <td>
-                                    <strong>{{ dipendente.codice_dipendente|default:"-" }}</strong>
-                                    <div class="ga-dipendenti-meta">Matricola</div>
+                                <td class="family-label-cell">
+                                    <div class="table-main-text">
+                                        {% if dipendente.is_educatore and dipendente.is_dipendente_operativo %}
+                                            {{ educator_terminology.selected_singular }} e dipendente
+                                        {% elif dipendente.is_educatore %}
+                                            {{ educator_terminology.selected_singular }}
+                                        {% else %}
+                                            Dipendente
+                                        {% endif %}
+                                    </div>
+                                    <div class="table-subtext">
+                                        {% if dipendente.classe_principale_label %}
+                                            {{ dipendente.classe_principale_tipo_label }} {{ dipendente.classe_principale_label }}
+                                        {% elif dipendente.mansione %}
+                                            {{ dipendente.mansione }}
+                                        {% elif dipendente.data_assunzione %}
+                                            Dal {{ dipendente.data_assunzione|date:"d/m/Y" }}
+                                        {% else %}
+                                            Ruolo amministrativo
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 <td>
-                                    {% if dipendente.stato == "attivo" %}
-                                        <span class="scambio-list-status-chip is-success">Attivo</span>
-                                    {% elif dipendente.stato == "sospeso" %}
-                                        <span class="scambio-list-status-chip is-amber">Sospeso</span>
+                                    <span class="anagrafica-status-chip is-muted">{{ dipendente.numero_contratti }} contratti</span>
+                                    <div class="table-subtext">
+                                        {{ dipendente.numero_buste }} buste paga{% if dipendente.numero_documenti %} · {{ dipendente.numero_documenti }} documenti{% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if dipendente.formatted_telefono %}
+                                        <a class="anagrafica-inline-link" href="https://wa.me/{{ dipendente.telefono }}" target="_blank" rel="noopener noreferrer">{{ dipendente.formatted_telefono }}</a>
+                                    {% elif dipendente.telefono %}
+                                        <span>{{ dipendente.telefono }}</span>
                                     {% else %}
-                                        <span class="scambio-list-status-chip is-muted">Cessato</span>
+                                        <span class="table-muted">-</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <strong>{% if dipendente.data_assunzione %}{{ dipendente.data_assunzione|date:"d/m/Y" }}{% else %}-{% endif %}</strong>
-                                    {% if dipendente.data_cessazione %}
-                                        <div class="ga-dipendenti-meta">Fine {{ dipendente.data_cessazione|date:"d/m/Y" }}</div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="scambio-list-status-chip is-blue">{{ dipendente.numero_contratti }} contratti</span>
-                                    <div class="ga-dipendenti-meta">{{ dipendente.numero_buste }} buste paga</div>
                                 </td>
                                 <td>
                                     {% if dipendente.email %}
-                                        <strong>{{ dipendente.email }}</strong>
+                                        <a class="anagrafica-inline-link" href="mailto:{{ dipendente.email }}">{{ dipendente.email }}</a>
                                     {% else %}
-                                        <strong>-</strong>
+                                        <span class="table-muted">-</span>
                                     {% endif %}
-                                    {% if dipendente.formatted_telefono or dipendente.telefono %}
-                                        <div class="ga-dipendenti-meta">
-                                            {% if dipendente.formatted_telefono %}{{ dipendente.formatted_telefono }}{% else %}{{ dipendente.telefono }}{% endif %}
-                                        </div>
+                                </td>
+                                <td>
+                                    {% if dipendente.stato == "attivo" %}
+                                        <span class="anagrafica-status-chip is-success">Attivo</span>
+                                    {% elif dipendente.stato == "sospeso" %}
+                                        <span class="anagrafica-status-chip is-amber">Sospeso</span>
+                                    {% else %}
+                                        <span class="anagrafica-status-chip is-danger">Cessato</span>
                                     {% endif %}
                                 </td>
                                 <td class="actions-cell">
-                                    <div class="table-icon-actions scambio-list-actions ga-dipendenti-actions">
-                                        <a href="{% url 'modifica_dipendente' dipendente.pk %}" class="table-icon-link" title="Apri scheda" aria-label="Apri dipendente {{ dipendente }}">
-                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg>
-                                        </a>
+                                    <div class="table-icon-actions anagrafica-row-actions ga-dipendenti-actions">
+                                        <a
+                                            class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                            href="{% url dipendenti_labels.detail_url dipendente.pk %}"
+                                            title="Apri scheda"
+                                            aria-label="Apri {{ dipendenti_labels.singular|default:'dipendente' }} {{ dipendente }}"
+                                        ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
                                         {% if can_manage_gestione_amministrativa %}
                                             <form method="post" action="{% url 'genera_previsione_busta_paga' dipendente.pk %}" class="ga-dipendenti-inline-action" title="Genera previsione">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="anno" value="{{ anno_corrente }}">
                                                 <input type="hidden" name="mese" value="{{ mese_corrente }}">
-                                                <button type="submit" class="table-icon-link ga-dipendenti-generate-btn" aria-label="Genera previsione per {{ dipendente }}">
+                                                <button type="submit" class="table-icon-link anagrafica-action-btn ga-dipendenti-generate-btn" aria-label="Genera previsione per {{ dipendente }}">
                                                     <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
                                                 </button>
                                             </form>
@@ -220,24 +214,25 @@
                                     </div>
                                 </td>
                             </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7"><div class="empty-state">Nessun dipendente trovato.</div></td>
-                            </tr>
                         {% endfor %}
                         <tr class="ga-dipendenti-empty-filter-row" hidden>
-                            <td colspan="7"><div class="empty-state">Nessun dipendente corrisponde alla ricerca.</div></td>
+                            <td colspan="7"><div class="empty-state">Nessun {{ dipendenti_labels.singular|default:"dipendente" }} corrisponde alla ricerca.</div></td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
-
-            <div class="scambio-list-footer">
+            {% else %}
+                <div class="empty-state">
+                    Nessun {{ dipendenti_labels.singular|default:"dipendente" }} trovato.
+                </div>
+            {% endif %}
+        </div>
+        {% if dipendenti %}
+            <div class="scambio-list-footer ga-dipendenti-list-footer">
                 <span data-ga-dipendenti-count>
-                    {{ dipendenti_stats.totale }} {% if dipendenti_stats.totale == 1 %}dipendente{% else %}dipendenti{% endif %}
+                    {{ dipendenti_stats.totale }} {% if dipendenti_stats.totale == 1 %}{{ dipendenti_labels.singular|default:"dipendente" }}{% else %}{{ dipendenti_labels.plural|default:"dipendenti" }}{% endif %}
                 </span>
             </div>
-        </section>
+        {% endif %}
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
@@ -251,6 +246,8 @@
             const rows = Array.from(document.querySelectorAll("[data-ga-dipendente-row]"));
             const emptyRow = document.querySelector(".ga-dipendenti-empty-filter-row");
             const countNode = document.querySelector("[data-ga-dipendenti-count]");
+            const singularLabel = "{{ dipendenti_labels.singular|default:'dipendente'|escapejs }}";
+            const pluralLabel = "{{ dipendenti_labels.plural|default:'dipendenti'|escapejs }}";
 
             if (!searchInput || !rows.length) return;
 
@@ -265,7 +262,7 @@
                 });
 
                 if (emptyRow) emptyRow.hidden = visibleCount !== 0;
-                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " dipendente" : " dipendenti");
+                if (countNode) countNode.textContent = visibleCount + " " + (visibleCount === 1 ? singularLabel : pluralLabel);
             });
         });
     </script>

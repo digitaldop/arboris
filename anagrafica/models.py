@@ -1,8 +1,10 @@
 from django.core.exceptions import ValidationError
 import os
 
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.urls import reverse
 from django.utils.text import get_valid_filename
 from .utils import format_phone_number, whatsapp_url_from_phone
@@ -17,6 +19,16 @@ SESSO_CHOICES = [
     ("M", "Maschio"),
     ("F", "Femmina"),
 ]
+
+
+def _first_principal_link(manager):
+    if not manager:
+        return None
+    try:
+        links = list(manager.all().order_by("ordine", "id"))
+        return next((link for link in links if link.principale), links[0] if links else None)
+    except (AttributeError, TypeError):
+        return None
 
 #INIZIO MODELLI PER GLI INDIRIZZI
 #Classe per la regione italiana, da utilizzare come scelta per i campi regione degli indirizzi
@@ -297,125 +309,200 @@ class Indirizzo(models.Model):
             return f"{base} - {' - '.join(dettagli)}"
         return base
 
-#FINE MODELLI PER GLI INDIRIZZI
 
-#INIZIO MODELLI PER LE FAMIGLIE
-
-class StatoRelazioneFamiglia(models.Model):
-    stato = models.CharField(max_length=100, unique=True)
+class LabelIndirizzo(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
     ordine = models.IntegerField(blank=True, null=True)
-    attivo = models.BooleanField(default=True)
+    attiva = models.BooleanField(default=True)
     note = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["ordine", "stato"]
-        verbose_name = "Stato relazione famiglia"
-        verbose_name_plural = "Stati relazione famiglia"
+        ordering = ["ordine", "nome"]
+        verbose_name = "Etichetta indirizzo"
+        verbose_name_plural = "Etichette indirizzi"
 
     def __str__(self):
-        return self.stato
+        return self.nome
 
     def save(self, *args, **kwargs):
+        self.nome = (self.nome or "").strip()
         if self.ordine is None:
-            self.ordine = next_order_value(StatoRelazioneFamiglia)
+            self.ordine = next_order_value(LabelIndirizzo)
         super().save(*args, **kwargs)
 
 
-class Famiglia(models.Model):
-    cognome_famiglia = models.CharField(max_length=150)
-    stato_relazione_famiglia = models.ForeignKey(
-        StatoRelazioneFamiglia,
-        on_delete=models.PROTECT,
-        related_name="famiglie",
-    )
-    indirizzo_principale = models.ForeignKey(
-        Indirizzo,
-        on_delete=models.SET_NULL,
-        related_name="famiglie_principali",
-        blank=True,
-        null=True,
-    )
+class LabelTelefono(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+    ordine = models.IntegerField(blank=True, null=True)
     attiva = models.BooleanField(default=True)
-    data_creazione = models.DateTimeField(auto_now_add=True)
-    data_aggiornamento = models.DateTimeField(auto_now=True)
     note = models.TextField(blank=True)
 
     class Meta:
-        ordering = ["cognome_famiglia"]
-        verbose_name = "Famiglia"
-        verbose_name_plural = "Famiglie"
+        ordering = ["ordine", "nome"]
+        verbose_name = "Etichetta telefono"
+        verbose_name_plural = "Etichette telefoni"
 
     def __str__(self):
-        return self.cognome_famiglia
+        return self.nome
 
-    @staticmethod
-    def _format_person_name(person):
-        return " ".join(part for part in [person.nome, person.cognome] if part).strip()
+    def save(self, *args, **kwargs):
+        self.nome = (self.nome or "").strip()
+        if self.ordine is None:
+            self.ordine = next_order_value(LabelTelefono)
+        super().save(*args, **kwargs)
 
-    @staticmethod
-    def _join_limited(items, limit=2):
-        values = [item for item in items if item]
-        if not values:
-            return ""
 
-        visible = values[:limit]
-        label = ", ".join(visible)
-        remaining = len(values) - len(visible)
-        if remaining > 0:
-            label = f"{label} +{remaining}"
-        return label
+class LabelEmail(models.Model):
+    nome = models.CharField(max_length=80, unique=True)
+    ordine = models.IntegerField(blank=True, null=True)
+    attiva = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
 
-    def referenti_label(self):
-        familiari = list(self.familiari.all())
-        referenti = [familiare for familiare in familiari if familiare.referente_principale]
-        if not referenti:
-            referenti = familiari
+    class Meta:
+        ordering = ["ordine", "nome"]
+        verbose_name = "Etichetta email"
+        verbose_name_plural = "Etichette email"
 
-        return self._join_limited(
-            [self._format_person_name(familiare) for familiare in referenti],
-        )
+    def __str__(self):
+        return self.nome
 
-    def studenti_label(self):
-        return self._join_limited(
-            [self._format_person_name(studente) for studente in self.studenti.all()],
-        )
+    def save(self, *args, **kwargs):
+        self.nome = (self.nome or "").strip()
+        if self.ordine is None:
+            self.ordine = next_order_value(LabelEmail)
+        super().save(*args, **kwargs)
 
-    def label_disambiguazione(self):
-        dettagli = []
 
-        referenti = self.referenti_label()
-        if referenti:
-            dettagli.append(f"Referenti: {referenti}")
+class AnagraficaIndirizzo(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    indirizzo = models.ForeignKey(
+        Indirizzo,
+        on_delete=models.CASCADE,
+        related_name="collegamenti_anagrafici",
+    )
+    label = models.ForeignKey(
+        LabelIndirizzo,
+        on_delete=models.PROTECT,
+        related_name="collegamenti",
+    )
+    principale = models.BooleanField(default=False)
+    ordine = models.IntegerField(blank=True, null=True)
+    note = models.CharField(max_length=255, blank=True)
 
-        studenti = self.studenti_label()
-        if studenti:
-            dettagli.append(f"Studenti: {studenti}")
+    class Meta:
+        ordering = ["ordine", "id"]
+        verbose_name = "Indirizzo anagrafico"
+        verbose_name_plural = "Indirizzi anagrafici"
+        indexes = [
+            models.Index(fields=["content_type", "object_id"], name="anag_ind_owner_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id"],
+                condition=Q(principale=True),
+                name="unique_indirizzo_principale",
+            )
+        ]
 
-        if self.indirizzo_principale:
-            dettagli.append(f"Indirizzo: {self.indirizzo_principale.label_select()}")
+    def __str__(self):
+        return f"{self.label} - {self.indirizzo}"
 
-        return " | ".join(dettagli)
+    def save(self, *args, **kwargs):
+        if self.ordine is None:
+            self.ordine = next_order_value(AnagraficaIndirizzo)
+        super().save(*args, **kwargs)
 
-    def label_contesto_anagrafica(self):
-        dettagli = []
 
-        referenti = self.referenti_label()
-        if referenti:
-            dettagli.append(f"Referenti: {referenti}")
+class AnagraficaTelefono(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    numero = models.CharField(max_length=40)
+    label = models.ForeignKey(
+        LabelTelefono,
+        on_delete=models.PROTECT,
+        related_name="collegamenti",
+    )
+    principale = models.BooleanField(default=False)
+    ordine = models.IntegerField(blank=True, null=True)
+    note = models.CharField(max_length=255, blank=True)
 
-        studenti = self.studenti_label()
-        if studenti:
-            dettagli.append(f"Studenti: {studenti}")
+    class Meta:
+        ordering = ["ordine", "id"]
+        verbose_name = "Telefono anagrafico"
+        verbose_name_plural = "Telefoni anagrafici"
+        indexes = [
+            models.Index(fields=["content_type", "object_id"], name="anag_tel_owner_idx"),
+            models.Index(fields=["numero"], name="anag_tel_numero_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id"],
+                condition=Q(principale=True),
+                name="unique_telefono_principale",
+            )
+        ]
 
-        return " | ".join(dettagli)
+    def __str__(self):
+        return f"{self.label} - {format_phone_number(self.numero)}"
 
-    def label_select(self):
-        dettagli = self.label_disambiguazione()
-        if dettagli:
-            return f"{self.cognome_famiglia} - {dettagli}"
-        return self.cognome_famiglia
-    
-#FINE MODELLI PER LE FAMIGLIE
+    def save(self, *args, **kwargs):
+        self.numero = (self.numero or "").strip()
+        if self.ordine is None:
+            self.ordine = next_order_value(AnagraficaTelefono)
+        super().save(*args, **kwargs)
+
+    @property
+    def numero_formattato(self):
+        return format_phone_number(self.numero)
+
+    @property
+    def whatsapp_url(self):
+        return whatsapp_url_from_phone(self.numero)
+
+
+class AnagraficaEmail(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    email = models.EmailField()
+    label = models.ForeignKey(
+        LabelEmail,
+        on_delete=models.PROTECT,
+        related_name="collegamenti",
+    )
+    principale = models.BooleanField(default=False)
+    ordine = models.IntegerField(blank=True, null=True)
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["ordine", "id"]
+        verbose_name = "Email anagrafica"
+        verbose_name_plural = "Email anagrafiche"
+        indexes = [
+            models.Index(fields=["content_type", "object_id"], name="anag_email_owner_idx"),
+            models.Index(fields=["email"], name="anag_email_value_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["content_type", "object_id"],
+                condition=Q(principale=True),
+                name="unique_email_principale",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.label} - {self.email}"
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower()
+        if self.ordine is None:
+            self.ordine = next_order_value(AnagraficaEmail)
+        super().save(*args, **kwargs)
+
+#FINE MODELLI PER GLI INDIRIZZI
 
 #INIZIO MODELLI PER I FAMILIARI
 
@@ -439,10 +526,17 @@ class RelazioneFamiliare(models.Model):
     
 
 class Familiare(models.Model):
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.CASCADE,
-        related_name="familiari",
+    indirizzi_anagrafici = GenericRelation(
+        AnagraficaIndirizzo,
+        related_query_name="familiari",
+    )
+    telefoni_anagrafici = GenericRelation(
+        AnagraficaTelefono,
+        related_query_name="familiari",
+    )
+    email_anagrafiche = GenericRelation(
+        AnagraficaEmail,
+        related_query_name="familiari",
     )
     relazione_familiare = models.ForeignKey(
         RelazioneFamiliare,
@@ -501,15 +595,32 @@ class Familiare(models.Model):
 
     @property
     def indirizzo_effettivo(self):
-        return self.indirizzo or self.famiglia.indirizzo_principale
+        link = _first_principal_link(self.indirizzi_anagrafici)
+        if link and link.indirizzo_id:
+            return link.indirizzo
+        return self.indirizzo
+
+    @property
+    def telefono_principale(self):
+        link = _first_principal_link(self.telefoni_anagrafici)
+        if link and link.numero:
+            return link.numero
+        return self.telefono
+
+    @property
+    def email_principale(self):
+        link = _first_principal_link(self.email_anagrafiche)
+        if link and link.email:
+            return link.email
+        return self.email
 
     @property
     def formatted_telefono(self):
-        return format_phone_number(self.telefono)
+        return format_phone_number(self.telefono_principale)
 
     @property
     def telefono_whatsapp_url(self):
-        return whatsapp_url_from_phone(self.telefono)
+        return whatsapp_url_from_phone(self.telefono_principale)
 
     @property
     def luogo_nascita_display(self):
@@ -530,10 +641,23 @@ class Familiare(models.Model):
 # INIZIO MODELLI PER GLI STUDENTI
 
 class Studente(models.Model):
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.CASCADE,
-        related_name="studenti",
+    indirizzi_anagrafici = GenericRelation(
+        AnagraficaIndirizzo,
+        related_query_name="studenti",
+    )
+    telefoni_anagrafici = GenericRelation(
+        AnagraficaTelefono,
+        related_query_name="studenti",
+    )
+    email_anagrafiche = GenericRelation(
+        AnagraficaEmail,
+        related_query_name="studenti",
+    )
+    familiari = models.ManyToManyField(
+        Familiare,
+        through="StudenteFamiliare",
+        related_name="studenti_collegati",
+        blank=True,
     )
     indirizzo = models.ForeignKey(
         Indirizzo,
@@ -582,7 +706,20 @@ class Studente(models.Model):
 
     @property
     def indirizzo_effettivo(self):
-        return self.indirizzo or self.famiglia.indirizzo_principale
+        link = _first_principal_link(self.indirizzi_anagrafici)
+        if link and link.indirizzo_id:
+            return link.indirizzo
+        return self.indirizzo
+
+    @property
+    def telefono_principale(self):
+        link = _first_principal_link(self.telefoni_anagrafici)
+        return link.numero if link and link.numero else ""
+
+    @property
+    def email_principale(self):
+        link = _first_principal_link(self.email_anagrafiche)
+        return link.email if link and link.email else ""
 
     @property
     def luogo_nascita_display(self):
@@ -597,6 +734,47 @@ class Studente(models.Model):
         if self.nazionalita:
             return self.nazionalita.label_nazionalita
         return ""
+
+
+class StudenteFamiliare(models.Model):
+    studente = models.ForeignKey(
+        Studente,
+        on_delete=models.CASCADE,
+        related_name="relazioni_familiari",
+    )
+    familiare = models.ForeignKey(
+        Familiare,
+        on_delete=models.CASCADE,
+        related_name="relazioni_studenti",
+    )
+    relazione_familiare = models.ForeignKey(
+        RelazioneFamiliare,
+        on_delete=models.SET_NULL,
+        related_name="relazioni_studenti",
+        blank=True,
+        null=True,
+    )
+    referente_principale = models.BooleanField(default=False)
+    convivente = models.BooleanField(default=False)
+    attivo = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["studente__cognome", "studente__nome", "familiare__cognome", "familiare__nome"]
+        verbose_name = "Relazione studente-familiare"
+        verbose_name_plural = "Relazioni studenti-familiari"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["studente", "familiare"],
+                name="unique_studente_familiare",
+            )
+        ]
+
+    def __str__(self):
+        relazione = f" ({self.relazione_familiare})" if self.relazione_familiare_id else ""
+        return f"{self.studente} - {self.familiare}{relazione}"
     
 # FINE MODELLI PER GLI STUDENTI
 
@@ -624,8 +802,6 @@ def documento_upload_to(instance, filename):
         owner_folder = "studenti"
     elif getattr(instance, "familiare_id", None):
         owner_folder = "familiari"
-    elif getattr(instance, "famiglia_id", None):
-        owner_folder = "famiglie"
     else:
         owner_folder = "non_associati"
 
@@ -653,13 +829,6 @@ class TipoDocumento(models.Model):
 
 
 class Documento(models.Model):
-    famiglia = models.ForeignKey(
-        Famiglia,
-        on_delete=models.CASCADE,
-        related_name="documenti",
-        blank=True,
-        null=True,
-    )
     familiare = models.ForeignKey(
         Familiare,
         on_delete=models.CASCADE,
@@ -709,7 +878,7 @@ class Documento(models.Model):
         return reverse("apri_documento", kwargs={"pk": self.pk})
 
     def clean(self):
-        owners = [self.famiglia_id, self.familiare_id, self.studente_id]
+        owners = [self.familiare_id, self.studente_id]
         valorizzati = sum(bool(x) for x in owners)
         if valorizzati > 1:
             raise ValidationError(

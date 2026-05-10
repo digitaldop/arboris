@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from django.urls import reverse
 from django.utils import timezone
 
+from anagrafica.family_logic import build_logical_family_snapshot, logical_family_detail_url
 from anagrafica.models import Documento
 from economia.models import RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
@@ -271,8 +272,6 @@ def get_document_owner_metadata(documento):
         return str(documento.studente), reverse("modifica_studente", kwargs={"pk": documento.studente_id})
     if documento.familiare_id:
         return str(documento.familiare), reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
-    if documento.famiglia_id:
-        return f"Famiglia {documento.famiglia}", reverse("modifica_famiglia", kwargs={"pk": documento.famiglia_id})
     return "Documento", ""
 
 

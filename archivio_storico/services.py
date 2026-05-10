@@ -7,7 +7,8 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from anagrafica.models import Documento, Familiare, Famiglia, Studente
+from anagrafica.family_logic import iter_logical_family_snapshots, logical_family_summary_for_person
+from anagrafica.models import Documento, Familiare, Studente, StudenteFamiliare
 from archivio_storico.models import ArchivioAnnoScolastico, ArchivioSnapshot, TipoSnapshotStorico
 from economia.models import Iscrizione, RataIscrizione, TariffaCondizioneIscrizione
 from osservazioni.models import OsservazioneStudente
@@ -63,21 +64,26 @@ def anno_scolastico_archiviabile(anno_scolastico, today=None):
 def get_archiviazione_preview(anno_scolastico):
     iscrizioni_qs = Iscrizione.objects.filter(anno_scolastico=anno_scolastico)
     studenti_ids = set(iscrizioni_qs.values_list("studente_id", flat=True))
-    famiglie_ids = set(
-        Studente.objects.filter(pk__in=studenti_ids).values_list("famiglia_id", flat=True)
+    familiari_ids = set(
+        StudenteFamiliare.objects.filter(studente_id__in=studenti_ids, attivo=True)
+        .values_list("familiare_id", flat=True)
     )
-    familiari_ids = set(Familiare.objects.filter(famiglia_id__in=famiglie_ids).values_list("pk", flat=True))
+    famiglie_count = sum(
+        1
+        for snapshot in iter_logical_family_snapshots()
+        if studenti_ids.intersection(snapshot.student_ids)
+    )
 
     documenti_qs = Documento.objects.filter(
         data_caricamento__gte=anno_scolastico.data_inizio,
         data_caricamento__lte=anno_scolastico.data_fine,
     ).filter(
-        build_documenti_owner_query(studenti_ids, famiglie_ids, familiari_ids)
+        build_documenti_owner_query(studenti_ids, familiari_ids)
     )
 
     return {
         "classi": iscrizioni_qs.exclude(classe_id__isnull=True).values("classe_id").distinct().count(),
-        "famiglie": len(famiglie_ids),
+        "famiglie": famiglie_count,
         "familiari": len(familiari_ids),
         "studenti": len(studenti_ids),
         "iscrizioni": iscrizioni_qs.count(),
@@ -143,11 +149,8 @@ def build_archivio_snapshots(archivio):
         Iscrizione.objects.filter(anno_scolastico=anno)
         .select_related(
             "studente",
-            "studente__famiglia",
             "studente__indirizzo__citta__provincia",
             "studente__indirizzo__provincia",
-            "studente__famiglia__indirizzo_principale__citta__provincia",
-            "studente__famiglia__indirizzo_principale__provincia",
             "classe",
             "gruppo_classe",
             "stato_iscrizione",
@@ -162,40 +165,20 @@ def build_archivio_snapshots(archivio):
     )
 
     studenti_by_id = {}
-    famiglie_by_id = {}
     for iscrizione in iscrizioni:
         studenti_by_id[iscrizione.studente_id] = iscrizione.studente
-        if iscrizione.studente.famiglia_id:
-            famiglie_by_id[iscrizione.studente.famiglia_id] = iscrizione.studente.famiglia
 
-    famiglie = sorted(famiglie_by_id.values(), key=lambda item: ((item.cognome_famiglia or "").lower(), item.pk))
     studenti = sorted(studenti_by_id.values(), key=lambda item: ((item.cognome or "").lower(), (item.nome or "").lower(), item.pk))
-    familiari = Familiare.objects.filter(famiglia_id__in=famiglie_by_id.keys()).select_related(
-        "famiglia",
+    familiari_ids = set(
+        StudenteFamiliare.objects.filter(studente_id__in=studenti_by_id.keys(), attivo=True)
+        .values_list("familiare_id", flat=True)
+    )
+    familiari = Familiare.objects.filter(pk__in=familiari_ids).select_related(
         "relazione_familiare",
         "indirizzo__citta__provincia",
         "indirizzo__provincia",
         "luogo_nascita__provincia",
-    ).order_by("famiglia__cognome_famiglia", "cognome", "nome", "id")
-
-    for famiglia in famiglie:
-        ordine += 1
-        snapshots.append(
-            create_snapshot(
-                archivio,
-                famiglia,
-                TipoSnapshotStorico.FAMIGLIA,
-                famiglia.cognome_famiglia,
-                {
-                    "cognome_famiglia": famiglia.cognome_famiglia,
-                    "stato_relazione": str(famiglia.stato_relazione_famiglia) if famiglia.stato_relazione_famiglia_id else "",
-                    "indirizzo_principale": address_label(famiglia.indirizzo_principale),
-                    "referenti": famiglia.referenti_label(),
-                    "note": famiglia.note,
-                },
-                ordine,
-            )
-        )
+    ).prefetch_related("relazioni_studenti__studente").order_by("cognome", "nome", "id")
 
     for familiare in familiari:
         ordine += 1
@@ -206,7 +189,7 @@ def build_archivio_snapshots(archivio):
                 TipoSnapshotStorico.FAMILIARE,
                 str(familiare),
                 {
-                    "famiglia": familiare.famiglia.cognome_famiglia if familiare.famiglia_id else "",
+                    "famiglia": logical_family_summary_for_person(familiare)["label"],
                     "nome": familiare.nome,
                     "cognome": familiare.cognome,
                     "relazione": str(familiare.relazione_familiare) if familiare.relazione_familiare_id else "",
@@ -215,7 +198,7 @@ def build_archivio_snapshots(archivio):
                     "codice_fiscale": familiare.codice_fiscale,
                     "telefono": familiare.telefono,
                     "email": familiare.email,
-                    "indirizzo": address_label(familiare.indirizzo or getattr(familiare.famiglia, "indirizzo_principale", None)),
+                    "indirizzo": address_label(familiare.indirizzo),
                     "convivente": familiare.convivente,
                     "referente_principale": familiare.referente_principale,
                     "scambio_retta": familiare.abilitato_scambio_retta,
@@ -233,7 +216,7 @@ def build_archivio_snapshots(archivio):
                 TipoSnapshotStorico.STUDENTE,
                 str(studente),
                 {
-                    "famiglia": studente.famiglia.cognome_famiglia if studente.famiglia_id else "",
+                    "famiglia": logical_family_summary_for_person(studente)["label"],
                     "nome": studente.nome,
                     "cognome": studente.cognome,
                     "data_nascita": studente.data_nascita,
@@ -258,7 +241,7 @@ def build_archivio_snapshots(archivio):
                 str(iscrizione),
                 {
                     "studente": str(iscrizione.studente),
-                    "famiglia": iscrizione.studente.famiglia.cognome_famiglia if iscrizione.studente.famiglia_id else "",
+                    "famiglia": logical_family_summary_for_person(iscrizione.studente)["label"],
                     "classe": str(iscrizione.classe) if iscrizione.classe_id else "",
                     "pluriclasse": (
                         iscrizione.gruppo_classe.nome_gruppo_classe if iscrizione.gruppo_classe_id else ""
@@ -290,7 +273,7 @@ def build_archivio_snapshots(archivio):
                     f"{rata.display_label} - {iscrizione.studente}",
                     {
                         "studente": str(iscrizione.studente),
-                        "famiglia": iscrizione.studente.famiglia.cognome_famiglia if iscrizione.studente.famiglia_id else "",
+                        "famiglia": logical_family_summary_for_person(iscrizione.studente)["label"],
                         "iscrizione": str(iscrizione),
                         "tipo_rata": rata.get_tipo_rata_display(),
                         "numero_rata": rata.numero_rata,
@@ -344,14 +327,14 @@ def build_archivio_snapshots(archivio):
     documenti = (
         Documento.objects.filter(data_caricamento__gte=anno.data_inizio, data_caricamento__lte=anno.data_fine)
         .filter(
-            build_documenti_owner_query(studenti_by_id.keys(), famiglie_by_id.keys(), familiari_ids)
+            build_documenti_owner_query(studenti_by_id.keys(), familiari_ids)
         )
-        .select_related("tipo_documento", "famiglia", "familiare", "studente")
+        .select_related("tipo_documento", "familiare", "studente")
         .order_by("data_caricamento", "id")
     )
     for documento in documenti:
         ordine += 1
-        owner = documento.studente or documento.familiare or documento.famiglia
+        owner = documento.studente or documento.familiare
         snapshots.append(
             create_snapshot(
                 archivio,
@@ -376,10 +359,9 @@ def build_archivio_snapshots(archivio):
     return snapshots
 
 
-def build_documenti_owner_query(studenti_ids, famiglie_ids, familiari_ids):
+def build_documenti_owner_query(studenti_ids, familiari_ids):
     return (
         Q(studente_id__in=list(studenti_ids))
-        | Q(famiglia_id__in=list(famiglie_ids))
         | Q(familiare_id__in=list(familiari_ids))
     )
 

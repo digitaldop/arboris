@@ -12,30 +12,18 @@
         {% csrf_token %}
         <div class="content-card">
             <table class="form-table">
+                {% if form.familiari_collegati %}
                 <tr>
-                    <th>{{ form.famiglia.label_tag }}</th>
+                    <th>{{ form.familiari_collegati.label_tag }}</th>
                     <td>
-                        <div class="related-field-row popup-related-field">
-                            <div class="related-field-stack">
-                                <div class="autocomplete-wrapper famiglia-autocomplete">
-                                    {{ form.famiglia }}
-                                </div>
-                            </div>
-                            <div class="related-actions">
-                                <button type="button" class="related-btn related-btn-add" id="popup-add-famiglia-btn" aria-label="Nuova famiglia" title="Nuova famiglia" data-floating-text="Nuova famiglia">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                </button>
-                                <button type="button" class="related-btn related-btn-edit" id="popup-edit-famiglia-btn" aria-label="Modifica famiglia" title="Modifica famiglia" data-floating-text="Modifica famiglia">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                </button>
-                                <button type="button" class="related-btn related-btn-delete" id="popup-delete-famiglia-btn" aria-label="Elimina famiglia" title="Elimina famiglia" data-floating-text="Elimina famiglia">
-                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        {{ form.famiglia.errors }}
+                        {{ form.familiari_collegati }}
+                        {% if form.familiari_collegati.help_text %}
+                            <div class="field-help">{{ form.familiari_collegati.help_text }}</div>
+                        {% endif %}
+                        {{ form.familiari_collegati.errors }}
                     </td>
                 </tr>
+                {% endif %}
                 <tr><th>{{ form.nome.label_tag }}</th><td>{{ form.nome }} {{ form.nome.errors }}</td></tr>
                 <tr><th>{{ form.cognome.label_tag }}</th><td>{{ form.cognome }} {{ form.cognome.errors }}</td></tr>
                 <tr><th>{{ form.data_nascita.label_tag }}</th><td>{{ form.data_nascita }} {{ form.data_nascita.errors }}</td></tr>
@@ -81,7 +69,7 @@
                             </div>
                         </div>
                         <div class="inline-address-help" id="popup-studente-address-help">
-                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                            Se lasci vuoto, potrai collegare un indirizzo principale dalla sezione contatti.
                         </div>
                         {{ form.indirizzo.errors }}
                     </td>
@@ -96,11 +84,7 @@
         </div>
     </form>
 
-    {% if studente and studente.famiglia and studente.famiglia.indirizzo_principale %}
-        {{ studente.famiglia.indirizzo_principale.label_full|json_script:"popup-studente-famiglia-indirizzo-label" }}
-    {% else %}
-        <script id="popup-studente-famiglia-indirizzo-label" type="application/json">""</script>
-    {% endif %}
+    <script id="popup-studente-famiglia-indirizzo-label" type="application/json">""</script>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/pages/studente-popup-form.js' %}?v=6"></script>

@@ -2,10 +2,20 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
+from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
+from anagrafica.forms import (
+    anagrafica_contact_formsets_are_valid,
+    anagrafica_contact_formsets_have_errors,
+    build_anagrafica_contact_formsets,
+    save_anagrafica_contact_formsets,
+)
+from economia.models import Iscrizione
+from sistema.models import SistemaImpostazioniGenerali
+from scuola.utils import resolve_default_anno_scolastico
 
 from .forms import (
     BustaPagaDipendenteForm,
@@ -17,9 +27,12 @@ from .forms import (
 )
 from .models import (
     BustaPagaDipendente,
+    CategoriaDatoPayrollUfficiale,
     ContrattoDipendente,
+    DatoPayrollUfficiale,
     Dipendente,
     ParametroCalcoloStipendio,
+    RuoloAnagraficoDipendente,
     SimulazioneCostoDipendente,
     StatoBustaPaga,
     StatoDipendente,
@@ -31,12 +44,115 @@ from .services import crea_o_aggiorna_previsione_busta_paga
 ZERO = Decimal("0.00")
 
 
+def gestione_dipendenti_dettagliata_attiva():
+    try:
+        impostazioni = SistemaImpostazioniGenerali.objects.first()
+    except (OperationalError, ProgrammingError):
+        return False
+    return bool(getattr(impostazioni, "gestione_dipendenti_dettagliata_attiva", False))
+
+
+def redirect_if_dipendenti_simple(request):
+    if gestione_dipendenti_dettagliata_attiva():
+        return None
+    messages.info(
+        request,
+        "La gestione dettagliata dei dipendenti e disattivata: usa dipendenti, contratti e buste paga.",
+    )
+    return redirect("lista_dipendenti")
+
+
 def _current_period():
     today = timezone.localdate()
     return today.year, today.month
 
 
+def _ruoli_for_scope(scope):
+    if scope == "educatori":
+        return [RuoloAnagraficoDipendente.EDUCATORE, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE]
+    return [RuoloAnagraficoDipendente.DIPENDENTE, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE]
+
+
+def _dipendente_labels(scope):
+    if scope == "educatori":
+        try:
+            impostazioni = SistemaImpostazioniGenerali.objects.first()
+        except (OperationalError, ProgrammingError):
+            impostazioni = None
+        singular_cap = getattr(impostazioni, "termine_educatore_singolare", "Educatore") if impostazioni else "Educatore"
+        plural_cap = getattr(impostazioni, "termine_educatore_plurale", "Educatori") if impostazioni else "Educatori"
+        singular = singular_cap.lower()
+        plural = plural_cap.lower()
+        return {
+            "scope": "educatori",
+            "title": plural_cap,
+            "singular": singular,
+            "singular_cap": singular_cap,
+            "plural": plural,
+            "plural_cap": plural_cap,
+            "subtitle": f"Archivio {plural}, classi principali, contratti e documenti collegati",
+            "list_title": f"Elenco {plural}",
+            "new_label": f"Nuovo {singular}",
+            "list_url": "lista_educatori",
+            "create_url": "crea_educatore",
+            "detail_url": "modifica_educatore",
+            "delete_url": "elimina_educatore",
+            "icon": "student",
+        }
+    return {
+        "scope": "dipendenti",
+        "title": "Dipendenti",
+        "singular": "dipendente",
+        "singular_cap": "Dipendente",
+        "plural": "dipendenti",
+        "plural_cap": "Dipendenti",
+        "subtitle": "Archivio dipendenti, contratti e previsioni retributive",
+        "list_title": "Elenco dipendenti",
+        "new_label": "Nuovo dipendente",
+        "list_url": "lista_dipendenti",
+        "create_url": "crea_dipendente",
+        "detail_url": "modifica_dipendente",
+        "delete_url": "elimina_dipendente",
+        "icon": "briefcase",
+    }
+
+
+def _studenti_classe_principale(dipendente):
+    if not dipendente or not dipendente.is_educatore:
+        return []
+
+    if not dipendente.classe_principale_id and not getattr(dipendente, "gruppo_classe_principale_id", None):
+        return []
+
+    anno = resolve_default_anno_scolastico()
+    iscrizioni = (
+        Iscrizione.objects.select_related("studente")
+        .filter(attiva=True)
+        .order_by("studente__cognome", "studente__nome", "-id")
+    )
+    if getattr(dipendente, "gruppo_classe_principale_id", None):
+        iscrizioni = iscrizioni.filter(gruppo_classe_id=dipendente.gruppo_classe_principale_id)
+    else:
+        iscrizioni = iscrizioni.filter(classe_id=dipendente.classe_principale_id)
+    if anno:
+        iscrizioni = iscrizioni.filter(anno_scolastico=anno)
+
+    studenti = []
+    seen = set()
+    for iscrizione in iscrizioni[:80]:
+        studente = iscrizione.studente
+        if studente.pk in seen:
+            continue
+        seen.add(studente.pk)
+        studenti.append(studente)
+    return studenti
+
+
 def dashboard_gestione_amministrativa(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     anno, mese = _current_period()
     buste_periodo = BustaPagaDipendente.objects.filter(anno=anno, mese=mese)
     ultimi_cedolini = (
@@ -83,10 +199,16 @@ def dashboard_gestione_amministrativa(request):
     )
 
 
-def lista_dipendenti(request):
-    dipendenti = Dipendente.objects.annotate(
-        numero_contratti=Count("contratti", distinct=True),
-        numero_buste=Count("buste_paga", distinct=True),
+def _lista_profili_lavoro(request, scope):
+    labels = _dipendente_labels(scope)
+    dipendenti = (
+        Dipendente.objects.select_related("classe_principale", "gruppo_classe_principale")
+        .annotate(
+            numero_contratti=Count("contratti", distinct=True),
+            numero_buste=Count("buste_paga", distinct=True),
+            numero_documenti=Count("documenti", distinct=True),
+        )
+        .filter(ruolo_anagrafico__in=_ruoli_for_scope(scope))
     )
     q = (request.GET.get("q") or "").strip()
     stato = (request.GET.get("stato") or "").strip()
@@ -97,6 +219,7 @@ def lista_dipendenti(request):
             | Q(codice_dipendente__icontains=q)
             | Q(codice_fiscale__icontains=q)
             | Q(email__icontains=q)
+            | Q(telefono__icontains=q)
         )
     if stato:
         dipendenti = dipendenti.filter(stato=stato)
@@ -109,6 +232,7 @@ def lista_dipendenti(request):
         "cessati": dipendenti.filter(stato=StatoDipendente.CESSATO).count(),
         "contratti": dipendenti.aggregate(totale=Count("contratti", distinct=True))["totale"] or 0,
         "buste": dipendenti.aggregate(totale=Count("buste_paga", distinct=True))["totale"] or 0,
+        "documenti": dipendenti.aggregate(totale=Count("documenti", distinct=True))["totale"] or 0,
     }
     return render(
         request,
@@ -116,6 +240,7 @@ def lista_dipendenti(request):
         {
             "dipendenti": dipendenti,
             "dipendenti_stats": dipendenti_stats,
+            "dipendenti_labels": labels,
             "q": q,
             "stato": stato,
             "stati": StatoDipendente.choices,
@@ -123,6 +248,14 @@ def lista_dipendenti(request):
             "mese_corrente": mese,
         },
     )
+
+
+def lista_dipendenti(request):
+    return _lista_profili_lavoro(request, "dipendenti")
+
+
+def lista_educatori(request):
+    return _lista_profili_lavoro(request, "educatori")
 
 
 def lista_contratti_dipendenti(request):
@@ -159,6 +292,10 @@ def lista_contratti_dipendenti(request):
 
 
 def lista_simulazioni_costo_dipendenti(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     simulazioni = SimulazioneCostoDipendente.objects.select_related(
         "contratto",
         "contratto__dipendente",
@@ -206,36 +343,72 @@ def lista_simulazioni_costo_dipendenti(request):
     )
 
 
-def crea_dipendente(request):
-    if request.method == "POST":
-        form = DipendenteForm(request.POST)
-        if form.is_valid():
-            dipendente = form.save()
-            messages.success(request, "Dipendente creato correttamente.")
-            return redirect("modifica_dipendente", pk=dipendente.pk)
+def _crea_profilo_lavoro(request, scope):
+    labels = _dipendente_labels(scope)
+    initial = {}
+    if scope == "educatori":
+        initial["ruolo_anagrafico"] = RuoloAnagraficoDipendente.EDUCATORE
     else:
-        form = DipendenteForm()
+        initial["ruolo_anagrafico"] = RuoloAnagraficoDipendente.DIPENDENTE
+
+    if request.method == "POST":
+        form = DipendenteForm(request.POST, initial=initial)
+        contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
+        if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
+            dipendente = form.save()
+            save_anagrafica_contact_formsets(dipendente, contact_formsets)
+            messages.success(request, f"{labels['singular_cap']} creato correttamente.")
+            return redirect(labels["detail_url"], pk=dipendente.pk)
+    else:
+        form = DipendenteForm(initial=initial)
+        contact_formsets = build_anagrafica_contact_formsets()
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/dipendente_form.html",
-        {"form": form, "dipendente": None, "contratti": [], "buste_paga": [], "simulazioni_costo": []},
+        {
+            "form": form,
+            **contact_formsets,
+            "dipendente": None,
+            "contratti": [],
+            "buste_paga": [],
+            "simulazioni_costo": [],
+            "documenti": [],
+            "studenti_classe_principale": [],
+            "dipendenti_labels": labels,
+            "has_form_errors": bool(form.errors or anagrafica_contact_formsets_have_errors(contact_formsets)),
+        },
     )
 
 
-def modifica_dipendente(request, pk):
+def crea_dipendente(request):
+    return _crea_profilo_lavoro(request, "dipendenti")
+
+
+def crea_educatore(request):
+    return _crea_profilo_lavoro(request, "educatori")
+
+
+def _modifica_profilo_lavoro(request, pk, scope=None):
     dipendente = get_object_or_404(Dipendente, pk=pk)
+    if scope is None:
+        scope = "educatori" if dipendente.is_educatore and not dipendente.is_dipendente_operativo else "dipendenti"
+    labels = _dipendente_labels(scope)
     if request.method == "POST":
         form = DipendenteForm(request.POST, instance=dipendente)
-        if form.is_valid():
+        contact_formsets = build_anagrafica_contact_formsets(data=request.POST, instance=dipendente)
+        if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
             form.save()
-            messages.success(request, "Dipendente aggiornato correttamente.")
-            return redirect("modifica_dipendente", pk=dipendente.pk)
+            save_anagrafica_contact_formsets(dipendente, contact_formsets)
+            messages.success(request, f"{labels['singular_cap']} aggiornato correttamente.")
+            return redirect(labels["detail_url"], pk=dipendente.pk)
     else:
         form = DipendenteForm(instance=dipendente)
+        contact_formsets = build_anagrafica_contact_formsets(instance=dipendente)
 
     contratti = dipendente.contratti.all()
     buste_paga = dipendente.buste_paga.select_related("contratto").order_by("-anno", "-mese")[:12]
+    documenti = dipendente.documenti.order_by("-data_documento", "-id")[:12]
     simulazioni_costo = (
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__tipo_contratto")
         .filter(contratto__dipendente=dipendente)
@@ -246,15 +419,29 @@ def modifica_dipendente(request, pk):
         "gestione_amministrativa/dipendenti/dipendente_form.html",
         {
             "form": form,
+            **contact_formsets,
             "dipendente": dipendente,
             "contratti": contratti,
             "buste_paga": buste_paga,
+            "documenti": documenti,
             "simulazioni_costo": simulazioni_costo,
+            "studenti_classe_principale": _studenti_classe_principale(dipendente),
+            "dipendenti_labels": labels,
+            "has_form_errors": bool(form.errors or anagrafica_contact_formsets_have_errors(contact_formsets)),
         },
     )
 
 
-def elimina_dipendente(request, pk):
+def modifica_dipendente(request, pk):
+    return _modifica_profilo_lavoro(request, pk, "dipendenti")
+
+
+def modifica_educatore(request, pk):
+    return _modifica_profilo_lavoro(request, pk, "educatori")
+
+
+def _elimina_profilo_lavoro(request, pk, scope):
+    labels = _dipendente_labels(scope)
     dipendente = get_object_or_404(Dipendente, pk=pk)
     count_relazioni = (
         dipendente.contratti.count()
@@ -265,34 +452,45 @@ def elimina_dipendente(request, pk):
         if count_relazioni:
             messages.error(
                 request,
-                "Impossibile eliminare il dipendente: sono presenti contratti, buste paga o documenti collegati.",
+                (
+                    f"Impossibile eliminare {labels['singular']} "
+                    "perche sono presenti contratti, buste paga o documenti collegati."
+                ),
             )
-            return redirect("modifica_dipendente", pk=dipendente.pk)
+            return redirect(labels["detail_url"], pk=dipendente.pk)
         dipendente.delete()
-        messages.success(request, "Dipendente eliminato correttamente.")
-        return redirect("lista_dipendenti")
+        messages.success(request, f"{labels['singular_cap']} eliminato correttamente.")
+        return redirect(labels["list_url"])
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/dipendente_confirm_delete.html",
-        {"dipendente": dipendente, "count_relazioni": count_relazioni},
+        {"dipendente": dipendente, "count_relazioni": count_relazioni, "dipendenti_labels": labels},
     )
+
+
+def elimina_dipendente(request, pk):
+    return _elimina_profilo_lavoro(request, pk, "dipendenti")
+
+
+def elimina_educatore(request, pk):
+    return _elimina_profilo_lavoro(request, pk, "educatori")
 
 
 def crea_contratto_dipendente(request, dipendente_pk=None):
     popup = is_popup_request(request)
+    detailed_mode = gestione_dipendenti_dettagliata_attiva()
     dipendente = None
     requested_dipendente = dipendente_pk or request.GET.get("dipendente") or request.POST.get("dipendente")
     if requested_dipendente:
         dipendente = get_object_or_404(Dipendente, pk=requested_dipendente)
 
     if request.method == "POST":
-        form = ContrattoDipendenteForm(request.POST)
+        form = ContrattoDipendenteForm(request.POST, detailed_mode=detailed_mode)
         if form.is_valid():
-            contratto = form.save(commit=False)
             if dipendente:
-                contratto.dipendente = dipendente
-            contratto.save()
+                form.instance.dipendente = dipendente
+            contratto = form.save()
             if popup:
                 return popup_select_response(
                     request,
@@ -305,12 +503,18 @@ def crea_contratto_dipendente(request, dipendente_pk=None):
                 return redirect("modifica_dipendente", pk=dipendente.pk)
             return redirect("lista_contratti_dipendenti")
     else:
-        form = ContrattoDipendenteForm()
+        form = ContrattoDipendenteForm(detailed_mode=detailed_mode)
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/contratto_form.html",
-        {"form": form, "dipendente": dipendente, "contratto": None, "popup": popup},
+        {
+            "form": form,
+            "dipendente": dipendente,
+            "contratto": None,
+            "popup": popup,
+            "gestione_dipendenti_dettagliata_attiva": detailed_mode,
+        },
     )
 
 
@@ -320,8 +524,9 @@ def modifica_contratto_dipendente(request, pk):
         pk=pk,
     )
     popup = is_popup_request(request)
+    detailed_mode = gestione_dipendenti_dettagliata_attiva()
     if request.method == "POST":
-        form = ContrattoDipendenteForm(request.POST, instance=contratto)
+        form = ContrattoDipendenteForm(request.POST, instance=contratto, detailed_mode=detailed_mode)
         if form.is_valid():
             contratto = form.save()
             if popup:
@@ -336,7 +541,7 @@ def modifica_contratto_dipendente(request, pk):
                 return redirect("modifica_dipendente", pk=contratto.dipendente_id)
             return redirect("lista_contratti_dipendenti")
     else:
-        form = ContrattoDipendenteForm(instance=contratto)
+        form = ContrattoDipendenteForm(instance=contratto, detailed_mode=detailed_mode)
 
     simulazioni_costo = contratto.simulazioni_costo.order_by("-valido_dal", "-id")
     return render(
@@ -348,6 +553,7 @@ def modifica_contratto_dipendente(request, pk):
             "contratto": contratto,
             "popup": popup,
             "simulazioni_costo": simulazioni_costo,
+            "gestione_dipendenti_dettagliata_attiva": detailed_mode,
         },
     )
 
@@ -408,6 +614,10 @@ def elimina_contratto_dipendente(request, pk):
 
 
 def crea_simulazione_costo_dipendente(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     popup = is_popup_request(request)
     initial = {}
     contratto_id = (request.GET.get("contratto") or request.POST.get("contratto") or "").strip()
@@ -445,6 +655,10 @@ def crea_simulazione_costo_dipendente(request):
 
 
 def modifica_simulazione_costo_dipendente(request, pk):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     simulazione = get_object_or_404(
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente", "contratto__tipo_contratto"),
         pk=pk,
@@ -474,6 +688,10 @@ def modifica_simulazione_costo_dipendente(request, pk):
 
 
 def elimina_simulazione_costo_dipendente(request, pk):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     simulazione = get_object_or_404(
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__dipendente"),
         pk=pk,
@@ -656,6 +874,7 @@ def lista_buste_paga_dipendenti(request):
 
 def crea_busta_paga_dipendente(request):
     popup = is_popup_request(request)
+    detailed_mode = gestione_dipendenti_dettagliata_attiva()
     initial = {}
     anno, mese = _current_period()
     initial["anno"] = anno
@@ -665,7 +884,7 @@ def crea_busta_paga_dipendente(request):
         initial["dipendente"] = int(dipendente_id)
 
     if request.method == "POST":
-        form = BustaPagaDipendenteForm(request.POST, request.FILES)
+        form = BustaPagaDipendenteForm(request.POST, request.FILES, detailed_mode=detailed_mode)
         if form.is_valid():
             busta = form.save()
             if popup:
@@ -678,12 +897,17 @@ def crea_busta_paga_dipendente(request):
             messages.success(request, "Busta paga salvata correttamente.")
             return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
     else:
-        form = BustaPagaDipendenteForm(initial=initial)
+        form = BustaPagaDipendenteForm(initial=initial, detailed_mode=detailed_mode)
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_form.html",
-        {"form": form, "busta": None, "popup": popup},
+        {
+            "form": form,
+            "busta": None,
+            "popup": popup,
+            "gestione_dipendenti_dettagliata_attiva": detailed_mode,
+        },
     )
 
 
@@ -698,8 +922,14 @@ def modifica_busta_paga_dipendente(request, pk):
         pk=pk,
     )
     popup = is_popup_request(request)
+    detailed_mode = gestione_dipendenti_dettagliata_attiva()
     if request.method == "POST":
-        form = BustaPagaDipendenteForm(request.POST, request.FILES, instance=busta)
+        form = BustaPagaDipendenteForm(
+            request.POST,
+            request.FILES,
+            instance=busta,
+            detailed_mode=detailed_mode,
+        )
         if form.is_valid():
             busta = form.save()
             if popup:
@@ -712,12 +942,18 @@ def modifica_busta_paga_dipendente(request, pk):
             messages.success(request, "Busta paga aggiornata correttamente.")
             return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
     else:
-        form = BustaPagaDipendenteForm(instance=busta)
+        form = BustaPagaDipendenteForm(instance=busta, detailed_mode=detailed_mode)
 
     return render(
         request,
         "gestione_amministrativa/dipendenti/busta_paga_form.html",
-        {"form": form, "busta": busta, "voci": busta.voci.all(), "popup": popup},
+        {
+            "form": form,
+            "busta": busta,
+            "voci": busta.voci.all(),
+            "popup": popup,
+            "gestione_dipendenti_dettagliata_attiva": detailed_mode,
+        },
     )
 
 
@@ -740,6 +976,10 @@ def elimina_busta_paga_dipendente(request, pk):
 
 
 def lista_parametri_calcolo_stipendi(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     parametri = ParametroCalcoloStipendio.objects.annotate(
         numero_contratti=Count("contratti", distinct=True),
     )
@@ -749,14 +989,51 @@ def lista_parametri_calcolo_stipendi(request):
         non_attivi=Count("id", filter=Q(attivo=False)),
         contratti_collegati=Count("contratti", distinct=True),
     )
+    dati_payroll = DatoPayrollUfficiale.objects.filter(attivo=True)
     return render(
         request,
         "gestione_amministrativa/dipendenti/parametri_list.html",
-        {"parametri": parametri, "parametri_stats": parametri_stats},
+        {
+            "parametri": parametri,
+            "parametri_stats": parametri_stats,
+            "dati_payroll_count": dati_payroll.exclude(categoria=CategoriaDatoPayrollUfficiale.FONTE).count(),
+            "fonti_payroll_count": dati_payroll.filter(categoria=CategoriaDatoPayrollUfficiale.FONTE).count(),
+            "ultimo_dato_payroll": dati_payroll.order_by("-data_rilevazione").first(),
+        },
+    )
+
+
+def lista_dati_payroll_ufficiali(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
+    dati = DatoPayrollUfficiale.objects.all()
+    stats = dati.aggregate(
+        totale=Count("id"),
+        fonti=Count("id", filter=Q(categoria=CategoriaDatoPayrollUfficiale.FONTE)),
+        valori=Count("id", filter=~Q(categoria=CategoriaDatoPayrollUfficiale.FONTE)),
+        attivi=Count("id", filter=Q(attivo=True)),
+    )
+    per_categoria = dati.values("categoria").annotate(totale=Count("id")).order_by("categoria")
+    ultimi_dati = dati.order_by("-data_rilevazione", "categoria", "nome")[:250]
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/dati_payroll_ufficiali_list.html",
+        {
+            "dati_payroll": ultimi_dati,
+            "dati_payroll_stats": stats,
+            "dati_payroll_per_categoria": per_categoria,
+            "categoria_fonte": CategoriaDatoPayrollUfficiale.FONTE,
+        },
     )
 
 
 def crea_parametro_calcolo_stipendio(request):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     popup = is_popup_request(request)
     if request.method == "POST":
         form = ParametroCalcoloStipendioForm(request.POST)
@@ -782,6 +1059,10 @@ def crea_parametro_calcolo_stipendio(request):
 
 
 def modifica_parametro_calcolo_stipendio(request, pk):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     parametro = get_object_or_404(ParametroCalcoloStipendio, pk=pk)
     popup = is_popup_request(request)
     if request.method == "POST":
@@ -808,6 +1089,10 @@ def modifica_parametro_calcolo_stipendio(request, pk):
 
 
 def elimina_parametro_calcolo_stipendio(request, pk):
+    redirect_response = redirect_if_dipendenti_simple(request)
+    if redirect_response:
+        return redirect_response
+
     parametro = get_object_or_404(ParametroCalcoloStipendio, pk=pk)
     popup = is_popup_request(request)
     usage_count = parametro.contratti.count()

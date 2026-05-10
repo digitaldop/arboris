@@ -16,18 +16,18 @@ urlpatterns = [
     path("indirizzi/nuovo/", anagrafica_manage(views.crea_indirizzo), name="crea_indirizzo"),
     path("indirizzi/<int:pk>/modifica/", anagrafica_edit(views.modifica_indirizzo), name="modifica_indirizzo"),
     path("indirizzi/<int:pk>/elimina/", anagrafica_manage(views.elimina_indirizzo), name="elimina_indirizzo"),
+    path("etichette-contatti/<str:kind>/nuova/", anagrafica_manage(views.crea_label_contatto), name="crea_label_contatto"),
+    path("etichette-contatti/<str:kind>/<int:pk>/modifica/", anagrafica_edit(views.modifica_label_contatto), name="modifica_label_contatto"),
+    path("etichette-contatti/<str:kind>/<int:pk>/elimina/", anagrafica_manage(views.elimina_label_contatto), name="elimina_label_contatto"),
 
     #URLS DELLE FAMIGLIE
     path("famiglie/", anagrafica_view(views.lista_famiglie), name="lista_famiglie"),
     path("famiglie/nuovo/", anagrafica_manage(views.crea_famiglia), name="crea_famiglia"),
+    path("famiglie/logica/<str:key>/", anagrafica_edit(views.modifica_famiglia_logica), name="modifica_famiglia_logica"),
+    path("famiglie/logica/<str:key>/stampa/", anagrafica_view(views.stampa_famiglia_logica), name="stampa_famiglia_logica"),
     path("famiglie/<int:pk>/modifica/", anagrafica_edit(views.modifica_famiglia), name="modifica_famiglia"),
     path("famiglie/<int:pk>/stampa/", anagrafica_view(views.stampa_famiglia), name="stampa_famiglia"),
     path("famiglie/<int:pk>/elimina/", anagrafica_manage(views.elimina_famiglia), name="elimina_famiglia"),
-
-    #URLS DEGLI STATI RELAZIONE FAMIGLIA
-    path("stati-relazione-famiglia/nuovo/", anagrafica_manage(views.crea_stato_relazione_famiglia), name="crea_stato_relazione_famiglia"),
-    path("stati-relazione-famiglia/<int:pk>/modifica/", anagrafica_edit(views.modifica_stato_relazione_famiglia), name="modifica_stato_relazione_famiglia"),
-    path("stati-relazione-famiglia/<int:pk>/elimina/", anagrafica_manage(views.elimina_stato_relazione_famiglia), name="elimina_stato_relazione_famiglia"),
 
     #URLS DELLE RELAZIONI FAMILIARI
     path("relazioni-familiari/nuovo/", anagrafica_manage(views.crea_relazione_familiare), name="crea_relazione_familiare"),
@@ -57,4 +57,5 @@ urlpatterns = [
 
     #URSL PER LE AJAX
     path("ajax/cerca-citta/", anagrafica_view(views.ajax_cerca_citta), name="ajax_cerca_citta"),
+    path("ajax/indirizzi-duplicati/", anagrafica_view(views.ajax_indirizzi_duplicati), name="ajax_indirizzi_duplicati"),
 ]

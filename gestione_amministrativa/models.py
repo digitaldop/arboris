@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -27,6 +28,12 @@ class SessoDipendente(models.TextChoices):
     FEMMINA = "F", "Femmina"
 
 
+class RuoloAnagraficoDipendente(models.TextChoices):
+    DIPENDENTE = "dipendente", "Dipendente"
+    EDUCATORE = "educatore", "Educatore"
+    EDUCATORE_DIPENDENTE = "educatore_dipendente", "Educatore e dipendente"
+
+
 class RegimeOrarioDipendente(models.TextChoices):
     TEMPO_PIENO = "tempo_pieno", "Tempo pieno"
     TEMPO_PARZIALE = "tempo_parziale", "Part-time"
@@ -42,6 +49,18 @@ class StatoBustaPaga(models.TextChoices):
 class ScenarioValorePayroll(models.TextChoices):
     PREVISTO = "previsto", "Previsto"
     EFFETTIVO = "effettivo", "Effettivo"
+
+
+class CategoriaDatoPayrollUfficiale(models.TextChoices):
+    FONTE = "fonte", "Fonte informativa"
+    CONTRIBUTI = "contributi", "Contributi INPS"
+    INAIL = "inail", "INAIL"
+    TFR = "tfr", "TFR"
+    IRPEF = "irpef", "IRPEF"
+    ADDIZIONALE_REGIONALE = "addizionale_regionale", "Addizionale regionale IRPEF"
+    ADDIZIONALE_COMUNALE = "addizionale_comunale", "Addizionale comunale IRPEF"
+    CCNL = "ccnl", "CCNL"
+    ALTRO = "altro", "Altro"
 
 
 class TipoVocePayroll(models.TextChoices):
@@ -87,6 +106,49 @@ class TipoContrattoDipendente(models.Model):
 
 
 class Dipendente(models.Model):
+    indirizzi_anagrafici = GenericRelation(
+        "anagrafica.AnagraficaIndirizzo",
+        related_query_name="dipendenti",
+    )
+    telefoni_anagrafici = GenericRelation(
+        "anagrafica.AnagraficaTelefono",
+        related_query_name="dipendenti",
+    )
+    email_anagrafiche = GenericRelation(
+        "anagrafica.AnagraficaEmail",
+        related_query_name="dipendenti",
+    )
+    ruolo_anagrafico = models.CharField(
+        max_length=30,
+        choices=RuoloAnagraficoDipendente.choices,
+        default=RuoloAnagraficoDipendente.DIPENDENTE,
+        db_index=True,
+    )
+    familiare_collegato = models.OneToOneField(
+        "anagrafica.Familiare",
+        on_delete=models.SET_NULL,
+        related_name="profilo_lavorativo",
+        blank=True,
+        null=True,
+        help_text="Collega un familiare esistente quando la stessa persona e anche dipendente o educatore.",
+    )
+    classe_principale = models.ForeignKey(
+        "scuola.Classe",
+        on_delete=models.SET_NULL,
+        related_name="educatori_principali",
+        blank=True,
+        null=True,
+        help_text="Classe di riferimento per gli educatori.",
+    )
+    gruppo_classe_principale = models.ForeignKey(
+        "scuola.GruppoClasse",
+        on_delete=models.SET_NULL,
+        related_name="educatori_principali",
+        blank=True,
+        null=True,
+        help_text="Gruppo classe o pluriclasse di riferimento per gli educatori.",
+    )
+    mansione = models.CharField(max_length=160, blank=True)
     codice_dipendente = models.CharField(max_length=40, blank=True)
     nome = models.CharField(max_length=120)
     cognome = models.CharField(max_length=120)
@@ -138,7 +200,34 @@ class Dipendente(models.Model):
     def formatted_telefono(self):
         from anagrafica.utils import format_phone_number
 
-        return format_phone_number(self.telefono) if self.telefono else ""
+        return format_phone_number(self.telefono_principale) if self.telefono_principale else ""
+
+    @property
+    def indirizzo_effettivo(self):
+        from anagrafica.models import _first_principal_link
+
+        link = _first_principal_link(self.indirizzi_anagrafici)
+        if link and link.indirizzo_id:
+            return link.indirizzo
+        return self.indirizzo
+
+    @property
+    def telefono_principale(self):
+        from anagrafica.models import _first_principal_link
+
+        link = _first_principal_link(self.telefoni_anagrafici)
+        if link and link.numero:
+            return link.numero
+        return self.telefono
+
+    @property
+    def email_principale(self):
+        from anagrafica.models import _first_principal_link
+
+        link = _first_principal_link(self.email_anagrafiche)
+        if link and link.email:
+            return link.email
+        return self.email
 
     def __str__(self):
         return self.nome_completo
@@ -151,10 +240,47 @@ class Dipendente(models.Model):
             self.codice_fiscale = self.codice_fiscale.upper().strip()
         if self.iban:
             self.iban = self.iban.replace(" ", "").upper().strip()
+        if not self.is_educatore:
+            self.classe_principale = None
+            self.gruppo_classe_principale = None
+        if not self.is_dipendente_operativo:
+            self.mansione = ""
+        if self.classe_principale_id and self.gruppo_classe_principale_id:
+            raise ValidationError({"classe_principale": "Scegli una sola classe principale o una sola pluriclasse."})
 
     @property
     def nome_completo(self):
         return f"{self.cognome} {self.nome}".strip()
+
+    @property
+    def classe_principale_label(self):
+        if self.gruppo_classe_principale_id:
+            return str(self.gruppo_classe_principale)
+        if self.classe_principale_id:
+            return str(self.classe_principale)
+        return ""
+
+    @property
+    def classe_principale_tipo_label(self):
+        if self.gruppo_classe_principale_id:
+            return "Gruppo classe"
+        if self.classe_principale_id:
+            return "Classe"
+        return ""
+
+    @property
+    def is_educatore(self):
+        return self.ruolo_anagrafico in {
+            RuoloAnagraficoDipendente.EDUCATORE,
+            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
+        }
+
+    @property
+    def is_dipendente_operativo(self):
+        return self.ruolo_anagrafico in {
+            RuoloAnagraficoDipendente.DIPENDENTE,
+            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
+        }
 
     @property
     def contratto_corrente(self):
@@ -444,6 +570,64 @@ class ParametroCalcoloStipendio(models.Model):
     def clean(self):
         super().clean()
         if self.valido_al and self.valido_al < self.valido_dal:
+            raise ValidationError({"valido_al": "La data di fine validita non puo' precedere la data iniziale."})
+
+
+class DatoPayrollUfficiale(models.Model):
+    categoria = models.CharField(max_length=40, choices=CategoriaDatoPayrollUfficiale.choices)
+    codice = models.CharField(max_length=80)
+    nome = models.CharField(max_length=180)
+    descrizione = models.TextField(blank=True)
+    anno = models.PositiveSmallIntegerField(blank=True, null=True, db_index=True)
+    valido_dal = models.DateField(blank=True, null=True)
+    valido_al = models.DateField(blank=True, null=True)
+    valore_percentuale = models.DecimalField(
+        max_digits=8,
+        decimal_places=4,
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(ZERO), MaxValueValidator(Decimal("1000.00"))],
+    )
+    valore_importo = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    valore_testo = models.CharField(max_length=255, blank=True)
+    ente = models.CharField(max_length=120, blank=True)
+    fonte_url = models.URLField(max_length=500, blank=True)
+    data_pubblicazione = models.DateField(blank=True, null=True)
+    data_rilevazione = models.DateTimeField(auto_now=True)
+    attivo = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "gestione_amministrativa_dato_payroll_ufficiale"
+        ordering = ["categoria", "-anno", "nome", "codice"]
+        verbose_name = "Dato payroll ufficiale"
+        verbose_name_plural = "Dati payroll ufficiali"
+        indexes = [
+            models.Index(fields=["categoria", "anno"], name="ga_payroll_cat_anno_idx"),
+            models.Index(fields=["attivo"], name="ga_payroll_attivo_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["categoria", "codice", "anno", "valido_dal"],
+                name="ga_payroll_dato_unique",
+            ),
+        ]
+
+    def __str__(self):
+        anno = f" {self.anno}" if self.anno else ""
+        return f"{self.nome}{anno}"
+
+    @property
+    def valore_display(self):
+        if self.valore_percentuale is not None:
+            return f"{self.valore_percentuale}%"
+        if self.valore_importo is not None:
+            return f"{self.valore_importo} EUR"
+        return self.valore_testo or "-"
+
+    def clean(self):
+        super().clean()
+        if self.valido_dal and self.valido_al and self.valido_al < self.valido_dal:
             raise ValidationError({"valido_al": "La data di fine validita non puo' precedere la data iniziale."})
 
 

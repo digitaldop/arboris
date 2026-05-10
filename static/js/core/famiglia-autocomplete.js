@@ -12,12 +12,36 @@
     }
 
     function buildItems(select) {
-        return Array.from(select.options || []).map(option => ({
+        return Array.from(select.options || []).map((option, index) => ({
+            index,
             value: option.value,
             label: option.textContent.trim(),
             searchText: normalize(option.dataset.searchText || option.textContent),
             disabled: option.disabled,
         }));
+    }
+
+    function mainSearchText(item) {
+        return (item.searchText || "").split(" (")[0].trim();
+    }
+
+    function matchRank(item, query) {
+        const text = item.searchText || "";
+        const mainText = mainSearchText(item);
+
+        if (text === query || mainText === query) {
+            return 0;
+        }
+
+        if (text.startsWith(query) || mainText.startsWith(query)) {
+            return 1;
+        }
+
+        if (text.includes(` ${query}`) || text.includes(`(${query}`)) {
+            return 2;
+        }
+
+        return 3;
     }
 
     function isInsideTemplate(select) {
@@ -158,7 +182,21 @@
                     return source;
                 }
 
-                return source.filter(item => item.searchText.includes(query));
+                return source
+                    .filter(item => item.searchText.includes(query))
+                    .sort((first, second) => {
+                        const rankDelta = matchRank(first, query) - matchRank(second, query);
+                        if (rankDelta !== 0) {
+                            return rankDelta;
+                        }
+
+                        const lengthDelta = mainSearchText(first).length - mainSearchText(second).length;
+                        if (lengthDelta !== 0) {
+                            return lengthDelta;
+                        }
+
+                        return first.index - second.index;
+                    });
             },
             renderDropdown: function () {
                 const filtered = state.getFilteredItems();

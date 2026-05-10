@@ -6,7 +6,14 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from anagrafica.models import Famiglia, Familiare, RelazioneFamiliare, StatoRelazioneFamiglia, Studente
+from anagrafica.models import (
+    Famiglia,
+    Familiare,
+    RelazioneFamiliare,
+    StatoRelazioneFamiglia,
+    Studente,
+    StudenteFamiliare,
+)
 from economia.forms import (
     AgevolazioneForm,
     CondizioneIscrizioneForm,
@@ -326,6 +333,42 @@ class ScambioRettaFormFamilySyncTests(TestCase):
         rendered = str(form["studente"])
         self.assertIn(f'data-famiglia-id="{self.famiglia.pk}"', rendered)
         self.assertIn(f'data-famiglia-id="{self.altra_famiglia.pk}"', rendered)
+        self.assertIn(f'data-studente-ids="{self.studente.pk}"', str(form["familiare"]))
+
+    def test_studenti_are_limited_to_direct_relations_when_available(self):
+        StudenteFamiliare.objects.create(
+            studente=self.altro_studente,
+            familiare=self.familiare,
+            attivo=True,
+        )
+
+        form = ScambioRettaForm(data={"familiare": self.familiare.pk})
+
+        self.assertNotIn(self.studente, form.fields["studente"].queryset)
+        self.assertIn(self.altro_studente, form.fields["studente"].queryset)
+
+    def test_direct_relation_allows_student_from_different_legacy_family(self):
+        StudenteFamiliare.objects.create(
+            studente=self.altro_studente,
+            familiare=self.familiare,
+            attivo=True,
+        )
+        form = ScambioRettaForm(
+            data={
+                "familiare": self.familiare.pk,
+                "famiglia": self.famiglia.pk,
+                "studente": self.altro_studente.pk,
+                "anno_scolastico": self.anno.pk,
+                "mese_riferimento": 9,
+                "descrizione": "Supporto mensa",
+                "ore_lavorate": "2.00",
+                "tariffa_scambio_retta": self.tariffa.pk,
+                "note": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["famiglia"], self.famiglia)
 
 
 class ScambioRettaPopupModeTests(TestCase):
