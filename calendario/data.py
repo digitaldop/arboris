@@ -388,7 +388,7 @@ def build_calendar_deadline_records(system_categories=None):
         current_year_end = date(today.year, 12, 31)
         documenti = (
             Documento.objects.filter(scadenza__range=(current_year_start, current_year_end))
-            .select_related("tipo_documento", "famiglia", "familiare", "studente")
+            .select_related("tipo_documento", "familiare", "studente")
             .order_by("scadenza", "pk")
         )
         for documento in documenti:

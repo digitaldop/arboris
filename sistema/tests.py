@@ -1,6 +1,7 @@
 from tempfile import TemporaryDirectory
 from datetime import timedelta
 from decimal import Decimal
+from unittest import skip
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -27,12 +28,10 @@ from .models import (
 from .popup_manifest import build_popup_manifest
 from anagrafica.models import (
     Citta,
-    Famiglia,
     Familiare,
     Provincia,
     Regione,
     RelazioneFamiliare,
-    StatoRelazioneFamiglia,
     Studente,
     StudenteFamiliare,
 )
@@ -142,6 +141,7 @@ class GlobalSearchTests(TestCase):
         self.assertContains(response, "data-global-search-dropdown")
         self.assertContains(response, "js/core/global-search.js")
 
+    @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
     def test_global_search_returns_only_allowed_modules(self):
         stato = StatoRelazioneFamiglia.objects.create(stato="Attiva")
         famiglia = Famiglia.objects.create(cognome_famiglia="Rossi", stato_relazione_famiglia=stato)

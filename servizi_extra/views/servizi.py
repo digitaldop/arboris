@@ -913,7 +913,6 @@ def lista_rate_servizi_extra(request):
     servizio = None
 
     rate = RataServizioExtra.objects.select_related(
-        "famiglia",
         "iscrizione",
         "iscrizione__studente",
         "iscrizione__servizio",
@@ -990,7 +989,6 @@ def lista_rate_servizi_extra(request):
 def modifica_rata_servizio_extra(request, pk):
     rata = get_object_or_404(
         RataServizioExtra.objects.select_related(
-            "famiglia",
             "iscrizione",
             "iscrizione__studente",
             "iscrizione__servizio",

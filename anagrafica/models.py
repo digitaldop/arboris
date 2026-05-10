@@ -882,7 +882,7 @@ class Documento(models.Model):
         valorizzati = sum(bool(x) for x in owners)
         if valorizzati > 1:
             raise ValidationError(
-                "Un documento può essere collegato a una sola entità: famiglia, familiare oppure studente."
+                "Un documento può essere collegato a una sola entità: familiare oppure studente."
             )
         
 # FINE MODELLI PER I DOCUMENTI

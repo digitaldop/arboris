@@ -515,7 +515,6 @@ def lista_rate_iscrizione(request):
     iscrizione = None
 
     rate = RataIscrizione.objects.select_related(
-        "famiglia",
         "iscrizione",
         "iscrizione__studente",
         "iscrizione__anno_scolastico",
@@ -901,7 +900,6 @@ def elimina_iscrizione(request, pk):
 def modifica_rata_iscrizione(request, pk):
     rata = get_object_or_404(
         RataIscrizione.objects.select_related(
-            "famiglia",
             "iscrizione",
             "iscrizione__studente",
             "iscrizione__anno_scolastico",
@@ -953,7 +951,6 @@ def modifica_rata_iscrizione(request, pk):
 def pagamento_rapido_rata_iscrizione(request, pk):
     rata = get_object_or_404(
         RataIscrizione.objects.select_related(
-            "famiglia",
             "iscrizione",
             "iscrizione__studente",
             "iscrizione__anno_scolastico",

@@ -80,7 +80,7 @@ def get_classe_corrente_label(studente):
 
 def osservazioni_studente(request, studente_pk):
     studente = get_object_or_404(
-        Studente.objects.select_related("famiglia"),
+        Studente.objects.all(),
         pk=studente_pk,
     )
     can_manage = user_can_manage_osservazioni(request.user)
