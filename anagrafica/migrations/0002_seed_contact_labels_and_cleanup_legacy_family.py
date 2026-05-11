@@ -13,44 +13,56 @@ def seed_contact_labels(apps, schema_editor):
     LabelTelefono = apps.get_model("anagrafica", "LabelTelefono")
     LabelEmail = apps.get_model("anagrafica", "LabelEmail")
 
-    for index, nome in enumerate(ADDRESS_LABELS, start=1):
-        ensure_label(LabelIndirizzo, db_alias, nome, index)
-    for index, nome in enumerate(PHONE_LABELS, start=1):
-        ensure_label(LabelTelefono, db_alias, nome, index)
-    for index, nome in enumerate(EMAIL_LABELS, start=1):
-        ensure_label(LabelEmail, db_alias, nome, index)
+    seed_label_group(LabelIndirizzo, db_alias, ADDRESS_LABELS)
+    seed_label_group(LabelTelefono, db_alias, PHONE_LABELS)
+    seed_label_group(LabelEmail, db_alias, EMAIL_LABELS)
 
 
-def next_order(Model, db_alias):
-    max_order = Model.objects.using(db_alias).aggregate(Max("ordine"))["ordine__max"]
-    return (max_order or 0) + 1
+def seed_label_group(Model, db_alias, labels):
+    existing_by_name = {
+        label.nome: label
+        for label in Model.objects.using(db_alias).filter(nome__in=labels)
+    }
+    used_orders = set(
+        Model.objects.using(db_alias)
+        .exclude(ordine__isnull=True)
+        .values_list("ordine", flat=True)
+    )
+
+    for preferred_order, nome in enumerate(labels, start=1):
+        label = existing_by_name.get(nome)
+        if label is None:
+            ordine = available_order_from_cache(Model, db_alias, used_orders, preferred_order)
+            label = Model.objects.using(db_alias).create(
+                nome=nome,
+                ordine=ordine,
+                attiva=True,
+            )
+            existing_by_name[nome] = label
+            used_orders.add(ordine)
+            continue
+
+        update_fields = []
+        if not label.attiva:
+            label.attiva = True
+            update_fields.append("attiva")
+        if label.ordine is None:
+            label.ordine = available_order_from_cache(Model, db_alias, used_orders, preferred_order)
+            update_fields.append("ordine")
+            used_orders.add(label.ordine)
+        if update_fields:
+            label.save(update_fields=update_fields)
 
 
-def ensure_label(Model, db_alias, nome, preferred_order):
-    label = Model.objects.using(db_alias).filter(nome=nome).first()
-    if label is None:
-        Model.objects.using(db_alias).create(
-            nome=nome,
-            ordine=available_order(Model, db_alias, preferred_order),
-            attiva=True,
-        )
-        return
-
-    update_fields = []
-    if not label.attiva:
-        label.attiva = True
-        update_fields.append("attiva")
-    if label.ordine is None:
-        label.ordine = next_order(Model, db_alias)
-        update_fields.append("ordine")
-    if update_fields:
-        label.save(update_fields=update_fields)
-
-
-def available_order(Model, db_alias, preferred_order):
-    if preferred_order and not Model.objects.using(db_alias).filter(ordine=preferred_order).exists():
+def available_order_from_cache(Model, db_alias, used_orders, preferred_order):
+    if preferred_order and preferred_order not in used_orders:
         return preferred_order
-    return next_order(Model, db_alias)
+
+    max_order = Model.objects.using(db_alias).aggregate(Max("ordine"))["ordine__max"] or 0
+    candidate = max(max_order, max(used_orders or {0})) + 1
+    while candidate in used_orders:
+        candidate += 1
+    return candidate
 
 
 def drop_legacy_family_tables(apps, schema_editor):
@@ -86,17 +98,14 @@ def drop_legacy_family_tables(apps, schema_editor):
         schema_editor.execute(f"DROP TABLE IF EXISTS {table}")
 
 
-def seed_and_cleanup(apps, schema_editor):
-    seed_contact_labels(apps, schema_editor)
-    drop_legacy_family_tables(apps, schema_editor)
-
-
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ("anagrafica", "0001_initial"),
     ]
 
     operations = [
-        migrations.RunPython(seed_and_cleanup, migrations.RunPython.noop),
+        migrations.RunPython(seed_contact_labels, migrations.RunPython.noop, atomic=False),
+        migrations.RunPython(drop_legacy_family_tables, migrations.RunPython.noop, atomic=False),
     ]

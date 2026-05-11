@@ -224,8 +224,8 @@ def build_anagrafica_global_search_results(query, remaining):
     studenti = (
         Studente.objects.filter(
             person_filter
-            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__nome__icontains=query)
-            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__cognome__icontains=query)
+            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__nome__icontains=query)
+            | Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__cognome__icontains=query)
         )
         .distinct()
         .order_by("cognome", "nome", "id")[:4]
@@ -250,7 +250,7 @@ def build_anagrafica_global_search_results(query, remaining):
             | Q(relazioni_studenti__attivo=True, relazioni_studenti__studente__nome__icontains=query)
             | Q(relazioni_studenti__attivo=True, relazioni_studenti__studente__cognome__icontains=query)
         )
-        .select_related("relazione_familiare")
+        .select_related("persona", "relazione_familiare")
         .distinct()
         .order_by("cognome", "nome", "id")[:3]
     )
@@ -271,12 +271,12 @@ def build_anagrafica_global_search_results(query, remaining):
             Q(tipo_documento__tipo_documento__icontains=query)
             | Q(descrizione__icontains=query)
             | Q(file__icontains=query)
-            | Q(familiare__nome__icontains=query)
-            | Q(familiare__cognome__icontains=query)
+            | Q(familiare__persona__nome__icontains=query)
+            | Q(familiare__persona__cognome__icontains=query)
             | Q(studente__nome__icontains=query)
             | Q(studente__cognome__icontains=query)
         )
-        .select_related("tipo_documento", "familiare", "studente")
+        .select_related("tipo_documento", "familiare__persona", "studente")
         .order_by("-data_caricamento", "-id")[:3]
     )
     for documento in documenti:

@@ -1,3 +1,4 @@
+from django.db import connection
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.db.utils import OperationalError, ProgrammingError
 from django.dispatch import receiver
@@ -21,6 +22,20 @@ from .models import (
 )
 
 
+def audit_table_exists():
+    if getattr(connection, "_arboris_audit_table_exists", False):
+        return True
+
+    try:
+        exists = SistemaOperazioneCronologia._meta.db_table in connection.introspection.table_names()
+    except (OperationalError, ProgrammingError):
+        return False
+
+    if exists:
+        connection._arboris_audit_table_exists = True
+    return exists
+
+
 def build_operation_description(action, model_verbose_name, object_label):
     if action == AzioneOperazioneCronologia.CREAZIONE:
         return f"Creato {model_verbose_name}: {object_label}."
@@ -31,6 +46,8 @@ def build_operation_description(action, model_verbose_name, object_label):
 
 def create_audit_entry(instance, action, changed_field_names=None):
     if is_audit_disabled():
+        return
+    if not audit_table_exists():
         return
 
     model = instance.__class__
