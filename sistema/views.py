@@ -1,3 +1,7 @@
+import base64
+import binascii
+import json
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -36,8 +40,10 @@ from .database_backups import (
     cancel_or_delete_restore_job,
     create_database_backup,
     create_restore_job_from_backup_record,
+    create_restore_job_from_local_file,
     create_restore_job_from_upload,
     delete_pending_restore_upload,
+    get_pending_restore_root,
     get_backup_configuration,
     restore_file_reference_exists,
 )
@@ -78,6 +84,8 @@ from .permissions import (
 
 PENDING_RESTORE_SESSION_KEY = "sistema_database_backup_pending_restore"
 PENDING_RESTORE_JOB_SESSION_KEY = "sistema_db_restore_job_id"
+RESTORE_CHUNKED_UPLOAD_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+RESTORE_CHUNK_MAX_BYTES = 768 * 1024
 CRONOLOGIA_RESULT_LIMIT = 250
 FEEDBACK_PER_PAGE = 20
 GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
@@ -917,6 +925,112 @@ def clear_pending_restore_metadata(request):
             pass
 
 
+def parse_restore_chunk_payload(request):
+    try:
+        return json.loads(request.body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def validate_restore_file_name(file_name):
+    safe_name = Path(str(file_name or "")).name
+    lower_name = safe_name.lower()
+    if not safe_name or not (lower_name.endswith(".sql") or lower_name.endswith(".sql.gz")):
+        return ""
+    return safe_name
+
+
+def handle_restore_chunk_upload(request):
+    payload = parse_restore_chunk_payload(request)
+    if not payload or payload.get("action") != "upload_restore_file_chunk":
+        return JsonResponse({"ok": False, "message": "Richiesta upload non valida."}, status=400)
+
+    upload_id = str(payload.get("upload_id") or "").strip()
+    if not RESTORE_CHUNKED_UPLOAD_ID_RE.match(upload_id):
+        return JsonResponse({"ok": False, "message": "Sessione upload non valida."}, status=400)
+
+    file_name = validate_restore_file_name(payload.get("file_name"))
+    if not file_name:
+        return JsonResponse(
+            {"ok": False, "message": "Carica un file di backup PostgreSQL in formato .sql o .sql.gz."},
+            status=400,
+        )
+
+    try:
+        chunk_index = int(payload.get("chunk_index"))
+        total_chunks = int(payload.get("total_chunks"))
+        file_size = int(payload.get("file_size") or 0)
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "message": "Indice blocco upload non valido."}, status=400)
+
+    if total_chunks <= 0 or chunk_index < 0 or chunk_index >= total_chunks or file_size <= 0:
+        return JsonResponse({"ok": False, "message": "Metadati upload non validi."}, status=400)
+
+    try:
+        chunk_bytes = base64.b64decode(payload.get("data") or "", validate=True)
+    except (binascii.Error, ValueError):
+        return JsonResponse({"ok": False, "message": "Blocco upload non leggibile."}, status=400)
+
+    if not chunk_bytes:
+        return JsonResponse({"ok": False, "message": "Blocco upload vuoto."}, status=400)
+    if len(chunk_bytes) > RESTORE_CHUNK_MAX_BYTES:
+        return JsonResponse({"ok": False, "message": "Blocco upload troppo grande."}, status=400)
+
+    upload_path = get_pending_restore_root() / f"chunked_{upload_id}.part"
+    try:
+        if chunk_index == 0:
+            clear_pending_restore_metadata(request)
+            upload_path.write_bytes(chunk_bytes)
+        else:
+            if not upload_path.exists():
+                return JsonResponse({"ok": False, "message": "Sessione upload scaduta. Riprova."}, status=410)
+            with upload_path.open("ab") as destination:
+                destination.write(chunk_bytes)
+
+        uploaded_size = upload_path.stat().st_size
+        if chunk_index + 1 < total_chunks:
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "complete": False,
+                    "uploaded_chunks": chunk_index + 1,
+                    "total_chunks": total_chunks,
+                    "uploaded_size": uploaded_size,
+                }
+            )
+
+        if uploaded_size != file_size:
+            upload_path.unlink(missing_ok=True)
+            return JsonResponse(
+                {"ok": False, "message": "Il file ricomposto non coincide con la dimensione attesa. Riprova."},
+                status=400,
+            )
+
+        job = create_restore_job_from_local_file(
+            upload_path,
+            file_name,
+            triggered_by=request.user,
+        )
+        upload_path.unlink(missing_ok=True)
+    except DatabaseBackupError as exc:
+        upload_path.unlink(missing_ok=True)
+        return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+    except OSError as exc:
+        upload_path.unlink(missing_ok=True)
+        return JsonResponse({"ok": False, "message": f"Impossibile completare l'upload: {exc}"}, status=500)
+
+    request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
+    request.session.modified = True
+    return JsonResponse(
+        {
+            "ok": True,
+            "complete": True,
+            "message": "File di backup caricato nello storage protetto.",
+            "redirect": reverse("backup_database_sistema"),
+        }
+    )
+
+
 def backup_database_sistema(request):
     configurazione = get_backup_configuration()
     pending_restore = get_pending_restore_metadata(request)
@@ -925,6 +1039,9 @@ def backup_database_sistema(request):
     confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
 
     if request.method == "POST":
+        if request.content_type.startswith("application/json"):
+            return handle_restore_chunk_upload(request)
+
         action = (request.POST.get("action") or "").strip()
 
         if action == "save_backup_settings":

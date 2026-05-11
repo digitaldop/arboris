@@ -1,3 +1,6 @@
+import base64
+import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from datetime import timedelta
 from decimal import Decimal
@@ -13,12 +16,18 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .database_backups import cancel_or_delete_restore_job, create_restore_job_from_backup_record, create_restore_job_from_upload
+from .database_backups import (
+    cancel_or_delete_restore_job,
+    create_restore_job_from_backup_record,
+    create_restore_job_from_local_file,
+    create_restore_job_from_upload,
+)
 from .models import (
     FeedbackSegnalazione,
     LivelloPermesso,
     RuoloUtente,
     SistemaDatabaseBackup,
+    SistemaDatabaseRestoreJob,
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
@@ -1019,6 +1028,55 @@ class BackupDatabaseAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backup Database")
 
+    def test_backup_database_page_renders_chunked_restore_upload(self):
+        self.client.force_login(self.amministratore)
+
+        response = self.client.get(reverse("backup_database_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-restore-chunked-upload-form")
+        self.assertContains(response, "upload_restore_file_chunk")
+
+    def test_chunked_restore_upload_creates_pending_restore_job(self):
+        self.client.force_login(self.amministratore)
+        content = b"backup-data-from-chunks"
+        chunks = [content[:8], content[8:]]
+        upload_id = "restorechunk123"
+
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                for index, chunk in enumerate(chunks):
+                    response = self.client.post(
+                        reverse("backup_database_sistema"),
+                        data=json.dumps(
+                            {
+                                "action": "upload_restore_file_chunk",
+                                "upload_id": upload_id,
+                                "file_name": "restore.sql.gz",
+                                "file_size": len(content),
+                                "chunk_index": index,
+                                "total_chunks": len(chunks),
+                                "data": base64.b64encode(chunk).decode("ascii"),
+                            }
+                        ),
+                        content_type="application/json",
+                    )
+                    self.assertEqual(response.status_code, 200)
+
+                payload = response.json()
+                self.assertTrue(payload["ok"])
+                self.assertTrue(payload["complete"])
+                self.assertEqual(payload["redirect"], reverse("backup_database_sistema"))
+
+                job = SistemaDatabaseRestoreJob.objects.get()
+                self.assertEqual(job.nome_file_originale, "restore.sql.gz")
+                self.assertEqual(job.dimensione_file_bytes, len(content))
+                self.assertTrue(default_storage.exists(job.percorso_file))
+                self.assertEqual(self.client.session["sistema_db_restore_job_id"], job.pk)
+
+                cancel_or_delete_restore_job(job)
+                self.assertFalse(default_storage.exists(job.percorso_file))
+
 
 class BetaFeedbackTests(TestCase):
     def setUp(self):
@@ -1158,6 +1216,22 @@ class BackupDatabaseStorageTests(TestCase):
 
                 self.assertTrue(default_storage.exists(job.percorso_file))
                 self.assertTrue(job.percorso_file.startswith("db_restore_uploads/"))
+
+                cancel_or_delete_restore_job(job)
+                self.assertFalse(default_storage.exists(job.percorso_file))
+
+    def test_restore_local_files_are_saved_on_storage_backend(self):
+        with TemporaryDirectory() as tmpdir:
+            local_file = Path(tmpdir) / "restore.sql.gz"
+            local_file.write_bytes(b"backup-data")
+            media_root = Path(tmpdir) / "media"
+
+            with override_settings(MEDIA_ROOT=media_root):
+                job = create_restore_job_from_local_file(local_file, "restore.sql.gz")
+
+                self.assertTrue(default_storage.exists(job.percorso_file))
+                self.assertTrue(job.percorso_file.startswith("db_restore_uploads/"))
+                self.assertEqual(job.dimensione_file_bytes, len(b"backup-data"))
 
                 cancel_or_delete_restore_job(job)
                 self.assertFalse(default_storage.exists(job.percorso_file))

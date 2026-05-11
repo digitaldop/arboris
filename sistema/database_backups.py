@@ -506,12 +506,46 @@ def store_pending_restore_upload(uploaded_file):
     }
 
 
+def store_pending_restore_local_file(file_path, original_name):
+    path = Path(file_path)
+    storage_name = get_restore_upload_storage_name(original_name or path.name)
+    with path.open("rb") as file_handle:
+        storage_name = default_storage.save(storage_name, File(file_handle))
+
+    try:
+        file_size = default_storage.size(storage_name)
+    except Exception:
+        file_size = path.stat().st_size if path.exists() else 0
+
+    return {
+        "storage_name": storage_name,
+        "original_name": original_name or path.name,
+        "size_bytes": file_size,
+        "size_label": format_size_label(file_size),
+    }
+
+
 def create_restore_job_from_upload(uploaded_file, triggered_by=None):
     """
     Salva il file nello storage configurato senza elaborarlo e crea un record SistemaDatabaseRestoreJob
     in stato 'in attesa di conferma'.
     """
     meta = store_pending_restore_upload(uploaded_file)
+    return SistemaDatabaseRestoreJob.objects.create(
+        stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+        percorso_file=meta["storage_name"],
+        nome_file_originale=meta["original_name"] or "backup.sql",
+        dimensione_file_bytes=meta["size_bytes"],
+        creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
+    )
+
+
+def create_restore_job_from_local_file(file_path, original_name, triggered_by=None):
+    """
+    Variante usata dall'upload a blocchi: il file viene ricomposto prima in area temporanea,
+    poi salvato nello storage configurato con lo stesso flusso del normale upload.
+    """
+    meta = store_pending_restore_local_file(file_path, original_name)
     return SistemaDatabaseRestoreJob.objects.create(
         stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
         percorso_file=meta["storage_name"],

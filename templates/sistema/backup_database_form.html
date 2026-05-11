@@ -216,7 +216,7 @@
                             </form>
                         </div>
                     {% else %}
-                        <form method="post" enctype="multipart/form-data" class="database-backup-form">
+                        <form method="post" enctype="multipart/form-data" class="database-backup-form" data-restore-chunked-upload-form>
                             {% csrf_token %}
                             <input type="hidden" name="action" value="upload_restore_file">
                             <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
@@ -233,6 +233,10 @@
                                         {% endif %}
                                     </span>
                                 </label>
+                                <div class="database-backup-upload-progress" data-restore-upload-progress hidden>
+                                    <progress value="0" max="100" data-restore-upload-bar></progress>
+                                    <span data-restore-upload-status>Preparazione upload...</span>
+                                </div>
                             </fieldset>
                             {% if can_access_database_backups %}
                                 <div class="database-backup-actions">
@@ -438,4 +442,116 @@
             </aside>
         </div>
     </div>
+
+    <script>
+        (() => {
+            const form = document.querySelector("[data-restore-chunked-upload-form]");
+            if (!form || !window.FileReader || !window.fetch) {
+                return;
+            }
+
+            const fileInput = form.querySelector('input[type="file"]');
+            const submitButton = form.querySelector('button[type="submit"]');
+            const progressWrap = form.querySelector("[data-restore-upload-progress]");
+            const progressBar = form.querySelector("[data-restore-upload-bar]");
+            const progressStatus = form.querySelector("[data-restore-upload-status]");
+            const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+            const chunkSize = 512 * 1024;
+
+            const setStatus = (message, value = null) => {
+                if (progressWrap) {
+                    progressWrap.hidden = false;
+                }
+                if (progressStatus) {
+                    progressStatus.textContent = message;
+                }
+                if (progressBar && value !== null) {
+                    progressBar.value = value;
+                }
+            };
+
+            const bytesToBase64 = (buffer) => {
+                const bytes = new Uint8Array(buffer);
+                let binary = "";
+                const sliceSize = 0x8000;
+                for (let index = 0; index < bytes.length; index += sliceSize) {
+                    binary += String.fromCharCode.apply(null, bytes.subarray(index, index + sliceSize));
+                }
+                return window.btoa(binary);
+            };
+
+            const uploadChunk = async (payload) => {
+                const response = await fetch(form.action || window.location.href, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.message || "Upload non riuscito.");
+                }
+                return data;
+            };
+
+            form.addEventListener("submit", async (event) => {
+                const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+                if (!file) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const lowerName = file.name.toLowerCase();
+                if (!(lowerName.endsWith(".sql") || lowerName.endsWith(".sql.gz"))) {
+                    setStatus("Carica un file PostgreSQL .sql o .sql.gz.", 0);
+                    return;
+                }
+
+                const uploadId = window.crypto && window.crypto.randomUUID
+                    ? window.crypto.randomUUID().replace(/-/g, "")
+                    : `${Date.now()}${Math.random().toString(16).slice(2)}`;
+                const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                }
+
+                try {
+                    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+                        const start = chunkIndex * chunkSize;
+                        const chunk = file.slice(start, Math.min(file.size, start + chunkSize));
+                        const data = bytesToBase64(await chunk.arrayBuffer());
+                        const percent = Math.round((chunkIndex / totalChunks) * 100);
+                        setStatus(`Caricamento backup ${chunkIndex + 1} di ${totalChunks}...`, percent);
+
+                        const result = await uploadChunk({
+                            action: "upload_restore_file_chunk",
+                            upload_id: uploadId,
+                            file_name: file.name,
+                            file_size: file.size,
+                            chunk_index: chunkIndex,
+                            total_chunks: totalChunks,
+                            data,
+                        });
+
+                        if (result.complete) {
+                            setStatus("Upload completato. Apro il secondo controllo...", 100);
+                            window.location.href = result.redirect || window.location.href;
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    setStatus(error.message || "Upload non riuscito.", 0);
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                    }
+                }
+            });
+        })();
+    </script>
 {% endblock %}
