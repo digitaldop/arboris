@@ -456,7 +456,7 @@
             const progressBar = form.querySelector("[data-restore-upload-bar]");
             const progressStatus = form.querySelector("[data-restore-upload-status]");
             const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
-            const chunkSize = 512 * 1024;
+            const chunkSize = 64 * 1024;
 
             const setStatus = (message, value = null) => {
                 if (progressWrap) {
@@ -480,6 +480,42 @@
                 return window.btoa(binary);
             };
 
+            const stripHtml = (text) => (
+                (text || "")
+                    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+                    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+                    .replace(/<[^>]+>/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim()
+            );
+
+            const extractServerError = (response, text, data) => {
+                if (data && data.message) {
+                    return data.message;
+                }
+
+                const plainText = stripHtml(text);
+                const requestIdMatch = plainText.match(/Request ID:?\s*([A-Za-z0-9_-]+)/i);
+                const requestId = requestIdMatch ? ` Request ID: ${requestIdMatch[1]}.` : "";
+
+                if (response.status === 403) {
+                    return `Upload bloccato dal firewall o dalla sessione di sicurezza (HTTP 403).${requestId}`;
+                }
+                if (response.status === 413) {
+                    return "Il blocco di upload e' ancora troppo grande per il server (HTTP 413).";
+                }
+                if (response.redirected) {
+                    return "La richiesta e' stata reindirizzata: verifica di essere ancora autenticato e autorizzato al backup database.";
+                }
+                if (!response.ok) {
+                    return `Upload non riuscito (HTTP ${response.status || "?"}).${requestId}`;
+                }
+                if (plainText) {
+                    return `Il server ha restituito una risposta non valida per l'upload: ${plainText.slice(0, 180)}`;
+                }
+                return "Upload non riuscito: risposta del server non valida.";
+            };
+
             const uploadChunk = async (payload) => {
                 const response = await fetch(form.action || window.location.href, {
                     method: "POST",
@@ -491,9 +527,17 @@
                     credentials: "same-origin",
                     body: JSON.stringify(payload),
                 });
-                const data = await response.json().catch(() => ({}));
+
+                const responseText = await response.text();
+                let data = null;
+                try {
+                    data = responseText ? JSON.parse(responseText) : null;
+                } catch (error) {
+                    data = null;
+                }
+
                 if (!response.ok || !data.ok) {
-                    throw new Error(data.message || "Upload non riuscito.");
+                    throw new Error(extractServerError(response, responseText, data));
                 }
                 return data;
             };

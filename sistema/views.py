@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -90,6 +91,7 @@ CRONOLOGIA_RESULT_LIMIT = 250
 FEEDBACK_PER_PAGE = 20
 GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
 GLOBAL_SEARCH_MAX_RESULTS = 12
+logger = logging.getLogger(__name__)
 
 
 def parse_toggle_bool(value):
@@ -1018,6 +1020,10 @@ def handle_restore_chunk_upload(request):
     except OSError as exc:
         upload_path.unlink(missing_ok=True)
         return JsonResponse({"ok": False, "message": f"Impossibile completare l'upload: {exc}"}, status=500)
+    except Exception as exc:
+        upload_path.unlink(missing_ok=True)
+        logger.exception("Errore durante l'upload a blocchi del ripristino database.")
+        return JsonResponse({"ok": False, "message": f"Upload non completato: {exc}"}, status=500)
 
     request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
     request.session.modified = True
