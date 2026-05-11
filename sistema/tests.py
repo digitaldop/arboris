@@ -20,12 +20,14 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .database_backups import (
+    build_sanitized_restore_sql,
     cancel_or_delete_restore_job,
     create_restore_job_from_backup_record,
     create_restore_job_from_local_file,
     create_restore_job_from_storage_reference,
     create_restore_job_from_upload,
     reset_public_schema_for_restore,
+    restore_stderr_has_blocking_errors,
 )
 from .models import (
     FeedbackSegnalazione,
@@ -41,6 +43,7 @@ from .models import (
     TipoFeedbackSegnalazione,
 )
 from .popup_manifest import build_popup_manifest
+from .restore_job_runner import run_restore_job
 from anagrafica.models import (
     Citta,
     Familiare,
@@ -1256,6 +1259,22 @@ class BetaFeedbackTests(TestCase):
 
 
 class BackupDatabaseStorageTests(TestCase):
+    def test_restore_error_parser_ignores_legacy_cleanup_errors(self):
+        stderr = "\n".join(
+            [
+                'psql:restore.sql:12: ERROR:  relation "public.vecchia_tabella" does not exist',
+                'psql:restore.sql:13: ERROR:  constraint "vecchia_pkey" of relation "vecchia_tabella" does not exist',
+                'psql:restore.sql:14: ERROR:  schema "public" already exists',
+            ]
+        )
+
+        self.assertFalse(restore_stderr_has_blocking_errors(stderr))
+
+    def test_restore_error_parser_blocks_real_restore_errors(self):
+        stderr = 'psql:restore.sql:120: ERROR:  duplicate key value violates unique constraint "auth_user_pkey"'
+
+        self.assertTrue(restore_stderr_has_blocking_errors(stderr))
+
     def test_reset_public_schema_for_restore_runs_cascade_cleanup(self):
         db_settings = {
             "NAME": "arboris_test",
@@ -1275,6 +1294,59 @@ class BackupDatabaseStorageTests(TestCase):
         sql = command[command.index("-c") + 1]
         self.assertIn("DROP SCHEMA IF EXISTS public CASCADE", sql)
         self.assertIn("CREATE SCHEMA public", sql)
+
+    def test_sanitized_restore_sql_removes_cleanup_but_preserves_copy_data(self):
+        with TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "restore.sql"
+            source_path.write_text(
+                "\n".join(
+                    [
+                        "DROP TABLE IF EXISTS public.vecchia;",
+                        "ALTER TABLE ONLY public.sistema_scuola DROP CONSTRAINT sistema_scuola_pkey;",
+                        "CREATE SCHEMA public;",
+                        "CREATE TABLE public.esempio (nome text);",
+                        "COPY public.esempio (nome) FROM stdin;",
+                        "DROP questo e dato, non comando;",
+                        r"\.",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            sanitized_path, cleanup = build_sanitized_restore_sql(source_path, reference_name="restore.sql")
+            try:
+                content = sanitized_path.read_text(encoding="utf-8")
+            finally:
+                cleanup()
+
+        self.assertNotIn("DROP TABLE IF EXISTS", content)
+        self.assertNotIn("DROP CONSTRAINT", content)
+        self.assertNotIn("CREATE SCHEMA public", content)
+        self.assertIn("CREATE TABLE public.esempio", content)
+        self.assertIn("DROP questo e dato, non comando;", content)
+
+    def test_restore_runner_saves_in_progress_without_celery_task_id(self):
+        job = SistemaDatabaseRestoreJob.objects.create(
+            stato=StatoRipristinoDatabase.IN_CODA,
+            percorso_file="manual_restore/restore.sql.gz",
+            nome_file_originale="restore.sql.gz",
+            dimensione_file_bytes=42,
+        )
+
+        def fake_restore(*args, **kwargs):
+            job.refresh_from_db()
+            self.assertEqual(job.stato, StatoRipristinoDatabase.IN_CORSO)
+            self.assertIsNotNone(job.data_avvio_ripristino)
+
+        with patch("sistema.restore_job_runner.restore_file_reference_exists", return_value=True), patch(
+            "sistema.restore_job_runner.restore_database_from_backup_file",
+            side_effect=fake_restore,
+        ):
+            run_restore_job(job.pk)
+
+        job.refresh_from_db()
+        self.assertEqual(job.stato, StatoRipristinoDatabase.COMPLETATO)
+        self.assertEqual(job.messaggio_errore, "")
 
     def test_restore_uploads_are_saved_on_storage_backend(self):
         with TemporaryDirectory() as tmpdir:

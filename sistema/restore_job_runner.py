@@ -20,6 +20,45 @@ from .models import SistemaDatabaseRestoreJob, StatoRipristinoDatabase
 logger = logging.getLogger(__name__)
 
 
+def _record_restore_job_outcome(
+    *,
+    job_id: int,
+    stato: str,
+    percorso_file: str,
+    nome_file_originale: str,
+    dimensione_file_bytes: int,
+    data_avvio_ripristino,
+    celery_task_id: str = "",
+    messaggio_errore: str = "",
+) -> None:
+    """
+    Registra l'esito anche dopo il DROP SCHEMA del restore.
+
+    Durante il ripristino viene sostituito anche il database che contiene il record
+    del job. Per questo non possiamo continuare a usare l'istanza ORM caricata prima
+    del restore: dopo l'import proviamo a ricreare/aggiornare un record minimale.
+    """
+    try:
+        if not connections["default"].in_atomic_block:
+            connections.close_all()
+        SistemaDatabaseRestoreJob.objects.update_or_create(
+            pk=job_id,
+            defaults={
+                "stato": stato,
+                "percorso_file": percorso_file,
+                "nome_file_originale": nome_file_originale,
+                "dimensione_file_bytes": dimensione_file_bytes or 0,
+                "data_avvio_ripristino": data_avvio_ripristino,
+                "data_completamento": timezone.now(),
+                "messaggio_errore": messaggio_errore,
+                "celery_task_id": (celery_task_id or "")[:120],
+                "backup_sicurezza": None,
+            },
+        )
+    except Exception:
+        logger.exception("impossibile registrare l'esito del restore job %s dopo il ripristino", job_id)
+
+
 def run_restore_job(job_id: int, *, celery_task_id: str = "") -> None:
     """
     Transizione in_coda → in_corso → completato/errore. Idempotente se job già terminato.
@@ -48,31 +87,49 @@ def run_restore_job(job_id: int, *, celery_task_id: str = "") -> None:
         job.save(update_fields=["stato", "messaggio_errore", "data_completamento"])
         return
 
+    percorso_file = job.percorso_file
+    nome_file_originale = job.nome_file_originale
+    dimensione_file_bytes = job.dimensione_file_bytes
+    creato_da = job.creato_da
+    data_avvio_ripristino = timezone.now()
+
     job.stato = StatoRipristinoDatabase.IN_CORSO
-    job.data_avvio_ripristino = timezone.now()
+    job.data_avvio_ripristino = data_avvio_ripristino
+    update_fields = ["stato", "data_avvio_ripristino"]
     if celery_task_id:
         job.celery_task_id = celery_task_id[:120]
-        job.save(update_fields=["stato", "data_avvio_ripristino", "celery_task_id"])
+        update_fields.append("celery_task_id")
+    job.save(update_fields=update_fields)
 
     try:
-        safety = restore_database_from_backup_file(
-            job.percorso_file,
-            original_name=job.nome_file_originale,
-            triggered_by=job.creato_da,
+        restore_database_from_backup_file(
+            percorso_file,
+            original_name=nome_file_originale,
+            triggered_by=creato_da,
         )
     except DatabaseBackupError as exc:
-        job.stato = StatoRipristinoDatabase.ERRORE
-        job.messaggio_errore = str(exc)
-        job.backup_sicurezza = getattr(exc, "safety_backup", None)
-        job.data_completamento = timezone.now()
-        job.save()
+        _record_restore_job_outcome(
+            job_id=job_id,
+            stato=StatoRipristinoDatabase.ERRORE,
+            percorso_file=percorso_file,
+            nome_file_originale=nome_file_originale,
+            dimensione_file_bytes=dimensione_file_bytes,
+            data_avvio_ripristino=data_avvio_ripristino,
+            celery_task_id=celery_task_id,
+            messaggio_errore=str(exc),
+        )
     else:
-        job.stato = StatoRipristinoDatabase.COMPLETATO
-        job.backup_sicurezza = safety
-        job.messaggio_errore = ""
-        job.data_completamento = timezone.now()
-        job.save()
-        if is_restore_upload_reference(job.percorso_file):
-            delete_restore_file_reference(job.percorso_file)
+        _record_restore_job_outcome(
+            job_id=job_id,
+            stato=StatoRipristinoDatabase.COMPLETATO,
+            percorso_file=percorso_file,
+            nome_file_originale=nome_file_originale,
+            dimensione_file_bytes=dimensione_file_bytes,
+            data_avvio_ripristino=data_avvio_ripristino,
+            celery_task_id=celery_task_id,
+        )
+        if is_restore_upload_reference(percorso_file):
+            delete_restore_file_reference(percorso_file)
     finally:
-        connections.close_all()
+        if not connections["default"].in_atomic_block:
+            connections.close_all()

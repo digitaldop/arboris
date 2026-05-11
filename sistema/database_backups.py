@@ -37,6 +37,16 @@ CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO CURRENT_USER;
 GRANT USAGE ON SCHEMA public TO PUBLIC;
 """
+RESTORE_IGNORABLE_ERROR_MARKERS = (
+    "does not exist",
+    "doesn't exist",
+    "non esiste",
+)
+RESTORE_IGNORABLE_EXACT_ERROR_MARKERS = (
+    'schema "public" already exists',
+    "schema public already exists",
+    'lo schema "public" esiste gia',
+)
 
 
 class DatabaseBackupError(Exception):
@@ -177,6 +187,69 @@ def materialize_restore_file_reference(file_reference, *, reference_name=""):
         except Exception:
             pass
         raise DatabaseBackupError(f"Impossibile leggere il file di backup dallo storage: {exc}") from exc
+
+    return temp_path, lambda: temp_path.unlink(missing_ok=True)
+
+
+def is_restore_cleanup_sql_line(line):
+    stripped = (line or "").strip()
+    if not stripped or stripped.startswith("--"):
+        return False
+
+    normalized = stripped.upper()
+    if normalized.startswith("DROP "):
+        return True
+    if normalized.startswith("ALTER TABLE") and " DROP CONSTRAINT " in normalized:
+        return True
+    if normalized in {"CREATE SCHEMA PUBLIC;", 'CREATE SCHEMA "PUBLIC";'}:
+        return True
+    return False
+
+
+def build_sanitized_restore_sql(source_path, *, reference_name=""):
+    """
+    Crea una copia SQL senza i comandi di cleanup del vecchio dump.
+
+    Arboris resetta gia lo schema public prima del restore. Tenere i DROP/ALTER DROP
+    dentro al file importato puo far fallire il ripristino su database vuoto o gia
+    ripulito, quindi li rimuoviamo e poi eseguiamo psql con ON_ERROR_STOP=1.
+    """
+    source_path = Path(source_path)
+    suffix = ".sql"
+    fd, temp_name = tempfile.mkstemp(prefix="arboris_restore_clean_", suffix=suffix)
+    os.close(fd)
+    temp_path = Path(temp_name)
+    input_name = str(reference_name or source_path.name).lower()
+    open_handler = gzip.open if input_name.endswith(".gz") else open
+    in_copy_block = False
+
+    try:
+        with open_handler(source_path, "rt", encoding="utf-8", errors="ignore", newline="") as source_handle:
+            with temp_path.open("w", encoding="utf-8", newline="") as destination_handle:
+                for line in source_handle:
+                    stripped = line.strip()
+                    if in_copy_block:
+                        destination_handle.write(line)
+                        if stripped == r"\.":
+                            in_copy_block = False
+                        continue
+
+                    normalized = stripped.upper()
+                    if normalized.startswith("COPY ") and normalized.endswith(" FROM STDIN;"):
+                        in_copy_block = True
+                        destination_handle.write(line)
+                        continue
+
+                    if is_restore_cleanup_sql_line(line):
+                        continue
+
+                    destination_handle.write(line)
+    except Exception as exc:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise DatabaseBackupError(f"Impossibile preparare il file SQL per il ripristino: {exc}") from exc
 
     return temp_path, lambda: temp_path.unlink(missing_ok=True)
 
@@ -325,8 +398,6 @@ def run_pg_dump(output_path):
     command = build_postgres_base_command(pg_dump_path, db_settings)
     command.extend(
         [
-            "--clean",
-            "--if-exists",
             "--no-owner",
             "--no-privileges",
             "--encoding=UTF8",
@@ -382,6 +453,26 @@ def reset_public_schema_for_restore(psql_path, db_settings, env):
     if result.returncode != 0:
         message = result.stderr.decode("utf-8", errors="ignore").strip()
         raise DatabaseBackupError(message or "Preparazione del database al ripristino non riuscita.")
+
+
+def restore_stderr_has_blocking_errors(stderr_text):
+    """
+    Dopo il reset dello schema i vecchi dump generati con --clean possono contenere
+    comandi DROP/ALTER DROP per oggetti gia rimossi. Questi errori sono innocui; gli
+    altri errori SQL devono invece bloccare il ripristino e finire nel log utente.
+    """
+    for line in (stderr_text or "").splitlines():
+        normalized = line.lower()
+        if "fatal:" in normalized:
+            return True
+        if "error:" not in normalized:
+            continue
+        if any(marker in normalized for marker in RESTORE_IGNORABLE_ERROR_MARKERS):
+            continue
+        if any(marker in normalized for marker in RESTORE_IGNORABLE_EXACT_ERROR_MARKERS):
+            continue
+        return True
+    return False
 
 
 def delete_backup_record(backup_record):
@@ -696,15 +787,18 @@ def restore_database_from_backup_file(file_path, original_name="", triggered_by=
 
     connections.close_all()
 
-    open_handler = gzip.open if str(original_name or materialized_file_path.name).lower().endswith(".gz") else open
-
+    cleanup_sanitized_file = lambda: None
     try:
+        sanitized_file_path, cleanup_sanitized_file = build_sanitized_restore_sql(
+            materialized_file_path,
+            reference_name=original_name,
+        )
         try:
             reset_public_schema_for_restore(psql_path, db_settings, env)
         except DatabaseBackupError as exc:
             raise DatabaseBackupError(str(exc), safety_backup=safety_backup) from exc
 
-        with open_handler(materialized_file_path, "rb") as restore_handle:
+        with sanitized_file_path.open("rb") as restore_handle:
             result = subprocess.run(
                 command,
                 stdin=restore_handle,
@@ -714,11 +808,12 @@ def restore_database_from_backup_file(file_path, original_name="", triggered_by=
                 check=False,
             )
     finally:
+        cleanup_sanitized_file()
         cleanup_materialized_file()
         connections.close_all()
 
-    if result.returncode != 0:
-        error_message = result.stderr.decode("utf-8", errors="ignore").strip()
+    error_message = result.stderr.decode("utf-8", errors="ignore").strip()
+    if result.returncode != 0 or restore_stderr_has_blocking_errors(error_message):
         raise DatabaseBackupError(
             error_message
             or "Ripristino del database non riuscito. Verifica il file di backup e riprova.",
