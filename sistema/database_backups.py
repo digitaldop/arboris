@@ -161,6 +161,14 @@ def build_restore_temp_suffix(reference_name):
     return ".sql"
 
 
+def file_looks_gzipped(file_path):
+    try:
+        with Path(file_path).open("rb") as handle:
+            return handle.read(2) == b"\x1f\x8b"
+    except OSError:
+        return False
+
+
 def materialize_restore_file_reference(file_reference, *, reference_name=""):
     reference = str(file_reference or "").strip()
     if not reference:
@@ -219,8 +227,7 @@ def build_sanitized_restore_sql(source_path, *, reference_name=""):
     fd, temp_name = tempfile.mkstemp(prefix="arboris_restore_clean_", suffix=suffix)
     os.close(fd)
     temp_path = Path(temp_name)
-    input_name = str(reference_name or source_path.name).lower()
-    open_handler = gzip.open if input_name.endswith(".gz") else open
+    open_handler = gzip.open if file_looks_gzipped(source_path) else open
     in_copy_block = False
 
     try:

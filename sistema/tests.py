@@ -1325,6 +1325,19 @@ class BackupDatabaseStorageTests(TestCase):
         self.assertIn("CREATE TABLE public.esempio", content)
         self.assertIn("DROP questo e dato, non comando;", content)
 
+    def test_sanitized_restore_sql_accepts_plain_sql_with_gz_name(self):
+        with TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "restore.sql.gz"
+            source_path.write_text("-- plain sql, not gzipped\nCREATE TABLE public.esempio (id integer);", encoding="utf-8")
+
+            sanitized_path, cleanup = build_sanitized_restore_sql(source_path, reference_name="restore.sql.gz")
+            try:
+                content = sanitized_path.read_text(encoding="utf-8")
+            finally:
+                cleanup()
+
+        self.assertIn("CREATE TABLE public.esempio", content)
+
     def test_restore_runner_saves_in_progress_without_celery_task_id(self):
         job = SistemaDatabaseRestoreJob.objects.create(
             stato=StatoRipristinoDatabase.IN_CODA,
