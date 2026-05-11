@@ -27,6 +27,7 @@ from .forms import (
     FeedbackSegnalazioneForm,
     SistemaBackupDatabaseConfigurazioneForm,
     SistemaBackupDatabaseRestoreConfirmForm,
+    SistemaBackupDatabaseStorageReferenceForm,
     SistemaBackupDatabaseUploadForm,
     SistemaImpostazioniGeneraliForm,
     ScuolaForm,
@@ -42,6 +43,7 @@ from .database_backups import (
     create_database_backup,
     create_restore_job_from_backup_record,
     create_restore_job_from_local_file,
+    create_restore_job_from_storage_reference,
     create_restore_job_from_upload,
     delete_pending_restore_upload,
     get_pending_restore_root,
@@ -1037,15 +1039,23 @@ def handle_restore_chunk_upload(request):
     )
 
 
+@require_POST
+def upload_restore_chunk_sistema(request):
+    if not (request.content_type or "").startswith("application/json"):
+        return JsonResponse({"ok": False, "message": "Endpoint riservato all'upload a blocchi."}, status=400)
+    return handle_restore_chunk_upload(request)
+
+
 def backup_database_sistema(request):
     configurazione = get_backup_configuration()
     pending_restore = get_pending_restore_metadata(request)
     configurazione_form = SistemaBackupDatabaseConfigurazioneForm(instance=configurazione)
     upload_form = SistemaBackupDatabaseUploadForm()
+    storage_reference_form = SistemaBackupDatabaseStorageReferenceForm()
     confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
 
     if request.method == "POST":
-        if request.content_type.startswith("application/json"):
+        if (request.content_type or "").startswith("application/json"):
             return handle_restore_chunk_upload(request)
 
         action = (request.POST.get("action") or "").strip()
@@ -1085,6 +1095,27 @@ def backup_database_sistema(request):
                     request,
                     "File di backup caricato nello storage protetto. Completa il secondo controllo per mettere in coda il ripristino in background.",
                 )
+
+        elif action == "prepare_restore_storage_reference":
+            storage_reference_form = SistemaBackupDatabaseStorageReferenceForm(request.POST)
+            if storage_reference_form.is_valid():
+                clear_pending_restore_metadata(request)
+                try:
+                    job = create_restore_job_from_storage_reference(
+                        storage_reference_form.cleaned_data["storage_reference"],
+                        triggered_by=request.user,
+                    )
+                except DatabaseBackupError as exc:
+                    messages.error(request, f"File storage non selezionato: {exc}")
+                else:
+                    request.session[PENDING_RESTORE_JOB_SESSION_KEY] = job.pk
+                    request.session.modified = True
+                    pending_restore = job
+                    confirm_form = SistemaBackupDatabaseRestoreConfirmForm()
+                    messages.warning(
+                        request,
+                        f"File storage {job.nome_file_originale} selezionato. Completa il secondo controllo per avviare il ripristino in background.",
+                    )
 
         elif action == "prepare_restore_backup":
             backup_id = request.POST.get("backup_id")
@@ -1166,6 +1197,7 @@ def backup_database_sistema(request):
             "configurazione": configurazione,
             "configurazione_form": configurazione_form,
             "upload_form": upload_form,
+            "storage_reference_form": storage_reference_form,
             "confirm_form": confirm_form,
             "pending_restore": pending_restore,
             "backup_records": backup_records,

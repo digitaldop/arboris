@@ -262,6 +262,24 @@ class SistemaBackupDatabaseUploadForm(forms.Form):
         return uploaded_file
 
 
+class SistemaBackupDatabaseStorageReferenceForm(forms.Form):
+    storage_reference = forms.CharField(
+        label="Percorso file nello storage/S3",
+        help_text=(
+            "Inserisci la chiave del file nel bucket, per esempio "
+            "db_restore_uploads/restore.sql.gz. Puoi incollare anche un URL S3 pubblico/firmato: Arboris usera il percorso interno."
+        ),
+        widget=forms.TextInput(attrs={"placeholder": "db_restore_uploads/restore.sql.gz"}),
+    )
+
+    def clean_storage_reference(self):
+        reference = (self.cleaned_data.get("storage_reference") or "").strip()
+        lower_reference = reference.lower()
+        if not (lower_reference.endswith(".sql") or lower_reference.endswith(".sql.gz")):
+            raise forms.ValidationError("Indica un file PostgreSQL in formato .sql o .sql.gz.")
+        return reference
+
+
 class SistemaBackupDatabaseRestoreConfirmForm(forms.Form):
     testo_conferma = forms.CharField(
         label="Conferma operazione",

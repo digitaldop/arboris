@@ -6,6 +6,7 @@ import tempfile
 from datetime import timedelta
 from glob import glob
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from django.conf import settings
@@ -75,8 +76,28 @@ def get_restore_upload_storage_name(original_name):
     return f"{get_restore_uploads_prefix()}/{timezone.localtime():%Y/%m}/{uuid4().hex}_{safe_name}"
 
 
-def restore_file_reference_exists(file_reference):
+def normalize_restore_storage_reference(file_reference):
     reference = str(file_reference or "").strip()
+    if not reference:
+        return ""
+
+    parsed = urlparse(reference)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        reference = unquote(parsed.path or "").lstrip("/")
+
+        media_url = (getattr(settings, "MEDIA_URL", "") or "").strip("/")
+        if media_url and reference.startswith(f"{media_url}/"):
+            reference = reference[len(media_url) + 1 :]
+
+        bucket_name = (getattr(settings, "AWS_STORAGE_BUCKET_NAME", "") or "").strip("/")
+        if bucket_name and reference.startswith(f"{bucket_name}/"):
+            reference = reference[len(bucket_name) + 1 :]
+
+    return reference.replace("\\", "/").lstrip("/")
+
+
+def restore_file_reference_exists(file_reference):
+    reference = normalize_restore_storage_reference(file_reference)
     if not reference:
         return False
 
@@ -551,6 +572,37 @@ def create_restore_job_from_local_file(file_path, original_name, triggered_by=No
         percorso_file=meta["storage_name"],
         nome_file_originale=meta["original_name"] or "backup.sql",
         dimensione_file_bytes=meta["size_bytes"],
+        creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
+    )
+
+
+def create_restore_job_from_storage_reference(file_reference, triggered_by=None):
+    """
+    Prepara un ripristino da un file gia presente nello storage configurato.
+    Utile quando il browser non riesce a caricare dump grandi passando da Render/WAF.
+    """
+    reference = normalize_restore_storage_reference(file_reference)
+    if not reference:
+        raise DatabaseBackupError("Indica il percorso del file nello storage.")
+    lower_reference = reference.lower()
+    if not (lower_reference.endswith(".sql") or lower_reference.endswith(".sql.gz")):
+        raise DatabaseBackupError("Il file nello storage deve essere in formato .sql o .sql.gz.")
+    if not restore_file_reference_exists(reference):
+        raise DatabaseBackupError("File non trovato nello storage configurato. Verifica percorso, bucket e permessi.")
+
+    if is_absolute_file_reference(reference):
+        file_size = Path(reference).stat().st_size
+    else:
+        try:
+            file_size = default_storage.size(reference)
+        except Exception:
+            file_size = 0
+
+    return SistemaDatabaseRestoreJob.objects.create(
+        stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+        percorso_file=reference,
+        nome_file_originale=Path(reference).name or "backup.sql",
+        dimensione_file_bytes=file_size,
         creato_da=triggered_by if getattr(triggered_by, "is_authenticated", False) else None,
     )
 

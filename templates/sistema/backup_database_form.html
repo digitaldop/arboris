@@ -145,7 +145,7 @@
                         </span>
                         <div>
                             <h2 id="backup-restore-title">Ripristino database</h2>
-                            <p>Carica un file o seleziona un backup gia presente per avviare il doppio controllo.</p>
+                            <p>Carica un file, seleziona un backup gia presente o usa un file gia caricato nello storage/S3.</p>
                         </div>
                     </div>
                     <div class="database-backup-warning">
@@ -216,7 +216,7 @@
                             </form>
                         </div>
                     {% else %}
-                        <form method="post" enctype="multipart/form-data" class="database-backup-form" data-restore-chunked-upload-form>
+                        <form method="post" enctype="multipart/form-data" class="database-backup-form" data-restore-chunked-upload-form data-restore-upload-url="{% url 'backup_database_restore_chunk_upload' %}">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="upload_restore_file">
                             <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
@@ -243,6 +243,33 @@
                                     <button type="submit" class="btn btn-danger btn-icon-text">
                                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
                                         <span class="btn-label">Carica backup e continua</span>
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </form>
+                        <form method="post" class="database-backup-form database-backup-storage-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="prepare_restore_storage_reference">
+                            <fieldset {% if not can_access_database_backups %}disabled{% endif %}>
+                                <label class="database-backup-field">
+                                    <span class="database-backup-field-icon is-amber" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                                    </span>
+                                    <span class="database-backup-field-body">
+                                        <span class="database-backup-label">{{ storage_reference_form.storage_reference.label }}</span>
+                                        {{ storage_reference_form.storage_reference }}
+                                        {{ storage_reference_form.storage_reference.errors }}
+                                        {% if storage_reference_form.storage_reference.help_text %}
+                                            <span class="database-backup-help">{{ storage_reference_form.storage_reference.help_text }}</span>
+                                        {% endif %}
+                                    </span>
+                                </label>
+                            </fieldset>
+                            {% if can_access_database_backups %}
+                                <div class="database-backup-actions">
+                                    <button type="submit" class="btn btn-secondary btn-icon-text">
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                        <span class="btn-label">Usa file da storage</span>
                                     </button>
                                 </div>
                             {% endif %}
@@ -456,6 +483,7 @@
             const progressBar = form.querySelector("[data-restore-upload-bar]");
             const progressStatus = form.querySelector("[data-restore-upload-status]");
             const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+            const uploadUrl = form.dataset.restoreUploadUrl || form.action || window.location.href;
             const chunkSize = 64 * 1024;
 
             const setStatus = (message, value = null) => {
@@ -517,7 +545,7 @@
             };
 
             const uploadChunk = async (payload) => {
-                const response = await fetch(form.action || window.location.href, {
+                const response = await fetch(uploadUrl, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

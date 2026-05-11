@@ -33344,6 +33344,12 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     font-weight: 700;
 }
 
+.database-backup-storage-form {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(57, 124, 151, 0.14);
+}
+
 .database-backup-check-card {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;

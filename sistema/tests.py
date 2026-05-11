@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core import mail
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -20,6 +21,7 @@ from .database_backups import (
     cancel_or_delete_restore_job,
     create_restore_job_from_backup_record,
     create_restore_job_from_local_file,
+    create_restore_job_from_storage_reference,
     create_restore_job_from_upload,
 )
 from .models import (
@@ -1036,6 +1038,8 @@ class BackupDatabaseAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "data-restore-chunked-upload-form")
         self.assertContains(response, "upload_restore_file_chunk")
+        self.assertContains(response, reverse("backup_database_restore_chunk_upload"))
+        self.assertContains(response, "prepare_restore_storage_reference")
 
     def test_chunked_restore_upload_creates_pending_restore_job(self):
         self.client.force_login(self.amministratore)
@@ -1047,7 +1051,7 @@ class BackupDatabaseAccessTests(TestCase):
             with override_settings(MEDIA_ROOT=tmpdir):
                 for index, chunk in enumerate(chunks):
                     response = self.client.post(
-                        reverse("backup_database_sistema"),
+                        reverse("backup_database_restore_chunk_upload"),
                         data=json.dumps(
                             {
                                 "action": "upload_restore_file_chunk",
@@ -1076,6 +1080,31 @@ class BackupDatabaseAccessTests(TestCase):
 
                 cancel_or_delete_restore_job(job)
                 self.assertFalse(default_storage.exists(job.percorso_file))
+
+    def test_storage_restore_reference_creates_pending_restore_job(self):
+        self.client.force_login(self.amministratore)
+
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                storage_name = default_storage.save(
+                    "manual_restore/restore.sql.gz",
+                    ContentFile(b"backup-data-from-storage"),
+                )
+                response = self.client.post(
+                    reverse("backup_database_sistema"),
+                    {
+                        "action": "prepare_restore_storage_reference",
+                        "storage_reference": storage_name,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 200)
+                job = SistemaDatabaseRestoreJob.objects.get()
+                self.assertEqual(job.percorso_file, storage_name)
+                self.assertEqual(job.nome_file_originale, "restore.sql.gz")
+                self.assertEqual(self.client.session["sistema_db_restore_job_id"], job.pk)
+
+                cancel_or_delete_restore_job(job)
 
 
 class BetaFeedbackTests(TestCase):
