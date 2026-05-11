@@ -120,6 +120,7 @@
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="studente-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="studente-inline-target" value="{{ inline_target|default:'iscrizioni' }}">
+        {{ form.attivo }}
         {% if studente %}
             <div class="student-dashboard-view family-dashboard-view mode-view-only">
                 <div class="student-dashboard-layout family-dashboard-layout">
@@ -719,17 +720,6 @@
                                 </div>
 
                                 <div class="family-student-editor-grid">
-                                    {% if form.familiari_collegati %}
-                                    <div class="family-student-editor-field family-student-editor-field-wide">
-                                        <label for="{{ form.familiari_collegati.id_for_label }}">Genitori e tutori collegati</label>
-                                        {{ form.familiari_collegati }}
-                                        {% if form.familiari_collegati.help_text %}
-                                            <div class="field-help">{{ form.familiari_collegati.help_text }}</div>
-                                        {% endif %}
-                                        {{ form.familiari_collegati.errors }}
-                                    </div>
-                                    {% endif %}
-
                                     <div class="family-student-editor-field family-student-editor-field-half">
                                         <label for="{{ form.cognome.id_for_label }}">Cognome</label>
                                         {{ form.cognome }}
@@ -740,6 +730,17 @@
                                         {{ form.nome }}
                                         {{ form.nome.errors }}
                                     </div>
+
+                                    {% if form.familiari_collegati %}
+                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                        <label for="{{ form.familiari_collegati.id_for_label }}">Genitori e tutori collegati</label>
+                                        {{ form.familiari_collegati }}
+                                        {% if form.familiari_collegati.help_text %}
+                                            <div class="field-help" data-parent-surname-help>{{ form.familiari_collegati.help_text }}</div>
+                                        {% endif %}
+                                        {{ form.familiari_collegati.errors }}
+                                    </div>
+                                    {% endif %}
 
                                     <div class="family-student-editor-field family-student-editor-field-third">
                                         <label for="{{ form.data_nascita.id_for_label }}">Data nascita</label>
@@ -793,20 +794,15 @@
                                                 <button type="button" class="related-btn related-btn-delete inline-related-delete" id="delete-indirizzo-btn" data-related-type="indirizzo" aria-label="Elimina indirizzo" title="Elimina indirizzo" data-floating-text="Elimina indirizzo">
                                                     <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                                                 </button>
+                                                <button type="button" class="related-btn related-btn-suggested-address" data-student-address-suggestion-apply aria-label="Usa indirizzo suggerito" title="Usa indirizzo suggerito" data-floating-text="Usa indirizzo suggerito" disabled>
+                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="inline-address-help" id="studente-address-help">
+                                        <div class="inline-address-help" id="studente-address-help" data-studente-address-help>
                                             Se lasci vuoto, verr&agrave; usato l'indirizzo principale della famiglia.
                                         </div>
                                         {{ form.indirizzo.errors }}
-                                    </div>
-
-                                    <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check">
-                                            {{ form.attivo }}
-                                            <span>Studente attivo</span>
-                                        </label>
-                                        {{ form.attivo.errors }}
                                     </div>
                                 </div>
 
@@ -822,7 +818,6 @@
                                 </div>
                             </div>
                         </section>
-                        {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
                     </div>
 
                     <div class="family-stat-grid family-create-stat-grid student-stat-grid student-create-stat-grid is-hidden" aria-hidden="true">
@@ -1002,36 +997,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                {% if form.familiari_collegati %}
-                                <tr>
-                                    <th>{{ form.familiari_collegati.label_tag }}</th>
-                                    <td>
-                                        <div class="mode-view-only readonly-display readonly-display-plain">
-                                            {% if familiari_collegati_diretti %}
-                                                {% for relazione in familiari_collegati_diretti %}
-                                                    <div class="table-main-text">
-                                                        <a href="{% url 'modifica_familiare' relazione.familiare.pk %}">
-                                                            {{ relazione.familiare.nome }} {{ relazione.familiare.cognome }}
-                                                        </a>
-                                                    </div>
-                                                    {% if relazione.relazione_familiare %}
-                                                        <div class="table-subtext">{{ relazione.relazione_familiare }}</div>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            {% else %}
-                                                <span class="table-muted">Nessun familiare collegato direttamente</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="mode-edit-field">
-                                            {{ form.familiari_collegati }}
-                                            {% if form.familiari_collegati.help_text %}
-                                                <div class="field-help">{{ form.familiari_collegati.help_text }}</div>
-                                            {% endif %}
-                                        </div>
-                                        {{ form.familiari_collegati.errors }}
-                                    </td>
-                                </tr>
-                                {% endif %}
                                 <tr>
                                     <th>{{ form.nome.label_tag }}</th>
                                     <td>
@@ -1064,6 +1029,36 @@
                                         {{ form.cognome.errors }}
                                     </td>
                                 </tr>
+                                {% if form.familiari_collegati %}
+                                <tr>
+                                    <th>{{ form.familiari_collegati.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiari_collegati_diretti %}
+                                                {% for relazione in familiari_collegati_diretti %}
+                                                    <div class="table-main-text">
+                                                        <a href="{% url 'modifica_familiare' relazione.familiare.pk %}">
+                                                            {{ relazione.familiare.nome }} {{ relazione.familiare.cognome }}
+                                                        </a>
+                                                    </div>
+                                                    {% if relazione.relazione_familiare %}
+                                                        <div class="table-subtext">{{ relazione.relazione_familiare }}</div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="table-muted">Nessun familiare collegato direttamente</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">
+                                            {{ form.familiari_collegati }}
+                                            {% if form.familiari_collegati.help_text %}
+                                                <div class="field-help" data-parent-surname-help>{{ form.familiari_collegati.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {{ form.familiari_collegati.errors }}
+                                    </td>
+                                </tr>
+                                {% endif %}
                                 <tr>
                                     <th>{{ form.data_nascita.label_tag }}</th>
                                     <td>
@@ -1181,23 +1176,21 @@
                                                 <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
                                                 <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">&#9998;</button>
                                                 <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">&#10006;</button>
+                                                <button type="button" class="related-btn related-btn-suggested-address" data-student-address-suggestion-apply aria-label="Usa indirizzo suggerito" title="Usa indirizzo suggerito" data-floating-text="Usa indirizzo suggerito" disabled>
+                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="inline-address-help mode-edit-field" id="studente-address-help">
+                                        <div class="inline-address-help mode-edit-field" id="studente-address-help" data-studente-address-help>
                                             Se lasci vuoto, verra usato l'indirizzo principale della famiglia
                                         </div>
                                         {{ form.indirizzo.errors }}
                                     </td>
                                 </tr>
-                                <tr>
-                                    <th>{{ form.attivo.label_tag }}</th>
-                                    <td>{{ form.attivo }} {{ form.attivo.errors }}</td>
-                                </tr>
                             </table>
                         </div>
                     </div>
                 </div>
-                {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
             </div>
 
             <div class="family-side-column">
@@ -2215,7 +2208,6 @@
                                         <th class="inline-checkbox-heading">CONVIVENTE</th>
                                         <th class="inline-checkbox-heading">REFERENTE<br>PRINCIPALE</th>
                                         <th class="inline-checkbox-heading inline-scambio-retta-col">SCAMBIO<br>RETTA</th>
-                                        <th class="mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
                                         <th class="mode-edit-only-table-cell">ELIMINA</th>
                                     </tr>
                                 </thead>
@@ -2224,6 +2216,7 @@
                                         <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}" data-relative-id="{{ f.instance.pk }}"{% endif %}>
                                             <td>
                                                 {{ f.id }}
+                                                {{ f.attivo }}
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if f.instance.pk and f.instance.cognome %}{{ f.instance.cognome }}{% else %}<span class="table-muted">Non indicato</span>{% endif %}</div>
                                                 <div class="mode-edit-field">{{ f.cognome }}</div>
                                             </td>
@@ -2274,7 +2267,6 @@
                                             <td class="inline-checkbox-cell"><div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.convivente|si_no }}</div><div class="mode-edit-field">{{ f.convivente }}</div></td>
                                             <td class="inline-checkbox-cell"><div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.referente_principale|si_no }}</div><div class="mode-edit-field">{{ f.referente_principale }}</div></td>
                                             <td class="inline-checkbox-cell inline-scambio-retta-col"><div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.abilitato_scambio_retta|si_no }}</div><div class="mode-edit-field">{{ f.abilitato_scambio_retta }}</div></td>
-                                            <td class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
                                             <td class="inline-delete-cell mode-edit-only-table-cell">
                                                 {% if f.instance.pk %}
                                                     <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
@@ -2284,7 +2276,7 @@
                                             </td>
                                         </tr>
                                         <tr class="inline-subform-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
-                                            <td colspan="14">
+                                            <td colspan="13">
                                                 <div class="inline-subform-grid">
                                                     <div class="inline-subform-field"><label>Data nascita</label>{{ f.data_nascita }}{{ f.data_nascita.errors }}</div>
                                                     <div class="inline-subform-field"><label>Sesso</label>{{ f.sesso }}{{ f.sesso.errors }}</div>
@@ -2299,9 +2291,9 @@
                                             </td>
                                         </tr>
                                         {% if f.non_field_errors %}
-                                            <tr class="inline-errors-row"><td colspan="14">{{ f.non_field_errors }}</td></tr>
+                                            <tr class="inline-errors-row"><td colspan="13">{{ f.non_field_errors }}</td></tr>
                                         {% elif f.errors %}
-                                            <tr class="inline-errors-row"><td colspan="14">{{ f.errors }}</td></tr>
+                                            <tr class="inline-errors-row"><td colspan="13">{{ f.errors }}</td></tr>
                                         {% endif %}
                                     {% endfor %}
                                 </tbody>
@@ -2474,6 +2466,12 @@
         <div class="family-card-sticky-spacer student-card-sticky-spacer is-hidden" id="student-card-sticky-spacer" hidden></div>
     </form>
 
+    {% if studente_indirizzi_correlati %}
+        {{ studente_indirizzi_correlati|json_script:"studente-indirizzi-correlati" }}
+    {% else %}
+        <script id="studente-indirizzi-correlati" type="application/json">[]</script>
+    {% endif %}
+
     {% if studente %}
         <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="student-note-dialog-overlay" aria-hidden="true">
             <form method="post" class="app-dialog family-note-dialog" id="student-note-popup-form" role="dialog" aria-modal="true" aria-labelledby="student-note-dialog-title">
@@ -2501,7 +2499,7 @@
     {% if parenti_formset %}
         <template id="parenti-empty-form-template">
             <tr class="inline-form-row">
-                <td>{{ parenti_formset.empty_form.id }}<div class="mode-edit-field">{{ parenti_formset.empty_form.cognome }}</div></td>
+                <td>{{ parenti_formset.empty_form.id }}{{ parenti_formset.empty_form.attivo }}<div class="mode-edit-field">{{ parenti_formset.empty_form.cognome }}</div></td>
                 <td><div class="mode-edit-field">{{ parenti_formset.empty_form.nome }}</div></td>
                 <td>
                     <div class="inline-related-field mode-edit-field">
@@ -2534,13 +2532,12 @@
                 <td class="inline-checkbox-cell"><div class="mode-edit-field">{{ parenti_formset.empty_form.convivente }}</div></td>
                 <td class="inline-checkbox-cell"><div class="mode-edit-field">{{ parenti_formset.empty_form.referente_principale }}</div></td>
                 <td class="inline-checkbox-cell inline-scambio-retta-col"><div class="mode-edit-field">{{ parenti_formset.empty_form.abilitato_scambio_retta }}</div></td>
-                <td class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-cell">{{ parenti_formset.empty_form.attivo }}</td>
                 <td class="inline-delete-cell mode-edit-only-table-cell">
                     <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
                 </td>
             </tr>
             <tr class="inline-subform-row">
-                <td colspan="14">
+                <td colspan="13">
                     <div class="inline-subform-grid">
                         <div class="inline-subform-field"><label>Data nascita</label>{{ parenti_formset.empty_form.data_nascita }}{{ parenti_formset.empty_form.data_nascita.errors }}</div>
                         <div class="inline-subform-field"><label>Sesso</label>{{ parenti_formset.empty_form.sesso }}{{ parenti_formset.empty_form.sesso.errors }}</div>

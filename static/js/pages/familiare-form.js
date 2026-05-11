@@ -85,6 +85,54 @@ window.ArborisFamiliareForm = (function () {
             });
         }
 
+        function normalizeSuggestionText(value) {
+            return (value || "")
+                .toString()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+        }
+
+        function bindStudentSuggestionsBySurname() {
+            if (window.ArborisDirectRelationPicker && typeof window.ArborisDirectRelationPicker.init === "function") {
+                window.ArborisDirectRelationPicker.init(document, {
+                    uiIconsSprite: config.uiIconsSprite,
+                });
+                return;
+            }
+
+            const selects = Array.from(document.querySelectorAll("[data-student-surname-suggestions]"));
+            const surnameInput = document.getElementById("id_cognome");
+            if (!selects.length || !surnameInput) {
+                return;
+            }
+
+            function updateSelect(select) {
+                const minChars = Number(select.dataset.studentSurnameMinChars || 3);
+                const query = normalizeSuggestionText(surnameInput.value);
+                const canFilter = query.length >= minChars;
+
+                Array.from(select.options).forEach(function (option) {
+                    if (!option.value) {
+                        return;
+                    }
+
+                    const shouldShow = option.selected || (canFilter && normalizeSuggestionText(option.textContent).includes(query));
+                    option.hidden = !shouldShow;
+                    option.classList.toggle("is-surname-suggestion-hidden", !shouldShow);
+                });
+            }
+
+            function refresh() {
+                selects.forEach(updateSelect);
+            }
+
+            surnameInput.addEventListener("input", refresh);
+            surnameInput.addEventListener("change", refresh);
+            refresh();
+        }
+
         function updateMainButtons() {
             refreshFamigliaNavigation();
             refreshRelazioneButtons();
@@ -1059,13 +1107,12 @@ window.ArborisFamiliareForm = (function () {
             const grid = document.createElement("div");
             grid.className = "family-student-editor-grid";
 
-            appendRelatedField(grid, formRoot, "#id_relazione_familiare", "Parentela", "family-student-editor-field-third relative-main-parentela-field", editor, "parentela");
-            appendInputField(grid, formRoot, "#id_nome", "Nome", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_cognome", "Cognome", "family-student-editor-field-half", editor);
-            appendInputField(grid, formRoot, "#id_telefono", "Telefono", "family-student-editor-field-third", editor);
-            appendInputField(grid, formRoot, "#id_email", "Email", "family-student-editor-field-half", editor);
-            appendInputField(grid, formRoot, "#id_data_nascita", "Data nascita", "family-student-editor-field-third", editor);
+            appendInputField(grid, formRoot, "#id_nome", "Nome", "family-student-editor-field-half", editor);
+            appendInputField(grid, formRoot, "#id_studenti_collegati", "Figli e figlie collegati", "family-student-editor-field-wide", editor);
+            appendRelatedField(grid, formRoot, "#id_relazione_familiare", "Parentela", "family-student-editor-field-third relative-main-parentela-field", editor, "parentela");
             appendInputField(grid, formRoot, "#id_sesso", "Sesso", "family-student-editor-field-third", editor);
+            appendInputField(grid, formRoot, "#id_data_nascita", "Data nascita", "family-student-editor-field-third", editor);
             appendInputField(grid, formRoot, "#id_luogo_nascita_search", "Luogo nascita", "family-student-editor-field-wide", editor);
             appendInputField(grid, formRoot, "#id_nazionalita", "Nazionalita", "family-student-editor-field-third", editor);
             appendInputField(grid, formRoot, "#id_codice_fiscale", "Codice fiscale", "family-student-editor-field-third", editor);
@@ -1073,9 +1120,13 @@ window.ArborisFamiliareForm = (function () {
                 helpSelector: "#familiare-address-help",
                 addressControl: true,
             });
+            appendInputField(grid, formRoot, "#id_telefono", "Telefono", "family-student-editor-field-half", editor);
+            appendInputField(grid, formRoot, "#id_email", "Email", "family-student-editor-field-half", editor);
             appendCheckboxField(grid, formRoot, "#id_convivente", "Convivente", "", editor);
             appendCheckboxField(grid, formRoot, "#id_referente_principale", "Referente principale", "", editor);
-            appendCheckboxField(grid, formRoot, "#id_abilitato_scambio_retta", "Scambio retta", "", editor);
+            appendCheckboxField(grid, formRoot, "#id_abilitato_scambio_retta", "Scambio retta", "", editor, {
+                helpText: "Attiva se il familiare pu\u00f2 offrire il suo lavoro alla scuola in cambio di credito da scalare alla retta mensile",
+            });
             appendCheckboxField(grid, formRoot, "#id_profilo_dipendente_attivo", "Anche dipendente", "", editor, {
                 helpText: "Crea o collega il profilo amministrativo senza duplicare l'anagrafica.",
             });
@@ -2700,6 +2751,7 @@ window.ArborisFamiliareForm = (function () {
             window.ArborisRichNotes.init(document);
         }
         wireInlineRelatedButtons(document);
+        bindStudentSuggestionsBySurname();
         wireStudentCardActions(document);
         wireRelativeCardActions(document);
         wireDocumentCardActions(document);

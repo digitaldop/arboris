@@ -881,6 +881,9 @@ def direct_student_peers_for_relations(studente, relazioni_familiari):
         .exclude(studente=studente)
         .select_related(
             "studente",
+            "studente__indirizzo",
+            "studente__indirizzo__citta",
+            "studente__indirizzo__provincia",
             "studente__luogo_nascita",
             "studente__luogo_nascita__provincia",
         )
@@ -972,6 +975,16 @@ def build_familiare_address_suggestions(familiare, relazioni_studenti, parenti_c
     for parente in parenti_collegati or []:
         if not familiare or getattr(parente, "pk", None) != getattr(familiare, "pk", None):
             people.append((parente, "Familiare"))
+    return build_related_address_suggestions(people)
+
+
+def build_studente_address_suggestions(studente, relazioni_familiari, studenti_collegati):
+    people = []
+    for relazione in relazioni_familiari or []:
+        people.append((getattr(relazione, "familiare", None), "Familiare"))
+    for studente_collegato in studenti_collegati or []:
+        if not studente or getattr(studente_collegato, "pk", None) != getattr(studente, "pk", None):
+            people.append((studente_collegato, "Studente"))
     return build_related_address_suggestions(people)
 
 
@@ -4131,7 +4144,7 @@ def crea_studente(request):
     iscrizioni_formset = None
     parenti_formset = None
     documenti_formset = None
-    contact_formsets = None
+    contact_formsets = {}
 
     if request.method == "POST":
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "iscrizioni")
@@ -4141,7 +4154,6 @@ def crea_studente(request):
             allowed_inline_targets,
         )
         form = StudenteStandaloneForm(request.POST)
-        contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
         iscrizioni_formset = (
             build_iscrizioni_studente_formset(data=request.POST, prefix="iscrizioni")
             if inline_target in (None, "iscrizioni")
@@ -4162,14 +4174,13 @@ def crea_studente(request):
         iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target in (None, "iscrizioni") else True
         parenti_is_valid = parenti_formset.is_valid() if inline_target in (None, "parenti") else True
         documenti_is_valid = documenti_formset.is_valid() if inline_target in (None, "documenti") else True
-        contatti_is_valid = anagrafica_contact_formsets_are_valid(contact_formsets)
+        contatti_is_valid = True
 
         if form_is_valid and iscrizioni_is_valid and parenti_is_valid and documenti_is_valid and contatti_is_valid:
             missing_rate_count = 0
             try:
                 with transaction.atomic():
                     studente = form.save()
-                    save_anagrafica_contact_formsets(studente, contact_formsets)
 
                     if inline_target in (None, "iscrizioni"):
                         iscrizioni_formset.instance = studente
@@ -4215,7 +4226,6 @@ def crea_studente(request):
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "iscrizioni")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = StudenteStandaloneForm(initial=initial)
-        contact_formsets = build_anagrafica_contact_formsets()
         iscrizioni_formset = build_iscrizioni_studente_formset(prefix="iscrizioni")
         parenti_formset = build_familiari_formset(prefix="parenti")
         documenti_formset = build_documenti_studente_formset(prefix="documenti")
@@ -4240,6 +4250,7 @@ def crea_studente(request):
         "count_fratelli_sorelle": 0,
         "familiari_collegati_diretti": [],
         "studenti_parenti_diretti": [],
+        "studente_indirizzi_correlati": [],
         "parenti_famiglia": [],
         "studenti_parenti_famiglia": [],
         "count_documenti_in_scadenza": 0,
@@ -4253,7 +4264,6 @@ def crea_studente(request):
             or iscrizioni_formset.total_error_count()
             or parenti_formset.total_error_count()
             or documenti_formset.total_error_count()
-            or anagrafica_contact_formsets_have_errors(contact_formsets)
         ),
     }
     ctx.update(
@@ -4363,10 +4373,7 @@ def modifica_studente(request, pk):
             if inline_editing
             else StudenteStandaloneForm(request.POST, instance=studente)
         )
-        contact_formsets = build_anagrafica_contact_formsets(
-            data=request.POST if not inline_editing else None,
-            instance=studente,
-        )
+        contact_formsets = {}
         familiari_diretti_form = StudenteDirectFamiliariForm(
             request.POST if inline_editing and inline_target == "parenti" else None,
             studente=studente,
@@ -4402,7 +4409,7 @@ def modifica_studente(request, pk):
         form_is_valid = True if inline_editing else form.is_valid()
         iscrizioni_is_valid = iscrizioni_formset.is_valid() if inline_target == "iscrizioni" else True
         documenti_is_valid = documenti_formset.is_valid() if inline_target == "documenti" else True
-        contatti_is_valid = True if inline_editing else anagrafica_contact_formsets_are_valid(contact_formsets)
+        contatti_is_valid = True
         parenti_is_valid = True
         if inline_target == "parenti":
             if card_inline_submit == "parenti" and parenti_formset is not None:
@@ -4416,7 +4423,6 @@ def modifica_studente(request, pk):
                 with transaction.atomic():
                     if not inline_editing:
                         studente = form.save()
-                        save_anagrafica_contact_formsets(studente, contact_formsets)
                     if inline_target == "iscrizioni":
                         iscrizioni_salvate = iscrizioni_formset.save()
                         missing_rate_count = sync_studente_iscrizioni_rate_schedules(
@@ -4469,7 +4475,7 @@ def modifica_studente(request, pk):
             )
     else:
         form = StudenteStandaloneForm(instance=studente)
-        contact_formsets = build_anagrafica_contact_formsets(instance=studente)
+        contact_formsets = {}
         familiari_diretti_form = StudenteDirectFamiliariForm(studente=studente)
         iscrizioni_formset = build_iscrizioni_studente_formset(
             instance=studente,
@@ -4534,6 +4540,11 @@ def modifica_studente(request, pk):
         key_prefix="s",
         referenti=student_family_referenti,
     )
+    studente_indirizzi_correlati = build_studente_address_suggestions(
+        studente,
+        familiari_collegati_diretti,
+        studenti_parenti_diretti,
+    )
 
     ctx = {
         "form": form,
@@ -4544,6 +4555,7 @@ def modifica_studente(request, pk):
         "studenti_parenti_famiglia": studenti_parenti_famiglia,
         "studenti_parenti_diretti": studenti_parenti_diretti,
         "familiari_collegati_diretti": familiari_collegati_diretti,
+        "studente_indirizzi_correlati": studente_indirizzi_correlati,
         "familiari_diretti_form": familiari_diretti_form,
         "usa_parenti_diretti": usa_parenti_diretti,
         "usa_parenti_diretti_cards": usa_parenti_diretti and parenti_formset is None,
@@ -4577,7 +4589,6 @@ def modifica_studente(request, pk):
             or iscrizioni_formset.total_error_count()
             or documenti_formset.total_error_count()
             or (parenti_formset.total_error_count() if parenti_formset is not None else 0)
-            or anagrafica_contact_formsets_have_errors(contact_formsets)
         ),
     }
     ctx.update(

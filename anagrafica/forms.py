@@ -48,8 +48,11 @@ def studente_direct_relation_label(studente):
 
 
 def familiare_direct_relation_label(familiare):
+    persona = getattr(familiare, "persona", None)
+    cognome = getattr(persona, "cognome", None) or familiare.cognome
+    nome = getattr(persona, "nome", None) or familiare.nome
     relation = f" ({familiare.relazione_familiare})" if getattr(familiare, "relazione_familiare", None) else ""
-    return f"{familiare.cognome} {familiare.nome}{relation}".strip()
+    return f"{cognome} {nome}{relation}".strip()
 
 
 def _active_label_queryset(label_model, selected_id=None):
@@ -300,7 +303,7 @@ class StudenteDirectFamiliariForm(forms.Form):
         widget=forms.SelectMultiple(
             attrs={
                 "class": "form-control direct-relation-select",
-                "size": 7,
+                "size": 3,
             }
         ),
     )
@@ -316,9 +319,9 @@ class StudenteDirectFamiliariForm(forms.Form):
             )
 
         queryset = (
-            Familiare.objects.select_related("relazione_familiare")
-            .filter(Q(attivo=True) | Q(pk__in=selected_ids))
-            .order_by("cognome", "nome", "pk")
+            Familiare.objects.select_related("persona", "relazione_familiare")
+            .filter(Q(persona__pk__isnull=False) | Q(pk__in=selected_ids))
+            .order_by("persona__cognome", "persona__nome", "pk")
         )
         field = self.fields["direct_familiari_collegati"]
         field.queryset = queryset
@@ -340,7 +343,7 @@ class FamiliareDirectStudentiForm(forms.Form):
         widget=forms.SelectMultiple(
             attrs={
                 "class": "form-control direct-relation-select",
-                "size": 7,
+                "size": 3,
             }
         ),
     )
@@ -554,6 +557,22 @@ class CondizioneIscrizioneInlineSelect(forms.Select):
         if value and hasattr(value, "instance"):
             option["attrs"]["data-anno-scolastico"] = value.instance.anno_scolastico_id
             option["attrs"]["data-riduzione-speciale-ammessa"] = "1" if value.instance.riduzione_speciale_ammessa else "0"
+
+        return option
+
+
+class FamiliareRelationSelectMultiple(forms.SelectMultiple):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+
+        if value and hasattr(value, "instance"):
+            familiare = value.instance
+            indirizzo = getattr(familiare, "indirizzo_effettivo", None)
+            if indirizzo and getattr(indirizzo, "pk", None):
+                option["attrs"]["data-address-id"] = str(indirizzo.pk)
+                option["attrs"]["data-address-label"] = indirizzo.label_select()
+                option["attrs"]["data-address-full"] = indirizzo.label_full()
+                option["attrs"]["data-person-label"] = familiare.nome_completo
 
         return option
 
@@ -1117,7 +1136,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         if getattr(self.instance, "pk", None) and not self.is_bound:
             for field_name in self.PERSONA_FORM_FIELDS:
                 if field_name == "attivo":
-                    self.initial.setdefault(field_name, True)
+                    self.initial.setdefault(field_name, getattr(self.instance, "attivo", True))
                     continue
                 value = getattr(self.instance, field_name, None)
                 if value is not None:
@@ -1128,6 +1147,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         if enable_direct_relations_field:
             self.setup_studenti_collegati_field()
 
+        self.fields["attivo"].widget = forms.HiddenInput()
         self.fields["indirizzo"].required = False
         self.fields["indirizzo"].help_text = (
             "Se lasci vuoto, verra usato automaticamente l'indirizzo principale collegato, quando disponibile."
@@ -1211,11 +1231,13 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             queryset=queryset,
             required=False,
             label="Figli e figlie collegati",
-            help_text="Collega direttamente il familiare agli studenti.",
+            help_text="Collega direttamente il familiare a bambini o studenti",
             widget=forms.SelectMultiple(
                 attrs={
                     "class": "form-control direct-relation-select",
-                    "size": 6,
+                    "size": 3,
+                    "data-student-surname-suggestions": "1",
+                    "data-student-surname-min-chars": "3",
                 }
             ),
         )
@@ -1559,6 +1581,7 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
         super().__init__(*args, **kwargs)
 
         configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
+        self.fields["attivo"].widget = forms.HiddenInput()
 
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
@@ -1678,6 +1701,7 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, for
         self.setup_indirizzo_search()
         self.setup_luogo_nascita_autocomplete_fk()
         configure_nazionalita_field(self.fields["nazionalita"])
+        self.fields["attivo"].widget = forms.HiddenInput()
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
@@ -1734,19 +1758,21 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, for
             selected_ids.update(self._submitted_pk_values("familiari_collegati"))
 
         queryset = (
-            Familiare.objects.select_related("relazione_familiare")
-            .filter(Q(attivo=True) | Q(pk__in=selected_ids))
-            .order_by("cognome", "nome", "pk")
+            Familiare.objects.select_related("persona", "persona__indirizzo", "relazione_familiare")
+            .filter(Q(persona__pk__isnull=False) | Q(pk__in=selected_ids))
+            .order_by("persona__cognome", "persona__nome", "pk")
         )
         self.fields["familiari_collegati"] = forms.ModelMultipleChoiceField(
             queryset=queryset,
             required=False,
             label="Genitori e tutori collegati",
-            help_text="Collega direttamente lo studente ai familiari.",
-            widget=forms.SelectMultiple(
+            help_text="Digita almeno 3 lettere del cognome: vedrai i familiari gia presenti che possono essere collegati.",
+            widget=FamiliareRelationSelectMultiple(
                 attrs={
                     "class": "form-control direct-relation-select",
-                    "size": 6,
+                    "size": 3,
+                    "data-parent-surname-suggestions": "1",
+                    "data-parent-surname-min-chars": "3",
                 }
             ),
         )

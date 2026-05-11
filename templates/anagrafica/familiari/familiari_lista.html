@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static active_toggles %}
+{% load static %}
 
 {% block title %}Familiari - Arboris{% endblock %}
 
@@ -67,7 +67,6 @@
                         <col class="familiari-col-family">
                         <col class="familiari-col-phone">
                         <col class="familiari-col-email">
-                        <col class="familiari-col-active">
                         <col class="familiari-col-actions">
                     </colgroup>
                     <thead>
@@ -76,7 +75,6 @@
                             <th>Studenti collegati</th>
                             <th>Telefono</th>
                             <th>Email</th>
-                            <th>Attivo</th>
                             <th>Azioni</th>
                         </tr>
                     </thead>
@@ -126,7 +124,6 @@
                                         <span class="table-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{% active_toggle familiare %}</td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions anagrafica-row-actions">
                                         <a

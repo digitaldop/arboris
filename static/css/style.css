@@ -18477,7 +18477,7 @@ a.header-school-compact:hover {
 .family-student-card-editor .direct-relation-select,
 .form-table .direct-relation-select,
 .direct-relation-inline-editor .direct-relation-select {
-    min-height: 132px;
+    min-height: 78px;
     padding: 8px 10px;
     border-color: #d1e1ec;
     border-radius: 8px;
@@ -18489,6 +18489,229 @@ a.header-school-compact:hover {
 .form-table .direct-relation-select option,
 .direct-relation-inline-editor .direct-relation-select option {
     padding: 6px 8px;
+}
+
+.family-student-card-editor .direct-relation-select.is-enhanced-native,
+.form-table .direct-relation-select.is-enhanced-native,
+.direct-relation-inline-editor .direct-relation-select.is-enhanced-native {
+    display: none;
+}
+
+.direct-relation-picker {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d7e6ef;
+    border-radius: 8px;
+    background: #f7fbfd;
+    box-sizing: border-box;
+}
+
+.direct-relation-picker-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 42px;
+    align-items: center;
+    gap: 10px;
+}
+
+.direct-relation-picker-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.direct-relation-picker-search svg {
+    position: absolute;
+    left: 13px;
+    width: 18px;
+    height: 18px;
+    color: #6f89a5;
+    pointer-events: none;
+}
+
+.direct-relation-picker-search input {
+    width: 100%;
+    min-height: 42px !important;
+    padding: 9px 12px 9px 42px !important;
+    border: 1px solid #cfdeea;
+    border-radius: 7px;
+    background: #fff;
+    color: #172131;
+    box-sizing: border-box;
+}
+
+.direct-relation-picker-search input:focus {
+    border-color: #75aeca;
+    box-shadow: 0 0 0 3px rgba(66, 129, 156, 0.14);
+    outline: none;
+}
+
+.direct-relation-picker-count {
+    color: #5d7290;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.direct-relation-picker-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #cfdeea;
+    border-radius: 7px;
+    background: #fff;
+    color: #2f6f8d;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.direct-relation-picker-toggle:hover,
+.direct-relation-picker-toggle:focus-visible {
+    border-color: #9fc7d9;
+    background: #edf7fb;
+    color: #204d65;
+}
+
+.direct-relation-picker-toggle svg {
+    width: 18px;
+    height: 18px;
+    transform: rotate(180deg);
+    transition: transform 0.16s ease;
+}
+
+.direct-relation-picker.is-collapsed .direct-relation-picker-toggle svg {
+    transform: rotate(0deg);
+}
+
+.direct-relation-picker-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.direct-relation-picker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid #b9daf0;
+    border-radius: 7px;
+    background: #eaf6ff;
+    color: #184f73;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.direct-relation-picker-chip-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.direct-relation-picker-chip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.direct-relation-picker-chip svg {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+}
+
+.direct-relation-picker-list {
+    display: grid;
+    max-height: 164px;
+    overflow: auto;
+    border: 1px solid #d8e7f0;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.direct-relation-picker-row {
+    display: grid;
+    grid-template-columns: 22px 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 7px 10px;
+    border-bottom: 1px solid #e6eef4;
+    color: #13253d;
+    cursor: pointer;
+}
+
+.direct-relation-picker-row:last-child {
+    border-bottom: 0;
+}
+
+.direct-relation-picker-row:hover,
+.direct-relation-picker-row:focus-within {
+    background: #f2f9fc;
+}
+
+.direct-relation-picker-row.is-selected {
+    background: #eef8ff;
+}
+
+.direct-relation-picker-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: #2f7fa1;
+}
+
+.direct-relation-picker-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: #e4f2fa;
+    color: #2f6f8d;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.direct-relation-picker-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.direct-relation-picker-empty {
+    padding: 14px;
+    color: #6b7b91;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.direct-relation-picker.is-collapsed .direct-relation-picker-list {
+    display: none;
+}
+
+@media (max-width: 720px) {
+    .direct-relation-picker-toolbar {
+        grid-template-columns: minmax(0, 1fr) 42px;
+    }
+
+    .direct-relation-picker-count {
+        grid-column: 1 / -1;
+        order: 3;
+    }
 }
 
 .direct-relation-inline-editor {

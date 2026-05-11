@@ -205,6 +205,587 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
+        function normalizeSuggestionText(value) {
+            return (value || "")
+                .toString()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .trim();
+        }
+
+        function parentRelationPickerIcon(symbolName) {
+            const sprite = config.uiIconsSprite || "/static/images/arboris-ui-icons.svg";
+            return `<svg aria-hidden="true" focusable="false"><use href="${sprite}#${symbolName}"></use></svg>`;
+        }
+
+        function parentRelationOptionLabel(option) {
+            return (option && option.textContent ? option.textContent : "").trim();
+        }
+
+        function parentRelationOptionSearchText(option) {
+            if (!option) {
+                return "";
+            }
+            return normalizeSuggestionText([
+                option.textContent || "",
+                option.dataset.personLabel || "",
+                option.dataset.addressLabel || "",
+                option.dataset.addressFull || "",
+            ].join(" "));
+        }
+
+        function parentRelationOptionInitials(option) {
+            const label = parentRelationOptionLabel(option).replace(/\([^)]*\)/g, " ");
+            const parts = label.split(/\s+/).filter(Boolean);
+            if (!parts.length) {
+                return "--";
+            }
+            if (parts.length === 1) {
+                return parts[0].slice(0, 2).toUpperCase();
+            }
+            return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+        }
+
+        function selectedParentRelationOptions(select) {
+            return Array.from(select.options || []).filter(function (option) {
+                return option.value && option.selected;
+            });
+        }
+
+        function dispatchParentRelationChange(select) {
+            select.dispatchEvent(new Event("input", { bubbles: true }));
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        function bindParentSuggestionsBySurname() {
+            if (window.ArborisDirectRelationPicker && typeof window.ArborisDirectRelationPicker.init === "function") {
+                window.ArborisDirectRelationPicker.init(document, {
+                    uiIconsSprite: config.uiIconsSprite,
+                });
+                return;
+            }
+
+            const selects = Array.from(document.querySelectorAll("[data-parent-surname-suggestions]"));
+            const surnameInput = document.getElementById("id_cognome");
+            if (!selects.length) {
+                return;
+            }
+
+            function updateNativeOptionVisibility(select, visibleValues) {
+                Array.from(select.options || []).forEach(function (option) {
+                    if (!option.value) {
+                        return;
+                    }
+                    const shouldShow = visibleValues.has(String(option.value));
+                    option.hidden = !shouldShow;
+                    option.classList.toggle("is-surname-suggestion-hidden", !shouldShow);
+                });
+            }
+
+            function getPickerMatches(state) {
+                const select = state.select;
+                const minChars = Number(select.dataset.parentSurnameMinChars || 3);
+                const surnameQuery = normalizeSuggestionText(surnameInput ? surnameInput.value : "");
+                const searchQuery = normalizeSuggestionText(state.searchInput.value);
+                const searchActive = searchQuery.length > 0;
+                const surnameActive = !searchActive && surnameQuery.length >= minChars;
+                const allOptions = Array.from(select.options || []).filter(function (option) {
+                    return option.value;
+                });
+
+                const visibleOptions = allOptions.filter(function (option) {
+                    if (option.selected) {
+                        return true;
+                    }
+                    const optionText = parentRelationOptionSearchText(option);
+                    if (searchActive) {
+                        return optionText.includes(searchQuery);
+                    }
+                    if (surnameActive) {
+                        return optionText.includes(surnameQuery);
+                    }
+                    return false;
+                });
+
+                return {
+                    minChars: minChars,
+                    searchActive: searchActive,
+                    surnameActive: surnameActive,
+                    visibleOptions: visibleOptions,
+                    visibleValues: new Set(visibleOptions.map(function (option) {
+                        return String(option.value);
+                    })),
+                    selectedOptions: selectedParentRelationOptions(select),
+                };
+            }
+
+            function updatePickerHelp(state, matches) {
+                if (!state.help) {
+                    return;
+                }
+
+                if (matches.searchActive && !matches.visibleOptions.length) {
+                    state.help.textContent = "Nessun familiare gia presente corrisponde alla ricerca.";
+                    return;
+                }
+
+                if (!matches.searchActive && !matches.surnameActive && !matches.selectedOptions.length) {
+                    state.help.textContent = `Cerca un familiare oppure digita almeno ${matches.minChars} lettere del cognome per vedere i suggerimenti automatici.`;
+                    return;
+                }
+
+                if (!matches.visibleOptions.length) {
+                    state.help.textContent = "Nessun familiare gia presente corrisponde al cognome inserito.";
+                    return;
+                }
+
+                if (matches.selectedOptions.length) {
+                    state.help.textContent = "I familiari selezionati restano collegati. Puoi cercarne altri anche con cognomi diversi.";
+                    return;
+                }
+
+                state.help.textContent = "Seleziona uno o piu familiari gia presenti da collegare allo studente.";
+            }
+
+            function renderPicker(state) {
+                const matches = getPickerMatches(state);
+                const selectedCount = matches.selectedOptions.length;
+
+                updateNativeOptionVisibility(state.select, matches.visibleValues);
+                updatePickerHelp(state, matches);
+
+                state.count.textContent = selectedCount === 1 ? "1 selezionato" : `${selectedCount} selezionati`;
+                state.picker.classList.toggle("is-collapsed", state.collapsed);
+                state.toggle.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
+                state.toggle.innerHTML = parentRelationPickerIcon("chevron-down");
+
+                state.chips.innerHTML = "";
+                matches.selectedOptions.forEach(function (option) {
+                    const chip = document.createElement("button");
+                    chip.type = "button";
+                    chip.className = "direct-relation-picker-chip";
+                    const chipLabel = document.createElement("span");
+                    chipLabel.className = "direct-relation-picker-chip-label";
+                    chipLabel.textContent = parentRelationOptionLabel(option);
+                    const chipIcon = document.createElement("span");
+                    chipIcon.className = "direct-relation-picker-chip-icon";
+                    chipIcon.innerHTML = parentRelationPickerIcon("x");
+                    chip.appendChild(chipLabel);
+                    chip.appendChild(chipIcon);
+                    chip.addEventListener("click", function () {
+                        option.selected = false;
+                        dispatchParentRelationChange(state.select);
+                        renderPicker(state);
+                    });
+                    state.chips.appendChild(chip);
+                });
+
+                state.list.innerHTML = "";
+                if (state.collapsed) {
+                    return;
+                }
+
+                if (!matches.visibleOptions.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "direct-relation-picker-empty";
+                    empty.textContent = matches.searchActive
+                        ? "Nessun risultato per questa ricerca."
+                        : `Digita almeno ${matches.minChars} lettere del cognome oppure usa la ricerca.`;
+                    state.list.appendChild(empty);
+                    return;
+                }
+
+                matches.visibleOptions.forEach(function (option) {
+                    const row = document.createElement("div");
+                    row.className = "direct-relation-picker-row";
+                    row.classList.toggle("is-selected", option.selected);
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.checked = option.selected;
+                    checkbox.setAttribute("aria-label", parentRelationOptionLabel(option));
+
+                    const avatar = document.createElement("span");
+                    avatar.className = "direct-relation-picker-avatar";
+                    avatar.textContent = parentRelationOptionInitials(option);
+
+                    const label = document.createElement("span");
+                    label.className = "direct-relation-picker-name";
+                    label.textContent = parentRelationOptionLabel(option);
+
+                    checkbox.addEventListener("change", function () {
+                        option.selected = checkbox.checked;
+                        dispatchParentRelationChange(state.select);
+                        renderPicker(state);
+                    });
+
+                    row.addEventListener("click", function (event) {
+                        if (event.target === checkbox) {
+                            return;
+                        }
+                        option.selected = !option.selected;
+                        dispatchParentRelationChange(state.select);
+                        renderPicker(state);
+                    });
+
+                    row.appendChild(checkbox);
+                    row.appendChild(avatar);
+                    row.appendChild(label);
+                    state.list.appendChild(row);
+                });
+            }
+
+            function ensurePicker(select) {
+                if (select.__parentRelationPicker) {
+                    return select.__parentRelationPicker;
+                }
+
+                const picker = document.createElement("div");
+                picker.className = "direct-relation-picker";
+                picker.innerHTML = `
+                    <div class="direct-relation-picker-toolbar">
+                        <label class="direct-relation-picker-search">
+                            ${parentRelationPickerIcon("search")}
+                            <input type="search" placeholder="Cerca e seleziona familiari..." autocomplete="off">
+                        </label>
+                        <span class="direct-relation-picker-count">0 selezionati</span>
+                        <button type="button" class="direct-relation-picker-toggle" aria-label="Mostra o nascondi risultati" aria-expanded="true"></button>
+                    </div>
+                    <div class="direct-relation-picker-chips"></div>
+                    <div class="direct-relation-picker-list"></div>
+                `;
+
+                select.classList.add("is-enhanced-native");
+                select.insertAdjacentElement("afterend", picker);
+
+                const state = {
+                    select: select,
+                    picker: picker,
+                    searchInput: picker.querySelector("input[type='search']"),
+                    count: picker.querySelector(".direct-relation-picker-count"),
+                    toggle: picker.querySelector(".direct-relation-picker-toggle"),
+                    chips: picker.querySelector(".direct-relation-picker-chips"),
+                    list: picker.querySelector(".direct-relation-picker-list"),
+                    help: select.closest(".family-student-editor-field, td, .direct-relation-inline-editor")
+                        ?.querySelector("[data-parent-surname-help]"),
+                    collapsed: false,
+                };
+
+                state.searchInput.addEventListener("input", function () {
+                    renderPicker(state);
+                });
+                state.toggle.addEventListener("click", function () {
+                    state.collapsed = !state.collapsed;
+                    renderPicker(state);
+                });
+                select.addEventListener("change", function () {
+                    renderPicker(state);
+                });
+
+                select.__parentRelationPicker = state;
+                renderPicker(state);
+                return state;
+            }
+
+            const states = selects.map(ensurePicker);
+
+            function refresh() {
+                states.forEach(renderPicker);
+            }
+
+            if (surnameInput) {
+                surnameInput.addEventListener("input", refresh);
+                surnameInput.addEventListener("change", refresh);
+            }
+            refresh();
+        }
+
+        function readJsonScript(scriptId, fallbackValue) {
+            const script = document.getElementById(scriptId);
+            if (!script) {
+                return fallbackValue;
+            }
+            try {
+                return JSON.parse(script.textContent);
+            } catch (error) {
+                return fallbackValue;
+            }
+        }
+
+        function normalizeAddressSuggestionSource(value) {
+            return normalizeSuggestionText((value || "").replace(/^(familiare|studente|bambino):\s*/i, ""));
+        }
+
+        function getServerStudentAddressSuggestions() {
+            const payload = readJsonScript("studente-indirizzi-correlati", []);
+            if (!Array.isArray(payload)) {
+                return [];
+            }
+            return payload.map(function (item) {
+                return {
+                    id: String(item.id || ""),
+                    label: item.label || item.label_full || "",
+                    labelFull: item.label_full || item.label || "",
+                    count: Number(item.count || 0),
+                    sources: Array.isArray(item.sources) ? item.sources.slice() : [],
+                };
+            }).filter(function (item) {
+                return item.id && item.label;
+            });
+        }
+
+        function mergeStudentAddressSuggestions(suggestionGroups) {
+            const mergedById = new Map();
+
+            (suggestionGroups || []).forEach(function (group) {
+                (group || []).forEach(function (item) {
+                    const id = String(item.id || "");
+                    if (!id) {
+                        return;
+                    }
+                    if (!mergedById.has(id)) {
+                        mergedById.set(id, {
+                            id: id,
+                            label: item.label || item.labelFull || "",
+                            labelFull: item.labelFull || item.label || "",
+                            count: 0,
+                            sources: [],
+                            sourceKeys: new Set(),
+                        });
+                    }
+
+                    const suggestion = mergedById.get(id);
+                    if (!suggestion.label && item.label) {
+                        suggestion.label = item.label;
+                    }
+                    if (!suggestion.labelFull && item.labelFull) {
+                        suggestion.labelFull = item.labelFull;
+                    }
+                    suggestion.count = Math.max(suggestion.count, Number(item.count || 0));
+                    (item.sources || []).forEach(function (source) {
+                        const sourceKey = normalizeAddressSuggestionSource(source);
+                        if (!sourceKey || suggestion.sourceKeys.has(sourceKey)) {
+                            return;
+                        }
+                        suggestion.sourceKeys.add(sourceKey);
+                        suggestion.sources.push(source);
+                    });
+                    suggestion.count = Math.max(suggestion.count, suggestion.sources.length);
+                });
+            });
+
+            return Array.from(mergedById.values()).map(function (item) {
+                delete item.sourceKeys;
+                return item;
+            }).sort(function (a, b) {
+                if (b.count !== a.count) {
+                    return b.count - a.count;
+                }
+                return (a.label || "").localeCompare(b.label || "", "it", { sensitivity: "base" });
+            });
+        }
+
+        function getSelectedParentAddressSuggestions() {
+            const parentSelect = document.getElementById("id_familiari_collegati");
+            if (!parentSelect) {
+                return [];
+            }
+
+            const suggestionsById = new Map();
+            Array.from(parentSelect.options || []).forEach(function (option) {
+                if (!option.selected || !option.dataset.addressId) {
+                    return;
+                }
+
+                const addressId = String(option.dataset.addressId || "");
+                if (!addressId) {
+                    return;
+                }
+
+                if (!suggestionsById.has(addressId)) {
+                    suggestionsById.set(addressId, {
+                        id: addressId,
+                        label: option.dataset.addressLabel || option.textContent || "",
+                        labelFull: option.dataset.addressFull || option.dataset.addressLabel || "",
+                        count: 0,
+                        sources: [],
+                    });
+                }
+
+                const suggestion = suggestionsById.get(addressId);
+                suggestion.count += 1;
+                const sourceLabel = option.dataset.personLabel || option.textContent || "";
+                if (sourceLabel) {
+                    suggestion.sources.push(sourceLabel.trim());
+                }
+            });
+
+            return Array.from(suggestionsById.values()).sort(function (a, b) {
+                if (b.count !== a.count) {
+                    return b.count - a.count;
+                }
+                return (a.label || "").localeCompare(b.label || "", "it", { sensitivity: "base" });
+            });
+        }
+
+        function getStudentAddressSuggestions() {
+            return mergeStudentAddressSuggestions([
+                getServerStudentAddressSuggestions(),
+                getSelectedParentAddressSuggestions(),
+            ]);
+        }
+
+        function getBestStudentAddressSuggestion() {
+            const suggestions = getStudentAddressSuggestions();
+            return suggestions.length ? suggestions[0] : null;
+        }
+
+        function formatStudentAddressSources(suggestion) {
+            if (!suggestion || !suggestion.sources || !suggestion.sources.length) {
+                return "";
+            }
+            const visible = suggestion.sources.slice(0, 3).join(", ");
+            const remaining = suggestion.sources.length - 3;
+            return remaining > 0 ? `${visible} +${remaining}` : visible;
+        }
+
+        function refreshStudentAddressSuggestionPriorities() {
+            const addressSelect = document.getElementById("id_indirizzo");
+            if (!addressSelect) {
+                return;
+            }
+
+            const suggestions = getStudentAddressSuggestions();
+            const suggestionsById = new Map(suggestions.map(function (suggestion) {
+                return [String(suggestion.id), suggestion];
+            }));
+
+            Array.from(addressSelect.options || []).forEach(function (option) {
+                const suggestion = suggestionsById.get(String(option.value || ""));
+                if (suggestion) {
+                    option.dataset.searchablePriority = "1";
+                    option.dataset.searchablePrioritySource = "student-related-address";
+                    option.dataset.searchableGroup = "Indirizzi collegati";
+                    option.dataset.searchText = `${option.textContent || ""} ${formatStudentAddressSources(suggestion)}`.trim();
+                } else if (option.dataset.searchablePrioritySource === "student-related-address") {
+                    delete option.dataset.searchablePriority;
+                    delete option.dataset.searchablePrioritySource;
+                    delete option.dataset.searchableGroup;
+                    delete option.dataset.searchText;
+                }
+            });
+
+            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.refresh === "function") {
+                window.ArborisFamigliaAutocomplete.refresh(document);
+            }
+        }
+
+        function updateStudentAddressSuggestionHelp() {
+            const addressSelect = document.getElementById("id_indirizzo");
+            const bestSuggestion = getBestStudentAddressSuggestion();
+            const canApply = Boolean(
+                addressSelect &&
+                bestSuggestion &&
+                String(addressSelect.value || "") !== String(bestSuggestion.id || "")
+            );
+
+            document.querySelectorAll("[data-studente-address-help], #studente-address-help").forEach(function (help) {
+                help.classList.toggle("is-clickable-address-help", canApply);
+                help.setAttribute("role", canApply ? "button" : "note");
+                help.tabIndex = canApply ? 0 : -1;
+
+                if (!bestSuggestion) {
+                    help.textContent = "Seleziona un genitore o tutore con indirizzo per impostarlo automaticamente.";
+                    return;
+                }
+
+                const countLabel = bestSuggestion.count === 1 ? "1 collegamento" : `${bestSuggestion.count} collegamenti`;
+                const sourcesLabel = formatStudentAddressSources(bestSuggestion);
+                help.textContent = `Imposta l'indirizzo come ${bestSuggestion.label} (${countLabel}${sourcesLabel ? ": " + sourcesLabel : ""}).`;
+            });
+
+            document.querySelectorAll("[data-student-address-suggestion-apply]").forEach(function (button) {
+                button.disabled = !canApply;
+                button.classList.toggle("is-disabled", !canApply);
+                if (bestSuggestion) {
+                    const label = `Usa ${bestSuggestion.label}`;
+                    button.dataset.floatingText = label;
+                    button.setAttribute("title", label);
+                    button.setAttribute("aria-label", label);
+                }
+            });
+        }
+
+        function refreshStudentAddressSuggestion() {
+            refreshStudentAddressSuggestionPriorities();
+            updateStudentAddressSuggestionHelp();
+            updateMainButtons();
+        }
+
+        function applyBestStudentAddressSuggestion() {
+            const addressSelect = document.getElementById("id_indirizzo");
+            const bestSuggestion = getBestStudentAddressSuggestion();
+            if (!addressSelect || !bestSuggestion) {
+                return;
+            }
+
+            const previousValue = addressSelect.value || "";
+            addressSelect.value = String(bestSuggestion.id);
+            if ((addressSelect.value || "") !== previousValue) {
+                addressSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            refreshStudentAddressSuggestion();
+        }
+
+        function bindStudentAddressSuggestion() {
+            const parentSelect = document.getElementById("id_familiari_collegati");
+            const addressSelect = document.getElementById("id_indirizzo");
+
+            if (parentSelect && parentSelect.dataset.studentAddressSuggestionBound !== "1") {
+                parentSelect.dataset.studentAddressSuggestionBound = "1";
+                parentSelect.addEventListener("change", refreshStudentAddressSuggestion);
+                parentSelect.addEventListener("input", refreshStudentAddressSuggestion);
+            }
+
+            if (addressSelect && addressSelect.dataset.studentAddressSuggestionBound !== "1") {
+                addressSelect.dataset.studentAddressSuggestionBound = "1";
+                addressSelect.addEventListener("change", refreshStudentAddressSuggestion);
+            }
+
+            document.querySelectorAll("[data-student-address-suggestion-apply]").forEach(function (button) {
+                if (button.dataset.studentAddressSuggestionApplyBound === "1") {
+                    return;
+                }
+                button.dataset.studentAddressSuggestionApplyBound = "1";
+                button.addEventListener("click", applyBestStudentAddressSuggestion);
+            });
+
+            document.querySelectorAll("[data-studente-address-help], #studente-address-help").forEach(function (help) {
+                if (help.dataset.studentAddressSuggestionHelpBound === "1") {
+                    return;
+                }
+                help.dataset.studentAddressSuggestionHelpBound = "1";
+                help.addEventListener("click", function () {
+                    if (help.classList.contains("is-clickable-address-help")) {
+                        applyBestStudentAddressSuggestion();
+                    }
+                });
+                help.addEventListener("keydown", function (event) {
+                    if (!help.classList.contains("is-clickable-address-help")) {
+                        return;
+                    }
+                    if (event.key !== "Enter" && event.key !== " ") {
+                        return;
+                    }
+                    event.preventDefault();
+                    applyBestStudentAddressSuggestion();
+                });
+            });
+
+            refreshStudentAddressSuggestion();
+        }
+
         function updateMainButtons() {
             refreshFamigliaNavigation();
             refreshIndirizzoButtons();
@@ -994,6 +1575,15 @@ window.ArborisStudenteForm = (function () {
             }
 
             root.querySelectorAll(".related-btn").forEach(function (button) {
+                if (button.classList.contains("related-btn-suggested-address")) {
+                    const actionLabel = "Usa indirizzo suggerito";
+                    button.setAttribute("aria-label", actionLabel);
+                    button.setAttribute("title", actionLabel);
+                    button.dataset.floatingText = actionLabel;
+                    button.innerHTML = relatedIconHtml("home");
+                    return;
+                }
+
                 const isAdd = button.classList.contains("related-btn-add");
                 const isEdit = button.classList.contains("related-btn-edit");
                 const actionLabel = isAdd ? `Nuovo ${noun}` : isEdit ? `Modifica ${noun}` : `Elimina ${noun}`;
@@ -1040,9 +1630,10 @@ window.ArborisStudenteForm = (function () {
             }
         }
 
-        function appendRelatedField(grid, root, selector, labelText, extraClass, editor, relatedLabel) {
+        function appendRelatedField(grid, root, selector, labelText, extraClass, editor, relatedLabel, options) {
             const input = root ? root.querySelector(selector) : null;
             const relatedField = input ? input.closest(".inline-related-field, .related-field-row") : null;
+            const helpNode = options && options.helpSelector && root ? root.querySelector(options.helpSelector) : null;
             const field = createEditorField(labelText, relatedField || (input ? input.closest(".mode-edit-field") || input : null), extraClass, editor);
 
             if (relatedField) {
@@ -1051,6 +1642,10 @@ window.ArborisStudenteForm = (function () {
             }
 
             if (field) {
+                if (helpNode) {
+                    rememberEditorNode(editor, helpNode);
+                    field.appendChild(helpNode);
+                }
                 grid.appendChild(field);
             }
         }
@@ -1980,13 +2575,15 @@ window.ArborisStudenteForm = (function () {
 
             appendInputField(grid, formRoot, "#id_cognome", "Cognome", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_nome", "Nome", "family-student-editor-field-half", editor);
+            appendInputField(grid, formRoot, "#id_familiari_collegati", "Genitori e tutori collegati", "family-student-editor-field-wide", editor);
             appendInputField(grid, formRoot, "#id_data_nascita", "Data nascita", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_sesso", "Sesso", "family-student-editor-field-half", editor);
             appendInputField(grid, formRoot, "#id_luogo_nascita_search", "Luogo nascita", "family-student-editor-field-wide", editor);
             appendInputField(grid, formRoot, "#id_nazionalita", "Nazionalit\u00e0", "family-student-editor-field-third", editor);
             appendInputField(grid, formRoot, "#id_codice_fiscale", "Codice fiscale", "family-student-editor-field-third", editor);
-            appendRelatedField(grid, formRoot, "#id_indirizzo", "Indirizzo", "family-student-editor-field-wide family-student-editor-address-field", editor, "indirizzo");
-            appendCheckboxField(grid, formRoot, "#id_attivo", "Attivo", "", editor);
+            appendRelatedField(grid, formRoot, "#id_indirizzo", "Indirizzo", "family-student-editor-field-wide family-student-editor-address-field", editor, "indirizzo", {
+                helpSelector: "#studente-address-help",
+            });
 
             editor.appendChild(grid);
 
@@ -2352,7 +2949,6 @@ window.ArborisStudenteForm = (function () {
             appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-convivente"]', "Convivente", "", editor);
             appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-referente_principale"]', "Referente principale", "", editor);
             appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-abilitato_scambio_retta"]', "Scambio retta", "", editor);
-            appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-attivo"]', "Attivo", "", editor);
 
             editor.appendChild(grid);
             editor.appendChild(createRelativeCardActions());
@@ -3359,6 +3955,8 @@ window.ArborisStudenteForm = (function () {
         refreshStudentPageActionLocks();
         bindRateRecalcForms();
         bindStandaloneSexFromNome();
+        bindParentSuggestionsBySurname();
+        bindStudentAddressSuggestion();
     }
 
     return {

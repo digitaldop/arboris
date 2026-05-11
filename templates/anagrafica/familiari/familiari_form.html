@@ -552,17 +552,6 @@
                                 </div>
 
                                 <div class="family-student-editor-grid">
-                                    {% if form.studenti_collegati %}
-                                    <div class="family-student-editor-field family-student-editor-field-wide">
-                                        <label for="{{ form.studenti_collegati.id_for_label }}">Figli e figlie collegati</label>
-                                        {{ form.studenti_collegati }}
-                                        {% if form.studenti_collegati.help_text %}
-                                            <div class="field-help">{{ form.studenti_collegati.help_text }}</div>
-                                        {% endif %}
-                                        {{ form.studenti_collegati.errors }}
-                                    </div>
-                                    {% endif %}
-
                                     <div class="family-student-editor-field family-student-editor-field-half">
                                         <label for="{{ form.cognome.id_for_label }}">Cognome</label>
                                         {{ form.cognome }}
@@ -573,6 +562,17 @@
                                         {{ form.nome }}
                                         {{ form.nome.errors }}
                                     </div>
+
+                                    {% if form.studenti_collegati %}
+                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                        <label for="{{ form.studenti_collegati.id_for_label }}">Figli e figlie collegati</label>
+                                        {{ form.studenti_collegati }}
+                                        {% if form.studenti_collegati.help_text %}
+                                            <div class="field-help" data-student-surname-help>{{ form.studenti_collegati.help_text }}</div>
+                                        {% endif %}
+                                        {{ form.studenti_collegati.errors }}
+                                    </div>
+                                    {% endif %}
 
                                     <div class="family-student-editor-field family-student-editor-field-third relative-main-parentela-field">
                                         <label for="{{ form.relazione_familiare.id_for_label }}">Parentela</label>
@@ -593,25 +593,15 @@
                                         {{ form.relazione_familiare.errors }}
                                     </div>
                                     <div class="family-student-editor-field family-student-editor-field-third">
-                                        <label for="{{ form.telefono.id_for_label }}">Telefono</label>
-                                        {{ form.telefono }}
-                                        {{ form.telefono.errors }}
-                                    </div>
-                                    <div class="family-student-editor-field family-student-editor-field-third">
-                                        <label for="{{ form.email.id_for_label }}">Email</label>
-                                        {{ form.email }}
-                                        {{ form.email.errors }}
+                                        <label for="{{ form.sesso.id_for_label }}">Sesso</label>
+                                        {{ form.sesso }}
+                                        {{ form.sesso.errors }}
                                     </div>
 
                                     <div class="family-student-editor-field family-student-editor-field-third">
                                         <label for="{{ form.data_nascita.id_for_label }}">Data nascita</label>
                                         {{ form.data_nascita }}
                                         {{ form.data_nascita.errors }}
-                                    </div>
-                                    <div class="family-student-editor-field family-student-editor-field-third">
-                                        <label for="{{ form.sesso.id_for_label }}">Sesso</label>
-                                        {{ form.sesso }}
-                                        {{ form.sesso.errors }}
                                     </div>
                                     <div class="family-student-editor-field family-student-editor-field-wide">
                                         <label for="{{ form.luogo_nascita_search.id_for_label }}">Luogo nascita</label>
@@ -666,6 +656,17 @@
                                         {{ form.indirizzo.errors }}
                                     </div>
 
+                                    <div class="family-student-editor-field family-student-editor-field-half">
+                                        <label for="{{ form.telefono.id_for_label }}">Telefono</label>
+                                        {{ form.telefono }}
+                                        {{ form.telefono.errors }}
+                                    </div>
+                                    <div class="family-student-editor-field family-student-editor-field-half">
+                                        <label for="{{ form.email.id_for_label }}">Email</label>
+                                        {{ form.email }}
+                                        {{ form.email.errors }}
+                                    </div>
+
                                     <div class="family-student-editor-field family-student-editor-field-check">
                                         <label class="family-student-editor-check family-editor-switch" for="{{ form.convivente.id_for_label }}">
                                             <span class="family-editor-switch-copy">
@@ -694,6 +695,7 @@
                                         <label class="family-student-editor-check family-editor-switch" for="{{ form.abilitato_scambio_retta.id_for_label }}">
                                             <span class="family-editor-switch-copy">
                                                 <strong>Scambio retta</strong>
+                                                <small>Attiva se il familiare pu&ograve; offrire il suo lavoro alla scuola in cambio di credito da scalare alla retta mensile</small>
                                             </span>
                                             <span class="fondo-plan-switch-control">
                                                 {{ form.abilitato_scambio_retta }}
@@ -961,7 +963,7 @@
                                         <div class="mode-edit-field">
                                             {{ form.studenti_collegati }}
                                             {% if form.studenti_collegati.help_text %}
-                                                <div class="field-help">{{ form.studenti_collegati.help_text }}</div>
+                                                <div class="field-help" data-student-surname-help>{{ form.studenti_collegati.help_text }}</div>
                                             {% endif %}
                                         </div>
                                         {{ form.studenti_collegati.errors }}
@@ -1253,6 +1255,7 @@
                                             <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.abilitato_scambio_retta.id_for_label }}">
                                                 <span class="family-editor-switch-copy">
                                                     <strong>Scambio retta</strong>
+                                                    <small>Attiva se il familiare pu&ograve; offrire il suo lavoro alla scuola in cambio di credito da scalare alla retta mensile</small>
                                                 </span>
                                                 <span class="fondo-plan-switch-control">
                                                     {{ form.abilitato_scambio_retta }}
@@ -2515,6 +2518,7 @@
             ArborisFamiliareForm.init({
                 familiareId: "{{ familiare.pk|default:'new' }}",
                 canManageActiveFields: {% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %}true{% else %}false{% endif %},
+                uiIconsSprite: "{% static 'images/arboris-ui-icons.svg' %}",
                 urls: {
                     creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",

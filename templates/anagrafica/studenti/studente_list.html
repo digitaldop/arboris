@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static currency active_toggles %}
+{% load static currency %}
 
 {% block title %}Studenti - Arboris{% endblock %}
 
@@ -68,7 +68,6 @@
                         <col class="studenti-col-birth">
                         <col class="studenti-col-address">
                         <col class="studenti-col-status">
-                        <col class="studenti-col-active">
                         <col class="studenti-col-actions">
                     </colgroup>
                     <thead>
@@ -78,7 +77,6 @@
                             <th>Data nascita</th>
                             <th>Indirizzo</th>
                             <th>Iscrizione</th>
-                            <th>Attivo</th>
                             <th>Azioni</th>
                         </tr>
                     </thead>
@@ -130,7 +128,6 @@
                                     {% endif %}
                                 </td>
                                 <td>{% include "common/badges/student_iscrizione_status.html" with studente=studente only %}</td>
-                                <td>{% active_toggle studente %}</td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions anagrafica-row-actions">
                                         <a
