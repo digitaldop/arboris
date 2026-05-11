@@ -31,6 +31,12 @@ from .models import (
 MAX_DATABASE_BACKUPS = 10
 BACKUP_SCHEDULE_CHECK_CACHE_KEY = "sistema:backup_schedule_recent_check"
 BACKUP_SCHEDULE_CHECK_TTL_SECONDS = 60
+RESTORE_PUBLIC_SCHEMA_RESET_SQL = """
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO CURRENT_USER;
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+"""
 
 
 class DatabaseBackupError(Exception):
@@ -344,6 +350,38 @@ def run_pg_dump(output_path):
     if result.returncode != 0:
         message = result.stderr.decode("utf-8", errors="ignore").strip()
         raise DatabaseBackupError(message or "Creazione backup non riuscita.")
+
+
+def reset_public_schema_for_restore(psql_path, db_settings, env):
+    """
+    Svuota lo schema applicativo prima del restore.
+
+    Il dump generato con --clean elimina gli oggetti che conosce, ma se il database di
+    destinazione contiene tabelle o vincoli piu recenti non presenti nel dump, PostgreSQL
+    puo bloccare il drop delle primary key per dipendenze residue. Resettare public rende
+    il ripristino coerente con la promessa "sostituisce integralmente il database".
+    """
+    command = build_postgres_base_command(psql_path, db_settings)
+    command.extend(
+        [
+            "-d",
+            db_settings["NAME"],
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            RESTORE_PUBLIC_SCHEMA_RESET_SQL,
+        ]
+    )
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        message = result.stderr.decode("utf-8", errors="ignore").strip()
+        raise DatabaseBackupError(message or "Preparazione del database al ripristino non riuscita.")
 
 
 def delete_backup_record(backup_record):
@@ -661,6 +699,11 @@ def restore_database_from_backup_file(file_path, original_name="", triggered_by=
     open_handler = gzip.open if str(original_name or materialized_file_path.name).lower().endswith(".gz") else open
 
     try:
+        try:
+            reset_public_schema_for_restore(psql_path, db_settings, env)
+        except DatabaseBackupError as exc:
+            raise DatabaseBackupError(str(exc), safety_backup=safety_backup) from exc
+
         with open_handler(materialized_file_path, "rb") as restore_handle:
             result = subprocess.run(
                 command,

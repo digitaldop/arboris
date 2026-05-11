@@ -1,10 +1,12 @@
 import base64
 import json
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from datetime import timedelta
 from decimal import Decimal
 from unittest import skip
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -23,6 +25,7 @@ from .database_backups import (
     create_restore_job_from_local_file,
     create_restore_job_from_storage_reference,
     create_restore_job_from_upload,
+    reset_public_schema_for_restore,
 )
 from .models import (
     FeedbackSegnalazione,
@@ -1253,6 +1256,26 @@ class BetaFeedbackTests(TestCase):
 
 
 class BackupDatabaseStorageTests(TestCase):
+    def test_reset_public_schema_for_restore_runs_cascade_cleanup(self):
+        db_settings = {
+            "NAME": "arboris_test",
+            "HOST": "localhost",
+            "PORT": "5432",
+            "USER": "arboris",
+        }
+
+        with patch("sistema.database_backups.subprocess.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout=b"", stderr=b"")
+
+            reset_public_schema_for_restore("psql", db_settings, {"PGPASSWORD": "secret"})
+
+        run_mock.assert_called_once()
+        command = run_mock.call_args.args[0]
+        self.assertIn("-c", command)
+        sql = command[command.index("-c") + 1]
+        self.assertIn("DROP SCHEMA IF EXISTS public CASCADE", sql)
+        self.assertIn("CREATE SCHEMA public", sql)
+
     def test_restore_uploads_are_saved_on_storage_backend(self):
         with TemporaryDirectory() as tmpdir:
             with override_settings(MEDIA_ROOT=tmpdir):
