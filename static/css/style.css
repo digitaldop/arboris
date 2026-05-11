@@ -33434,6 +33434,19 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     overflow-wrap: anywhere;
 }
 
+.database-backup-error-result {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.database-backup-copy-log-btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
 .database-backup-row-actions {
     justify-content: flex-end;
     gap: 8px;

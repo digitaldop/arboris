@@ -34,6 +34,7 @@ from .models import (
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
+    StatoRipristinoDatabase,
     TipoFeedbackSegnalazione,
 )
 from .popup_manifest import build_popup_manifest
@@ -1040,6 +1041,22 @@ class BackupDatabaseAccessTests(TestCase):
         self.assertContains(response, "upload_restore_file_chunk")
         self.assertContains(response, reverse("backup_database_restore_chunk_upload"))
         self.assertContains(response, "prepare_restore_storage_reference")
+
+    def test_backup_database_page_renders_restore_error_copy_button(self):
+        self.client.force_login(self.amministratore)
+        SistemaDatabaseRestoreJob.objects.create(
+            stato=StatoRipristinoDatabase.ERRORE,
+            percorso_file="manual_restore/restore.sql.gz",
+            nome_file_originale="restore.sql.gz",
+            messaggio_errore="ERROR: cannot drop constraint sistema_scuola_pkey\nDETAIL: esempio log completo",
+        )
+
+        response = self.client.get(reverse("backup_database_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Copia log")
+        self.assertContains(response, "data-copy-text=")
+        self.assertContains(response, "cannot drop constraint sistema_scuola_pkey")
 
     def test_chunked_restore_upload_creates_pending_restore_job(self):
         self.client.force_login(self.amministratore)

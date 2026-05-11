@@ -307,7 +307,18 @@
                                             </td>
                                             <td>
                                                 {% if rj.stato == "errore" and rj.messaggio_errore %}
-                                                    <span class="table-muted" title="{{ rj.messaggio_errore }}">{{ rj.messaggio_errore|truncatechars:72 }}</span>
+                                                    <span class="database-backup-error-result">
+                                                        <span class="table-muted" title="{{ rj.messaggio_errore }}">{{ rj.messaggio_errore|truncatechars:72 }}</span>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-secondary btn-icon-text database-backup-copy-log-btn"
+                                                            data-copy-text="{{ rj.messaggio_errore }}"
+                                                            aria-label="Copia log errore ripristino"
+                                                        >
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                                            <span class="btn-label">Copia log</span>
+                                                        </button>
+                                                    </span>
                                                 {% elif rj.stato == "completato" and rj.backup_sicurezza %}
                                                     Backup sicurezza: {{ rj.backup_sicurezza.nome_file }}
                                                 {% elif rj.stato == "in_corso" or rj.stato == "in_coda" %}
