@@ -85,6 +85,7 @@ class SistemaImpostazioniGeneraliAdmin(admin.ModelAdmin):
     list_display = (
         "terminologia_studente",
         "mostra_dashboard_prossimo_anno_scolastico",
+        "interfaccia_colorata_attiva",
         "cronologia_retention_mesi",
         "gestione_iscrizione_corso_anno",
         "font_principale",

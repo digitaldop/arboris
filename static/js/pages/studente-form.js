@@ -79,6 +79,8 @@ window.ArborisStudenteForm = (function () {
         const inlineLockContainerId = "studente-inline-lock-container";
         const inlineEditButtonId = "enable-inline-edit-studente-btn";
         let inlineManagers = null;
+        let lazySectionsPromise = null;
+        let lazySectionsLoaded = !config.lazySectionsEnabled;
 
         function normalizeTabId(tabId) {
             if (!tabId) {
@@ -196,6 +198,259 @@ window.ArborisStudenteForm = (function () {
                 syncIscrizioniInlineDetails();
             },
         });
+
+        function isLazySectionsPending() {
+            return !lazySectionsLoaded && Boolean(document.querySelector("[data-student-lazy-section]"));
+        }
+
+        function lazySectionsUrl(tabId) {
+            const source = document.querySelector("[data-student-lazy-url]");
+            const rawUrl = (source && source.dataset.studentLazyUrl) || config.lazySectionsUrl || window.location.href;
+            const url = new URL(rawUrl, window.location.origin);
+            url.searchParams.set("_lazy", "student-sections");
+            if (tabId) {
+                url.searchParams.set("tab", normalizeTabId(tabId).replace(/^tab-/, ""));
+            }
+            return `${url.pathname}${url.search}${url.hash}`;
+        }
+
+        function replaceElementFromLazyDocument(doc, selector) {
+            const next = doc.querySelector(selector);
+            const current = document.querySelector(selector);
+            if (!next || !current) {
+                return false;
+            }
+            current.replaceWith(document.importNode(next, true));
+            return true;
+        }
+
+        function replaceInlineSectionFromLazyDocument(doc) {
+            const next = doc.getElementById(inlineLockContainerId);
+            const current = document.getElementById(inlineLockContainerId);
+            if (!next || !current) {
+                return false;
+            }
+
+            const currentBody = current.querySelector(".student-tabs-card-body");
+            const nextBody = next.querySelector(".student-tabs-card-body");
+            if (currentBody && nextBody) {
+                currentBody.innerHTML = nextBody.innerHTML;
+            } else {
+                current.innerHTML = next.innerHTML;
+            }
+            current.className = next.className;
+            current.setAttribute("data-mode-lock-scope", next.getAttribute("data-mode-lock-scope") || "inline");
+            current.setAttribute("data-student-stack-card", next.getAttribute("data-student-stack-card") || "");
+            current.setAttribute("data-student-stack-card-key", next.getAttribute("data-student-stack-card-key") || "tabs");
+            current.setAttribute("data-student-stack-card-title", next.getAttribute("data-student-stack-card-title") || "Iscrizioni, parenti e documenti");
+            current.removeAttribute("data-student-lazy-section");
+            current.removeAttribute("data-student-lazy-url");
+            return true;
+        }
+
+        function importLazyTemplates(doc) {
+            ["parenti-empty-form-template", "iscrizioni-empty-form-template", "documenti-empty-form-template"].forEach(function (id) {
+                const next = doc.getElementById(id);
+                if (!next) {
+                    return;
+                }
+                const current = document.getElementById(id);
+                const imported = document.importNode(next, true);
+                if (current) {
+                    current.replaceWith(imported);
+                } else {
+                    document.body.appendChild(imported);
+                }
+            });
+        }
+
+        function bindInlineTabButtonHandlers(root) {
+            const container = root || document;
+            container.querySelectorAll("#" + inlineLockContainerId + " .tab-btn[data-tab-target]").forEach(function (btn) {
+                if (btn.dataset.studentInlineTabClickBound === "1") {
+                    return;
+                }
+                btn.dataset.studentInlineTabClickBound = "1";
+                btn.addEventListener("click", function () {
+                    setInlineTarget(btn.dataset.tabTarget);
+                    updateInlineEditButtonLabel(btn.dataset.tabTarget);
+                    syncActiveTabUrl(btn.dataset.tabTarget);
+                    refreshInlineEditScope();
+                });
+            });
+        }
+
+        function prepareLazyLoadedSections(tabId) {
+            lazySectionsLoaded = true;
+            config.lazySectionsEnabled = false;
+
+            inlineManagers.iscrizioni.prepare();
+            inlineManagers.documenti.prepare();
+            inlineManagers.parenti.prepare();
+            document.querySelectorAll("#iscrizioni-table tbody .inline-form-row").forEach(function (row) {
+                wireIscrizioneBundle(getIscrizioneBundleState(row));
+            });
+
+            const inlineLockRoot = studenteInlineRoot();
+            if (inlineLockRoot) {
+                tabs.bindTabButtons(getStudenteTabStorageKey(), inlineLockRoot);
+                inlineTabs.bindTabNavigationLock({
+                    containerId: inlineLockContainerId,
+                    targetInputId: targetInputId,
+                    getViewMode: function () {
+                        return window.studenteViewMode;
+                    },
+                });
+                bindInlineTabButtonHandlers(inlineLockRoot);
+            }
+
+            collapsible.initCollapsibleSections(document);
+            wireInlineRelatedButtons(document);
+            wireEnrollmentCardActions(document);
+            wireDocumentCardActions(document);
+            wireRelativeCardActions(document);
+            inlineFormsets.wireActionTriggers(document, {
+                handlers: {
+                    add: function (prefix) {
+                        addManagedInlineForm(prefix);
+                    },
+                    remove: function (_prefix, element) {
+                        removeManagedInlineRow(element);
+                    },
+                },
+            });
+            if (routes && typeof routes.wirePopupTriggerElements === "function" && relatedPopups && typeof relatedPopups.openRelatedPopup === "function") {
+                routes.wirePopupTriggerElements(document, {
+                    openRelatedPopup: relatedPopups.openRelatedPopup,
+                });
+            }
+            if (window.ArborisPopupWindowTriggers) {
+                ArborisPopupWindowTriggers.wire(document);
+            }
+
+            initStudentSideCards();
+            bindRateRecalcForms();
+            bindParentSuggestionsBySurname();
+
+            if (tabId) {
+                activateInlineTab(tabId);
+            }
+            refreshInlineEditScope();
+            refreshTabCounts();
+            syncEnrollmentCardEmptyState();
+            syncDocumentCardEmptyState();
+            syncRelativeCardEmptyState();
+            refreshStudentPageActionLocks();
+        }
+
+        function loadStudentLazySections(options) {
+            const cfg = options || {};
+            const tabId = cfg.activateTab ? normalizeTabId(cfg.activateTab) : "";
+
+            if (!isLazySectionsPending()) {
+                if (tabId) {
+                    activateInlineTab(tabId);
+                }
+                return Promise.resolve(true);
+            }
+
+            if (!lazySectionsPromise) {
+                lazySectionsPromise = fetch(lazySectionsUrl(tabId), {
+                    credentials: "same-origin",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("Impossibile caricare i dettagli dello studente.");
+                        }
+                        return response.text();
+                    })
+                    .then(function (html) {
+                        const doc = new DOMParser().parseFromString(html, "text/html");
+                        replaceElementFromLazyDocument(doc, "#student-rate-summary");
+                        replaceElementFromLazyDocument(doc, ".student-dashboard-side [data-family-side-card-key='rette']");
+                        replaceElementFromLazyDocument(doc, ".student-dashboard-side [data-family-side-card-key='activity']");
+                        replaceInlineSectionFromLazyDocument(doc);
+                        importLazyTemplates(doc);
+                        prepareLazyLoadedSections(tabId);
+                        return true;
+                    })
+                    .catch(function (error) {
+                        console.warn("ArborisStudenteForm: caricamento progressivo non riuscito", error);
+                        document.querySelectorAll("[data-student-lazy-placeholder]").forEach(function (placeholder) {
+                            placeholder.textContent = "Dettagli non caricati. Ricarica la pagina per visualizzarli.";
+                        });
+                        lazySectionsPromise = null;
+                        throw error;
+                    });
+            } else if (tabId) {
+                lazySectionsPromise = lazySectionsPromise.then(function (result) {
+                    activateInlineTab(tabId);
+                    return result;
+                });
+            }
+
+            return lazySectionsPromise.then(function (result) {
+                if (cfg.scrollToInline) {
+                    const inlineRoot = studenteInlineRoot();
+                    if (inlineRoot && typeof inlineRoot.scrollIntoView === "function") {
+                        inlineRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                }
+                return result;
+            });
+        }
+
+        function bindStudentLazySectionLoading() {
+            if (!isLazySectionsPending()) {
+                return;
+            }
+
+            const inlineRoot = studenteInlineRoot();
+            if (inlineRoot && inlineRoot.dataset.studentLazyNavBound !== "1") {
+                inlineRoot.dataset.studentLazyNavBound = "1";
+                inlineRoot.addEventListener("arboris:before-tab-activate", function (event) {
+                    if (!isLazySectionsPending()) {
+                        return;
+                    }
+                    const tabId = event.detail && event.detail.tabId;
+                    event.preventDefault();
+                    loadStudentLazySections({ activateTab: tabId, scrollToInline: true }).catch(function () {});
+                });
+            }
+
+            const inlineEditButton = document.getElementById(inlineEditButtonId);
+            if (inlineEditButton && inlineEditButton.dataset.studentLazyEditBound !== "1") {
+                inlineEditButton.dataset.studentLazyEditBound = "1";
+                inlineEditButton.addEventListener("click", function () {
+                    if (!isLazySectionsPending()) {
+                        return;
+                    }
+                    const targetInput = document.getElementById(targetInputId);
+                    const target = targetInput && targetInput.value ? `tab-${targetInput.value}` : normalizeTabId(config.initialActiveTab || defaultInlineTab);
+                    loadStudentLazySections({ activateTab: target, scrollToInline: true }).catch(function () {});
+                });
+            }
+
+            const placeholders = Array.from(document.querySelectorAll("[data-student-lazy-section]"));
+            if ("IntersectionObserver" in window && placeholders.length) {
+                const observer = new IntersectionObserver(function (entries) {
+                    if (entries.some(function (entry) { return entry.isIntersecting; })) {
+                        observer.disconnect();
+                        loadStudentLazySections().catch(function () {});
+                    }
+                }, { rootMargin: "240px 0px" });
+                placeholders.forEach(function (node) {
+                    observer.observe(node);
+                });
+            }
+
+            if (config.preferInitialActiveTab && config.initialActiveTab) {
+                loadStudentLazySections({ activateTab: config.initialActiveTab, scrollToInline: false }).catch(function () {});
+            }
+        }
 
         function bindStandaloneSexFromNome() {
             personRules.bindSexFromFirstName({
@@ -882,6 +1137,10 @@ window.ArborisStudenteForm = (function () {
         }
 
         function refreshTabCounts() {
+            if (isLazySectionsPending()) {
+                return;
+            }
+
             const iscrizioniRows = inlineFormsets.countPersistedRows("iscrizioni-table");
             const tabIscrizioni = document.querySelector('[data-tab-target="tab-iscrizioni"]');
             const documentiRows = inlineFormsets.countPersistedRows("documenti-table");
@@ -2509,6 +2768,11 @@ window.ArborisStudenteForm = (function () {
                         return;
                     }
 
+                    if (isLazySectionsPending()) {
+                        loadStudentLazySections({ activateTab: tabId, scrollToInline: true }).catch(function () {});
+                        return;
+                    }
+
                     activateInlineTab(tabId);
 
                     const inlineRoot = studenteInlineRoot();
@@ -3374,6 +3638,16 @@ window.ArborisStudenteForm = (function () {
                     event.preventDefault();
                     event.stopPropagation();
                     const action = element.dataset.enrollmentCardAction || "";
+                    if ((action === "add" || action === "edit") && isLazySectionsPending()) {
+                        loadStudentLazySections({ activateTab: "tab-iscrizioni", scrollToInline: action === "add" }).then(function () {
+                            if (action === "add") {
+                                addEnrollmentCardFromView(element);
+                            } else {
+                                openEnrollmentCardEditor(element.closest("[data-enrollment-card]"));
+                            }
+                        }).catch(function () {});
+                        return;
+                    }
                     if (action === "add") {
                         addEnrollmentCardFromView(element);
                     } else if (action === "edit") {
@@ -3399,6 +3673,16 @@ window.ArborisStudenteForm = (function () {
                     event.preventDefault();
                     event.stopPropagation();
                     const action = element.dataset.documentCardAction || "";
+                    if ((action === "add" || action === "edit") && isLazySectionsPending()) {
+                        loadStudentLazySections({ activateTab: "tab-documenti", scrollToInline: action === "add" }).then(function () {
+                            if (action === "add") {
+                                addDocumentCardFromView(element);
+                            } else {
+                                openDocumentCardEditor(element.closest("[data-document-card]"));
+                            }
+                        }).catch(function () {});
+                        return;
+                    }
                     if (action === "add") {
                         addDocumentCardFromView(element);
                     } else if (action === "edit") {
@@ -3425,6 +3709,17 @@ window.ArborisStudenteForm = (function () {
                 event.__arborisRelativeCardActionHandled = true;
                 event.preventDefault();
                 event.stopPropagation();
+            }
+
+            if ((action === "add" || action === "edit") && isLazySectionsPending()) {
+                loadStudentLazySections({ activateTab: "tab-parenti", scrollToInline: action === "add" }).then(function () {
+                    if (action === "add") {
+                        addRelativeCardFromView(element);
+                    } else {
+                        openRelativeCardEditor(element.closest("[data-relative-card]"));
+                    }
+                }).catch(function () {});
+                return;
             }
 
             if (action === "add") {
@@ -3831,6 +4126,13 @@ window.ArborisStudenteForm = (function () {
         }
 
         function addManagedInlineForm(prefix) {
+            if (isLazySectionsPending()) {
+                loadStudentLazySections({ activateTab: `tab-${prefix}`, scrollToInline: true }).then(function () {
+                    addManagedInlineForm(prefix);
+                }).catch(function () {});
+                return;
+            }
+
             const manager = inlineManagers[prefix];
             if (!manager) {
                 return;
@@ -3908,14 +4210,7 @@ window.ArborisStudenteForm = (function () {
                 },
             });
         }
-        document.querySelectorAll("#studente-inline-lock-container .tab-btn[data-tab-target]").forEach(btn => {
-            btn.addEventListener("click", function () {
-                setInlineTarget(btn.dataset.tabTarget);
-                updateInlineEditButtonLabel(btn.dataset.tabTarget);
-                syncActiveTabUrl(btn.dataset.tabTarget);
-                refreshInlineEditScope();
-            });
-        });
+        bindInlineTabButtonHandlers(document);
         collapsible.initCollapsibleSections(document);
         wireInlineRelatedButtons(document);
         bindStudentPageActionLock();
@@ -3957,6 +4252,7 @@ window.ArborisStudenteForm = (function () {
         bindStandaloneSexFromNome();
         bindParentSuggestionsBySurname();
         bindStudentAddressSuggestion();
+        bindStudentLazySectionLoading();
     }
 
     return {

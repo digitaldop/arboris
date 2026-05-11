@@ -16,7 +16,48 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=264">
+    <script>
+        (function () {
+            try {
+                const value = window.sessionStorage.getItem("arboris-next-page-loading-until");
+                const expiresAt = Number(value || 0);
+                if (expiresAt && Date.now() <= expiresAt) {
+                    document.documentElement.classList.add("arboris-long-wait", "arboris-page-boot-loading");
+                } else if (value) {
+                    window.sessionStorage.removeItem("arboris-next-page-loading-until");
+                }
+            } catch (error) {}
+        })();
+    </script>
+    <script>
+        (function () {
+            try {
+                const rules = [];
+                for (let i = 0; i < window.localStorage.length; i += 1) {
+                    const key = window.localStorage.key(i) || "";
+                    if (!key.startsWith("arboris-sidebar-") || window.localStorage.getItem(key) !== "closed") {
+                        continue;
+                    }
+                    const targetId = key.replace(/^arboris-/, "") + "-panel";
+                    if (!/^[A-Za-z0-9_-]+$/.test(targetId)) {
+                        continue;
+                    }
+                    rules.push(
+                        `.sidebar-state-preload #${targetId}{display:none!important;}`,
+                        `.sidebar-state-preload .sidebar-collapsible[data-target="${targetId}"]::after{transform:rotate(0deg)!important;}`
+                    );
+                }
+                if (rules.length) {
+                    document.documentElement.classList.add("sidebar-state-preload");
+                    const style = document.createElement("style");
+                    style.id = "sidebar-initial-state-style";
+                    style.textContent = rules.join("");
+                    document.head.appendChild(style);
+                }
+            } catch (error) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=269">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
     {% if role_theme %}
@@ -38,7 +79,13 @@
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=5"></script>
 </head>
-<body class="{% if current_permission_module %}module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
+<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
+    <div id="arboris-page-loading-overlay" class="page-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+        <div class="page-loading-overlay-card">
+            <span class="page-loading-spinner" aria-hidden="true"></span>
+            <span class="page-loading-text">Caricamento<span class="page-loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></span>
+        </div>
+    </div>
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
     <script src="{% static 'js/core/related-entity-routes.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-form-tools.js' %}?v=4"></script>
@@ -253,7 +300,7 @@
                                 <nav class="sidebar-nav sidebar-subnav">
                                     <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' or request.resolver_match.url_name == 'crea_studente' or request.resolver_match.url_name == 'modifica_studente' or request.resolver_match.url_name == 'stampa_studente' or request.resolver_match.url_name == 'stampa_studente_opzioni' or request.resolver_match.url_name == 'elimina_studente' %}active{% endif %}">
                                         <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
-                                        <span class="sidebar-link-text">Studenti</span>
+                                        <span class="sidebar-link-text">{{ student_terminology.selected_plural|default:"Studenti" }}</span>
                                     </a>
 
                                     <a href="{% url 'lista_familiari' %}" class="{% if request.resolver_match.url_name == 'lista_familiari' or request.resolver_match.url_name == 'crea_familiare' or request.resolver_match.url_name == 'modifica_familiare' or request.resolver_match.url_name == 'elimina_familiare' %}active{% endif %}">
@@ -1013,9 +1060,14 @@
     {% endif %}
 
     {{ student_terminology|json_script:"student-terminology-data" }}
-    <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
-    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=10"></script>
-    <script src="{% static 'js/core/collapsible.js' %}"></script>
+    <script src="{% static 'js/core/terminology.js' %}?v=3"></script>
+    <script>
+        if (window.ArborisTerminology) {
+            ArborisTerminology.init();
+        }
+    </script>
+    <script src="{% static 'js/core/long-wait-cursor.js' %}?v=11"></script>
+    <script src="{% static 'js/core/collapsible.js' %}?v=2"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=10"></script>
     <script src="{% static 'js/core/codice-fiscale.js' %}?v=5"></script>

@@ -1003,6 +1003,8 @@ window.ArborisFamiliareForm = (function () {
                 || document.getElementById("id_profilo_educatore_attivo");
             const classField = scope.querySelector("#id_classe_principale_educatore")
                 || document.getElementById("id_classe_principale_educatore");
+            const subjectField = scope.querySelector("#id_materia_educatore")
+                || document.getElementById("id_materia_educatore");
             const employeeFields = [
                 scope.querySelector("#id_profilo_mansione") || document.getElementById("id_profilo_mansione"),
             ].filter(Boolean);
@@ -1011,7 +1013,7 @@ window.ArborisFamiliareForm = (function () {
                 scope.querySelector("#id_profilo_stato") || document.getElementById("id_profilo_stato"),
             ].filter(Boolean);
 
-            if (!employeeToggle && !educatorToggle && !classField && !employeeFields.length && !workFields.length) {
+            if (!employeeToggle && !educatorToggle && !classField && !subjectField && !employeeFields.length && !workFields.length) {
                 return;
             }
 
@@ -1035,6 +1037,7 @@ window.ArborisFamiliareForm = (function () {
                 const employeeEnabled = employeeToggle ? Boolean(employeeToggle.checked) : false;
                 const educatorEnabled = educatorToggle ? Boolean(educatorToggle.checked) : false;
                 setFieldContainerDisabled(classField, educatorEnabled);
+                setFieldContainerDisabled(subjectField, educatorEnabled);
                 employeeFields.forEach(function (field) {
                     setFieldContainerDisabled(field, employeeEnabled);
                 });
@@ -1131,9 +1134,10 @@ window.ArborisFamiliareForm = (function () {
                 helpText: "Crea o collega il profilo amministrativo senza duplicare l'anagrafica.",
             });
             appendCheckboxField(grid, formRoot, "#id_profilo_educatore_attivo", "Anche educatore", "", editor, {
-                helpText: "Abilita classe principale, studenti collegati, contratto, buste paga e documenti.",
+                helpText: "Abilita classe principale o materia, studenti collegati, contratto, buste paga e documenti.",
             });
             appendInputField(grid, formRoot, "#id_classe_principale_educatore", "Classe principale", "family-student-editor-field-wide family-work-class-field", editor);
+            appendInputField(grid, formRoot, "#id_materia_educatore", "Materia", "family-student-editor-field-half family-work-class-field", editor);
             appendInputField(grid, formRoot, "#id_profilo_mansione", "Mansione", "family-student-editor-field-half family-work-employee-field", editor);
             appendInputField(grid, formRoot, "#id_profilo_iban", "Dati di pagamento", "family-student-editor-field-half family-work-profile-field", editor);
             appendInputField(grid, formRoot, "#id_profilo_stato", "Stato lavorativo", "family-student-editor-field-third family-work-profile-field", editor);

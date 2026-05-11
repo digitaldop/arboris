@@ -1,6 +1,7 @@
 window.ArborisTerminology = (function () {
     let terminology = null;
     let observer = null;
+    let initialized = false;
     const skipSelector = '[data-terminology-skip="true"]';
     const attributeNames = ["placeholder", "title", "aria-label"];
     const skippedTagNames = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA"]);
@@ -148,7 +149,12 @@ window.ArborisTerminology = (function () {
         });
     }
 
-    function init() {
+    function init(options) {
+        if (initialized) {
+            return;
+        }
+
+        const cfg = options || {};
         terminology = getConfig();
         if (!terminology || !Array.isArray(terminology.replacements)) {
             return;
@@ -156,10 +162,14 @@ window.ArborisTerminology = (function () {
 
         const hasVisualOverride = terminology.replacements.some((item) => item && item.from !== item.to);
         if (!hasVisualOverride) {
+            initialized = true;
             return;
         }
 
-        processNode(document.documentElement);
+        initialized = true;
+        if (cfg.processExisting === true) {
+            processNode(document.documentElement);
+        }
         startObserver();
     }
 

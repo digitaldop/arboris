@@ -1,16 +1,23 @@
 /**
- * Mostra il cursore di attesa (wait) se un'azione impiega più di 1 secondo:
- * invio form, navigazione con link interni, richieste fetch in corso.
+ * Mostra il velo di caricamento quando navigazioni, form o richieste dati
+ * superano una soglia percepibile.
  *
  * Navigazione via location.assign / href / click su riga (data-row-href): stesso
  * timer di attesa dei link.
  *
- * location.reload() è sincrono rispetto al paint: si arma il cursore e si
+ * location.reload() è sincrono rispetto al paint: si arma il velo e si
  * rimanda il reload (doppio rAF + setTimeout(0)) così il browser può ridisegnare.
  */
 (function () {
-    const DELAY_MS = 1000;
+    const NAV_DELAY_MS = 180;
+    const FORM_DELAY_MS = 180;
+    const FETCH_DELAY_MS = 700;
+    const MIN_VISIBLE_MS = 320;
+    const BOOT_RELEASE_DELAY_MS = 120;
+    const NEXT_PAGE_WAIT_TTL_MS = 8000;
     const CLASS_NAME = "arboris-long-wait";
+    const BOOT_CLASS_NAME = "arboris-page-boot-loading";
+    const NEXT_PAGE_WAIT_KEY = "arboris-next-page-loading-until";
 
     let formTimer = null;
     let formArmed = false;
@@ -19,12 +26,144 @@
     let navArmed = false;
     let navClickPending = false;
 
+    let bootArmed = false;
+    let hideVisualTimer = null;
+    let visualShownAt = 0;
+
+    function nowMs() {
+        return Date.now();
+    }
+
+    function rememberNextPageLoading() {
+        try {
+            window.sessionStorage.setItem(NEXT_PAGE_WAIT_KEY, String(nowMs() + NEXT_PAGE_WAIT_TTL_MS));
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    function clearNextPageLoading() {
+        try {
+            window.sessionStorage.removeItem(NEXT_PAGE_WAIT_KEY);
+        } catch (e) {
+            /* ignore */
+        }
+    }
+
+    function hasPendingNextPageLoading() {
+        let value = null;
+        try {
+            value = window.sessionStorage.getItem(NEXT_PAGE_WAIT_KEY);
+        } catch (e) {
+            return false;
+        }
+        if (!value) {
+            return false;
+        }
+
+        const expiresAt = Number(value);
+        if (expiresAt && nowMs() <= expiresAt) {
+            return true;
+        }
+
+        clearNextPageLoading();
+        return false;
+    }
+
+    function ensureOverlay(doc) {
+        const targetDoc = doc || document;
+        if (!targetDoc || !targetDoc.getElementById) {
+            return null;
+        }
+
+        let overlay = targetDoc.getElementById("arboris-page-loading-overlay");
+        if (overlay) {
+            return overlay;
+        }
+        if (!targetDoc.createElement) {
+            return null;
+        }
+
+        const container = targetDoc.body || targetDoc.documentElement;
+        if (!container || !container.appendChild) {
+            return null;
+        }
+
+        overlay = targetDoc.createElement("div");
+        overlay.id = "arboris-page-loading-overlay";
+        overlay.className = "page-loading-overlay";
+        overlay.setAttribute("role", "status");
+        overlay.setAttribute("aria-live", "polite");
+        overlay.setAttribute("aria-atomic", "true");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML =
+            '<div class="page-loading-overlay-card">' +
+            '<span class="page-loading-spinner" aria-hidden="true"></span>' +
+            '<span class="page-loading-text">Caricamento<span class="page-loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></span>' +
+            "</div>";
+        container.appendChild(overlay);
+        return overlay;
+    }
+
+    function setDocumentVisualActive(doc, active, immediate) {
+        const targetDoc = doc || document;
+        if (!targetDoc || !targetDoc.documentElement || !targetDoc.documentElement.classList) {
+            return;
+        }
+
+        const root = targetDoc.documentElement;
+        const overlay = ensureOverlay(targetDoc);
+        if (hideVisualTimer) {
+            clearTimeout(hideVisualTimer);
+            hideVisualTimer = null;
+        }
+
+        if (active) {
+            if (!root.classList.contains(CLASS_NAME) || !visualShownAt) {
+                visualShownAt = nowMs();
+            }
+            root.classList.add(CLASS_NAME);
+            if (overlay) {
+                overlay.setAttribute("aria-hidden", "false");
+            }
+            return;
+        }
+
+        const hide = function () {
+            root.classList.remove(CLASS_NAME);
+            root.classList.remove(BOOT_CLASS_NAME);
+            if (overlay) {
+                overlay.setAttribute("aria-hidden", "true");
+            }
+            visualShownAt = 0;
+            hideVisualTimer = null;
+        };
+
+        if (immediate || !root.classList.contains(CLASS_NAME)) {
+            hide();
+            return;
+        }
+
+        const visibleFor = nowMs() - visualShownAt;
+        const delay = Math.max(0, MIN_VISIBLE_MS - visibleFor);
+        if (delay > 0) {
+            hideVisualTimer = setTimeout(hide, delay);
+        } else {
+            hide();
+        }
+    }
+
+    function setVisualActive(active, immediate) {
+        setDocumentVisualActive(document, active, immediate);
+    }
+
     function armNavigationLongWait() {
         if (navTimer) {
             clearTimeout(navTimer);
         }
         navArmed = false;
         navClickPending = true;
+        rememberNextPageLoading();
         updateVisual();
         navTimer = setTimeout(function () {
             navTimer = null;
@@ -32,7 +171,7 @@
                 navArmed = true;
                 updateVisual();
             }
-        }, DELAY_MS);
+        }, NAV_DELAY_MS);
     }
 
     /**
@@ -72,11 +211,7 @@
     }
 
     function updateVisual() {
-        if (formArmed || navArmed || fetchArmed) {
-            document.documentElement.classList.add(CLASS_NAME);
-        } else {
-            document.documentElement.classList.remove(CLASS_NAME);
-        }
+        setVisualActive(bootArmed || formArmed || navArmed || fetchArmed);
     }
 
     function resetFormWait() {
@@ -104,9 +239,10 @@
         formArmed = false;
         navArmed = false;
         navClickPending = false;
+        bootArmed = false;
         fetchArmed = false;
         activeFetchCount = 0;
-        document.documentElement.classList.remove(CLASS_NAME);
+        setVisualActive(false, true);
     }
 
     function documentForReloadLocation(loc) {
@@ -126,10 +262,9 @@
     function reloadWithWaitCursor(loc) {
         loc = loc || window.location;
         const doc = documentForReloadLocation(loc);
+        rememberNextPageLoading();
         try {
-            if (doc.documentElement) {
-                doc.documentElement.classList.add(CLASS_NAME);
-            }
+            setDocumentVisualActive(doc, true, true);
         } catch (e) {
             /* ignore */
         }
@@ -144,6 +279,50 @@
                 }, 0);
             });
         });
+    }
+
+    function releaseBootWaitAfterReady() {
+        let released = false;
+        const release = function () {
+            if (released) {
+                return;
+            }
+            released = true;
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    setTimeout(function () {
+                        bootArmed = false;
+                        updateVisual();
+                    }, BOOT_RELEASE_DELAY_MS);
+                });
+            });
+        };
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", release, { once: true });
+        } else {
+            release();
+        }
+
+        setTimeout(function () {
+            if (bootArmed) {
+                bootArmed = false;
+                updateVisual();
+            }
+        }, 2500);
+    }
+
+    function consumeBootWaitIfNeeded() {
+        const root = document.documentElement;
+        const hasEarlyClass = root && root.classList && root.classList.contains(BOOT_CLASS_NAME);
+        if (!hasPendingNextPageLoading() && !hasEarlyClass) {
+            return;
+        }
+
+        clearNextPageLoading();
+        bootArmed = true;
+        setVisualActive(true, true);
+        releaseBootWaitAfterReady();
     }
 
     window.ArborisReloadWithLongWait = function (optLocation) {
@@ -165,6 +344,7 @@
     };
 
     window.ArborisResetLongWaitCursor = resetAll;
+    consumeBootWaitIfNeeded();
 
     function isPopupOrModalLink(anchor) {
         if (!anchor || !anchor.dataset) {
@@ -263,15 +443,17 @@
                 clearTimeout(formTimer);
             }
             formArmed = false;
+            rememberNextPageLoading();
             updateVisual();
             formTimer = setTimeout(function () {
                 formTimer = null;
                 formArmed = true;
                 updateVisual();
-            }, DELAY_MS);
+            }, FORM_DELAY_MS);
 
             setTimeout(function () {
                 if (event.defaultPrevented) {
+                    clearNextPageLoading();
                     resetFormWait();
                 }
             }, 0);
@@ -315,6 +497,7 @@
                     clearTimeout(navTimer);
                     navTimer = null;
                 }
+                clearNextPageLoading();
                 navClickPending = false;
                 navArmed = false;
                 updateVisual();
@@ -323,6 +506,7 @@
         false
     );
 
+    window.addEventListener("beforeunload", rememberNextPageLoading);
     window.addEventListener("pagehide", resetAll);
     window.addEventListener("pageshow", resetAll);
 
@@ -335,7 +519,7 @@
                     fetchArmed = true;
                     updateVisual();
                 }
-            }, DELAY_MS);
+            }, FETCH_DELAY_MS);
         }
     }
 

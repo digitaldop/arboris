@@ -366,10 +366,25 @@
                                 </span>
                                 <div>
                                     <h2>Aspetto del software</h2>
-                                    <p>Font usati per testi, titoli e sezioni dell'interfaccia.</p>
+                                    <p>Colori e font usati per testi, titoli e sezioni dell'interfaccia.</p>
                                 </div>
                             </div>
                             <div class="settings-fields-grid">
+                                <label class="settings-switch-line" for="{{ form.interfaccia_colorata_attiva.id_for_label }}">
+                                    <span class="settings-field-icon is-amber" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg>
+                                    </span>
+                                    <span class="settings-switch-copy">
+                                        <strong>{{ form.interfaccia_colorata_attiva.label }}</strong>
+                                        {% if form.interfaccia_colorata_attiva.help_text %}<span>{{ form.interfaccia_colorata_attiva.help_text }}</span>{% endif %}
+                                        {{ form.interfaccia_colorata_attiva.errors }}
+                                    </span>
+                                    <span class="settings-switch-holder">
+                                        {{ form.interfaccia_colorata_attiva }}
+                                        <span class="settings-switch-ui" aria-hidden="true"></span>
+                                    </span>
+                                </label>
+
                                 <div class="settings-field-row">
                                     <span class="settings-field-icon is-blue" aria-hidden="true">
                                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
@@ -424,6 +439,10 @@
                                 <div>
                                     <span>Font titoli</span>
                                     <strong>{{ impostazioni.get_font_titoli_display|default:"Manrope" }}</strong>
+                                </div>
+                                <div>
+                                    <span>Interfaccia</span>
+                                    <strong>{% if impostazioni.interfaccia_colorata_attiva %}Colorata{% else %}Uniforme{% endif %}</strong>
                                 </div>
                                 <div>
                                     <span>Cronologia operazioni</span>

@@ -1219,6 +1219,17 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, reverse("modifica_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
         self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
 
+    def test_modifica_familiare_labels_work_reference_as_materia_when_no_class(self):
+        self.profilo.materia = "Francese"
+        self.profilo.save(update_fields=["materia"])
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Materia")
+        self.assertContains(response, "Francese")
+        self.assertNotIn("<span>Riferimento</span>", response.content.decode("utf-8"))
+
     def test_modifica_familiare_renders_related_address_suggestions_and_card_sticky_menu(self):
         response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
 
@@ -2321,6 +2332,7 @@ class FamiliareDetailViewTests(TestCase):
                 "profilo_dipendente_attivo": "",
                 "profilo_educatore_attivo": "on",
                 "classe_principale_educatore": classe.pk,
+                "materia_educatore": "Inglese",
                 "profilo_mansione": "Coordinamento didattico",
                 "profilo_iban": "IT60 X054 2811 1010 0000 0123 456",
                 "profilo_stato": StatoDipendente.ATTIVO,
@@ -2337,6 +2349,7 @@ class FamiliareDetailViewTests(TestCase):
         profilo = Dipendente.objects.get(familiare_collegato=self.familiare)
         self.assertEqual(profilo.ruolo_anagrafico, RuoloAnagraficoDipendente.EDUCATORE)
         self.assertEqual(profilo.classe_principale, classe)
+        self.assertEqual(profilo.materia, "Inglese")
         self.assertEqual(profilo.stato, StatoDipendente.ATTIVO)
         self.assertEqual(profilo.mansione, "Coordinamento didattico")
         self.assertEqual(profilo.iban, "IT60X0542811101000000123456")
@@ -2349,6 +2362,7 @@ class FamiliareDetailViewTests(TestCase):
         self.assertContains(detail_response, "Profilo lavorativo")
         self.assertContains(detail_response, "Educatore")
         self.assertContains(detail_response, "Prima A")
+        self.assertContains(detail_response, "Inglese")
 
     def test_modifica_familiare_accetta_gruppo_classe_come_classe_principale_educatore(self):
         anno = AnnoScolastico.objects.create(

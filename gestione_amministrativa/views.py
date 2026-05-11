@@ -307,6 +307,7 @@ def _lista_profili_lavoro(request, scope):
             | Q(persona_collegata__codice_fiscale__icontains=q)
             | Q(persona_collegata__email__icontains=q)
             | Q(persona_collegata__telefono__icontains=q)
+            | Q(materia__icontains=q)
         )
     if stato:
         dipendenti = dipendenti.filter(stato=stato)

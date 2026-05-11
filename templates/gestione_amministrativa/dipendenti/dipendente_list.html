@@ -148,11 +148,13 @@
                                     </div>
                                     <div class="table-subtext">
                                         {% if dipendente.classe_principale_label %}
-                                            {{ dipendente.classe_principale_tipo_label }} {{ dipendente.classe_principale_label }}
+                                            {{ dipendente.classe_principale_tipo_label }} {{ dipendente.classe_principale_label }}{% if dipendente.materia_label %} · Materia {{ dipendente.materia_label }}{% endif %}
+                                        {% elif dipendente.materia_label %}
+                                            Materia {{ dipendente.materia_label }}
                                         {% elif dipendente.mansione %}
                                             {{ dipendente.mansione }}
                                         {% else %}
-                                            Ruolo amministrativo
+                                            {% if dipendente.is_educatore %}Educatore trasversale{% else %}Ruolo amministrativo{% endif %}
                                         {% endif %}
                                     </div>
                                 </td>

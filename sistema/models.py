@@ -481,6 +481,13 @@ class SistemaImpostazioniGenerali(models.Model):
             "salvo amministratori e superuser."
         ),
     )
+    interfaccia_colorata_attiva = models.BooleanField(
+        default=True,
+        help_text=(
+            "Quando attiva usa accenti colore morbidi per differenziare moduli, icone e azioni principali. "
+            "Disattivala per un'interfaccia piu uniforme."
+        ),
+    )
     font_principale = models.CharField(
         max_length=40,
         choices=GoogleFontChoice.choices,

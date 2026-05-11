@@ -296,6 +296,22 @@
                             data-student-main-card-order-key="arboris-student-main-card-order-{{ studente.pk }}"
                             data-student-main-card-collapse-key="arboris-student-main-card-collapsed-{{ studente.pk }}"
                         >
+                        {% if studente_lazy_sections_enabled %}
+                        <section id="student-rate-summary" class="family-overview-card student-main-rate-card student-rate-summary-card student-main-stack-card" data-student-main-rate-card data-student-stack-card data-student-stack-card-key="rates" data-student-stack-card-title="Resoconto rate iscrizione" data-student-lazy-section="rates" data-student-lazy-url="{{ studente_lazy_sections_url }}">
+                            <div class="student-main-rate-card-head">
+                                <div class="student-main-rate-title">
+                                    <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                                    <div>
+                                        <h2>Resoconto rate iscrizione</h2>
+                                        <p>Riepilogo economico per anno scolastico e stato delle rate.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="student-main-rate-card-body" data-student-main-card-body>
+                                <div class="empty-state compact-empty-state" data-student-lazy-placeholder="rates">Caricamento riepilogo rate...</div>
+                            </div>
+                        </section>
+                        {% else %}
                         <section id="student-rate-summary" class="family-overview-card student-main-rate-card student-rate-summary-card student-main-stack-card" data-student-main-rate-card data-student-stack-card data-student-stack-card-key="rates" data-student-stack-card-title="Resoconto rate iscrizione">
                             <div class="student-main-rate-card-head">
                                 <div class="student-main-rate-title">
@@ -478,6 +494,7 @@
                                 {% endif %}
                             </div>
                         </section>
+                        {% endif %}
                         </div>
                     </div>
 
@@ -543,6 +560,9 @@
                                 </div>
                             </div>
                             <div class="family-side-card-body" data-family-side-card-body>
+                                {% if studente_lazy_sections_enabled %}
+                                    <div class="empty-state compact-empty-state" data-student-lazy-placeholder="rates">Caricamento riepilogo rate...</div>
+                                {% else %}
                                 {% if rate_overview %}
                                     {% if rate_overview|length > 1 %}
                                         <div class="family-rate-year-switch" role="tablist" aria-label="Anno scolastico rette">
@@ -639,6 +659,7 @@
                                 {% else %}
                                     <div class="empty-state compact-empty-state">Nessun piano rate disponibile per questo studente.</div>
                                 {% endif %}
+                                {% endif %}
                             </div>
                         </section>
 
@@ -679,6 +700,9 @@
                                 </div>
                             </div>
                             <div class="family-side-card-body" data-family-side-card-body>
+                                {% if studente_lazy_sections_enabled %}
+                                    <div class="empty-state compact-empty-state" data-student-lazy-placeholder="activity">Caricamento cronologia...</div>
+                                {% else %}
                                 {% if studente_activity_entries %}
                                     <ol class="family-activity-list student-activity-list">
                                         {% for activity in studente_activity_entries %}
@@ -698,6 +722,7 @@
                                     <a href="{% url 'cronologia_operazioni_sistema' %}?q={{ studente.cognome|urlencode }}%20{{ studente.nome|urlencode }}" class="btn btn-secondary btn-sm student-activity-link">
                                         Vedi tutta la cronologia
                                     </a>
+                                {% endif %}
                                 {% endif %}
                             </div>
                         </section>
@@ -1259,6 +1284,29 @@
         </div>
         {% endif %}
 
+        {% if studente_lazy_sections_enabled %}
+        <div class="admin-section inline-lock-container student-main-stack-card student-tabs-stack-card{% if not studente %} is-hidden{% endif %}" id="studente-inline-lock-container" data-mode-lock-scope="inline" data-student-stack-card data-student-stack-card-key="tabs" data-student-stack-card-title="Iscrizioni, parenti e documenti" data-student-lazy-section="inline" data-student-lazy-url="{{ studente_lazy_sections_url }}"{% if not studente %} aria-hidden="true"{% endif %}>
+            <div class="inline-section-head student-tabs-card-head">
+                {% include "common/inline_tab_nav.html" with tabs=studente_inline_tabs only %}
+                <div class="student-tabs-head-actions">
+                    {% if studente %}
+                        <button type="button" class="btn btn-primary btn-sm{% if inline_target == 'parenti' %} is-hidden{% endif %}" id="enable-inline-edit-studente-btn">{{ studente_inline_edit_label }}</button>
+                        <div class="student-main-card-tools">
+                            <button type="button" class="family-side-drag-handle" draggable="true" data-student-main-card-drag-handle aria-label="Sposta card Iscrizioni, parenti e documenti" title="Trascina per riordinare">
+                                <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
+                            </button>
+                            <button type="button" class="family-side-collapse-toggle" data-student-main-card-collapse-toggle aria-expanded="true" aria-label="Comprimi card Iscrizioni, parenti e documenti" title="Comprimi card">
+                                <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="student-tabs-card-body" data-student-main-card-body>
+                <div class="empty-state compact-empty-state" data-student-lazy-placeholder="inline">Caricamento dettagli...</div>
+            </div>
+        </div>
+        {% else %}
         <div class="admin-section inline-lock-container student-main-stack-card student-tabs-stack-card{% if not studente %} is-hidden{% endif %}" id="studente-inline-lock-container" data-mode-lock-scope="inline" data-student-stack-card data-student-stack-card-key="tabs" data-student-stack-card-title="Iscrizioni, parenti e documenti"{% if not studente %} aria-hidden="true"{% endif %}>
             <div class="inline-section-head student-tabs-card-head">
                 {% include "common/inline_tab_nav.html" with tabs=studente_inline_tabs only %}
@@ -2416,6 +2464,7 @@
             </div>
             </div>
         </div>
+        {% endif %}
 
         <div class="form-actions sticky-form-actions mode-edit-only{% if not studente %} family-create-sticky-actions{% endif %}" id="studente-sticky-form-actions">
             {% if not studente %}
@@ -2496,6 +2545,7 @@
         </div>
     {% endif %}
 
+    {% if not studente_lazy_sections_enabled %}
     {% if parenti_formset %}
         <template id="parenti-empty-form-template">
             <tr class="inline-form-row">
@@ -2903,6 +2953,7 @@
             </td>
         </tr>
     </template>
+    {% endif %}
 
     <script id="studente-famiglia-indirizzo-label" type="application/json">""</script>
 
@@ -2913,7 +2964,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=55"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=56"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -2976,6 +3027,8 @@
                 initialActiveTab: "{{ inline_target|default:'iscrizioni' }}",
                 defaultInlineTab: "iscrizioni",
                 preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
+                lazySectionsUrl: "{{ studente_lazy_sections_url|default:'' }}",
+                lazySectionsEnabled: {% if studente_lazy_sections_enabled %}true{% else %}false{% endif %},
                 urls: {
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
                     creaTipoDocumento: "{% url 'crea_tipo_documento' %}"

@@ -79,7 +79,12 @@
         {% block content %}{% endblock %}
     </main>
     {{ student_terminology|json_script:"student-terminology-data" }}
-    <script src="{% static 'js/core/terminology.js' %}?v=1"></script>
+    <script src="{% static 'js/core/terminology.js' %}?v=3"></script>
+    <script>
+        if (window.ArborisTerminology) {
+            ArborisTerminology.init();
+        }
+    </script>
     <script src="{% static 'js/core/modal-popups.js' %}?v=7"></script>
     <script src="{% static 'js/core/related-popups.js' %}?v=9"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>

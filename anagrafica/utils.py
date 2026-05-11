@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.cache import cache
 
 
 def citta_choice_label(citta):
@@ -47,10 +48,14 @@ def validate_and_normalize_phone_number(value):
 
 
 def _phone_display_format_from_settings():
+    sentinel = object()
     try:
-        from sistema.models import SistemaImpostazioniGenerali
+        from sistema.models import GENERAL_SETTINGS_CACHE_KEY, SistemaImpostazioniGenerali
 
-        imp = SistemaImpostazioniGenerali.objects.only("formato_visualizzazione_telefono").first()
+        imp = cache.get(GENERAL_SETTINGS_CACHE_KEY, sentinel)
+        if imp is sentinel:
+            imp = SistemaImpostazioniGenerali.objects.first()
+            cache.set(GENERAL_SETTINGS_CACHE_KEY, imp, 300)
         if imp and imp.formato_visualizzazione_telefono:
             return imp.formato_visualizzazione_telefono
     except Exception:  # noqa: BLE001

@@ -185,6 +185,11 @@ class Dipendente(models.Model):
         null=True,
         help_text="Gruppo classe o pluriclasse di riferimento per gli educatori.",
     )
+    materia = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Materia di riferimento per educatori trasversali a piu classi.",
+    )
     mansione = models.CharField(max_length=160, blank=True)
     iban = models.CharField(max_length=34, blank=True)
     stato = models.CharField(
@@ -252,6 +257,9 @@ class Dipendente(models.Model):
         if not self.is_educatore:
             self.classe_principale = None
             self.gruppo_classe_principale = None
+            self.materia = ""
+        elif self.materia:
+            self.materia = self.materia.strip()
         if not self.is_dipendente_operativo:
             self.mansione = ""
         if self.classe_principale_id and self.gruppo_classe_principale_id:
@@ -458,6 +466,10 @@ class Dipendente(models.Model):
         if self.classe_principale_id:
             return "Classe"
         return ""
+
+    @property
+    def materia_label(self):
+        return (self.materia or "").strip()
 
     @property
     def is_educatore(self):

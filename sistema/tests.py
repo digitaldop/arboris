@@ -506,6 +506,7 @@ class SidebarSistemaTests(TestCase):
             "gestione_iscrizione_corso_anno": "mese_iscrizione_intero",
             "giorno_soglia_iscrizione_corso_anno": "15",
             "osservazioni_solo_autori_modifica": "on",
+            "interfaccia_colorata_attiva": "on",
             "modulo_anagrafica_attivo": "on",
             "modulo_famiglie_interessate_attivo": "on",
             "modulo_economia_attivo": "on",
@@ -584,8 +585,19 @@ class SidebarSistemaTests(TestCase):
         self.assertContains(response, "Moduli del software")
         self.assertContains(response, "Cronologia operazioni")
         self.assertContains(response, 'name="cronologia_retention_mesi"')
+        self.assertContains(response, 'name="interfaccia_colorata_attiva"')
         self.assertContains(response, 'name="modulo_calendario_attivo"')
         self.assertContains(response, 'class="settings-module-grid"')
+
+    def test_general_settings_switches_colorful_interface_class(self):
+        SistemaImpostazioniGenerali.objects.create(interfaccia_colorata_attiva=False)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("impostazioni_generali_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="ui-uniform-modules module-sistema"')
+        self.assertNotContains(response, "ui-colorful-modules")
 
     def test_general_settings_can_disable_module_globally(self):
         self.client.force_login(self.user)

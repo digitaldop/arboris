@@ -105,6 +105,7 @@ window.ArborisDipendenteForm = (function () {
         }
 
         const educatorField = document.querySelector("[data-role-field='educator-class']");
+        const educatorSubjectField = document.querySelector("[data-role-field='educator-subject']");
         const employeeField = document.querySelector("[data-role-field='employee-mansione']");
 
         const update = function () {
@@ -114,6 +115,10 @@ window.ArborisDipendenteForm = (function () {
             if (educatorField) {
                 educatorField.hidden = !educatorEnabled;
                 educatorField.classList.toggle("is-hidden", !educatorEnabled);
+            }
+            if (educatorSubjectField) {
+                educatorSubjectField.hidden = !educatorEnabled;
+                educatorSubjectField.classList.toggle("is-hidden", !educatorEnabled);
             }
             if (employeeField) {
                 employeeField.hidden = !employeeEnabled;

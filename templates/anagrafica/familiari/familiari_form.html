@@ -744,6 +744,14 @@
                                             {{ form.classe_principale_educatore.errors }}
                                         </div>
                                     {% endif %}
+                                    {% if form.materia_educatore %}
+                                        <div class="family-student-editor-field family-work-class-field">
+                                            <label for="{{ form.materia_educatore.id_for_label }}">{{ form.materia_educatore.label }}</label>
+                                            {{ form.materia_educatore }}
+                                            <div class="inline-address-help">{{ form.materia_educatore.help_text }}</div>
+                                            {{ form.materia_educatore.errors }}
+                                        </div>
+                                    {% endif %}
                                     {% if form.profilo_mansione %}
                                         <div class="family-student-editor-field family-work-employee-field">
                                             <label for="{{ form.profilo_mansione.id_for_label }}">{{ form.profilo_mansione.label }}</label>
@@ -1319,6 +1327,17 @@
                                             <div class="mode-edit-field autocomplete-wrapper family-work-class-field">{{ form.classe_principale_educatore }}</div>
                                             <div class="inline-address-help mode-edit-field">{{ form.classe_principale_educatore.help_text }}</div>
                                             {{ form.classe_principale_educatore.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                                {% if form.materia_educatore %}
+                                    <tr>
+                                        <th>{{ form.materia_educatore.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.materia_label %}{{ profilo_lavorativo.materia_label }}{% else %}-{% endif %}</div>
+                                            <div class="mode-edit-field family-work-class-field">{{ form.materia_educatore }}</div>
+                                            <div class="inline-address-help mode-edit-field">{{ form.materia_educatore.help_text }}</div>
+                                            {{ form.materia_educatore.errors }}
                                         </td>
                                     </tr>
                                 {% endif %}
@@ -2094,10 +2113,16 @@
                                 <div class="relative-work-summary-item">
                                     <span class="relative-work-summary-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if profilo_lavorativo.is_educatore %}calendar{% else %}briefcase{% endif %}"></use></svg></span>
                                     <span class="relative-work-summary-copy">
-                                        <span>{% if profilo_lavorativo.is_educatore %}Classe{% else %}Mansione{% endif %}</span>
+                                        <span>{% if profilo_lavorativo.is_educatore %}{% if profilo_lavorativo.classe_principale_label %}Classe{% else %}Materia{% endif %}{% else %}Mansione{% endif %}</span>
                                         <strong>
                                             {% if profilo_lavorativo.is_educatore %}
-                                                {{ profilo_lavorativo.classe_principale_label|default:"-" }}
+                                                {% if profilo_lavorativo.classe_principale_label %}
+                                                    {{ profilo_lavorativo.classe_principale_label }}{% if profilo_lavorativo.materia_label %} · {{ profilo_lavorativo.materia_label }}{% endif %}
+                                                {% elif profilo_lavorativo.materia_label %}
+                                                    {{ profilo_lavorativo.materia_label }}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
                                             {% else %}
                                                 {{ profilo_lavorativo.mansione|default:"-" }}
                                             {% endif %}
@@ -2491,7 +2516,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=36"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=37"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

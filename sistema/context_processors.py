@@ -71,8 +71,13 @@ def general_settings_context(request):
     except (OperationalError, ProgrammingError):
         general_settings = None
 
+    interfaccia_colorata_attiva = bool(
+        getattr(general_settings, "interfaccia_colorata_attiva", True)
+    )
+
     return {
         "general_settings": general_settings,
+        "interfaccia_colorata_attiva": interfaccia_colorata_attiva,
         "gestione_dipendenti_dettagliata_attiva": bool(
             getattr(general_settings, "gestione_dipendenti_dettagliata_attiva", False)
         ),

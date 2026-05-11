@@ -54,16 +54,18 @@ class DipendenteAdmin(admin.ModelAdmin):
         "codice_fiscale",
         "classe_principale",
         "gruppo_classe_principale",
+        "materia",
         "mansione",
         "sesso",
         "stato",
     )
-    list_filter = ("ruolo_aziendale", "stato", "classe_principale", "gruppo_classe_principale")
+    list_filter = ("ruolo_aziendale", "stato", "classe_principale", "gruppo_classe_principale", "materia")
     search_fields = (
         "persona_collegata__nome",
         "persona_collegata__cognome",
         "persona_collegata__codice_fiscale",
         "persona_collegata__email",
+        "materia",
     )
     autocomplete_fields = ("persona_collegata", "classe_principale", "gruppo_classe_principale")
     inlines = [ContrattoDipendenteInline]

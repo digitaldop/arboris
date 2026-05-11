@@ -25,7 +25,14 @@ def _first_principal_link(manager):
     if not manager:
         return None
     try:
-        links = list(manager.all().order_by("ordine", "id"))
+        links = list(manager.all())
+        links.sort(
+            key=lambda link: (
+                getattr(link, "ordine", None) is None,
+                getattr(link, "ordine", None) or 0,
+                getattr(link, "pk", None) or 0,
+            )
+        )
         return next((link for link in links if link.principale), links[0] if links else None)
     except (AttributeError, TypeError):
         return None

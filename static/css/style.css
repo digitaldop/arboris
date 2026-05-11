@@ -38,10 +38,113 @@ html, body {
     min-height: 100%;
 }
 
-/* Cursore di attesa dopo >1s (long-wait-cursor.js) su form, link e fetch */
+/* Velo di caricamento e cursore di attesa (long-wait-cursor.js) su form, link e fetch */
 html.arboris-long-wait,
 html.arboris-long-wait * {
     cursor: wait !important;
+}
+
+.page-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(12, 29, 38, 0.3);
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+
+html.arboris-long-wait .page-loading-overlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.16s ease;
+}
+
+.page-loading-overlay-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    max-width: min(92vw, 320px);
+    padding: 13px 18px;
+    border: 1px solid rgba(172, 204, 219, 0.75);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--primary-dark);
+    box-shadow: 0 14px 38px rgba(8, 26, 38, 0.2);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.page-loading-spinner {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(65, 118, 144, 0.22);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: arboris-loading-spin 0.75s linear infinite;
+}
+
+.page-loading-text {
+    display: inline-flex;
+    align-items: baseline;
+}
+
+.page-loading-dots {
+    display: inline-flex;
+    width: 16px;
+    justify-content: flex-start;
+}
+
+.page-loading-dots span {
+    animation: arboris-loading-dot 1.1s ease-in-out infinite;
+}
+
+.page-loading-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.page-loading-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes arboris-loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes arboris-loading-dot {
+    0%,
+    80%,
+    100% {
+        opacity: 0.25;
+    }
+    40% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-loading-overlay {
+        transition: none;
+    }
+
+    .page-loading-spinner,
+    .page-loading-dots span {
+        animation: none;
+    }
 }
 
 .sr-only {
@@ -21557,6 +21660,14 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     margin-top: 2px;
 }
 
+.student-main-rate-month-actions .btn-save-soft,
+.student-main-rate-month-actions .btn-save-soft:hover,
+.student-main-rate-month-actions .btn-save-soft:focus-visible,
+.student-main-rate-month-actions .btn-save-soft .btn-icon,
+.student-main-rate-month-actions .btn-save-soft .btn-label {
+    color: #ffffff !important;
+}
+
 .student-rate-summary-card .family-rate-student {
     background: #fbfdff;
 }
@@ -34475,4 +34586,653 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     .anagrafica-contact-row-grid.is-address {
         grid-template-columns: 1fr;
     }
+}
+
+/* Arboris palette moduli: accenti morbidi sulle icone senza cambiare lo sprite SVG. */
+:root {
+    --module-dashboard: #0f6f7a;
+    --module-dashboard-soft: #e3f5f6;
+    --module-dashboard-ring: #bfe2e5;
+    --module-families: #6f9274;
+    --module-families-soft: #edf6ef;
+    --module-families-ring: #d2e7d6;
+    --module-students: #d57532;
+    --module-students-soft: #fff1e6;
+    --module-students-ring: #f1d1b4;
+    --module-calendar: #7d67bd;
+    --module-calendar-soft: #f1ecfb;
+    --module-calendar-ring: #d9d0f2;
+    --module-documents: #a97820;
+    --module-documents-soft: #fff6df;
+    --module-documents-ring: #ead7a7;
+    --module-payments: #b85a48;
+    --module-payments-soft: #fff0ed;
+    --module-payments-ring: #efcbc3;
+    --module-communications: #168b8f;
+    --module-communications-soft: #e3f7f6;
+    --module-communications-ring: #bfe7e5;
+    --module-settings: #596f86;
+    --module-settings-soft: #eef3f7;
+    --module-settings-ring: #d4e0e9;
+}
+
+body.ui-colorful-modules .sidebar-link-icon,
+body.ui-colorful-modules .page-head-icon,
+body.ui-colorful-modules .settings-hero-icon,
+body.ui-colorful-modules .settings-card-icon,
+body.ui-colorful-modules .settings-field-icon,
+body.ui-colorful-modules .settings-module-icon,
+body.ui-colorful-modules .system-role-card-icon,
+body.ui-colorful-modules .system-role-field-icon,
+body.ui-colorful-modules .dashboard-info-icon,
+body.ui-colorful-modules .family-stat-icon,
+body.ui-colorful-modules .family-meta-icon,
+body.ui-colorful-modules .family-system-icon,
+body.ui-colorful-modules .interested-summary-icon,
+body.ui-colorful-modules .interested-record-icon,
+body.ui-colorful-modules .interested-timeline-icon,
+body.ui-colorful-modules .interested-card-icon,
+body.ui-colorful-modules .finance-guide-icon,
+body.ui-colorful-modules .supplier-document-summary-icon,
+body.ui-colorful-modules .archive-record-icon,
+body.ui-colorful-modules .archive-empty-icon,
+body.ui-colorful-modules .feedback-admin-summary-icon,
+body.ui-colorful-modules .audit-log-title-icon,
+body.ui-colorful-modules .audit-log-kpi-icon,
+body.ui-colorful-modules .audit-log-card-icon,
+body.ui-colorful-modules .audit-log-warning-icon,
+body.ui-colorful-modules .audit-log-empty-icon,
+body.ui-colorful-modules .audit-log-user-icon,
+body.ui-colorful-modules .audit-log-search-icon {
+    --module-icon-color: var(--module-settings);
+    --module-icon-soft: var(--module-settings-soft);
+    --module-icon-ring: var(--module-settings-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+    box-shadow: inset 0 0 0 1px var(--module-icon-ring);
+}
+
+body.ui-colorful-modules .sidebar-icon-blue,
+body.ui-colorful-modules .settings-card-icon.is-blue,
+body.ui-colorful-modules .settings-field-icon.is-blue,
+body.ui-colorful-modules .system-role-card-icon.is-blue,
+body.ui-colorful-modules .system-role-field-icon.is-blue,
+body.ui-colorful-modules .settings-module-toggle-card.is-blue .settings-module-icon,
+body.ui-colorful-modules .dashboard-info-icon-blue,
+body.ui-colorful-modules .family-stat-blue {
+    --module-icon-color: var(--module-dashboard);
+    --module-icon-soft: var(--module-dashboard-soft);
+    --module-icon-ring: var(--module-dashboard-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-green,
+body.ui-colorful-modules .sidebar-icon-emerald,
+body.ui-colorful-modules .settings-card-icon.is-green,
+body.ui-colorful-modules .settings-field-icon.is-green,
+body.ui-colorful-modules .system-role-card-icon.is-green,
+body.ui-colorful-modules .system-role-field-icon.is-green,
+body.ui-colorful-modules .settings-module-toggle-card.is-green .settings-module-icon,
+body.ui-colorful-modules .settings-module-toggle-card.is-emerald .settings-module-icon,
+body.ui-colorful-modules .dashboard-info-icon-green,
+body.ui-colorful-modules .family-stat-green {
+    --module-icon-color: var(--module-families);
+    --module-icon-soft: var(--module-families-soft);
+    --module-icon-ring: var(--module-families-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-violet,
+body.ui-colorful-modules .sidebar-icon-indigo,
+body.ui-colorful-modules .settings-card-icon.is-violet,
+body.ui-colorful-modules .settings-field-icon.is-violet,
+body.ui-colorful-modules .system-role-card-icon.is-violet,
+body.ui-colorful-modules .system-role-field-icon.is-violet,
+body.ui-colorful-modules .system-role-card-icon.is-purple,
+body.ui-colorful-modules .system-role-field-icon.is-purple,
+body.ui-colorful-modules .settings-module-toggle-card.is-violet .settings-module-icon,
+body.ui-colorful-modules .family-stat-purple {
+    --module-icon-color: var(--module-calendar);
+    --module-icon-soft: var(--module-calendar-soft);
+    --module-icon-ring: var(--module-calendar-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-amber,
+body.ui-colorful-modules .settings-card-icon.is-amber,
+body.ui-colorful-modules .settings-field-icon.is-amber,
+body.ui-colorful-modules .system-role-card-icon.is-amber,
+body.ui-colorful-modules .system-role-field-icon.is-amber,
+body.ui-colorful-modules .settings-module-toggle-card.is-amber .settings-module-icon,
+body.ui-colorful-modules .family-stat-orange {
+    --module-icon-color: var(--module-documents);
+    --module-icon-soft: var(--module-documents-soft);
+    --module-icon-ring: var(--module-documents-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-rose,
+body.ui-colorful-modules .settings-card-icon.is-rose,
+body.ui-colorful-modules .settings-field-icon.is-rose,
+body.ui-colorful-modules .system-role-card-icon.is-rose,
+body.ui-colorful-modules .system-role-field-icon.is-rose,
+body.ui-colorful-modules .system-role-card-icon.is-red,
+body.ui-colorful-modules .system-role-field-icon.is-red,
+body.ui-colorful-modules .settings-module-toggle-card.is-rose .settings-module-icon {
+    --module-icon-color: var(--module-payments);
+    --module-icon-soft: var(--module-payments-soft);
+    --module-icon-ring: var(--module-payments-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-sky,
+body.ui-colorful-modules .sidebar-icon-teal,
+body.ui-colorful-modules .settings-card-icon.is-sky,
+body.ui-colorful-modules .settings-field-icon.is-sky,
+body.ui-colorful-modules .system-role-card-icon.is-sky,
+body.ui-colorful-modules .system-role-field-icon.is-sky,
+body.ui-colorful-modules .settings-module-toggle-card.is-sky .settings-module-icon {
+    --module-icon-color: var(--module-communications);
+    --module-icon-soft: var(--module-communications-soft);
+    --module-icon-ring: var(--module-communications-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-icon-slate,
+body.ui-colorful-modules .settings-card-icon.is-slate,
+body.ui-colorful-modules .settings-field-icon.is-slate,
+body.ui-colorful-modules .system-role-card-icon.is-slate,
+body.ui-colorful-modules .system-role-field-icon.is-slate {
+    --module-icon-color: var(--module-settings);
+    --module-icon-soft: var(--module-settings-soft);
+    --module-icon-ring: var(--module-settings-ring);
+    background: var(--module-icon-soft);
+    color: var(--module-icon-color);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#home"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#home"]) {
+    --module-icon-color: var(--module-dashboard);
+    --module-icon-soft: var(--module-dashboard-soft);
+    --module-icon-ring: var(--module-dashboard-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#hands-heart"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#hands-heart"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .system-role-field-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .system-role-field-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .system-role-field-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#family"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#user"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#family"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#user"]) {
+    --module-icon-color: var(--module-families);
+    --module-icon-soft: var(--module-families-soft);
+    --module-icon-ring: var(--module-families-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#child"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#child"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .system-role-field-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#child"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#student"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#student"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#child"]) {
+    --module-icon-color: var(--module-students);
+    --module-icon-soft: var(--module-students-soft);
+    --module-icon-ring: var(--module-students-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#clock"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#timer"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#clock"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#clock"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#timer"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#calendar"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#calendar"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#clock"]) {
+    --module-icon-color: var(--module-calendar);
+    --module-icon-soft: var(--module-calendar-soft);
+    --module-icon-ring: var(--module-calendar-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#archive"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#printer"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#archive"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#archive"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#archive"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#printer"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#document"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#archive"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#document"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#archive"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#printer"]) {
+    --module-icon-color: var(--module-documents);
+    --module-icon-soft: var(--module-documents-soft);
+    --module-icon-ring: var(--module-documents-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#bank"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#supplier"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#bank"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#supplier"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#coins"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#finance"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#coins"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#finance"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#bank"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#supplier"]) {
+    --module-icon-color: var(--module-payments);
+    --module-icon-soft: var(--module-payments-soft);
+    --module-icon-ring: var(--module-payments-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#mail"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#bell"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#lightbulb"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#mail"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#mail"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#bell"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#lightbulb"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#message"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#mail"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#message"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#mail"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#bell"]) {
+    --module-icon-color: var(--module-communications);
+    --module-icon-soft: var(--module-communications-soft);
+    --module-icon-ring: var(--module-communications-ring);
+}
+
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#shield"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#menu"]),
+body.ui-colorful-modules .sidebar-link-icon:has(use[href$="#list"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .page-head-icon:has(use[href$="#shield"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .settings-card-icon:has(use[href$="#shield"]),
+body.ui-colorful-modules .settings-field-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .dashboard-info-icon:has(use[href$="#shield"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#shield"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#menu"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#list"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#settings"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#settings"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#shield"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#list"]) {
+    --module-icon-color: var(--module-settings);
+    --module-icon-soft: var(--module-settings-soft);
+    --module-icon-ring: var(--module-settings-ring);
+}
+
+body.ui-colorful-modules .btn-icon:has(use[href$="#plus"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#check"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#plus"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#check"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#check"]) {
+    --module-icon-color: var(--module-families);
+    --module-icon-soft: var(--module-families-soft);
+    --module-icon-ring: var(--module-families-ring);
+}
+
+body.ui-colorful-modules .btn-icon:has(use[href$="#search"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#edit"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#search"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#edit"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#search"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#edit"]) {
+    --module-icon-color: var(--module-dashboard);
+    --module-icon-soft: var(--module-dashboard-soft);
+    --module-icon-ring: var(--module-dashboard-ring);
+}
+
+body.ui-colorful-modules .btn-icon:has(use[href$="#trash"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#x"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#alert"]),
+body.ui-colorful-modules .btn-icon:has(use[href$="#bug"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#trash"]),
+body.ui-colorful-modules .related-btn-icon:has(use[href$="#x"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#trash"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#x"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#alert"]),
+body.ui-colorful-modules .table-icon-link:has(use[href$="#bug"]) {
+    --module-icon-color: var(--module-payments);
+    --module-icon-soft: var(--module-payments-soft);
+    --module-icon-ring: var(--module-payments-ring);
+}
+
+body.ui-colorful-modules .btn-secondary .btn-icon:not(.btn-plus-mark),
+body.ui-colorful-modules .btn-secondary.btn-icon-text .btn-icon:not(.btn-plus-mark),
+body.ui-colorful-modules .related-btn-icon {
+    color: var(--module-icon-color, var(--module-settings));
+    background: transparent;
+    box-shadow: none;
+}
+
+body.ui-colorful-modules .table-icon-link,
+body.ui-colorful-modules .finance-icon-button {
+    background: transparent;
+    border-color: transparent;
+    color: var(--module-icon-color, #3b6f87);
+    box-shadow: none;
+}
+
+body.ui-colorful-modules .table-icon-link:hover,
+body.ui-colorful-modules .table-icon-link:focus-visible,
+body.ui-colorful-modules .finance-icon-button:hover,
+body.ui-colorful-modules .finance-icon-button:focus-visible {
+    background: transparent;
+    border-color: transparent;
+    color: var(--module-icon-color, #244b5e);
+    box-shadow: none;
+    transform: none;
+}
+
+body.ui-colorful-modules .table-icon-link-danger,
+body.ui-colorful-modules .table-icon-link-danger:hover,
+body.ui-colorful-modules .table-icon-link-danger:focus-visible {
+    --module-icon-color: var(--module-payments);
+    --module-icon-soft: var(--module-payments-soft);
+    --module-icon-ring: var(--module-payments-ring);
+}
+
+body.ui-colorful-modules .sidebar-nav a {
+    --sidebar-link-accent: var(--module-settings);
+    --sidebar-link-soft: var(--module-settings-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#home"]) {
+    --sidebar-link-accent: var(--module-dashboard);
+    --sidebar-link-soft: var(--module-dashboard-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#family"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#family-heart"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#hands-heart"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#user"]) {
+    --sidebar-link-accent: var(--module-families);
+    --sidebar-link-soft: var(--module-families-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#student"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#child"]) {
+    --sidebar-link-accent: var(--module-students);
+    --sidebar-link-soft: var(--module-students-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#calendar"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#clock"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#timer"]) {
+    --sidebar-link-accent: var(--module-calendar);
+    --sidebar-link-soft: var(--module-calendar-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#document"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#archive"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#printer"]) {
+    --sidebar-link-accent: var(--module-documents);
+    --sidebar-link-soft: var(--module-documents-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#coins"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#finance"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#bank"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#supplier"]) {
+    --sidebar-link-accent: var(--module-payments);
+    --sidebar-link-soft: var(--module-payments-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#message"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#mail"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#bell"]),
+body.ui-colorful-modules .sidebar-nav a:has(use[href$="#lightbulb"]) {
+    --sidebar-link-accent: var(--module-communications);
+    --sidebar-link-soft: var(--module-communications-soft);
+}
+
+body.ui-colorful-modules .sidebar-nav a:hover,
+body.ui-colorful-modules .sidebar-nav a:focus-visible {
+    background: color-mix(in srgb, var(--sidebar-link-soft) 72%, #ffffff);
+    color: var(--sidebar-link-accent);
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--sidebar-link-accent) 42%, #ffffff), 0 4px 12px rgba(43, 93, 119, 0.08);
+}
+
+body.ui-colorful-modules .sidebar-nav a:hover .sidebar-link-icon,
+body.ui-colorful-modules .sidebar-nav a:focus-visible .sidebar-link-icon,
+body.ui-colorful-modules .sidebar-nav a.active .sidebar-link-icon {
+    color: var(--module-icon-color);
+    background: transparent;
+}
+
+body.ui-colorful-modules .sidebar-nav a.active,
+body.ui-colorful-modules .sidebar-nav a.active:hover,
+body.ui-colorful-modules .sidebar-nav a.active:focus-visible {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--sidebar-link-soft) 84%, #ffffff) 0%, #ffffff 100%);
+    color: var(--sidebar-link-accent);
+    box-shadow: inset 4px 0 0 var(--sidebar-link-accent), 0 5px 14px color-mix(in srgb, var(--sidebar-link-accent) 12%, transparent);
+}
+
+body.ui-colorful-modules .sidebar-nav a.active::after {
+    background: var(--sidebar-link-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sidebar-link-accent) 16%, transparent);
+}
+
+body.ui-colorful-modules .sidebar-home-section,
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section {
+    --sidebar-section-accent: var(--module-settings);
+    --sidebar-section-soft: var(--module-settings-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="anagrafica"] {
+    --sidebar-section-accent: var(--module-students);
+    --sidebar-section-soft: var(--module-students-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="famiglie-interessate"] {
+    --sidebar-section-accent: var(--module-families);
+    --sidebar-section-soft: var(--module-families-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="economia"],
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-finanziaria"] {
+    --sidebar-section-accent: var(--module-payments);
+    --sidebar-section-soft: var(--module-payments-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="calendario"] {
+    --sidebar-section-accent: var(--module-calendar);
+    --sidebar-section-soft: var(--module-calendar-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="archivio-storico"],
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="servizi-extra"] {
+    --sidebar-section-accent: var(--module-documents);
+    --sidebar-section-soft: var(--module-documents-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="parcheggio"] {
+    --sidebar-section-accent: var(--module-communications);
+    --sidebar-section-soft: var(--module-communications-soft);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section {
+    border-color: color-mix(in srgb, var(--sidebar-section-accent) 18%, #e4edf4);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar-section-soft) 54%, #ffffff) 0%, #ffffff 100%);
+}
+
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section:has(.active) {
+    border-color: color-mix(in srgb, var(--sidebar-section-accent) 30%, #dce7ef);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar-section-soft) 74%, #ffffff) 0%, #ffffff 100%);
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--sidebar-section-accent) 10%, transparent);
+}
+
+body.ui-colorful-modules .sidebar-section > .sidebar-collapsible,
+body.ui-colorful-modules .sidebar-subsection .sidebar-collapsible {
+    color: color-mix(in srgb, var(--sidebar-section-accent, var(--module-settings)) 76%, #283d52);
+}
+
+body.ui-colorful-modules .settings-module-toggle-card {
+    --module-card-accent: var(--module-settings);
+    --module-card-soft: var(--module-settings-soft);
+    --module-card-ring: var(--module-settings-ring);
+    border-color: color-mix(in srgb, var(--module-card-ring) 72%, #dfe8ef);
+    background: color-mix(in srgb, var(--module-card-soft) 38%, #ffffff);
+}
+
+body.ui-colorful-modules .settings-module-toggle-card:hover {
+    border-color: color-mix(in srgb, var(--module-card-accent) 30%, var(--module-card-ring));
+    background: color-mix(in srgb, var(--module-card-soft) 52%, #ffffff);
+}
+
+body.ui-colorful-modules .settings-module-toggle-card .settings-module-icon {
+    background: var(--module-card-soft);
+    color: var(--module-card-accent);
+    box-shadow: inset 0 0 0 1px var(--module-card-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(1) {
+    --module-card-accent: var(--module-students);
+    --module-card-soft: var(--module-students-soft);
+    --module-card-ring: var(--module-students-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(2) {
+    --module-card-accent: var(--module-families);
+    --module-card-soft: var(--module-families-soft);
+    --module-card-ring: var(--module-families-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(3),
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(5) {
+    --module-card-accent: var(--module-payments);
+    --module-card-soft: var(--module-payments-soft);
+    --module-card-ring: var(--module-payments-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(4) {
+    --module-card-accent: var(--module-calendar);
+    --module-card-soft: var(--module-calendar-soft);
+    --module-card-ring: var(--module-calendar-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(6) {
+    --module-card-accent: var(--module-settings);
+    --module-card-soft: var(--module-settings-soft);
+    --module-card-ring: var(--module-settings-ring);
+}
+
+body.ui-colorful-modules .settings-module-grid > .settings-module-toggle-card:nth-child(7) {
+    --module-card-accent: var(--module-documents);
+    --module-card-soft: var(--module-documents-soft);
+    --module-card-ring: var(--module-documents-ring);
+}
+
+/* Le icone restano colorate, senza badge o quadrati di contenimento. */
+body.ui-colorful-modules .sidebar-link-icon,
+body.ui-colorful-modules .page-head-icon,
+body.ui-colorful-modules .settings-hero-icon,
+body.ui-colorful-modules .settings-card-icon,
+body.ui-colorful-modules .settings-field-icon,
+body.ui-colorful-modules .settings-module-icon,
+body.ui-colorful-modules .system-role-card-icon,
+body.ui-colorful-modules .system-role-field-icon,
+body.ui-colorful-modules .dashboard-info-icon,
+body.ui-colorful-modules .family-meta-icon,
+body.ui-colorful-modules .interested-summary-icon,
+body.ui-colorful-modules .interested-record-icon,
+body.ui-colorful-modules .interested-timeline-icon,
+body.ui-colorful-modules .interested-card-icon,
+body.ui-colorful-modules .finance-guide-icon,
+body.ui-colorful-modules .supplier-document-summary-icon,
+body.ui-colorful-modules .archive-record-icon,
+body.ui-colorful-modules .archive-empty-icon,
+body.ui-colorful-modules .feedback-admin-summary-icon,
+body.ui-colorful-modules .audit-log-title-icon,
+body.ui-colorful-modules .audit-log-kpi-icon,
+body.ui-colorful-modules .audit-log-card-icon,
+body.ui-colorful-modules .audit-log-warning-icon,
+body.ui-colorful-modules .audit-log-empty-icon,
+body.ui-colorful-modules .audit-log-user-icon,
+body.ui-colorful-modules .audit-log-search-icon,
+body.ui-colorful-modules .settings-module-toggle-card .settings-module-icon,
+body.ui-colorful-modules .btn-secondary .btn-icon:not(.btn-plus-mark),
+body.ui-colorful-modules .btn-secondary.btn-icon-text .btn-icon:not(.btn-plus-mark),
+body.ui-colorful-modules .related-btn-icon {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+body.ui-colorful-modules .table-icon-link,
+body.ui-colorful-modules .finance-icon-button {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
 }

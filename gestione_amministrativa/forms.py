@@ -123,7 +123,7 @@ class DipendenteForm(forms.ModelForm):
         choices=[],
         required=False,
         label="Classe principale",
-        help_text="Per gli educatori, collega una classe o un gruppo classe di riferimento.",
+        help_text="Per gli educatori con classe fissa, collega una classe o un gruppo classe di riferimento.",
     )
     contratto = forms.ModelChoiceField(
         queryset=ContrattoDipendente.objects.none(),
@@ -153,6 +153,7 @@ class DipendenteForm(forms.ModelForm):
             "ruolo_aziendale",
             "persona_collegata",
             "classe_principale_ref",
+            "materia",
             "mansione",
             "iban",
             "stato",
@@ -161,6 +162,7 @@ class DipendenteForm(forms.ModelForm):
         labels = {
             "ruolo_aziendale": "Profilo aziendale",
             "persona_collegata": "Persona collegata",
+            "materia": "Materia",
             "mansione": "Mansione",
             "iban": "IBAN",
             "stato": "Stato",
@@ -169,6 +171,7 @@ class DipendenteForm(forms.ModelForm):
         widgets = {
             "note": forms.Textarea(attrs={"rows": 4}),
             "iban": forms.TextInput(attrs={"placeholder": "IT00X0000000000000000000000"}),
+            "materia": forms.TextInput(attrs={"placeholder": "Es. Inglese, Musica, Arte..."}),
             "mansione": forms.TextInput(attrs={"placeholder": "Es. Segreteria, cucina, amministrazione..."}),
         }
 
@@ -178,6 +181,7 @@ class DipendenteForm(forms.ModelForm):
         optional_fields = [
             "persona_collegata",
             "classe_principale_ref",
+            "materia",
             "mansione",
             "codice_fiscale",
             "data_nascita",
@@ -378,9 +382,11 @@ class DipendenteForm(forms.ModelForm):
         if dipendente.is_educatore:
             dipendente.classe_principale_id = classe_id
             dipendente.gruppo_classe_principale_id = gruppo_id
+            dipendente.materia = (self.cleaned_data.get("materia") or "").strip()
         else:
             dipendente.classe_principale = None
             dipendente.gruppo_classe_principale = None
+            dipendente.materia = ""
         if not dipendente.is_dipendente_operativo:
             dipendente.mansione = ""
         if commit:

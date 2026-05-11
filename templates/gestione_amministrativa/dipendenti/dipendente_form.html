@@ -104,6 +104,18 @@
                                 </div>
                             </div>
 
+                            <div class="fondo-plan-field" data-role-field="educator-subject">
+                                <span class="fondo-plan-field-icon is-violet" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                </span>
+                                <div class="fondo-plan-field-body">
+                                    <label for="{{ form.materia.id_for_label }}">{{ form.materia.label }}</label>
+                                    {{ form.materia }}
+                                    {{ form.materia.errors }}
+                                    <p class="fondo-plan-help">Per educatori che seguono una materia su piu classi, ad esempio Inglese o Musica.</p>
+                                </div>
+                            </div>
+
                             <div class="fondo-plan-field" data-role-field="employee-mansione">
                                 <span class="fondo-plan-field-icon is-amber" aria-hidden="true">
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
@@ -353,31 +365,41 @@
                             <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-classe-title">
                                 <div class="ga-dipendente-side-card-head">
                                     <div>
-                                        <h2 id="ga-dipendente-classe-title">Classe principale</h2>
-                                        <p>Studenti collegati alla classe di riferimento.</p>
+                                        <h2 id="ga-dipendente-classe-title">Riferimento educativo</h2>
+                                        <p>Classe principale o materia trasversale.</p>
                                     </div>
                                 </div>
-                                {% if dipendente.classe_principale_label %}
+                                {% if dipendente.classe_principale_label or dipendente.materia_label %}
                                     <div class="ga-dipendente-mini-list">
-                                        <article class="ga-dipendente-mini-row">
-                                            <div>
-                                                <strong>{{ dipendente.classe_principale_label }}</strong>
-                                                <span>{{ dipendente.classe_principale_tipo_label }} assegnata</span>
-                                            </div>
-                                            <strong>{{ studenti_classe_principale|length }}</strong>
-                                        </article>
-                                        {% for studente in studenti_classe_principale %}
+                                        {% if dipendente.classe_principale_label %}
                                             <article class="ga-dipendente-mini-row">
                                                 <div>
-                                                    <a href="{% url 'modifica_studente' studente.pk %}" class="ga-dipendente-mini-title">{{ studente }}</a>
+                                                    <strong>{{ dipendente.classe_principale_label }}</strong>
+                                                    <span>{{ dipendente.classe_principale_tipo_label }} assegnata</span>
+                                                </div>
+                                                <strong>{{ studenti_classe_principale|length }}</strong>
+                                            </article>
+                                            {% for studente in studenti_classe_principale %}
+                                                <article class="ga-dipendente-mini-row">
+                                                    <div>
+                                                        <a href="{% url 'modifica_studente' studente.pk %}" class="ga-dipendente-mini-title">{{ studente }}</a>
+                                                    </div>
+                                                </article>
+                                            {% empty %}
+                                                <div class="ga-dipendente-empty">Nessuno studente attivo per questa classe.</div>
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% if dipendente.materia_label %}
+                                            <article class="ga-dipendente-mini-row">
+                                                <div>
+                                                    <strong>{{ dipendente.materia_label }}</strong>
+                                                    <span>Materia trasversale</span>
                                                 </div>
                                             </article>
-                                        {% empty %}
-                                            <div class="ga-dipendente-empty">Nessuno studente attivo per questa classe.</div>
-                                        {% endfor %}
+                                        {% endif %}
                                     </div>
                                 {% else %}
-                                    <div class="ga-dipendente-empty">Nessuna classe o pluriclasse principale impostata.</div>
+                                    <div class="ga-dipendente-empty">Nessuna classe, pluriclasse o materia impostata.</div>
                                 {% endif %}
                             </section>
                         {% endif %}
@@ -565,7 +587,7 @@
     </div>
 
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
-    <script src="{% static 'js/pages/dipendente-form.js' %}?v=8"></script>
+    <script src="{% static 'js/pages/dipendente-form.js' %}?v=9"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisDipendenteForm) {

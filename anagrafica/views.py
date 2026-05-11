@@ -7,7 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
+from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
 from django.forms import modelform_factory
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -48,6 +48,8 @@ from .models import (
     StudenteFamiliare,
     Documento,
     Familiare,
+    AnagraficaIndirizzo,
+    AnagraficaTelefono,
 )
 from calendario.data import build_dashboard_calendar_data
 from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione, TariffaCondizioneIscrizione
@@ -771,6 +773,36 @@ def decorate_studenti_current_enrollment_labels(student_instances, today=None):
         studente.classe_corrente_famiglia_label = label
 
 
+def anagrafica_address_link_queryset():
+    return AnagraficaIndirizzo.objects.select_related(
+        "indirizzo",
+        "indirizzo__citta",
+        "indirizzo__provincia",
+        "indirizzo__regione",
+    )
+
+
+def anagrafica_phone_link_queryset():
+    return AnagraficaTelefono.objects.all()
+
+
+def familiare_contact_prefetches(prefix=""):
+    base = f"{prefix}__" if prefix else ""
+    return (
+        Prefetch(f"{base}persona__indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+        Prefetch(f"{base}indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+        Prefetch(f"{base}persona__telefoni_anagrafici", queryset=anagrafica_phone_link_queryset()),
+        Prefetch(f"{base}telefoni_anagrafici", queryset=anagrafica_phone_link_queryset()),
+    )
+
+
+def studente_address_prefetches(prefix=""):
+    base = f"{prefix}__" if prefix else ""
+    return (
+        Prefetch(f"{base}indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+    )
+
+
 def active_student_relative_prefetch(to_attr="relazioni_familiari_attive_prefetch"):
     return Prefetch(
         "relazioni_familiari",
@@ -782,7 +814,10 @@ def active_student_relative_prefetch(to_attr="relazioni_familiari_attive_prefetc
                 "familiare__persona",
                 "familiare__persona__indirizzo",
                 "familiare__persona__indirizzo__citta",
+                "familiare__persona__indirizzo__provincia",
+                "familiare__persona__indirizzo__regione",
             )
+            .prefetch_related(*familiare_contact_prefetches("familiare"))
             .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
         ),
         to_attr=to_attr,
@@ -802,6 +837,7 @@ def active_relative_student_prefetch(to_attr="relazioni_studenti_attive_prefetch
                 "studente__luogo_nascita",
                 "studente__luogo_nascita__provincia",
             )
+            .prefetch_related(*studente_address_prefetches("studente"))
             .order_by("studente__cognome", "studente__nome", "studente_id")
         ),
         to_attr=to_attr,
@@ -887,6 +923,7 @@ def direct_student_peers_for_relations(studente, relazioni_familiari):
             "studente__luogo_nascita",
             "studente__luogo_nascita__provincia",
         )
+        .prefetch_related(*studente_address_prefetches("studente"))
         .order_by("studente__cognome", "studente__nome", "studente_id")
     )
 
@@ -917,7 +954,10 @@ def direct_relative_peers_for_student_relations(familiare, relazioni_studenti):
             "familiare__persona",
             "familiare__persona__indirizzo",
             "familiare__persona__indirizzo__citta",
+            "familiare__persona__indirizzo__provincia",
+            "familiare__persona__indirizzo__regione",
         )
+        .prefetch_related(*familiare_contact_prefetches("familiare"))
         .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
     )
 
@@ -988,7 +1028,7 @@ def build_studente_address_suggestions(studente, relazioni_familiari, studenti_c
     return build_related_address_suggestions(people)
 
 
-def ordered_queryset_from_ids(model, ids, *, select_related_fields=()):
+def ordered_queryset_from_ids(model, ids, *, select_related_fields=(), prefetch_related_fields=()):
     ordered_ids = []
     seen = set()
     for item_id in ids or []:
@@ -1007,6 +1047,8 @@ def ordered_queryset_from_ids(model, ids, *, select_related_fields=()):
     queryset = model.objects.filter(pk__in=ordered_ids)
     if select_related_fields:
         queryset = queryset.select_related(*select_related_fields)
+    if prefetch_related_fields:
+        queryset = queryset.prefetch_related(*prefetch_related_fields)
     return queryset.order_by(preserved_order)
 
 
@@ -1200,6 +1242,29 @@ def build_studente_document_counts(studente, today):
     }
 
 
+def build_studente_document_counts_from_list(documenti, today):
+    in_scadenza_limite = today + timedelta(days=30)
+    count_documenti = 0
+    count_documenti_in_scadenza = 0
+    count_documenti_scaduti = 0
+
+    for documento in documenti or []:
+        count_documenti += 1
+        scadenza = getattr(documento, "scadenza", None)
+        if not scadenza:
+            continue
+        if scadenza < today:
+            count_documenti_scaduti += 1
+        elif scadenza <= in_scadenza_limite:
+            count_documenti_in_scadenza += 1
+
+    return {
+        "count_documenti": count_documenti,
+        "count_documenti_in_scadenza": count_documenti_in_scadenza,
+        "count_documenti_scaduti": count_documenti_scaduti,
+    }
+
+
 def count_studente_rate_scadute_from_overview(rate_overview, today):
     count = 0
 
@@ -1217,6 +1282,19 @@ def count_studente_rate_scadute_from_overview(rate_overview, today):
                 count += 1
 
     return count
+
+
+def count_studente_rate_scadute(studente, today):
+    if not studente:
+        return 0
+
+    return RataIscrizione.objects.filter(
+        iscrizione__studente=studente,
+        data_scadenza__lt=today,
+        importo_finale__gt=0,
+        pagata=False,
+        importo_pagato__lt=F("importo_finale"),
+    ).count()
 
 
 def should_prefer_initial_famiglia_tab(request, allowed_targets):
@@ -3306,6 +3384,7 @@ def sync_familiare_profilo_lavorativo(familiare, cleaned_data):
     classe_id, gruppo_id = split_classe_principale_reference(cleaned_data.get("classe_principale_educatore"))
     profilo.classe_principale_id = classe_id if abilita_educatore else None
     profilo.gruppo_classe_principale_id = gruppo_id if abilita_educatore else None
+    profilo.materia = (cleaned_data.get("materia_educatore") or "").strip() if abilita_educatore else ""
     profilo.mansione = (cleaned_data.get("profilo_mansione") or "").strip() if abilita_dipendente else ""
     profilo.iban = (cleaned_data.get("profilo_iban") or "").replace(" ", "").upper().strip()
     profilo.stato = cleaned_data.get("profilo_stato") or profilo.stato or StatoDipendente.ATTIVO
@@ -4287,7 +4366,10 @@ def modifica_studente(request, pk):
             "indirizzo__citta__provincia",
             "luogo_nascita",
             "luogo_nascita__provincia",
+            "nazione_nascita",
+            "nazionalita",
         ).prefetch_related(
+            *studente_address_prefetches(),
             active_student_relative_prefetch()
         ),
         pk=pk,
@@ -4300,6 +4382,12 @@ def modifica_studente(request, pk):
     allowed_edit_targets = {"iscrizioni", "parenti", "documenti"}
     active_inline_tab = resolve_active_inline_tab(request, allowed_display_targets, "iscrizioni")
     prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_display_targets)
+    lazy_sections_requested = request.GET.get("_lazy") == "student-sections"
+    lazy_sections_enabled = (
+        request.method == "GET"
+        and edit_scope == "view"
+        and not lazy_sections_requested
+    )
     familiari_diretti_form = None
     contact_formsets = None
 
@@ -4344,7 +4432,15 @@ def modifica_studente(request, pk):
     parenti_formset_queryset = ordered_queryset_from_ids(
         Familiare,
         [relazione.familiare_id for relazione in familiari_collegati_diretti],
-        select_related_fields=("relazione_familiare", "persona", "persona__indirizzo", "persona__indirizzo__citta"),
+        select_related_fields=(
+            "relazione_familiare",
+            "persona",
+            "persona__indirizzo",
+            "persona__indirizzo__citta",
+            "persona__indirizzo__provincia",
+            "persona__indirizzo__regione",
+        ),
+        prefetch_related_fields=familiare_contact_prefetches(),
     )
 
     if request.method == "POST":
@@ -4476,24 +4572,31 @@ def modifica_studente(request, pk):
     else:
         form = StudenteStandaloneForm(instance=studente)
         contact_formsets = {}
-        familiari_diretti_form = StudenteDirectFamiliariForm(studente=studente)
-        iscrizioni_formset = build_iscrizioni_studente_formset(
-            instance=studente,
-            prefix="iscrizioni",
-            queryset=iscrizioni_queryset,
-        )
-        documenti_formset = build_documenti_studente_formset(
-            instance=studente,
-            prefix="documenti",
-            queryset=documenti_queryset,
-        )
-        parenti_formset = build_familiari_formset(
-            instance=famiglia_for_parenti,
-            prefix="parenti",
-            queryset=parenti_formset_queryset,
-        )
+        if lazy_sections_enabled:
+            familiari_diretti_form = None
+            iscrizioni_formset = None
+            documenti_formset = None
+            parenti_formset = None
+        else:
+            familiari_diretti_form = StudenteDirectFamiliariForm(studente=studente)
+            iscrizioni_formset = build_iscrizioni_studente_formset(
+                instance=studente,
+                prefix="iscrizioni",
+                queryset=iscrizioni_queryset,
+            )
+            documenti_formset = build_documenti_studente_formset(
+                instance=studente,
+                prefix="documenti",
+                queryset=documenti_queryset,
+            )
+            parenti_formset = build_familiari_formset(
+                instance=famiglia_for_parenti,
+                prefix="parenti",
+                queryset=parenti_formset_queryset,
+            )
 
     iscrizioni_correnti_list = list(iscrizioni_queryset)
+    documenti_correnti_list = [] if lazy_sections_enabled else list(documenti_queryset)
     iscrizione_corrente = (
         next(
             (
@@ -4510,10 +4613,15 @@ def modifica_studente(request, pk):
         )
     )
     classe_corrente_tipo, classe_corrente_label = current_iscrizione_class_display(iscrizione_corrente)
-    document_counts = build_studente_document_counts(studente, today)
-    studente_activity = studente_activity_entries(
+    document_counts = (
+        build_studente_document_counts(studente, today)
+        if lazy_sections_enabled
+        else build_studente_document_counts_from_list(documenti_correnti_list, today)
+    )
+    studente_activity = [] if lazy_sections_enabled else studente_activity_entries(
         studente,
         iscrizione_ids=[item.pk for item in iscrizioni_correnti_list],
+        documenti_ids=[item.pk for item in documenti_correnti_list],
     )
     studente_audit_info = studente_audit_labels(studente)
     parenti_famiglia = []
@@ -4529,7 +4637,7 @@ def modifica_studente(request, pk):
         else len(studenti_parenti_famiglia)
     )
     count_parenti = count_genitori_tutori
-    rate_overview = build_studente_rate_overview(studente, iscrizioni_correnti_list)
+    rate_overview = [] if lazy_sections_enabled else build_studente_rate_overview(studente, iscrizioni_correnti_list)
     student_family_referenti = [
         relazione.familiare
         for relazione in familiari_collegati_diretti
@@ -4576,7 +4684,11 @@ def modifica_studente(request, pk):
         "count_documenti": document_counts["count_documenti"],
         "count_documenti_in_scadenza": document_counts["count_documenti_in_scadenza"],
         "count_documenti_scaduti": document_counts["count_documenti_scaduti"],
-        "count_rate_scadute": count_studente_rate_scadute_from_overview(rate_overview, today),
+        "count_rate_scadute": (
+            count_studente_rate_scadute(studente, today)
+            if lazy_sections_enabled
+            else count_studente_rate_scadute_from_overview(rate_overview, today)
+        ),
         "rate_overview": rate_overview,
         "iscrizione_corrente": iscrizione_corrente,
         "studente_activity_entries": studente_activity,
@@ -4584,10 +4696,12 @@ def modifica_studente(request, pk):
         "studente_creato_da_label": studente_audit_info["created_label"],
         "studente_ultima_modifica_data": studente_audit_info["updated_data"],
         "studente_aggiornato_da_label": studente_audit_info["updated_label"],
+        "studente_lazy_sections_enabled": lazy_sections_enabled,
+        "studente_lazy_sections_url": f"{reverse('modifica_studente', kwargs={'pk': studente.pk})}?_lazy=student-sections",
         "has_form_errors": bool(
             form.errors
-            or iscrizioni_formset.total_error_count()
-            or documenti_formset.total_error_count()
+            or (iscrizioni_formset.total_error_count() if iscrizioni_formset is not None else 0)
+            or (documenti_formset.total_error_count() if documenti_formset is not None else 0)
             or (parenti_formset.total_error_count() if parenti_formset is not None else 0)
         ),
     }

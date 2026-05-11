@@ -1,10 +1,11 @@
 from django import forms
 from django.contrib.contenttypes.forms import BaseGenericInlineFormSet, generic_inlineformset_factory
 from django.db import DatabaseError
-from django.db.models import Case, IntegerField, Q, When
+from django.db.models import Case, IntegerField, Prefetch, Q, When
 from django.forms import HiddenInput
-from django.forms.models import BaseInlineFormSet
+from django.forms.models import BaseInlineFormSet, BaseModelFormSet
 from django.forms.utils import ErrorDict
+from django.utils.functional import cached_property
 from decimal import Decimal
 import re
 from .contact_services import (
@@ -40,6 +41,15 @@ def make_searchable_select(field, placeholder):
             "data-searchable-select": "1",
             "data-searchable-placeholder": placeholder,
         }
+    )
+
+
+def anagrafica_address_link_queryset():
+    return AnagraficaIndirizzo.objects.select_related(
+        "indirizzo",
+        "indirizzo__citta",
+        "indirizzo__provincia",
+        "indirizzo__regione",
     )
 
 
@@ -314,12 +324,31 @@ class StudenteDirectFamiliariForm(forms.Form):
 
         selected_ids = set()
         if getattr(studente, "pk", None):
-            selected_ids.update(
-                studente.relazioni_familiari.filter(attivo=True).values_list("familiare_id", flat=True)
-            )
+            relazioni_prefetched = getattr(studente, "relazioni_familiari_attive_prefetch", None)
+            if relazioni_prefetched is not None:
+                selected_ids.update(
+                    relazione.familiare_id
+                    for relazione in relazioni_prefetched
+                    if relazione.familiare_id
+                )
+            else:
+                selected_ids.update(
+                    studente.relazioni_familiari.filter(attivo=True).values_list("familiare_id", flat=True)
+                )
 
         queryset = (
-            Familiare.objects.select_related("persona", "relazione_familiare")
+            Familiare.objects.select_related(
+                "persona",
+                "persona__indirizzo",
+                "persona__indirizzo__citta",
+                "persona__indirizzo__provincia",
+                "persona__indirizzo__regione",
+                "relazione_familiare",
+            )
+            .prefetch_related(
+                Prefetch("persona__indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+                Prefetch("indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+            )
             .filter(Q(persona__pk__isnull=False) | Q(pk__in=selected_ids))
             .order_by("persona__cognome", "persona__nome", "pk")
         )
@@ -354,9 +383,17 @@ class FamiliareDirectStudentiForm(forms.Form):
 
         selected_ids = set()
         if getattr(familiare, "pk", None):
-            selected_ids.update(
-                familiare.relazioni_studenti.filter(attivo=True).values_list("studente_id", flat=True)
-            )
+            relazioni_prefetched = getattr(familiare, "relazioni_studenti_attive_prefetch", None)
+            if relazioni_prefetched is not None:
+                selected_ids.update(
+                    relazione.studente_id
+                    for relazione in relazioni_prefetched
+                    if relazione.studente_id
+                )
+            else:
+                selected_ids.update(
+                    familiare.relazioni_studenti.filter(attivo=True).values_list("studente_id", flat=True)
+                )
 
         queryset = (
             Studente.objects.filter(Q(attivo=True) | Q(pk__in=selected_ids))
@@ -1262,7 +1299,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         self.fields["profilo_educatore_attivo"] = forms.BooleanField(
             required=False,
             label="Anche educatore",
-            help_text="Abilita classe principale, studenti collegati, contratto, buste paga e documenti.",
+            help_text="Abilita classe principale o materia, studenti collegati, contratto, buste paga e documenti.",
         )
         self.fields["classe_principale_educatore"] = forms.ChoiceField(
             choices=classe_principale_reference_choices(
@@ -1271,9 +1308,16 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             ),
             required=False,
             label="Classe principale",
-            help_text="Visibile nella scheda dell'educatore e usata per mostrare studenti collegati o pluriclasse.",
+            help_text="Per educatori con classe fissa: mostra studenti collegati o pluriclasse.",
         )
         make_searchable_select(self.fields["classe_principale_educatore"], "Cerca una classe o pluriclasse...")
+        self.fields["materia_educatore"] = forms.CharField(
+            required=False,
+            label="Materia",
+            help_text="Per educatori che seguono una materia su piu classi, ad esempio Inglese o Musica.",
+            max_length=120,
+            widget=forms.TextInput(attrs={"placeholder": "Es. Inglese, Musica, Arte..."}),
+        )
         self.fields["profilo_mansione"] = forms.CharField(
             required=False,
             label="Mansione",
@@ -1301,6 +1345,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         self.initial["profilo_dipendente_attivo"] = profilo.ruolo_anagrafico == RuoloAnagraficoDipendente.DIPENDENTE
         self.initial["profilo_educatore_attivo"] = profilo.ruolo_anagrafico == RuoloAnagraficoDipendente.EDUCATORE
         self.initial["classe_principale_educatore"] = classe_principale_reference_initial(profilo)
+        self.initial["materia_educatore"] = profilo.materia
         self.initial["profilo_mansione"] = profilo.mansione
         self.initial["profilo_iban"] = profilo.iban
         self.initial["profilo_stato"] = profilo.stato
@@ -1368,7 +1413,13 @@ class FamiliareInlineForm(FamiliareForm):
         return True
 
 
-class IgnoreBlankExtraInlineFormSet(BaseInlineFormSet):
+class CachedEmptyFormSetMixin:
+    @cached_property
+    def empty_form(self):
+        return super().empty_form
+
+
+class IgnoreBlankExtraFormSetMixin(CachedEmptyFormSetMixin):
     meaningful_field_names = ()
 
     def _is_meaningfully_filled(self, form):
@@ -1400,6 +1451,14 @@ class IgnoreBlankExtraInlineFormSet(BaseInlineFormSet):
                 form.cleaned_data = {}
 
 
+class IgnoreBlankExtraModelFormSet(IgnoreBlankExtraFormSetMixin, BaseModelFormSet):
+    pass
+
+
+class IgnoreBlankExtraInlineFormSet(IgnoreBlankExtraFormSetMixin, BaseInlineFormSet):
+    pass
+
+
 def build_person_inline_shared_lookups(*, include_relazioni=False):
     lookups = {
         "indirizzi": prime_queryset(indirizzo_choice_queryset()),
@@ -1413,7 +1472,7 @@ def build_person_inline_shared_lookups(*, include_relazioni=False):
     return lookups
 
 
-class FamiliareInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
+class FamiliareInlineBaseFormSet(IgnoreBlankExtraModelFormSet):
     meaningful_field_names = (
         "cognome",
         "nome",
@@ -1437,6 +1496,7 @@ class FamiliareInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
 LogicalFamiliareFormSet = modelformset_factory(
     Familiare,
     form=FamiliareInlineForm,
+    formset=FamiliareInlineBaseFormSet,
     extra=1,
     can_delete=True,
 )
@@ -1637,7 +1697,7 @@ class StudenteInlineForm(StudenteForm):
         return True
 
 
-class StudenteInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
+class StudenteInlineBaseFormSet(IgnoreBlankExtraModelFormSet):
     meaningful_field_names = (
         "nome",
         "data_nascita",
@@ -1658,6 +1718,7 @@ class StudenteInlineBaseFormSet(IgnoreBlankExtraInlineFormSet):
 LogicalStudenteFormSet = modelformset_factory(
     Studente,
     form=StudenteInlineForm,
+    formset=StudenteInlineBaseFormSet,
     extra=1,
     can_delete=True,
 )
@@ -1758,7 +1819,18 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, for
             selected_ids.update(self._submitted_pk_values("familiari_collegati"))
 
         queryset = (
-            Familiare.objects.select_related("persona", "persona__indirizzo", "relazione_familiare")
+            Familiare.objects.select_related(
+                "persona",
+                "persona__indirizzo",
+                "persona__indirizzo__citta",
+                "persona__indirizzo__provincia",
+                "persona__indirizzo__regione",
+                "relazione_familiare",
+            )
+            .prefetch_related(
+                Prefetch("persona__indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+                Prefetch("indirizzi_anagrafici", queryset=anagrafica_address_link_queryset()),
+            )
             .filter(Q(persona__pk__isnull=False) | Q(pk__in=selected_ids))
             .order_by("persona__cognome", "persona__nome", "pk")
         )
@@ -2051,7 +2123,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             return True
 
 
-class IscrizioneStudenteInlineBaseFormSet(BaseInlineFormSet):
+class IscrizioneStudenteInlineBaseFormSet(CachedEmptyFormSetMixin, BaseInlineFormSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

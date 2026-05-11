@@ -64,6 +64,14 @@ window.ArborisCollapsible = (function () {
                 setState(btn, panel, !isOpen);
             });
         });
+
+        if (container === document || container === document.documentElement || container === document.body) {
+            document.documentElement.classList.remove("sidebar-state-preload");
+            const initialStyle = document.getElementById("sidebar-initial-state-style");
+            if (initialStyle) {
+                initialStyle.remove();
+            }
+        }
     }
 
     return {

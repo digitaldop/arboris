@@ -134,6 +134,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
             nome="Elena",
             cognome="Bianchi",
             ruolo_anagrafico=RuoloAnagraficoDipendente.EDUCATORE,
+            materia="Musica",
         )
 
         response = self.client.get(reverse("lista_educatori"))
@@ -142,8 +143,12 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, "Educatori")
         self.assertContains(response, "anagrafica-record-avatar-educator")
         self.assertContains(response, "Bianchi Elena")
+        self.assertContains(response, "Materia Musica")
         self.assertContains(response, f"{reverse('modifica_educatore', args=[educatore.pk])}")
         self.assertNotContains(response, "Rossi Mario")
+
+        search_response = self.client.get(reverse("lista_educatori"), {"q": "Musica"})
+        self.assertContains(search_response, "Bianchi Elena")
 
     def test_scheda_dipendente_usa_scheda_familiare_collegata(self):
         self.client.force_login(self.user)
@@ -237,6 +242,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "ruolo_anagrafico": RuoloAnagraficoDipendente.EDUCATORE,
                 "familiare_collegato": "",
                 "classe_principale_ref": f"gruppo:{gruppo.pk}",
+                "materia": "Musica",
                 "mansione": "Non salvare",
                 "nome": "Elena",
                 "cognome": "Bianchi",
@@ -259,6 +265,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         educatore = Dipendente.objects.get(nome="Elena", cognome="Bianchi")
         self.assertEqual(educatore.gruppo_classe_principale, gruppo)
         self.assertIsNone(educatore.classe_principale)
+        self.assertEqual(educatore.materia, "Musica")
         self.assertEqual(educatore.mansione, "")
 
     @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
