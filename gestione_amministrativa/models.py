@@ -28,10 +28,12 @@ class SessoDipendente(models.TextChoices):
     FEMMINA = "F", "Femmina"
 
 
-class RuoloAnagraficoDipendente(models.TextChoices):
+class RuoloAziendaleDipendente(models.TextChoices):
     DIPENDENTE = "dipendente", "Dipendente"
     EDUCATORE = "educatore", "Educatore"
-    EDUCATORE_DIPENDENTE = "educatore_dipendente", "Educatore e dipendente"
+
+
+RuoloAnagraficoDipendente = RuoloAziendaleDipendente
 
 
 class RegimeOrarioDipendente(models.TextChoices):
@@ -105,6 +107,41 @@ class TipoContrattoDipendente(models.Model):
         super().save(*args, **kwargs)
 
 
+class DipendenteQuerySet(models.QuerySet):
+    LEGACY_PERSONA_LOOKUPS = {
+        "nome": "persona_collegata__nome",
+        "cognome": "persona_collegata__cognome",
+        "codice_fiscale": "persona_collegata__codice_fiscale",
+        "email": "persona_collegata__email",
+        "telefono": "persona_collegata__telefono",
+    }
+    LEGACY_LOOKUPS = {
+        "ruolo_anagrafico": "ruolo_aziendale",
+        "familiare_collegato": "persona_collegata__profilo_familiare",
+        "familiare_collegato_id": "persona_collegata__profilo_familiare_id",
+    }
+
+    def _translate_legacy_kwargs(self, kwargs):
+        translated = {}
+        for key, value in kwargs.items():
+            lookup_root, separator, lookup_tail = key.partition("__")
+            if lookup_root in self.LEGACY_PERSONA_LOOKUPS:
+                key = f"{self.LEGACY_PERSONA_LOOKUPS[lookup_root]}{separator}{lookup_tail}" if separator else self.LEGACY_PERSONA_LOOKUPS[lookup_root]
+            elif lookup_root in self.LEGACY_LOOKUPS:
+                key = f"{self.LEGACY_LOOKUPS[lookup_root]}{separator}{lookup_tail}" if separator else self.LEGACY_LOOKUPS[lookup_root]
+            translated[key] = value
+        return translated
+
+    def filter(self, *args, **kwargs):
+        return super().filter(*args, **self._translate_legacy_kwargs(kwargs))
+
+    def exclude(self, *args, **kwargs):
+        return super().exclude(*args, **self._translate_legacy_kwargs(kwargs))
+
+    def get(self, *args, **kwargs):
+        return super().get(*args, **self._translate_legacy_kwargs(kwargs))
+
+
 class Dipendente(models.Model):
     indirizzi_anagrafici = GenericRelation(
         "anagrafica.AnagraficaIndirizzo",
@@ -118,19 +155,19 @@ class Dipendente(models.Model):
         "anagrafica.AnagraficaEmail",
         related_query_name="dipendenti",
     )
-    ruolo_anagrafico = models.CharField(
+    ruolo_aziendale = models.CharField(
         max_length=30,
-        choices=RuoloAnagraficoDipendente.choices,
-        default=RuoloAnagraficoDipendente.DIPENDENTE,
+        choices=RuoloAziendaleDipendente.choices,
+        default=RuoloAziendaleDipendente.DIPENDENTE,
         db_index=True,
     )
-    familiare_collegato = models.OneToOneField(
-        "anagrafica.Familiare",
+    persona_collegata = models.ForeignKey(
+        "anagrafica.Persona",
         on_delete=models.SET_NULL,
-        related_name="profilo_lavorativo",
+        related_name="profili_lavorativi",
         blank=True,
         null=True,
-        help_text="Collega un familiare esistente quando la stessa persona e anche dipendente o educatore.",
+        help_text="Anagrafica persona condivisa con familiari, educatori e dipendenti.",
     )
     classe_principale = models.ForeignKey(
         "scuola.Classe",
@@ -149,52 +186,28 @@ class Dipendente(models.Model):
         help_text="Gruppo classe o pluriclasse di riferimento per gli educatori.",
     )
     mansione = models.CharField(max_length=160, blank=True)
-    codice_dipendente = models.CharField(max_length=40, blank=True)
-    nome = models.CharField(max_length=120)
-    cognome = models.CharField(max_length=120)
-    codice_fiscale = models.CharField(max_length=16, blank=True)
-    sesso = models.CharField(max_length=1, choices=SessoDipendente.choices, blank=True)
-    data_nascita = models.DateField(blank=True, null=True)
-    luogo_nascita = models.CharField(max_length=120, blank=True)
-    nazionalita = models.CharField(max_length=80, blank=True)
-    email = models.EmailField(blank=True)
-    telefono = models.CharField(max_length=40, blank=True)
-    indirizzo = models.ForeignKey(
-        "anagrafica.Indirizzo",
-        on_delete=models.SET_NULL,
-        related_name="dipendenti_gestione_amministrativa",
-        blank=True,
-        null=True,
-    )
     iban = models.CharField(max_length=34, blank=True)
     stato = models.CharField(
         max_length=20,
         choices=StatoDipendente.choices,
         default=StatoDipendente.ATTIVO,
     )
-    data_assunzione = models.DateField(blank=True, null=True)
-    data_cessazione = models.DateField(blank=True, null=True)
     note = models.TextField(blank=True)
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
+    objects = DipendenteQuerySet.as_manager()
+
     class Meta:
         db_table = "gestione_amministrativa_dipendente"
-        ordering = ["cognome", "nome"]
+        ordering = ["persona_collegata__cognome", "persona_collegata__nome"]
         verbose_name = "Dipendente"
         verbose_name_plural = "Dipendenti"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["codice_dipendente"],
-                condition=~Q(codice_dipendente=""),
-                name="ga_dip_cod_unique",
-            ),
-            models.UniqueConstraint(
-                fields=["codice_fiscale"],
-                condition=~Q(codice_fiscale=""),
-                name="ga_dip_cf_unique",
-            ),
-        ]
+
+    def __init__(self, *args, **kwargs):
+        self._persona_pending_values = {}
+        self._persona_dirty_fields = set()
+        super().__init__(*args, **kwargs)
 
     @property
     def formatted_telefono(self):
@@ -209,7 +222,7 @@ class Dipendente(models.Model):
         link = _first_principal_link(self.indirizzi_anagrafici)
         if link and link.indirizzo_id:
             return link.indirizzo
-        return self.indirizzo
+        return self.persona_collegata.indirizzo_effettivo if self.persona_collegata_id else None
 
     @property
     def telefono_principale(self):
@@ -218,7 +231,7 @@ class Dipendente(models.Model):
         link = _first_principal_link(self.telefoni_anagrafici)
         if link and link.numero:
             return link.numero
-        return self.telefono
+        return self.persona_collegata.telefono_principale if self.persona_collegata_id else ""
 
     @property
     def email_principale(self):
@@ -227,17 +240,13 @@ class Dipendente(models.Model):
         link = _first_principal_link(self.email_anagrafiche)
         if link and link.email:
             return link.email
-        return self.email
+        return self.persona_collegata.email_principale if self.persona_collegata_id else ""
 
     def __str__(self):
         return self.nome_completo
 
     def clean(self):
         super().clean()
-        if self.data_assunzione and self.data_cessazione and self.data_cessazione < self.data_assunzione:
-            raise ValidationError({"data_cessazione": "La data di cessazione non puo' precedere l'assunzione."})
-        if self.codice_fiscale:
-            self.codice_fiscale = self.codice_fiscale.upper().strip()
         if self.iban:
             self.iban = self.iban.replace(" ", "").upper().strip()
         if not self.is_educatore:
@@ -248,9 +257,191 @@ class Dipendente(models.Model):
         if self.classe_principale_id and self.gruppo_classe_principale_id:
             raise ValidationError({"classe_principale": "Scegli una sola classe principale o una sola pluriclasse."})
 
+    def _ensure_persona_collegata(self):
+        from anagrafica.models import Persona
+
+        pending = getattr(self, "_persona_pending_values", {})
+        dirty_fields = getattr(self, "_persona_dirty_fields", set())
+
+        if self.persona_collegata_id:
+            if pending:
+                for field_name, value in pending.items():
+                    setattr(self.persona_collegata, field_name, value)
+                    dirty_fields.add(field_name)
+                pending.clear()
+            if dirty_fields:
+                self.persona_collegata.save(update_fields=sorted(dirty_fields) + ["data_aggiornamento"])
+                dirty_fields.clear()
+            return
+
+        persona_payload = {
+            "nome": pending.pop("nome", "") or "",
+            "cognome": pending.pop("cognome", "") or "",
+        }
+        for field_name in (
+            "indirizzo",
+            "sesso",
+            "data_nascita",
+            "luogo_nascita",
+            "nazione_nascita",
+            "luogo_nascita_custom",
+            "nazionalita",
+            "codice_fiscale",
+            "email",
+            "telefono",
+            "note",
+        ):
+            if field_name in pending:
+                persona_payload[field_name] = pending.pop(field_name)
+        self.persona_collegata = Persona.objects.create(**persona_payload)
+        dirty_fields.clear()
+
+    def save(self, *args, **kwargs):
+        self._ensure_persona_collegata()
+        super().save(*args, **kwargs)
+
     @property
     def nome_completo(self):
-        return f"{self.cognome} {self.nome}".strip()
+        return self.persona_collegata.nome_completo if self.persona_collegata_id else ""
+
+    @property
+    def nome(self):
+        return self.persona_collegata.nome if self.persona_collegata_id else ""
+
+    @nome.setter
+    def nome(self, value):
+        self._set_persona_field("nome", value or "")
+
+    @property
+    def cognome(self):
+        return self.persona_collegata.cognome if self.persona_collegata_id else ""
+
+    @cognome.setter
+    def cognome(self, value):
+        self._set_persona_field("cognome", value or "")
+
+    @property
+    def codice_fiscale(self):
+        return self.persona_collegata.codice_fiscale if self.persona_collegata_id else ""
+
+    @codice_fiscale.setter
+    def codice_fiscale(self, value):
+        self._set_persona_field("codice_fiscale", (value or "").upper().strip())
+
+    @property
+    def sesso(self):
+        return self.persona_collegata.sesso if self.persona_collegata_id else ""
+
+    @sesso.setter
+    def sesso(self, value):
+        self._set_persona_field("sesso", value or "")
+
+    @property
+    def data_nascita(self):
+        return self.persona_collegata.data_nascita if self.persona_collegata_id else None
+
+    @data_nascita.setter
+    def data_nascita(self, value):
+        self._set_persona_field("data_nascita", value)
+
+    @property
+    def luogo_nascita(self):
+        return self.persona_collegata.luogo_nascita_display if self.persona_collegata_id else ""
+
+    @luogo_nascita.setter
+    def luogo_nascita(self, value):
+        if hasattr(value, "pk"):
+            self._set_persona_field("luogo_nascita", value)
+            self._set_persona_field("luogo_nascita_custom", "")
+        else:
+            self._set_persona_field("luogo_nascita", None)
+            self._set_persona_field("luogo_nascita_custom", value or "")
+
+    @property
+    def nazionalita(self):
+        return self.persona_collegata.nazionalita_display if self.persona_collegata_id else ""
+
+    @nazionalita.setter
+    def nazionalita(self, value):
+        if hasattr(value, "pk"):
+            self._set_persona_field("nazionalita", value)
+            return
+        label = (value or "").strip()
+        if not label:
+            self._set_persona_field("nazionalita", None)
+            return
+        from anagrafica.models import Nazione
+
+        nazione = (
+            Nazione.objects.filter(nome_nazionalita__iexact=label, attiva=True).first()
+            or Nazione.objects.filter(nome__iexact=label, attiva=True).first()
+        )
+        self._set_persona_field("nazionalita", nazione)
+
+    @property
+    def email(self):
+        return self.persona_collegata.email if self.persona_collegata_id else ""
+
+    @email.setter
+    def email(self, value):
+        self._set_persona_field("email", value or "")
+
+    @property
+    def telefono(self):
+        return self.persona_collegata.telefono if self.persona_collegata_id else ""
+
+    @telefono.setter
+    def telefono(self, value):
+        self._set_persona_field("telefono", value or "")
+
+    @property
+    def indirizzo(self):
+        return self.persona_collegata.indirizzo if self.persona_collegata_id else None
+
+    @indirizzo.setter
+    def indirizzo(self, value):
+        self._set_persona_field("indirizzo", value)
+
+    @property
+    def familiare_collegato(self):
+        if not self.persona_collegata_id:
+            return None
+        try:
+            return self.persona_collegata.profilo_familiare
+        except Exception:
+            return None
+
+    @familiare_collegato.setter
+    def familiare_collegato(self, value):
+        self.persona_collegata = value.persona if value and value.persona_id else None
+
+    @property
+    def familiare_collegato_id(self):
+        familiare = self.familiare_collegato
+        return familiare.pk if familiare else None
+
+    @property
+    def codice_dipendente(self):
+        return ""
+
+    @codice_dipendente.setter
+    def codice_dipendente(self, value):
+        return None
+
+    @property
+    def ruolo_anagrafico(self):
+        return self.ruolo_aziendale
+
+    @ruolo_anagrafico.setter
+    def ruolo_anagrafico(self, value):
+        self.ruolo_aziendale = value
+
+    def _set_persona_field(self, field_name, value):
+        if not self.persona_collegata_id:
+            self._persona_pending_values[field_name] = value
+            return
+        setattr(self.persona_collegata, field_name, value)
+        self._persona_dirty_fields.add(field_name)
 
     @property
     def classe_principale_label(self):
@@ -270,17 +461,11 @@ class Dipendente(models.Model):
 
     @property
     def is_educatore(self):
-        return self.ruolo_anagrafico in {
-            RuoloAnagraficoDipendente.EDUCATORE,
-            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
-        }
+        return self.ruolo_aziendale == RuoloAziendaleDipendente.EDUCATORE
 
     @property
     def is_dipendente_operativo(self):
-        return self.ruolo_anagrafico in {
-            RuoloAnagraficoDipendente.DIPENDENTE,
-            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
-        }
+        return self.ruolo_aziendale == RuoloAziendaleDipendente.DIPENDENTE
 
     @property
     def contratto_corrente(self):
@@ -357,7 +542,7 @@ class ContrattoDipendente(models.Model):
 
     class Meta:
         db_table = "gestione_amministrativa_contratto_dipendente"
-        ordering = ["dipendente__cognome", "dipendente__nome", "-data_inizio"]
+        ordering = ["dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome", "-data_inizio"]
         verbose_name = "Contratto dipendente"
         verbose_name_plural = "Contratti dipendenti"
         indexes = [
@@ -690,7 +875,7 @@ class BustaPagaDipendente(models.Model):
 
     class Meta:
         db_table = "gestione_amministrativa_busta_paga"
-        ordering = ["-anno", "-mese", "dipendente__cognome", "dipendente__nome"]
+        ordering = ["-anno", "-mese", "dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome"]
         verbose_name = "Busta paga dipendente"
         verbose_name_plural = "Buste paga dipendenti"
         indexes = [
@@ -819,7 +1004,7 @@ class DocumentoDipendente(models.Model):
 
     class Meta:
         db_table = "gestione_amministrativa_documento_dipendente"
-        ordering = ["dipendente__cognome", "dipendente__nome", "-data_documento", "-id"]
+        ordering = ["dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome", "-data_documento", "-id"]
         verbose_name = "Documento dipendente"
         verbose_name_plural = "Documenti dipendenti"
         indexes = [

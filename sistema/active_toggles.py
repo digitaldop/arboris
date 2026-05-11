@@ -143,9 +143,24 @@ ACTIVE_TOGGLE_REGISTRY = {
     ),
 }
 
+ACTIVE_TOGGLE_FIELD_OVERRIDES = {
+    ("calendario.categoriacalendario", "visibile_dashboard"): ActiveToggleConfig(
+        "calendario.CategoriaCalendario",
+        "visibile_dashboard",
+        "calendario",
+        active_label="Mostra nella Dashboard",
+        inactive_label="Nascosta dalla Dashboard",
+    ),
+}
+
 
 def get_active_toggle_config(model_label, field_name=None):
     normalized_label = (model_label or "").lower()
+    if field_name:
+        override = ACTIVE_TOGGLE_FIELD_OVERRIDES.get((normalized_label, field_name))
+        if override:
+            return override
+
     config = ACTIVE_TOGGLE_REGISTRY.get(normalized_label)
     if not config:
         return None

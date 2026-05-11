@@ -535,7 +535,16 @@ def build_calendar_list_bundle(categoria_filter="", query="", user=None):
 def build_dashboard_calendar_data(today=None, user=None, week_page_size=3):
     today = today or timezone.localdate()
     agenda_bundle = build_calendar_agenda_bundle(user=user)
-    records = agenda_bundle["records"]
+    visible_dashboard_category_ids = {
+        categoria.pk
+        for categoria in agenda_bundle["categories"]
+        if getattr(categoria, "visibile_dashboard", True)
+    }
+    records = [
+        record
+        for record in agenda_bundle["records"]
+        if record.get("category_id") in visible_dashboard_category_ids
+    ]
 
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)

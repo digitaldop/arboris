@@ -18,6 +18,8 @@
             label: option.textContent.trim(),
             searchText: normalize(option.dataset.searchText || option.textContent),
             disabled: option.disabled,
+            priority: option.dataset.searchablePriority === "1",
+            group: option.dataset.searchableGroup || "",
         }));
     }
 
@@ -99,6 +101,7 @@
         }
 
         const placeholder = select.dataset.searchablePlaceholder || "Cerca...";
+        const minChars = Math.max(0, parseInt(select.dataset.searchableMinChars || "0", 10) || 0);
 
         const wrapper = document.createElement("div");
         wrapper.className = "searchable-select";
@@ -177,14 +180,26 @@
             getFilteredItems: function () {
                 const query = normalize(input.value);
                 const source = state.getItems().filter(item => item.value && !item.disabled);
+                const prioritySource = source.filter(item => item.priority);
 
                 if (!query) {
-                    return source;
+                    if (prioritySource.length) {
+                        return prioritySource;
+                    }
+                    return minChars ? [] : source;
+                }
+
+                if (minChars && query.length < minChars) {
+                    return prioritySource.filter(item => item.searchText.includes(query));
                 }
 
                 return source
                     .filter(item => item.searchText.includes(query))
                     .sort((first, second) => {
+                        if (first.priority !== second.priority) {
+                            return first.priority ? -1 : 1;
+                        }
+
                         const rankDelta = matchRank(first, query) - matchRank(second, query);
                         if (rankDelta !== 0) {
                             return rankDelta;
@@ -205,7 +220,10 @@
                 if (!filtered.length) {
                     const empty = document.createElement("div");
                     empty.className = "searchable-select-empty";
-                    empty.textContent = "Nessun risultato";
+                    const query = normalize(input.value);
+                    empty.textContent = minChars && query.length < minChars
+                        ? `Digita almeno ${minChars} caratteri`
+                        : "Nessun risultato";
                     dropdown.appendChild(empty);
                     state.updateDropdownPosition();
                     return;

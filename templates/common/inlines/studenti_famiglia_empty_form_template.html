@@ -1,3 +1,4 @@
+{% load static %}
 {# Template nuova riga studenti (clone JS). Richiede: studenti_formset, famiglia #}
 <template id="studenti-empty-form-template">
     <tr class="inline-form-row">
@@ -15,21 +16,42 @@
                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
                     <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
                     <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                    <button
+                        type="button"
+                        class="related-btn related-btn-family-address inline-family-address-apply"
+                        data-inline-address-action="apply-family-address"
+                        aria-label="Imposta indirizzo principale"
+                        title="Imposta indirizzo principale"
+                        data-floating-text="Imposta indirizzo principale"
+                    >
+                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                    </button>
                 </div>
             </div>
 
-            <div class="inline-address-help" data-role="address-help">
+            <button type="button" class="inline-address-help inline-address-help-action" data-role="address-help" data-inline-address-action="apply-family-address">
                 {% if famiglia and famiglia.indirizzo_principale %}
-                    Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                    Imposta l'indirizzo come {{ famiglia.indirizzo_principale.label_select }}
                 {% else %}
-                    Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                    Se lasci vuoto, non verra impostato un indirizzo principale
                 {% endif %}
-            </div>
+            </button>
         </td>
         <td class="inline-view-only-table-cell"></td>
         <td class="inline-view-only-table-cell"></td>
         <td class="inline-view-only-table-cell"></td>
-        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ studenti_formset.empty_form.attivo }}</td>
+        <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell{% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %} active-field-visible{% endif %}">
+            {% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %}
+                <label class="inline-active-switch active-field-visible" aria-label="Studente attivo">
+                    <span class="fondo-plan-switch-control">
+                        {{ studenti_formset.empty_form.attivo }}
+                        <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                    </span>
+                </label>
+            {% else %}
+                {{ studenti_formset.empty_form.attivo }}
+            {% endif %}
+        </td>
         <td class="inline-delete-cell mode-edit-only-table-cell">
             <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
         </td>

@@ -84,12 +84,35 @@
                         <span class="calendar-event-form-icon calendar-category-editor-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
                         <div class="calendar-category-editor-label">Stato</div>
                         <div class="calendar-event-field">
-                            <label class="calendar-event-check-field calendar-category-status-field" for="{{ form.attiva.id_for_label }}">
-                                {{ form.attiva }}
-                                <span>{{ form.attiva.label }}</span>
+                            <label class="calendar-event-check-field calendar-category-status-field calendar-category-switch-field" for="{{ form.attiva.id_for_label }}">
+                                <span class="fondo-plan-switch-copy">
+                                    <strong>{{ form.attiva.label }}</strong>
+                                </span>
+                                <span class="fondo-plan-switch-control">
+                                    {{ form.attiva }}
+                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                </span>
                                 {{ form.attiva.errors }}
                             </label>
                             <span class="help-text">La categoria sara disponibile nel calendario e negli elenchi.</span>
+                        </div>
+                    </div>
+
+                    <div class="calendar-category-editor-row">
+                        <span class="calendar-event-form-icon calendar-category-editor-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <div class="calendar-category-editor-label">Dashboard</div>
+                        <div class="calendar-event-field">
+                            <label class="calendar-event-check-field calendar-category-status-field calendar-category-switch-field" for="{{ form.visibile_dashboard.id_for_label }}">
+                                <span class="fondo-plan-switch-copy">
+                                    <strong>{{ form.visibile_dashboard.label }}</strong>
+                                </span>
+                                <span class="fondo-plan-switch-control">
+                                    {{ form.visibile_dashboard }}
+                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                </span>
+                                {{ form.visibile_dashboard.errors }}
+                            </label>
+                            <span class="help-text">Se disattivato, gli eventi restano nel calendario ma non compaiono nel widget dashboard.</span>
                         </div>
                     </div>
                 </div>

@@ -32,13 +32,14 @@ class CategoriaCalendarioForm(forms.ModelForm):
 
     class Meta:
         model = CategoriaCalendario
-        fields = ["nome", "colore", "ordine", "attiva"]
+        fields = ["nome", "colore", "ordine", "attiva", "visibile_dashboard"]
         widgets = {
             "colore": ColorInput(),
         }
         labels = {
             "nome": "Nome categoria",
             "colore": "Colore etichetta",
+            "visibile_dashboard": "Mostra nel widget dashboard",
         }
 
 

@@ -15,6 +15,7 @@ from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, SistemaUtentePermessi
 
 from .data import build_dashboard_calendar_data
+from .forms import CategoriaCalendarioForm
 from .models import CategoriaCalendario, EventoCalendario
 
 
@@ -96,6 +97,49 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertEqual(dashboard_data["week_page_size"], 3)
         self.assertEqual(dashboard_data["week_total_pages"], 3)
         self.assertEqual(len(dashboard_data["week_records"]), 7)
+
+    def test_dashboard_ignores_categories_hidden_from_widget(self):
+        visible_category = CategoriaCalendario.objects.create(
+            nome="Colloqui",
+            colore="#22c55e",
+            ordine=2,
+        )
+        hidden_category = CategoriaCalendario.objects.create(
+            nome="Promemoria interni",
+            colore="#f97316",
+            ordine=3,
+            visibile_dashboard=False,
+        )
+        EventoCalendario.objects.create(
+            titolo="Evento visibile",
+            categoria_evento=visible_category,
+            data_inizio=date(2026, 5, 5),
+            data_fine=date(2026, 5, 5),
+            intera_giornata=True,
+        )
+        EventoCalendario.objects.create(
+            titolo="Evento nascosto dashboard",
+            categoria_evento=hidden_category,
+            data_inizio=date(2026, 5, 5),
+            data_fine=date(2026, 5, 5),
+            intera_giornata=True,
+        )
+
+        dashboard_data = build_dashboard_calendar_data(
+            today=date(2026, 5, 5),
+            user=self.user,
+        )
+
+        week_titles = [record["title"] for record in dashboard_data["week_records"]]
+        self.assertIn("Evento visibile", week_titles)
+        self.assertNotIn("Evento nascosto dashboard", week_titles)
+        self.assertEqual(dashboard_data["count_week_records"], 1)
+
+    def test_category_form_exposes_dashboard_visibility_toggle(self):
+        form = CategoriaCalendarioForm()
+
+        self.assertIn("visibile_dashboard", form.fields)
+        self.assertEqual(form.fields["visibile_dashboard"].label, "Mostra nel widget dashboard")
 
     @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
     def test_document_deadline_links_to_owner_card_without_popup(self):
@@ -303,6 +347,8 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "Chiudi e aggiorna")
         self.assertContains(response, f'data-popup-url="{reverse("crea_categoria_calendario")}?popup=1"')
         self.assertContains(response, f'data-popup-url="{reverse("modifica_categoria_calendario", kwargs={"pk": self.category.pk})}?popup=1"')
+        self.assertContains(response, 'name="field" value="visibile_dashboard"')
+        self.assertContains(response, "Mostra nella Dashboard")
 
     def test_category_form_popup_uses_new_editor_layout(self):
         self.client.force_login(self.user)

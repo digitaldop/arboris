@@ -59,7 +59,16 @@ from economia.models import (
     TariffaScambioRetta,
     TariffaCondizioneIscrizione,
 )
-from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente, StatoDipendente
+from gestione_amministrativa.models import (
+    BustaPagaDipendente,
+    ContrattoDipendente,
+    Dipendente,
+    DocumentoDipendente,
+    RuoloAnagraficoDipendente,
+    StatoBustaPaga,
+    StatoDipendente,
+    TipoContrattoDipendente,
+)
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
@@ -980,7 +989,6 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertContains(response, "Studenti: Luca Rossi")
         self.assertContains(response, logical_url)
 
-    @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
     def test_modifica_famiglia_logica_renders_relation_group_without_legacy_family(self):
         user = User.objects.create_superuser(
             username="scheda-famiglia-logica@example.com",
@@ -1015,12 +1023,14 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.context["legacy_famiglia"])
+        self.assertNotIn("legacy_famiglia", response.context)
         self.assertEqual(response.context["count_studenti"], 1)
         self.assertEqual(response.context["count_familiari"], 1)
         self.assertContains(response, "Famiglia Bianchi")
         self.assertContains(response, "Anna Bianchi")
         self.assertContains(response, "Paolo Bianchi")
+        self.assertNotContains(response, "Informazioni di sistema")
+        self.assertNotContains(response, "data-document-card-action")
 
     @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
     def test_scheda_studente_links_to_logical_family(self):
@@ -1066,6 +1076,214 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, logical_url)
         self.assertNotContains(response, reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+
+class FamiliareCurrentDetailViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="familiare-current-detail@example.com",
+            email="familiare-current-detail@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.regione = Regione.objects.create(nome="Emilia-Romagna", ordine=1, attiva=True)
+        self.provincia = Provincia.objects.create(
+            sigla="BO",
+            nome="Bologna",
+            regione=self.regione,
+            ordine=1,
+            attiva=True,
+        )
+        self.citta = Citta.objects.create(
+            nome="Bologna",
+            provincia=self.provincia,
+            codice_catastale="A944",
+            ordine=1,
+            attiva=True,
+        )
+        self.indirizzo_condiviso = Indirizzo.objects.create(
+            via="Via Comune",
+            numero_civico="10",
+            citta=self.citta,
+        )
+        self.indirizzo_secondario = Indirizzo.objects.create(
+            via="Via Secondaria",
+            numero_civico="5",
+            citta=self.citta,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.altra_relazione = RelazioneFamiliare.objects.create(relazione="Padre", ordine=2)
+        self.familiare = Familiare.objects.create(
+            relazione_familiare=self.relazione,
+            nome="Ada",
+            cognome="Rossi",
+            telefono="3331234567",
+            email="ada.rossi@example.com",
+            attivo=True,
+        )
+        self.parente = Familiare.objects.create(
+            relazione_familiare=self.altra_relazione,
+            nome="Mario",
+            cognome="Rossi",
+            indirizzo=self.indirizzo_condiviso,
+            attivo=True,
+        )
+        self.studente = Studente.objects.create(
+            nome="Luca",
+            cognome="Rossi",
+            indirizzo=self.indirizzo_condiviso,
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.familiare,
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.parente,
+            relazione_familiare=self.altra_relazione,
+            attivo=True,
+        )
+        self.tipo_contratto = TipoContrattoDipendente.objects.create(nome="Tempo indeterminato")
+        self.profilo = Dipendente.objects.create(
+            familiare_collegato=self.familiare,
+            ruolo_anagrafico=RuoloAnagraficoDipendente.EDUCATORE,
+            nome="Ada",
+            cognome="Rossi",
+            email="ada.rossi@example.com",
+            telefono="3331234567",
+            mansione="Coordinamento",
+            iban="IT60X0542811101000000123456",
+            stato=StatoDipendente.ATTIVO,
+        )
+        self.contratto = ContrattoDipendente.objects.create(
+            dipendente=self.profilo,
+            tipo_contratto=self.tipo_contratto,
+            descrizione="Contratto principale",
+            data_inizio=date(2026, 1, 1),
+            mansione="Coordinamento",
+            retribuzione_lorda_mensile=Decimal("1800.00"),
+            attivo=True,
+        )
+        self.busta = BustaPagaDipendente.objects.create(
+            dipendente=self.profilo,
+            contratto=self.contratto,
+            anno=2026,
+            mese=5,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_previsto=Decimal("1300.00"),
+            costo_azienda_previsto=Decimal("2200.00"),
+        )
+
+    def test_modifica_familiare_renders_work_profile_inline_with_tabs(self):
+        with TemporaryDirectory() as tmpdir:
+            with override_settings(MEDIA_ROOT=tmpdir):
+                self.busta.file_busta_paga = SimpleUploadedFile(
+                    "busta-maggio.pdf",
+                    b"pdf",
+                    content_type="application/pdf",
+                )
+                self.busta.save(update_fields=["file_busta_paga"])
+                DocumentoDipendente.objects.create(
+                    dipendente=self.profilo,
+                    busta_paga=self.busta,
+                    titolo="Allegato cedolino",
+                    file=SimpleUploadedFile(
+                        "allegato-cedolino.pdf",
+                        b"pdf",
+                        content_type="application/pdf",
+                    ),
+                )
+
+                response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="profilo-lavorativo-inline"')
+        self.assertContains(response, 'data-work-tab-target="tab-lavoro-generali"')
+        self.assertContains(response, 'data-work-tab-target="tab-lavoro-contratti"')
+        self.assertContains(response, 'data-work-tab-target="tab-lavoro-buste"')
+        self.assertContains(response, "Dati generali")
+        self.assertContains(response, "Educatore")
+        self.assertContains(response, "Coordinamento")
+        self.assertContains(response, "IT60X0542811101000000123456")
+        self.assertContains(response, "Contratto principale")
+        self.assertContains(response, reverse("crea_contratto_dipendente", kwargs={"dipendente_pk": self.profilo.pk}))
+        self.assertContains(response, reverse("modifica_contratto_dipendente", kwargs={"pk": self.contratto.pk}))
+        self.assertContains(response, reverse("elimina_contratto_dipendente", kwargs={"pk": self.contratto.pk}))
+        self.assertContains(response, "05/2026")
+        self.assertContains(response, "File busta paga")
+        self.assertContains(response, "Allegato cedolino")
+        self.assertContains(response, reverse("crea_busta_paga_dipendente"))
+        self.assertContains(response, reverse("modifica_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+        self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+
+    def test_modifica_familiare_renders_related_address_suggestions_and_card_sticky_menu(self):
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        suggestions = response.context["familiare_indirizzi_correlati"]
+        self.assertEqual(suggestions[0]["id"], str(self.indirizzo_condiviso.pk))
+        self.assertEqual(suggestions[0]["count"], 2)
+        self.assertContains(response, 'data-searchable-min-chars="3"')
+        self.assertContains(response, 'data-address-suggestion-apply')
+        self.assertContains(response, "Via Comune 10 - Bologna (2)")
+        self.assertContains(response, 'id="familiare-indirizzi-correlati"')
+        self.assertContains(response, 'id="relative-card-sticky-actions"')
+        self.assertContains(response, 'data-relative-card-sticky-cancel="1"')
+        self.assertContains(response, 'id="relative-card-sticky-cancel"')
+
+    def test_modifica_familiare_renders_current_and_future_student_enrollment_badges(self):
+        today = timezone.localdate()
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=today + timedelta(days=90),
+            data_fine=today + timedelta(days=450),
+            attivo=True,
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Iscritto", ordine=1, attiva=True)
+        condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Standard corrente",
+            numero_mensilita_default=10,
+        )
+        condizione_futura = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="Standard futuro",
+            numero_mensilita_default=10,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=anno_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_corrente,
+            data_iscrizione=anno_corrente.data_inizio,
+            data_fine_iscrizione=anno_corrente.data_fine,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=anno_futuro,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_futura,
+            data_iscrizione=today,
+            data_fine_iscrizione=anno_futuro.data_fine,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ISCRITTO 2025/2026")
+        self.assertContains(response, "PREISCRITTO 2026/2027")
+        self.assertNotContains(response, "NON ISCRITTO")
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
@@ -2100,9 +2318,12 @@ class FamiliareDetailViewTests(TestCase):
                 "convivente": "",
                 "referente_principale": "on",
                 "abilitato_scambio_retta": "",
-                "profilo_dipendente_attivo": "on",
+                "profilo_dipendente_attivo": "",
                 "profilo_educatore_attivo": "on",
                 "classe_principale_educatore": classe.pk,
+                "profilo_mansione": "Coordinamento didattico",
+                "profilo_iban": "IT60 X054 2811 1010 0000 0123 456",
+                "profilo_stato": StatoDipendente.ATTIVO,
                 "attivo": "on",
                 "note": "",
             },
@@ -2114,9 +2335,11 @@ class FamiliareDetailViewTests(TestCase):
             fetch_redirect_response=False,
         )
         profilo = Dipendente.objects.get(familiare_collegato=self.familiare)
-        self.assertEqual(profilo.ruolo_anagrafico, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE)
+        self.assertEqual(profilo.ruolo_anagrafico, RuoloAnagraficoDipendente.EDUCATORE)
         self.assertEqual(profilo.classe_principale, classe)
         self.assertEqual(profilo.stato, StatoDipendente.ATTIVO)
+        self.assertEqual(profilo.mansione, "Coordinamento didattico")
+        self.assertEqual(profilo.iban, "IT60X0542811101000000123456")
         self.assertEqual(profilo.nome, "Ada")
         self.assertEqual(profilo.cognome, "Rossi")
         self.assertEqual(profilo.email, "ada.rossi@example.com")
@@ -2124,7 +2347,7 @@ class FamiliareDetailViewTests(TestCase):
         detail_response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
         self.assertContains(detail_response, 'id="profilo-lavorativo-card"')
         self.assertContains(detail_response, "Profilo lavorativo")
-        self.assertContains(detail_response, "Educatore e dipendente")
+        self.assertContains(detail_response, "Educatore")
         self.assertContains(detail_response, "Prima A")
 
     def test_modifica_familiare_accetta_gruppo_classe_come_classe_principale_educatore(self):

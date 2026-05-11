@@ -269,7 +269,7 @@ def _set_studente_familiare_relation(studente, familiare, *, attivo=True):
             "relazione_familiare_id": familiare.relazione_familiare_id,
             "referente_principale": familiare.referente_principale,
             "convivente": familiare.convivente,
-            "attivo": attivo and familiare.attivo and studente.attivo,
+            "attivo": attivo and studente.attivo,
         },
     )[0]
 
@@ -336,7 +336,7 @@ def _address_owner_payload(indirizzo):
         )
 
     legacy_sources = [
-        ("Familiare", Familiare.objects.filter(indirizzo=indirizzo)),
+        ("Familiare", Familiare.objects.filter(persona__indirizzo=indirizzo)),
         ("Studente", Studente.objects.filter(indirizzo=indirizzo)),
     ]
     for tipo, queryset in legacy_sources:

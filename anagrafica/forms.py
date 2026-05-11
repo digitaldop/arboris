@@ -26,6 +26,7 @@ from .models import (
     Familiare, Studente, Documento, RelazioneFamiliare, TipoDocumento, Nazione,
     AnagraficaIndirizzo, AnagraficaTelefono, AnagraficaEmail,
     LabelIndirizzo, LabelTelefono, LabelEmail,
+    SESSO_CHOICES,
 )
 
 
@@ -466,6 +467,7 @@ def configure_indirizzo_choice_field(field, queryset=None):
     field.required = False
     field.label_from_instance = lambda obj: obj.label_select()
     make_searchable_select(field, "Cerca un indirizzo...")
+    field.widget.attrs["data-searchable-min-chars"] = "3"
 
 
 def nazione_choice_queryset():
@@ -611,6 +613,8 @@ class IndirizzoSearchMixin:
                     selected_label = selected.label_select()
         else:
             selected = self.initial.get(field_name) or getattr(self.instance, field_name, None)
+            if not selected:
+                selected = getattr(self.instance, "indirizzo_effettivo", None)
             if selected:
                 if hasattr(selected, "pk"):
                     selected_id = selected.pk
@@ -1038,6 +1042,49 @@ class FamigliaForm(forms.Form):
 
 #INIZIO FORMS PER I FAMILIARI
 class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelForm):
+    PERSONA_FORM_FIELDS = (
+        "indirizzo",
+        "nome",
+        "cognome",
+        "telefono",
+        "email",
+        "codice_fiscale",
+        "sesso",
+        "data_nascita",
+        "luogo_nascita",
+        "nazione_nascita",
+        "luogo_nascita_custom",
+        "nazionalita",
+        "attivo",
+        "note",
+    )
+
+    indirizzo = forms.ModelChoiceField(queryset=Indirizzo.objects.none(), required=False)
+    nome = forms.CharField(max_length=100)
+    cognome = forms.CharField(max_length=100)
+    telefono = forms.CharField(max_length=40, required=False)
+    email = forms.EmailField(required=False)
+    codice_fiscale = forms.CharField(max_length=16, required=False)
+    sesso = forms.ChoiceField(choices=[("", "---------")] + SESSO_CHOICES, required=False)
+    data_nascita = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=html5_date_input(),
+    )
+    luogo_nascita = forms.ModelChoiceField(queryset=Citta.objects.none(), required=False)
+    nazione_nascita = forms.ModelChoiceField(
+        queryset=Nazione.objects.none(),
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-nazione-hidden": "1"}),
+    )
+    luogo_nascita_custom = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"data-luogo-nascita-custom": "1"}),
+    )
+    nazionalita = forms.ModelChoiceField(queryset=Nazione.objects.none(), required=False)
+    attivo = forms.BooleanField(required=False)
+    note = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 4}))
+
     class Meta:
         model = Familiare
         fields = [
@@ -1060,16 +1107,21 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             "attivo",
             "note",
         ]
-        widgets = {
-            "data_nascita": html5_date_input(),
-            "note": forms.Textarea(attrs={"rows": 4}),
-        }
 
     def __init__(self, *args, **kwargs):
         shared_lookups = kwargs.pop("shared_lookups", None) or {}
         enable_work_profile_fields = kwargs.pop("enable_work_profile_fields", False)
         enable_direct_relations_field = kwargs.pop("enable_direct_relations_field", False)
         super().__init__(*args, **kwargs)
+
+        if getattr(self.instance, "pk", None) and not self.is_bound:
+            for field_name in self.PERSONA_FORM_FIELDS:
+                if field_name == "attivo":
+                    self.initial.setdefault(field_name, True)
+                    continue
+                value = getattr(self.instance, field_name, None)
+                if value is not None:
+                    self.initial.setdefault(field_name, value)
 
         if enable_work_profile_fields:
             self.setup_work_profile_fields()
@@ -1172,14 +1224,13 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             self.initial["studenti_collegati"] = list(selected_ids)
 
     def setup_work_profile_fields(self):
-        from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente
+        from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente, StatoDipendente
 
         profilo = None
         if getattr(self.instance, "pk", None):
-            try:
-                profilo = self.instance.profilo_lavorativo
-            except Dipendente.DoesNotExist:
-                profilo = None
+            persona_id = getattr(self.instance, "persona_id", None)
+            if persona_id:
+                profilo = Dipendente.objects.filter(persona_collegata_id=persona_id).first()
 
         self.fields["profilo_dipendente_attivo"] = forms.BooleanField(
             required=False,
@@ -1201,26 +1252,55 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             help_text="Visibile nella scheda dell'educatore e usata per mostrare studenti collegati o pluriclasse.",
         )
         make_searchable_select(self.fields["classe_principale_educatore"], "Cerca una classe o pluriclasse...")
+        self.fields["profilo_mansione"] = forms.CharField(
+            required=False,
+            label="Mansione",
+            help_text="Usata per i profili dipendente.",
+            max_length=160,
+            widget=forms.TextInput(attrs={"placeholder": "Es. Segreteria, cucina, amministrazione..."}),
+        )
+        self.fields["profilo_iban"] = forms.CharField(
+            required=False,
+            label="Dati di pagamento",
+            help_text="IBAN o riferimento utile per pagamenti e buste paga.",
+            max_length=34,
+            widget=forms.TextInput(attrs={"placeholder": "Es. IT60X0542811101000000123456"}),
+        )
+        self.fields["profilo_stato"] = forms.ChoiceField(
+            choices=StatoDipendente.choices,
+            required=False,
+            label="Stato lavorativo",
+        )
 
         if not profilo:
+            self.initial.setdefault("profilo_stato", StatoDipendente.ATTIVO)
             return
 
-        self.initial["profilo_dipendente_attivo"] = profilo.ruolo_anagrafico in {
-            RuoloAnagraficoDipendente.DIPENDENTE,
-            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
-        }
-        self.initial["profilo_educatore_attivo"] = profilo.ruolo_anagrafico in {
-            RuoloAnagraficoDipendente.EDUCATORE,
-            RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE,
-        }
+        self.initial["profilo_dipendente_attivo"] = profilo.ruolo_anagrafico == RuoloAnagraficoDipendente.DIPENDENTE
+        self.initial["profilo_educatore_attivo"] = profilo.ruolo_anagrafico == RuoloAnagraficoDipendente.EDUCATORE
         self.initial["classe_principale_educatore"] = classe_principale_reference_initial(profilo)
+        self.initial["profilo_mansione"] = profilo.mansione
+        self.initial["profilo_iban"] = profilo.iban
+        self.initial["profilo_stato"] = profilo.stato
 
     def clean(self):
-        return super().clean()
+        cleaned_data = super().clean()
+        if cleaned_data.get("profilo_dipendente_attivo") and cleaned_data.get("profilo_educatore_attivo"):
+            message = "Scegli Dipendente oppure Educatore: la stessa persona non puo avere entrambi i profili."
+            self.add_error("profilo_dipendente_attivo", message)
+            self.add_error("profilo_educatore_attivo", message)
+        return cleaned_data
 
     def save(self, commit=True):
-        familiare = super().save(commit=commit)
+        familiare = super().save(commit=False)
+        for field_name in self.PERSONA_FORM_FIELDS:
+            if field_name == "attivo" or field_name not in self.cleaned_data:
+                continue
+            setattr(familiare, field_name, self.cleaned_data.get(field_name))
+
         if commit:
+            familiare.save()
+            self.save_m2m()
             sync_principal_contacts(
                 familiare,
                 indirizzo=familiare.indirizzo,

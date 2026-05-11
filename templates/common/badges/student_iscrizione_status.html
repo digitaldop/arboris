@@ -1,11 +1,18 @@
-{% if studente.ha_iscrizione_attiva_corrente %}
+{% if studente.iscrizione_status_badges %}
+    {% for badge in studente.iscrizione_status_badges %}
+        <span
+            class="status-chip {{ badge.css_class }} student-enrollment-status"
+            title="{{ badge.title }}"
+        >{{ badge.label }}</span>
+    {% endfor %}
+{% elif studente.ha_iscrizione_attiva_corrente %}
     <span
         class="status-chip status-chip-success student-enrollment-status"
         title="Iscrizione attiva per l'anno scolastico corrente"
-    >Iscritto</span>
+    >ISCRITTO</span>
 {% else %}
     <span
         class="status-chip status-chip-danger student-enrollment-status"
         title="Nessuna iscrizione attiva per l'anno scolastico corrente"
-    >Non iscritto</span>
+    >NON ISCRITTO</span>
 {% endif %}

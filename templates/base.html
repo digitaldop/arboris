@@ -16,7 +16,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=261">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=264">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
     {% if role_theme %}
@@ -251,7 +251,7 @@
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-anagrafica-panel">
                                 <nav class="sidebar-nav sidebar-subnav">
-                                    <a href="{% url 'lista_famiglie' %}" class="{% if request.resolver_match.url_name == 'lista_famiglie' or request.resolver_match.url_name == 'crea_famiglia' or request.resolver_match.url_name == 'modifica_famiglia' or request.resolver_match.url_name == 'modifica_famiglia_logica' or request.resolver_match.url_name == 'stampa_famiglia' or request.resolver_match.url_name == 'stampa_famiglia_logica' or request.resolver_match.url_name == 'elimina_famiglia' %}active{% endif %}">
+                                    <a href="{% url 'lista_famiglie' %}" class="{% if request.resolver_match.url_name == 'lista_famiglie' or request.resolver_match.url_name == 'crea_famiglia' or request.resolver_match.url_name == 'modifica_famiglia_logica' or request.resolver_match.url_name == 'stampa_famiglia_logica' %}active{% endif %}">
                                         <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
                                         <span class="sidebar-link-text">Famiglie</span>
                                     </a>
@@ -1017,15 +1017,15 @@
     <script src="{% static 'js/core/long-wait-cursor.js' %}?v=10"></script>
     <script src="{% static 'js/core/collapsible.js' %}"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
-    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
+    <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=10"></script>
     <script src="{% static 'js/core/codice-fiscale.js' %}?v=5"></script>
     <script src="{% static 'js/core/person-rules.js' %}?v=3"></script>
-    <script src="{% static 'js/core/family-linked-address.js' %}?v=4"></script>
+    <script src="{% static 'js/core/family-linked-address.js' %}?v=5"></script>
     <script src="{% static 'js/core/browser-autofill.js' %}?v=1"></script>
     <script src="{% static 'js/core/document-type-autoselect.js' %}?v=1"></script>
     <script src="{% static 'js/core/live-list-search.js' %}?v=3"></script>
     <script src="{% static 'js/core/currency-fields.js' %}?v=2"></script>
-    <script src="{% static 'js/core/hide-active-fields.js' %}?v=1"></script>
+    <script src="{% static 'js/core/hide-active-fields.js' %}?v=2"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-contacts.js' %}?v=1"></script>

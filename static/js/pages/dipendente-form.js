@@ -99,7 +99,7 @@ window.ArborisDipendenteForm = (function () {
     }
 
     function initRoleDependentFields() {
-        const roleSelect = document.getElementById("id_ruolo_anagrafico");
+        const roleSelect = document.getElementById("id_ruolo_aziendale");
         if (!roleSelect) {
             return;
         }
@@ -109,8 +109,8 @@ window.ArborisDipendenteForm = (function () {
 
         const update = function () {
             const role = roleSelect.value || "";
-            const educatorEnabled = role === "educatore" || role === "educatore_dipendente";
-            const employeeEnabled = role === "dipendente" || role === "educatore_dipendente";
+            const educatorEnabled = role === "educatore";
+            const employeeEnabled = role === "dipendente";
             if (educatorField) {
                 educatorField.hidden = !educatorEnabled;
                 educatorField.classList.toggle("is-hidden", !educatorEnabled);
@@ -126,8 +126,8 @@ window.ArborisDipendenteForm = (function () {
     }
 
     function initFamiliareAutofill() {
-        const familiareSelect = document.getElementById("id_familiare_collegato");
-        if (!familiareSelect) {
+        const personaSelect = document.getElementById("id_persona_collegata");
+        if (!personaSelect) {
             return;
         }
 
@@ -145,7 +145,7 @@ window.ArborisDipendenteForm = (function () {
         ];
 
         const sync = function () {
-            const option = selectedOption(familiareSelect);
+            const option = selectedOption(personaSelect);
             const locked = Boolean(option && option.value);
 
             if (locked) {
@@ -185,7 +185,7 @@ window.ArborisDipendenteForm = (function () {
             });
         });
 
-        familiareSelect.addEventListener("change", sync);
+        personaSelect.addEventListener("change", sync);
         sync();
     }
 

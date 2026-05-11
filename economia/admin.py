@@ -118,8 +118,8 @@ class ScambioRettaAdmin(admin.ModelAdmin):
     )
     list_filter = ("anno_scolastico", "mese_riferimento", "approvata", "contabilizzata")
     search_fields = (
-        "familiare__cognome",
-        "familiare__nome",
+        "familiare__persona__cognome",
+        "familiare__persona__nome",
         "studente__cognome",
         "studente__nome",
         "descrizione",
@@ -140,8 +140,8 @@ class PrestazioneScambioRettaAdmin(admin.ModelAdmin):
     )
     list_filter = ("anno_scolastico", "data", "tariffa_scambio_retta")
     search_fields = (
-        "familiare__cognome",
-        "familiare__nome",
+        "familiare__persona__cognome",
+        "familiare__persona__nome",
         "studente__cognome",
         "studente__nome",
         "descrizione",

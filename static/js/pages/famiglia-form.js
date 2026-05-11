@@ -34,6 +34,7 @@ window.ArborisFamigliaForm = (function () {
         const familyCardPageLockMessage = "Salva, annulla o rimuovi la card corrente prima di continuare.";
         const cardStickyActionsId = "family-card-sticky-actions";
         const cardStickySpacerId = "family-card-sticky-spacer";
+        const canManageActiveFields = Boolean(config.canManageActiveFields);
 
         function normalizeTabId(tabId) {
             if (!tabId) {
@@ -632,12 +633,32 @@ window.ArborisFamigliaForm = (function () {
             }
         }
 
+        function getFamigliaIndirizzoPrincipaleId() {
+            const select = document.getElementById("id_indirizzo_principale");
+            if (select && select.value) {
+                return select.value;
+            }
+
+            const node = document.getElementById("famiglia-indirizzo-principale-id");
+            if (!node) return "";
+
+            try {
+                const value = JSON.parse(node.textContent);
+                return value ? String(value) : "";
+            } catch (e) {
+                return "";
+            }
+        }
+
         const famigliaInlineAddressConfig = {
             getFamilyAddressId: function () {
-                return document.getElementById("id_indirizzo_principale")?.value || "";
+                return getFamigliaIndirizzoPrincipaleId();
             },
             getFamilyAddressLabel: getFamigliaIndirizzoPrincipaleLabel,
-            emptyFamilyPrefix: "Ereditera: ",
+            selectedFamilyPrefix: "Indirizzo impostato come ",
+            emptyFamilyPrefix: "Imposta l'indirizzo come ",
+            emptyHelpText: "Nessun indirizzo principale disponibile",
+            wrapperSelector: ".inline-studente-address-cell, .inline-family-address-cell, .inline-family-editor-address, .family-student-editor-address-field",
         };
 
         const famigliaInlineAddressTrackingConfig = Object.assign({
@@ -654,6 +675,8 @@ window.ArborisFamigliaForm = (function () {
             surnameSelector: 'input[name$="-cognome"]',
             getFamilySurname: getFamigliaCognome,
             attivoSelector: 'input[type="checkbox"][name$="-attivo"]',
+            syncFamilyAddressAutomatically: false,
+            markInheritedWhenEmpty: false,
         }, famigliaInlineAddressConfig);
 
         function getFamigliaCognome() {
@@ -1707,16 +1730,38 @@ window.ArborisFamigliaForm = (function () {
             return document.querySelector("[data-document-card-list]");
         }
 
+        function getActiveVisualEditingCard(cardSelector, editorSelector, dataFlag) {
+            const cards = Array.from(document.querySelectorAll(cardSelector));
+            let activeCard = null;
+
+            cards.forEach(function (card) {
+                const hasEditor = Boolean(card.querySelector(editorSelector));
+                if (hasEditor && !activeCard) {
+                    activeCard = card;
+                    return;
+                }
+
+                if (!hasEditor) {
+                    card.classList.remove("is-card-editing");
+                    if (dataFlag) {
+                        delete card.dataset[dataFlag];
+                    }
+                }
+            });
+
+            return activeCard;
+        }
+
         function getActiveStudentEditingCard() {
-            return document.querySelector("[data-student-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-student-card].is-card-editing", ".family-student-card-editor", "studentCardEditing");
         }
 
         function getActiveRelativeEditingCard() {
-            return document.querySelector("[data-relative-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-relative-card].is-card-editing", ".family-relative-card-editor", "relativeCardEditing");
         }
 
         function getActiveDocumentEditingCard() {
-            return document.querySelector("[data-document-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-document-card].is-card-editing", ".family-document-card-editor", "documentCardEditing");
         }
 
         function isStudentCardEditing() {
@@ -1859,7 +1904,18 @@ window.ArborisFamigliaForm = (function () {
         }
 
         function getActiveFamilyGeneralEditingCard() {
-            return document.querySelector("[data-family-general-card].is-card-editing");
+            const card = document.querySelector("[data-family-general-card].is-card-editing");
+            if (!card) {
+                return null;
+            }
+
+            if (card.querySelector(".family-general-card-editor")) {
+                return card;
+            }
+
+            card.classList.remove("is-card-editing");
+            delete card.dataset.familyGeneralEditing;
+            return null;
         }
 
         function isFamilyGeneralCardEditing() {
@@ -2600,6 +2656,15 @@ window.ArborisFamigliaForm = (function () {
             field.classList.add("family-student-editor-address-field");
             relatedField.classList.add("family-card-editor-related-control", "family-student-editor-address-control");
             relatedField.querySelectorAll(".related-btn").forEach(function (button) {
+                if (button.classList.contains("related-btn-family-address")) {
+                    const actionLabel = "Imposta indirizzo principale";
+                    button.setAttribute("aria-label", actionLabel);
+                    button.setAttribute("title", actionLabel);
+                    button.dataset.floatingText = actionLabel;
+                    button.innerHTML = studentCardRelatedIconHtml("home");
+                    return;
+                }
+
                 const isAdd = button.classList.contains("related-btn-add");
                 const isEdit = button.classList.contains("related-btn-edit");
                 const actionLabel = isAdd ? "Nuovo indirizzo" : isEdit ? "Modifica indirizzo" : "Elimina indirizzo";
@@ -2619,6 +2684,10 @@ window.ArborisFamigliaForm = (function () {
         }
 
         function appendStudentActiveField(grid, row, editor) {
+            if (!canManageActiveFields) {
+                return;
+            }
+
             const activeInput = row ? row.querySelector('input[type="checkbox"][name$="-attivo"]') : null;
             if (!activeInput) {
                 return;
@@ -2626,14 +2695,30 @@ window.ArborisFamigliaForm = (function () {
 
             rememberStudentEditorNode(editor, activeInput);
             const field = document.createElement("div");
-            field.className = "family-student-editor-field family-student-editor-field-check";
+            field.className = "family-student-editor-field family-student-editor-field-check active-field-visible";
 
             const label = document.createElement("label");
-            label.className = "family-student-editor-check";
-            label.appendChild(activeInput);
-            const text = document.createElement("span");
+            label.className = "family-student-editor-check family-editor-switch family-editor-switch-inline active-field-visible";
+            if (activeInput.id) {
+                label.setAttribute("for", activeInput.id);
+            }
+
+            const copy = document.createElement("span");
+            copy.className = "family-editor-switch-copy";
+            const text = document.createElement("strong");
             text.textContent = "Attivo";
-            label.appendChild(text);
+            copy.appendChild(text);
+
+            const control = document.createElement("span");
+            control.className = "fondo-plan-switch-control";
+            const ui = document.createElement("span");
+            ui.className = "fondo-plan-switch-ui";
+            ui.setAttribute("aria-hidden", "true");
+            control.appendChild(activeInput);
+            control.appendChild(ui);
+
+            label.appendChild(copy);
+            label.appendChild(control);
 
             field.appendChild(label);
             grid.appendChild(field);
@@ -2740,6 +2825,8 @@ window.ArborisFamigliaForm = (function () {
             formTools.initSearchableSelects(editor);
             formTools.initCodiceFiscale(editor);
             wireInlineRelatedButtons(editor);
+            studentiInlineAddressDefaults.bindTracking(editor);
+            studentiInlineAddressDefaults.refreshCollectionHelp(editor);
             setStudentCardFieldsEnabled(editor);
             wireStudentCardActions(editor);
 
@@ -2908,12 +2995,69 @@ window.ArborisFamigliaForm = (function () {
             }
         }
 
+        function handleStudentCardAction(element, event) {
+            if (!element || (event && event.__arborisStudentCardActionHandled)) {
+                return;
+            }
+
+            const action = element.dataset.studentCardAction || "";
+
+            if (event) {
+                event.__arborisStudentCardActionHandled = true;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            const activeCard = getActiveStudentEditingCard();
+            const actionCard = element.closest("[data-student-card]");
+            const isCurrentCardAction = Boolean(activeCard && actionCard === activeCard);
+            if (
+                activeCard &&
+                (
+                    action === "add" ||
+                    (actionCard && !isCurrentCardAction) ||
+                    (!actionCard && action !== "cancel")
+                )
+            ) {
+                showStudentCardLockMessage(element);
+                return;
+            }
+
+            if (action === "add") {
+                addStudentCardFromView(element);
+            } else if (action === "edit") {
+                openStudentCardEditor(actionCard);
+            } else if (action === "cancel") {
+                cancelStudentCardEditor(element);
+            } else if (action === "remove") {
+                removeStudentCardEditor(element);
+            }
+        }
+
+        function bindStudentCardActionDelegation() {
+            const list = getStudentCardList();
+            if (!list || list.dataset.studentCardActionDelegateBound === "1") {
+                return;
+            }
+
+            list.dataset.studentCardActionDelegateBound = "1";
+            list.addEventListener("click", function (event) {
+                const element = event.target.closest("[data-student-card-action]");
+                if (!element || !list.contains(element)) {
+                    return;
+                }
+
+                handleStudentCardAction(element, event);
+            }, true);
+        }
+
         function wireStudentCardActions(root) {
             const container = root || document;
             if (!container || typeof container.querySelectorAll !== "function") {
                 return;
             }
 
+            bindStudentCardActionDelegation();
             container.querySelectorAll("[data-student-card-action]").forEach(function (element) {
                 if (element.dataset.studentCardActionBound === "1") {
                     return;
@@ -2921,35 +3065,7 @@ window.ArborisFamigliaForm = (function () {
 
                 element.dataset.studentCardActionBound = "1";
                 element.addEventListener("click", function (event) {
-                    const action = element.dataset.studentCardAction || "";
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    const activeCard = getActiveStudentEditingCard();
-                    const actionCard = element.closest("[data-student-card]");
-                    const isCurrentCardAction = Boolean(activeCard && actionCard === activeCard);
-                    if (
-                        activeCard &&
-                        (
-                            action === "add" ||
-                            (actionCard && !isCurrentCardAction) ||
-                            (!actionCard && action !== "cancel")
-                        )
-                    ) {
-                        showStudentCardLockMessage(element);
-                        return;
-                    }
-
-                    if (action === "add") {
-                        addStudentCardFromView(element);
-                    } else if (action === "edit") {
-                        openStudentCardEditor(element.closest("[data-student-card]"));
-                    } else if (action === "cancel") {
-                        cancelStudentCardEditor(element);
-                    } else if (action === "remove") {
-                        removeStudentCardEditor(element);
-                    }
+                    handleStudentCardAction(element, event);
                 });
             });
         }
@@ -3640,12 +3756,60 @@ window.ArborisFamigliaForm = (function () {
             window.location.href = popupUrl;
         }
 
+        function handleRelativeCardAction(element, event) {
+            if (!element || (event && event.__arborisRelativeCardActionHandled)) {
+                return;
+            }
+
+            const action = element.dataset.relativeCardAction || "";
+
+            if (event) {
+                event.__arborisRelativeCardActionHandled = true;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            const activeContext = getActiveFamilyCardEditContext();
+            if (activeContext && !isAllowedDuringFamilyCardEdit(element, activeContext)) {
+                showFamilyCardLockMessage(element, activeContext.message);
+                return;
+            }
+
+            if (action === "add") {
+                addRelativeCardFromView(element);
+            } else if (action === "edit") {
+                openRelativeCardEditor(element.closest("[data-relative-card]"));
+            } else if (action === "cancel") {
+                cancelRelativeCardEditor(element);
+            } else if (action === "remove") {
+                removeRelativeCardEditor(element);
+            }
+        }
+
+        function bindRelativeCardActionDelegation() {
+            const list = getRelativeCardList();
+            if (!list || list.dataset.relativeCardActionDelegateBound === "1") {
+                return;
+            }
+
+            list.dataset.relativeCardActionDelegateBound = "1";
+            list.addEventListener("click", function (event) {
+                const element = event.target.closest("[data-relative-card-action]");
+                if (!element || !list.contains(element)) {
+                    return;
+                }
+
+                handleRelativeCardAction(element, event);
+            }, true);
+        }
+
         function wireRelativeCardActions(root) {
             const container = root || document;
             if (!container || typeof container.querySelectorAll !== "function") {
                 return;
             }
 
+            bindRelativeCardActionDelegation();
             container.querySelectorAll("[data-relative-card-action]").forEach(function (element) {
                 if (element.dataset.relativeCardActionBound === "1") {
                     return;
@@ -3653,26 +3817,7 @@ window.ArborisFamigliaForm = (function () {
 
                 element.dataset.relativeCardActionBound = "1";
                 element.addEventListener("click", function (event) {
-                    const action = element.dataset.relativeCardAction || "";
-                    const activeContext = getActiveFamilyCardEditContext();
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    if (activeContext && !isAllowedDuringFamilyCardEdit(element, activeContext)) {
-                        showFamilyCardLockMessage(element, activeContext.message);
-                        return;
-                    }
-
-                    if (action === "add") {
-                        addRelativeCardFromView(element);
-                    } else if (action === "edit") {
-                        openRelativeCardEditor(element.closest("[data-relative-card]"));
-                    } else if (action === "cancel") {
-                        cancelRelativeCardEditor(element);
-                    } else if (action === "remove") {
-                        removeRelativeCardEditor(element);
-                    }
+                    handleRelativeCardAction(element, event);
                 });
             });
         }

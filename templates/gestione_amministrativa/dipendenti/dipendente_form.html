@@ -70,9 +70,9 @@
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
                                 </span>
                                 <div class="fondo-plan-field-body">
-                                    <label for="{{ form.ruolo_anagrafico.id_for_label }}">{{ form.ruolo_anagrafico.label }}</label>
-                                    {{ form.ruolo_anagrafico }}
-                                    {{ form.ruolo_anagrafico.errors }}
+                                    <label for="{{ form.ruolo_aziendale.id_for_label }}">{{ form.ruolo_aziendale.label }}</label>
+                                    {{ form.ruolo_aziendale }}
+                                    {{ form.ruolo_aziendale.errors }}
                                 </div>
                             </div>
 
@@ -81,12 +81,12 @@
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
                                 </span>
                                 <div class="fondo-plan-field-body">
-                                    <label for="{{ form.familiare_collegato.id_for_label }}">{{ form.familiare_collegato.label }}</label>
+                                    <label for="{{ form.persona_collegata.id_for_label }}">{{ form.persona_collegata.label }}</label>
                                     <div class="autocomplete-wrapper">
-                                        {{ form.familiare_collegato }}
+                                        {{ form.persona_collegata }}
                                     </div>
-                                    {{ form.familiare_collegato.errors }}
-                                    <p class="fondo-plan-help">Usalo quando la stessa persona e gia presente tra i familiari: evita duplicati anagrafici.</p>
+                                    {{ form.persona_collegata.errors }}
+                                    <p class="fondo-plan-help">Usalo quando la stessa persona e gia presente in anagrafica: evita duplicati.</p>
                                 </div>
                             </div>
 
@@ -271,19 +271,6 @@
                                 </div>
                             </div>
 
-                            <div class="fondo-plan-field">
-                                <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
-                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
-                                </span>
-                                <div class="fondo-plan-field-body">
-                                    <label for="{{ form.codice_dipendente.id_for_label }}">{{ form.codice_dipendente.label }}</label>
-                                    {{ form.codice_dipendente }}
-                                    {{ form.codice_dipendente.errors }}
-                                    {% if form.codice_dipendente.help_text %}
-                                        <p class="fondo-plan-help">{{ form.codice_dipendente.help_text }}</p>
-                                    {% endif %}
-                                </div>
-                            </div>
                         </div>
                     </section>
 
@@ -337,36 +324,6 @@
                                         </span>
                                     </div>
                                     {{ form.contratto.errors }}
-                                </div>
-                            </div>
-
-                            <div class="fondo-plan-field">
-                                <span class="fondo-plan-field-icon is-cyan" aria-hidden="true">
-                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
-                                </span>
-                                <div class="fondo-plan-field-body">
-                                    <label for="{{ form.data_assunzione.id_for_label }}">{{ form.data_assunzione.label }}</label>
-                                    {{ form.data_assunzione }}
-                                    {{ form.data_assunzione.errors }}
-                                </div>
-                            </div>
-
-                            <div class="fondo-plan-field">
-                                <span class="fondo-plan-field-icon is-rose" aria-hidden="true">
-                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
-                                </span>
-                                <div class="fondo-plan-field-body">
-                                    <span class="ga-dipendente-label-with-help">
-                                        <label for="{{ form.data_cessazione.id_for_label }}">{{ form.data_cessazione.label }}</label>
-                                        <button
-                                            type="button"
-                                            class="ga-dipendente-field-help"
-                                            aria-label="Informazioni data cessazione"
-                                            data-floating-text="Se ancora in essere, non compilare"
-                                        >?</button>
-                                    </span>
-                                    {{ form.data_cessazione }}
-                                    {{ form.data_cessazione.errors }}
                                 </div>
                             </div>
 

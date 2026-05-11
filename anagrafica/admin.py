@@ -6,6 +6,7 @@ from .models import (
     Nazione,
     CAP,
     RelazioneFamiliare,
+    Persona,
     TipoDocumento,
     Familiare,
     Studente,
@@ -169,6 +170,13 @@ class AnagraficaEmailAdmin(admin.ModelAdmin):
 #FINE ADMIN DEGLI INDIRIZZI
 
 
+@admin.register(Persona)
+class PersonaAdmin(admin.ModelAdmin):
+    list_display = ("cognome", "nome", "codice_fiscale", "telefono", "email")
+    search_fields = ("cognome", "nome", "codice_fiscale", "telefono", "email")
+    ordering = ("cognome", "nome")
+
+
 @admin.register(Familiare)
 class FamiliareAdmin(admin.ModelAdmin):
     list_display = (
@@ -180,26 +188,24 @@ class FamiliareAdmin(admin.ModelAdmin):
         "indirizzo",
         "referente_principale",
         "abilitato_scambio_retta",
-        "attivo",
     )
     list_filter = (
         "relazione_familiare",
         "convivente",
         "referente_principale",
         "abilitato_scambio_retta",
-        "attivo",
     )
     search_fields = (
-        "cognome",
-        "nome",
-        "telefono",
-        "email",
-        "codice_fiscale",
-        "luogo_nascita__nome",
-        "nazione_nascita__nome",
-        "luogo_nascita_custom",
+        "persona__cognome",
+        "persona__nome",
+        "persona__telefono",
+        "persona__email",
+        "persona__codice_fiscale",
+        "persona__luogo_nascita__nome",
+        "persona__nazione_nascita__nome",
+        "persona__luogo_nascita_custom",
     )
-    ordering = ("cognome", "nome")
+    ordering = ("persona__cognome", "persona__nome")
     inlines = [FamiliareStudenteInline, DocumentoFamiliareInline]
 
     fieldsets = (
@@ -207,34 +213,8 @@ class FamiliareAdmin(admin.ModelAdmin):
             "Dati principali",
             {
                 "fields": (
+                    "persona",
                     "relazione_familiare",
-                    "cognome",
-                    "nome",
-                    "attivo",
-                )
-            },
-        ),
-        (
-            "Contatti",
-            {
-                "fields": (
-                    "telefono",
-                    "email",
-                    "indirizzo",
-                )
-            },
-        ),
-        (
-            "Dati anagrafici",
-            {
-                "fields": (
-                    "codice_fiscale",
-                    "data_nascita",
-                    "sesso",
-                    "luogo_nascita",
-                    "nazione_nascita",
-                    "luogo_nascita_custom",
-                    "nazionalita",
                 )
             },
         ),
@@ -248,13 +228,6 @@ class FamiliareAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        (
-            "Note",
-            {
-                "fields": ("note",),
-                "classes": ("collapse",),
-            },
-        ),
     )
 
     #Questa funzione serve per visualizzare l'indirizzo effettivo del familiare, che può essere diverso da quello principale della famiglia, direttamente nella lista dei familiari nell'Admin
@@ -263,7 +236,7 @@ class FamiliareAdmin(admin.ModelAdmin):
         indirizzo = obj.indirizzo_effettivo
         return str(indirizzo) if indirizzo else "-"
     
-    autocomplete_fields = ("indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita")
+    autocomplete_fields = ("persona", "relazione_familiare")
 
 
 @admin.register(Studente)
@@ -338,11 +311,11 @@ class StudenteFamiliareAdmin(admin.ModelAdmin):
     search_fields = (
         "studente__cognome",
         "studente__nome",
-        "familiare__cognome",
-        "familiare__nome",
+        "familiare__persona__cognome",
+        "familiare__persona__nome",
     )
     autocomplete_fields = ("studente", "familiare", "relazione_familiare")
-    ordering = ("studente__cognome", "studente__nome", "familiare__cognome", "familiare__nome")
+    ordering = ("studente__cognome", "studente__nome", "familiare__persona__cognome", "familiare__persona__nome")
 
 #Visualizzazione del modulo indirizzo dalla Home dell'Admin
 '''@admin.register(Indirizzo)

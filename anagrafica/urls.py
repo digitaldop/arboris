@@ -25,9 +25,6 @@ urlpatterns = [
     path("famiglie/nuovo/", anagrafica_manage(views.crea_famiglia), name="crea_famiglia"),
     path("famiglie/logica/<str:key>/", anagrafica_edit(views.modifica_famiglia_logica), name="modifica_famiglia_logica"),
     path("famiglie/logica/<str:key>/stampa/", anagrafica_view(views.stampa_famiglia_logica), name="stampa_famiglia_logica"),
-    path("famiglie/<int:pk>/modifica/", anagrafica_edit(views.modifica_famiglia), name="modifica_famiglia"),
-    path("famiglie/<int:pk>/stampa/", anagrafica_view(views.stampa_famiglia), name="stampa_famiglia"),
-    path("famiglie/<int:pk>/elimina/", anagrafica_manage(views.elimina_famiglia), name="elimina_famiglia"),
 
     #URLS DELLE RELAZIONI FAMILIARI
     path("relazioni-familiari/nuovo/", anagrafica_manage(views.crea_relazione_familiare), name="crea_relazione_familiare"),

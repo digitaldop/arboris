@@ -4,15 +4,18 @@ from django.contrib import messages
 from django.db.models import Count, Q, Sum
 from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
+from anagrafica.contact_services import sync_principal_contacts
 from anagrafica.forms import (
     anagrafica_contact_formsets_are_valid,
     anagrafica_contact_formsets_have_errors,
     build_anagrafica_contact_formsets,
     save_anagrafica_contact_formsets,
 )
+from anagrafica.models import Familiare, Nazione, RelazioneFamiliare
+from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from economia.models import Iscrizione
 from sistema.models import SistemaImpostazioniGenerali
 from scuola.utils import resolve_default_anno_scolastico
@@ -69,8 +72,8 @@ def _current_period():
 
 def _ruoli_for_scope(scope):
     if scope == "educatori":
-        return [RuoloAnagraficoDipendente.EDUCATORE, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE]
-    return [RuoloAnagraficoDipendente.DIPENDENTE, RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE]
+        return [RuoloAnagraficoDipendente.EDUCATORE]
+    return [RuoloAnagraficoDipendente.DIPENDENTE]
 
 
 def _dipendente_labels(scope):
@@ -148,6 +151,91 @@ def _studenti_classe_principale(dipendente):
     return studenti
 
 
+def _relazione_lavorativa_default():
+    relazione = RelazioneFamiliare.objects.filter(relazione__iexact="Altro").first()
+    if relazione:
+        return relazione
+
+    relazione = RelazioneFamiliare.objects.order_by("ordine", "relazione").first()
+    if relazione:
+        return relazione
+
+    return RelazioneFamiliare.objects.create(relazione="Altro")
+
+
+def _nazione_from_label(label):
+    label = (label or "").strip()
+    if not label:
+        return None
+    return (
+        Nazione.objects.filter(Q(nome_nazionalita__iexact=label) | Q(nome__iexact=label))
+        .order_by("nome")
+        .first()
+    )
+
+
+def _find_familiare_for_profilo_lavorativo(dipendente):
+    if dipendente.persona_collegata_id:
+        try:
+            return dipendente.persona_collegata.profilo_familiare
+        except Familiare.DoesNotExist:
+            pass
+    codice_fiscale = (dipendente.codice_fiscale or "").strip()
+    if not codice_fiscale:
+        return None
+    return (
+        Familiare.objects.filter(codice_fiscale__iexact=codice_fiscale)
+        .select_related("persona", "persona__indirizzo", "persona__luogo_nascita", "persona__nazionalita")
+        .order_by("cognome", "nome", "pk")
+        .first()
+    )
+
+
+def _ensure_familiare_for_profilo_lavorativo(dipendente):
+    familiare = _find_familiare_for_profilo_lavorativo(dipendente)
+    if familiare:
+        if familiare.persona_id and dipendente.persona_collegata_id != familiare.persona_id:
+            dipendente.persona_collegata = familiare.persona
+            dipendente.save(update_fields=["persona_collegata"])
+        sync_principal_contacts(
+            dipendente,
+            indirizzo=dipendente.indirizzo,
+            telefono=dipendente.telefono,
+            email=dipendente.email,
+        )
+        return familiare
+
+    persona = dipendente.persona_collegata
+    familiare = Familiare.objects.create(
+        persona=persona,
+        relazione_familiare=_relazione_lavorativa_default(),
+        indirizzo=dipendente.indirizzo_effettivo,
+        nome=dipendente.nome,
+        cognome=dipendente.cognome,
+        telefono=dipendente.telefono_principale,
+        email=dipendente.email_principale,
+        codice_fiscale=(dipendente.codice_fiscale or "").upper().strip(),
+        sesso=dipendente.sesso,
+        data_nascita=dipendente.data_nascita,
+        luogo_nascita_custom=(dipendente.luogo_nascita or "")[:160],
+        nazionalita=_nazione_from_label(dipendente.nazionalita),
+        attivo=dipendente.stato == StatoDipendente.ATTIVO,
+        note=dipendente.note,
+    )
+    sync_principal_contacts(
+        familiare,
+        indirizzo=familiare.indirizzo,
+        telefono=familiare.telefono,
+        email=familiare.email,
+    )
+    return familiare
+
+
+def _redirect_to_scheda_anagrafica_lavorativa(dipendente):
+    familiare = _ensure_familiare_for_profilo_lavorativo(dipendente)
+    return redirect(f"{reverse('modifica_familiare', args=[familiare.pk])}#profilo-lavorativo-inline")
+
+
 def dashboard_gestione_amministrativa(request):
     redirect_response = redirect_if_dipendenti_simple(request)
     if redirect_response:
@@ -156,8 +244,8 @@ def dashboard_gestione_amministrativa(request):
     anno, mese = _current_period()
     buste_periodo = BustaPagaDipendente.objects.filter(anno=anno, mese=mese)
     ultimi_cedolini = (
-        BustaPagaDipendente.objects.select_related("dipendente", "contratto", "contratto__tipo_contratto")
-        .order_by("-anno", "-mese", "dipendente__cognome", "dipendente__nome")[:12]
+        BustaPagaDipendente.objects.select_related("dipendente__persona_collegata", "contratto", "contratto__tipo_contratto")
+        .order_by("-anno", "-mese", "dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome")[:12]
     )
     aggregates = buste_periodo.aggregate(
         costo_previsto=Sum("costo_azienda_previsto"),
@@ -202,24 +290,23 @@ def dashboard_gestione_amministrativa(request):
 def _lista_profili_lavoro(request, scope):
     labels = _dipendente_labels(scope)
     dipendenti = (
-        Dipendente.objects.select_related("classe_principale", "gruppo_classe_principale")
+        Dipendente.objects.select_related("persona_collegata", "classe_principale", "gruppo_classe_principale")
         .annotate(
             numero_contratti=Count("contratti", distinct=True),
             numero_buste=Count("buste_paga", distinct=True),
             numero_documenti=Count("documenti", distinct=True),
         )
-        .filter(ruolo_anagrafico__in=_ruoli_for_scope(scope))
+        .filter(ruolo_aziendale__in=_ruoli_for_scope(scope))
     )
     q = (request.GET.get("q") or "").strip()
     stato = (request.GET.get("stato") or "").strip()
     if q:
         dipendenti = dipendenti.filter(
-            Q(nome__icontains=q)
-            | Q(cognome__icontains=q)
-            | Q(codice_dipendente__icontains=q)
-            | Q(codice_fiscale__icontains=q)
-            | Q(email__icontains=q)
-            | Q(telefono__icontains=q)
+            Q(persona_collegata__nome__icontains=q)
+            | Q(persona_collegata__cognome__icontains=q)
+            | Q(persona_collegata__codice_fiscale__icontains=q)
+            | Q(persona_collegata__email__icontains=q)
+            | Q(persona_collegata__telefono__icontains=q)
         )
     if stato:
         dipendenti = dipendenti.filter(stato=stato)
@@ -284,7 +371,7 @@ def lista_contratti_dipendenti(request):
         {
             "contratti": contratti,
             "contratti_stats": contratti_stats,
-            "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
+            "dipendenti": Dipendente.objects.order_by("persona_collegata__cognome", "persona_collegata__nome"),
             "dipendente_id": dipendente_id,
             "attivo": attivo,
         },
@@ -332,9 +419,9 @@ def lista_simulazioni_costo_dipendenti(request):
         {
             "simulazioni": simulazioni,
             "simulazioni_stats": simulazioni_stats,
-            "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
+            "dipendenti": Dipendente.objects.order_by("persona_collegata__cognome", "persona_collegata__nome"),
             "contratti": ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto").order_by(
-                "dipendente__cognome", "dipendente__nome", "-data_inizio"
+                "dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome", "-data_inizio"
             ),
             "dipendente_id": dipendente_id,
             "contratto_id": contratto_id,
@@ -345,23 +432,23 @@ def lista_simulazioni_costo_dipendenti(request):
 
 def _crea_profilo_lavoro(request, scope):
     labels = _dipendente_labels(scope)
+    if request.method == "GET":
+        profilo = "educatore" if scope == "educatori" else "dipendente"
+        return redirect(f"{reverse('crea_familiare')}?profilo_lavorativo={profilo}")
+
     initial = {}
     if scope == "educatori":
-        initial["ruolo_anagrafico"] = RuoloAnagraficoDipendente.EDUCATORE
+        initial["ruolo_aziendale"] = RuoloAnagraficoDipendente.EDUCATORE
     else:
-        initial["ruolo_anagrafico"] = RuoloAnagraficoDipendente.DIPENDENTE
+        initial["ruolo_aziendale"] = RuoloAnagraficoDipendente.DIPENDENTE
 
-    if request.method == "POST":
-        form = DipendenteForm(request.POST, initial=initial)
-        contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
-        if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
-            dipendente = form.save()
-            save_anagrafica_contact_formsets(dipendente, contact_formsets)
-            messages.success(request, f"{labels['singular_cap']} creato correttamente.")
-            return redirect(labels["detail_url"], pk=dipendente.pk)
-    else:
-        form = DipendenteForm(initial=initial)
-        contact_formsets = build_anagrafica_contact_formsets()
+    form = DipendenteForm(request.POST, initial=initial)
+    contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
+    if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
+        dipendente = form.save()
+        save_anagrafica_contact_formsets(dipendente, contact_formsets)
+        messages.success(request, f"{labels['singular_cap']} creato correttamente.")
+        return _redirect_to_scheda_anagrafica_lavorativa(dipendente)
 
     return render(
         request,
@@ -394,17 +481,16 @@ def _modifica_profilo_lavoro(request, pk, scope=None):
     if scope is None:
         scope = "educatori" if dipendente.is_educatore and not dipendente.is_dipendente_operativo else "dipendenti"
     labels = _dipendente_labels(scope)
-    if request.method == "POST":
-        form = DipendenteForm(request.POST, instance=dipendente)
-        contact_formsets = build_anagrafica_contact_formsets(data=request.POST, instance=dipendente)
-        if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
-            form.save()
-            save_anagrafica_contact_formsets(dipendente, contact_formsets)
-            messages.success(request, f"{labels['singular_cap']} aggiornato correttamente.")
-            return redirect(labels["detail_url"], pk=dipendente.pk)
-    else:
-        form = DipendenteForm(instance=dipendente)
-        contact_formsets = build_anagrafica_contact_formsets(instance=dipendente)
+    if request.method != "POST":
+        return _redirect_to_scheda_anagrafica_lavorativa(dipendente)
+
+    form = DipendenteForm(request.POST, instance=dipendente)
+    contact_formsets = build_anagrafica_contact_formsets(data=request.POST, instance=dipendente)
+    if form.is_valid() and anagrafica_contact_formsets_are_valid(contact_formsets):
+        dipendente = form.save()
+        save_anagrafica_contact_formsets(dipendente, contact_formsets)
+        messages.success(request, f"{labels['singular_cap']} aggiornato correttamente.")
+        return _redirect_to_scheda_anagrafica_lavorativa(dipendente)
 
     contratti = dipendente.contratti.all()
     buste_paga = dipendente.buste_paga.select_related("contratto").order_by("-anno", "-mese")[:12]
@@ -867,7 +953,7 @@ def lista_buste_paga_dipendenti(request):
             "anno": anno,
             "mese": mese,
             "dipendente_id": dipendente_id,
-            "dipendenti": Dipendente.objects.order_by("cognome", "nome"),
+            "dipendenti": Dipendente.objects.order_by("persona_collegata__cognome", "persona_collegata__nome"),
         },
     )
 

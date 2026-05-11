@@ -1,6 +1,6 @@
 import mimetypes
 import unicodedata
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -26,7 +26,6 @@ from .forms import (
     LogicalFamiliareFormSet,
     LogicalStudenteFormSet,
     StudenteFormSet,
-    DocumentoFamigliaFormSet,
     DocumentoFamiliareFormSet,
     StudenteDirectFamiliariForm,
     StudenteStandaloneForm,
@@ -66,7 +65,7 @@ from sistema.models import (
     SistemaOperazioneCronologia,
 )
 from sistema.permissions import user_has_module_permission
-from sistema.terminology import get_student_terminology
+from sistema.terminology import get_educator_terminology, get_student_terminology
 
 from .contact_services import address_duplicate_candidates, set_familiare_studenti, set_studente_familiari
 from .family_logic import (
@@ -662,6 +661,25 @@ def annotate_studenti_current_iscrizione_status(queryset, today=None):
     )
 
 
+def _school_year_label(anno_scolastico):
+    if not anno_scolastico:
+        return ""
+    return anno_scolastico.nome_anno_scolastico or str(anno_scolastico)
+
+
+def _is_current_school_year(anno_scolastico, today):
+    return bool(
+        anno_scolastico
+        and anno_scolastico.data_inizio
+        and anno_scolastico.data_fine
+        and anno_scolastico.data_inizio <= today <= anno_scolastico.data_fine
+    )
+
+
+def _is_future_school_year(anno_scolastico, today):
+    return bool(anno_scolastico and anno_scolastico.data_inizio and anno_scolastico.data_inizio > today)
+
+
 def current_iscrizione_class_display(iscrizione):
     classe_label = str(iscrizione.classe) if iscrizione and iscrizione.classe_id else ""
     if iscrizione and iscrizione.gruppo_classe_id:
@@ -691,28 +709,61 @@ def decorate_studenti_current_enrollment_labels(student_instances, today=None):
     for studente in student_instances:
         studente.classe_corrente_famiglia_tipo = ""
         studente.classe_corrente_famiglia_label = ""
+        studente.ha_iscrizione_attiva_corrente = False
+        studente.iscrizione_status_badges = []
 
     student_ids = [studente.pk for studente in student_instances]
     if not student_ids:
         return
 
-    iscrizioni_correnti = (
+    iscrizioni_attive = (
         Iscrizione.objects
         .filter(
             studente_id__in=student_ids,
             attiva=True,
-            anno_scolastico__data_inizio__lte=today,
-            anno_scolastico__data_fine__gte=today,
         )
-        .select_related("classe", "gruppo_classe")
-        .order_by("studente_id", "-data_iscrizione", "-id")
+        .filter(
+            Q(anno_scolastico__data_inizio__lte=today, anno_scolastico__data_fine__gte=today)
+            | Q(anno_scolastico__data_inizio__gt=today)
+        )
+        .select_related("anno_scolastico", "classe", "gruppo_classe")
+        .order_by("studente_id", "anno_scolastico__data_inizio", "id")
     )
 
+    student_map = {studente.pk: studente for studente in student_instances}
     labels_by_student = {}
-    for iscrizione in iscrizioni_correnti:
-        tipo, label = current_iscrizione_class_display(iscrizione)
-        if label and iscrizione.studente_id not in labels_by_student:
-            labels_by_student[iscrizione.studente_id] = (tipo, label)
+    badges_seen = defaultdict(set)
+    for iscrizione in iscrizioni_attive:
+        studente = student_map.get(iscrizione.studente_id)
+        if studente is None:
+            continue
+
+        anno = iscrizione.anno_scolastico
+        anno_label = _school_year_label(anno)
+        if _is_current_school_year(anno, today):
+            studente.ha_iscrizione_attiva_corrente = True
+            tipo, label = current_iscrizione_class_display(iscrizione)
+            if label and iscrizione.studente_id not in labels_by_student:
+                labels_by_student[iscrizione.studente_id] = (tipo, label)
+            badge = {
+                "label": f"ISCRITTO {anno_label}" if anno_label else "ISCRITTO",
+                "css_class": "status-chip-success",
+                "title": "Iscrizione attiva per l'anno scolastico corrente",
+            }
+        elif _is_future_school_year(anno, today):
+            badge = {
+                "label": f"PREISCRITTO {anno_label}" if anno_label else "PREISCRITTO",
+                "css_class": "status-chip-warning",
+                "title": "Preiscrizione attiva per un anno scolastico futuro",
+            }
+        else:
+            continue
+
+        badge_key = (badge["label"], badge["css_class"])
+        if badge_key in badges_seen[iscrizione.studente_id]:
+            continue
+        badges_seen[iscrizione.studente_id].add(badge_key)
+        studente.iscrizione_status_badges.append(badge)
 
     for studente in student_instances:
         tipo, label = labels_by_student.get(studente.pk, ("", ""))
@@ -728,10 +779,11 @@ def active_student_relative_prefetch(to_attr="relazioni_familiari_attive_prefetc
             .select_related(
                 "familiare",
                 "familiare__relazione_familiare",
-                "familiare__indirizzo",
-                "familiare__indirizzo__citta",
+                "familiare__persona",
+                "familiare__persona__indirizzo",
+                "familiare__persona__indirizzo__citta",
             )
-            .order_by("familiare__cognome", "familiare__nome", "familiare_id")
+            .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
         ),
         to_attr=to_attr,
     )
@@ -742,7 +794,14 @@ def active_relative_student_prefetch(to_attr="relazioni_studenti_attive_prefetch
         "relazioni_studenti",
         queryset=(
             StudenteFamiliare.objects.filter(attivo=True)
-            .select_related("studente", "studente__luogo_nascita", "studente__luogo_nascita__provincia")
+            .select_related(
+                "studente",
+                "studente__indirizzo",
+                "studente__indirizzo__citta",
+                "studente__indirizzo__provincia",
+                "studente__luogo_nascita",
+                "studente__luogo_nascita__provincia",
+            )
             .order_by("studente__cognome", "studente__nome", "studente_id")
         ),
         to_attr=to_attr,
@@ -771,10 +830,11 @@ def decorate_studenti_direct_relation_labels(studenti):
                 .select_related(
                     "familiare",
                     "familiare__relazione_familiare",
-                    "familiare__indirizzo",
-                    "familiare__indirizzo__citta",
+                    "familiare__persona",
+                    "familiare__persona__indirizzo",
+                    "familiare__persona__indirizzo__citta",
                 )
-                .order_by("familiare__cognome", "familiare__nome", "familiare_id")
+                .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
             )
 
         labels = []
@@ -851,10 +911,11 @@ def direct_relative_peers_for_student_relations(familiare, relazioni_studenti):
         .select_related(
             "familiare",
             "familiare__relazione_familiare",
-            "familiare__indirizzo",
-            "familiare__indirizzo__citta",
+            "familiare__persona",
+            "familiare__persona__indirizzo",
+            "familiare__persona__indirizzo__citta",
         )
-        .order_by("familiare__cognome", "familiare__nome", "familiare_id")
+        .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
     )
 
     familiari = []
@@ -867,18 +928,96 @@ def direct_relative_peers_for_student_relations(familiare, relazioni_studenti):
     return familiari
 
 
-def famiglia_documenti_inline_queryset(famiglia=None):
-    if not famiglia:
-        return Documento.objects.none()
+def build_related_address_suggestions(people):
+    addresses = {}
+    counts = Counter()
+    sources = defaultdict(list)
 
-    return Documento.objects.none()
+    for person, person_type in people or []:
+        if not person:
+            continue
+        address = getattr(person, "indirizzo_effettivo", None)
+        if not address or not getattr(address, "pk", None):
+            continue
+        address_id = str(address.pk)
+        addresses[address_id] = address
+        counts[address_id] += 1
+        person_label = _person_name(person)
+        if person_type and person_label:
+            sources[address_id].append(f"{person_type}: {person_label}")
+        elif person_label:
+            sources[address_id].append(person_label)
+
+    suggestions = []
+    for address_id, address in addresses.items():
+        source_labels = sources[address_id]
+        suggestions.append(
+            {
+                "id": address_id,
+                "label": address.label_select(),
+                "label_full": address.label_full(),
+                "count": counts[address_id],
+                "sources": source_labels[:4],
+                "sources_label": _join_limited_labels(source_labels, limit=3),
+            }
+        )
+
+    return sorted(suggestions, key=lambda item: (-item["count"], item["label"].casefold(), item["id"]))
 
 
-def build_familiari_formset(*, data=None, instance=None, prefix="familiari", logical=False):
+def build_familiare_address_suggestions(familiare, relazioni_studenti, parenti_collegati):
+    people = []
+    for relazione in relazioni_studenti or []:
+        people.append((getattr(relazione, "studente", None), "Studente"))
+    for parente in parenti_collegati or []:
+        if not familiare or getattr(parente, "pk", None) != getattr(familiare, "pk", None):
+            people.append((parente, "Familiare"))
+    return build_related_address_suggestions(people)
+
+
+def ordered_queryset_from_ids(model, ids, *, select_related_fields=()):
+    ordered_ids = []
+    seen = set()
+    for item_id in ids or []:
+        if not item_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        ordered_ids.append(item_id)
+
+    if not ordered_ids:
+        return model.objects.none()
+
+    preserved_order = Case(
+        *[When(pk=item_id, then=index) for index, item_id in enumerate(ordered_ids)],
+        output_field=IntegerField(),
+    )
+    queryset = model.objects.filter(pk__in=ordered_ids)
+    if select_related_fields:
+        queryset = queryset.select_related(*select_related_fields)
+    return queryset.order_by(preserved_order)
+
+
+def ensure_direct_student_family_relation(studente, familiare):
+    if not getattr(studente, "pk", None) or not getattr(familiare, "pk", None):
+        return
+
+    StudenteFamiliare.objects.update_or_create(
+        studente=studente,
+        familiare=familiare,
+        defaults={
+            "relazione_familiare_id": familiare.relazione_familiare_id,
+            "referente_principale": familiare.referente_principale,
+            "convivente": familiare.convivente,
+            "attivo": bool(studente.attivo),
+        },
+    )
+
+
+def build_familiari_formset(*, data=None, instance=None, prefix="familiari", logical=False, queryset=None):
     if logical:
         kwargs = {
             "prefix": prefix,
-            "queryset": famiglia_familiari_inline_queryset(instance),
+            "queryset": queryset if queryset is not None else famiglia_familiari_inline_queryset(instance),
         }
         if data is not None:
             kwargs["data"] = data
@@ -886,7 +1025,7 @@ def build_familiari_formset(*, data=None, instance=None, prefix="familiari", log
 
     kwargs = {
         "prefix": prefix,
-        "queryset": famiglia_familiari_inline_queryset(instance),
+        "queryset": queryset if queryset is not None else famiglia_familiari_inline_queryset(instance),
     }
     if data is not None:
         kwargs["data"] = data
@@ -895,11 +1034,11 @@ def build_familiari_formset(*, data=None, instance=None, prefix="familiari", log
     return FamiliareFormSet(**kwargs)
 
 
-def build_studenti_formset(*, data=None, instance=None, prefix="studenti", logical=False):
+def build_studenti_formset(*, data=None, instance=None, prefix="studenti", logical=False, queryset=None):
     if logical:
         kwargs = {
             "prefix": prefix,
-            "queryset": famiglia_studenti_inline_queryset(instance),
+            "queryset": queryset if queryset is not None else famiglia_studenti_inline_queryset(instance),
         }
         if data is not None:
             kwargs["data"] = data
@@ -907,27 +1046,13 @@ def build_studenti_formset(*, data=None, instance=None, prefix="studenti", logic
 
     kwargs = {
         "prefix": prefix,
-        "queryset": famiglia_studenti_inline_queryset(instance),
+        "queryset": queryset if queryset is not None else famiglia_studenti_inline_queryset(instance),
     }
     if data is not None:
         kwargs["data"] = data
     if instance is not None:
         kwargs["instance"] = instance
     return StudenteFormSet(**kwargs)
-
-
-def build_documenti_famiglia_formset(*, data=None, files=None, instance=None, prefix="documenti"):
-    kwargs = {
-        "prefix": prefix,
-        "queryset": famiglia_documenti_inline_queryset(instance),
-    }
-    if data is not None:
-        kwargs["data"] = data
-    if files is not None:
-        kwargs["files"] = files
-    if instance is not None:
-        kwargs["instance"] = instance
-    return DocumentoFamigliaFormSet(**kwargs)
 
 
 def studente_iscrizioni_inline_queryset(studente=None):
@@ -2005,7 +2130,9 @@ def get_indirizzo_usage(indirizzo):
     ]
     familiari = [
         f"{cognome} {nome}".strip()
-        for cognome, nome in indirizzo.familiari.order_by("cognome", "nome").values_list("cognome", "nome")
+        for cognome, nome in indirizzo.persone.filter(profilo_familiare__isnull=False)
+        .order_by("cognome", "nome")
+        .values_list("cognome", "nome")
     ]
     scuole_legali = list(
         indirizzo.scuole_sede_legale.order_by("nome_scuola").values_list("nome_scuola", flat=True)
@@ -2736,10 +2863,6 @@ def crea_famiglia(request):
     return redirect("lista_famiglie")
 
 
-def modifica_famiglia(request, pk):
-    raise Http404("Le famiglie legacy non sono piu modificabili.")
-
-
 def modifica_famiglia_logica(request, key):
     logical_snapshot = resolve_logical_family_snapshot(key)
     if logical_snapshot is None:
@@ -2750,7 +2873,6 @@ def modifica_famiglia_logica(request, key):
 def _render_famiglia_logica(request, logical_snapshot):
     allowed_inline_targets = {"familiari", "studenti", "documenti"}
     famiglia = logical_snapshot
-    legacy_famiglia = logical_snapshot.legacy_family
     redirect_key = logical_snapshot.logical_key
     edit_scope = "full" if request.GET.get("edit") == "1" else "view"
     inline_target = "studenti"
@@ -2758,7 +2880,6 @@ def _render_famiglia_logica(request, logical_snapshot):
     prefer_initial_active_tab = False
     familiari_formset = None
     studenti_formset = None
-    documenti_formset = None
 
     if request.method == "POST" and request.POST.get("_note_popup") == "1":
         messages.info(
@@ -2785,21 +2906,11 @@ def _render_famiglia_logica(request, logical_snapshot):
             if inline_target == "studenti"
             else None
         )
-        documenti_formset = (
-            build_documenti_famiglia_formset(
-                data=request.POST,
-                files=request.FILES,
-                instance=legacy_famiglia,
-                prefix="documenti",
-            )
-            if inline_target == "documenti"
-            else None
-        )
 
         form_is_valid = True
         familiari_is_valid = familiari_formset.is_valid() if inline_target == "familiari" else True
         studenti_is_valid = studenti_formset.is_valid() if inline_target == "studenti" else True
-        documenti_is_valid = documenti_formset.is_valid() if inline_target == "documenti" else True
+        documenti_is_valid = True
 
         if form_is_valid and familiari_is_valid and studenti_is_valid and documenti_is_valid:
             try:
@@ -2841,23 +2952,20 @@ def _render_famiglia_logica(request, logical_snapshot):
             familiari_formset = build_familiari_formset(instance=logical_snapshot, prefix="familiari", logical=True)
         if studenti_formset is None:
             studenti_formset = build_studenti_formset(instance=logical_snapshot, prefix="studenti", logical=True)
-        if documenti_formset is None:
-            documenti_formset = build_documenti_famiglia_formset(instance=legacy_famiglia, prefix="documenti")
     else:
         active_inline_tab = resolve_active_inline_tab(request, allowed_inline_targets, "studenti")
         prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_inline_targets)
         form = build_famiglia_logica_form(logical_snapshot)
         familiari_formset = build_familiari_formset(instance=logical_snapshot, prefix="familiari", logical=True)
         studenti_formset = build_studenti_formset(instance=logical_snapshot, prefix="studenti", logical=True)
-        documenti_formset = build_documenti_famiglia_formset(instance=legacy_famiglia, prefix="documenti")
 
     today = timezone.localdate()
 
     documenti_familiari = list(
         Documento.objects
         .filter(familiare_id__in=logical_snapshot.familiare_ids)
-        .select_related("familiare", "tipo_documento")
-        .order_by("familiare__cognome", "familiare__nome", "-data_caricamento", "-id")
+        .select_related("familiare", "familiare__persona", "tipo_documento")
+        .order_by("familiare__persona__cognome", "familiare__persona__nome", "-data_caricamento", "-id")
     )
 
     documenti_studenti = list(
@@ -2891,18 +2999,13 @@ def _render_famiglia_logica(request, logical_snapshot):
         famiglia_documenti_counts["totale"] or 0
     )
     decorate_studenti_formset_current_enrollment_labels(studenti_formset, today)
-    famiglia_creata_da_label, famiglia_aggiornata_da_label = famiglia_audit_labels(legacy_famiglia)
 
     ctx = {
         "form": form,
         "famiglia": famiglia,
         "famiglia_logical_key": logical_snapshot.logical_key,
-        "legacy_famiglia": legacy_famiglia,
-        "famiglia_creata_da_label": famiglia_creata_da_label,
-        "famiglia_aggiornata_da_label": famiglia_aggiornata_da_label,
         "familiari_formset": familiari_formset,
         "studenti_formset": studenti_formset,
-        "documenti_formset": documenti_formset,
         "count_familiari": len(logical_snapshot.familiari),
         "count_studenti": len(logical_snapshot.studenti),
         "count_documenti": count_documenti_totali,
@@ -2919,7 +3022,7 @@ def _render_famiglia_logica(request, logical_snapshot):
         "inline_target": inline_target,
         "active_inline_tab": active_inline_tab,
         "prefer_initial_active_tab": prefer_initial_active_tab,
-        "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count() or documenti_formset.total_error_count()),
+        "has_form_errors": bool(form.errors or familiari_formset.total_error_count() or studenti_formset.total_error_count()),
     }
     ctx.update(
         famiglia_inline_head(
@@ -2931,21 +3034,6 @@ def _render_famiglia_logica(request, logical_snapshot):
         )
     )
     return render(request, "anagrafica/famiglie/famiglia_form.html", ctx)
-
-
-def elimina_famiglia(request, pk):
-    message = (
-        "L'eliminazione delle famiglie legacy e disattivata: "
-        "la scheda famiglia verra progressivamente ricostruita dalle relazioni tra studenti e familiari."
-    )
-    if is_popup_request(request):
-        return popup_response(request, message)
-    messages.warning(request, message)
-    return redirect("lista_famiglie")
-
-
-def stampa_famiglia(request, pk):
-    raise Http404("Le famiglie legacy non sono piu stampabili.")
 
 
 def stampa_famiglia_logica(request, key):
@@ -3151,25 +3239,13 @@ def lista_familiari(request):
 def get_familiare_profilo_lavorativo(familiare):
     if not familiare or not getattr(familiare, "pk", None):
         return None
-    try:
-        return familiare.profilo_lavorativo
-    except Dipendente.DoesNotExist:
+    if not getattr(familiare, "persona_id", None):
         return None
+    return Dipendente.objects.filter(persona_collegata=familiare.persona).first()
 
 
 def familiare_to_dipendente_payload(familiare):
-    indirizzo = familiare.indirizzo
     return {
-        "nome": familiare.nome or "",
-        "cognome": familiare.cognome or "",
-        "codice_fiscale": (familiare.codice_fiscale or "").upper().strip(),
-        "sesso": familiare.sesso or "",
-        "data_nascita": familiare.data_nascita,
-        "luogo_nascita": (familiare.luogo_nascita_display or "")[:120],
-        "nazionalita": (familiare.nazionalita_display or "")[:80],
-        "email": familiare.email or "",
-        "telefono": familiare.telefono or "",
-        "indirizzo": indirizzo,
         "stato": StatoDipendente.ATTIVO if familiare.attivo else StatoDipendente.SOSPESO,
     }
 
@@ -3181,6 +3257,8 @@ def sync_familiare_profilo_lavorativo(familiare, cleaned_data):
     profilo = get_familiare_profilo_lavorativo(familiare)
     abilita_dipendente = bool(cleaned_data.get("profilo_dipendente_attivo"))
     abilita_educatore = bool(cleaned_data.get("profilo_educatore_attivo"))
+    if abilita_dipendente and abilita_educatore:
+        abilita_dipendente = False
 
     if not abilita_dipendente and not abilita_educatore:
         if not profilo:
@@ -3193,31 +3271,31 @@ def sync_familiare_profilo_lavorativo(familiare, cleaned_data):
         profilo.delete()
         return None, False
 
-    if abilita_dipendente and abilita_educatore:
-        ruolo = RuoloAnagraficoDipendente.EDUCATORE_DIPENDENTE
-    elif abilita_educatore:
+    if abilita_educatore:
         ruolo = RuoloAnagraficoDipendente.EDUCATORE
     else:
         ruolo = RuoloAnagraficoDipendente.DIPENDENTE
 
     payload = familiare_to_dipendente_payload(familiare)
-    if not profilo and payload.get("codice_fiscale"):
+    if not profilo and getattr(familiare, "persona_id", None):
         profilo = (
-            Dipendente.objects.filter(codice_fiscale=payload["codice_fiscale"])
-            .filter(Q(familiare_collegato__isnull=True) | Q(familiare_collegato=familiare))
+            Dipendente.objects.filter(persona_collegata=familiare.persona)
             .first()
         )
 
     if not profilo:
-        profilo = Dipendente(familiare_collegato=familiare)
+        profilo = Dipendente(persona_collegata=familiare.persona)
 
     for field_name, value in payload.items():
         setattr(profilo, field_name, value)
-    profilo.ruolo_anagrafico = ruolo
-    profilo.familiare_collegato = familiare
+    profilo.ruolo_aziendale = ruolo
+    profilo.persona_collegata = familiare.persona
     classe_id, gruppo_id = split_classe_principale_reference(cleaned_data.get("classe_principale_educatore"))
     profilo.classe_principale_id = classe_id if abilita_educatore else None
     profilo.gruppo_classe_principale_id = gruppo_id if abilita_educatore else None
+    profilo.mansione = (cleaned_data.get("profilo_mansione") or "").strip() if abilita_dipendente else ""
+    profilo.iban = (cleaned_data.get("profilo_iban") or "").replace(" ", "").upper().strip()
+    profilo.stato = cleaned_data.get("profilo_stato") or profilo.stato or StatoDipendente.ATTIVO
     profilo.save()
     return profilo, False
 
@@ -3258,16 +3336,24 @@ def build_familiare_lavoro_context(familiare):
     if not profilo:
         return {
             "profilo_lavorativo": None,
+            "profilo_contratto_corrente": None,
             "profilo_contratti": [],
             "profilo_buste_paga": [],
             "profilo_documenti": [],
             "profilo_studenti_classe": [],
         }
 
+    contratto_corrente = profilo.contratto_corrente
+
     return {
         "profilo_lavorativo": profilo,
-        "profilo_contratti": profilo.contratti.select_related("tipo_contratto").order_by("-data_inizio", "-id")[:6],
-        "profilo_buste_paga": profilo.buste_paga.select_related("contratto").order_by("-anno", "-mese", "-id")[:6],
+        "profilo_contratto_corrente": contratto_corrente,
+        "profilo_contratti": profilo.contratti.select_related("tipo_contratto").order_by("-data_inizio", "-id")[:8],
+        "profilo_buste_paga": (
+            profilo.buste_paga.select_related("contratto", "contratto__tipo_contratto")
+            .prefetch_related("documenti")
+            .order_by("-anno", "-mese", "-id")[:8]
+        ),
         "profilo_documenti": profilo.documenti.order_by("-data_documento", "-id")[:6],
         "profilo_studenti_classe": studenti_classe_principale_educatore(profilo),
     }
@@ -3283,6 +3369,31 @@ def crea_familiare(request):
     documenti_formset = None
     contact_formsets = None
     initial = {}
+    profilo_lavorativo_iniziale = (request.GET.get("profilo_lavorativo") or "").strip().lower()
+    create_profile_context = {}
+    if profilo_lavorativo_iniziale in {"dipendente", "educatore"}:
+        initial["profilo_dipendente_attivo"] = profilo_lavorativo_iniziale == "dipendente"
+        initial["profilo_educatore_attivo"] = profilo_lavorativo_iniziale == "educatore"
+        if profilo_lavorativo_iniziale == "educatore":
+            create_profile_context = {
+                "create_profile_scope": "educatori",
+                "create_profile_title": f"Nuovo {get_educator_terminology()['selected_singular_lower']}",
+                "create_profile_status": get_educator_terminology()["selected_singular"],
+                "create_profile_list_label": get_educator_terminology()["selected_plural"],
+                "create_profile_list_url": "lista_educatori",
+                "create_profile_save_label": f"Salva {get_educator_terminology()['selected_singular_lower']}",
+                "create_profile_cancel_url": "lista_educatori",
+            }
+        else:
+            create_profile_context = {
+                "create_profile_scope": "dipendenti",
+                "create_profile_title": "Nuovo dipendente",
+                "create_profile_status": "Dipendente",
+                "create_profile_list_label": "Dipendenti",
+                "create_profile_list_url": "lista_dipendenti",
+                "create_profile_save_label": "Salva dipendente",
+                "create_profile_cancel_url": "lista_dipendenti",
+            }
     studente_collegato_id = (request.GET.get("studente") or "").strip()
     if studente_collegato_id.isdigit():
         studente_collegato = (
@@ -3350,20 +3461,29 @@ def crea_familiare(request):
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
+                created_label = create_profile_context.get("create_profile_status") or "Familiare"
                 if profilo_rimosso_bloccato:
                     messages.warning(
                         request,
                         "Il profilo lavorativo e' rimasto attivo perche' contiene contratti, buste paga o documenti collegati.",
                     )
                 if "_continue" in request.POST:
-                    messages.success(request, "Familiare creato correttamente.")
+                    messages.success(request, f"{created_label} creato correttamente.")
+                    if create_profile_context.get("create_profile_list_url"):
+                        profilo_creato = get_familiare_profilo_lavorativo(familiare)
+                        highlight_id = profilo_creato.pk if profilo_creato else familiare.pk
+                        return redirect(
+                            f"{reverse(create_profile_context['create_profile_list_url'])}?highlight={highlight_id}"
+                        )
                     return redirect(f"{reverse('lista_familiari')}?highlight={familiare.pk}")
 
                 if "_addanother" in request.POST:
-                    messages.success(request, "Familiare creato correttamente. Puoi inserirne un altro.")
+                    messages.success(request, f"{created_label} creato correttamente. Puoi inserirne un altro.")
+                    if profilo_lavorativo_iniziale in {"dipendente", "educatore"}:
+                        return redirect(f"{reverse('crea_familiare')}?profilo_lavorativo={profilo_lavorativo_iniziale}")
                     return redirect("crea_familiare")
 
-                messages.success(request, "Familiare creato correttamente. Ora puoi continuare a inserire i dati.")
+                messages.success(request, f"{created_label} creato correttamente. Ora puoi continuare a inserire i dati.")
                 default_target = "studenti"
                 target = active_inline_tab if active_inline_tab in allowed_inline_targets else default_target
                 return redirect(build_familiare_redirect_url(familiare.pk, target, default_target))
@@ -3409,6 +3529,8 @@ def crea_familiare(request):
             "count_studenti": 0,
             "count_parenti": 0,
             "studenti_collegati_diretti": [],
+            "parenti_collegati_diretti": [],
+            "familiare_indirizzi_correlati": [],
             "studente_inline_defaults": None,
             "count_documenti": 0,
             "count_documenti_in_scadenza": 0,
@@ -3418,6 +3540,7 @@ def crea_familiare(request):
             "edit_scope": edit_scope,
             "inline_target": active_inline_tab,
             "has_form_errors": has_form_errors,
+            **create_profile_context,
             **build_familiare_lavoro_context(None),
             "familiare_inline_tabs": [
                 {
@@ -3468,6 +3591,35 @@ def modifica_familiare(request, pk):
     studenti_diretti_form = None
     contact_formsets = None
 
+    relazioni_studenti_prefetch = getattr(familiare, "relazioni_studenti_attive_prefetch", None)
+    if relazioni_studenti_prefetch is None:
+        studenti_collegati_diretti = list(
+            familiare.relazioni_studenti.filter(attivo=True)
+            .select_related(
+                "studente",
+                "studente__luogo_nascita",
+                "studente__luogo_nascita__provincia",
+            )
+            .order_by("studente__cognome", "studente__nome", "studente_id")
+        )
+    else:
+        studenti_collegati_diretti = list(relazioni_studenti_prefetch)
+    decorate_studenti_current_enrollment_labels(
+        [relazione.studente for relazione in studenti_collegati_diretti if getattr(relazione, "studente", None)],
+        today,
+    )
+    parenti_collegati_diretti = direct_relative_peers_for_student_relations(familiare, studenti_collegati_diretti)
+    studenti_formset_queryset = ordered_queryset_from_ids(
+        Studente,
+        [relazione.studente_id for relazione in studenti_collegati_diretti],
+        select_related_fields=("luogo_nascita", "luogo_nascita__provincia"),
+    )
+    parenti_formset_queryset = ordered_queryset_from_ids(
+        Familiare,
+        [parente.pk for parente in parenti_collegati_diretti],
+        select_related_fields=("relazione_familiare", "persona", "persona__indirizzo", "persona__indirizzo__citta"),
+    )
+
     if request.method == "POST" and request.POST.get("_note_popup") == "1":
         note_active_tab = (request.POST.get("_note_active_tab") or "studenti").strip()
         if note_active_tab.startswith("tab-"):
@@ -3480,7 +3632,7 @@ def modifica_familiare(request, pk):
         nuova_nota = request.POST.get("note", "")
         if familiare.note != nuova_nota:
             familiare.note = nuova_nota
-            familiare.save(update_fields=["note"])
+            familiare.save()
             messages.success(request, "Note aggiornate correttamente.")
         else:
             messages.info(request, "Nessuna modifica alle note.")
@@ -3525,6 +3677,16 @@ def modifica_familiare(request, pk):
             )
         else:
             documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
+        studenti_formset = build_studenti_formset(
+            data=request.POST if inline_editing and inline_target == "studenti" and card_inline_submit == "studenti" else None,
+            prefix="studenti",
+            queryset=studenti_formset_queryset,
+        )
+        parenti_formset = build_familiari_formset(
+            data=request.POST if inline_editing and inline_target == "parenti" else None,
+            prefix="parenti",
+            queryset=parenti_formset_queryset,
+        )
         studenti_diretti_form = FamiliareDirectStudentiForm(
             request.POST if inline_editing and inline_target == "studenti" else None,
             familiare=familiare,
@@ -3552,10 +3714,16 @@ def modifica_familiare(request, pk):
                         documenti_formset.save()
                     if inline_editing and inline_target == "studenti" and card_inline_submit == "studenti" and studenti_formset is not None:
                         studenti_formset.save()
+                        for studente_salvato in getattr(studenti_formset, "new_objects", []):
+                            ensure_direct_student_family_relation(studente_salvato, familiare)
                     if inline_editing and inline_target == "studenti" and card_inline_submit != "studenti":
                         studenti_diretti_form.save()
                     if inline_editing and inline_target == "parenti" and parenti_formset is not None:
                         parenti_formset.save()
+                        studenti_base = [relazione.studente for relazione in studenti_collegati_diretti if getattr(relazione, "studente", None)]
+                        for parente_salvato in getattr(parenti_formset, "new_objects", []):
+                            for studente_base in studenti_base:
+                                ensure_direct_student_family_relation(studente_base, parente_salvato)
             except DOCUMENT_STORAGE_ERROR_TYPES as exc:
                 messages.error(request, build_document_storage_error_message(exc))
             else:
@@ -3603,22 +3771,15 @@ def modifica_familiare(request, pk):
         )
         contact_formsets = build_anagrafica_contact_formsets(instance=familiare)
         studenti_diretti_form = FamiliareDirectStudentiForm(familiare=familiare)
-        documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
-
-    relazioni_studenti_prefetch = getattr(familiare, "relazioni_studenti_attive_prefetch", None)
-    if relazioni_studenti_prefetch is None:
-        studenti_collegati_diretti = list(
-            familiare.relazioni_studenti.filter(attivo=True)
-            .select_related(
-                "studente",
-                "studente__luogo_nascita",
-                "studente__luogo_nascita__provincia",
-            )
-            .order_by("studente__cognome", "studente__nome", "studente_id")
+        studenti_formset = build_studenti_formset(
+            prefix="studenti",
+            queryset=studenti_formset_queryset,
         )
-    else:
-        studenti_collegati_diretti = list(relazioni_studenti_prefetch)
-    parenti_collegati_diretti = direct_relative_peers_for_student_relations(familiare, studenti_collegati_diretti)
+        parenti_formset = build_familiari_formset(
+            prefix="parenti",
+            queryset=parenti_formset_queryset,
+        )
+        documenti_formset = DocumentoFamiliareFormSet(instance=familiare, prefix="documenti")
 
     usa_studenti_diretti = bool(studenti_collegati_diretti)
     usa_parenti_diretti = bool(parenti_collegati_diretti)
@@ -3658,7 +3819,7 @@ def modifica_familiare(request, pk):
         if inline_target == "parenti":
             familiare_inline_edit_label = (
                 "Modifica Parenti"
-                if parenti_formset is not None and not usa_parenti_diretti
+                if parenti_formset is not None
                 else "Modifica dalla scheda"
             )
     familiare_inline_tabs.append({
@@ -3676,6 +3837,11 @@ def modifica_familiare(request, pk):
     decorate_studenti_formset_current_enrollment_labels(studenti_formset, today)
     familiare_audit_info = familiare_audit_labels(familiare)
     documenti_ids = list(familiare.documenti.values_list("pk", flat=True))
+    familiare_indirizzi_correlati = build_familiare_address_suggestions(
+        familiare,
+        studenti_collegati_diretti,
+        parenti_collegati_diretti,
+    )
     return render(
         request,
         "anagrafica/familiari/familiari_form.html",
@@ -3693,8 +3859,11 @@ def modifica_familiare(request, pk):
             "count_parenti": count_parenti,
             "studenti_collegati_diretti": studenti_collegati_diretti,
             "parenti_collegati_diretti": parenti_collegati_diretti,
+            "familiare_indirizzi_correlati": familiare_indirizzi_correlati,
             "usa_studenti_diretti": usa_studenti_diretti,
             "usa_parenti_diretti": usa_parenti_diretti,
+            "usa_studenti_diretti_cards": usa_studenti_diretti and studenti_formset is None,
+            "usa_parenti_diretti_cards": usa_parenti_diretti and parenti_formset is None,
             "studente_inline_defaults": studente_inline_defaults,
             "count_documenti": familiare.documenti.count(),
             "count_documenti_in_scadenza": familiare.documenti.filter(
@@ -3713,8 +3882,8 @@ def modifica_familiare(request, pk):
             "familiare_inline_tabs": familiare_inline_tabs,
             "familiare_inline_edit_label": familiare_inline_edit_label,
             "familiare_inline_can_edit": (
-                (inline_target == "studenti" and studenti_diretti_form is not None)
-                or (inline_target == "parenti" and parenti_formset is not None and not usa_parenti_diretti)
+                (inline_target == "studenti" and (studenti_formset is not None or studenti_diretti_form is not None))
+                or (inline_target == "parenti" and parenti_formset is not None)
                 or inline_target == "documenti"
             ),
             "familiare_creazione_data": familiare_audit_info["created_data"],
@@ -3902,10 +4071,10 @@ def lista_studenti(request):
             Q(luogo_nascita__provincia__sigla__icontains=q) |
             Q(nazione_nascita__nome__icontains=q) |
             Q(luogo_nascita_custom__icontains=q) |
-            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__nome__icontains=q) |
-            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__cognome__icontains=q) |
-            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__email__icontains=q) |
-            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__telefono__icontains=q)
+            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__nome__icontains=q) |
+            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__cognome__icontains=q) |
+            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__email__icontains=q) |
+            Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__telefono__icontains=q)
         ).distinct()
 
     studenti = list(studenti)
@@ -4146,6 +4315,27 @@ def modifica_studente(request, pk):
     iscrizioni_queryset = studente_iscrizioni_inline_queryset(studente)
     documenti_queryset = studente_documenti_inline_queryset(studente)
     famiglia_for_parenti = None
+    relazioni_familiari_prefetch = getattr(studente, "relazioni_familiari_attive_prefetch", None)
+    if relazioni_familiari_prefetch is None:
+        familiari_collegati_diretti = list(
+            studente.relazioni_familiari.filter(attivo=True)
+            .select_related(
+                "familiare",
+                "familiare__relazione_familiare",
+                "familiare__persona",
+                "familiare__persona__indirizzo",
+                "familiare__persona__indirizzo__citta",
+            )
+            .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
+        )
+    else:
+        familiari_collegati_diretti = list(relazioni_familiari_prefetch)
+    studenti_parenti_diretti = direct_student_peers_for_relations(studente, familiari_collegati_diretti)
+    parenti_formset_queryset = ordered_queryset_from_ids(
+        Familiare,
+        [relazione.familiare_id for relazione in familiari_collegati_diretti],
+        select_related_fields=("relazione_familiare", "persona", "persona__indirizzo", "persona__indirizzo__citta"),
+    )
 
     if request.method == "POST":
         if request.POST.get("_note_popup") == "1":
@@ -4202,14 +4392,11 @@ def modifica_studente(request, pk):
             if inline_target == "documenti"
             else None
         )
-        parenti_formset = (
-            build_familiari_formset(
-                data=request.POST if card_inline_submit == "parenti" else None,
-                instance=famiglia_for_parenti,
-                prefix="parenti",
-            )
-            if False
-            else None
+        parenti_formset = build_familiari_formset(
+            data=request.POST if inline_target == "parenti" and card_inline_submit == "parenti" else None,
+            instance=famiglia_for_parenti,
+            prefix="parenti",
+            queryset=parenti_formset_queryset,
         )
 
         form_is_valid = True if inline_editing else form.is_valid()
@@ -4243,6 +4430,8 @@ def modifica_studente(request, pk):
 
                     if inline_target == "parenti" and card_inline_submit == "parenti" and parenti_formset is not None:
                         parenti_formset.save()
+                        for parente_salvato in getattr(parenti_formset, "new_objects", []):
+                            ensure_direct_student_family_relation(studente, parente_salvato)
 
                     if inline_target == "parenti" and card_inline_submit != "parenti":
                         familiari_diretti_form.save()
@@ -4292,7 +4481,11 @@ def modifica_studente(request, pk):
             prefix="documenti",
             queryset=documenti_queryset,
         )
-        parenti_formset = None
+        parenti_formset = build_familiari_formset(
+            instance=famiglia_for_parenti,
+            prefix="parenti",
+            queryset=parenti_formset_queryset,
+        )
 
     iscrizioni_correnti_list = list(iscrizioni_queryset)
     iscrizione_corrente = (
@@ -4320,21 +4513,6 @@ def modifica_studente(request, pk):
     parenti_famiglia = []
     studenti_parenti_famiglia = []
     count_parenti_legacy = 0
-    relazioni_familiari_prefetch = getattr(studente, "relazioni_familiari_attive_prefetch", None)
-    if relazioni_familiari_prefetch is None:
-        familiari_collegati_diretti = list(
-            studente.relazioni_familiari.filter(attivo=True)
-            .select_related(
-                "familiare",
-                "familiare__relazione_familiare",
-                "familiare__indirizzo",
-                "familiare__indirizzo__citta",
-            )
-            .order_by("familiare__cognome", "familiare__nome", "familiare_id")
-        )
-    else:
-        familiari_collegati_diretti = list(relazioni_familiari_prefetch)
-    studenti_parenti_diretti = direct_student_peers_for_relations(studente, familiari_collegati_diretti)
     decorate_studenti_current_enrollment_labels(studenti_parenti_diretti, today=today)
     usa_parenti_diretti = bool(familiari_collegati_diretti)
     usa_fratelli_diretti = bool(studenti_parenti_diretti)
@@ -4368,6 +4546,7 @@ def modifica_studente(request, pk):
         "familiari_collegati_diretti": familiari_collegati_diretti,
         "familiari_diretti_form": familiari_diretti_form,
         "usa_parenti_diretti": usa_parenti_diretti,
+        "usa_parenti_diretti_cards": usa_parenti_diretti and parenti_formset is None,
         "usa_fratelli_diretti": usa_fratelli_diretti,
         "count_parenti": count_parenti,
         "count_genitori_tutori": count_genitori_tutori,

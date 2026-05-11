@@ -1,17 +1,17 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static currency rich_notes %}
 
 {% block title %}
-    {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %} - Arboris School Management
+    Famiglia {{ famiglia.cognome_famiglia }} - Arboris School Management
 {% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">â€º</span>
+        <span class="breadcrumb-sep">›</span>
         <a href="{% url 'lista_famiglie' %}">Famiglie</a>
-        <span class="breadcrumb-sep">â€º</span>
-        <span>{% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova{% endif %}</span>
+        <span class="breadcrumb-sep">›</span>
+        <span>Famiglia {{ famiglia.cognome_famiglia }}</span>
     </div>
 {% endblock %}
 
@@ -20,83 +20,43 @@
         <div class="family-page-title-block">
             <div class="family-page-title-line">
                 <h1 class="page-title">
-                    {% if famiglia %}Famiglia {{ famiglia.cognome_famiglia }}{% else %}Nuova famiglia{% endif %}
+                    Famiglia {{ famiglia.cognome_famiglia }}
                 </h1>
-                {% if not famiglia %}
-                    <span class="family-status-pill is-muted">
-                        <span class="family-status-dot" aria-hidden="true"></span>
-                        Nuova scheda
-                    </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
+                {% if famiglia.indirizzo_principale %}
+                    {{ famiglia.indirizzo_principale.label_full }}
+                {% else %}
+                    Nessun indirizzo principale registrato
                 {% endif %}
             </div>
-            {% if famiglia %}
-                <div class="family-page-address">
-                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#map-pin"></use></svg></span>
-                    {% if famiglia.indirizzo_principale %}
-                        {{ famiglia.indirizzo_principale.label_full }}
-                    {% else %}
-                        Nessun indirizzo principale registrato
-                    {% endif %}
-                </div>
-            {% else %}
-                <div class="family-page-address">
-                    <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
-                    Inserimento nuova scheda famiglia
-                </div>
-            {% endif %}
         </div>
         <div class="page-head-actions family-page-actions">
-            {% if famiglia %}
-                <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Indietro</span>
-                </button>
-                <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">{{ student_terminology.selected_singular }}</span>
-                </button>
-                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Familiare</span>
-                </button>
-                <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia_logica' famiglia.logical_key %}">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#printer"></use></svg></span>
-                    <span class="btn-label">Stampa</span>
-                </button>
-                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                    <span class="btn-label">Elenco</span>
-                </a>
-            {% else %}
-                <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Indietro</span>
-                </button>
-                <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">{{ student_terminology.selected_singular }}</span>
-                </button>
-                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Familiare</span>
-                </button>
-                <button type="submit" form="famiglia-detail-form" name="_save" class="btn btn-save-soft btn-icon-text" data-auto-save-for="famiglia-detail-form">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                    <span class="btn-label">Salva famiglia</span>
-                </button>
-                <button type="button" class="btn btn-intent-danger btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                    <span class="btn-label">Annulla</span>
-                </button>
-                <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                    <span class="btn-label">Elenco</span>
-                </a>
-            {% endif %}
+            <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Indietro</span>
+            </button>
+            <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Familiare</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia_logica' famiglia.logical_key %}">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#printer"></use></svg></span>
+                <span class="btn-label">Stampa</span>
+            </button>
+            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                <span class="btn-label">Elenco</span>
+            </a>
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form{% if famiglia %} is-view-mode{% else %} is-create-mode{% endif %}{% if has_form_errors %} has-form-errors{% endif %}" autocomplete="off" data-lpignore="true">
+    <form method="post" enctype="multipart/form-data" id="famiglia-detail-form" class="detail-form is-view-mode{% if has_form_errors %} has-form-errors{% endif %}" autocomplete="off" data-lpignore="true">
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="famiglia-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="famiglia-inline-target" value="{{ active_inline_tab|default:'studenti' }}">
@@ -355,213 +315,8 @@
                     </aside>
                 </div>
             </div>
-        {% else %}
-            <div class="family-create-dashboard">
-                <div class="family-create-main">
-                    <div id="famiglia-lock-container" class="mode-lock-container main-fields-section family-create-main-fields" data-mode-lock-scope="main">
-                    <section class="family-overview-card family-create-overview-card is-card-editing">
-                        <div class="family-avatar-illustration" aria-hidden="true">
-                            <svg viewBox="0 0 128 128" focusable="false">
-                                <use href="{% static 'images/arboris-avatars.svg' %}#avatar-family"></use>
-                            </svg>
-                        </div>
-                        <div class="family-general-card-editor family-create-general-editor">
-                            <div class="family-general-card-editor-head">
-                                <h3>Dati nuova famiglia</h3>
-                            </div>
-
-                            <div class="family-general-editor-grid">
-                                <div class="family-general-editor-field family-general-editor-field-half">
-                                    <label for="{{ form.cognome_famiglia.id_for_label }}">Cognome famiglia</label>
-                                    <div class="family-general-editor-control">
-                                        {{ form.cognome_famiglia }}
-                                    </div>
-                                    {{ form.cognome_famiglia.errors }}
-                                </div>
-
-                                <div class="family-general-editor-field family-general-editor-field-wide family-general-editor-field-related family-general-editor-field-address">
-                                    <label for="{{ form.indirizzo_principale.id_for_label }}">Indirizzo principale</label>
-                                    <div class="related-field-row mode-edit-field family-general-editor-related-control">
-                                        {{ form.indirizzo_principale }}
-                                        <div class="related-actions">
-                                            <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                            </button>
-                                            <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                            </button>
-                                            <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
-                                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="help-text">
-                                        Questo indirizzo verr&agrave; usato come riferimento per familiari e {{ student_terminology.selected_plural_lower }} quando il loro indirizzo specifico &egrave; vuoto.
-                                    </div>
-                                    {{ form.indirizzo_principale.errors }}
-                                </div>
-
-                                <div class="family-general-editor-field family-general-editor-field-check">
-                                    <label class="family-general-editor-check">
-                                        {{ form.attiva }}
-                                        <span>Famiglia attiva</span>
-                                    </label>
-                                    {{ form.attiva.errors }}
-                                </div>
-                            </div>
-
-                            <div class="family-general-card-editor-actions">
-                                <button type="submit" name="_save" class="btn btn-save-soft btn-sm btn-icon-text" data-family-general-submit="1">
-                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                    <span class="btn-label">Salva famiglia</span>
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-sm btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_famiglie' %}">
-                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                                    <span class="btn-label">Annulla</span>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-                    </div>
-
-                    <div class="family-stat-grid family-create-stat-grid">
-                        <a href="#tab-familiari" class="family-stat-card">
-                            <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
-                            <span class="family-stat-content">
-                                <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">Familiari</span>
-                                <span class="family-stat-link">Da aggiungere</span>
-                            </span>
-                        </a>
-                        <a href="#tab-studenti" class="family-stat-card">
-                            <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#child"></use></svg></span>
-                            <span class="family-stat-content">
-                                <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">{{ student_terminology.selected_plural }}</span>
-                                <span class="family-stat-link">Da aggiungere</span>
-                            </span>
-                        </a>
-                        <a href="#tab-documenti" class="family-stat-card">
-                            <span class="family-stat-icon family-stat-purple" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                            <span class="family-stat-content">
-                                <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">Documenti</span>
-                                <span class="family-stat-link">Da caricare</span>
-                            </span>
-                        </a>
-                        <a href="#tab-documenti" class="family-stat-card">
-                            <span class="family-stat-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#timer"></use></svg></span>
-                            <span class="family-stat-content">
-                                <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">In scadenza</span>
-                                <span class="family-stat-link">Da caricare</span>
-                            </span>
-                        </a>
-                        <a href="#tab-documenti" class="family-stat-card">
-                            <span class="family-stat-icon family-stat-red" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
-                            <span class="family-stat-content">
-                                <span class="family-stat-value">0</span>
-                                <span class="family-stat-label">Scaduti</span>
-                                <span class="family-stat-link">Da caricare</span>
-                            </span>
-                        </a>
-                    </div>
-                </div>
-
-                <aside class="family-dashboard-side family-create-side" data-family-side-reorder data-family-side-order-key="arboris-family-create-side-card-order">
-                    <section class="family-side-card" data-family-side-card data-family-side-card-key="create-system">
-                        <div class="family-side-card-head">
-                            <h2>Informazioni di sistema</h2>
-                            <div class="family-side-card-tools">
-                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Informazioni di sistema" title="Trascina per riordinare">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-                                </button>
-                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Informazioni di sistema" title="Comprimi card">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="family-side-card-body" data-family-side-card-body>
-                            <div class="family-system-list">
-                                <div class="family-system-item">
-                                    <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                    <div>
-                                        <div>Data creazione</div>
-                                        <strong>Dopo il salvataggio</strong>
-                                    </div>
-                                </div>
-                                <div class="family-system-item">
-                                    <span class="family-system-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                                    <div>
-                                        <div>Creato da</div>
-                                        <strong>{{ request.user.get_full_name|default:request.user.email|default:request.user.username }}</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="family-side-card family-rate-summary-card" data-family-side-card data-family-side-card-key="create-rette">
-                        <div class="family-side-card-head">
-                            <h2>Rette mensili</h2>
-                            <div class="family-side-card-tools">
-                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Rette mensili" title="Trascina per riordinare">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-                                </button>
-                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Rette mensili" title="Comprimi card">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="family-side-card-body" data-family-side-card-body>
-                            <div class="empty-state compact-empty-state">
-                                Il riepilogo delle rette sar&agrave; disponibile dopo il salvataggio e l'inserimento delle iscrizioni.
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="family-side-card family-notes-card" data-family-side-card data-family-side-card-key="create-notes">
-                        <div class="family-side-card-head">
-                            <h2>Note</h2>
-                            <div class="family-side-card-tools">
-                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Note" title="Trascina per riordinare">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-                                </button>
-                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Note" title="Comprimi card">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="family-side-card-body" data-family-side-card-body>
-                            <div class="family-create-note-field">
-                                {{ form.note }}
-                                {{ form.note.errors }}
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="family-side-card family-activity-card" data-family-side-card data-family-side-card-key="create-activity">
-                        <div class="family-side-card-head">
-                            <h2>Cronologia attivit&agrave;</h2>
-                            <div class="family-side-card-tools">
-                                <button type="button" class="family-side-drag-handle" draggable="true" data-family-side-drag-handle aria-label="Sposta card Cronologia attivita" title="Trascina per riordinare">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg></span>
-                                </button>
-                                <button type="button" class="family-side-collapse-toggle" data-family-side-collapse-toggle aria-expanded="true" aria-label="Comprimi card Cronologia attivita" title="Comprimi card">
-                                    <span aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-down"></use></svg></span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="family-side-card-body" data-family-side-card-body>
-                            <div class="empty-state compact-empty-state">La cronologia sar&agrave; disponibile dopo il primo salvataggio.</div>
-                        </div>
-                    </section>
-                </aside>
-            </div>
         {% endif %}
-        {% if famiglia %}
-            <div id="famiglia-lock-container" class="mode-lock-container family-derived-lock-container" data-mode-lock-scope="main" hidden></div>
-        {% endif %}
+        <div id="famiglia-lock-container" class="mode-lock-container family-derived-lock-container" data-mode-lock-scope="main" hidden></div>
 
 
         <!-- INIZIO CODICE GENERICO DEGLI INLINE-->
@@ -584,12 +339,6 @@
                     {% endif %}
                     {% if studenti_formset.errors %}
                         <div>{{ studenti_formset.errors }}</div>
-                    {% endif %}
-                    {% if documenti_formset.non_form_errors %}
-                        <div>{{ documenti_formset.non_form_errors }}</div>
-                    {% endif %}
-                    {% if documenti_formset.errors %}
-                        <div>{{ documenti_formset.errors }}</div>
                     {% endif %}
                 </div>
             {% endif %}
@@ -776,8 +525,8 @@
                                                 {{ f.relazione_familiare }}
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
                                                 </div>
                                             </div>
                                         </td>
@@ -795,8 +544,8 @@
                                                 </div>
                                                 <div class="related-actions inline-related-actions">
                                                     <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
                                                 </div>
                                             </div>
 
@@ -804,9 +553,9 @@
                                                 {% if f.instance.pk and f.instance.indirizzo %}
                                                     Indirizzo specifico
                                                 {% elif famiglia and famiglia.indirizzo_principale %}
-                                                    ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
+                                                    Riferimento famiglia: {{ famiglia.indirizzo_principale.label_select }}
                                                 {% else %}
-                                                    Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
+                                                    Se lasci vuoto, non verra impostato un indirizzo principale
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -969,8 +718,8 @@
                                                         {{ f.relazione_familiare }}
                                                         <div class="related-actions inline-related-actions">
                                                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
-                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
                                                         </div>
                                                     </div>
                                                     {{ f.relazione_familiare.errors }}
@@ -983,15 +732,15 @@
                                                         </div>
                                                         <div class="related-actions inline-related-actions">
                                                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
-                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
+                                                            <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                                            <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
                                                         </div>
                                                     </div>
                                                     <div class="inline-address-help" data-role="address-help">
                                                         {% if famiglia and famiglia.indirizzo_principale %}
-                                                            ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
+                                                            Riferimento famiglia: {{ famiglia.indirizzo_principale.label_select }}
                                                         {% else %}
-                                                            Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
+                                                            Se lasci vuoto, non verra impostato un indirizzo principale
                                                         {% endif %}
                                                     </div>
                                                     {{ f.indirizzo.errors }}
@@ -1182,56 +931,10 @@
                 <div class="admin-section-title">Documenti</div>
                 <div class="panel">
                     <div class="panel-body">
-                        {{ documenti_formset.management_form }}
                         <div
                             class="family-related-list family-documents-list mode-view-only"
-                            data-document-card-list
                             data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
                         >
-                            {% for f in documenti_formset %}
-                                {% if f.instance.pk %}
-                                    <article class="family-document-card" data-document-card data-document-form-prefix="{{ f.prefix }}" data-document-id="{{ f.instance.pk }}">
-                                        {% if f.instance.file %}
-                                            <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer" class="family-document-icon" aria-label="Apri documento">
-                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
-                                            </a>
-                                        {% else %}
-                                            <span class="family-document-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                                        {% endif %}
-                                        <div class="family-document-main">
-                                            <h3>{% if f.instance.tipo_documento %}{{ f.instance.tipo_documento }}{% else %}Documento famiglia{% endif %}</h3>
-                                            <div class="family-document-meta">
-                                                {% if f.instance.descrizione %}<span>{{ f.instance.descrizione }}</span>{% endif %}
-                                                {% if f.instance.data_caricamento %}<span class="family-document-muted-meta">Caricato il {{ f.instance.data_caricamento|it_date }}</span>{% endif %}
-                                                {% if f.instance.scadenza %}<span>Scadenza {{ f.instance.scadenza|it_date }}</span>{% endif %}
-                                                {% if f.instance.filename %}<span class="family-document-filename family-document-muted-meta">{{ f.instance.filename }}</span>{% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="family-person-actions">
-                                            {% if f.instance.file %}
-                                                <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm btn-icon-text">
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></span>
-                                                    Apri
-                                                </a>
-                                            {% endif %}
-                                            <button
-                                                type="button"
-                                                class="btn btn-danger btn-sm btn-icon-text"
-                                                data-document-card-action="delete"
-                                                data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                                data-document-delete-label="{% if f.instance.tipo_documento %}{{ f.instance.tipo_documento }}{% else %}Documento famiglia{% endif %}"
-                                            >
-                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                                Elimina
-                                            </button>
-                                            <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-document-card-action="edit">
-                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                Modifica
-                                            </button>
-                                        </div>
-                                    </article>
-                                {% endif %}
-                            {% endfor %}
                             {% for doc in documenti_familiari %}
                                 <article class="family-document-card">
                                     {% if doc.file %}
@@ -1258,16 +961,6 @@
                                                 Apri
                                             </a>
                                         {% endif %}
-                                        <button
-                                            type="button"
-                                            class="btn btn-danger btn-sm btn-icon-text"
-                                            data-document-card-action="delete"
-                                            data-popup-url="{% url 'elimina_documento' doc.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                            data-document-delete-label="{{ doc.tipo_documento }}"
-                                        >
-                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                            Elimina
-                                        </button>
                                     </div>
                                 </article>
                             {% endfor %}
@@ -1297,16 +990,6 @@
                                                 Apri
                                             </a>
                                         {% endif %}
-                                        <button
-                                            type="button"
-                                            class="btn btn-danger btn-sm btn-icon-text"
-                                            data-document-card-action="delete"
-                                            data-popup-url="{% url 'elimina_documento' doc.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                            data-document-delete-label="{{ doc.tipo_documento }}"
-                                        >
-                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                            Elimina
-                                        </button>
                                     </div>
                                 </article>
                             {% endfor %}
@@ -1314,129 +997,6 @@
                                 <div class="family-card-empty">Ancora nessun documento caricato.</div>
                             {% endif %}
                         </div>
-                        <table class="inline-table" id="documenti-table">
-                            <thead>
-                                <tr>
-                                    <th>TIPO DOCUMENTO</th>
-                                    <th>DESCRIZIONE</th>
-                                    <th>FILE</th>
-                                    <th class="inline-view-only-table-cell">DATA CARICAMENTO</th>
-                                    <th>SCADENZA</th>
-                                    <th>VISIBILE</th>
-                                    <th>NOTE</th>
-                                    <th class="mode-edit-only-table-cell">ELIMINA</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for f in documenti_formset %}
-                                    <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}">
-                                        {{ f.id }}
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.tipo_documento %}
-                                                    {{ f.instance.tipo_documento }}
-                                                {% else %}
-                                                    <span class="table-muted">Non indicato</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="inline-related-field mode-edit-field">
-                                                {{ f.tipo_documento }}
-                                                <div class="related-actions inline-related-actions">
-                                                    <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">âœŽ</button>
-                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">âœ–</button>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.descrizione %}
-                                                    {{ f.instance.descrizione }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessuna descrizione</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">{{ f.descrizione }}</div>
-                                        </td>
-                                        <td class="document-file-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain readonly-display-link">
-                                                {% if f.instance.pk and f.instance.file %}
-                                                    <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">{{ f.instance.filename }}</a>
-                                                {% else %}
-                                                    <span class="table-muted">Nessun file</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">
-                                                {{ f.file }}
-                                                {% if f.instance.pk and f.instance.file %}
-                                                    <div class="help-text">
-                                                        <a href="{{ f.instance.download_url }}" target="_blank" rel="noopener noreferrer">File attuale: {{ f.instance.filename }}</a>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td class="inline-view-only-table-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.data_caricamento %}
-                                                    {{ f.instance.data_caricamento|it_date }}
-                                                {% else %}
-                                                    <span class="table-muted">-</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.scadenza %}
-                                                    {{ f.instance.scadenza|it_date }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessuna scadenza</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">{{ f.scadenza }}</div>
-                                        </td>
-                                        <td class="inline-checkbox-cell">
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ f.instance.visibile|si_no }}</div>
-                                            <div class="mode-edit-field">{{ f.visibile }}</div>
-                                        </td>
-                                        <td>
-                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
-                                                {% if f.instance.pk and f.instance.note %}
-                                                    {{ f.instance.note }}
-                                                {% else %}
-                                                    <span class="table-muted">Nessuna nota</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="mode-edit-field">{{ f.note }}</div>
-                                        </td>
-                                        <td class="inline-delete-cell mode-edit-only-table-cell">
-                                            {% if f.instance.pk %}
-                                                <span class="inline-delete-hidden">{{ f.DELETE }}</span>
-                                                <button
-                                                    type="button"
-                                                    class="inline-remove-btn"
-                                                    data-popup-url="{% url 'elimina_documento' f.instance.pk %}?popup=1&return_to={{ request.get_full_path|urlencode }}"
-                                                    data-related-popup-trigger="1"
-                                                >
-                                                    Elimina
-                                                </button>
-                                            {% else %}
-                                                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% if f.errors %}
-                                        <tr class="inline-errors-row">
-                                            <td colspan="8">{{ f.errors }}</td>
-                                        </tr>
-                                    {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% if not count_documenti %}
-                            <div class="empty-state compact-empty-state inline-empty-state">
-                                Ancora nessun documento caricato.
-                            </div>
-                        {% endif %}
                         <!-- VISUALIZZAZIONE DEI DOCUMENTI DI FAMILIARI E STUDENTI-->
                         <div class="aggregated-documents-sections">
                             <div class="aggregated-documents-block">
@@ -1460,15 +1020,15 @@
                                                 <tr>
                                                     <td>{{ doc.familiare }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
-                                                    <td>{{ doc.descrizione|default:"â€”" }}</td>
+                                                    <td>{{ doc.descrizione|default:"—" }}</td>
                                                     <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
-                                                    <td>{{ doc.scadenza|default:"â€”" }}</td>
-                                                    <td>{% if doc.visibile %}SÃ¬{% else %}No{% endif %}</td>
+                                                    <td>{{ doc.scadenza|default:"—" }}</td>
+                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
                                                             <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
-                                                            <span class="table-muted">â€”</span>
+                                                            <span class="table-muted">—</span>
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -1503,15 +1063,15 @@
                                                 <tr>
                                                     <td>{{ doc.studente }}</td>
                                                     <td>{{ doc.tipo_documento }}</td>
-                                                    <td>{{ doc.descrizione|default:"â€”" }}</td>
+                                                    <td>{{ doc.descrizione|default:"—" }}</td>
                                                     <td>{% if doc.data_caricamento %}{{ doc.data_caricamento|it_date }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
-                                                    <td>{{ doc.scadenza|default:"â€”" }}</td>
-                                                    <td>{% if doc.visibile %}SÃ¬{% else %}No{% endif %}</td>
+                                                    <td>{{ doc.scadenza|default:"—" }}</td>
+                                                    <td>{% if doc.visibile %}Sì{% else %}No{% endif %}</td>
                                                     <td>
                                                         {% if doc.file %}
                                                             <a href="{{ doc.download_url }}" target="_blank" rel="noopener noreferrer">Apri</a>
                                                         {% else %}
-                                                            <span class="table-muted">â€”</span>
+                                                            <span class="table-muted">—</span>
                                                         {% endif %}
                                                     </td>
                                                 </tr>
@@ -1533,33 +1093,19 @@
         </div> <!-- CHIUSURA CODICE DEGLI INLINE -->
 
         <!-- PULSANTI DI AZIONE DEL FORM -->
-        <div class="form-actions sticky-form-actions mode-edit-only{% if not famiglia %} family-create-sticky-actions{% endif %}" id="sticky-form-actions">
-            {% if not famiglia %}
-                <div class="family-create-sticky-context">
-                    <span class="family-card-sticky-kicker">Nuova famiglia</span>
-                    <strong>Completa e salva la scheda</strong>
-                </div>
-                <div class="family-create-sticky-controls">
-            {% endif %}
+        <div class="form-actions sticky-form-actions mode-edit-only" id="sticky-form-actions">
             <button type="submit" name="_save" class="btn btn-save-soft btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                 <span class="btn-label">Salva</span>
             </button>
-            <button type="submit" name="_continue" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-return-list{% endif %} btn-icon-text">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if famiglia %}check{% else %}list{% endif %}"></use></svg></span>
-                <span class="btn-label">{% if famiglia %}Salva e continua{% else %}Salva e torna all'elenco{% endif %}</span>
+            <button type="submit" name="_continue" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                <span class="btn-label">Salva e continua</span>
             </button>
-            <button type="submit" name="_addanother" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-add-another{% endif %} btn-icon-text">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                <span class="btn-label">Salva e aggiungi un'altra</span>
-            </button>
-            <button type="button" class="btn {% if famiglia %}btn-secondary{% else %}btn-intent-danger{% endif %} btn-icon-text" id="sticky-cancel-edit-famiglia-btn" data-fallback-url="{% url 'lista_famiglie' %}">
+            <button type="button" class="btn btn-secondary btn-icon-text" id="sticky-cancel-edit-famiglia-btn" data-fallback-url="{% url 'lista_famiglie' %}">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Annulla</span>
             </button>
-            {% if not famiglia %}
-                </div>
-            {% endif %}
         </div>
         <div class="sticky-actions-spacer"></div>
         <div class="form-actions sticky-form-actions family-card-sticky-actions is-hidden" id="family-card-sticky-actions" hidden>
@@ -1582,32 +1128,6 @@
         <!-- FINE PULSANTI DI AZIONE DEL FORM -->
     </form>
 
-    {% if not famiglia %}
-    {% if famiglia %}
-        <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="family-note-dialog-overlay" aria-hidden="true">
-            <form method="post" class="app-dialog family-note-dialog" id="family-note-popup-form" role="dialog" aria-modal="true" aria-labelledby="family-note-dialog-title">
-                {% csrf_token %}
-                <input type="hidden" name="_note_popup" value="1">
-                <input type="hidden" name="_note_active_tab" id="family-note-active-tab" value="{{ active_inline_tab|default:'studenti' }}">
-                <div class="app-dialog-header">
-                    <h2 class="app-dialog-title" id="family-note-dialog-title">Modifica note</h2>
-                </div>
-                <div class="app-dialog-body family-note-dialog-body">
-                    <label class="app-dialog-field-label" for="id_family_note_popup">Note famiglia</label>
-                    <textarea name="note" id="id_family_note_popup" rows="10" data-rich-notes="1">{{ famiglia.note }}</textarea>
-                </div>
-                <div class="app-dialog-actions family-note-dialog-actions">
-                    <button type="button" class="btn btn-secondary" data-family-note-dialog-cancel>Annulla</button>
-                    <button type="submit" class="btn btn-primary btn-icon-text">
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                        Salva
-                    </button>
-                </div>
-            </form>
-        </div>
-    {% endif %}
-    {% endif %}
-
     <!-- TEMPLATE RIGA VUOTA FAMILIARI INLINE -->
     <template id="familiari-empty-form-template">
         <tr class="inline-form-row inline-family-editor-row">
@@ -1628,8 +1148,8 @@
                             {{ familiari_formset.empty_form.relazione_familiare }}
                             <div class="related-actions inline-related-actions">
                                 <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="relazione_familiare">+</button>
-                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">âœŽ</button>
-                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">âœ–</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="relazione_familiare">✎</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="relazione_familiare">✖</button>
                             </div>
                         </div>
                     </div>
@@ -1641,15 +1161,15 @@
                             </div>
                             <div class="related-actions inline-related-actions">
                                 <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
-                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">âœŽ</button>
-                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">âœ–</button>
+                                <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
+                                <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
                             </div>
                         </div>
                         <div class="inline-address-help" data-role="address-help">
                             {% if famiglia and famiglia.indirizzo_principale %}
-                                ErediterÃ : {{ famiglia.indirizzo_principale.label_select }}
+                                Riferimento famiglia: {{ famiglia.indirizzo_principale.label_select }}
                             {% else %}
-                                Se lasci vuoto, verrÃ  usato l'indirizzo principale della famiglia
+                                Se lasci vuoto, non verra impostato un indirizzo principale
                             {% endif %}
                         </div>
                     </div>
@@ -1730,37 +1250,12 @@
     {% include "common/inlines/studenti_famiglia_empty_form_template.html" %}
     <!-- FINE TEMPLATE RIGA VUOTA STUDENTI INLINE -->
 
-    <!-- TEMPLATE RIGA VUOTA DOCUMENTI INLINE -->
-    <template id="documenti-empty-form-template">
-        <tr class="inline-form-row">
-            {{ documenti_formset.empty_form.id }}
-            <td>
-                <div class="inline-related-field">
-                    {{ documenti_formset.empty_form.tipo_documento }}
-                    <div class="related-actions inline-related-actions">
-                        <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="tipo_documento">+</button>
-                        <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="tipo_documento">âœŽ</button>
-                        <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="tipo_documento">âœ–</button>
-                    </div>
-                </div>
-            </td>
-            <td>{{ documenti_formset.empty_form.descrizione }}</td>
-            <td>{{ documenti_formset.empty_form.file }}</td>
-            <td class="inline-view-only-table-cell"><span class="table-muted">-</span></td>
-            <td>{{ documenti_formset.empty_form.scadenza }}</td>
-            <td class="inline-checkbox-cell">{{ documenti_formset.empty_form.visibile }}</td>
-            <td>{{ documenti_formset.empty_form.note }}</td>
-            <td class="inline-delete-cell">
-                <button type="button" class="inline-remove-btn" data-inline-action="remove">Rimuovi</button>
-            </td>
-        </tr>
-    </template>
-    <!-- FINE TEMPLATE RIGA VUOTA DOCUMENTI INLINE -->
-
     {% if famiglia and famiglia.indirizzo_principale %}
         {{ famiglia.indirizzo_principale.label_select|json_script:"famiglia-indirizzo-principale-label" }}
+        {{ famiglia.indirizzo_principale.pk|json_script:"famiglia-indirizzo-principale-id" }}
     {% else %}
         <script id="famiglia-indirizzo-principale-label" type="application/json">""</script>
+        <script id="famiglia-indirizzo-principale-id" type="application/json">""</script>
     {% endif %}
 
     {% if famiglia %}
@@ -1887,7 +1382,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=52"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=56"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -1966,6 +1461,7 @@
                 initialActiveTab: "{{ active_inline_tab|default:'studenti' }}",
                 defaultInlineTab: "studenti",
                 preferInitialActiveTab: {% if prefer_initial_active_tab %}true{% else %}false{% endif %},
+                canManageActiveFields: {% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %}true{% else %}false{% endif %},
                 urls: {
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
                     creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",

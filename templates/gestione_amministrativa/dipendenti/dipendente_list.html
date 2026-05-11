@@ -129,9 +129,7 @@
                                         <span class="anagrafica-record-main">
                                             <span class="table-main-text">{{ dipendente }}</span>
                                             <span class="table-subtext">
-                                                {% if dipendente.codice_dipendente %}
-                                                    Matricola {{ dipendente.codice_dipendente }}
-                                                {% elif dipendente.codice_fiscale %}
+                                                {% if dipendente.codice_fiscale %}
                                                     CF {{ dipendente.codice_fiscale }}
                                                 {% else %}
                                                     Dati anagrafici essenziali
@@ -142,9 +140,7 @@
                                 </td>
                                 <td class="family-label-cell">
                                     <div class="table-main-text">
-                                        {% if dipendente.is_educatore and dipendente.is_dipendente_operativo %}
-                                            {{ educator_terminology.selected_singular }} e dipendente
-                                        {% elif dipendente.is_educatore %}
+                                        {% if dipendente.is_educatore %}
                                             {{ educator_terminology.selected_singular }}
                                         {% else %}
                                             Dipendente
@@ -155,8 +151,6 @@
                                             {{ dipendente.classe_principale_tipo_label }} {{ dipendente.classe_principale_label }}
                                         {% elif dipendente.mansione %}
                                             {{ dipendente.mansione }}
-                                        {% elif dipendente.data_assunzione %}
-                                            Dal {{ dipendente.data_assunzione|date:"d/m/Y" }}
                                         {% else %}
                                             Ruolo amministrativo
                                         {% endif %}

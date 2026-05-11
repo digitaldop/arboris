@@ -33,6 +33,20 @@ window.ArborisFamilyLinkedAddress = (function () {
         }
     }
 
+    function getFamilyAddressId(config, addressSelect) {
+        const cfg = config || {};
+        return typeof cfg.getFamilyAddressId === "function"
+            ? (cfg.getFamilyAddressId(addressSelect) || "")
+            : (cfg.familyAddressId || "");
+    }
+
+    function getFamilyAddressLabel(config, addressSelect) {
+        const cfg = config || {};
+        return typeof cfg.getFamilyAddressLabel === "function"
+            ? (cfg.getFamilyAddressLabel(addressSelect) || "")
+            : (cfg.familyAddressLabel || "");
+    }
+
     function collectElements(root, selector) {
         if (typeof root === "string") {
             return Array.from(document.querySelectorAll(root));
@@ -87,16 +101,19 @@ window.ArborisFamilyLinkedAddress = (function () {
             return;
         }
 
-        const familyAddressId = typeof cfg.getFamilyAddressId === "function"
-            ? (cfg.getFamilyAddressId(addressSelect) || "")
-            : (cfg.familyAddressId || "");
-        const familyAddressLabel = typeof cfg.getFamilyAddressLabel === "function"
-            ? (cfg.getFamilyAddressLabel(addressSelect) || "")
-            : (cfg.familyAddressLabel || "");
+        const familyAddressId = getFamilyAddressId(cfg, addressSelect);
+        const familyAddressLabel = getFamilyAddressLabel(cfg, addressSelect);
         const specificHelpText = cfg.specificHelpText || "Indirizzo specifico";
-        const selectedFamilyPrefix = cfg.selectedFamilyPrefix || "Indirizzo famiglia: ";
-        const emptyFamilyPrefix = cfg.emptyFamilyPrefix || "Ereditera: ";
-        const emptyHelpText = cfg.emptyHelpText || "Se lasci vuoto, verra usato l'indirizzo principale della famiglia";
+        const selectedFamilyPrefix = cfg.selectedFamilyPrefix || "Indirizzo impostato come ";
+        const emptyFamilyPrefix = cfg.emptyFamilyPrefix || "Imposta l'indirizzo come ";
+        const emptyHelpText = cfg.emptyHelpText || "Nessun indirizzo principale disponibile";
+
+        wrapperCell
+            .querySelectorAll(cfg.applyActionSelector || '[data-inline-address-action="apply-family-address"]')
+            .forEach(function (button) {
+                button.disabled = !familyAddressId;
+                button.classList.toggle("is-disabled", !familyAddressId);
+            });
 
         if (addressSelect.value && familyAddressId && addressSelect.value === familyAddressId && familyAddressLabel) {
             help.textContent = selectedFamilyPrefix + familyAddressLabel;
@@ -104,6 +121,10 @@ window.ArborisFamilyLinkedAddress = (function () {
         }
 
         if (addressSelect.value) {
+            if (familyAddressId && familyAddressLabel) {
+                help.textContent = emptyFamilyPrefix + familyAddressLabel;
+                return;
+            }
             help.textContent = specificHelpText;
             return;
         }
@@ -116,15 +137,96 @@ window.ArborisFamilyLinkedAddress = (function () {
         help.textContent = emptyHelpText;
     }
 
+    function applyFamilyAddressToSelect(addressSelect, config) {
+        if (!addressSelect) {
+            return false;
+        }
+
+        const cfg = config || {};
+        const familyAddressId = getFamilyAddressId(cfg, addressSelect);
+        if (!familyAddressId) {
+            refreshInlineAddressHelp(addressSelect, cfg);
+            return false;
+        }
+
+        const previousValue = addressSelect.value || "";
+        addressSelect.value = familyAddressId;
+        markInheritedAddress(addressSelect, true);
+        if (addressSelect.value !== previousValue) {
+            addressSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        refreshInlineAddressHelp(addressSelect, cfg);
+        return true;
+    }
+
+    function getAddressPriorityIds(root, config) {
+        const cfg = config || {};
+        const ids = new Set();
+        const familyAddressId = getFamilyAddressId(cfg);
+        if (familyAddressId) {
+            ids.add(String(familyAddressId));
+        }
+
+        const scope = typeof cfg.relatedAddressScope === "function"
+            ? cfg.relatedAddressScope()
+            : (cfg.relatedAddressScope || root || document);
+
+        collectElements(scope, cfg.relatedAddressSelector || 'select[name$="-indirizzo"]').forEach(function (select) {
+            if (select && select.value) {
+                ids.add(String(select.value));
+            }
+        });
+
+        return ids;
+    }
+
+    function refreshRelatedAddressPriorities(root, config) {
+        const cfg = config || {};
+        const ids = getAddressPriorityIds(root, cfg);
+
+        collectElements(root || cfg.root || document, cfg.selector || 'select[name$="-indirizzo"]').forEach(function (select) {
+            Array.from(select.options || []).forEach(function (option) {
+                const isPriority = option.value && ids.has(String(option.value));
+                if (isPriority) {
+                    option.dataset.searchablePriority = "1";
+                    option.dataset.searchablePrioritySource = "family-linked-address";
+                    option.dataset.searchableGroup = cfg.priorityGroupLabel || "Indirizzi collegati";
+                } else if (option.dataset.searchablePrioritySource === "family-linked-address") {
+                    delete option.dataset.searchablePriority;
+                    delete option.dataset.searchablePrioritySource;
+                    delete option.dataset.searchableGroup;
+                }
+            });
+        });
+    }
+
+    function bindFamilyAddressApplyActions(root, config) {
+        const cfg = config || {};
+        collectElements(root || document, cfg.applyActionSelector || '[data-inline-address-action="apply-family-address"]').forEach(function (button) {
+            const bindFlag = cfg.applyActionBindFlag || "familyAddressApplyBound";
+            if (button.dataset[bindFlag] === "1") {
+                return;
+            }
+
+            button.dataset[bindFlag] = "1";
+            button.addEventListener("click", function () {
+                const wrapperCell = button.closest(cfg.wrapperSelector || "td");
+                const addressSelect = wrapperCell
+                    ? wrapperCell.querySelector(cfg.addressSelector || 'select[name$="-indirizzo"]')
+                    : null;
+                applyFamilyAddressToSelect(addressSelect, cfg);
+                refreshRelatedAddressPriorities(cfg.root || document, cfg);
+            });
+        });
+    }
+
     function syncInlineAddressToFamily(addressSelect, config) {
         if (!addressSelect) {
             return;
         }
 
         const cfg = config || {};
-        const familyAddressId = typeof cfg.getFamilyAddressId === "function"
-            ? (cfg.getFamilyAddressId(addressSelect) || "")
-            : (cfg.familyAddressId || "");
+        const familyAddressId = getFamilyAddressId(cfg, addressSelect);
         const isInherited = addressSelect.dataset.inheritedAddress === "1";
         const previousValue = addressSelect.value || "";
 
@@ -135,6 +237,14 @@ window.ArborisFamilyLinkedAddress = (function () {
                 if (previousValue) {
                     addressSelect.dispatchEvent(new Event("change", { bubbles: true }));
                 }
+            }
+            refreshInlineAddressHelp(addressSelect, cfg);
+            return;
+        }
+
+        if (cfg.syncFamilyAddressAutomatically === false) {
+            if (!addressSelect.value && isInherited) {
+                markInheritedAddress(addressSelect, false);
             }
             refreshInlineAddressHelp(addressSelect, cfg);
             return;
@@ -161,13 +271,15 @@ window.ArborisFamilyLinkedAddress = (function () {
 
             select.dataset[bindFlag] = "1";
             select.addEventListener("change", function () {
-                const familyAddressId = typeof cfg.getFamilyAddressId === "function"
-                    ? (cfg.getFamilyAddressId(select) || "")
-                    : (cfg.familyAddressId || "");
+                const familyAddressId = getFamilyAddressId(cfg, select);
                 markInheritedAddress(select, Boolean(familyAddressId && select.value === familyAddressId));
                 refreshInlineAddressHelp(select, cfg);
+                refreshRelatedAddressPriorities(cfg.root || document, cfg);
             });
         });
+
+        bindFamilyAddressApplyActions(root || document, cfg);
+        refreshRelatedAddressPriorities(root || document, cfg);
     }
 
     function applyInlineRowDefaults(row, config) {
@@ -196,7 +308,12 @@ window.ArborisFamilyLinkedAddress = (function () {
             return;
         }
 
-        if (!isPersisted && !addressSelect.value && cfg.markInheritedWhenEmpty !== false) {
+        if (
+            !isPersisted &&
+            !addressSelect.value &&
+            cfg.markInheritedWhenEmpty !== false &&
+            cfg.syncFamilyAddressAutomatically !== false
+        ) {
             markInheritedAddress(addressSelect, true);
         }
 
@@ -208,10 +325,15 @@ window.ArborisFamilyLinkedAddress = (function () {
         collectElements(root, cfg.rowSelector || ".inline-form-row").forEach(function (row) {
             applyInlineRowDefaults(row, cfg);
         });
+        const priorityRoot = typeof root === "string" ? (cfg.root || document) : (root || cfg.root || document);
+        refreshRelatedAddressPriorities(priorityRoot, cfg);
+        bindFamilyAddressApplyActions(priorityRoot, cfg);
     }
 
     function refreshInlineAddressHelpForCollection(root, config) {
         const cfg = config || {};
+        refreshRelatedAddressPriorities(root || cfg.root || document, cfg);
+        bindFamilyAddressApplyActions(root || cfg.root || document, cfg);
         collectElements(root, cfg.selector || 'select[name$="-indirizzo"]').forEach(function (select) {
             refreshInlineAddressHelp(select, cfg);
         });
@@ -232,6 +354,10 @@ window.ArborisFamilyLinkedAddress = (function () {
             refreshInlineAddressHelp(select, cfg);
         }
 
+        function applyFamilyAddress(select) {
+            return applyFamilyAddressToSelect(select, cfg);
+        }
+
         function refreshCollectionHelp(root) {
             refreshInlineAddressHelpForCollection(root || cfg.root || document, cfg);
         }
@@ -241,6 +367,7 @@ window.ArborisFamilyLinkedAddress = (function () {
             bindTracking: bindTracking,
             syncRows: syncRows,
             refreshSelectHelp: refreshSelectHelp,
+            applyFamilyAddress: applyFamilyAddress,
             refreshCollectionHelp: refreshCollectionHelp,
         };
     }

@@ -95,11 +95,15 @@ class CategoriaCalendario(models.Model):
     chiave_sistema = models.CharField(max_length=50, blank=True, null=True, unique=True)
     ordine = models.PositiveIntegerField(blank=True, null=True)
     attiva = models.BooleanField(default=True)
+    visibile_dashboard = models.BooleanField(
+        default=True,
+        help_text="Mostra gli eventi di questa categoria nel widget calendario della dashboard.",
+    )
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "claendario_categoria_calendario"
+        db_table = "calendario_categoria_calendario"
         ordering = ["ordine", "nome"]
         verbose_name = "Categoria calendario"
         verbose_name_plural = "Categorie calendario"
@@ -193,7 +197,7 @@ class EventoCalendario(models.Model):
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "claendario_evento_calendario"
+        db_table = "calendario_evento_calendario"
         ordering = ["data_inizio", "ora_inizio", "titolo"]
         verbose_name = "Evento calendario"
         verbose_name_plural = "Eventi calendario"

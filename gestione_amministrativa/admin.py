@@ -50,20 +50,22 @@ class DipendenteAdmin(admin.ModelAdmin):
     list_display = (
         "cognome",
         "nome",
-        "ruolo_anagrafico",
-        "codice_dipendente",
+        "ruolo_aziendale",
         "codice_fiscale",
         "classe_principale",
         "gruppo_classe_principale",
         "mansione",
         "sesso",
         "stato",
-        "data_assunzione",
-        "data_cessazione",
     )
-    list_filter = ("ruolo_anagrafico", "stato", "classe_principale", "gruppo_classe_principale")
-    search_fields = ("nome", "cognome", "codice_dipendente", "codice_fiscale", "email")
-    autocomplete_fields = ("indirizzo", "familiare_collegato", "classe_principale", "gruppo_classe_principale")
+    list_filter = ("ruolo_aziendale", "stato", "classe_principale", "gruppo_classe_principale")
+    search_fields = (
+        "persona_collegata__nome",
+        "persona_collegata__cognome",
+        "persona_collegata__codice_fiscale",
+        "persona_collegata__email",
+    )
+    autocomplete_fields = ("persona_collegata", "classe_principale", "gruppo_classe_principale")
     inlines = [ContrattoDipendenteInline]
 
 
@@ -88,7 +90,13 @@ class ContrattoDipendenteAdmin(admin.ModelAdmin):
         "attivo",
     )
     list_filter = ("tipo_contratto", "regime_orario", "attivo")
-    search_fields = ("dipendente__nome", "dipendente__cognome", "ccnl", "livello", "mansione")
+    search_fields = (
+        "dipendente__persona_collegata__nome",
+        "dipendente__persona_collegata__cognome",
+        "ccnl",
+        "livello",
+        "mansione",
+    )
     autocomplete_fields = ("dipendente", "tipo_contratto", "parametro_calcolo")
     date_hierarchy = "data_inizio"
     inlines = [SimulazioneCostoDipendenteInline]
@@ -108,9 +116,9 @@ class SimulazioneCostoDipendenteAdmin(admin.ModelAdmin):
     list_filter = ("attiva", "valido_dal")
     search_fields = (
         "titolo",
-        "contratto__dipendente__nome",
-        "contratto__dipendente__cognome",
-        "contratto__dipendente__codice_fiscale",
+        "contratto__dipendente__persona_collegata__nome",
+        "contratto__dipendente__persona_collegata__cognome",
+        "contratto__dipendente__persona_collegata__codice_fiscale",
         "livello",
         "qualifica",
     )
@@ -170,7 +178,11 @@ class BustaPagaDipendenteAdmin(admin.ModelAdmin):
         "costo_azienda_effettivo",
     )
     list_filter = ("stato", "anno", "mese")
-    search_fields = ("dipendente__nome", "dipendente__cognome", "dipendente__codice_fiscale")
+    search_fields = (
+        "dipendente__persona_collegata__nome",
+        "dipendente__persona_collegata__cognome",
+        "dipendente__persona_collegata__codice_fiscale",
+    )
     autocomplete_fields = ("dipendente", "contratto", "movimento_pagamento")
     inlines = [VoceBustaPagaInline]
 
@@ -179,7 +191,12 @@ class BustaPagaDipendenteAdmin(admin.ModelAdmin):
 class VoceBustaPagaAdmin(admin.ModelAdmin):
     list_display = ("busta_paga", "scenario", "tipo_voce", "codice", "descrizione", "importo")
     list_filter = ("scenario", "tipo_voce")
-    search_fields = ("descrizione", "codice", "busta_paga__dipendente__nome", "busta_paga__dipendente__cognome")
+    search_fields = (
+        "descrizione",
+        "codice",
+        "busta_paga__dipendente__persona_collegata__nome",
+        "busta_paga__dipendente__persona_collegata__cognome",
+    )
     autocomplete_fields = ("busta_paga",)
 
 
@@ -187,5 +204,5 @@ class VoceBustaPagaAdmin(admin.ModelAdmin):
 class DocumentoDipendenteAdmin(admin.ModelAdmin):
     list_display = ("dipendente", "tipo_documento", "titolo", "data_documento", "data_creazione")
     list_filter = ("tipo_documento",)
-    search_fields = ("dipendente__nome", "dipendente__cognome", "titolo")
+    search_fields = ("dipendente__persona_collegata__nome", "dipendente__persona_collegata__cognome", "titolo")
     autocomplete_fields = ("dipendente", "busta_paga")

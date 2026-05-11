@@ -8,6 +8,13 @@
         return /(^|[-_])(attivo|attiva)$/.test(name);
     }
 
+    function shouldRemainVisible(input) {
+        return Boolean(
+            input.dataset.activeFieldVisible === "1" ||
+            input.closest(".active-field-visible, [data-active-field-visible='1']")
+        );
+    }
+
     function getCellIndex(cell) {
         if (!cell || !cell.parentElement) {
             return -1;
@@ -68,7 +75,7 @@
 
     function scan(root) {
         (root || document).querySelectorAll('input[type="checkbox"]').forEach((input) => {
-            if (isActiveCheckbox(input)) {
+            if (isActiveCheckbox(input) && !shouldRemainVisible(input)) {
                 hideField(input);
             }
         });
@@ -89,7 +96,7 @@
                     }
 
                     if (node.matches('input[type="checkbox"]')) {
-                        if (isActiveCheckbox(node)) {
+                        if (isActiveCheckbox(node) && !shouldRemainVisible(node)) {
                             hideField(node);
                         }
                         return;

@@ -2,16 +2,20 @@
 {% load static currency rich_notes %}
 
 {% block title %}
-    {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo familiare{% endif %} - Arboris
+    {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}{{ create_profile_title|default:"Nuovo familiare" }}{% endif %} - Arboris
 {% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'lista_familiari' %}">Familiari</a>
+        {% if not familiare and create_profile_list_url %}
+            <a href="{% url create_profile_list_url %}">{{ create_profile_list_label }}</a>
+        {% else %}
+            <a href="{% url 'lista_familiari' %}">Familiari</a>
+        {% endif %}
         <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo{% endif %}</span>
+        <span>{% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}{{ create_profile_title|default:"Nuovo" }}{% endif %}</span>
     </div>
 {% endblock %}
 
@@ -20,7 +24,7 @@
         <div class="family-page-title-block">
             <div class="family-page-title-line">
                 <h1 class="page-title">
-                    {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}Nuovo familiare{% endif %}
+                    {% if familiare %}{{ familiare.nome }} {{ familiare.cognome }}{% else %}{{ create_profile_title|default:"Nuovo familiare" }}{% endif %}
                 </h1>
                 {% if familiare %}
                     <span class="family-status-pill{% if not familiare.attivo %} is-danger{% endif %}">
@@ -30,7 +34,7 @@
                 {% else %}
                     <span class="family-status-pill is-muted">
                         <span class="family-status-dot" aria-hidden="true"></span>
-                        Nuova scheda
+                        {{ create_profile_status|default:"Nuova scheda" }}
                     </span>
                 {% endif %}
             </div>
@@ -40,24 +44,26 @@
                     {{ familiare_famiglia_logica.label }}
                 {% elif familiare %}
                     Nessuna famiglia collegata
+                {% elif create_profile_scope %}
+                    Scheda anagrafica unica con profilo lavorativo gia' attivo
                 {% else %}
                     Inserimento nuova scheda familiare
                 {% endif %}
             </div>
         </div>
         <div class="page-head-actions family-page-actions">
-            <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_familiari' %}">
+            <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% if not familiare and create_profile_cancel_url %}{% url create_profile_cancel_url %}{% else %}{% url 'lista_familiari' %}{% endif %}">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Indietro</span>
             </button>
             {% if familiare %}
-                {% if studenti_formset and not usa_studenti_diretti and not studenti_diretti_form %}
+                {% if studenti_formset %}
                     <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-student-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">{{ student_terminology.selected_singular }}</span>
                     </button>
                 {% endif %}
-                {% if parenti_formset and not usa_parenti_diretti %}
+                {% if parenti_formset %}
                     <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-relative-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">Familiare</span>
@@ -78,9 +84,9 @@
             {% else %}
                 <button type="submit" form="familiare-detail-form" name="_save" class="btn btn-save-soft btn-icon-text" data-auto-save-for="familiare-detail-form">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                    <span class="btn-label">Salva familiare</span>
+                    <span class="btn-label">{{ create_profile_save_label|default:"Salva familiare" }}</span>
                 </button>
-                <button type="button" class="btn btn-intent-danger btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_familiari' %}">
+                <button type="button" class="btn btn-intent-danger btn-icon-text js-page-back-btn" data-fallback-url="{% if create_profile_cancel_url %}{% url create_profile_cancel_url %}{% else %}{% url 'lista_familiari' %}{% endif %}">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                     <span class="btn-label">Annulla</span>
                 </button>
@@ -242,8 +248,11 @@
                                                 {% if familiare.referente_principale %}<span class="family-status-pill is-muted">Referente</span>{% endif %}
                                                 {% if familiare.convivente %}<span class="family-status-pill is-muted">Convivente</span>{% endif %}
                                                 {% if familiare.abilitato_scambio_retta %}<span class="family-status-pill is-muted">Scambio retta</span>{% endif %}
-                                                {% if profilo_lavorativo and profilo_lavorativo.is_dipendente_operativo %}<span class="family-status-pill is-muted">Dipendente</span>{% endif %}
-                                                {% if profilo_lavorativo and profilo_lavorativo.is_educatore %}<span class="family-status-pill is-muted">{{ educator_terminology.selected_singular }}</span>{% endif %}
+                                                {% if profilo_lavorativo and profilo_lavorativo.is_educatore %}
+                                                    <span class="family-status-pill is-muted">{{ educator_terminology.selected_singular }}</span>
+                                                {% elif profilo_lavorativo and profilo_lavorativo.is_dipendente_operativo %}
+                                                    <span class="family-status-pill is-muted">Dipendente</span>
+                                                {% endif %}
                                                 {% if not familiare.attivo %}<span class="family-status-pill is-danger">Non attivo</span>{% endif %}
                                                 {% if not familiare.referente_principale and not familiare.convivente and not familiare.abilitato_scambio_retta and not profilo_lavorativo and familiare.attivo %}
                                                     <span class="family-muted-value">Nessun ruolo aggiuntivo</span>
@@ -312,7 +321,7 @@
                                 <a href="#profilo-lavorativo-card" class="family-stat-card">
                                     <span class="family-stat-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
                                     <span class="family-stat-content">
-                                        <span class="family-stat-value">{% if profilo_lavorativo.is_educatore and profilo_lavorativo.is_dipendente_operativo %}2{% else %}1{% endif %}</span>
+                                        <span class="family-stat-value">1</span>
                                         <span class="family-stat-label">Profilo lavorativo</span>
                                         <span class="family-stat-link">{{ profilo_contratti|length }} contratti, {{ profilo_buste_paga|length }} buste</span>
                                     </span>
@@ -390,9 +399,7 @@
                                             <div>
                                                 <div>Ruolo</div>
                                                 <strong>
-                                                    {% if profilo_lavorativo.is_educatore and profilo_lavorativo.is_dipendente_operativo %}
-                                                        {{ educator_terminology.selected_singular }} e dipendente
-                                                    {% elif profilo_lavorativo.is_educatore %}
+                                                    {% if profilo_lavorativo.is_educatore %}
                                                         {{ educator_terminology.selected_singular }}
                                                     {% else %}
                                                         Dipendente
@@ -648,10 +655,13 @@
                                                 <button type="button" class="related-btn related-btn-delete inline-related-delete" id="delete-indirizzo-btn" data-related-type="indirizzo" aria-label="Elimina indirizzo" title="Elimina indirizzo" data-floating-text="Elimina indirizzo">
                                                     <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                                                 </button>
+                                                <button type="button" class="related-btn related-btn-suggested-address" data-address-suggestion-apply aria-label="Usa indirizzo suggerito" title="Usa indirizzo suggerito" data-floating-text="Usa indirizzo suggerito" disabled>
+                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="inline-address-help" id="familiare-address-help">
-                                            Se lasci vuoto, verr&agrave; usato l'indirizzo principale della famiglia.
+                                        <div class="inline-address-help" id="familiare-address-help-editor" data-familiare-address-help>
+                                            Imposta l'indirizzo come indirizzo principale dei collegamenti.
                                         </div>
                                         {{ form.indirizzo.errors }}
                                     </div>
@@ -732,26 +742,37 @@
                                             {{ form.classe_principale_educatore.errors }}
                                         </div>
                                     {% endif %}
-                                    <div class="family-student-editor-field family-student-editor-field-check">
-                                        <label class="family-student-editor-check family-editor-switch" for="{{ form.attivo.id_for_label }}">
-                                            <span class="family-editor-switch-copy">
-                                                <strong>Familiare attivo</strong>
-                                            </span>
-                                            <span class="fondo-plan-switch-control">
-                                                {{ form.attivo }}
-                                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
-                                            </span>
-                                        </label>
-                                        {{ form.attivo.errors }}
-                                    </div>
+                                    {% if form.profilo_mansione %}
+                                        <div class="family-student-editor-field family-work-employee-field">
+                                            <label for="{{ form.profilo_mansione.id_for_label }}">{{ form.profilo_mansione.label }}</label>
+                                            {{ form.profilo_mansione }}
+                                            <div class="inline-address-help">{{ form.profilo_mansione.help_text }}</div>
+                                            {{ form.profilo_mansione.errors }}
+                                        </div>
+                                    {% endif %}
+                                    {% if form.profilo_iban %}
+                                        <div class="family-student-editor-field family-work-profile-field">
+                                            <label for="{{ form.profilo_iban.id_for_label }}">{{ form.profilo_iban.label }}</label>
+                                            {{ form.profilo_iban }}
+                                            <div class="inline-address-help">{{ form.profilo_iban.help_text }}</div>
+                                            {{ form.profilo_iban.errors }}
+                                        </div>
+                                    {% endif %}
+                                    {% if form.profilo_stato %}
+                                        <div class="family-student-editor-field family-work-profile-field">
+                                            <label for="{{ form.profilo_stato.id_for_label }}">{{ form.profilo_stato.label }}</label>
+                                            {{ form.profilo_stato }}
+                                            {{ form.profilo_stato.errors }}
+                                        </div>
+                                    {% endif %}
                                 </div>
 
                                 <div class="family-student-card-editor-actions">
                                     <button type="submit" name="_save" class="btn btn-save-soft btn-sm btn-icon-text">
                                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                        <span class="btn-label">Salva familiare</span>
+                                        <span class="btn-label">{{ create_profile_save_label|default:"Salva familiare" }}</span>
                                     </button>
-                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_familiari' %}">
+                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text js-page-back-btn" data-fallback-url="{% if create_profile_cancel_url %}{% url create_profile_cancel_url %}{% else %}{% url 'lista_familiari' %}{% endif %}">
                                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                                         <span class="btn-label">Annulla</span>
                                     </button>
@@ -1165,11 +1186,23 @@
                                                 <button type="button" class="related-btn related-btn-add" id="add-indirizzo-btn">+</button>
                                                 <button type="button" class="related-btn related-btn-edit" id="edit-indirizzo-btn">E</button>
                                                 <button type="button" class="related-btn related-btn-delete" id="delete-indirizzo-btn">X</button>
+                                                <button type="button" class="related-btn related-btn-suggested-address" data-address-suggestion-apply aria-label="Usa indirizzo suggerito" title="Usa indirizzo suggerito" data-floating-text="Usa indirizzo suggerito" disabled>
+                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="inline-address-help mode-edit-field" id="familiare-address-help">
-                                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                                        <div class="inline-address-help mode-edit-field" id="familiare-address-help" data-familiare-address-help>
+                                            Imposta l'indirizzo come indirizzo principale dei collegamenti.
                                         </div>
+                                        {% if familiare_indirizzi_correlati %}
+                                            <div class="related-address-suggestions mode-edit-field" id="familiare-address-suggestions-summary">
+                                                {% for suggerimento in familiare_indirizzi_correlati|slice:":3" %}
+                                                    <span class="related-address-suggestion-chip">
+                                                        {{ suggerimento.label }}{% if suggerimento.count > 1 %} ({{ suggerimento.count }}){% endif %}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
                                         {{ form.indirizzo.errors }}
                                     </td>
                                 </tr>
@@ -1287,24 +1320,41 @@
                                     </tr>
                                 {% endif %}
 
-                                <tr>
-                                    <th>{{ form.attivo.label_tag }}</th>
-                                    <td>
-                                        <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{{ familiare.attivo|si_no }}</div>
-                                        <div class="mode-edit-field family-editor-switch-wrap">
-                                            <label class="family-student-editor-check family-editor-switch family-editor-switch-inline" for="{{ form.attivo.id_for_label }}">
-                                                <span class="family-editor-switch-copy">
-                                                    <strong>Familiare attivo</strong>
-                                                </span>
-                                                <span class="fondo-plan-switch-control">
-                                                    {{ form.attivo }}
-                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
-                                                </span>
-                                            </label>
-                                        </div>
-                                        {{ form.attivo.errors }}
-                                    </td>
-                                </tr>
+                                {% if form.profilo_mansione %}
+                                    <tr>
+                                        <th>{{ form.profilo_mansione.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.mansione %}{{ profilo_lavorativo.mansione }}{% else %}-{% endif %}</div>
+                                            <div class="mode-edit-field">{{ form.profilo_mansione }}</div>
+                                            <div class="inline-address-help mode-edit-field">{{ form.profilo_mansione.help_text }}</div>
+                                            {{ form.profilo_mansione.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+
+                                {% if form.profilo_iban %}
+                                    <tr>
+                                        <th>{{ form.profilo_iban.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo and profilo_lavorativo.iban %}{{ profilo_lavorativo.iban }}{% else %}-{% endif %}</div>
+                                            <div class="mode-edit-field">{{ form.profilo_iban }}</div>
+                                            <div class="inline-address-help mode-edit-field">{{ form.profilo_iban.help_text }}</div>
+                                            {{ form.profilo_iban.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+
+                                {% if form.profilo_stato %}
+                                    <tr>
+                                        <th>{{ form.profilo_stato.label_tag }}</th>
+                                        <td>
+                                            <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if profilo_lavorativo %}{{ profilo_lavorativo.get_stato_display }}{% else %}-{% endif %}</div>
+                                            <div class="mode-edit-field">{{ form.profilo_stato }}</div>
+                                            {{ form.profilo_stato.errors }}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+
                             </table>
                         </div>
                     </div>
@@ -1414,7 +1464,7 @@
                                 data-student-singular="{{ student_terminology.selected_singular }}"
                                 data-student-new-title="Nuovo {{ student_terminology.selected_singular_lower }}"
                             >
-                                {% if usa_studenti_diretti %}
+                                {% if usa_studenti_diretti_cards %}
                                     {% for relazione in studenti_collegati_diretti %}
                                         {% with studente_collegato=relazione.studente %}
                                         <article class="family-person-card family-student-card" data-student-card data-direct-student-card data-student-id="{{ studente_collegato.pk }}">
@@ -1560,7 +1610,7 @@
                                 data-avatar-sprite="{% static 'images/arboris-avatars.svg' %}"
                                 data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
                             >
-                                {% if usa_parenti_diretti %}
+                                {% if usa_parenti_diretti_cards %}
                                     {% for parente in parenti_collegati_diretti %}
                                         <article class="family-person-card family-relative-card" data-relative-card data-direct-relative-card data-relative-id="{{ parente.pk }}">
                                             <a href="{% url 'modifica_familiare' parente.pk %}" class="family-person-avatar family-person-avatar-relative" aria-label="Apri scheda di {{ parente.nome }} {{ parente.cognome }}">
@@ -1715,7 +1765,7 @@
                                 </thead>
                                 <tbody>
                                     {% for f in parenti_formset %}
-                                        <tr class="inline-form-row{% if studenti_famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}" data-relative-id="{{ f.instance.pk }}"{% endif %}>
+                                        <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}" data-relative-id="{{ f.instance.pk }}"{% endif %}>
                                             <td>
                                                 {{ f.id }}
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if f.instance.pk and f.instance.cognome %}{{ f.instance.cognome }}{% else %}<span class="table-muted">Non indicato</span>{% endif %}</div>
@@ -1750,9 +1800,9 @@
                                                     {% if f.instance.pk and f.instance.indirizzo %}
                                                         Indirizzo specifico
                                                     {% elif studenti_famiglia and studenti_famiglia.indirizzo_principale %}
-                                                        Ereditera: {{ studenti_famiglia.indirizzo_principale.label_select }}
+                                                        Imposta l'indirizzo come {{ studenti_famiglia.indirizzo_principale.label_select }}
                                                     {% else %}
-                                                        Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                                                        Nessun indirizzo principale disponibile
                                                     {% endif %}
                                                 </div>
                                             </td>
@@ -1779,7 +1829,7 @@
                                                 {% endif %}
                                             </td>
                                         </tr>
-                                        <tr class="inline-subform-row{% if studenti_famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
+                                        <tr class="inline-subform-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_familiare' f.instance.pk %}"{% endif %}>
                                             <td colspan="14">
                                                 <div class="inline-subform-grid">
                                                     <div class="inline-subform-field"><label>Data nascita</label>{{ f.data_nascita }}{{ f.data_nascita.errors }}</div>
@@ -2005,12 +2055,218 @@
             </div>
         </div>
 
+        {% if profilo_lavorativo %}
+            <div class="admin-section inline-lock-container relative-work-inline" id="profilo-lavorativo-inline" data-relative-work-inline>
+                <div class="inline-section-head relative-work-inline-head">
+                    <div class="tab-nav" role="tablist" aria-label="Profilo lavorativo">
+                        <button type="button" class="tab-btn is-active" data-work-tab-target="tab-lavoro-generali">Dati generali (1)</button>
+                        <button type="button" class="tab-btn" data-work-tab-target="tab-lavoro-contratti">Contratto ({{ profilo_contratti|length }})</button>
+                        <button type="button" class="tab-btn" data-work-tab-target="tab-lavoro-buste">Buste paga ({{ profilo_buste_paga|length }})</button>
+                    </div>
+                    <div class="relative-work-inline-actions">
+                        <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-relative-main-action="edit">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                            <span class="btn-label">Modifica dati lavorativi</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-body relative-work-inline-body">
+                        <div class="relative-work-tab-panel is-active" id="tab-lavoro-generali" data-relative-work-panel>
+                            <div class="relative-work-summary-grid">
+                                <div class="relative-work-summary-item">
+                                    <span class="relative-work-summary-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                    <span class="relative-work-summary-copy">
+                                        <span>Ruolo</span>
+                                        <strong>
+                                            {% if profilo_lavorativo.is_educatore %}
+                                                {{ educator_terminology.selected_singular }}
+                                            {% else %}
+                                                Dipendente
+                                            {% endif %}
+                                        </strong>
+                                    </span>
+                                </div>
+                                <div class="relative-work-summary-item">
+                                    <span class="relative-work-summary-icon family-stat-orange" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if profilo_lavorativo.is_educatore %}calendar{% else %}briefcase{% endif %}"></use></svg></span>
+                                    <span class="relative-work-summary-copy">
+                                        <span>{% if profilo_lavorativo.is_educatore %}Classe{% else %}Mansione{% endif %}</span>
+                                        <strong>
+                                            {% if profilo_lavorativo.is_educatore %}
+                                                {{ profilo_lavorativo.classe_principale_label|default:"-" }}
+                                            {% else %}
+                                                {{ profilo_lavorativo.mansione|default:"-" }}
+                                            {% endif %}
+                                        </strong>
+                                    </span>
+                                </div>
+                                <div class="relative-work-summary-item">
+                                    <span class="relative-work-summary-icon family-stat-purple" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                    <span class="relative-work-summary-copy">
+                                        <span>Dati di pagamento</span>
+                                        <strong>{{ profilo_lavorativo.iban|default:"IBAN non indicato" }}</strong>
+                                    </span>
+                                </div>
+                                <div class="relative-work-summary-item">
+                                    <span class="relative-work-summary-icon family-stat-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                                    <span class="relative-work-summary-copy">
+                                        <span>Stato</span>
+                                        <strong>{{ profilo_lavorativo.get_stato_display }}</strong>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="relative-work-tab-panel" id="tab-lavoro-contratti" data-relative-work-panel hidden>
+                            <div class="relative-work-panel-head">
+                                <div>
+                                    <h3>Contratto in essere</h3>
+                                    {% if profilo_contratto_corrente %}
+                                        <p>{{ profilo_contratto_corrente.label_select }}</p>
+                                    {% else %}
+                                        <p>Nessun contratto attivo nel periodo corrente.</p>
+                                    {% endif %}
+                                </div>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <a
+                                        href="{% url 'crea_contratto_dipendente' profilo_lavorativo.pk %}?popup=1"
+                                        class="btn btn-secondary btn-sm btn-icon-text"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'crea_contratto_dipendente' profilo_lavorativo.pk %}?popup=1"
+                                        data-popup-window-name="arboris-contratto-dipendente-popup"
+                                        data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        <span class="btn-label">Aggiungi</span>
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="relative-work-list">
+                                {% for contratto in profilo_contratti %}
+                                    <article class="relative-work-row">
+                                        <div>
+                                            <strong>{{ contratto.tipo_contratto|default:"Contratto" }}</strong>
+                                            <span>{{ contratto.data_inizio|date:"d/m/Y" }} - {% if contratto.data_fine %}{{ contratto.data_fine|date:"d/m/Y" }}{% else %}oggi{% endif %}</span>
+                                            {% if contratto.mansione %}<span>{{ contratto.mansione }}</span>{% endif %}
+                                        </div>
+                                        <div class="relative-work-row-value">
+                                            <strong>{{ contratto.retribuzione_lorda_totale_mensile|euro }} &euro;</strong>
+                                            <span>{{ contratto.get_regime_orario_display }}</span>
+                                        </div>
+                                        <div class="relative-work-row-actions">
+                                            <a
+                                                href="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                                class="btn btn-secondary btn-sm btn-icon-text"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_contratto_dipendente' contratto.pk %}?popup=1"
+                                                data-popup-window-name="arboris-contratto-dipendente-popup"
+                                                data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                            >
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                <span class="btn-label">Modifica</span>
+                                            </a>
+                                            {% if can_manage_gestione_amministrativa %}
+                                                <a
+                                                    href="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                                                    class="btn btn-danger btn-sm btn-icon-text"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'elimina_contratto_dipendente' contratto.pk %}?popup=1"
+                                                    data-popup-window-name="arboris-contratto-dipendente-delete-popup"
+                                                    data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                                                >
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                    <span class="btn-label">Elimina</span>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </article>
+                                {% empty %}
+                                    <div class="empty-state compact-empty-state">Nessun contratto registrato.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="relative-work-tab-panel" id="tab-lavoro-buste" data-relative-work-panel hidden>
+                            <div class="relative-work-panel-head">
+                                <div>
+                                    <h3>Buste paga</h3>
+                                    <p>Cedolini, importi e allegati collegati al profilo lavorativo.</p>
+                                </div>
+                                {% if can_manage_gestione_amministrativa %}
+                                    <a
+                                        href="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ profilo_lavorativo.pk }}"
+                                        class="btn btn-secondary btn-sm btn-icon-text"
+                                        data-window-popup="1"
+                                        data-popup-url="{% url 'crea_busta_paga_dipendente' %}?dipendente={{ profilo_lavorativo.pk }}&popup=1"
+                                        data-popup-window-name="arboris-busta-paga-popup"
+                                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                    >
+                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        <span class="btn-label">Aggiungi</span>
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="relative-work-list">
+                                {% for busta in profilo_buste_paga %}
+                                    <article class="relative-work-row">
+                                        <div>
+                                            <strong>{{ busta.periodo_label }}</strong>
+                                            <span>{{ busta.get_stato_display }}{% if busta.contratto_id %} - {{ busta.contratto.tipo_contratto|default:"Contratto" }}{% endif %}</span>
+                                            {% if busta.file_busta_paga %}
+                                                <a href="{{ busta.file_busta_paga.url }}" target="_blank" rel="noopener">File busta paga</a>
+                                            {% endif %}
+                                            {% for documento in busta.documenti.all %}
+                                                <a href="{{ documento.file.url }}" target="_blank" rel="noopener">{{ documento.titolo }}</a>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="relative-work-row-value">
+                                            <strong>{{ busta.netto_effettivo|default:busta.netto_previsto|euro }} &euro;</strong>
+                                            <span>Costo {{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</span>
+                                        </div>
+                                        <div class="relative-work-row-actions">
+                                            <a
+                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
+                                                class="btn btn-secondary btn-sm btn-icon-text"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                data-popup-window-name="arboris-busta-paga-popup"
+                                                data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                            >
+                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                <span class="btn-label">Modifica</span>
+                                            </a>
+                                            {% if can_manage_gestione_amministrativa %}
+                                                <a
+                                                    href="{% url 'elimina_busta_paga_dipendente' busta.pk %}"
+                                                    class="btn btn-danger btn-sm btn-icon-text"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                    data-popup-window-name="arboris-busta-paga-delete-popup"
+                                                    data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                                                >
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                    <span class="btn-label">Elimina</span>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </article>
+                                {% empty %}
+                                    <div class="empty-state compact-empty-state">Nessuna busta paga registrata.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         {% include "anagrafica/familiari/includes/scambio_retta_inline.html" %}
 
         <div class="form-actions sticky-form-actions mode-edit-only{% if not familiare %} family-create-sticky-actions{% endif %}" id="familiare-sticky-form-actions">
             {% if not familiare %}
                 <div class="family-create-sticky-context">
-                    <span class="family-card-sticky-kicker">Nuovo familiare</span>
+                    <span class="family-card-sticky-kicker">{{ create_profile_title|default:"Nuovo familiare" }}</span>
                     <strong>Completa e salva la scheda</strong>
                 </div>
                 <div class="family-create-sticky-controls">
@@ -2027,10 +2283,17 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
                 <span class="btn-label">Salva e aggiungi un altro</span>
             </button>
-            <button type="button" class="btn {% if familiare %}btn-secondary{% else %}btn-intent-danger{% endif %} btn-icon-text" id="sticky-cancel-edit-familiare-btn" data-fallback-url="{% url 'lista_familiari' %}">
-                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
-                <span class="btn-label">{% if familiare %}Annulla modifiche{% else %}Annulla{% endif %}</span>
-            </button>
+            {% if familiare %}
+                <a href="{% url 'modifica_familiare' familiare.pk %}" class="btn btn-secondary btn-icon-text" id="sticky-cancel-edit-familiare-btn" data-view-url="{% url 'modifica_familiare' familiare.pk %}" data-fallback-url="{% url 'lista_familiari' %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Annulla modifiche</span>
+                </a>
+            {% else %}
+                <button type="button" class="btn btn-intent-danger btn-icon-text" id="sticky-cancel-edit-familiare-btn" data-fallback-url="{% if create_profile_cancel_url %}{% url create_profile_cancel_url %}{% else %}{% url 'lista_familiari' %}{% endif %}">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            {% endif %}
             {% if not familiare %}
                 </div>
             {% endif %}
@@ -2089,9 +2352,9 @@
                     </div>
                     <div class="inline-address-help" data-role="address-help">
                         {% if studenti_famiglia.indirizzo_principale %}
-                            Ereditera: {{ studenti_famiglia.indirizzo_principale.label_select }}
+                            Imposta l'indirizzo come {{ studenti_famiglia.indirizzo_principale.label_select }}
                         {% else %}
-                            Se lasci vuoto, verra usato l'indirizzo principale della famiglia
+                            Nessun indirizzo principale disponibile
                         {% endif %}
                     </div>
                 </td>
@@ -2186,7 +2449,12 @@
         </tr>
     </template>
 
-    <script id="familiare-famiglia-indirizzo-label" type="application/json">""</script>
+    {% if studenti_famiglia and studenti_famiglia.indirizzo_principale %}
+        {{ studenti_famiglia.indirizzo_principale.label_select|json_script:"familiare-famiglia-indirizzo-label" }}
+    {% else %}
+        <script id="familiare-famiglia-indirizzo-label" type="application/json">""</script>
+    {% endif %}
+    {{ familiare_indirizzi_correlati|json_script:"familiare-indirizzi-correlati" }}
 
     {% if familiare %}
         <div class="app-dialog-overlay family-note-dialog-overlay is-hidden" id="relative-note-dialog-overlay" aria-hidden="true">
@@ -2220,7 +2488,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=28"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=36"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
@@ -2246,6 +2514,7 @@
 
             ArborisFamiliareForm.init({
                 familiareId: "{{ familiare.pk|default:'new' }}",
+                canManageActiveFields: {% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %}true{% else %}false{% endif %},
                 urls: {
                     creaRelazioneFamiliare: "{% url 'crea_relazione_familiare' %}",
                     creaIndirizzo: "{% url 'crea_indirizzo' %}",
@@ -2262,9 +2531,19 @@
             }
 
             if (stickyCancelButton) {
-                stickyCancelButton.addEventListener("click", function () {
+                stickyCancelButton.addEventListener("click", function (event) {
                     const formEl = document.getElementById("familiare-detail-form");
+                    const activeMainEditor = document.querySelector("[data-relative-main-card] .relative-main-card-editor");
+                    if (activeMainEditor) {
+                        event.preventDefault();
+                        const cancelButton = activeMainEditor.querySelector("[data-relative-main-action='cancel']");
+                        if (cancelButton) {
+                            cancelButton.click();
+                            return;
+                        }
+                    }
                     if (formEl && formEl.classList.contains("is-create-mode")) {
+                        event.preventDefault();
                         const fallbackUrl = stickyCancelButton.dataset.fallbackUrl || "{% url 'lista_familiari' %}";
                         const targetUrl = window.ArborisAppNavigation && typeof window.ArborisAppNavigation.resolveBackUrl === "function"
                             ? window.ArborisAppNavigation.resolveBackUrl(fallbackUrl)
@@ -2272,10 +2551,20 @@
                         window.location.assign(targetUrl || fallbackUrl);
                         return;
                     }
+                    if (formEl && !formEl.classList.contains("is-create-mode")) {
+                        const viewUrl = stickyCancelButton.dataset.viewUrl || stickyCancelButton.getAttribute("href");
+                        if (viewUrl) {
+                            event.preventDefault();
+                            window.location.assign(viewUrl);
+                            return;
+                        }
+                    }
                     if (window.familiareViewMode && typeof window.familiareViewMode.returnToView === "function") {
+                        event.preventDefault();
                         window.familiareViewMode.returnToView();
                         return;
                     }
+                    event.preventDefault();
                     if (typeof window.ArborisReloadWithLongWait === "function") {
                         window.ArborisReloadWithLongWait();
                     } else {

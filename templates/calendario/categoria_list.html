@@ -72,13 +72,16 @@
                                     {% if categoria_obj.is_system_category %}
                                         <span class="calendar-state-pill is-muted">Sistema</span>
                                     {% endif %}
+                                    {% if not categoria_obj.visibile_dashboard %}
+                                        <span class="calendar-state-pill is-muted">Nascosta dashboard</span>
+                                    {% endif %}
                                 </div>
                                 <div class="calendar-category-row-meta">
                                     Ordine {{ categoria_obj.ordine }} - {{ categoria_obj.count_eventi_agenda }} eventi a calendario
                                 </div>
                             </div>
                             <div class="calendar-category-row-status">
-                                {% active_toggle categoria_obj %}
+                                {% active_toggle categoria_obj "visibile_dashboard" %}
                             </div>
                             <div class="calendar-category-row-actions">
                                 <a href="{{ modifica_categoria_url }}?popup=1" class="btn btn-secondary btn-sm" data-window-popup="1" data-popup-url="{{ modifica_categoria_url }}?popup=1" data-popup-window-features="width=820,height=640,resizable=yes,scrollbars=yes">Modifica</a>

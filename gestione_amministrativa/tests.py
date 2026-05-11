@@ -33,6 +33,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.user = User.objects.create_user(username="admin", password="test")
         SistemaUtentePermessi.objects.create(
             user=self.user,
+            permesso_anagrafica=LivelloPermesso.GESTIONE,
             permesso_gestione_amministrativa=LivelloPermesso.GESTIONE,
         )
         self.impostazioni = SistemaImpostazioniGenerali.objects.create(
@@ -144,6 +145,22 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, f"{reverse('modifica_educatore', args=[educatore.pk])}")
         self.assertNotContains(response, "Rossi Mario")
 
+    def test_scheda_dipendente_usa_scheda_familiare_collegata(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("modifica_dipendente", args=[self.dipendente.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.dipendente.refresh_from_db()
+        self.assertIsNotNone(self.dipendente.familiare_collegato_id)
+        self.assertEqual(self.dipendente.familiare_collegato.nome, self.dipendente.nome)
+        self.assertEqual(self.dipendente.familiare_collegato.cognome, self.dipendente.cognome)
+        self.assertRedirects(
+            response,
+            f"{reverse('modifica_familiare', args=[self.dipendente.familiare_collegato_id])}#profilo-lavorativo-inline",
+            fetch_redirect_response=False,
+        )
+
     def test_dashboard_gestione_amministrativa_renderizza_nuovo_layout_e_tooltip(self):
         self.client.force_login(self.user)
 
@@ -181,18 +198,25 @@ class SimulazioneCostoDipendenteTests(TestCase):
 
         response = self.client.get(reverse("crea_dipendente"))
 
+        self.assertRedirects(
+            response,
+            f"{reverse('crea_familiare')}?profilo_lavorativo=dipendente",
+            fetch_redirect_response=False,
+        )
+
+        response = self.client.get(f"{reverse('crea_familiare')}?profilo_lavorativo=dipendente")
+
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "ga-dipendente-form-shell")
-        self.assertContains(response, "ga-dipendente-related-field")
-        self.assertContains(response, "Profilo anagrafico")
-        self.assertContains(response, "Familiare collegato")
-        self.assertContains(response, "Classe principale")
+        self.assertContains(response, "familiare-detail-form")
+        self.assertContains(response, "Nuovo dipendente")
+        self.assertContains(response, "Scheda anagrafica unica con profilo lavorativo gia' attivo")
+        self.assertContains(response, "Anche dipendente")
+        self.assertContains(response, "Anche educatore")
+        self.assertContains(response, "profilo_dipendente_attivo")
         self.assertContains(response, "Mansione")
-        self.assertContains(response, 'id="add-indirizzo-btn"')
-        self.assertContains(response, 'id="add-contratto-btn"')
-        self.assertContains(response, 'value="Italiana"')
-        self.assertContains(response, 'data-nazionalita-label="Italiana"')
-        self.assertContains(response, "Se ancora in essere, non compilare")
+        self.assertContains(response, "Salva dipendente")
+        self.assertContains(response, "Italiana")
+        self.assertNotContains(response, "Data cessazione")
         self.assertEqual(italia.label_nazionalita, "Italiana")
 
     def test_crea_educatore_accetta_gruppo_classe_principale(self):
@@ -227,8 +251,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "iban": "",
                 "codice_dipendente": "",
                 "stato": "attivo",
-                "data_assunzione": "",
-                "data_cessazione": "",
                 "note": "",
             },
         )
@@ -290,8 +312,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "iban": "",
                 "codice_dipendente": "",
                 "stato": "attivo",
-                "data_assunzione": "",
-                "data_cessazione": "",
                 "note": "",
             },
         )

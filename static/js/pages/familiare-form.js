@@ -20,6 +20,7 @@ window.ArborisFamiliareForm = (function () {
         const targetInputId = "familiare-inline-target";
         const inlineLockContainerId = "familiare-inline-lock-container";
         const inlineEditButtonId = "enable-inline-edit-familiare-btn";
+        const canManageActiveFields = Boolean(config.canManageActiveFields);
 
         function getFamiliareTabStorageKey() {
             return `arboris-familiare-form-active-tab-${config.familiareId || "new"}`;
@@ -132,7 +133,10 @@ window.ArborisFamiliareForm = (function () {
                 return readFamiliareStudentiInlineDefaults().indirizzo_principale_id || "";
             },
             getFamilyAddressLabel: getStudenteInlineFamigliaIndirizzoPrincipaleLabel,
-            emptyFamilyPrefix: "Ereditera: ",
+            selectedFamilyPrefix: "Indirizzo impostato come ",
+            emptyFamilyPrefix: "Imposta l'indirizzo come ",
+            emptyHelpText: "Nessun indirizzo principale disponibile",
+            wrapperSelector: ".inline-studente-address-cell, .inline-family-address-cell, .family-student-editor-address-field",
         };
 
         const studentiInlineAddressTrackingConfig = Object.assign({
@@ -147,6 +151,8 @@ window.ArborisFamiliareForm = (function () {
                 return (readFamiliareStudentiInlineDefaults().cognome_famiglia || "").trim();
             },
             attivoSelector: 'input[type="checkbox"][name$="-attivo"]',
+            syncFamilyAddressAutomatically: false,
+            markInheritedWhenEmpty: false,
         }, studentiInlineAddressConfig);
         const studentiInlineAddressCollection = familyLinkedAddress.createInlineAddressCollection(studentiInlineAddressTrackingConfig);
         const studentiInlineAddressDefaults = familyLinkedAddress.createInlineAddressCollection(studentiInlineDefaultsConfig);
@@ -328,7 +334,51 @@ window.ArborisFamiliareForm = (function () {
         }
 
         function getActiveMainEditorCard() {
-            return document.querySelector("[data-relative-main-card].is-card-editing");
+            let card = document.querySelector("[data-relative-main-card].is-card-editing");
+            if (!card) {
+                const editor = document.querySelector("[data-relative-main-card] .relative-main-card-editor");
+                card = editor ? editor.closest("[data-relative-main-card]") : null;
+                if (card) {
+                    card.classList.add("is-card-editing");
+                    card.dataset.relativeMainEditing = "1";
+                }
+            }
+
+            if (!card) {
+                return null;
+            }
+
+            if (card.querySelector(".relative-main-card-editor")) {
+                return card;
+            }
+
+            card.classList.remove("is-card-editing");
+            delete card.dataset.relativeMainEditing;
+            return null;
+        }
+
+        function getActiveVisualEditingCard(cardSelector, editorSelector) {
+            const cards = Array.from(document.querySelectorAll(cardSelector));
+            for (const card of cards) {
+                if (card.querySelector(editorSelector)) {
+                    return card;
+                }
+
+                card.classList.remove("is-card-editing");
+            }
+            return null;
+        }
+
+        function getActiveStudentEditingCard() {
+            return getActiveVisualEditingCard("[data-student-card].is-card-editing", ".family-student-card-editor");
+        }
+
+        function getActiveRelativeEditingCard() {
+            return getActiveVisualEditingCard("[data-relative-card].is-card-editing", ".family-relative-card-editor");
+        }
+
+        function getActiveDocumentEditingCard() {
+            return getActiveVisualEditingCard("[data-document-card].is-card-editing", ".family-document-card-editor");
         }
 
         function getActiveRelativePageEditContext() {
@@ -343,7 +393,7 @@ window.ArborisFamiliareForm = (function () {
                 };
             }
 
-            const studentCard = document.querySelector("[data-student-card].is-card-editing");
+            const studentCard = getActiveStudentEditingCard();
             if (studentCard) {
                 return {
                     kind: "student-card",
@@ -354,7 +404,7 @@ window.ArborisFamiliareForm = (function () {
                 };
             }
 
-            const relativeCard = document.querySelector("[data-relative-card].is-card-editing");
+            const relativeCard = getActiveRelativeEditingCard();
             if (relativeCard) {
                 return {
                     kind: "relative-card",
@@ -365,7 +415,7 @@ window.ArborisFamiliareForm = (function () {
                 };
             }
 
-            const documentCard = document.querySelector("[data-document-card].is-card-editing");
+            const documentCard = getActiveDocumentEditingCard();
             if (documentCard) {
                 return {
                     kind: "document-card",
@@ -474,9 +524,30 @@ window.ArborisFamiliareForm = (function () {
 
             menu.hidden = !shouldShow;
             menu.classList.toggle("is-hidden", !shouldShow);
+            menu.style.display = shouldShow ? "flex" : "";
+            menu.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+            if (shouldShow) {
+                menu.style.position = "fixed";
+                menu.style.left = "50%";
+                menu.style.right = "auto";
+                menu.style.bottom = "16px";
+                menu.style.width = "min(1160px, calc(100vw - 48px))";
+                menu.style.transform = "translateX(-50%)";
+                menu.style.zIndex = "260";
+            } else {
+                menu.style.position = "";
+                menu.style.left = "";
+                menu.style.right = "";
+                menu.style.bottom = "";
+                menu.style.width = "";
+                menu.style.transform = "";
+                menu.style.zIndex = "";
+            }
             if (spacer) {
                 spacer.hidden = !shouldShow;
                 spacer.classList.toggle("is-hidden", !shouldShow);
+                spacer.style.display = shouldShow ? "block" : "";
+                spacer.setAttribute("aria-hidden", shouldShow ? "false" : "true");
             }
             if (form) {
                 form.classList.toggle("has-relative-card-sticky-actions", shouldShow);
@@ -675,6 +746,24 @@ window.ArborisFamiliareForm = (function () {
             }
 
             root.querySelectorAll(".related-btn").forEach(function (button) {
+                if (button.classList.contains("related-btn-suggested-address")) {
+                    const actionLabel = "Usa indirizzo suggerito";
+                    button.setAttribute("aria-label", actionLabel);
+                    button.setAttribute("title", actionLabel);
+                    button.dataset.floatingText = actionLabel;
+                    button.innerHTML = relatedIconHtml("home");
+                    return;
+                }
+
+                if (button.classList.contains("related-btn-family-address")) {
+                    const actionLabel = "Imposta indirizzo principale";
+                    button.setAttribute("aria-label", actionLabel);
+                    button.setAttribute("title", actionLabel);
+                    button.dataset.floatingText = actionLabel;
+                    button.innerHTML = relatedIconHtml("home");
+                    return;
+                }
+
                 const isAdd = button.classList.contains("related-btn-add");
                 const isEdit = button.classList.contains("related-btn-edit");
                 const actionLabel = isAdd ? `Nuovo ${noun}` : isEdit ? `Modifica ${noun}` : `Elimina ${noun}`;
@@ -755,6 +844,10 @@ window.ArborisFamiliareForm = (function () {
 
         function appendCheckboxField(grid, root, selector, labelText, extraClass, editor, options) {
             const cfg = options || {};
+            if (cfg.visible === false) {
+                return;
+            }
+
             const input = root ? root.querySelector(selector) : null;
             if (!input) {
                 return;
@@ -823,30 +916,97 @@ window.ArborisFamiliareForm = (function () {
             });
         }
 
+        function setEditorFieldDisabled(field, disabled) {
+            if (!field) {
+                return;
+            }
+
+            field.disabled = disabled;
+            field.readOnly = disabled;
+            if (disabled) {
+                field.setAttribute("aria-disabled", "true");
+            } else {
+                field.removeAttribute("aria-disabled");
+            }
+        }
+
+        function setFieldContainerDisabled(field, enabled) {
+            if (!field) {
+                return;
+            }
+
+            const container = field.closest(".family-work-class-field, .family-work-employee-field, .family-work-profile-field, .family-student-editor-field, tr");
+            if (field.matches("select[data-searchable-select]")) {
+                setSearchableSelectDisabled(field, !enabled);
+            } else {
+                setEditorFieldDisabled(field, !enabled);
+            }
+            if (container) {
+                container.classList.toggle("is-disabled", !enabled);
+                container.setAttribute("aria-disabled", enabled ? "false" : "true");
+            }
+        }
+
         function syncEducatorClassField(root) {
             const scope = root || document;
+            const employeeToggle = scope.querySelector("#id_profilo_dipendente_attivo")
+                || document.getElementById("id_profilo_dipendente_attivo");
             const educatorToggle = scope.querySelector("#id_profilo_educatore_attivo")
                 || document.getElementById("id_profilo_educatore_attivo");
             const classField = scope.querySelector("#id_classe_principale_educatore")
                 || document.getElementById("id_classe_principale_educatore");
+            const employeeFields = [
+                scope.querySelector("#id_profilo_mansione") || document.getElementById("id_profilo_mansione"),
+            ].filter(Boolean);
+            const workFields = [
+                scope.querySelector("#id_profilo_iban") || document.getElementById("id_profilo_iban"),
+                scope.querySelector("#id_profilo_stato") || document.getElementById("id_profilo_stato"),
+            ].filter(Boolean);
 
-            if (!educatorToggle || !classField) {
+            if (!employeeToggle && !educatorToggle && !classField && !employeeFields.length && !workFields.length) {
                 return;
             }
 
-            const update = function () {
-                const enabled = Boolean(educatorToggle.checked);
-                const container = classField.closest(".family-work-class-field, .family-student-editor-field, tr");
-                setSearchableSelectDisabled(classField, !enabled);
-                if (container) {
-                    container.classList.toggle("is-disabled", !enabled);
-                    container.setAttribute("aria-disabled", enabled ? "false" : "true");
+            let isSyncingProfileChoice = false;
+            const enforceExclusiveProfileChoice = function (source) {
+                if (isSyncingProfileChoice) {
+                    return;
                 }
+                isSyncingProfileChoice = true;
+                if (employeeToggle && educatorToggle && employeeToggle.checked && educatorToggle.checked) {
+                    if (source === employeeToggle) {
+                        educatorToggle.checked = false;
+                    } else {
+                        employeeToggle.checked = false;
+                    }
+                }
+                isSyncingProfileChoice = false;
+            };
+            const update = function (source) {
+                enforceExclusiveProfileChoice(source);
+                const employeeEnabled = employeeToggle ? Boolean(employeeToggle.checked) : false;
+                const educatorEnabled = educatorToggle ? Boolean(educatorToggle.checked) : false;
+                setFieldContainerDisabled(classField, educatorEnabled);
+                employeeFields.forEach(function (field) {
+                    setFieldContainerDisabled(field, employeeEnabled);
+                });
+                workFields.forEach(function (field) {
+                    setFieldContainerDisabled(field, employeeEnabled || educatorEnabled);
+                });
             };
 
-            if (educatorToggle.dataset.educatorClassFieldBound !== "1") {
+            if (employeeToggle && employeeToggle.dataset.workProfileFieldsBound !== "1") {
+                employeeToggle.dataset.workProfileFieldsBound = "1";
+                employeeToggle.addEventListener("change", function () {
+                    update(employeeToggle);
+                });
+            }
+            if (educatorToggle && educatorToggle.dataset.workProfileFieldsBound !== "1") {
                 educatorToggle.dataset.educatorClassFieldBound = "1";
-                educatorToggle.addEventListener("change", update);
+                educatorToggle.dataset.workProfileFieldsBound = "1";
+                educatorToggle.addEventListener("change", function () {
+                    update(educatorToggle);
+                });
             }
 
             update();
@@ -860,6 +1020,7 @@ window.ArborisFamiliareForm = (function () {
                 formTools.initCodiceFiscale(editor);
             }
             wireInlineRelatedButtons(editor);
+            applyFamiliareAddressSuggestions(editor);
             bindStandaloneSexFromRelazioneFamiliare();
             setFieldsEnabled(editor, true);
             syncEducatorClassField(editor);
@@ -922,8 +1083,9 @@ window.ArborisFamiliareForm = (function () {
                 helpText: "Abilita classe principale, studenti collegati, contratto, buste paga e documenti.",
             });
             appendInputField(grid, formRoot, "#id_classe_principale_educatore", "Classe principale", "family-student-editor-field-wide family-work-class-field", editor);
-            appendCheckboxField(grid, formRoot, "#id_attivo", "Attivo", "", editor);
-
+            appendInputField(grid, formRoot, "#id_profilo_mansione", "Mansione", "family-student-editor-field-half family-work-employee-field", editor);
+            appendInputField(grid, formRoot, "#id_profilo_iban", "Dati di pagamento", "family-student-editor-field-half family-work-profile-field", editor);
+            appendInputField(grid, formRoot, "#id_profilo_stato", "Stato lavorativo", "family-student-editor-field-third family-work-profile-field", editor);
             editor.appendChild(grid);
 
             const actions = document.createElement("div");
@@ -942,6 +1104,11 @@ window.ArborisFamiliareForm = (function () {
             cancelButton.className = "btn btn-secondary btn-sm btn-icon-text";
             cancelButton.dataset.relativeMainAction = "cancel";
             cancelButton.innerHTML = iconHtml("chevron-left", "Annulla modifiche");
+            cancelButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeRelativeMainCardEditor({ restoreValues: true });
+            });
 
             actions.appendChild(saveButton);
             actions.appendChild(cancelButton);
@@ -950,9 +1117,15 @@ window.ArborisFamiliareForm = (function () {
             card.appendChild(editor);
             card.classList.add("is-card-editing");
             card.dataset.relativeMainEditing = "1";
-            initEditorEnhancements(editor);
+            refreshRelativeCardStickyActions();
+            try {
+                initEditorEnhancements(editor);
+            } catch (error) {
+                console.error("Errore durante l'inizializzazione dell'editor familiare", error);
+            }
             wireRelativeMainCardActions(editor);
             refreshRelativePageActionLocks();
+            window.requestAnimationFrame(refreshRelativeCardStickyActions);
             syncRelativeViewSideHeight();
             return editor;
         }
@@ -1002,8 +1175,12 @@ window.ArborisFamiliareForm = (function () {
             if (form) {
                 delete form.dataset.pendingRelativeMainSubmit;
             }
+            if (window.familiareViewMode && typeof window.familiareViewMode.setEditing === "function") {
+                window.familiareViewMode.setEditing(false);
+            }
             setFieldsEnabled(document.getElementById("familiare-lock-container"), false);
             refreshRelativePageActionLocks();
+            refreshRelativeCardStickyActions();
             updateMainButtons();
             syncRelativeViewSideHeight();
         }
@@ -1029,7 +1206,11 @@ window.ArborisFamiliareForm = (function () {
                     if (action === "edit") {
                         openRelativeMainCardEditor(element);
                     } else if (action === "cancel") {
+                        const hadMainEditor = Boolean(getActiveMainEditorCard());
                         closeRelativeMainCardEditor({ restoreValues: true });
+                        if (!hadMainEditor && window.familiareViewMode && typeof window.familiareViewMode.returnToView === "function") {
+                            window.familiareViewMode.returnToView();
+                        }
                     }
                 });
             });
@@ -1069,8 +1250,12 @@ window.ArborisFamiliareForm = (function () {
                 cancelButton.addEventListener("click", function (event) {
                     const context = getActiveRelativePageEditContext();
                     event.preventDefault();
+                    event.stopPropagation();
+                    if (typeof event.stopImmediatePropagation === "function") {
+                        event.stopImmediatePropagation();
+                    }
 
-                    if (!context || context.kind === "main") {
+                    if (!context || context.kind === "main" || getActiveMainEditorCard()) {
                         closeRelativeMainCardEditor({ restoreValues: true });
                     } else if (context.kind === "student-card") {
                         cancelStudentCardEditor(context.card);
@@ -1302,13 +1487,17 @@ window.ArborisFamiliareForm = (function () {
             appendSubformField(grid, subformRow, 'select[name$="-nazionalita"]', "family-student-editor-field-third", editor);
             appendSubformField(grid, subformRow, 'input[name$="-codice_fiscale"]', "family-student-editor-field-third", editor);
             appendCardAddressField(grid, row, editor, ".inline-studente-address-cell");
-            appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-attivo"]', "Attivo", "", editor);
+            appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-attivo"]', "Attivo", "", editor, {
+                visible: canManageActiveFields,
+            });
 
             editor.appendChild(grid);
             editor.appendChild(createCardActions("studenti", "student"));
             card.appendChild(editor);
             card.classList.add("is-card-editing");
             initEditorEnhancements(editor);
+            studentiInlineAddressDefaults.bindTracking(editor);
+            studentiInlineAddressDefaults.refreshCollectionHelp(editor);
             wireStudentCardActions(editor);
             refreshRelativePageActionLocks();
             return editor;
@@ -1564,7 +1753,7 @@ window.ArborisFamiliareForm = (function () {
         }
 
         function cancelStudentCardEditor(button) {
-            const card = button && button.closest ? button.closest("[data-student-card]") : document.querySelector("[data-student-card].is-card-editing");
+            const card = button && button.closest ? button.closest("[data-student-card]") : getActiveStudentEditingCard();
             const row = getStudentRowFromCard(card);
             if (!card || !row) return;
             if (!inlineFormsets.isRowPersisted(row)) {
@@ -1579,7 +1768,7 @@ window.ArborisFamiliareForm = (function () {
         }
 
         function cancelRelativeCardEditor(button) {
-            const card = button && button.closest ? button.closest("[data-relative-card]") : document.querySelector("[data-relative-card].is-card-editing");
+            const card = button && button.closest ? button.closest("[data-relative-card]") : getActiveRelativeEditingCard();
             const row = getRelativeRowFromCard(card);
             if (!card || !row) return;
             if (!inlineFormsets.isRowPersisted(row)) {
@@ -1594,7 +1783,7 @@ window.ArborisFamiliareForm = (function () {
         }
 
         function cancelDocumentCardEditor(button) {
-            const card = button && button.closest ? button.closest("[data-document-card]") : document.querySelector("[data-document-card].is-card-editing");
+            const card = button && button.closest ? button.closest("[data-document-card]") : getActiveDocumentEditingCard();
             const row = getDocumentRowFromCard(card);
             if (!card || !row) return;
             if (!inlineFormsets.isRowPersisted(row)) {
@@ -1675,50 +1864,100 @@ window.ArborisFamiliareForm = (function () {
             }
         }
 
+        function handleStudentCardAction(element, event) {
+            if (!element || (event && event.__arborisStudentCardActionHandled)) return;
+
+            const action = element.dataset.studentCardAction || "";
+            const context = getActiveRelativePageEditContext();
+
+            if (event) {
+                event.__arborisStudentCardActionHandled = true;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            if (context && !isAllowedDuringRelativeCardEdit(element, context)) {
+                showRelativeCardLockMessage(element, context.message);
+                return;
+            }
+
+            if (action === "add") addStudentCardFromView(element);
+            if (action === "edit") openStudentCardEditor(element.closest("[data-student-card]"));
+            if (action === "cancel") cancelStudentCardEditor(element);
+            if (action === "remove") removeCardEditor(element, { cardSelector: "[data-student-card]", getRow: getStudentRowFromCard, manager: inlineManagers.studenti, target: "studenti", fallbackLabel: "questo studente" });
+        }
+
+        function bindStudentCardActionDelegation() {
+            const list = getStudentCardList();
+            if (!list || list.dataset.studentCardActionDelegateBound === "1") return;
+
+            list.dataset.studentCardActionDelegateBound = "1";
+            list.addEventListener("click", function (event) {
+                const element = event.target.closest("[data-student-card-action]");
+                if (!element || !list.contains(element)) return;
+                handleStudentCardAction(element, event);
+            }, true);
+        }
+
         function wireStudentCardActions(root) {
             const container = root || document;
             if (!container || typeof container.querySelectorAll !== "function") return;
 
+            bindStudentCardActionDelegation();
             container.querySelectorAll("[data-student-card-action]").forEach(function (element) {
                 if (element.dataset.studentCardActionBound === "1") return;
                 element.dataset.studentCardActionBound = "1";
                 element.addEventListener("click", function (event) {
-                    const action = element.dataset.studentCardAction || "";
-                    const context = getActiveRelativePageEditContext();
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (context && !isAllowedDuringRelativeCardEdit(element, context)) {
-                        showRelativeCardLockMessage(element, context.message);
-                        return;
-                    }
-                    if (action === "add") addStudentCardFromView(element);
-                    if (action === "edit") openStudentCardEditor(element.closest("[data-student-card]"));
-                    if (action === "cancel") cancelStudentCardEditor(element);
-                    if (action === "remove") removeCardEditor(element, { cardSelector: "[data-student-card]", getRow: getStudentRowFromCard, manager: inlineManagers.studenti, target: "studenti", fallbackLabel: "questo studente" });
+                    handleStudentCardAction(element, event);
                 });
             });
+        }
+
+        function handleRelativeCardAction(element, event) {
+            if (!element || (event && event.__arborisRelativeCardActionHandled)) return;
+
+            const action = element.dataset.relativeCardAction || "";
+            const context = getActiveRelativePageEditContext();
+
+            if (event) {
+                event.__arborisRelativeCardActionHandled = true;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            if (context && !isAllowedDuringRelativeCardEdit(element, context)) {
+                showRelativeCardLockMessage(element, context.message);
+                return;
+            }
+
+            if (action === "add") addRelativeCardFromView(element);
+            if (action === "edit") openRelativeCardEditor(element.closest("[data-relative-card]"));
+            if (action === "cancel") cancelRelativeCardEditor(element);
+            if (action === "remove") removeCardEditor(element, { cardSelector: "[data-relative-card]", getRow: getRelativeRowFromCard, manager: inlineManagers.parenti, target: "parenti", fallbackLabel: "questo familiare" });
+        }
+
+        function bindRelativeCardActionDelegation() {
+            const list = getRelativeCardList();
+            if (!list || list.dataset.relativeCardActionDelegateBound === "1") return;
+
+            list.dataset.relativeCardActionDelegateBound = "1";
+            list.addEventListener("click", function (event) {
+                const element = event.target.closest("[data-relative-card-action]");
+                if (!element || !list.contains(element)) return;
+                handleRelativeCardAction(element, event);
+            }, true);
         }
 
         function wireRelativeCardActions(root) {
             const container = root || document;
             if (!container || typeof container.querySelectorAll !== "function") return;
 
+            bindRelativeCardActionDelegation();
             container.querySelectorAll("[data-relative-card-action]").forEach(function (element) {
                 if (element.dataset.relativeCardActionBound === "1") return;
                 element.dataset.relativeCardActionBound = "1";
                 element.addEventListener("click", function (event) {
-                    const action = element.dataset.relativeCardAction || "";
-                    const context = getActiveRelativePageEditContext();
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (context && !isAllowedDuringRelativeCardEdit(element, context)) {
-                        showRelativeCardLockMessage(element, context.message);
-                        return;
-                    }
-                    if (action === "add") addRelativeCardFromView(element);
-                    if (action === "edit") openRelativeCardEditor(element.closest("[data-relative-card]"));
-                    if (action === "cancel") cancelRelativeCardEditor(element);
-                    if (action === "remove") removeCardEditor(element, { cardSelector: "[data-relative-card]", getRow: getRelativeRowFromCard, manager: inlineManagers.parenti, target: "parenti", fallbackLabel: "questo familiare" });
+                    handleRelativeCardAction(element, event);
                 });
             });
         }
@@ -2246,6 +2485,168 @@ window.ArborisFamiliareForm = (function () {
         let refreshRelazioneButtons = function () {};
         let refreshIndirizzoButtons = function () {};
 
+        function readJsonScript(scriptId, fallbackValue) {
+            const script = document.getElementById(scriptId);
+            if (!script) {
+                return fallbackValue;
+            }
+            try {
+                return JSON.parse(script.textContent);
+            } catch (error) {
+                return fallbackValue;
+            }
+        }
+
+        function getAddressSuggestions() {
+            const payload = readJsonScript("familiare-indirizzi-correlati", []);
+            return Array.isArray(payload) ? payload : [];
+        }
+
+        function getBestAddressSuggestion() {
+            const suggestions = getAddressSuggestions();
+            return suggestions.length ? suggestions[0] : null;
+        }
+
+        function updateAddressSuggestionHelp(select, bestSuggestion) {
+            document.querySelectorAll("[data-familiare-address-help], #familiare-address-help").forEach(function (help) {
+                const canApply = Boolean(bestSuggestion && (!select || String(select.value || "") !== String(bestSuggestion.id)));
+                help.classList.toggle("is-clickable-address-help", canApply);
+                help.setAttribute("role", canApply ? "button" : "note");
+                help.tabIndex = canApply ? 0 : -1;
+                if (!bestSuggestion) {
+                    help.textContent = "Nessun indirizzo principale disponibile tra i collegamenti.";
+                    return;
+                }
+                const countLabel = bestSuggestion.count === 1 ? "1 collegamento" : `${bestSuggestion.count} collegamenti`;
+                help.textContent = `Imposta l'indirizzo come ${bestSuggestion.label} (${countLabel}${bestSuggestion.sources_label ? ": " + bestSuggestion.sources_label : ""}).`;
+            });
+        }
+
+        function refreshAddressSuggestionButton() {
+            const select = document.getElementById("id_indirizzo");
+            const bestSuggestion = getBestAddressSuggestion();
+            document.querySelectorAll("[data-address-suggestion-apply]").forEach(function (button) {
+                const canApply = Boolean(select && bestSuggestion && String(select.value || "") !== String(bestSuggestion.id));
+                button.disabled = !canApply;
+                button.classList.toggle("is-disabled", !canApply);
+                if (bestSuggestion) {
+                    button.dataset.floatingText = `Usa ${bestSuggestion.label}`;
+                    button.setAttribute("title", `Usa ${bestSuggestion.label}`);
+                    button.setAttribute("aria-label", `Usa ${bestSuggestion.label}`);
+                }
+            });
+            updateAddressSuggestionHelp(select, bestSuggestion);
+        }
+
+        function applyBestFamiliareAddressSuggestion() {
+            const currentSelect = document.getElementById("id_indirizzo");
+            const bestSuggestion = getBestAddressSuggestion();
+            if (!currentSelect || !bestSuggestion) {
+                return;
+            }
+            const previousValue = currentSelect.value || "";
+            currentSelect.value = String(bestSuggestion.id);
+            if ((currentSelect.value || "") !== previousValue) {
+                currentSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            refreshIndirizzoButtons();
+            refreshAddressSuggestionButton();
+        }
+
+        function applyFamiliareAddressSuggestions(root) {
+            const scope = root || document;
+            const suggestions = getAddressSuggestions();
+            if (!suggestions.length) {
+                refreshAddressSuggestionButton();
+                return;
+            }
+            const suggestionsById = new Map(suggestions.map(function (suggestion) {
+                return [String(suggestion.id), suggestion];
+            }));
+            const select = document.getElementById("id_indirizzo");
+            if (select) {
+                Array.from(select.options || []).forEach(function (option) {
+                    const suggestion = suggestionsById.get(String(option.value || ""));
+                    if (suggestion) {
+                        option.dataset.searchablePriority = "1";
+                        option.dataset.searchablePrioritySource = "familiare-related-address";
+                        option.dataset.searchableGroup = "Indirizzi correlati";
+                        option.dataset.searchText = `${option.textContent || ""} ${suggestion.sources_label || ""}`.trim();
+                    } else if (option.dataset.searchablePrioritySource === "familiare-related-address") {
+                        delete option.dataset.searchablePriority;
+                        delete option.dataset.searchablePrioritySource;
+                        delete option.dataset.searchableGroup;
+                        delete option.dataset.searchText;
+                    }
+                });
+            }
+            if (window.ArborisFamigliaAutocomplete && typeof window.ArborisFamigliaAutocomplete.refresh === "function") {
+                window.ArborisFamigliaAutocomplete.refresh(scope);
+            }
+            refreshAddressSuggestionButton();
+        }
+
+        function bindFamiliareAddressSuggestion() {
+            const select = document.getElementById("id_indirizzo");
+            if (select && select.dataset.relatedAddressSuggestionBound !== "1") {
+                select.dataset.relatedAddressSuggestionBound = "1";
+                select.addEventListener("change", refreshAddressSuggestionButton);
+            }
+            document.querySelectorAll("[data-address-suggestion-apply]").forEach(function (button) {
+                if (button.dataset.addressSuggestionBound === "1") {
+                    return;
+                }
+                button.dataset.addressSuggestionBound = "1";
+                button.addEventListener("click", function () {
+                    applyBestFamiliareAddressSuggestion();
+                });
+            });
+            document.querySelectorAll("[data-familiare-address-help], #familiare-address-help").forEach(function (help) {
+                if (help.dataset.addressSuggestionHelpBound === "1") {
+                    return;
+                }
+                help.dataset.addressSuggestionHelpBound = "1";
+                help.addEventListener("click", function () {
+                    if (!help.classList.contains("is-clickable-address-help")) {
+                        return;
+                    }
+                    applyBestFamiliareAddressSuggestion();
+                });
+                help.addEventListener("keydown", function (event) {
+                    if (!help.classList.contains("is-clickable-address-help")) {
+                        return;
+                    }
+                    if (event.key !== "Enter" && event.key !== " ") {
+                        return;
+                    }
+                    event.preventDefault();
+                    applyBestFamiliareAddressSuggestion();
+                });
+            });
+        }
+
+        function bindRelativeWorkInlineTabs() {
+            document.querySelectorAll("[data-relative-work-inline]").forEach(function (root) {
+                if (root.dataset.relativeWorkTabsBound === "1") {
+                    return;
+                }
+                root.dataset.relativeWorkTabsBound = "1";
+                root.querySelectorAll("[data-work-tab-target]").forEach(function (button) {
+                    button.addEventListener("click", function () {
+                        const targetId = button.dataset.workTabTarget || "";
+                        root.querySelectorAll("[data-work-tab-target]").forEach(function (item) {
+                            item.classList.toggle("is-active", item === button);
+                        });
+                        root.querySelectorAll("[data-relative-work-panel]").forEach(function (panel) {
+                            const active = panel.id === targetId;
+                            panel.hidden = !active;
+                            panel.classList.toggle("is-active", active);
+                        });
+                    });
+                });
+            });
+        }
+
         const relazioneCrud = routes.wireCrudButtonsById({
             select: relazioneSelect,
             relatedType: "relazione_familiare",
@@ -2265,6 +2666,8 @@ window.ArborisFamiliareForm = (function () {
             openRelatedPopup: relatedPopups.openRelatedPopup,
         });
         refreshIndirizzoButtons = indirizzoCrud.refresh;
+        bindFamiliareAddressSuggestion();
+        applyFamiliareAddressSuggestions(document);
         if (relazioneSelect) {
             relazioneSelect.addEventListener("change", function () {
                 updateMainButtons();
@@ -2327,6 +2730,7 @@ window.ArborisFamiliareForm = (function () {
         bindScambioRettaNavigation();
         syncEducatorClassField(document);
         initRelativeNoteDialog();
+        bindRelativeWorkInlineTabs();
         wireRelativeMainCardActions(document);
         bindRelativePageActionLock();
         bindRelativeCardStickyActions();

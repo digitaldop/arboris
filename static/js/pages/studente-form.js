@@ -528,19 +528,42 @@ window.ArborisStudenteForm = (function () {
         }
 
         function getActiveMainEditorCard() {
-            return document.querySelector("[data-student-main-card].is-card-editing");
+            const card = document.querySelector("[data-student-main-card].is-card-editing");
+            if (!card) {
+                return null;
+            }
+
+            if (card.querySelector(".student-main-card-editor")) {
+                return card;
+            }
+
+            card.classList.remove("is-card-editing");
+            delete card.dataset.studentMainEditing;
+            return null;
+        }
+
+        function getActiveVisualEditingCard(cardSelector, editorSelector) {
+            const cards = Array.from(document.querySelectorAll(cardSelector));
+            for (const card of cards) {
+                if (card.querySelector(editorSelector)) {
+                    return card;
+                }
+
+                card.classList.remove("is-card-editing");
+            }
+            return null;
         }
 
         function getActiveEnrollmentEditingCard() {
-            return document.querySelector("[data-enrollment-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-enrollment-card].is-card-editing", ".student-enrollment-card-editor");
         }
 
         function getActiveDocumentEditingCard() {
-            return document.querySelector("[data-document-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-document-card].is-card-editing", ".family-document-card-editor");
         }
 
         function getActiveRelativeEditingCard() {
-            return document.querySelector("[data-relative-card].is-card-editing");
+            return getActiveVisualEditingCard("[data-relative-card].is-card-editing", ".family-relative-card-editor");
         }
 
         function getActiveStudentPageEditContext() {
@@ -2795,12 +2818,54 @@ window.ArborisStudenteForm = (function () {
             });
         }
 
+        function handleRelativeCardAction(element, event) {
+            if (!element || (event && event.__arborisRelativeCardActionHandled)) {
+                return;
+            }
+
+            const action = element.dataset.relativeCardAction || "";
+
+            if (event) {
+                event.__arborisRelativeCardActionHandled = true;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+
+            if (action === "add") {
+                addRelativeCardFromView(element);
+            } else if (action === "edit") {
+                openRelativeCardEditor(element.closest("[data-relative-card]"));
+            } else if (action === "cancel") {
+                cancelRelativeCardEditor(element);
+            } else if (action === "remove") {
+                removeRelativeCardEditor(element);
+            }
+        }
+
+        function bindRelativeCardActionDelegation() {
+            const list = getRelativeCardList();
+            if (!list || list.dataset.relativeCardActionDelegateBound === "1") {
+                return;
+            }
+
+            list.dataset.relativeCardActionDelegateBound = "1";
+            list.addEventListener("click", function (event) {
+                const element = event.target.closest("[data-relative-card-action]");
+                if (!element || !list.contains(element)) {
+                    return;
+                }
+
+                handleRelativeCardAction(element, event);
+            }, true);
+        }
+
         function wireRelativeCardActions(root) {
             const container = root || document;
             if (!container || typeof container.querySelectorAll !== "function") {
                 return;
             }
 
+            bindRelativeCardActionDelegation();
             container.querySelectorAll("[data-relative-card-action]").forEach(function (element) {
                 if (element.dataset.relativeCardActionBound === "1") {
                     return;
@@ -2808,19 +2873,7 @@ window.ArborisStudenteForm = (function () {
 
                 element.dataset.relativeCardActionBound = "1";
                 element.addEventListener("click", function (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    const action = element.dataset.relativeCardAction || "";
-                    if (action === "add") {
-                        addRelativeCardFromView(element);
-                    } else if (action === "edit") {
-                        openRelativeCardEditor(element.closest("[data-relative-card]"));
-                    } else if (action === "cancel") {
-                        cancelRelativeCardEditor(element);
-                    } else if (action === "remove") {
-                        removeRelativeCardEditor(element);
-                    }
+                    handleRelativeCardAction(element, event);
                 });
             });
         }

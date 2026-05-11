@@ -2019,7 +2019,7 @@
                             data-ui-icons-sprite="{% static 'images/arboris-ui-icons.svg' %}"
                             data-relative-new-title="Nuovo genitore o tutore"
                         >
-                            {% if usa_parenti_diretti %}
+                            {% if usa_parenti_diretti_cards %}
                                 {% for relazione in familiari_collegati_diretti %}
                                     {% with parente=relazione.familiare %}
                                     <article class="family-person-card family-relative-card" data-relative-card data-direct-relative-card data-relative-id="{{ parente.pk }}">
@@ -2916,7 +2916,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=53"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=55"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

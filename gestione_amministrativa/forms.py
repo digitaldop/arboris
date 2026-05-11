@@ -12,7 +12,7 @@ from anagrafica.forms import (
     make_searchable_select,
     split_classe_principale_reference,
 )
-from anagrafica.models import Citta, Familiare, Indirizzo, Nazione
+from anagrafica.models import Citta, Familiare, Indirizzo, Nazione, Persona
 from anagrafica.utils import validate_and_normalize_phone_number
 
 from .models import (
@@ -22,6 +22,8 @@ from .models import (
     ParametroCalcoloStipendio,
     RegimeOrarioDipendente,
     RuoloAnagraficoDipendente,
+    RuoloAziendaleDipendente,
+    SessoDipendente,
     SimulazioneCostoDipendente,
     TipoContrattoDipendente,
 )
@@ -38,23 +40,23 @@ class CittaCodiceCatastaleSelect(forms.Select):
         return option
 
 
-class FamiliareCollegatoSelect(forms.Select):
+class PersonaCollegataSelect(forms.Select):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
         if value and hasattr(value, "instance"):
-            familiare = value.instance
-            indirizzo = familiare.indirizzo_effettivo
+            persona = value.instance
+            indirizzo = persona.indirizzo_effettivo
             option["attrs"].update(
                 {
-                    "data-nome": familiare.nome or "",
-                    "data-cognome": familiare.cognome or "",
-                    "data-telefono": familiare.telefono_principale or "",
-                    "data-email": familiare.email_principale or "",
-                    "data-codice-fiscale": (familiare.codice_fiscale or "").upper().strip(),
-                    "data-sesso": familiare.sesso or "",
-                    "data-data-nascita": familiare.data_nascita.isoformat() if familiare.data_nascita else "",
-                    "data-luogo-nascita-id": familiare.luogo_nascita_id or "",
-                    "data-nazionalita-label": familiare.nazionalita_display or "",
+                    "data-nome": persona.nome or "",
+                    "data-cognome": persona.cognome or "",
+                    "data-telefono": persona.telefono_principale or "",
+                    "data-email": persona.email_principale or "",
+                    "data-codice-fiscale": (persona.codice_fiscale or "").upper().strip(),
+                    "data-sesso": persona.sesso or "",
+                    "data-data-nascita": persona.data_nascita.isoformat() if persona.data_nascita else "",
+                    "data-luogo-nascita-id": persona.luogo_nascita_id or "",
+                    "data-nazionalita-label": persona.nazionalita_display or "",
                     "data-indirizzo-id": indirizzo.pk if indirizzo else "",
                 }
             )
@@ -114,6 +116,9 @@ def suggested_parametro_calcolo_name(valid_from):
 
 
 class DipendenteForm(forms.ModelForm):
+    nome = forms.CharField(label="Nome", max_length=100)
+    cognome = forms.CharField(label="Cognome", max_length=100)
+    data_nascita = forms.DateField(label="Data nascita", required=False, widget=html5_date_input())
     classe_principale_ref = forms.ChoiceField(
         choices=[],
         required=False,
@@ -131,66 +136,47 @@ class DipendenteForm(forms.ModelForm):
         label="Luogo di nascita",
         widget=CittaCodiceCatastaleSelect(),
     )
+    nazionalita = forms.CharField(label="Nazionalita", max_length=80, required=False)
+    sesso = forms.ChoiceField(label="Sesso", choices=[("", "---------")] + list(SessoDipendente.choices), required=False)
+    codice_fiscale = forms.CharField(label="Codice fiscale", max_length=16, required=False)
+    indirizzo = forms.ModelChoiceField(
+        queryset=Indirizzo.objects.none(),
+        required=False,
+        label="Indirizzo",
+    )
+    telefono = forms.CharField(label="Telefono", max_length=40, required=False)
+    email = forms.EmailField(label="Email", required=False)
 
     class Meta:
         model = Dipendente
         fields = [
-            "ruolo_anagrafico",
-            "familiare_collegato",
+            "ruolo_aziendale",
+            "persona_collegata",
             "classe_principale_ref",
             "mansione",
-            "nome",
-            "cognome",
-            "data_nascita",
-            "luogo_nascita",
-            "nazionalita",
-            "sesso",
-            "codice_fiscale",
-            "indirizzo",
-            "telefono",
-            "email",
             "iban",
-            "codice_dipendente",
             "stato",
-            "data_assunzione",
-            "data_cessazione",
             "note",
         ]
         labels = {
-            "ruolo_anagrafico": "Profilo anagrafico",
-            "familiare_collegato": "Familiare collegato",
+            "ruolo_aziendale": "Profilo aziendale",
+            "persona_collegata": "Persona collegata",
             "mansione": "Mansione",
-            "codice_dipendente": "Matricola / codice interno",
-            "nome": "Nome",
-            "cognome": "Cognome",
-            "codice_fiscale": "Codice fiscale",
-            "data_nascita": "Data nascita",
-            "luogo_nascita": "Luogo nascita",
-            "nazionalita": "Nazionalita",
-            "sesso": "Sesso",
-            "email": "Email",
-            "telefono": "Telefono",
-            "indirizzo": "Indirizzo",
             "iban": "IBAN",
             "stato": "Stato",
-            "data_assunzione": "Data assunzione",
-            "data_cessazione": "Data cessazione",
             "note": "Note",
         }
         widgets = {
-            "data_nascita": html5_date_input(),
-            "data_assunzione": html5_date_input(),
-            "data_cessazione": html5_date_input(),
             "note": forms.Textarea(attrs={"rows": 4}),
             "iban": forms.TextInput(attrs={"placeholder": "IT00X0000000000000000000000"}),
             "mansione": forms.TextInput(attrs={"placeholder": "Es. Segreteria, cucina, amministrazione..."}),
         }
 
     def __init__(self, *args, **kwargs):
+        args = self._normalizza_legacy_bound_data(args, kwargs.get("prefix"))
         super().__init__(*args, **kwargs)
         optional_fields = [
-            "codice_dipendente",
-            "familiare_collegato",
+            "persona_collegata",
             "classe_principale_ref",
             "mansione",
             "codice_fiscale",
@@ -202,27 +188,24 @@ class DipendenteForm(forms.ModelForm):
             "telefono",
             "indirizzo",
             "iban",
-            "data_assunzione",
-            "data_cessazione",
             "note",
         ]
         for field_name in optional_fields:
             self.fields[field_name].required = False
 
-        self.fields["ruolo_anagrafico"].choices = RuoloAnagraficoDipendente.choices
-        linked_familiare_id = self.data.get(self.add_prefix("familiare_collegato")) if self.is_bound else None
-        if linked_familiare_id:
+        self.fields["ruolo_aziendale"].choices = RuoloAziendaleDipendente.choices
+        linked_persona_id = self.data.get(self.add_prefix("persona_collegata")) if self.is_bound else None
+        if linked_persona_id:
             self.fields["nome"].required = False
             self.fields["cognome"].required = False
 
-        familiare_filter = Q(profilo_lavorativo__isnull=True)
-        if getattr(self.instance, "familiare_collegato_id", None):
-            familiare_filter |= Q(pk=self.instance.familiare_collegato_id)
-        familiare_widget_attrs = self.fields["familiare_collegato"].widget.attrs.copy()
-        self.fields["familiare_collegato"].widget = FamiliareCollegatoSelect(attrs=familiare_widget_attrs)
-        self.fields["familiare_collegato"].queryset = (
-            Familiare.objects.select_related(
-                "relazione_familiare",
+        persona_filter = Q(profili_lavorativi__isnull=True)
+        if getattr(self.instance, "persona_collegata_id", None):
+            persona_filter |= Q(pk=self.instance.persona_collegata_id)
+        persona_widget_attrs = self.fields["persona_collegata"].widget.attrs.copy()
+        self.fields["persona_collegata"].widget = PersonaCollegataSelect(attrs=persona_widget_attrs)
+        self.fields["persona_collegata"].queryset = (
+            Persona.objects.select_related(
                 "indirizzo",
                 "indirizzo__citta",
                 "indirizzo__provincia",
@@ -230,12 +213,13 @@ class DipendenteForm(forms.ModelForm):
                 "luogo_nascita__provincia",
                 "nazionalita",
             )
-            .filter(familiare_filter)
+            .filter(persona_filter)
             .order_by("cognome", "nome")
+            .distinct()
         )
-        self.fields["familiare_collegato"].label_from_instance = lambda obj: str(obj)
-        make_searchable_select(self.fields["familiare_collegato"], "Cerca un familiare gia presente...")
-        self.fields["familiare_collegato"].empty_label = "--- nessun familiare collegato ---"
+        self.fields["persona_collegata"].label_from_instance = lambda obj: str(obj)
+        make_searchable_select(self.fields["persona_collegata"], "Cerca una persona gia presente...")
+        self.fields["persona_collegata"].empty_label = "--- nuova persona ---"
 
         self.fields["classe_principale_ref"].choices = classe_principale_reference_choices(
             selected_classe_id=getattr(self.instance, "classe_principale_id", None),
@@ -266,9 +250,6 @@ class DipendenteForm(forms.ModelForm):
         make_searchable_select(self.fields["indirizzo"], "Cerca un indirizzo...")
         self.fields["indirizzo"].empty_label = "--- nessun indirizzo collegato ---"
         self._setup_contratto_field()
-        self.fields["codice_dipendente"].help_text = (
-            "Campo opzionale per una matricola interna, un codice consulente paghe o un identificativo usato nei file esterni."
-        )
         self.fields["nome"].widget.attrs["data-cf-nome"] = "1"
         self.fields["cognome"].widget.attrs["data-cf-cognome"] = "1"
         self.fields["data_nascita"].widget.attrs["data-cf-data-nascita"] = "1"
@@ -279,16 +260,73 @@ class DipendenteForm(forms.ModelForm):
         if self.is_bound:
             return
 
+        persona = getattr(self.instance, "persona_collegata", None)
+        if persona:
+            self.initial.update(
+                {
+                    "persona_collegata": persona.pk,
+                    "nome": persona.nome,
+                    "cognome": persona.cognome,
+                    "data_nascita": persona.data_nascita,
+                    "luogo_nascita": persona.luogo_nascita_id,
+                    "nazionalita": persona.nazionalita_display,
+                    "sesso": persona.sesso,
+                    "codice_fiscale": persona.codice_fiscale,
+                    "indirizzo": persona.indirizzo_id,
+                    "telefono": persona.telefono,
+                    "email": persona.email,
+                }
+            )
+
         if not getattr(self.instance, "pk", None) and not self.initial.get("nazionalita"):
             self.initial["nazionalita"] = default_nazionalita
             self.fields["nazionalita"].initial = default_nazionalita
 
         luogo_nascita_value = (getattr(self.instance, "luogo_nascita", "") or "").strip()
-        if luogo_nascita_value:
+        if not self.initial.get("luogo_nascita") and luogo_nascita_value:
             citta = self._find_citta_from_label(luogo_nascita_value)
             if citta:
                 self.initial["luogo_nascita"] = citta.pk
                 self.fields["luogo_nascita"].widget.attrs["data-codice-catastale"] = citta.codice_catastale or ""
+
+    @staticmethod
+    def _normalizza_legacy_bound_data(args, prefix=None):
+        if not args:
+            return args
+        data = args[0]
+        if data is None:
+            return args
+
+        def field_key(name):
+            return f"{prefix}-{name}" if prefix else name
+
+        ruolo_key = field_key("ruolo_aziendale")
+        ruolo_legacy_key = field_key("ruolo_anagrafico")
+        persona_key = field_key("persona_collegata")
+        familiare_legacy_key = field_key("familiare_collegato")
+
+        needs_copy = False
+        if ruolo_key not in data and ruolo_legacy_key in data:
+            needs_copy = True
+        if persona_key not in data and familiare_legacy_key in data:
+            needs_copy = True
+        if not needs_copy:
+            return args
+
+        mutable_data = data.copy()
+        if ruolo_key not in mutable_data and ruolo_legacy_key in mutable_data:
+            mutable_data[ruolo_key] = mutable_data.get(ruolo_legacy_key)
+        if persona_key not in mutable_data and familiare_legacy_key in mutable_data:
+            familiare_id = (mutable_data.get(familiare_legacy_key) or "").strip()
+            if familiare_id.isdigit():
+                persona_id = (
+                    Familiare.objects.filter(pk=int(familiare_id))
+                    .values_list("persona_id", flat=True)
+                    .first()
+                )
+                if persona_id:
+                    mutable_data[persona_key] = str(persona_id)
+        return (mutable_data, *args[1:])
 
     def _setup_contratto_field(self):
         contratto_id = self.data.get(self.add_prefix("contratto")) if self.is_bound else self.initial.get("contratto")
@@ -333,12 +371,8 @@ class DipendenteForm(forms.ModelForm):
 
     def save(self, commit=True):
         dipendente = super().save(commit=False)
-        familiare = self.cleaned_data.get("familiare_collegato")
-        if familiare:
-            self._apply_familiare_to_dipendente(dipendente, familiare)
-        else:
-            citta = self.cleaned_data.get("luogo_nascita")
-            dipendente.luogo_nascita = f"{citta.nome} ({citta.provincia.sigla})" if citta else ""
+        persona = self._save_persona_collegata(commit=commit)
+        dipendente.persona_collegata = persona
 
         classe_id, gruppo_id = split_classe_principale_reference(self.cleaned_data.get("classe_principale_ref"))
         if dipendente.is_educatore:
@@ -364,19 +398,33 @@ class DipendenteForm(forms.ModelForm):
                 contratto.save(update_fields=["dipendente"])
         return dipendente
 
-    @staticmethod
-    def _apply_familiare_to_dipendente(dipendente, familiare):
-        indirizzo = familiare.indirizzo_effettivo
-        dipendente.nome = familiare.nome or ""
-        dipendente.cognome = familiare.cognome or ""
-        dipendente.codice_fiscale = (familiare.codice_fiscale or "").upper().strip()
-        dipendente.sesso = familiare.sesso or ""
-        dipendente.data_nascita = familiare.data_nascita
-        dipendente.luogo_nascita = (familiare.luogo_nascita_display or "")[:120]
-        dipendente.nazionalita = (familiare.nazionalita_display or "")[:80]
-        dipendente.email = familiare.email_principale or ""
-        dipendente.telefono = familiare.telefono_principale or ""
-        dipendente.indirizzo = indirizzo
+    def _save_persona_collegata(self, commit=True):
+        persona = self.cleaned_data.get("persona_collegata") or getattr(self.instance, "persona_collegata", None)
+        if not persona:
+            persona = Persona()
+
+        citta = self.cleaned_data.get("luogo_nascita")
+        nazionalita_label = (self.cleaned_data.get("nazionalita") or "").strip()
+        nazionalita = None
+        if nazionalita_label:
+            nazionalita = (
+                Nazione.objects.filter(nome_nazionalita__iexact=nazionalita_label, attiva=True).first()
+                or Nazione.objects.filter(nome__iexact=nazionalita_label, attiva=True).first()
+            )
+        persona.nome = self.cleaned_data.get("nome") or persona.nome or ""
+        persona.cognome = self.cleaned_data.get("cognome") or persona.cognome or ""
+        persona.data_nascita = self.cleaned_data.get("data_nascita")
+        persona.luogo_nascita = citta
+        persona.luogo_nascita_custom = ""
+        persona.nazionalita = nazionalita
+        persona.sesso = self.cleaned_data.get("sesso") or ""
+        persona.codice_fiscale = (self.cleaned_data.get("codice_fiscale") or "").upper().strip()
+        persona.indirizzo = self.cleaned_data.get("indirizzo")
+        persona.telefono = self.cleaned_data.get("telefono") or ""
+        persona.email = self.cleaned_data.get("email") or ""
+        if commit:
+            persona.save()
+        return persona
 
     def clean_telefono(self):
         return validate_and_normalize_phone_number(self.cleaned_data.get("telefono"))
@@ -830,7 +878,7 @@ class SimulazioneCostoDipendenteForm(forms.ModelForm):
         self.fields["contratto"].queryset = (
             ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto")
             .filter(qs_filter)
-            .order_by("dipendente__cognome", "dipendente__nome", "-data_inizio", "-id")
+            .order_by("dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome", "-data_inizio", "-id")
         )
         self.fields["contratto"].label_from_instance = lambda obj: obj.label_select(include_dipendente=True)
         make_searchable_select(self.fields["contratto"], "Cerca un contratto...")
@@ -948,14 +996,16 @@ class BustaPagaDipendenteForm(forms.ModelForm):
         self.fields["note_effettivo"].required = False
         for field_name in self.FORECAST_AMOUNT_FIELDS + self.REAL_AMOUNT_FIELDS:
             self.fields[field_name].required = False
-        self.fields["dipendente"].queryset = Dipendente.objects.order_by("cognome", "nome")
+        self.fields["dipendente"].queryset = Dipendente.objects.order_by(
+            "persona_collegata__cognome", "persona_collegata__nome"
+        )
         self.fields["contratto"].queryset = ContrattoDipendente.objects.select_related(
             "dipendente",
             "tipo_contratto",
             "parametro_calcolo",
         ).order_by(
-            "dipendente__cognome",
-            "dipendente__nome",
+            "dipendente__persona_collegata__cognome",
+            "dipendente__persona_collegata__nome",
             "-data_inizio",
         )
         self.fields["contratto"].empty_label = "--- nessun contratto collegato ---"

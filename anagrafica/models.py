@@ -506,6 +506,123 @@ class AnagraficaEmail(models.Model):
 
 #INIZIO MODELLI PER I FAMILIARI
 
+class Persona(models.Model):
+    indirizzi_anagrafici = GenericRelation(
+        AnagraficaIndirizzo,
+        related_query_name="persone",
+    )
+    telefoni_anagrafici = GenericRelation(
+        AnagraficaTelefono,
+        related_query_name="persone",
+    )
+    email_anagrafiche = GenericRelation(
+        AnagraficaEmail,
+        related_query_name="persone",
+    )
+    indirizzo = models.ForeignKey(
+        Indirizzo,
+        on_delete=models.SET_NULL,
+        related_name="persone",
+        blank=True,
+        null=True,
+    )
+    nome = models.CharField(max_length=100)
+    cognome = models.CharField(max_length=100)
+    sesso = models.CharField(max_length=1, choices=SESSO_CHOICES, blank=True)
+    data_nascita = models.DateField(blank=True, null=True)
+    luogo_nascita = models.ForeignKey(
+        Citta,
+        on_delete=models.PROTECT,
+        related_name="persone_nate",
+        blank=True,
+        null=True,
+    )
+    nazione_nascita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="persone_nate",
+        blank=True,
+        null=True,
+    )
+    luogo_nascita_custom = models.CharField(max_length=160, blank=True)
+    nazionalita = models.ForeignKey(
+        Nazione,
+        on_delete=models.PROTECT,
+        related_name="persone_nazionalita",
+        blank=True,
+        null=True,
+    )
+    codice_fiscale = models.CharField(max_length=16, blank=True)
+    email = models.EmailField(blank=True)
+    telefono = models.CharField(max_length=40, blank=True)
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "anagrafica_persona"
+        ordering = ["cognome", "nome"]
+        verbose_name = "Persona"
+        verbose_name_plural = "Persone"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["codice_fiscale"],
+                condition=~Q(codice_fiscale=""),
+                name="anagrafica_persona_cf_unique",
+            )
+        ]
+
+    def __str__(self):
+        return self.nome_completo
+
+    @property
+    def nome_completo(self):
+        return f"{self.cognome} {self.nome}".strip()
+
+    @property
+    def indirizzo_effettivo(self):
+        link = _first_principal_link(self.indirizzi_anagrafici)
+        if link and link.indirizzo_id:
+            return link.indirizzo
+        return self.indirizzo
+
+    @property
+    def telefono_principale(self):
+        link = _first_principal_link(self.telefoni_anagrafici)
+        if link and link.numero:
+            return link.numero
+        return self.telefono
+
+    @property
+    def email_principale(self):
+        link = _first_principal_link(self.email_anagrafiche)
+        if link and link.email:
+            return link.email
+        return self.email
+
+    @property
+    def formatted_telefono(self):
+        return format_phone_number(self.telefono_principale)
+
+    @property
+    def telefono_whatsapp_url(self):
+        return whatsapp_url_from_phone(self.telefono_principale)
+
+    @property
+    def luogo_nascita_display(self):
+        if self.luogo_nascita:
+            return str(self.luogo_nascita)
+        if self.nazione_nascita:
+            return str(self.nazione_nascita)
+        return self.luogo_nascita_custom
+
+    @property
+    def nazionalita_display(self):
+        if self.nazionalita:
+            return self.nazionalita.label_nazionalita
+        return ""
+
+
 class RelazioneFamiliare(models.Model):
     relazione = models.CharField(max_length=100, unique=True)
     ordine = models.IntegerField(blank=True, null=True)
@@ -525,7 +642,124 @@ class RelazioneFamiliare(models.Model):
         super().save(*args, **kwargs)
     
 
+class FamiliareQuerySet(models.QuerySet):
+    PERSONA_LOOKUP_FIELDS = {
+        "indirizzo",
+        "nome",
+        "cognome",
+        "telefono",
+        "email",
+        "codice_fiscale",
+        "sesso",
+        "data_nascita",
+        "luogo_nascita",
+        "nazione_nascita",
+        "luogo_nascita_custom",
+        "nazionalita",
+        "note",
+    }
+
+    def _translate_lookup(self, lookup):
+        root, separator, suffix = lookup.partition("__")
+        if root in self.PERSONA_LOOKUP_FIELDS:
+            return f"persona__{root}{separator}{suffix}" if separator else f"persona__{root}"
+        return lookup
+
+    def _translate_kwargs(self, kwargs, *, exclude=False):
+        translated = {}
+        force_empty = False
+        for key, value in kwargs.items():
+            root = key.partition("__")[0]
+            if root == "attivo":
+                is_active = bool(value)
+                if (not exclude and not is_active) or (exclude and is_active):
+                    force_empty = True
+                continue
+            translated[self._translate_lookup(key)] = value
+        return translated, force_empty
+
+    def _translate_q(self, q_object):
+        if not isinstance(q_object, Q):
+            return q_object
+
+        translated = Q()
+        translated.connector = q_object.connector
+        translated.negated = q_object.negated
+        children = []
+        for child in q_object.children:
+            if isinstance(child, Q):
+                children.append(self._translate_q(child))
+                continue
+
+            lookup, value = child
+            root = lookup.partition("__")[0]
+            if root == "attivo":
+                if bool(value):
+                    continue
+                children.append(("pk__in", []))
+                continue
+            children.append((self._translate_lookup(lookup), value))
+        translated.children = children
+        return translated
+
+    def filter(self, *args, **kwargs):
+        args = tuple(self._translate_q(arg) for arg in args)
+        kwargs, force_empty = self._translate_kwargs(kwargs)
+        queryset = super().filter(*args, **kwargs)
+        return queryset.none() if force_empty else queryset
+
+    def exclude(self, *args, **kwargs):
+        args = tuple(self._translate_q(arg) for arg in args)
+        kwargs, force_empty = self._translate_kwargs(kwargs, exclude=True)
+        queryset = super().exclude(*args, **kwargs)
+        return queryset.none() if force_empty else queryset
+
+    def order_by(self, *field_names):
+        translated = []
+        for field_name in field_names:
+            if not isinstance(field_name, str):
+                translated.append(field_name)
+                continue
+            prefix = "-" if field_name.startswith("-") else ""
+            raw_name = field_name[1:] if prefix else field_name
+            translated.append(f"{prefix}{self._translate_lookup(raw_name)}")
+        return super().order_by(*translated)
+
+    def select_related(self, *fields):
+        translated = []
+        for field_name in fields:
+            if field_name in {"indirizzo", "luogo_nascita", "nazione_nascita", "nazionalita"}:
+                translated.append(f"persona__{field_name}")
+            elif field_name.startswith(("indirizzo__", "luogo_nascita__", "nazione_nascita__", "nazionalita__")):
+                translated.append(f"persona__{field_name}")
+            else:
+                translated.append(field_name)
+        return super().select_related(*translated)
+
+
 class Familiare(models.Model):
+    PERSONA_PROXY_FIELDS = {
+        "indirizzo",
+        "nome",
+        "cognome",
+        "telefono",
+        "email",
+        "codice_fiscale",
+        "sesso",
+        "data_nascita",
+        "luogo_nascita",
+        "nazione_nascita",
+        "luogo_nascita_custom",
+        "nazionalita",
+        "note",
+    }
+
+    persona = models.OneToOneField(
+        Persona,
+        on_delete=models.CASCADE,
+        related_name="profilo_familiare",
+        help_text="Anagrafica persona condivisa con eventuali profili lavorativi.",
+    )
     indirizzi_anagrafici = GenericRelation(
         AnagraficaIndirizzo,
         related_query_name="familiari",
@@ -543,73 +777,227 @@ class Familiare(models.Model):
         on_delete=models.PROTECT,
         related_name="familiari",
     )
-    indirizzo = models.ForeignKey(
-        Indirizzo,
-        on_delete=models.SET_NULL,
-        related_name="familiari",
-        blank=True,
-        null=True,
-    )
-    nome = models.CharField(max_length=100)
-    cognome = models.CharField(max_length=100)
-    telefono = models.CharField(max_length=20, blank=True)
-    email = models.EmailField(blank=True)
-    codice_fiscale = models.CharField(max_length=16, blank=True)
-    sesso = models.CharField(max_length=1, choices=SESSO_CHOICES, blank=True)
-    data_nascita = models.DateField(blank=True, null=True)
-    luogo_nascita = models.ForeignKey(
-        Citta,
-        on_delete=models.PROTECT,
-        related_name="familiari_nati",
-        blank=True,
-        null=True,
-    )
-    nazione_nascita = models.ForeignKey(
-        Nazione,
-        on_delete=models.PROTECT,
-        related_name="familiari_nati",
-        blank=True,
-        null=True,
-    )
-    luogo_nascita_custom = models.CharField(max_length=160, blank=True)
-    nazionalita = models.ForeignKey(
-        Nazione,
-        on_delete=models.PROTECT,
-        related_name="familiari_nazionalita",
-        blank=True,
-        null=True,
-    )
     convivente = models.BooleanField(default=False)
     referente_principale = models.BooleanField(default=False)
     abilitato_scambio_retta = models.BooleanField(default=False)
-    attivo = models.BooleanField(default=True)
-    note = models.TextField(blank=True)
+
+    objects = FamiliareQuerySet.as_manager()
 
     class Meta:
-        ordering = ["cognome", "nome"]
+        ordering = ["persona__cognome", "persona__nome"]
         verbose_name = "Familiare"
         verbose_name_plural = "Familiari"
 
+    def __init__(self, *args, **kwargs):
+        pending_persona_payload = {}
+        for field_name in self.PERSONA_PROXY_FIELDS:
+            if field_name in kwargs:
+                pending_persona_payload[field_name] = kwargs.pop(field_name)
+        kwargs.pop("attivo", None)
+        super().__init__(*args, **kwargs)
+        self._pending_persona_payload = pending_persona_payload
+
     def __str__(self):
-        return f"{self.cognome} {self.nome}"
+        return self.persona.nome_completo if self.persona_id else self._pending_full_name()
+
+    def _pending_full_name(self):
+        return " ".join(
+            part
+            for part in [
+                self._pending_persona_payload.get("cognome", ""),
+                self._pending_persona_payload.get("nome", ""),
+            ]
+            if part
+        ).strip()
+
+    def _get_persona_value(self, field_name):
+        if self.persona_id:
+            return getattr(self.persona, field_name)
+        return self._pending_persona_payload.get(field_name)
+
+    def _set_persona_value(self, field_name, value):
+        if field_name == "codice_fiscale":
+            value = (value or "").upper().strip()
+        if self.persona_id:
+            setattr(self.persona, field_name, value)
+        else:
+            self._pending_persona_payload[field_name] = value
+
+    @property
+    def indirizzo(self):
+        return self._get_persona_value("indirizzo")
+
+    @indirizzo.setter
+    def indirizzo(self, value):
+        self._set_persona_value("indirizzo", value)
+
+    @property
+    def nome(self):
+        return self._get_persona_value("nome") or ""
+
+    @nome.setter
+    def nome(self, value):
+        self._set_persona_value("nome", value or "")
+
+    @property
+    def cognome(self):
+        return self._get_persona_value("cognome") or ""
+
+    @cognome.setter
+    def cognome(self, value):
+        self._set_persona_value("cognome", value or "")
+
+    @property
+    def telefono(self):
+        return self._get_persona_value("telefono") or ""
+
+    @telefono.setter
+    def telefono(self, value):
+        self._set_persona_value("telefono", value or "")
+
+    @property
+    def email(self):
+        return self._get_persona_value("email") or ""
+
+    @email.setter
+    def email(self, value):
+        self._set_persona_value("email", value or "")
+
+    @property
+    def codice_fiscale(self):
+        return self._get_persona_value("codice_fiscale") or ""
+
+    @codice_fiscale.setter
+    def codice_fiscale(self, value):
+        self._set_persona_value("codice_fiscale", value)
+
+    @property
+    def sesso(self):
+        return self._get_persona_value("sesso") or ""
+
+    @sesso.setter
+    def sesso(self, value):
+        self._set_persona_value("sesso", value or "")
+
+    @property
+    def data_nascita(self):
+        return self._get_persona_value("data_nascita")
+
+    @data_nascita.setter
+    def data_nascita(self, value):
+        self._set_persona_value("data_nascita", value)
+
+    @property
+    def luogo_nascita(self):
+        return self._get_persona_value("luogo_nascita")
+
+    @luogo_nascita.setter
+    def luogo_nascita(self, value):
+        self._set_persona_value("luogo_nascita", value)
+
+    @property
+    def nazione_nascita(self):
+        return self._get_persona_value("nazione_nascita")
+
+    @nazione_nascita.setter
+    def nazione_nascita(self, value):
+        self._set_persona_value("nazione_nascita", value)
+
+    @property
+    def luogo_nascita_custom(self):
+        return self._get_persona_value("luogo_nascita_custom") or ""
+
+    @luogo_nascita_custom.setter
+    def luogo_nascita_custom(self, value):
+        self._set_persona_value("luogo_nascita_custom", value or "")
+
+    @property
+    def nazionalita(self):
+        return self._get_persona_value("nazionalita")
+
+    @nazionalita.setter
+    def nazionalita(self, value):
+        self._set_persona_value("nazionalita", value)
+
+    @property
+    def note(self):
+        return self._get_persona_value("note") or ""
+
+    @note.setter
+    def note(self, value):
+        self._set_persona_value("note", value or "")
+
+    @property
+    def attivo(self):
+        return True
+
+    @attivo.setter
+    def attivo(self, value):
+        return None
+
+    @property
+    def nome_completo(self):
+        return f"{self.cognome} {self.nome}".strip()
+
+    def get_sesso_display(self):
+        return dict(SESSO_CHOICES).get(self.sesso, self.sesso)
+
+    def _normalizzato_persona_payload(self):
+        payload = {}
+        for field_name in self.PERSONA_PROXY_FIELDS:
+            value = self._pending_persona_payload.get(field_name)
+            if field_name in {"nome", "cognome", "telefono", "email", "codice_fiscale", "sesso", "luogo_nascita_custom", "note"}:
+                value = value or ""
+            payload[field_name] = value
+        payload["codice_fiscale"] = (payload.get("codice_fiscale") or "").upper().strip()
+        return payload
+
+    def _persona_payload(self):
+        if self.persona_id:
+            payload = {field_name: getattr(self.persona, field_name) for field_name in self.PERSONA_PROXY_FIELDS}
+            payload.update(self._pending_persona_payload)
+            self._pending_persona_payload = payload
+        return self._normalizzato_persona_payload()
+
+    def save(self, *args, **kwargs):
+        payload = self._persona_payload()
+        if self.persona_id:
+            persona = self.persona
+            changed_fields = []
+            for field_name, value in payload.items():
+                if getattr(persona, field_name) != value:
+                    setattr(persona, field_name, value)
+                    changed_fields.append(field_name)
+            if changed_fields:
+                persona.save(update_fields=changed_fields + ["data_aggiornamento"])
+        else:
+            self.persona = Persona.objects.create(**payload)
+        super().save(*args, **kwargs)
+        self._pending_persona_payload = {}
 
     @property
     def indirizzo_effettivo(self):
-        link = _first_principal_link(self.indirizzi_anagrafici)
+        link = _first_principal_link(self.persona.indirizzi_anagrafici) if self.persona_id else None
+        if not link:
+            link = _first_principal_link(self.indirizzi_anagrafici)
         if link and link.indirizzo_id:
             return link.indirizzo
         return self.indirizzo
 
     @property
     def telefono_principale(self):
-        link = _first_principal_link(self.telefoni_anagrafici)
+        link = _first_principal_link(self.persona.telefoni_anagrafici) if self.persona_id else None
+        if not link:
+            link = _first_principal_link(self.telefoni_anagrafici)
         if link and link.numero:
             return link.numero
         return self.telefono
 
     @property
     def email_principale(self):
-        link = _first_principal_link(self.email_anagrafiche)
+        link = _first_principal_link(self.persona.email_anagrafiche) if self.persona_id else None
+        if not link:
+            link = _first_principal_link(self.email_anagrafiche)
         if link and link.email:
             return link.email
         return self.email
@@ -762,7 +1150,7 @@ class StudenteFamiliare(models.Model):
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["studente__cognome", "studente__nome", "familiare__cognome", "familiare__nome"]
+        ordering = ["studente__cognome", "studente__nome", "familiare__persona__cognome", "familiare__persona__nome"]
         verbose_name = "Relazione studente-familiare"
         verbose_name_plural = "Relazioni studenti-familiari"
         constraints = [

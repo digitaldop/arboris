@@ -74,10 +74,9 @@ def familiare_ids_for_studente(studente):
         StudenteFamiliare.objects.filter(
             studente_id=studente.pk,
             attivo=True,
-            familiare__attivo=True,
             familiare__abilitato_scambio_retta=True,
         )
-        .order_by("familiare__cognome", "familiare__nome", "familiare_id")
+        .order_by("familiare__persona__cognome", "familiare__persona__nome", "familiare_id")
         .values_list("familiare_id", flat=True)
     )
     return direct_ids

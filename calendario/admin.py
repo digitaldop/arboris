@@ -5,8 +5,8 @@ from .models import CategoriaCalendario, EventoCalendario
 
 @admin.register(CategoriaCalendario)
 class CategoriaCalendarioAdmin(admin.ModelAdmin):
-    list_display = ("nome", "chiave_sistema", "colore", "ordine", "attiva")
-    list_filter = ("attiva", "chiave_sistema")
+    list_display = ("nome", "chiave_sistema", "colore", "ordine", "attiva", "visibile_dashboard")
+    list_filter = ("attiva", "visibile_dashboard", "chiave_sistema")
     search_fields = ("nome", "chiave_sistema")
     ordering = ("ordine", "nome")
 

@@ -1,4 +1,4 @@
-{% load currency %}
+{% load currency static %}
 {# Tabella inline studenti (stesso markup ovunque: famiglia, familiare, …). Richiede: studenti_formset, famiglia, count_studenti, studenti_add_action, studenti_add_prefix #}
 {{ studenti_formset.management_form }}
 <table class="inline-table" id="studenti-table">
@@ -10,14 +10,14 @@
             <th class="inline-view-only-table-cell">DATA NASCITA</th>
             <th class="inline-view-only-table-cell">LUOGO NASCITA</th>
             <th class="inline-view-only-table-cell">CODICE FISCALE</th>
-            <th class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-col">ATTIVO</th>
+            <th class="inline-checkbox-cell mode-edit-only-table-cell inline-attivo-col{% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %} active-field-visible{% endif %}">ATTIVO</th>
             <th class="mode-edit-only-table-cell">ELIMINA</th>
             <th class="inline-view-only-table-cell student-enrollment-col">ISCRIZIONE</th>
         </tr>
     </thead>
     <tbody>
         {% for f in studenti_formset %}
-            <tr class="inline-form-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}" data-student-id="{{ f.instance.pk }}"{% endif %}>
+            <tr class="inline-form-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}" data-student-id="{{ f.instance.pk }}"{% endif %}>
                 <td>
                     {{ f.id }}
                     <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">
@@ -55,18 +55,28 @@
                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
                             <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">✎</button>
                             <button type="button" class="related-btn related-btn-delete inline-related-delete" data-related-type="indirizzo">✖</button>
+                            <button
+                                type="button"
+                                class="related-btn related-btn-family-address inline-family-address-apply"
+                                data-inline-address-action="apply-family-address"
+                                aria-label="Imposta indirizzo principale"
+                                title="Imposta indirizzo principale"
+                                data-floating-text="Imposta indirizzo principale"
+                            >
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="inline-address-help" data-role="address-help">
+                    <button type="button" class="inline-address-help inline-address-help-action" data-role="address-help" data-inline-address-action="apply-family-address">
                         {% if f.instance.pk and f.instance.indirizzo %}
                             Indirizzo specifico
                         {% elif famiglia and famiglia.indirizzo_principale %}
-                            Erediterà: {{ famiglia.indirizzo_principale.label_select }}
+                            Imposta l'indirizzo come {{ famiglia.indirizzo_principale.label_select }}
                         {% else %}
-                            Se lasci vuoto, verrà usato l'indirizzo principale della famiglia
+                            Se lasci vuoto, non verra impostato un indirizzo principale
                         {% endif %}
-                    </div>
+                    </button>
                 </td>
                 {% if f.instance.pk %}
                     <td class="inline-view-only-table-cell">
@@ -110,7 +120,18 @@
                     <td class="inline-view-only-table-cell"></td>
                     <td class="inline-view-only-table-cell"></td>
                 {% endif %}
-                <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell">{{ f.attivo }}</td>
+                <td class="inline-checkbox-cell inline-checkbox-cell-wide mode-edit-only-table-cell inline-attivo-cell{% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %} active-field-visible{% endif %}">
+                    {% if request.user.is_superuser or user_permission_profile.amministratore_operativo_effettivo %}
+                        <label class="inline-active-switch active-field-visible" aria-label="Studente attivo">
+                            <span class="fondo-plan-switch-control">
+                                {{ f.attivo }}
+                                <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                    {% else %}
+                        {{ f.attivo }}
+                    {% endif %}
+                </td>
                 <td class="inline-delete-cell mode-edit-only-table-cell">
                     {% if f.instance.pk %}
                         <label class="delete-label">{{ f.DELETE }}<span class="delete-label-text">Elimina</span></label>
@@ -128,7 +149,7 @@
                     </div>
                 </td>
             </tr>
-            <tr class="inline-subform-row{% if famiglia and not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
+            <tr class="inline-subform-row{% if not f.instance.pk and not f.errors %} inline-empty-row is-hidden{% endif %}{% if f.instance.pk %} list-row-link{% endif %}"{% if f.instance.pk %} data-row-href="{% url 'modifica_studente' f.instance.pk %}"{% endif %}>
                 <td colspan="8">
                     <div class="inline-subform-grid">
                         <div class="inline-subform-field">
