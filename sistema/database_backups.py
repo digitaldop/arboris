@@ -169,6 +169,46 @@ def file_looks_gzipped(file_path):
         return False
 
 
+def unwrap_gzip_layers(file_path, *, max_layers=3):
+    """
+    Restituisce un file SQL non compresso, decomprimendo anche eventuali gzip annidati.
+
+    Alcuni backup possono arrivare rinominati o compressi piu volte. Il restore deve
+    basarsi sui byte reali del file, non sull'estensione, e deve garantire che a psql
+    arrivi testo SQL puro.
+    """
+    current_path = Path(file_path)
+    temporary_paths = []
+
+    try:
+        for _ in range(max_layers):
+            if not file_looks_gzipped(current_path):
+                break
+
+            fd, temp_name = tempfile.mkstemp(prefix="arboris_restore_unwrapped_", suffix=".sql")
+            os.close(fd)
+            next_path = Path(temp_name)
+            try:
+                with gzip.open(current_path, "rb") as source_handle:
+                    with next_path.open("wb") as destination_handle:
+                        shutil.copyfileobj(source_handle, destination_handle)
+            except Exception:
+                next_path.unlink(missing_ok=True)
+                raise
+
+            temporary_paths.append(next_path)
+            current_path = next_path
+
+        if file_looks_gzipped(current_path):
+            raise DatabaseBackupError("Il file di backup risulta ancora compresso dopo piu livelli gzip.")
+
+        return current_path, lambda: [path.unlink(missing_ok=True) for path in temporary_paths]
+    except Exception:
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
+        raise
+
+
 def materialize_restore_file_reference(file_reference, *, reference_name=""):
     reference = str(file_reference or "").strip()
     if not reference:
@@ -227,11 +267,11 @@ def build_sanitized_restore_sql(source_path, *, reference_name=""):
     fd, temp_name = tempfile.mkstemp(prefix="arboris_restore_clean_", suffix=suffix)
     os.close(fd)
     temp_path = Path(temp_name)
-    open_handler = gzip.open if file_looks_gzipped(source_path) else open
+    plain_source_path, cleanup_unwrapped_file = unwrap_gzip_layers(source_path)
     in_copy_block = False
 
     try:
-        with open_handler(source_path, "rt", encoding="utf-8", errors="ignore", newline="") as source_handle:
+        with plain_source_path.open("rt", encoding="utf-8", errors="ignore", newline="") as source_handle:
             with temp_path.open("w", encoding="utf-8", newline="") as destination_handle:
                 for line in source_handle:
                     stripped = line.strip()
@@ -257,6 +297,8 @@ def build_sanitized_restore_sql(source_path, *, reference_name=""):
         except Exception:
             pass
         raise DatabaseBackupError(f"Impossibile preparare il file SQL per il ripristino: {exc}") from exc
+    finally:
+        cleanup_unwrapped_file()
 
     return temp_path, lambda: temp_path.unlink(missing_ok=True)
 

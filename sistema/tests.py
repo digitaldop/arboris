@@ -1,4 +1,5 @@
 import base64
+import gzip
 import json
 import subprocess
 from pathlib import Path
@@ -1064,6 +1065,37 @@ class BackupDatabaseAccessTests(TestCase):
         self.assertContains(response, "data-copy-text=")
         self.assertContains(response, "cannot drop constraint sistema_scuola_pkey")
 
+    def test_backup_database_page_renders_restore_job_remove_button(self):
+        self.client.force_login(self.amministratore)
+        job = SistemaDatabaseRestoreJob.objects.create(
+            stato=StatoRipristinoDatabase.IN_CORSO,
+            percorso_file="manual_restore/restore.sql.gz",
+            nome_file_originale="restore.sql.gz",
+        )
+
+        response = self.client.get(reverse("backup_database_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("rimuovi_job_ripristino_database", kwargs={"pk": job.pk}))
+        self.assertContains(response, "Rimuovi job")
+
+    def test_remove_restore_job_deletes_job_and_clears_pending_session(self):
+        self.client.force_login(self.amministratore)
+        job = SistemaDatabaseRestoreJob.objects.create(
+            stato=StatoRipristinoDatabase.IN_ATTESA_CONFERMA,
+            percorso_file="manual_restore/restore.sql.gz",
+            nome_file_originale="restore.sql.gz",
+        )
+        session = self.client.session
+        session["sistema_db_restore_job_id"] = job.pk
+        session.save()
+
+        response = self.client.post(reverse("rimuovi_job_ripristino_database", kwargs={"pk": job.pk}))
+
+        self.assertRedirects(response, reverse("backup_database_sistema"))
+        self.assertFalse(SistemaDatabaseRestoreJob.objects.filter(pk=job.pk).exists())
+        self.assertNotIn("sistema_db_restore_job_id", self.client.session)
+
     def test_chunked_restore_upload_creates_pending_restore_job(self):
         self.client.force_login(self.amministratore)
         content = b"backup-data-from-chunks"
@@ -1337,6 +1369,39 @@ class BackupDatabaseStorageTests(TestCase):
                 cleanup()
 
         self.assertIn("CREATE TABLE public.esempio", content)
+
+    def test_sanitized_restore_sql_unwraps_gzip_content(self):
+        with TemporaryDirectory() as tmpdir:
+            source_path = Path(tmpdir) / "restore.sql.gz"
+            with gzip.open(source_path, "wt", encoding="utf-8") as handle:
+                handle.write("CREATE TABLE public.esempio (id integer);")
+
+            sanitized_path, cleanup = build_sanitized_restore_sql(source_path, reference_name="restore.sql.gz")
+            try:
+                content = sanitized_path.read_text(encoding="utf-8")
+            finally:
+                cleanup()
+
+        self.assertIn("CREATE TABLE public.esempio", content)
+        self.assertFalse(content.startswith("\x1f"))
+
+    def test_sanitized_restore_sql_unwraps_nested_gzip_content(self):
+        with TemporaryDirectory() as tmpdir:
+            inner_path = Path(tmpdir) / "inner.sql.gz"
+            source_path = Path(tmpdir) / "restore.sql.gz"
+            with gzip.open(inner_path, "wt", encoding="utf-8") as handle:
+                handle.write("CREATE TABLE public.esempio (id integer);")
+            with gzip.open(source_path, "wb") as handle:
+                handle.write(inner_path.read_bytes())
+
+            sanitized_path, cleanup = build_sanitized_restore_sql(source_path, reference_name="restore.sql.gz")
+            try:
+                content = sanitized_path.read_text(encoding="utf-8")
+            finally:
+                cleanup()
+
+        self.assertIn("CREATE TABLE public.esempio", content)
+        self.assertFalse(content.startswith("\x1f"))
 
     def test_restore_runner_saves_in_progress_without_celery_task_id(self):
         job = SistemaDatabaseRestoreJob.objects.create(

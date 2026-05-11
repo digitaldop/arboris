@@ -293,6 +293,7 @@
                                         <th>Stato</th>
                                         <th>File</th>
                                         <th>Esito / backup sicurezza</th>
+                                        <th class="actions-head">Azioni</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -323,6 +324,24 @@
                                                     Backup sicurezza: {{ rj.backup_sicurezza.nome_file }}
                                                 {% elif rj.stato == "in_corso" or rj.stato == "in_coda" %}
                                                     In elaborazione
+                                                {% else %}
+                                                    <span class="table-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="actions-cell">
+                                                {% if can_access_database_backups %}
+                                                    <form
+                                                        method="post"
+                                                        action="{% url 'rimuovi_job_ripristino_database' rj.pk %}"
+                                                        class="database-backup-inline-action"
+                                                        onsubmit="return confirm('Rimuovere questo job di ripristino? Se un ripristino e ancora realmente in esecuzione, il processo gia partito non viene interrotto.');"
+                                                    >
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-danger btn-sm btn-icon-text">
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                            <span class="btn-label">Rimuovi job</span>
+                                                        </button>
+                                                    </form>
                                                 {% else %}
                                                     <span class="table-muted">-</span>
                                                 {% endif %}

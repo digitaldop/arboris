@@ -56,6 +56,11 @@ urlpatterns = [
         name="backup_database_restore_chunk_upload",
     ),
     path(
+        "sistema/backup-database/job-ripristino/<int:pk>/rimuovi/",
+        database_backup_access_required(views.rimuovi_job_ripristino_database),
+        name="rimuovi_job_ripristino_database",
+    ),
+    path(
         "sistema/backup-database/<int:pk>/scarica/",
         database_backup_access_required(views.scarica_backup_database),
         name="scarica_backup_database",

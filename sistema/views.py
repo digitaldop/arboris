@@ -1046,6 +1046,20 @@ def upload_restore_chunk_sistema(request):
     return handle_restore_chunk_upload(request)
 
 
+@require_POST
+def rimuovi_job_ripristino_database(request, pk):
+    job = get_object_or_404(SistemaDatabaseRestoreJob, pk=pk)
+    if request.session.get(PENDING_RESTORE_JOB_SESSION_KEY) == job.pk:
+        request.session.pop(PENDING_RESTORE_JOB_SESSION_KEY, None)
+        request.session.modified = True
+
+    nome_file = job.nome_file_originale
+    stato = job.get_stato_display()
+    cancel_or_delete_restore_job(job)
+    messages.info(request, f"Job di ripristino rimosso: {nome_file} ({stato}).")
+    return redirect("backup_database_sistema")
+
+
 def backup_database_sistema(request):
     configurazione = get_backup_configuration()
     pending_restore = get_pending_restore_metadata(request)
