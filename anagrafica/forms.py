@@ -1906,6 +1906,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             "data_fine_iscrizione",
             "stato_iscrizione",
             "condizione_iscrizione",
+            "rate_custom",
             "agevolazione",
             "riduzione_speciale",
             "importo_riduzione_speciale",
@@ -1987,6 +1988,21 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 )
             )
         bind_primed_queryset(self.fields["condizione_iscrizione"], condizione_qs)
+        self.fields["rate_custom"].label = "Numero rate personalizzato"
+        self.fields["rate_custom"].required = False
+        self.fields["rate_custom"].widget.attrs.update(
+            {
+                "min": "1",
+                "max": "36",
+                "inputmode": "numeric",
+                "placeholder": "Default",
+                "data-rate-custom-input": "1",
+            }
+        )
+        if self.instance.pk:
+            self.fields["rate_custom"].disabled = True
+            self.fields["rate_custom"].help_text = "Per modificare un piano avviato usa Rimodula rate future."
+            self.fields["rate_custom"].widget.attrs["data-rate-custom-locked"] = "1"
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].widget = forms.TextInput()
         self.fields["importo_riduzione_speciale"].widget.attrs.update(
@@ -2085,6 +2101,7 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             "classe",
             "gruppo_classe",
             "condizione_iscrizione",
+            "rate_custom",
             "agevolazione",
             "scadenza_pagamento_unica",
             "note_amministrative",

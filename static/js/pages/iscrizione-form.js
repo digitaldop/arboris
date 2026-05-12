@@ -108,6 +108,32 @@ window.ArborisIscrizioneForm = (function () {
         const scadenzaUnicoRow = document.querySelector(".iscrizione-scadenza-unico-row");
         const scontoUnicoSuffix = document.querySelector("[data-single-payment-discount-suffix]");
         const detailForm = document.getElementById("iscrizione-detail-form");
+        const rateCustomToggle = document.querySelector("[data-rate-custom-toggle]");
+        const rateCustomInput = document.querySelector("[data-rate-custom-input]");
+
+        if (rateCustomToggle && rateCustomInput) {
+            function syncRateCustom() {
+                const locked = rateCustomInput.dataset.rateCustomLocked === "1";
+                const enabled = !locked && rateCustomToggle.checked;
+                rateCustomInput.disabled = locked || !enabled;
+                rateCustomInput.readOnly = locked || !enabled;
+                rateCustomInput.classList.toggle("is-readonly", locked || !enabled);
+                if (!enabled && !locked) {
+                    rateCustomInput.value = "";
+                }
+            }
+
+            rateCustomToggle.addEventListener("change", syncRateCustom);
+            ["enable-edit-iscrizione-btn", "cancel-edit-iscrizione-btn"].forEach(function (buttonId) {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener("click", function () {
+                        window.setTimeout(syncRateCustom, 0);
+                    });
+                }
+            });
+            syncRateCustom();
+        }
 
         if (annoSelect) {
             function selectedAnnoDate(datasetKey) {

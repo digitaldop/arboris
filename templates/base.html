@@ -57,8 +57,9 @@
             } catch (error) {}
         })();
     </script>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=269">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=276">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
+    <script defer src="{% static 'js/core/streamline-icons.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
     {% if role_theme %}
         <style>
@@ -77,9 +78,9 @@
         </style>
     {% endif %}
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
-    <script src="{% static 'js/core/detail-form-actions.js' %}?v=5"></script>
+    <script src="{% static 'js/core/detail-form-actions.js' %}?v=6"></script>
 </head>
-<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}">
+<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if stile_streamline_attivo %} ui-streamline-icons{% endif %}{% if stile_iconscout_3d_attivo %} ui-iconscout-3d-icons{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}" data-streamline-icons-url="{% static 'images/arboris-streamline-icons.svg' %}" data-iconscout-3d-icons-url="{% static 'images/arboris-iconscout-3d-icons.svg' %}">
     <div id="arboris-page-loading-overlay" class="page-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
         <div class="page-loading-overlay-card">
             <span class="page-loading-spinner" aria-hidden="true"></span>
@@ -842,6 +843,10 @@
                                             <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
                                             <span class="sidebar-link-text">Impostazioni generali</span>
                                         </a>
+                                        <a href="{% url 'crediti' %}" class="{% if request.resolver_match.url_name == 'crediti' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                            <span class="sidebar-link-text">Crediti</span>
+                                        </a>
                                     </nav>
 
                                     <div class="sidebar-subsection">
@@ -980,6 +985,7 @@
             <span class="site-footer-legal">
                 · <a href="{% url 'informativa_privacy' %}">Privacy</a>
                 · <a href="{% url 'termini_condizioni' %}">Termini e condizioni</a>
+                · <a href="{% url 'crediti' %}">Crediti</a>
             </span>
         </div>
     </footer>

@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.conf import settings
 from django.db import models
 from django.db.models import Max
 
@@ -312,6 +313,12 @@ class Iscrizione(models.Model):
         on_delete=models.PROTECT,
         related_name="iscrizioni",
     )
+    rate_custom = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(36)],
+        help_text="Numero di rate concordato per questa iscrizione. Lascia vuoto per usare la condizione economica.",
+    )
     agevolazione = models.ForeignKey(
         Agevolazione,
         on_delete=models.SET_NULL,
@@ -474,6 +481,13 @@ class Iscrizione(models.Model):
         importo -= self.get_importo_sconto_unica_soluzione_applicato(importo)
         return max(importo, Decimal("0.00"))
 
+    def get_numero_rate_mensili(self):
+        if self.rate_custom:
+            return max(self.rate_custom, 1)
+        if self.condizione_iscrizione_id:
+            return max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
+        return 1
+
     def get_importo_preiscrizione_dovuto(self):
         if self.non_pagante:
             return Decimal("0.00")
@@ -560,7 +574,7 @@ class Iscrizione(models.Model):
         if not self.non_pagante and not tariffa:
             return []
 
-        numero_rate = max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
+        numero_rate = self.get_numero_rate_mensili()
         importo_annuo_base = importo_annuo or Decimal("0.00")
         importo_base = (importo_annuo_base / numero_rate).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
         importo_residuo = importo_annuo_base - (importo_base * numero_rate)
@@ -849,9 +863,13 @@ class Iscrizione(models.Model):
             "scadenza_pagamento_unica": self.get_scadenza_pagamento_unica_soluzione()
             if self.is_pagamento_unica_soluzione
             else None,
-            "numero_mensilita": max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
-            if self.condizione_iscrizione_id
-            else 0,
+            "numero_mensilita": self.get_numero_rate_mensili() if self.condizione_iscrizione_id else 0,
+            "numero_mensilita_custom": self.rate_custom,
+            "numero_mensilita_default": (
+                max(self.condizione_iscrizione.numero_mensilita_default or 0, 1)
+                if self.condizione_iscrizione_id
+                else 0
+            ),
             "rata_standard": rata_standard,
             "rata_finale": rata_finale,
             "rata_unica": rata_unica,
@@ -886,6 +904,20 @@ class Iscrizione(models.Model):
 
         if self.data_fine_effettiva and self.data_iscrizione and self.data_fine_effettiva < self.data_iscrizione:
             raise ValidationError("La data di fine iscrizione non puo essere precedente alla data di iscrizione.")
+
+        if self.pk:
+            rate_custom_originale = (
+                Iscrizione.objects.filter(pk=self.pk).values_list("rate_custom", flat=True).first()
+            )
+            if rate_custom_originale != self.rate_custom and self.rate.exists():
+                raise ValidationError(
+                    {
+                        "rate_custom": (
+                            "Il numero rate iniziale non puo essere modificato su un piano gia generato. "
+                            "Usa la rimodulazione delle rate future."
+                        )
+                    }
+                )
 
         if not self.riduzione_speciale and self.importo_riduzione_speciale:
             raise ValidationError("L'importo della riduzione speciale puo essere valorizzato solo se la riduzione speciale e attiva.")
@@ -1031,6 +1063,48 @@ class RataIscrizione(models.Model):
             self.data_scadenza = None
         self.importo_finale = self.calcola_importo_finale()
         super().save(*args, **kwargs)
+
+
+class RimodulazioneRetta(models.Model):
+    MODALITA_RIDISTRIBUISCI_RESIDUO = "ridistribuisci_residuo"
+    MODALITA_IMPORTO_MENSILE = "importo_mensile"
+    MODALITA_TOTALE_RESIDUO = "totale_residuo"
+    MODALITA_CHOICES = (
+        (MODALITA_RIDISTRIBUISCI_RESIDUO, "Ridistribuisci il residuo attuale"),
+        (MODALITA_IMPORTO_MENSILE, "Imposta un nuovo importo mensile"),
+        (MODALITA_TOTALE_RESIDUO, "Ripartisci un nuovo totale residuo"),
+    )
+
+    iscrizione = models.ForeignKey(
+        Iscrizione,
+        on_delete=models.CASCADE,
+        related_name="rimodulazioni_retta",
+    )
+    data_decorrenza = models.DateField()
+    modalita = models.CharField(max_length=32, choices=MODALITA_CHOICES)
+    numero_rate_future = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(36)])
+    importo_mensile = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    totale_precedente = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    totale_rimodulato = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    rate_sostituite = models.PositiveSmallIntegerField(default=0)
+    note = models.TextField(blank=True)
+    creata_il = models.DateTimeField(auto_now_add=True)
+    creata_da = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="rimodulazioni_retta_create",
+    )
+
+    class Meta:
+        db_table = "economia_rimodulazione_retta"
+        ordering = ["-data_decorrenza", "-id"]
+        verbose_name = "Rimodulazione retta"
+        verbose_name_plural = "Rimodulazioni retta"
+
+    def __str__(self):
+        return f"{self.iscrizione} - dal {self.data_decorrenza:%d/%m/%Y}"
 
 
 class MovimentoCreditoRetta(models.Model):

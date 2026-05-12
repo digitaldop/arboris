@@ -9,6 +9,7 @@ from .models import (
     Agevolazione,
     Iscrizione,
     RataIscrizione,
+    RimodulazioneRetta,
     MovimentoCreditoRetta,
     TariffaScambioRetta,
     ScambioRetta,
@@ -89,6 +90,13 @@ class RataIscrizioneAdmin(admin.ModelAdmin):
     list_display = ("iscrizione", "tipo_rata", "numero_rata", "mese_riferimento", "anno_riferimento", "importo_dovuto", "pagata")
     list_filter = ("tipo_rata", "pagata", "anno_riferimento", "mese_riferimento")
     search_fields = ("iscrizione__studente__cognome", "iscrizione__studente__nome", "descrizione")
+
+
+@admin.register(RimodulazioneRetta)
+class RimodulazioneRettaAdmin(admin.ModelAdmin):
+    list_display = ("iscrizione", "data_decorrenza", "modalita", "numero_rate_future", "totale_precedente", "totale_rimodulato")
+    list_filter = ("modalita", "data_decorrenza")
+    search_fields = ("iscrizione__studente__cognome", "iscrizione__studente__nome", "note")
 
 
 @admin.register(MovimentoCreditoRetta)

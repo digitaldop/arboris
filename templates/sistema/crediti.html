@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Crediti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Crediti</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Crediti</h1>
+    </div>
+
+    <div class="content-card legal-static credits-page">
+        <p class="legal-meta">
+            Questa pagina raccoglie i crediti relativi agli asset grafici e alle librerie visive usate
+            nell'interfaccia di <strong>Arboris School Management</strong>.
+        </p>
+
+        <h2>Icone Streamline</h2>
+        <p>
+            Lo stile opzionale <strong>Streamline</strong> usa icone selezionate dal pacchetto ufficiale
+            <a href="https://github.com/webalys-hq/streamline-vectors" target="_blank" rel="noopener noreferrer">streamline-vectors</a>,
+            realizzato da Streamline / Webalys.
+        </p>
+        <p>
+            Il pacchetto è distribuito con licenza
+            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 4.0 International</a>.
+            Come richiesto dalla licenza, attribuiamo il lavoro a
+            <a href="https://streamlinehq.com" target="_blank" rel="noopener noreferrer">Streamline</a>.
+        </p>
+
+        <h2>Integrazione nel software</h2>
+        <p>
+            Arboris integra una selezione locale di icone Streamline nel file
+            <code>static/images/arboris-streamline-icons.svg</code>, generato a partire dagli SVG ufficiali
+            scaricati nel percorso <code>static/vendor/streamline-vectors/selected-icons/</code>.
+        </p>
+
+        <h2>Altri asset</h2>
+        <p>
+            Logo Arboris, componenti grafici personalizzati e icone interne non Streamline sono parte
+            dell'identità visiva del progetto Arboris, salvo diversa indicazione nei file sorgente o nella
+            documentazione del progetto.
+        </p>
+    </div>
+{% endblock %}

@@ -1,11 +1,227 @@
 from collections import Counter
-from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_DOWN
 
-from economia.models import Iscrizione
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
+from economia.models import Iscrizione, RataIscrizione, RimodulazioneRetta
+from economia.models.iscrizioni import add_months_safe
 
 
 PUNTEGGIO_MINIMO_RICONCILIAZIONE_AUTOMATICA = 70
+
+
+def _rata_reference_date(rata):
+    if rata.data_scadenza:
+        return rata.data_scadenza
+    return date(rata.anno_riferimento, rata.mese_riferimento, 1)
+
+
+def _split_amount(total, count):
+    total = total or Decimal("0.00")
+    count = max(int(count or 0), 1)
+    base = (total / count).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    amounts = [base for _index in range(count)]
+    amounts[-1] = total - sum(amounts[:-1], Decimal("0.00"))
+    return amounts
+
+
+def _rata_total_amount(rata):
+    return (rata.importo_finale if rata.importo_finale is not None else rata.importo_dovuto) or Decimal("0.00")
+
+
+def _rata_paid_amount(rata):
+    return rata.importo_pagato or Decimal("0.00")
+
+
+def _rata_residual_amount(rata):
+    return max(_rata_total_amount(rata) - _rata_paid_amount(rata), Decimal("0.00"))
+
+
+def _rata_has_credit_or_discount_activity(rata):
+    return (rata.credito_applicato or Decimal("0.00")) > 0 or (rata.altri_sgravi or Decimal("0.00")) > 0
+
+
+def _add_months_from_rate(rata, months, target_day):
+    riferimento = _rata_reference_date(rata)
+    return add_months_safe(riferimento, months, target_day=target_day)
+
+
+def rimodula_rate_future(
+    iscrizione,
+    *,
+    rata_decorrenza,
+    modalita,
+    numero_rate_future,
+    importo_mensile=None,
+    totale_residuo=None,
+    note="",
+    utente=None,
+):
+    if iscrizione.is_pagamento_unica_soluzione:
+        raise ValidationError("La rimodulazione e disponibile solo per iscrizioni con pagamento rateale.")
+
+    numero_rate_future = int(numero_rate_future or 0)
+    if numero_rate_future < 1:
+        raise ValidationError("Il numero di rate future deve essere almeno 1.")
+    if numero_rate_future > 36:
+        raise ValidationError("Il numero di rate future non puo superare 36.")
+
+    with transaction.atomic():
+        iscrizione_locked = Iscrizione.objects.select_for_update().get(pk=iscrizione.pk)
+        rata_start = RataIscrizione.objects.select_for_update().get(
+            pk=rata_decorrenza.pk,
+            iscrizione=iscrizione_locked,
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+        )
+        if _rata_has_credit_or_discount_activity(rata_start):
+            raise ValidationError("La rata di decorrenza ha crediti o sgravi collegati e non puo essere rimodulata.")
+        if _rata_residual_amount(rata_start) <= 0:
+            raise ValidationError("La rata di decorrenza non ha residuo da rimodulare.")
+
+        decorrenza = _rata_reference_date(rata_start)
+        rate_mensili = list(
+            RataIscrizione.objects.select_for_update()
+            .filter(iscrizione=iscrizione_locked, tipo_rata=RataIscrizione.TIPO_MENSILE)
+            .order_by("anno_riferimento", "mese_riferimento", "numero_rata", "id")
+        )
+        rate_da_sostituire = [
+            rata
+            for rata in rate_mensili
+            if _rata_reference_date(rata) >= decorrenza and _rata_residual_amount(rata) > 0
+        ]
+        if not rate_da_sostituire:
+            raise ValidationError("Non ci sono rate future da rimodulare dalla decorrenza scelta.")
+
+        rate_bloccate = [rata for rata in rate_da_sostituire if _rata_has_credit_or_discount_activity(rata)]
+        if rate_bloccate:
+            raise ValidationError(
+                "Esistono rate future con crediti o sgravi. "
+                "Scegli una decorrenza successiva oppure gestisci prima quelle rate."
+            )
+
+        totale_precedente = sum(_rata_residual_amount(rata) for rata in rate_da_sostituire)
+        if totale_precedente <= 0:
+            raise ValidationError("Non ci sono importi residui da rimodulare dalla decorrenza scelta.")
+
+        if modalita == RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO:
+            residuo_rimodulato = totale_precedente
+            importi_residui = _split_amount(residuo_rimodulato, numero_rate_future)
+            importo_mensile_effettivo = None
+        elif modalita == RimodulazioneRetta.MODALITA_IMPORTO_MENSILE:
+            importo_mensile_effettivo = importo_mensile or Decimal("0.00")
+            if importo_mensile_effettivo <= 0:
+                raise ValidationError("Il nuovo importo mensile deve essere maggiore di zero.")
+            for rata in rate_da_sostituire[:numero_rate_future]:
+                if importo_mensile_effettivo < _rata_paid_amount(rata):
+                    raise ValidationError(
+                        "Il nuovo importo mensile non puo essere inferiore agli importi gia pagati."
+                    )
+            importi_finali = [importo_mensile_effettivo for _index in range(numero_rate_future)]
+        elif modalita == RimodulazioneRetta.MODALITA_TOTALE_RESIDUO:
+            residuo_rimodulato = totale_residuo or Decimal("0.00")
+            if residuo_rimodulato <= 0:
+                raise ValidationError("Il nuovo totale residuo deve essere maggiore di zero.")
+            importi_residui = _split_amount(residuo_rimodulato, numero_rate_future)
+            importo_mensile_effettivo = None
+        else:
+            raise ValidationError("Modalita di rimodulazione non valida.")
+
+        giorno_scadenza = decorrenza.day or iscrizione_locked.get_giorno_scadenza_rate()
+        rate_sostituite_count = len(rate_da_sostituire)
+
+        if modalita in {
+            RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+            RimodulazioneRetta.MODALITA_TOTALE_RESIDUO,
+        }:
+            importi_finali = []
+            for indice, importo_residuo in enumerate(importi_residui):
+                rata_esistente = rate_da_sostituire[indice] if indice < len(rate_da_sostituire) else None
+                importi_finali.append(
+                    _rata_paid_amount(rata_esistente) + importo_residuo
+                    if rata_esistente
+                    else importo_residuo
+                )
+
+        rate_in_eccesso = rate_da_sostituire[numero_rate_future:]
+        rate_in_eccesso_bloccate = [
+            rata
+            for rata in rate_in_eccesso
+            if _rata_paid_amount(rata) > 0 or rata.pagata
+        ]
+        if rate_in_eccesso_bloccate:
+            raise ValidationError(
+                "Non puoi ridurre il numero di rate sotto le rate future che hanno gia importi pagati."
+            )
+        if rate_in_eccesso:
+            RataIscrizione.objects.filter(pk__in=[rata.pk for rata in rate_in_eccesso]).delete()
+
+        nuove_rate = []
+        ultima_rata = rate_da_sostituire[-1]
+        ultimo_numero_rata = max(rata.numero_rata for rata in rate_mensili)
+        for indice, importo_finale in enumerate(importi_finali):
+            rata_esistente = rate_da_sostituire[indice] if indice < len(rate_da_sostituire) else None
+            if rata_esistente:
+                importo_pagato = _rata_paid_amount(rata_esistente)
+                rata_esistente.importo_dovuto = importo_finale
+                rata_esistente.credito_applicato = Decimal("0.00")
+                rata_esistente.altri_sgravi = Decimal("0.00")
+                rata_esistente.importo_finale = importo_finale
+                rata_esistente.pagata = importo_finale > 0 and importo_pagato >= importo_finale
+                rata_esistente.save(
+                    update_fields=[
+                        "importo_dovuto",
+                        "credito_applicato",
+                        "altri_sgravi",
+                        "importo_finale",
+                        "pagata",
+                    ]
+                )
+                continue
+
+            extra_index = indice - len(rate_da_sostituire) + 1
+            data_scadenza = _add_months_from_rate(ultima_rata, extra_index, giorno_scadenza)
+            numero_rata = ultimo_numero_rata + extra_index
+            nuove_rate.append(
+                RataIscrizione(
+                    iscrizione=iscrizione_locked,
+                    tipo_rata=RataIscrizione.TIPO_MENSILE,
+                    numero_rata=numero_rata,
+                    mese_riferimento=data_scadenza.month,
+                    anno_riferimento=data_scadenza.year,
+                    descrizione=f"Rata rimodulata {indice + 1}/{numero_rate_future} - {data_scadenza.strftime('%m/%Y')}",
+                    importo_dovuto=importo_finale,
+                    data_scadenza=data_scadenza,
+                    credito_applicato=Decimal("0.00"),
+                    altri_sgravi=Decimal("0.00"),
+                    importo_finale=importo_finale,
+                )
+            )
+        RataIscrizione.objects.bulk_create(nuove_rate)
+
+        totale_rimodulato = sum(
+            max(importo_finale - _rata_paid_amount(rate_da_sostituire[indice]), Decimal("0.00"))
+            if indice < len(rate_da_sostituire)
+            else importo_finale
+            for indice, importo_finale in enumerate(importi_finali)
+        )
+
+        rimodulazione = RimodulazioneRetta.objects.create(
+            iscrizione=iscrizione_locked,
+            data_decorrenza=decorrenza,
+            modalita=modalita,
+            numero_rate_future=numero_rate_future,
+            importo_mensile=importo_mensile_effettivo,
+            totale_precedente=totale_precedente,
+            totale_rimodulato=totale_rimodulato,
+            rate_sostituite=rate_sostituite_count,
+            note=note or "",
+            creata_da=utente if getattr(utente, "is_authenticated", False) else None,
+        )
+        iscrizione_locked._sincronizza_fondo_accantonamento_su_agevolazione()
+
+    return rimodulazione
 
 
 def ricalcola_rate_anno_scolastico(anno_scolastico):

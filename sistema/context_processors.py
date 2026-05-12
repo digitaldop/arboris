@@ -74,10 +74,18 @@ def general_settings_context(request):
     interfaccia_colorata_attiva = bool(
         getattr(general_settings, "interfaccia_colorata_attiva", True)
     )
+    stile_streamline_attivo = bool(
+        getattr(general_settings, "stile_streamline_attivo", False)
+    )
+    stile_iconscout_3d_attivo = bool(
+        getattr(general_settings, "stile_iconscout_3d_attivo", False)
+    )
 
     return {
         "general_settings": general_settings,
         "interfaccia_colorata_attiva": interfaccia_colorata_attiva,
+        "stile_streamline_attivo": stile_streamline_attivo,
+        "stile_iconscout_3d_attivo": stile_iconscout_3d_attivo,
         "gestione_dipendenti_dettagliata_attiva": bool(
             getattr(general_settings, "gestione_dipendenti_dettagliata_attiva", False)
         ),

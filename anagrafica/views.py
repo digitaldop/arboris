@@ -3,6 +3,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from django.conf import settings
 from django.contrib import messages
@@ -236,6 +237,50 @@ def resolve_document_return_url(request, documento):
     if candidate and url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}):
         return candidate
     return build_document_owner_redirect_url(documento)
+
+
+def local_internal_url(request, candidate):
+    if not candidate:
+        return ""
+
+    if not url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return ""
+
+    parts = urlsplit(candidate)
+    path = parts.path or "/"
+    return urlunsplit(("", "", path, parts.query, parts.fragment))
+
+
+def resolve_safe_back_url(request, fallback_url):
+    fallback = local_internal_url(request, fallback_url) or fallback_url
+    candidate = (
+        request.GET.get("next")
+        or request.POST.get("next")
+        or request.META.get("HTTP_REFERER")
+        or ""
+    ).strip()
+    back_url = local_internal_url(request, candidate)
+    current_url = local_internal_url(request, request.build_absolute_uri())
+
+    if back_url and back_url != current_url:
+        return back_url
+
+    return fallback
+
+
+def add_next_to_url(request, url, next_url):
+    base_url = local_internal_url(request, url) or url
+    safe_next = local_internal_url(request, next_url)
+    if not safe_next:
+        return base_url
+
+    parts = urlsplit(base_url)
+    separator = "&" if parts.query else "?"
+    return f"{base_url}{separator}next={quote(safe_next, safe='')}"
 
 
 def build_document_owner_label(documento):
@@ -4216,6 +4261,7 @@ def crea_studente(request):
         )
 
     allowed_inline_targets = {"iscrizioni", "parenti", "documenti"}
+    student_back_url = resolve_safe_back_url(request, reverse("lista_studenti"))
     edit_scope = "full"
     inline_target = "iscrizioni"
     active_inline_tab = "iscrizioni"
@@ -4290,10 +4336,10 @@ def crea_studente(request):
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Studente creato correttamente. Puoi inserirne un altro.")
-                    return redirect("crea_studente")
+                    return redirect(add_next_to_url(request, reverse("crea_studente"), student_back_url))
 
                 messages.success(request, "Studente creato correttamente. Ora puoi continuare a inserire i dati.")
-                return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
+                return redirect(add_next_to_url(request, build_studente_redirect_url(studente.pk, active_inline_tab), student_back_url))
 
         if iscrizioni_formset is None:
             iscrizioni_formset = build_iscrizioni_studente_formset(prefix="iscrizioni")
@@ -4338,6 +4384,7 @@ def crea_studente(request):
         "rate_overview": [],
         "iscrizione_corrente": None,
         "studente_activity_entries": [],
+        "student_back_url": student_back_url,
         "has_form_errors": bool(
             form.errors
             or iscrizioni_formset.total_error_count()
@@ -4410,6 +4457,7 @@ def modifica_studente(request, pk):
             },
         )
 
+    student_back_url = resolve_safe_back_url(request, reverse("lista_studenti"))
     iscrizioni_queryset = studente_iscrizioni_inline_queryset(studente)
     documenti_queryset = studente_documenti_inline_queryset(studente)
     famiglia_for_parenti = None
@@ -4454,7 +4502,7 @@ def modifica_studente(request, pk):
             note_active_tab = (request.POST.get("_note_active_tab") or "iscrizioni").strip()
             if note_active_tab not in allowed_display_targets:
                 note_active_tab = "iscrizioni"
-            return redirect(build_studente_redirect_url(studente.pk, note_active_tab))
+            return redirect(add_next_to_url(request, build_studente_redirect_url(studente.pk, note_active_tab), student_back_url))
 
         edit_scope, inline_target = resolve_inline_target(
             request,
@@ -4548,14 +4596,14 @@ def modifica_studente(request, pk):
 
                 if "_continue" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente.")
-                    return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
+                    return redirect(add_next_to_url(request, build_studente_redirect_url(studente.pk, active_inline_tab), student_back_url))
 
                 if "_addanother" in request.POST:
                     messages.success(request, "Modifiche salvate correttamente. Puoi inserire un nuovo studente.")
                     return redirect("crea_studente")
 
                 messages.success(request, "Modifiche salvate correttamente.")
-                return redirect(build_studente_redirect_url(studente.pk, active_inline_tab))
+                return redirect(add_next_to_url(request, build_studente_redirect_url(studente.pk, active_inline_tab), student_back_url))
 
         if iscrizioni_formset is None:
             iscrizioni_formset = build_iscrizioni_studente_formset(
@@ -4692,6 +4740,7 @@ def modifica_studente(request, pk):
         "rate_overview": rate_overview,
         "iscrizione_corrente": iscrizione_corrente,
         "studente_activity_entries": studente_activity,
+        "student_back_url": student_back_url,
         "studente_creazione_data": studente_audit_info["created_data"],
         "studente_creato_da_label": studente_audit_info["created_label"],
         "studente_ultima_modifica_data": studente_audit_info["updated_data"],

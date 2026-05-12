@@ -385,6 +385,36 @@
                                     </span>
                                 </label>
 
+                                <label class="settings-switch-line" for="{{ form.stile_streamline_attivo.id_for_label }}">
+                                    <span class="settings-field-icon is-sky" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#lightbulb"></use></svg>
+                                    </span>
+                                    <span class="settings-switch-copy">
+                                        <strong>{{ form.stile_streamline_attivo.label }}</strong>
+                                        {% if form.stile_streamline_attivo.help_text %}<span>{{ form.stile_streamline_attivo.help_text }}</span>{% endif %}
+                                        {{ form.stile_streamline_attivo.errors }}
+                                    </span>
+                                    <span class="settings-switch-holder">
+                                        {{ form.stile_streamline_attivo }}
+                                        <span class="settings-switch-ui" aria-hidden="true"></span>
+                                    </span>
+                                </label>
+
+                                <label class="settings-switch-line" for="{{ form.stile_iconscout_3d_attivo.id_for_label }}">
+                                    <span class="settings-field-icon is-violet" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#lightbulb"></use></svg>
+                                    </span>
+                                    <span class="settings-switch-copy">
+                                        <strong>{{ form.stile_iconscout_3d_attivo.label }}</strong>
+                                        {% if form.stile_iconscout_3d_attivo.help_text %}<span>{{ form.stile_iconscout_3d_attivo.help_text }}</span>{% endif %}
+                                        {{ form.stile_iconscout_3d_attivo.errors }}
+                                    </span>
+                                    <span class="settings-switch-holder">
+                                        {{ form.stile_iconscout_3d_attivo }}
+                                        <span class="settings-switch-ui" aria-hidden="true"></span>
+                                    </span>
+                                </label>
+
                                 <div class="settings-field-row">
                                     <span class="settings-field-icon is-blue" aria-hidden="true">
                                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
@@ -443,6 +473,10 @@
                                 <div>
                                     <span>Interfaccia</span>
                                     <strong>{% if impostazioni.interfaccia_colorata_attiva %}Colorata{% else %}Uniforme{% endif %}</strong>
+                                </div>
+                                <div>
+                                    <span>Icone</span>
+                                    <strong>{% if impostazioni.stile_iconscout_3d_attivo %}IconScout 3D{% elif impostazioni.stile_streamline_attivo %}Streamline{% else %}Lineari{% endif %}</strong>
                                 </div>
                                 <div>
                                     <span>Cronologia operazioni</span>

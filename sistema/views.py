@@ -1686,3 +1686,8 @@ def informativa_privacy(request):
 def termini_e_condizioni(request):
     """Pagina statica termini e condizioni d'uso del software (template generico)."""
     return render(request, "sistema/termini_condizioni.html")
+
+
+def crediti(request):
+    """Pagina statica dei crediti e delle attribuzioni degli asset."""
+    return render(request, "sistema/crediti.html")

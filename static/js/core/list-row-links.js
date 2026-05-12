@@ -43,6 +43,9 @@ window.ArborisListRowLinks = (function () {
 
                 const href = row.dataset.rowHref;
                 if (href) {
+                    if (window.ArborisAppNavigation && typeof window.ArborisAppNavigation.rememberBackForNavigation === "function") {
+                        window.ArborisAppNavigation.rememberBackForNavigation(href);
+                    }
                     if (typeof window.ArborisArmLongWaitForNavigationUrl === "function") {
                         window.ArborisArmLongWaitForNavigationUrl(href);
                     }

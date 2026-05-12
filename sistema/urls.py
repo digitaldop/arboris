@@ -15,6 +15,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("privacy/", views.informativa_privacy, name="informativa_privacy"),
     path("termini-e-condizioni/", views.termini_e_condizioni, name="termini_condizioni"),
+    path("crediti/", views.crediti, name="crediti"),
     path("sistema/ricerca-globale/", views.ricerca_globale_sistema, name="ricerca_globale_sistema"),
     path("sistema/toggle-attivo/", views.toggle_active_state, name="toggle_active_state"),
     path("feedback/beta/", views.crea_feedback_beta, name="crea_feedback_beta"),

@@ -132,9 +132,24 @@
             padding: 0;
         }
         .verifica-rette-scroll {
+            position: relative;
+            max-height: calc(100vh - 220px);
             overflow-x: auto;
+            overflow-y: auto;
             max-width: 100%;
             box-sizing: border-box;
+            cursor: grab;
+            overscroll-behavior-x: contain;
+            overscroll-behavior-y: contain;
+            scrollbar-gutter: stable;
+            -webkit-overflow-scrolling: touch;
+        }
+        .verifica-rette-scroll.is-dragging {
+            cursor: grabbing;
+            user-select: none;
+        }
+        .verifica-rette-scroll.is-dragging * {
+            cursor: grabbing !important;
         }
 
         .verifica-rette-table {
@@ -154,23 +169,28 @@
         .verifica-rette-table thead th {
             position: sticky;
             top: 0;
-            z-index: 3;
+            z-index: 18;
             background: #f3f5f7;
             font-weight: 600;
             padding: 0.5rem 0.6rem;
             text-align: center;
             white-space: nowrap;
+            background-clip: padding-box;
+            box-shadow: 0 2px 0 #b9c8d2, 0 8px 14px rgba(19, 42, 63, 0.08);
         }
         .verifica-rette-table .sticky-col {
             position: sticky;
             left: 0;
-            z-index: 2;
+            z-index: 8;
             background: #fff;
-            min-width: 190px;
-            max-width: 220px;
+            width: 210px;
+            min-width: 210px;
+            max-width: 210px;
+            background-clip: padding-box;
+            border-right-color: #c9d7e1;
         }
         .verifica-rette-table thead .sticky-col {
-            z-index: 4;
+            z-index: 28;
             background: #f3f5f7;
         }
         .verifica-rette-table .studente-col {
@@ -181,6 +201,8 @@
             padding: 0.48rem 0.62rem;
             text-decoration: none;
             color: inherit;
+            -webkit-user-drag: none;
+            user-select: none;
         }
         .verifica-rette-table .studente-link:hover {
             background: #f1f5f9;
@@ -203,6 +225,7 @@
             border-bottom: 2px solid #b9c8d2;
         }
         .verifica-rette-table .verifica-rette-total-row .sticky-col {
+            z-index: 9;
             background: #edf4f7;
             color: #223846;
             font-weight: 700;
@@ -229,17 +252,31 @@
         }
 
         .verifica-rette-table .classe-separator td {
+            position: sticky;
+            top: 34px;
+            z-index: 16;
             background: #e8edf2;
             padding: 0.4rem 0.75rem;
             font-size: 0.85rem;
             color: #334155;
-            position: sticky;
-            left: 0;
+            box-shadow: 0 2px 0 #c9d7e1;
+        }
+        .verifica-rette-table .classe-separator .classe-separator-cell {
+            z-index: 20;
+            background: #e8edf2;
+            font-weight: 800;
+            box-shadow: 9px 0 18px rgba(19, 42, 63, 0.12), 0 2px 0 #c9d7e1;
+        }
+        .verifica-rette-table .classe-separator .classe-separator-fill {
+            min-width: 112px;
         }
 
         .verifica-rette-cell {
             min-width: 112px;
             max-width: 138px;
+        }
+        .verifica-rette-cell[data-rate-matrix-cell] {
+            cursor: grab;
         }
         .verifica-rette-cell .cell-link {
             display: block;
@@ -248,9 +285,16 @@
             text-decoration: none;
             font-size: 0.76rem;
             line-height: 1.2;
+            cursor: grab;
+            -webkit-user-drag: none;
+            user-select: none;
         }
         .verifica-rette-cell .cell-link:hover {
             filter: brightness(0.96);
+        }
+        .verifica-rette-cell .cell-link:focus-visible {
+            outline: 2px solid #2f7c9b;
+            outline-offset: -2px;
         }
         .verifica-rette-cell .cell-amount {
             display: flex;
@@ -298,6 +342,31 @@
         .verifica-rette-table td.cella-parziale .cell-link   { color: #6b4906; }
         .verifica-rette-table td.cella-non-pagata .cell-link { color: #7f1d1d; }
         .verifica-rette-table td.cella-non-dovuta .cell-link { color: #475569; }
+
+        .verifica-rette-table tr.is-row-highlighted td {
+            box-shadow: inset 0 0 0 2px rgba(47, 124, 155, 0.75);
+        }
+        .verifica-rette-table tr.is-row-highlighted td:not(.sticky-col) {
+            position: relative;
+        }
+        .verifica-rette-table tr.is-row-highlighted td:not(.sticky-col)::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background: rgba(47, 124, 155, 0.1);
+            box-shadow: inset 0 0 0 3px rgba(47, 124, 155, 0.9);
+        }
+        .verifica-rette-table tr.is-row-highlighted .sticky-col {
+            background: #eef8fb;
+            box-shadow:
+                inset 0 0 0 3px rgba(47, 124, 155, 0.9),
+                9px 0 18px rgba(19, 42, 63, 0.12);
+        }
+        .verifica-rette-table tr.is-row-highlighted .studente-link {
+            color: #10384a;
+        }
 
         /* Stessi colori anche sui chip della legenda. */
         .verifica-rette-legenda .legenda-chip.cella-pagata     { background: #d6f5dc; }
@@ -405,6 +474,42 @@
             justify-content: flex-end;
             gap: 10px;
             flex-wrap: wrap;
+        }
+        .verifica-rette-scroll-help {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid #cfdce8;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #2b5d77;
+            cursor: help;
+            box-shadow: 0 8px 18px rgba(19, 42, 63, 0.04);
+        }
+        .verifica-rette-scroll-help:hover,
+        .verifica-rette-scroll-help:focus-visible {
+            border-color: #9fc7d8;
+            background: #eef6fa;
+        }
+        .verifica-rette-scroll-help svg {
+            width: 18px;
+            height: 18px;
+        }
+        .verifica-rette-scroll-help-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: #2b5d77;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1;
         }
         .verifica-rette-view-switch {
             display: inline-flex;
@@ -519,7 +624,7 @@
             border-spacing: 0;
             border: 1px solid #dfe8ef;
             border-radius: 8px;
-            overflow: hidden;
+            overflow: visible;
         }
         .verifica-rette-table th,
         .verifica-rette-table td {
@@ -533,7 +638,7 @@
         .verifica-rette-table .sticky-col,
         .verifica-rette-table thead .sticky-col {
             background: #ffffff;
-            box-shadow: 7px 0 14px rgba(19, 42, 63, 0.06);
+            box-shadow: 9px 0 18px rgba(19, 42, 63, 0.12);
         }
         .verifica-rette-table thead .sticky-col {
             background: #f3f9fc;
@@ -750,6 +855,14 @@
                     <p class="verifica-rette-card-subtitle">Vista alfabetica predefinita; puoi passare alla divisione per classe quando serve.</p>
                 </div>
                 <div class="verifica-rette-card-actions">
+                    <button
+                        type="button"
+                        class="verifica-rette-scroll-help"
+                        data-floating-text="Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro su una rata: apri il dettaglio. Click sul nome: apri la scheda studente."
+                        aria-label="Come navigare la matrice rette"
+                    >
+                        <span class="verifica-rette-scroll-help-mark" aria-hidden="true">?</span>
+                    </button>
                     <div class="verifica-rette-view-switch" role="group" aria-label="Vista matrice rette">
                         <button
                             type="button"
@@ -771,10 +884,10 @@
                 </div>
             </div>
             <div class="verifica-rette-matrix-panel" data-matrix-view-panel="alfabetica">
-                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with righe_matrice=righe_matrice_alfabetica %}
+                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with righe_matrice=righe_matrice_alfabetica matrix_return_url=matrix_return_url %}
             </div>
             <div class="verifica-rette-matrix-panel" data-matrix-view-panel="classe" hidden>
-                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with grouped=1 %}
+                {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_table.html" with grouped=1 matrix_return_url=matrix_return_url %}
             </div>
         </section>
     {% else %}
@@ -813,6 +926,184 @@
             });
 
             setMatrixView("alfabetica");
+        })();
+
+        (function () {
+            var scrollAreas = Array.prototype.slice.call(document.querySelectorAll("[data-rate-matrix-scroll]"));
+            var dragThreshold = 5;
+
+            function closestElement(target, selector) {
+                var element = target && target.nodeType === 1 ? target : target && target.parentElement;
+                return element && element.closest ? element.closest(selector) : null;
+            }
+
+            function getRateDetailLink(target) {
+                return closestElement(target, "[data-rate-detail-link]");
+            }
+
+            function setRowHighlight(row, isHighlighted) {
+                row.classList.toggle("is-row-highlighted", isHighlighted);
+                row.setAttribute("aria-selected", isHighlighted ? "true" : "false");
+            }
+
+            function toggleMatrixRowHighlight(row) {
+                if (!row) {
+                    return;
+                }
+
+                var studentId = row.dataset.studentId;
+                var shouldHighlight = !row.classList.contains("is-row-highlighted");
+
+                Array.prototype.slice.call(document.querySelectorAll("[data-rate-matrix-row]")).forEach(function (candidate) {
+                    if (studentId && candidate.dataset.studentId === studentId) {
+                        setRowHighlight(candidate, shouldHighlight);
+                    }
+                });
+            }
+
+            scrollAreas.forEach(function (scrollArea) {
+                var activePointerId = null;
+                var startX = 0;
+                var startScrollLeft = 0;
+                var hasDragged = false;
+                var suppressNextRateClick = false;
+                var lastHighlightToggle = null;
+
+                function finishDrag() {
+                    if (activePointerId === null) {
+                        return;
+                    }
+
+                    if (hasDragged) {
+                        suppressNextRateClick = true;
+                        window.setTimeout(function () {
+                            suppressNextRateClick = false;
+                        }, 200);
+                    }
+
+                    activePointerId = null;
+                    hasDragged = false;
+                    scrollArea.classList.remove("is-dragging");
+                }
+
+                scrollArea.addEventListener("pointerdown", function (event) {
+                    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+                        return;
+                    }
+
+                    if (closestElement(event.target, "button, input, select, textarea, label")) {
+                        return;
+                    }
+
+                    if (closestElement(event.target, ".studente-link")) {
+                        return;
+                    }
+
+                    activePointerId = event.pointerId;
+                    startX = event.clientX;
+                    startScrollLeft = scrollArea.scrollLeft;
+                    hasDragged = false;
+
+                    if (scrollArea.setPointerCapture) {
+                        try {
+                            scrollArea.setPointerCapture(event.pointerId);
+                        } catch (error) {
+                            activePointerId = null;
+                            return;
+                        }
+                    }
+
+                });
+
+                scrollArea.addEventListener("pointermove", function (event) {
+                    if (activePointerId !== event.pointerId) {
+                        return;
+                    }
+
+                    var deltaX = event.clientX - startX;
+                    if (!hasDragged && Math.abs(deltaX) > dragThreshold) {
+                        hasDragged = true;
+                        scrollArea.classList.add("is-dragging");
+                    }
+
+                    if (hasDragged) {
+                        event.preventDefault();
+                        scrollArea.scrollLeft = startScrollLeft - deltaX;
+                    }
+                });
+
+                scrollArea.addEventListener("pointerup", finishDrag);
+                scrollArea.addEventListener("pointercancel", finishDrag);
+                scrollArea.addEventListener("lostpointercapture", finishDrag);
+
+                function handleMatrixRowDoubleClick(event) {
+                    var row = closestElement(event.target, "[data-rate-matrix-row]");
+                    var matrixCell = closestElement(event.target, "[data-rate-matrix-cell]");
+                    if (!row || !matrixCell || closestElement(event.target, ".studente-link")) {
+                        return false;
+                    }
+
+                    event.preventDefault();
+                    lastHighlightToggle = {
+                        row: row,
+                        time: Date.now()
+                    };
+                    toggleMatrixRowHighlight(row);
+                    return true;
+                }
+
+                scrollArea.addEventListener("mousedown", function (event) {
+                    if (event.button !== 0 || event.detail !== 2) {
+                        return;
+                    }
+
+                    handleMatrixRowDoubleClick(event);
+                }, true);
+
+                scrollArea.addEventListener("click", function (event) {
+                    var detailLink = getRateDetailLink(event.target);
+                    if (!detailLink) {
+                        return;
+                    }
+
+                    if (suppressNextRateClick) {
+                        event.preventDefault();
+                        suppressNextRateClick = false;
+                        return;
+                    }
+
+                    if (event.detail === 0) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                }, true);
+
+                scrollArea.addEventListener("dblclick", function (event) {
+                    var row = closestElement(event.target, "[data-rate-matrix-row]");
+                    if (
+                        lastHighlightToggle &&
+                        lastHighlightToggle.row === row &&
+                        Date.now() - lastHighlightToggle.time < 350
+                    ) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    handleMatrixRowDoubleClick(event);
+                }, true);
+
+                scrollArea.addEventListener("contextmenu", function (event) {
+                    var detailLink = getRateDetailLink(event.target);
+                    if (!detailLink) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    finishDrag();
+                    window.location.assign(detailLink.href);
+                });
+            });
         })();
 
         (function () {

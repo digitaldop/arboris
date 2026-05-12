@@ -35236,3 +35236,837 @@ body.ui-colorful-modules .finance-icon-button {
     border-color: transparent !important;
     box-shadow: none !important;
 }
+
+/* Stile Streamline: icone emozionali multicolore, mantenendo lineari le icone funzionali. */
+body.ui-streamline-icons {
+    --streamline-dashboard: #0b7480;
+    --streamline-dashboard-soft: #d9f5f6;
+    --streamline-dashboard-ring: #8fd4dc;
+    --streamline-families: #5f8f69;
+    --streamline-families-soft: #e0f4e4;
+    --streamline-families-ring: #acd9b7;
+    --streamline-students: #da7a2f;
+    --streamline-students-soft: #ffe5cc;
+    --streamline-students-ring: #efb77d;
+    --streamline-educators: #0c9397;
+    --streamline-educators-soft: #dcf7f5;
+    --streamline-educators-ring: #92dcd8;
+    --streamline-documents: #b8841f;
+    --streamline-documents-soft: #fff0bf;
+    --streamline-documents-ring: #e3c36f;
+    --streamline-calendar: #7d5fc5;
+    --streamline-calendar-soft: #ebe3fb;
+    --streamline-calendar-ring: #c4b1ee;
+    --streamline-payments: #bd5e48;
+    --streamline-payments-soft: #ffe3da;
+    --streamline-payments-ring: #eda998;
+    --streamline-settings: #536d86;
+    --streamline-settings-soft: #e4edf4;
+    --streamline-settings-ring: #b9cbd8;
+    --streamline-functional-color: var(--streamline-settings);
+    --streamline-functional-soft: var(--streamline-settings-soft);
+    --streamline-functional-ring: var(--streamline-settings-ring);
+}
+
+body.ui-streamline-icons .page-head-icon,
+body.ui-streamline-icons .settings-hero-icon,
+body.ui-streamline-icons .settings-card-icon,
+body.ui-streamline-icons .settings-module-icon,
+body.ui-streamline-icons .dashboard-info-icon,
+body.ui-streamline-icons .family-stat-icon,
+body.ui-streamline-icons .family-system-icon,
+body.ui-streamline-icons .family-meta-icon,
+body.ui-streamline-icons .interested-page-hero-icon,
+body.ui-streamline-icons .interested-summary-icon,
+body.ui-streamline-icons .interested-record-icon,
+body.ui-streamline-icons .interested-timeline-icon,
+body.ui-streamline-icons .interested-card-icon,
+body.ui-streamline-icons .finance-guide-icon,
+body.ui-streamline-icons .supplier-document-summary-icon,
+body.ui-streamline-icons .supplier-payment-hero-icon,
+body.ui-streamline-icons .rate-detail-hero-icon,
+body.ui-streamline-icons .rate-payment-hero-icon,
+body.ui-streamline-icons .rate-reconcile-page-hero-icon,
+body.ui-streamline-icons .rate-detail-summary-icon,
+body.ui-streamline-icons .calendar-event-hero-icon,
+body.ui-streamline-icons .calendar-category-hero-icon,
+body.ui-streamline-icons .related-status-icon-tile,
+body.ui-streamline-icons .archive-record-icon,
+body.ui-streamline-icons .archive-empty-icon,
+body.ui-streamline-icons .feedback-admin-summary-icon,
+body.ui-streamline-icons .audit-log-title-icon,
+body.ui-streamline-icons .audit-log-kpi-icon,
+body.ui-streamline-icons .audit-log-card-icon,
+body.ui-streamline-icons .audit-log-warning-icon,
+body.ui-streamline-icons .audit-log-empty-icon,
+body.ui-streamline-icons .database-backup-empty-icon,
+body.ui-streamline-icons .fondo-plans-status-icon,
+body.ui-streamline-icons .fondo-plan-summary-hero-icon,
+body.ui-streamline-icons .fondo-plan-empty-icon,
+body.ui-streamline-icons .fondo-movement-hero-icon,
+body.ui-streamline-icons .ga-admin-dashboard-title-icon,
+body.ui-streamline-icons .ga-admin-dashboard-workflow-icon {
+    --streamline-icon-color: var(--streamline-settings);
+    --streamline-icon-soft: var(--streamline-settings-soft);
+    --streamline-icon-ring: var(--streamline-settings-ring);
+    background:
+        radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.98) 0 17%, transparent 18%),
+        radial-gradient(circle at 78% 82%, color-mix(in srgb, var(--streamline-icon-color) 24%, transparent) 0 21%, transparent 22%),
+        linear-gradient(145deg, #ffffff 0%, color-mix(in srgb, var(--streamline-icon-soft) 88%, #ffffff) 42%, color-mix(in srgb, var(--streamline-icon-color) 15%, #ffffff) 100%) !important;
+    color: var(--streamline-icon-color);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--streamline-icon-ring) 84%, #ffffff),
+        inset 0 -10px 18px color-mix(in srgb, var(--streamline-icon-color) 9%, transparent),
+        0 10px 22px color-mix(in srgb, var(--streamline-icon-color) 15%, transparent) !important;
+}
+
+body.ui-streamline-icons .streamline-emotional-svg {
+    overflow: visible;
+    filter: saturate(1.2) contrast(1.04);
+}
+
+body.ui-streamline-icons .streamline-emotional-svg use {
+    color: inherit;
+}
+
+body.ui-streamline-icons .page-head-icon svg,
+body.ui-streamline-icons .settings-hero-icon svg,
+body.ui-streamline-icons .dashboard-info-icon svg {
+    width: 30px;
+    height: 30px;
+}
+
+body.ui-streamline-icons .settings-card-icon svg,
+body.ui-streamline-icons .settings-module-icon svg,
+body.ui-streamline-icons .family-stat-icon svg,
+body.ui-streamline-icons .family-system-icon svg,
+body.ui-streamline-icons .family-meta-icon svg,
+body.ui-streamline-icons .interested-summary-icon svg,
+body.ui-streamline-icons .interested-card-icon svg,
+body.ui-streamline-icons .finance-guide-icon svg,
+body.ui-streamline-icons .rate-detail-summary-icon svg,
+body.ui-streamline-icons .audit-log-kpi-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#home"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#home"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#home"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#home"]) {
+    --streamline-icon-color: var(--streamline-dashboard);
+    --streamline-icon-soft: var(--streamline-dashboard-soft);
+    --streamline-icon-ring: var(--streamline-dashboard-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#family-heart"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#hands-heart"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#family-heart"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#family-heart"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .family-stat-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .family-system-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .family-meta-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .interested-summary-icon:has(use[href$="#family"]),
+body.ui-streamline-icons .interested-card-icon:has(use[href$="#family"]) {
+    --streamline-icon-color: var(--streamline-families);
+    --streamline-icon-soft: var(--streamline-families-soft);
+    --streamline-icon-ring: var(--streamline-families-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#student"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#child"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#student"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#student"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#student"]),
+body.ui-streamline-icons .family-stat-icon:has(use[href$="#student"]) {
+    --streamline-icon-color: var(--streamline-students);
+    --streamline-icon-soft: var(--streamline-students-soft);
+    --streamline-icon-ring: var(--streamline-students-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#user"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#user"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#user"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#user"]) {
+    --streamline-icon-color: var(--streamline-educators);
+    --streamline-icon-soft: var(--streamline-educators-soft);
+    --streamline-icon-ring: var(--streamline-educators-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#document"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#archive"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#printer"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#document"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#archive"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#document"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#document"]),
+body.ui-streamline-icons .archive-empty-icon,
+body.ui-streamline-icons .archive-record-icon {
+    --streamline-icon-color: var(--streamline-documents);
+    --streamline-icon-soft: var(--streamline-documents-soft);
+    --streamline-icon-ring: var(--streamline-documents-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#calendar"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#clock"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#timer"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#calendar"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#calendar"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#calendar"]),
+body.ui-streamline-icons .calendar-event-hero-icon,
+body.ui-streamline-icons .calendar-category-hero-icon {
+    --streamline-icon-color: var(--streamline-calendar);
+    --streamline-icon-soft: var(--streamline-calendar-soft);
+    --streamline-icon-ring: var(--streamline-calendar-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#coins"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#finance"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#bank"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#supplier"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#coins"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#finance"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#coins"]),
+body.ui-streamline-icons .settings-module-icon:has(use[href$="#finance"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#coins"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#finance"]),
+body.ui-streamline-icons .rate-detail-summary-icon,
+body.ui-streamline-icons .supplier-document-summary-icon,
+body.ui-streamline-icons .supplier-payment-hero-icon,
+body.ui-streamline-icons .rate-payment-hero-icon,
+body.ui-streamline-icons .rate-reconcile-page-hero-icon,
+body.ui-streamline-icons .finance-guide-icon {
+    --streamline-icon-color: var(--streamline-payments);
+    --streamline-icon-soft: var(--streamline-payments-soft);
+    --streamline-icon-ring: var(--streamline-payments-ring);
+}
+
+body.ui-streamline-icons .page-head-icon:has(use[href$="#message"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#mail"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#bell"]),
+body.ui-streamline-icons .page-head-icon:has(use[href$="#lightbulb"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#message"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#mail"]),
+body.ui-streamline-icons .dashboard-info-icon:has(use[href$="#message"]),
+body.ui-streamline-icons .interested-record-icon,
+body.ui-streamline-icons .interested-timeline-icon {
+    --streamline-icon-color: var(--streamline-educators);
+    --streamline-icon-soft: var(--streamline-educators-soft);
+    --streamline-icon-ring: var(--streamline-educators-ring);
+}
+
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#settings"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#shield"]),
+body.ui-streamline-icons .settings-card-icon:has(use[href$="#list"]),
+body.ui-streamline-icons .settings-hero-icon,
+body.ui-streamline-icons .related-status-icon-tile,
+body.ui-streamline-icons .feedback-admin-summary-icon,
+body.ui-streamline-icons .audit-log-title-icon,
+body.ui-streamline-icons .audit-log-kpi-icon,
+body.ui-streamline-icons .audit-log-card-icon,
+body.ui-streamline-icons .audit-log-warning-icon,
+body.ui-streamline-icons .audit-log-empty-icon,
+body.ui-streamline-icons .database-backup-empty-icon {
+    --streamline-icon-color: var(--streamline-settings);
+    --streamline-icon-soft: var(--streamline-settings-soft);
+    --streamline-icon-ring: var(--streamline-settings-ring);
+}
+
+body.ui-streamline-icons .dashboard-stat-card:not(.dashboard-stat-card-full)::before {
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 63% 33%, rgba(255, 255, 255, 0.95) 0 12%, transparent 13%),
+        radial-gradient(circle at 36% 62%, var(--dashboard-card-accent, var(--streamline-dashboard)) 0 21%, transparent 22%),
+        linear-gradient(145deg, #ffffff 0%, var(--dashboard-icon-tint, var(--streamline-dashboard-soft)) 100%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--dashboard-card-accent, var(--streamline-dashboard)) 18%, #ffffff),
+        0 8px 18px color-mix(in srgb, var(--dashboard-card-accent, var(--streamline-dashboard)) 12%, transparent);
+}
+
+body.ui-streamline-icons .settings-module-toggle-card .settings-module-icon {
+    border-radius: 12px;
+}
+
+body.ui-streamline-icons .page-head-icon,
+body.ui-streamline-icons .settings-hero-icon,
+body.ui-streamline-icons .dashboard-info-icon {
+    border-radius: 16px;
+}
+
+body.ui-streamline-icons .sidebar-nav a,
+body.ui-streamline-icons .calendar-sidebar-link {
+    --streamline-functional-color: var(--streamline-settings);
+    --streamline-functional-soft: var(--streamline-settings-soft);
+    --streamline-functional-ring: var(--streamline-settings-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#home"]) {
+    --streamline-functional-color: var(--streamline-dashboard);
+    --streamline-functional-soft: var(--streamline-dashboard-soft);
+    --streamline-functional-ring: var(--streamline-dashboard-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#family"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#family-heart"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#hands-heart"]) {
+    --streamline-functional-color: var(--streamline-families);
+    --streamline-functional-soft: var(--streamline-families-soft);
+    --streamline-functional-ring: var(--streamline-families-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#student"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#child"]) {
+    --streamline-functional-color: var(--streamline-students);
+    --streamline-functional-soft: var(--streamline-students-soft);
+    --streamline-functional-ring: var(--streamline-students-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#user"]) {
+    --streamline-functional-color: var(--streamline-educators);
+    --streamline-functional-soft: var(--streamline-educators-soft);
+    --streamline-functional-ring: var(--streamline-educators-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#document"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#archive"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#printer"]) {
+    --streamline-functional-color: var(--streamline-documents);
+    --streamline-functional-soft: var(--streamline-documents-soft);
+    --streamline-functional-ring: var(--streamline-documents-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#calendar"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#clock"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#timer"]) {
+    --streamline-functional-color: var(--streamline-calendar);
+    --streamline-functional-soft: var(--streamline-calendar-soft);
+    --streamline-functional-ring: var(--streamline-calendar-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#coins"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#finance"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#bank"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#supplier"]) {
+    --streamline-functional-color: var(--streamline-payments);
+    --streamline-functional-soft: var(--streamline-payments-soft);
+    --streamline-functional-ring: var(--streamline-payments-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#message"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#mail"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#bell"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#lightbulb"]) {
+    --streamline-functional-color: var(--streamline-educators);
+    --streamline-functional-soft: var(--streamline-educators-soft);
+    --streamline-functional-ring: var(--streamline-educators-ring);
+}
+
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#settings"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#shield"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#list"]),
+body.ui-streamline-icons .sidebar-nav a:has(use[href$="#menu"]) {
+    --streamline-functional-color: var(--streamline-settings);
+    --streamline-functional-soft: var(--streamline-settings-soft);
+    --streamline-functional-ring: var(--streamline-settings-ring);
+}
+
+body.ui-streamline-icons .sidebar-link-icon {
+    color: var(--streamline-functional-color) !important;
+    background: color-mix(in srgb, var(--streamline-functional-soft) 78%, #ffffff) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--streamline-functional-ring) 82%, #ffffff) !important;
+}
+
+body.ui-streamline-icons .sidebar-nav a:hover,
+body.ui-streamline-icons .sidebar-nav a:focus-visible,
+body.ui-streamline-icons .sidebar-nav a.active,
+body.ui-streamline-icons .sidebar-nav a.active:hover,
+body.ui-streamline-icons .sidebar-nav a.active:focus-visible {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--streamline-functional-soft) 90%, #ffffff) 0%, #ffffff 100%) !important;
+    color: color-mix(in srgb, var(--streamline-functional-color) 86%, #182c3e) !important;
+    box-shadow:
+        inset 4px 0 0 var(--streamline-functional-color),
+        0 7px 16px color-mix(in srgb, var(--streamline-functional-color) 14%, transparent) !important;
+}
+
+body.ui-streamline-icons .sidebar-nav a.active::after {
+    background: var(--streamline-functional-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--streamline-functional-color) 18%, transparent);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section,
+body.ui-streamline-icons .sidebar-home-section {
+    --streamline-section-color: var(--streamline-settings);
+    --streamline-section-soft: var(--streamline-settings-soft);
+    border-color: color-mix(in srgb, var(--streamline-section-color) 20%, #e4edf4);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--streamline-section-soft) 60%, #ffffff) 0%, #ffffff 100%);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="anagrafica"] {
+    --streamline-section-color: var(--streamline-students);
+    --streamline-section-soft: var(--streamline-students-soft);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="famiglie-interessate"] {
+    --streamline-section-color: var(--streamline-families);
+    --streamline-section-soft: var(--streamline-families-soft);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="economia"],
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-finanziaria"] {
+    --streamline-section-color: var(--streamline-payments);
+    --streamline-section-soft: var(--streamline-payments-soft);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="calendario"] {
+    --streamline-section-color: var(--streamline-calendar);
+    --streamline-section-soft: var(--streamline-calendar-soft);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="archivio-storico"],
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="servizi-extra"] {
+    --streamline-section-color: var(--streamline-documents);
+    --streamline-section-soft: var(--streamline-documents-soft);
+}
+
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section:has(.active) {
+    border-color: color-mix(in srgb, var(--streamline-section-color) 36%, #dce7ef);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--streamline-section-soft) 82%, #ffffff) 0%, #ffffff 100%);
+    box-shadow: 0 9px 22px color-mix(in srgb, var(--streamline-section-color) 12%, transparent);
+}
+
+body.ui-streamline-icons .sidebar-section > .sidebar-collapsible,
+body.ui-streamline-icons .sidebar-subsection .sidebar-collapsible {
+    color: color-mix(in srgb, var(--streamline-section-color, var(--streamline-settings)) 84%, #283d52);
+}
+
+body.ui-streamline-icons .settings-module-toggle-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--module-card-soft, var(--streamline-settings-soft)) 70%, #ffffff) 0%, #ffffff 100%);
+    border-color: color-mix(in srgb, var(--module-card-ring, var(--streamline-settings-ring)) 78%, #dfe8ef);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(1) {
+    --module-card-accent: var(--streamline-students);
+    --module-card-soft: var(--streamline-students-soft);
+    --module-card-ring: var(--streamline-students-ring);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(2) {
+    --module-card-accent: var(--streamline-families);
+    --module-card-soft: var(--streamline-families-soft);
+    --module-card-ring: var(--streamline-families-ring);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(3),
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(5) {
+    --module-card-accent: var(--streamline-payments);
+    --module-card-soft: var(--streamline-payments-soft);
+    --module-card-ring: var(--streamline-payments-ring);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(4) {
+    --module-card-accent: var(--streamline-calendar);
+    --module-card-soft: var(--streamline-calendar-soft);
+    --module-card-ring: var(--streamline-calendar-ring);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(6) {
+    --module-card-accent: var(--streamline-settings);
+    --module-card-soft: var(--streamline-settings-soft);
+    --module-card-ring: var(--streamline-settings-ring);
+}
+
+body.ui-streamline-icons .settings-module-grid > .settings-module-toggle-card:nth-child(7) {
+    --module-card-accent: var(--streamline-documents);
+    --module-card-soft: var(--streamline-documents-soft);
+    --module-card-ring: var(--streamline-documents-ring);
+}
+
+body.ui-streamline-icons .settings-module-toggle-card:hover {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--module-card-soft, var(--streamline-settings-soft)) 84%, #ffffff) 0%, #ffffff 100%);
+    border-color: color-mix(in srgb, var(--module-card-accent, var(--streamline-settings)) 36%, var(--module-card-ring, var(--streamline-settings-ring)));
+}
+
+body.ui-streamline-icons .settings-module-toggle-card .settings-module-icon {
+    background:
+        radial-gradient(circle at 25% 22%, rgba(255, 255, 255, 0.96) 0 18%, transparent 19%),
+        linear-gradient(145deg, #ffffff 0%, color-mix(in srgb, var(--module-card-soft, var(--streamline-settings-soft)) 92%, #ffffff) 100%) !important;
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--module-card-ring, var(--streamline-settings-ring)) 84%, #ffffff),
+        0 7px 16px color-mix(in srgb, var(--module-card-accent, var(--streamline-settings)) 12%, transparent) !important;
+}
+
+body.ui-streamline-icons .table-icon-link,
+body.ui-streamline-icons .finance-icon-button,
+body.ui-streamline-icons .related-btn-icon,
+body.ui-streamline-icons .btn-secondary .btn-icon:not(.btn-plus-mark),
+body.ui-streamline-icons .btn-secondary.btn-icon-text .btn-icon:not(.btn-plus-mark) {
+    color: color-mix(in srgb, var(--streamline-functional-color, var(--streamline-settings)) 82%, #20384d);
+}
+
+/* Stile Streamline: badge mantenuti sulle icone emozionali, rimossi solo dalle icone funzionali piccole. */
+body.ui-streamline-icons .sidebar-link-icon,
+body.ui-streamline-icons .settings-field-icon,
+body.ui-streamline-icons .system-role-field-icon,
+body.ui-streamline-icons .audit-log-user-icon,
+body.ui-streamline-icons .audit-log-search-icon,
+body.ui-streamline-icons .btn-secondary .btn-icon:not(.btn-plus-mark),
+body.ui-streamline-icons .btn-secondary.btn-icon-text .btn-icon:not(.btn-plus-mark),
+body.ui-streamline-icons .related-btn-icon,
+body.ui-streamline-icons .table-icon-link,
+body.ui-streamline-icons .finance-icon-button {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+body.ui-streamline-icons .sidebar-link-icon {
+    color: var(--streamline-functional-color) !important;
+}
+
+body.ui-streamline-icons .table-icon-link,
+body.ui-streamline-icons .finance-icon-button {
+    color: color-mix(in srgb, var(--streamline-functional-color, var(--streamline-settings)) 82%, #20384d);
+}
+
+/* Stile IconScout 3D: icone emozionali tridimensionali, funzionali piccole lineari. */
+body.ui-iconscout-3d-icons {
+    --iconscout-3d-dashboard: #0f7f94;
+    --iconscout-3d-dashboard-soft: #ddf7fb;
+    --iconscout-3d-dashboard-ring: #9bdcea;
+    --iconscout-3d-families: #5f9467;
+    --iconscout-3d-families-soft: #e4f6df;
+    --iconscout-3d-families-ring: #b7e2a8;
+    --iconscout-3d-students: #df7a2e;
+    --iconscout-3d-students-soft: #ffe7cb;
+    --iconscout-3d-students-ring: #f1bd84;
+    --iconscout-3d-educators: #0f9598;
+    --iconscout-3d-educators-soft: #ddf7f4;
+    --iconscout-3d-educators-ring: #9be0dc;
+    --iconscout-3d-documents: #ba861f;
+    --iconscout-3d-documents-soft: #fff0c2;
+    --iconscout-3d-documents-ring: #e5c570;
+    --iconscout-3d-calendar: #795fc5;
+    --iconscout-3d-calendar-soft: #ece4fc;
+    --iconscout-3d-calendar-ring: #c7b4f0;
+    --iconscout-3d-payments: #c35f48;
+    --iconscout-3d-payments-soft: #ffe3d9;
+    --iconscout-3d-payments-ring: #efaa98;
+    --iconscout-3d-settings: #536d86;
+    --iconscout-3d-settings-soft: #e6eef5;
+    --iconscout-3d-settings-ring: #b9cbd8;
+    --iconscout-3d-icon-color: var(--iconscout-3d-settings);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-settings-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-settings-ring);
+    --iconscout-3d-functional-color: var(--iconscout-3d-settings);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-settings-soft);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon,
+body.ui-iconscout-3d-icons .settings-hero-icon,
+body.ui-iconscout-3d-icons .settings-card-icon,
+body.ui-iconscout-3d-icons .settings-module-icon,
+body.ui-iconscout-3d-icons .dashboard-info-icon,
+body.ui-iconscout-3d-icons .family-stat-icon,
+body.ui-iconscout-3d-icons .family-system-icon,
+body.ui-iconscout-3d-icons .family-meta-icon,
+body.ui-iconscout-3d-icons .interested-page-hero-icon,
+body.ui-iconscout-3d-icons .interested-summary-icon,
+body.ui-iconscout-3d-icons .interested-record-icon,
+body.ui-iconscout-3d-icons .interested-timeline-icon,
+body.ui-iconscout-3d-icons .interested-card-icon,
+body.ui-iconscout-3d-icons .finance-guide-icon,
+body.ui-iconscout-3d-icons .supplier-document-summary-icon,
+body.ui-iconscout-3d-icons .supplier-payment-hero-icon,
+body.ui-iconscout-3d-icons .rate-detail-hero-icon,
+body.ui-iconscout-3d-icons .rate-payment-hero-icon,
+body.ui-iconscout-3d-icons .rate-reconcile-page-hero-icon,
+body.ui-iconscout-3d-icons .rate-detail-summary-icon,
+body.ui-iconscout-3d-icons .calendar-event-hero-icon,
+body.ui-iconscout-3d-icons .calendar-category-hero-icon,
+body.ui-iconscout-3d-icons .related-status-icon-tile,
+body.ui-iconscout-3d-icons .archive-record-icon,
+body.ui-iconscout-3d-icons .archive-empty-icon,
+body.ui-iconscout-3d-icons .feedback-admin-summary-icon,
+body.ui-iconscout-3d-icons .audit-log-title-icon,
+body.ui-iconscout-3d-icons .audit-log-kpi-icon,
+body.ui-iconscout-3d-icons .audit-log-card-icon,
+body.ui-iconscout-3d-icons .audit-log-warning-icon,
+body.ui-iconscout-3d-icons .audit-log-empty-icon,
+body.ui-iconscout-3d-icons .database-backup-empty-icon,
+body.ui-iconscout-3d-icons .fondo-plans-status-icon,
+body.ui-iconscout-3d-icons .fondo-plan-summary-hero-icon,
+body.ui-iconscout-3d-icons .fondo-plan-empty-icon,
+body.ui-iconscout-3d-icons .fondo-movement-hero-icon,
+body.ui-iconscout-3d-icons .ga-admin-dashboard-title-icon,
+body.ui-iconscout-3d-icons .ga-admin-dashboard-workflow-icon {
+    --streamline-icon-color: var(--iconscout-3d-icon-color);
+    --streamline-icon-soft: var(--iconscout-3d-icon-soft);
+    --streamline-icon-ring: var(--iconscout-3d-icon-ring);
+    background:
+        radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.98) 0 20%, transparent 21%),
+        radial-gradient(circle at 76% 82%, color-mix(in srgb, var(--iconscout-3d-icon-color) 20%, transparent) 0 22%, transparent 23%),
+        linear-gradient(145deg, #ffffff 0%, color-mix(in srgb, var(--iconscout-3d-icon-soft) 92%, #ffffff) 48%, color-mix(in srgb, var(--iconscout-3d-icon-color) 16%, #ffffff) 100%) !important;
+    color: var(--iconscout-3d-icon-color);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--iconscout-3d-icon-ring) 82%, #ffffff),
+        inset 0 -12px 20px color-mix(in srgb, var(--iconscout-3d-icon-color) 8%, transparent),
+        0 11px 24px color-mix(in srgb, var(--iconscout-3d-icon-color) 16%, transparent) !important;
+}
+
+body.ui-iconscout-3d-icons .iconscout-3d-emotional-svg {
+    overflow: visible;
+    filter: saturate(1.12) contrast(1.04) drop-shadow(0 5px 7px rgba(38, 59, 75, 0.16));
+}
+
+body.ui-iconscout-3d-icons .iconscout-3d-emotional-svg use {
+    color: inherit;
+}
+
+body.ui-iconscout-3d-icons .page-head-icon svg,
+body.ui-iconscout-3d-icons .settings-hero-icon svg,
+body.ui-iconscout-3d-icons .dashboard-info-icon svg {
+    width: 34px;
+    height: 34px;
+}
+
+body.ui-iconscout-3d-icons .settings-card-icon svg,
+body.ui-iconscout-3d-icons .settings-module-icon svg,
+body.ui-iconscout-3d-icons .family-stat-icon svg,
+body.ui-iconscout-3d-icons .family-system-icon svg,
+body.ui-iconscout-3d-icons .family-meta-icon svg,
+body.ui-iconscout-3d-icons .interested-summary-icon svg,
+body.ui-iconscout-3d-icons .interested-card-icon svg,
+body.ui-iconscout-3d-icons .finance-guide-icon svg,
+body.ui-iconscout-3d-icons .rate-detail-summary-icon svg,
+body.ui-iconscout-3d-icons .audit-log-kpi-icon svg {
+    width: 27px;
+    height: 27px;
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#home"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#home"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#home"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#home"]) {
+    --iconscout-3d-icon-color: var(--iconscout-3d-dashboard);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-dashboard-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-dashboard-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#family-heart"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#hands-heart"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#family-heart"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#family-heart"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .family-stat-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .family-system-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .family-meta-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .interested-summary-icon:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .interested-card-icon:has(use[href$="#family"]) {
+    --iconscout-3d-icon-color: var(--iconscout-3d-families);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-families-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-families-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#student"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#child"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#student"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#student"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#student"]),
+body.ui-iconscout-3d-icons .family-stat-icon:has(use[href$="#student"]) {
+    --iconscout-3d-icon-color: var(--iconscout-3d-students);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-students-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-students-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#user"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#user"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#user"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#user"]) {
+    --iconscout-3d-icon-color: var(--iconscout-3d-educators);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-educators-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-educators-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#document"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#archive"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#printer"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#document"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#archive"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#document"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#document"]),
+body.ui-iconscout-3d-icons .archive-empty-icon,
+body.ui-iconscout-3d-icons .archive-record-icon {
+    --iconscout-3d-icon-color: var(--iconscout-3d-documents);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-documents-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-documents-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#calendar"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#clock"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#timer"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#calendar"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#calendar"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#calendar"]),
+body.ui-iconscout-3d-icons .calendar-event-hero-icon,
+body.ui-iconscout-3d-icons .calendar-category-hero-icon {
+    --iconscout-3d-icon-color: var(--iconscout-3d-calendar);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-calendar-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-calendar-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#coins"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#finance"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#bank"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#supplier"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#coins"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#finance"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#coins"]),
+body.ui-iconscout-3d-icons .settings-module-icon:has(use[href$="#finance"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#coins"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#finance"]),
+body.ui-iconscout-3d-icons .rate-detail-summary-icon,
+body.ui-iconscout-3d-icons .supplier-document-summary-icon,
+body.ui-iconscout-3d-icons .supplier-payment-hero-icon,
+body.ui-iconscout-3d-icons .rate-payment-hero-icon,
+body.ui-iconscout-3d-icons .rate-reconcile-page-hero-icon,
+body.ui-iconscout-3d-icons .finance-guide-icon {
+    --iconscout-3d-icon-color: var(--iconscout-3d-payments);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-payments-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-payments-ring);
+}
+
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#message"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#mail"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#bell"]),
+body.ui-iconscout-3d-icons .page-head-icon:has(use[href$="#lightbulb"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#message"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#mail"]),
+body.ui-iconscout-3d-icons .dashboard-info-icon:has(use[href$="#message"]),
+body.ui-iconscout-3d-icons .interested-record-icon,
+body.ui-iconscout-3d-icons .interested-timeline-icon {
+    --iconscout-3d-icon-color: var(--iconscout-3d-educators);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-educators-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-educators-ring);
+}
+
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#settings"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#shield"]),
+body.ui-iconscout-3d-icons .settings-card-icon:has(use[href$="#list"]),
+body.ui-iconscout-3d-icons .settings-hero-icon,
+body.ui-iconscout-3d-icons .related-status-icon-tile,
+body.ui-iconscout-3d-icons .feedback-admin-summary-icon,
+body.ui-iconscout-3d-icons .audit-log-title-icon,
+body.ui-iconscout-3d-icons .audit-log-kpi-icon,
+body.ui-iconscout-3d-icons .audit-log-card-icon,
+body.ui-iconscout-3d-icons .audit-log-warning-icon,
+body.ui-iconscout-3d-icons .audit-log-empty-icon,
+body.ui-iconscout-3d-icons .database-backup-empty-icon {
+    --iconscout-3d-icon-color: var(--iconscout-3d-settings);
+    --iconscout-3d-icon-soft: var(--iconscout-3d-settings-soft);
+    --iconscout-3d-icon-ring: var(--iconscout-3d-settings-ring);
+}
+
+body.ui-iconscout-3d-icons .dashboard-stat-card:not(.dashboard-stat-card-full)::before {
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 62% 31%, rgba(255, 255, 255, 0.94) 0 12%, transparent 13%),
+        radial-gradient(circle at 38% 63%, var(--dashboard-card-accent, var(--iconscout-3d-dashboard)) 0 22%, transparent 23%),
+        linear-gradient(145deg, #ffffff 0%, var(--dashboard-icon-tint, var(--iconscout-3d-dashboard-soft)) 100%);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--dashboard-card-accent, var(--iconscout-3d-dashboard)) 20%, #ffffff),
+        0 9px 20px color-mix(in srgb, var(--dashboard-card-accent, var(--iconscout-3d-dashboard)) 14%, transparent);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a,
+body.ui-iconscout-3d-icons .calendar-sidebar-link {
+    --iconscout-3d-functional-color: var(--iconscout-3d-settings);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-settings-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#home"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-dashboard);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-dashboard-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#family"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#family-heart"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#hands-heart"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-families);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-families-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#student"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#child"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-students);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-students-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#user"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-educators);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-educators-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#document"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#archive"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#printer"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-documents);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-documents-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#calendar"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#clock"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#timer"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-calendar);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-calendar-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#coins"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#finance"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#bank"]),
+body.ui-iconscout-3d-icons .sidebar-nav a:has(use[href$="#supplier"]) {
+    --iconscout-3d-functional-color: var(--iconscout-3d-payments);
+    --iconscout-3d-functional-soft: var(--iconscout-3d-payments-soft);
+}
+
+body.ui-iconscout-3d-icons .sidebar-nav a:hover,
+body.ui-iconscout-3d-icons .sidebar-nav a:focus-visible,
+body.ui-iconscout-3d-icons .sidebar-nav a.active,
+body.ui-iconscout-3d-icons .sidebar-nav a.active:hover,
+body.ui-iconscout-3d-icons .sidebar-nav a.active:focus-visible {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--iconscout-3d-functional-soft) 88%, #ffffff) 0%, #ffffff 100%) !important;
+    color: color-mix(in srgb, var(--iconscout-3d-functional-color) 86%, #182c3e) !important;
+    box-shadow:
+        inset 4px 0 0 var(--iconscout-3d-functional-color),
+        0 7px 16px color-mix(in srgb, var(--iconscout-3d-functional-color) 13%, transparent) !important;
+}
+
+body.ui-iconscout-3d-icons .sidebar-link-icon,
+body.ui-iconscout-3d-icons .settings-field-icon,
+body.ui-iconscout-3d-icons .system-role-field-icon,
+body.ui-iconscout-3d-icons .audit-log-user-icon,
+body.ui-iconscout-3d-icons .audit-log-search-icon,
+body.ui-iconscout-3d-icons .btn-secondary .btn-icon:not(.btn-plus-mark),
+body.ui-iconscout-3d-icons .btn-secondary.btn-icon-text .btn-icon:not(.btn-plus-mark),
+body.ui-iconscout-3d-icons .related-btn-icon,
+body.ui-iconscout-3d-icons .table-icon-link,
+body.ui-iconscout-3d-icons .finance-icon-button {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+body.ui-iconscout-3d-icons .sidebar-link-icon {
+    color: var(--iconscout-3d-functional-color) !important;
+}
+
+body.ui-streamline-icons .family-meta-icon,
+body.ui-iconscout-3d-icons .family-meta-icon {
+    border-radius: 8px;
+}

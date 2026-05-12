@@ -1,0 +1,220 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
+
+{% block title %}Rimodula rate - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_iscrizioni' %}">Iscrizioni</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'modifica_iscrizione' iscrizione.pk %}">{{ iscrizione }}</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Rimodula rate</span>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <div class="rate-detail-shell{% if popup %} is-popup{% endif %}">
+        <div class="calendar-event-hero rate-detail-hero">
+            <span class="calendar-event-hero-icon rate-detail-hero-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+            </span>
+            <div class="calendar-event-hero-copy">
+                <h1 class="page-title">Rimodula rate future</h1>
+                <p>{{ iscrizione.studente }} - {{ iscrizione.anno_scolastico }}</p>
+            </div>
+            <div class="calendar-category-hero-actions rate-detail-hero-actions">
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Chiudi</span>
+                    </button>
+                {% else %}
+                    <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <form method="post" class="calendar-event-form rate-detail-form" data-rimodulazione-rate-form>
+            {% csrf_token %}
+            {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+
+            {% if form.non_field_errors %}
+                <div class="settings-warning-box calendar-event-form-errors">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <section class="rate-detail-summary-grid" aria-label="Riepilogo rate future">
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                    <div>
+                        <span>Rate modificabili</span>
+                        <strong>{{ rate_future|length }}</strong>
+                    </div>
+                </article>
+                <article class="rate-detail-summary-card">
+                    <span class="rate-detail-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                    <div>
+                        <span>Residuo modificabile</span>
+                        <strong>EUR {{ totale_future|euro }}</strong>
+                    </div>
+                </article>
+            </section>
+
+            <section class="calendar-event-form-card rate-detail-card">
+                <div class="calendar-event-form-title">
+                    <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                    <span>Nuovo piano futuro</span>
+                </div>
+
+                <div class="calendar-event-form-grid rate-detail-form-grid">
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.rata_decorrenza.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.rata_decorrenza.label }}</span>
+                            {{ form.rata_decorrenza }}
+                            {{ form.rata_decorrenza.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.modalita.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.modalita.label }}</span>
+                            {{ form.modalita }}
+                            {{ form.modalita.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.numero_rate_future.id_for_label }}">
+                            <span class="calendar-event-field-label">
+                                {{ form.numero_rate_future.label }}
+                                <span class="calendar-event-check-field rate-count-custom-toggle">
+                                    {{ form.personalizza_numero_rate }}
+                                    <span>{{ form.personalizza_numero_rate.label }}</span>
+                                </span>
+                            </span>
+                            {{ form.numero_rate_future }}
+                            {{ form.numero_rate_future.errors }}
+                            {{ form.personalizza_numero_rate.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row" data-rimodulazione-amount-row="importo_mensile">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.importo_mensile.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.importo_mensile.label }}</span>
+                            {{ form.importo_mensile }}
+                            {{ form.importo_mensile.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row" data-rimodulazione-amount-row="totale_residuo">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.totale_residuo.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.totale_residuo.label }}</span>
+                            {{ form.totale_residuo }}
+                            {{ form.totale_residuo.errors }}
+                        </label>
+                    </div>
+
+                    <div class="calendar-event-form-row rate-detail-notes-row">
+                        <span class="calendar-event-form-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg></span>
+                        <label class="calendar-event-field" for="{{ form.note.id_for_label }}">
+                            <span class="calendar-event-field-label">{{ form.note.label }}</span>
+                            {{ form.note }}
+                            {{ form.note.errors }}
+                        </label>
+                    </div>
+                </div>
+
+                <div class="calendar-event-suggestion rate-detail-help">
+                    <span class="calendar-event-suggestion-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
+                    <div>
+                        <strong>Rate gia registrate</strong>
+                        <span>La procedura ricalcola il residuo delle rate mensili future e lascia registrati gli importi gia pagati.</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="calendar-event-actions rate-detail-actions">
+                <button type="submit" class="btn btn-save-soft btn-icon-text" {% if not rate_future %}disabled{% endif %}>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                    <span class="btn-label">Rimodula rate</span>
+                </button>
+                {% if popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </button>
+                {% else %}
+                    <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Annulla</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.querySelector("[data-rimodulazione-rate-form]");
+            if (!form) return;
+            const mode = form.querySelector("[data-rimodulazione-mode]");
+            const decorrenza = form.querySelector("[data-rimodulazione-decorrenza]");
+            const rateCount = form.querySelector("[data-rimodulazione-rate-count]");
+            const rateCountToggle = form.querySelector("[data-rimodulazione-rate-count-toggle]");
+            const rows = Array.from(form.querySelectorAll("[data-rimodulazione-amount-row]"));
+
+            function selectedRemainingCount() {
+                if (!decorrenza || decorrenza.selectedIndex < 0) return "";
+                return String(Math.max(decorrenza.options.length - decorrenza.selectedIndex, 0));
+            }
+
+            function syncRateCount() {
+                if (!rateCount) return;
+                const custom = Boolean(rateCountToggle && rateCountToggle.checked);
+                const defaultCount = selectedRemainingCount() || rateCount.dataset.defaultRateCount || "";
+                rateCount.readOnly = !custom;
+                rateCount.classList.toggle("is-readonly", !custom);
+                rateCount.classList.toggle("is-conditional-disabled", !custom);
+                if (!custom && defaultCount) {
+                    rateCount.value = defaultCount;
+                }
+            }
+
+            function syncRows() {
+                const selected = mode ? mode.value : "";
+                rows.forEach(function (row) {
+                    const key = row.dataset.rimodulazioneAmountRow;
+                    const active =
+                        (key === "importo_mensile" && selected === "importo_mensile") ||
+                        (key === "totale_residuo" && selected === "totale_residuo");
+                    row.classList.toggle("is-hidden", !active);
+                    row.querySelectorAll("input").forEach(function (input) {
+                        input.disabled = !active;
+                        if (!active) input.value = "";
+                    });
+                });
+            }
+
+            if (mode) mode.addEventListener("change", syncRows);
+            if (decorrenza) decorrenza.addEventListener("change", syncRateCount);
+            if (rateCountToggle) rateCountToggle.addEventListener("change", syncRateCount);
+            syncRateCount();
+            syncRows();
+        });
+    </script>
+{% endblock %}

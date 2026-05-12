@@ -6,6 +6,7 @@ from .iscrizioni import (
     Agevolazione,
     Iscrizione,
     RataIscrizione,
+    RimodulazioneRetta,
     MovimentoCreditoRetta,
 )
 from .scambio_retta import TariffaScambioRetta, ScambioRetta, PrestazioneScambioRetta
@@ -19,6 +20,7 @@ __all__ = [
     "Agevolazione",
     "Iscrizione",
     "RataIscrizione",
+    "RimodulazioneRetta",
     "MovimentoCreditoRetta",
     "TariffaScambioRetta",
     "ScambioRetta",

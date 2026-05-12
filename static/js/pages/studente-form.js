@@ -3954,6 +3954,8 @@ window.ArborisStudenteForm = (function () {
             const scontoUnicoTipoSelect = findInBundle('select[name$="-sconto_unica_soluzione_tipo"]');
             const scontoUnicoValoreInput = findInBundle('input[name$="-sconto_unica_soluzione_valore"]');
             const scadenzaUnicoInput = findInBundle('input[name$="-scadenza_pagamento_unica"]');
+            const rateCustomToggle = findInBundle('input[type="checkbox"][data-rate-custom-toggle]');
+            const rateCustomInput = findInBundle('input[name$="-rate_custom"]');
 
             if (!annoSelect || !classeSelect || !condizioneSelect) {
                 return;
@@ -4108,6 +4110,23 @@ window.ArborisStudenteForm = (function () {
                 }
             }
 
+            function syncRateCustomState() {
+                if (!rateCustomToggle || !rateCustomInput) {
+                    return;
+                }
+
+                const locked = rateCustomInput.dataset.rateCustomLocked === "1";
+                const enabled = !locked && rateCustomToggle.checked;
+                rateCustomInput.disabled = locked || !enabled;
+                rateCustomInput.readOnly = locked || !enabled;
+                rateCustomInput.classList.toggle("is-readonly", locked || !enabled);
+                rateCustomInput.classList.toggle("is-conditional-disabled", locked || !enabled);
+
+                if (!enabled && !locked) {
+                    rateCustomInput.value = "";
+                }
+            }
+
             if (modalitaPagamentoSelect && scontoUnicoTipoSelect && scontoUnicoValoreInput) {
                 modalitaPagamentoSelect.addEventListener("change", syncPagamentoUnicoState);
                 scontoUnicoTipoSelect.addEventListener("change", syncPagamentoUnicoState);
@@ -4118,10 +4137,14 @@ window.ArborisStudenteForm = (function () {
             }
 
             condizioneSelect.addEventListener("change", syncRiduzioneSpecialeState);
+            if (rateCustomToggle && rateCustomInput) {
+                rateCustomToggle.addEventListener("change", syncRateCustomState);
+            }
             refreshDependentChoices();
             syncIscrizioneDates();
             syncRiduzioneSpecialeState();
             syncPagamentoUnicoState();
+            syncRateCustomState();
             collapsible.initCollapsibleSections(row.parentElement);
         }
 

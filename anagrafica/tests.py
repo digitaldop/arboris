@@ -2500,6 +2500,52 @@ class StudenteListTests(TestCase):
         self.assertContains(response, "status-chip-danger student-enrollment-status")
 
 
+class StudenteBackNavigationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="studente-back@example.com",
+            email="studente-back@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+        self.studente = Studente.objects.create(nome="Luca", cognome="Bianchi", attivo=True)
+
+    def test_modifica_studente_uses_safe_next_for_back_buttons(self):
+        back_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico=1"
+
+        response = self.client.get(
+            reverse("modifica_studente", kwargs={"pk": self.studente.pk}),
+            {"next": back_url},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["student_back_url"], back_url)
+        self.assertContains(response, f'data-fallback-url="{back_url}"')
+        self.assertContains(response, f'name="next" value="{back_url}"')
+
+    def test_modifica_studente_uses_safe_referer_for_back_buttons(self):
+        back_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico=1"
+
+        response = self.client.get(
+            reverse("modifica_studente", kwargs={"pk": self.studente.pk}),
+            HTTP_REFERER=f"http://testserver{back_url}",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["student_back_url"], back_url)
+        self.assertContains(response, f'data-fallback-url="{back_url}"')
+
+    def test_modifica_studente_rejects_external_next_for_back_buttons(self):
+        response = self.client.get(
+            reverse("modifica_studente", kwargs={"pk": self.studente.pk}),
+            {"next": "https://example.com/economia/verifica-situazione-rette/"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["student_back_url"], reverse("lista_studenti"))
+        self.assertContains(response, f'data-fallback-url="{reverse("lista_studenti")}"')
+
+
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class RicercheAnagraficaTests(TestCase):
     def setUp(self):

@@ -1,6 +1,6 @@
 {% load currency %}
 
-<div class="verifica-rette-scroll">
+<div class="verifica-rette-scroll" data-rate-matrix-scroll>
     <table class="verifica-rette-table">
         <thead>
             <tr>
@@ -32,12 +32,13 @@
             {% if grouped %}
                 {% for gruppo in righe_per_classe %}
                     <tr class="classe-separator">
-                        <td colspan="{{ num_colonne }}" class="classe-separator-cell">
+                        <td class="sticky-col classe-separator-cell">
                             Classe: <strong>{{ gruppo.classe_label }}</strong>
                         </td>
+                        <td colspan="{{ num_colonne|add:"-1" }}" class="classe-separator-fill" aria-hidden="true"></td>
                     </tr>
                     {% for riga in gruppo.righe %}
-                        {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga only %}
+                        {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga matrix_return_url=matrix_return_url only %}
                     {% empty %}
                         <tr>
                             <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuno studente in questa classe.</div></td>
@@ -50,7 +51,7 @@
                 {% endfor %}
             {% else %}
                 {% for riga in righe_matrice %}
-                    {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga show_classe_label=1 only %}
+                    {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga show_classe_label=1 matrix_return_url=matrix_return_url only %}
                 {% empty %}
                     <tr>
                         <td colspan="{{ num_colonne }}"><div class="empty-state">Nessuna iscrizione attiva per l'anno selezionato.</div></td>

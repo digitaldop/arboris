@@ -94,6 +94,25 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertContains(response, 'autocomplete="username"')
         self.assertContains(response, 'autocomplete="current-password"')
         self.assertContains(response, f'<input type="hidden" name="next" value="{next_url}">', html=True)
+        self.assertContains(response, f'href="{reverse("crediti")}"', html=False)
+
+    def test_credits_page_renders_streamline_attribution(self):
+        response = self.client.get(reverse("crediti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crediti")
+        self.assertContains(response, "streamline-vectors")
+        self.assertContains(response, "Creative Commons Attribution 4.0")
+        self.assertContains(response, "streamlinehq.com")
+
+    def test_streamline_vendor_manifest_documents_source_and_license(self):
+        manifest_path = settings.BASE_DIR / "static" / "vendor" / "streamline-vectors" / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["source_repository"], "https://github.com/webalys-hq/streamline-vectors")
+        self.assertEqual(manifest["license"], "CC BY 4.0")
+        self.assertEqual(manifest["attribution_url"], "https://streamlinehq.com")
+        self.assertGreaterEqual(len(manifest["icons"]), 30)
 
     def test_login_with_remember_me_keeps_session_persistent(self):
         response = self.client.post(
@@ -531,6 +550,7 @@ class SidebarSistemaTests(TestCase):
 
         labels_in_order = [
             "Impostazioni generali",
+            "Crediti",
             "<span>Gestione Account</span>",
             "Utenti",
             "Ruoli",
@@ -586,6 +606,10 @@ class SidebarSistemaTests(TestCase):
         self.assertContains(response, "Cronologia operazioni")
         self.assertContains(response, 'name="cronologia_retention_mesi"')
         self.assertContains(response, 'name="interfaccia_colorata_attiva"')
+        self.assertContains(response, 'name="stile_streamline_attivo"')
+        self.assertContains(response, "Stile Streamline")
+        self.assertContains(response, 'name="stile_iconscout_3d_attivo"')
+        self.assertContains(response, "Stile IconScout 3D")
         self.assertContains(response, 'name="modulo_calendario_attivo"')
         self.assertContains(response, 'class="settings-module-grid"')
 
@@ -598,6 +622,29 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="ui-uniform-modules module-sistema"')
         self.assertNotContains(response, "ui-colorful-modules")
+
+    def test_general_settings_switches_streamline_icon_style(self):
+        SistemaImpostazioniGenerali.objects.create(stile_streamline_attivo=True)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("impostazioni_generali_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-streamline-icons")
+        self.assertContains(response, "arboris-streamline-icons.svg")
+        self.assertContains(response, "js/core/streamline-icons.js")
+
+    def test_general_settings_switches_iconscout_3d_icon_style(self):
+        SistemaImpostazioniGenerali.objects.create(stile_iconscout_3d_attivo=True)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("impostazioni_generali_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-iconscout-3d-icons")
+        self.assertContains(response, "arboris-iconscout-3d-icons.svg")
+        self.assertContains(response, "IconScout 3D")
+        self.assertContains(response, "js/core/streamline-icons.js")
 
     def test_general_settings_can_disable_module_globally(self):
         self.client.force_login(self.user)

@@ -1,0 +1,170 @@
+{
+  "package": "streamline-vectors",
+  "source_repository": "https://github.com/webalys-hq/streamline-vectors",
+  "source_commit": "52d750c9ce051e51cb181b7a78932120c48541d0",
+  "license": "CC BY 4.0",
+  "attribution_url": "https://streamlinehq.com",
+  "generated_at": "2026-05-12T14:49:33.921Z",
+  "icons": [
+    {
+      "symbol": "alert",
+      "source": "core/gradient/interface-essential/warning-triangle.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/core/gradient/interface-essential/warning-triangle.svg"
+    },
+    {
+      "symbol": "archive",
+      "source": "ultimate/colors/content/archive-locker.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/content/archive-locker.svg"
+    },
+    {
+      "symbol": "bank",
+      "source": "ultimate/colors/money-payments-finance/saving-bank-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/money-payments-finance/saving-bank-1.svg"
+    },
+    {
+      "symbol": "bell",
+      "source": "ultimate/colors/interface-essential/alarm-bell-ring.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/alarm-bell-ring.svg"
+    },
+    {
+      "symbol": "briefcase",
+      "source": "ultimate/colors/business-products/cash-briefcase.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/business-products/cash-briefcase.svg"
+    },
+    {
+      "symbol": "calendar",
+      "source": "ultimate/colors/interface-essential/calendar-date.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/calendar-date.svg"
+    },
+    {
+      "symbol": "check",
+      "source": "ultimate/colors/interface-essential/check-badge.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/check-badge.svg"
+    },
+    {
+      "symbol": "child",
+      "source": "core/gradient/work-education/class-lesson.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/core/gradient/work-education/class-lesson.svg"
+    },
+    {
+      "symbol": "clock",
+      "source": "ultimate/colors/interface-essential/time-clock-circle.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/time-clock-circle.svg"
+    },
+    {
+      "symbol": "coins",
+      "source": "ultimate/colors/money-payments-finance/accounting-coins.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/money-payments-finance/accounting-coins.svg"
+    },
+    {
+      "symbol": "document",
+      "source": "ultimate/colors/interface-essential/bookmarks-document.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/bookmarks-document.svg"
+    },
+    {
+      "symbol": "edit",
+      "source": "ultimate/colors/content/content-paper-edit.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/content/content-paper-edit.svg"
+    },
+    {
+      "symbol": "eye",
+      "source": "ultimate/colors/interface-essential/view-square.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/view-square.svg"
+    },
+    {
+      "symbol": "family",
+      "source": "ultimate/colors/users/multiple-users-2.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/users/multiple-users-2.svg"
+    },
+    {
+      "symbol": "family-heart",
+      "source": "ultimate/colors/users/single-neutral-actions-heart.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/users/single-neutral-actions-heart.svg"
+    },
+    {
+      "symbol": "finance",
+      "source": "ultimate/colors/money-payments-finance/accounting-calculator-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/money-payments-finance/accounting-calculator-1.svg"
+    },
+    {
+      "symbol": "hands-heart",
+      "source": "ultimate/colors/business-products/business-deal-handshake-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/business-products/business-deal-handshake-1.svg"
+    },
+    {
+      "symbol": "home",
+      "source": "ultimate/colors/interface-essential/house-chimney.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/house-chimney.svg"
+    },
+    {
+      "symbol": "lightbulb",
+      "source": "ultimate/colors/work-office-companies/idea-strategy.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/work-office-companies/idea-strategy.svg"
+    },
+    {
+      "symbol": "list",
+      "source": "ultimate/colors/content/task-list-text-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/content/task-list-text-1.svg"
+    },
+    {
+      "symbol": "mail",
+      "source": "ultimate/colors/emails/envelope-letter.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/emails/envelope-letter.svg"
+    },
+    {
+      "symbol": "menu",
+      "source": "ultimate/colors/interface-essential/navigation-menu-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/navigation-menu-1.svg"
+    },
+    {
+      "symbol": "message",
+      "source": "ultimate/colors/messages-chat-smileys/messages-bubble-text.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/messages-chat-smileys/messages-bubble-text.svg"
+    },
+    {
+      "symbol": "printer",
+      "source": "ultimate/colors/interface-essential/print-text.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/print-text.svg"
+    },
+    {
+      "symbol": "refresh",
+      "source": "ultimate/colors/interface-essential/tags-refresh.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/tags-refresh.svg"
+    },
+    {
+      "symbol": "search",
+      "source": "ultimate/colors/interface-essential/search-circle.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/search-circle.svg"
+    },
+    {
+      "symbol": "settings",
+      "source": "ultimate/colors/interface-essential/settings-slider-desktop-horizontal.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/interface-essential/settings-slider-desktop-horizontal.svg"
+    },
+    {
+      "symbol": "shield",
+      "source": "ultimate/colors/programing-apps-websites/programming-apps-websites/shield-check-1.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/programing-apps-websites/programming-apps-websites/shield-check-1.svg"
+    },
+    {
+      "symbol": "student",
+      "source": "core/gradient/work-education/graduation-cap.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/core/gradient/work-education/graduation-cap.svg"
+    },
+    {
+      "symbol": "supplier",
+      "source": "ultimate/colors/shopping-ecommerce/shop-sign-open.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/shopping-ecommerce/shop-sign-open.svg"
+    },
+    {
+      "symbol": "timer",
+      "source": "ultimate/colors/images-photography/timer-10.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/images-photography/timer-10.svg"
+    },
+    {
+      "symbol": "user",
+      "source": "ultimate/colors/users/single-neutral-circle.svg",
+      "url": "https://raw.githubusercontent.com/webalys-hq/streamline-vectors/main/ultimate/colors/users/single-neutral-circle.svg"
+    }
+  ]
+}

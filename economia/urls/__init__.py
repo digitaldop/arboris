@@ -34,6 +34,7 @@ urlpatterns = [
     path("economia/iscrizioni/nuova/", economia_manage(iscrizioni_views.crea_iscrizione), name="crea_iscrizione"),
     path("economia/iscrizioni/<int:pk>/modifica/", economia_edit(iscrizioni_views.modifica_iscrizione), name="modifica_iscrizione"),
     path("economia/iscrizioni/<int:pk>/ricalcola-rate/", economia_manage(iscrizioni_views.ricalcola_rate_iscrizione), name="ricalcola_rate_iscrizione"),
+    path("economia/iscrizioni/<int:pk>/rimodula-rate/", economia_manage(iscrizioni_views.rimodula_rate_iscrizione), name="rimodula_rate_iscrizione"),
     path("economia/iscrizioni/<int:pk>/riconcilia-pagamenti/", economia_manage(iscrizioni_views.riconcilia_pagamenti_iscrizione), name="riconcilia_pagamenti_iscrizione"),
     path("economia/rate-iscrizione/ricalcola-anno/", economia_manage(iscrizioni_views.ricalcola_rate_anno_scolastico), name="ricalcola_rate_anno_scolastico"),
     path("economia/rate-iscrizione/riconcilia-pagamenti-anno/", economia_manage(iscrizioni_views.riconcilia_pagamenti_rate_anno_scolastico), name="riconcilia_pagamenti_rate_anno_scolastico"),

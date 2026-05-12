@@ -4,6 +4,7 @@ from unittest import skip
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -17,6 +18,7 @@ from economia.forms import (
     AgevolazioneForm,
     CondizioneIscrizioneForm,
     IscrizioneForm,
+    RimodulazioneRateFutureForm,
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
@@ -26,6 +28,7 @@ from economia.models import (
     Iscrizione,
     MetodoPagamento,
     RataIscrizione,
+    RimodulazioneRetta,
     ScambioRetta,
     StatoIscrizione,
     TariffaCondizioneIscrizione,
@@ -36,6 +39,7 @@ from economia.services import (
     ricalcola_rate_anno_scolastico,
     riconcilia_pagamenti_iscrizione,
     riconcilia_pagamenti_rate_anno_scolastico,
+    rimodula_rate_future,
 )
 from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
 from scuola.models import AnnoScolastico, Classe
@@ -425,6 +429,244 @@ class ScambioRettaPopupModeTests(TestCase):
 
         self.assertNotContains(response, "fondo-plan-switch-control")
         self.assertNotContains(response, 'type="checkbox"')
+
+
+class RateCustomizationAndRemodulationTests(TestCase):
+    def setUp(self):
+        self.studente = Studente.objects.create(nome="Luca", cognome="Bianchi")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.stato_iscrizione = StatoIscrizione.objects.create(
+            stato_iscrizione="Attiva",
+            ordine=1,
+            attiva=True,
+        )
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=self.condizione,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("1200.00"),
+            preiscrizione=Decimal("0.00"),
+        )
+        self.iscrizione = Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+        )
+
+    def _rate_mensili(self):
+        return list(
+            self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).order_by(
+                "anno_riferimento",
+                "mese_riferimento",
+                "numero_rata",
+            )
+        )
+
+    def test_rate_custom_controls_initial_month_count(self):
+        self.iscrizione.rate_custom = 6
+        self.iscrizione.save()
+
+        piano = self.iscrizione.build_rate_plan()
+        rate_mensili = [item for item in piano if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE]
+
+        self.assertEqual(len(rate_mensili), 6)
+        self.assertEqual(rate_mensili[0]["importo_dovuto"], Decimal("200.00"))
+        self.assertEqual(sum(item["importo_dovuto"] for item in rate_mensili), Decimal("1200.00"))
+
+    def test_rate_custom_cannot_change_after_generated_rates(self):
+        self.iscrizione.rate_custom = 6
+        self.iscrizione.save()
+        self.iscrizione.sync_rate_schedule()
+
+        self.iscrizione.rate_custom = 8
+
+        with self.assertRaises(ValidationError):
+            self.iscrizione.full_clean()
+
+    def test_rimodula_rate_future_redistributes_unpaid_residual(self):
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+        for rata in rate[:2]:
+            rata.pagata = True
+            rata.importo_pagato = rata.importo_finale
+            rata.data_pagamento = rata.data_scadenza
+            rata.save()
+
+        rimodulazione = rimodula_rate_future(
+            self.iscrizione,
+            rata_decorrenza=rate[2],
+            modalita=RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+            numero_rate_future=10,
+        )
+        nuove_future = self._rate_mensili()[2:]
+
+        self.assertEqual(rimodulazione.rate_sostituite, 8)
+        self.assertEqual(rimodulazione.numero_rate_future, 10)
+        self.assertEqual(rimodulazione.totale_precedente, Decimal("960.00"))
+        self.assertEqual(rimodulazione.totale_rimodulato, Decimal("960.00"))
+        self.assertEqual(len(nuove_future), 10)
+        self.assertEqual(sum(rata.importo_finale for rata in nuove_future), Decimal("960.00"))
+        self.assertTrue(all(rata.importo_finale == Decimal("96.00") for rata in nuove_future))
+
+    def test_rimodula_rate_future_redistributes_partial_payment_residual(self):
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+        rate[4].importo_pagato = Decimal("20.00")
+        rate[4].save(update_fields=["importo_pagato"])
+
+        rimodulazione = rimodula_rate_future(
+            self.iscrizione,
+            rata_decorrenza=rate[2],
+            modalita=RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+            numero_rate_future=10,
+        )
+        rate[4].refresh_from_db()
+        rate_aggiornate = self._rate_mensili()[2:]
+
+        self.assertEqual(rimodulazione.totale_precedente, Decimal("940.00"))
+        self.assertEqual(rimodulazione.totale_rimodulato, Decimal("940.00"))
+        self.assertEqual(rate[4].importo_finale, Decimal("114.00"))
+        self.assertFalse(rate[4].pagata)
+        self.assertEqual(sum(rata.importo_finale - rata.importo_pagato for rata in rate_aggiornate), Decimal("940.00"))
+        self.assertEqual(len(rate_aggiornate), 10)
+
+    def test_rimodula_rate_future_updates_existing_rates_without_duplicates(self):
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+        for rata in rate[4:]:
+            rata.importo_pagato = Decimal("20.00")
+            rata.save(update_fields=["importo_pagato"])
+
+        rimodulazione = rimodula_rate_future(
+            self.iscrizione,
+            rata_decorrenza=rate[4],
+            modalita=RimodulazioneRetta.MODALITA_IMPORTO_MENSILE,
+            numero_rate_future=6,
+            importo_mensile=Decimal("20.00"),
+        )
+        rate_aggiornate = self._rate_mensili()
+
+        self.assertEqual(rimodulazione.totale_precedente, Decimal("600.00"))
+        self.assertEqual(rimodulazione.totale_rimodulato, Decimal("0.00"))
+        self.assertEqual(len(rate_aggiornate), 10)
+        self.assertFalse(self.iscrizione.rate.filter(descrizione__startswith="Rata rimodulata").exists())
+        self.assertTrue(all(rata.importo_finale == Decimal("20.00") for rata in rate_aggiornate[4:]))
+        self.assertTrue(all(rata.pagata for rata in rate_aggiornate[4:]))
+
+    def test_rimodula_form_lists_rates_with_partial_payments(self):
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+        for rata in rate[:4]:
+            rata.pagata = True
+            rata.importo_pagato = rata.importo_finale
+            rata.save(update_fields=["pagata", "importo_pagato"])
+        for rata in rate[4:]:
+            rata.importo_pagato = Decimal("20.00")
+            rata.save(update_fields=["importo_pagato"])
+
+        form = RimodulazioneRateFutureForm(iscrizione=self.iscrizione)
+
+        self.assertGreater(form.fields["rata_decorrenza"].queryset.count(), 0)
+        self.assertIn(rate[4], form.fields["rata_decorrenza"].queryset)
+        self.assertEqual(form.initial["numero_rate_future"], 6)
+        self.assertEqual(form.fields["numero_rate_future"].widget.attrs["readonly"], "readonly")
+
+    def test_rimodula_form_uses_default_rate_count_unless_custom_enabled(self):
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+
+        form = RimodulazioneRateFutureForm(
+            {
+                "rata_decorrenza": str(rate[3].pk),
+                "modalita": RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+                "numero_rate_future": "99",
+            },
+            iscrizione=self.iscrizione,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["numero_rate_future"], 7)
+
+        custom_form = RimodulazioneRateFutureForm(
+            {
+                "rata_decorrenza": str(rate[3].pk),
+                "modalita": RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+                "numero_rate_future": "5",
+                "personalizza_numero_rate": "on",
+            },
+            iscrizione=self.iscrizione,
+        )
+        self.assertTrue(custom_form.is_valid(), custom_form.errors)
+        self.assertEqual(custom_form.cleaned_data["numero_rate_future"], 5)
+
+    def test_rimodula_rate_view_renders_popup_form(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+
+        response = self.client.get(reverse("rimodula_rate_iscrizione", args=[self.iscrizione.pk]), {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Rimodula rate future")
+        self.assertContains(response, "Nuovo piano futuro")
+        self.assertContains(response, "name=\"rata_decorrenza\"")
+        self.assertContains(response, "data-rimodulazione-rate-count")
+        self.assertContains(response, "name=\"personalizza_numero_rate\"")
+        self.assertContains(response, "Personalizza")
+        self.assertContains(response, "onclick=\"window.close()\"", count=2)
+        self.assertContains(response, "La procedura ricalcola il residuo")
+
+    def test_verifica_situazione_rette_matrix_uses_drag_scroll_and_right_click_detail(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+
+        response = self.client.get(
+            reverse("verifica_situazione_rette"),
+            {"anno_scolastico": self.anno.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-rate-matrix-scroll")
+        self.assertContains(response, "data-rate-matrix-row")
+        self.assertContains(response, "data-rate-matrix-cell")
+        self.assertContains(response, "data-rate-detail-link")
+        self.assertContains(response, "verifica-rette-scroll-help")
+        self.assertContains(response, "class=\"studente-link\"")
+        self.assertContains(response, reverse("modifica_studente", args=[self.studente.pk]))
+        self.assertContains(response, "?next=/economia/verifica-situazione-rette/%3Fanno_scolastico%3D")
+        self.assertContains(response, "classe-separator-cell")
+        self.assertContains(response, "classe-separator-fill")
+        self.assertContains(response, "top: 34px")
+        self.assertContains(response, "is-row-highlighted")
+        self.assertContains(response, "aria-selected=\"false\"")
+        self.assertContains(response, "verifica-rette-scroll-help-mark")
+        self.assertContains(response, "max-height: calc(100vh - 220px)")
+        self.assertContains(response, "overflow: visible")
+        self.assertContains(response, "mousedown")
+        self.assertContains(response, "dblclick")
+        self.assertContains(response, "contextmenu")
+        self.assertContains(response, "toggleMatrixRowHighlight")
+        self.assertContains(response, "closestElement(event.target, \".studente-link\")")
+        self.assertContains(response, "Bianchi Luca - Settembre")
+        self.assertContains(response, "Bianchi Luca - Settembre&#10;Doppio click su una cella", html=False)
+        self.assertContains(
+            response,
+            "Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro: apri il dettaglio rata.",
+        )
+        self.assertContains(response, "Click sul nome: apri la scheda studente.")
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")

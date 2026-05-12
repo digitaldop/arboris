@@ -17,7 +17,26 @@ from economia.models import (
     Agevolazione,
     Iscrizione,
     RataIscrizione,
+    RimodulazioneRetta,
 )
+
+
+class RataDecorrenzaChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        importo = _rata_residual_amount(obj)
+        return f"{obj.display_label} - {obj.display_period_label} - residuo EUR {importo}"
+
+
+def _rata_total_amount(rata):
+    return (rata.importo_finale if rata.importo_finale is not None else rata.importo_dovuto) or Decimal("0.00")
+
+
+def _rata_residual_amount(rata):
+    return max(_rata_total_amount(rata) - (rata.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+
+
+def _rata_has_credit_or_discount_activity(rata):
+    return (rata.credito_applicato or Decimal("0.00")) > 0 or (rata.altri_sgravi or Decimal("0.00")) > 0
 
 
 class DateInput(forms.DateInput):
@@ -173,6 +192,7 @@ class IscrizioneForm(forms.ModelForm):
             "gruppo_classe",
             "stato_iscrizione",
             "condizione_iscrizione",
+            "rate_custom",
             "agevolazione",
             "riduzione_speciale",
             "importo_riduzione_speciale",
@@ -216,6 +236,24 @@ class IscrizioneForm(forms.ModelForm):
             "La Classe resta l'assegnazione standard dell'iscrizione."
         )
         self.fields["gruppo_classe"].required = False
+        self.fields["rate_custom"].label = "Numero rate personalizzato"
+        self.fields["rate_custom"].required = False
+        self.fields["rate_custom"].widget.attrs.update(
+            {
+                "min": "1",
+                "max": "36",
+                "inputmode": "numeric",
+                "placeholder": "Default",
+                "data-rate-custom-input": "1",
+            }
+        )
+        if self.instance.pk:
+            self.fields["rate_custom"].disabled = True
+            self.fields["rate_custom"].help_text = (
+                "Il numero rate iniziale non si modifica dopo la creazione. "
+                "Usa Rimodula rate future per cambiare un piano gia avviato."
+            )
+            self.fields["rate_custom"].widget.attrs["data-rate-custom-locked"] = "1"
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
         self.fields["importo_riduzione_speciale"].help_text = "Importo in euro."
         apply_eur_currency_widget(self.fields["importo_riduzione_speciale"])
@@ -455,6 +493,137 @@ class RataIscrizionePagamentoRapidoForm(forms.Form):
 
         if not pagamento_integrale and importo_personalizzato is None:
             self.add_error("importo_pagato_personalizzato", "Indica l'importo pagato se il pagamento non e integrale.")
+
+        return cleaned_data
+
+
+class RimodulazioneRateFutureForm(forms.Form):
+    rata_decorrenza = RataDecorrenzaChoiceField(
+        queryset=RataIscrizione.objects.none(),
+        label="Da quale rata",
+    )
+    modalita = forms.ChoiceField(
+        choices=RimodulazioneRetta.MODALITA_CHOICES,
+        label="Tipo di rimodulazione",
+    )
+    numero_rate_future = forms.IntegerField(
+        required=False,
+        label="Numero rate future",
+    )
+    personalizza_numero_rate = forms.BooleanField(
+        required=False,
+        label="Personalizza",
+    )
+    importo_mensile = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        label="Nuovo importo mensile",
+    )
+    totale_residuo = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+        label="Nuovo totale residuo",
+    )
+    note = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        label="Note",
+    )
+
+    def __init__(self, *args, iscrizione=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.iscrizione = iscrizione
+        qs = RataIscrizione.objects.none()
+        self._rate_future_counts = {}
+
+        if iscrizione and iscrizione.pk:
+            rate_mensili = list(
+                iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).order_by(
+                    "anno_riferimento",
+                    "mese_riferimento",
+                    "numero_rata",
+                    "id",
+                )
+            )
+            rate_ids = []
+            suffix_modificabile = True
+            for rata in reversed(rate_mensili):
+                if _rata_has_credit_or_discount_activity(rata):
+                    suffix_modificabile = False
+                    continue
+                if suffix_modificabile and _rata_residual_amount(rata) > 0:
+                    rate_ids.append(rata.pk)
+            qs = RataIscrizione.objects.filter(pk__in=rate_ids).order_by(
+                "anno_riferimento",
+                "mese_riferimento",
+                "numero_rata",
+                "id",
+            )
+
+        self.fields["rata_decorrenza"].queryset = qs
+        self.fields["rata_decorrenza"].empty_label = None
+        self.fields["modalita"].widget.attrs["data-rimodulazione-mode"] = "1"
+        self.fields["rata_decorrenza"].widget.attrs["data-rimodulazione-decorrenza"] = "1"
+        rate_future_ids = list(qs.values_list("pk", flat=True))
+        default_rate_count = len(rate_future_ids)
+        self._rate_future_counts = {
+            rata_id: default_rate_count - index
+            for index, rata_id in enumerate(rate_future_ids)
+        }
+        if default_rate_count and not self.is_bound:
+            self.initial["numero_rate_future"] = default_rate_count
+        self.fields["numero_rate_future"].widget.attrs.update(
+            {
+                "min": "1",
+                "max": "36",
+                "inputmode": "numeric",
+                "readonly": "readonly",
+                "data-rimodulazione-rate-count": "1",
+                "data-default-rate-count": str(default_rate_count or ""),
+            }
+        )
+        self.fields["personalizza_numero_rate"].widget.attrs["data-rimodulazione-rate-count-toggle"] = "1"
+        for field_name in ("importo_mensile", "totale_residuo"):
+            apply_eur_currency_widget(self.fields[field_name])
+            self.fields[field_name].widget.attrs["data-rimodulazione-amount"] = field_name
+
+    def _default_count_for_rata(self, rata):
+        if not rata:
+            return 0
+        return self._rate_future_counts.get(rata.pk, 0)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.iscrizione and self.iscrizione.is_pagamento_unica_soluzione:
+            raise forms.ValidationError("La rimodulazione e disponibile solo per iscrizioni con pagamento rateale.")
+
+        rata_decorrenza = cleaned_data.get("rata_decorrenza")
+        modalita = cleaned_data.get("modalita")
+        personalizza_numero_rate = cleaned_data.get("personalizza_numero_rate")
+        numero_rate_future = cleaned_data.get("numero_rate_future")
+        importo_mensile = cleaned_data.get("importo_mensile") or Decimal("0.00")
+        totale_residuo = cleaned_data.get("totale_residuo") or Decimal("0.00")
+
+        if personalizza_numero_rate:
+            if numero_rate_future is None:
+                self.add_error("numero_rate_future", "Indica il numero di rate future.")
+            elif numero_rate_future < 1:
+                self.add_error("numero_rate_future", "Il numero di rate future deve essere almeno 1.")
+            elif numero_rate_future > 36:
+                self.add_error("numero_rate_future", "Il numero di rate future non puo superare 36.")
+        else:
+            default_rate_count = self._default_count_for_rata(rata_decorrenza)
+            if default_rate_count:
+                cleaned_data["numero_rate_future"] = default_rate_count
+
+        if modalita == RimodulazioneRetta.MODALITA_IMPORTO_MENSILE and importo_mensile <= 0:
+            self.add_error("importo_mensile", "Indica un importo mensile maggiore di zero.")
+        if modalita == RimodulazioneRetta.MODALITA_TOTALE_RESIDUO and totale_residuo <= 0:
+            self.add_error("totale_residuo", "Indica un totale residuo maggiore di zero.")
 
         return cleaned_data
 

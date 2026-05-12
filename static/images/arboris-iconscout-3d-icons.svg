@@ -1,0 +1,278 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ic3d-blue" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5fd6ea"/>
+      <stop offset=".55" stop-color="#2f9fbd"/>
+      <stop offset="1" stop-color="#176f8c"/>
+    </linearGradient>
+    <linearGradient id="ic3d-green" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bdeba3"/>
+      <stop offset=".58" stop-color="#75c96f"/>
+      <stop offset="1" stop-color="#4e9963"/>
+    </linearGradient>
+    <linearGradient id="ic3d-orange" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd38d"/>
+      <stop offset=".56" stop-color="#f49b45"/>
+      <stop offset="1" stop-color="#d46e2e"/>
+    </linearGradient>
+    <linearGradient id="ic3d-violet" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d5c7ff"/>
+      <stop offset=".58" stop-color="#9679df"/>
+      <stop offset="1" stop-color="#6e54b8"/>
+    </linearGradient>
+    <linearGradient id="ic3d-amber" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe48e"/>
+      <stop offset=".58" stop-color="#dca33a"/>
+      <stop offset="1" stop-color="#a96f1d"/>
+    </linearGradient>
+    <linearGradient id="ic3d-terracotta" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffb8a6"/>
+      <stop offset=".58" stop-color="#d9725c"/>
+      <stop offset="1" stop-color="#a74d3f"/>
+    </linearGradient>
+    <linearGradient id="ic3d-slate" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#dce8f2"/>
+      <stop offset=".58" stop-color="#8ba2bb"/>
+      <stop offset="1" stop-color="#526d86"/>
+    </linearGradient>
+    <linearGradient id="ic3d-paper" x1="5" y1="3" x2="18" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffdf8"/>
+      <stop offset=".62" stop-color="#f4ead3"/>
+      <stop offset="1" stop-color="#dfc77e"/>
+    </linearGradient>
+    <radialGradient id="ic3d-shine" cx="7" cy="6" r="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".88"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="ic3d-soft-shadow" x="-30%" y="-25%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="1.7" stdDeviation="1.5" flood-color="#345066" flood-opacity=".22"/>
+    </filter>
+  </defs>
+
+  <symbol id="home" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.7" rx="7" ry="1.4" fill="#2d596f" opacity=".16"/>
+    <path d="M4.1 11.3 12 4.4l7.9 6.9v7.8c0 1-.8 1.8-1.8 1.8H5.9c-1 0-1.8-.8-1.8-1.8Z" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M7.4 12.4h9.2v8.5H7.4Z" fill="#f8fbff" opacity=".86"/>
+    <path d="M9.5 20.9v-5.3h5v5.3Z" fill="url(#ic3d-orange)"/>
+    <path d="M3.4 11.9 12 4.2l8.6 7.7" fill="none" stroke="#0d6078" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+    <circle cx="7.1" cy="8.5" r="2.7" fill="url(#ic3d-shine)"/>
+  </symbol>
+
+  <symbol id="family" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.7" rx="7.5" ry="1.3" fill="#3f6345" opacity=".14"/>
+    <circle cx="7.8" cy="8.3" r="3.3" fill="url(#ic3d-green)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="16.2" cy="8.3" r="3.3" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="12" cy="14.9" r="3.1" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M3.7 20.3c.8-3.4 2.4-5 4.4-5 1.2 0 2.2.5 3 1.4M20.3 20.3c-.8-3.4-2.4-5-4.4-5-1.2 0-2.2.5-3 1.4M8.1 21c.5-2.2 1.8-3.5 3.9-3.5s3.4 1.3 3.9 3.5" fill="none" stroke="#4d8757" stroke-width="1.35" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="family-heart" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.5" rx="7.3" ry="1.3" fill="#6c3a34" opacity=".14"/>
+    <circle cx="8.1" cy="10" r="3.2" fill="url(#ic3d-green)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="15.9" cy="10" r="3.2" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M12 5.8 10.9 4.8A2.6 2.6 0 0 0 7 8.2l5 5.1 5-5.1a2.6 2.6 0 0 0-3.9-3.4Z" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M4 20.7c.6-3.2 2-4.8 4.2-4.8 1.1 0 2 .4 2.7 1.2M20 20.7c-.6-3.2-2-4.8-4.2-4.8-1.1 0-2 .4-2.7 1.2" fill="none" stroke="#4d8757" stroke-width="1.3" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="hands-heart" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="7.2" ry="1.2" fill="#356a72" opacity=".14"/>
+    <path d="M12 6.2 10.8 5a2.8 2.8 0 0 0-4.1 4L12 14.4 17.3 9a2.8 2.8 0 0 0-4.1-4Z" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M4.1 13.3v2.3c0 1 .5 1.9 1.4 2.4l3.4 2.1M19.9 13.3v2.3c0 1-.5 1.9-1.4 2.4l-3.4 2.1" fill="none" stroke="#148a8f" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M7.8 14.9 5.4 13a1.6 1.6 0 0 0-2 2.5l3.2 2.5c.7.5 1.6.8 2.5.8H11M16.2 14.9l2.4-1.9a1.6 1.6 0 0 1 2 2.5L17.4 18c-.7.5-1.6.8-2.5.8H13" fill="none" stroke="#148a8f" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="user" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.7" rx="6.2" ry="1.3" fill="#2a6267" opacity=".15"/>
+    <circle cx="12" cy="8" r="4" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M5.2 20.4c1-4.2 3.4-6.3 6.8-6.3s5.8 2.1 6.8 6.3Z" fill="url(#ic3d-green)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="10.2" cy="6.5" r="1.5" fill="url(#ic3d-shine)"/>
+  </symbol>
+
+  <symbol id="student" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="7.1" ry="1.2" fill="#8a4f20" opacity=".15"/>
+    <path d="M3.3 8.2 12 4.2l8.7 4-8.7 4Z" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M6.8 10.7v4.4c1.3 1.6 3.1 2.5 5.2 2.5s3.9-.9 5.2-2.5v-4.4L12 13Z" fill="#fff5e8"/>
+    <path d="M4.2 8.2 12 4.6l7.8 3.6-7.8 3.6ZM20 9.1v5.3" fill="none" stroke="#a85d21" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="20" cy="15.9" r="1.2" fill="url(#ic3d-amber)"/>
+  </symbol>
+
+  <symbol id="child" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.6" ry="1.2" fill="#8a4f20" opacity=".14"/>
+    <circle cx="12" cy="6.9" r="3.2" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M8.2 11.2h7.6l-1 4.9H9.2Z" fill="#fff5e8"/>
+    <path d="M7.2 21v-6.2L5 12.7M16.8 21v-6.2l2.2-2.1M8.1 11.2h7.8M12 10v11" fill="none" stroke="#a85d21" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="calendar" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="7.1" ry="1.2" fill="#544093" opacity=".16"/>
+    <rect x="4" y="5.4" width="16" height="14.5" rx="2.4" fill="url(#ic3d-violet)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M4 10h16" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity=".78"/>
+    <rect x="7" y="12.5" width="3.4" height="3.2" rx=".8" fill="#ffffff" opacity=".78"/>
+    <rect x="11.4" y="12.5" width="5.6" height="3.2" rx=".8" fill="#e9e1ff"/>
+    <path d="M8 3.8v3.7M16 3.8v3.7" stroke="#6e54b8" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="clock" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="6.4" ry="1.2" fill="#544093" opacity=".15"/>
+    <circle cx="12" cy="12" r="8.6" fill="url(#ic3d-violet)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="12" cy="12" r="6.3" fill="#ffffff" opacity=".76"/>
+    <path d="M12 7.7V12l3.1 2" fill="none" stroke="#6e54b8" stroke-width="1.55" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="timer" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.9" rx="6.1" ry="1.2" fill="#544093" opacity=".14"/>
+    <path d="M9.2 3.8h5.6" stroke="#6e54b8" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="12" cy="13" r="7.2" fill="url(#ic3d-violet)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="12" cy="13" r="5.1" fill="#ffffff" opacity=".75"/>
+    <path d="m12 12.3-2 3M16.6 8.5l1.2-1.2" fill="none" stroke="#6e54b8" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="document" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.5" ry="1.2" fill="#80611d" opacity=".15"/>
+    <path d="M7 3.8h7l4 4v12.4H7Z" fill="url(#ic3d-paper)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M14 3.8v4.8h4" fill="#d8bb65"/>
+    <path d="M9.3 12.2h5.4M9.3 16h5.4" stroke="#8c641a" stroke-width="1.35" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="archive" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="7.1" ry="1.2" fill="#80611d" opacity=".15"/>
+    <path d="M4.3 7.4h15.4v12.2H4.3Z" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M3.4 4.5h17.2v3.3H3.4Z" fill="url(#ic3d-paper)"/>
+    <path d="M9 11.4h6" stroke="#8c641a" stroke-width="1.45" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="printer" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.9" rx="7" ry="1.2" fill="#80611d" opacity=".15"/>
+    <rect x="4" y="8.1" width="16" height="8.4" rx="2.2" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M7 8V4.2h10V8" fill="url(#ic3d-paper)"/>
+    <path d="M7.2 14.2h9.6v5.6H7.2Z" fill="#ffffff" opacity=".9"/>
+    <circle cx="17.2" cy="11.1" r=".8" fill="#8c641a"/>
+  </symbol>
+
+  <symbol id="coins" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="7.2" ry="1.2" fill="#7b3a32" opacity=".16"/>
+    <ellipse cx="9" cy="7" rx="5" ry="3" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M4 7v5c0 1.7 2.2 3 5 3s5-1.3 5-3V7" fill="#ffdcd5"/>
+    <path d="M14 10.2c3.4.2 6 1.5 6 3.1v4.7c0 1.7-2.2 3-5 3s-5-1.3-5-3v-4.7c0-1.6 1.8-2.8 4-3.1Z" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M10 13.3c0 1.7 2.2 3 5 3s5-1.3 5-3" fill="none" stroke="#9c4d3e" stroke-width="1.15" opacity=".65"/>
+  </symbol>
+
+  <symbol id="finance" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="7.1" ry="1.2" fill="#7b3a32" opacity=".15"/>
+    <rect x="6" y="10" width="3.2" height="7.2" rx=".9" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <rect x="10.4" y="6" width="3.2" height="11.2" rx=".9" fill="url(#ic3d-orange)" filter="url(#ic3d-soft-shadow)"/>
+    <rect x="14.8" y="11" width="3.2" height="6.2" rx=".9" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="m5.3 10.5 4.8-4 3.8 4 4.8-5" fill="none" stroke="#a74d3f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="bank" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="7.2" ry="1.2" fill="#7b3a32" opacity=".15"/>
+    <path d="M3.4 8.5 12 3.8l8.6 4.7Z" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M6.2 10h11.6M6.9 10v7.6M10.3 10v7.6M13.7 10v7.6M17.1 10v7.6M4.4 20h15.2" fill="none" stroke="#9c4d3e" stroke-width="1.35" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="supplier" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="7" ry="1.2" fill="#7b3a32" opacity=".14"/>
+    <path d="M4.4 20V7.6L8.1 4h7.8l3.7 3.6V20Z" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M8 20v-6h8v6M8 9h8" fill="none" stroke="#fff4ef" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M4.4 20V7.6L8.1 4h7.8l3.7 3.6V20Z" fill="none" stroke="#9c4d3e" stroke-width="1.15" stroke-linejoin="round" opacity=".65"/>
+  </symbol>
+
+  <symbol id="briefcase" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.9" rx="7" ry="1.2" fill="#40556a" opacity=".15"/>
+    <rect x="4.2" y="7.2" width="15.6" height="11.8" rx="2.2" fill="url(#ic3d-slate)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M9.2 7.2V5.1h5.6v2.1M4.2 12.2h15.6" fill="none" stroke="#526d86" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M10.2 12.3h3.6v1.8h-3.6Z" fill="#f6fbff" opacity=".82"/>
+  </symbol>
+
+  <symbol id="settings" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.8" ry="1.2" fill="#40556a" opacity=".15"/>
+    <path d="M19 12c0-.4 0-.8-.1-1.1l1.9-1.4-1.8-3.1-2.3.9c-.5-.4-1.1-.8-1.8-1L14.5 3h-5l-.4 3.3c-.7.2-1.3.6-1.8 1L5 6.4 3.2 9.5l1.9 1.4C5 11.2 5 11.6 5 12s0 .8.1 1.1l-1.9 1.4L5 17.6l2.3-.9c.5.4 1.1.8 1.8 1l.4 3.3h5l.4-3.3c.7-.2 1.3-.6 1.8-1l2.3.9 1.8-3.1-1.9-1.4c.1-.3.1-.7.1-1.1Z" fill="url(#ic3d-slate)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="12" cy="12" r="3.2" fill="#f7fbff" opacity=".88"/>
+  </symbol>
+
+  <symbol id="shield" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.3" ry="1.2" fill="#40556a" opacity=".15"/>
+    <path d="M12 3.8 19 7v5.1c0 4.1-2.8 7.1-7 8.7-4.2-1.6-7-4.6-7-8.7V7Z" fill="url(#ic3d-slate)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="m9 12 2 2 4.2-4.2" fill="none" stroke="#ffffff" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="menu" viewBox="0 0 24 24">
+    <rect x="4" y="5.2" width="16" height="13.6" rx="3" fill="url(#ic3d-slate)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M7.5 9h9M7.5 12h9M7.5 15h9" stroke="#ffffff" stroke-width="1.45" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="list" viewBox="0 0 24 24">
+    <rect x="4" y="4.5" width="16" height="15" rx="3" fill="url(#ic3d-slate)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M8.4 8.2h8.2M8.4 12h8.2M8.4 15.8h8.2" stroke="#ffffff" stroke-width="1.35" stroke-linecap="round"/>
+    <circle cx="6.7" cy="8.2" r=".7" fill="#ffffff"/>
+    <circle cx="6.7" cy="12" r=".7" fill="#ffffff"/>
+    <circle cx="6.7" cy="15.8" r=".7" fill="#ffffff"/>
+  </symbol>
+
+  <symbol id="check" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="6" ry="1.1" fill="#3f6345" opacity=".15"/>
+    <circle cx="12" cy="12" r="8.5" fill="url(#ic3d-green)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="m8.1 12.2 2.6 2.7 5.4-5.7" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="refresh" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="6.3" ry="1.1" fill="#2a6267" opacity=".15"/>
+    <circle cx="12" cy="12" r="8.4" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M16.8 9.1A5.4 5.4 0 0 0 7.4 8l-1 1.2M7.2 14.9a5.4 5.4 0 0 0 9.4 1.1l1-1.2M6.3 6.5v2.7h2.7M17.7 17.5v-2.7H15" fill="none" stroke="#ffffff" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
+  <symbol id="search" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="6.1" ry="1.1" fill="#2a6267" opacity=".14"/>
+    <circle cx="10.3" cy="10.3" r="5.4" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="10.3" cy="10.3" r="3.3" fill="#ffffff" opacity=".78"/>
+    <path d="m14.2 14.2 5 5" stroke="#176f8c" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="eye" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="6.3" ry="1.1" fill="#2a6267" opacity=".14"/>
+    <path d="M3.3 12s3.2-5.4 8.7-5.4 8.7 5.4 8.7 5.4-3.2 5.4-8.7 5.4S3.3 12 3.3 12Z" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <circle cx="12" cy="12" r="2.8" fill="#ffffff" opacity=".86"/>
+    <circle cx="12" cy="12" r="1.35" fill="#176f8c"/>
+  </symbol>
+
+  <symbol id="edit" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.5" ry="1.1" fill="#544093" opacity=".14"/>
+    <path d="M5.2 17.6 4.6 21l3.4-.7 9.9-9.9-2.8-2.8Z" fill="url(#ic3d-violet)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="m15.1 7.6 1.8-1.8c.7-.7 1.8-.7 2.5 0s.7 1.8 0 2.5l-1.5 1.5Z" fill="url(#ic3d-orange)"/>
+    <path d="M5.2 17.6 8 20.3" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity=".8"/>
+  </symbol>
+
+  <symbol id="lightbulb" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="5.7" ry="1.1" fill="#80611d" opacity=".14"/>
+    <path d="M7.2 10.2a4.8 4.8 0 1 1 8.8 2.7c-.9 1.1-1.5 2-1.7 3.2H9.7c-.2-1.2-.8-2.1-1.7-3.2a4.7 4.7 0 0 1-.8-2.7Z" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M9.5 16.1h5M10 18.2h4M10.8 20h2.4" stroke="#8c641a" stroke-width="1.25" stroke-linecap="round"/>
+    <circle cx="9.2" cy="7.5" r="2.1" fill="url(#ic3d-shine)"/>
+  </symbol>
+
+  <symbol id="alert" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.9" rx="6.5" ry="1.1" fill="#80611d" opacity=".14"/>
+    <path d="M12 4.2 21 20H3Z" fill="url(#ic3d-amber)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M12 9.2v4.6M12 17.2h.1" stroke="#8c641a" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="bell" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="21" rx="6.2" ry="1.1" fill="#7b3a32" opacity=".15"/>
+    <path d="M6.2 17.2h11.6l-1.2-1.8V11c0-2.7-1.8-4.8-4.6-4.8S7.4 8.3 7.4 11v4.4Z" fill="url(#ic3d-terracotta)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M10.1 18.1a2 2 0 0 0 3.8 0" fill="none" stroke="#9c4d3e" stroke-width="1.35" stroke-linecap="round"/>
+    <path d="M12 4.2v1.5" stroke="#9c4d3e" stroke-width="1.35" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="mail" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="7" ry="1.1" fill="#2a6267" opacity=".14"/>
+    <rect x="4" y="6" width="16" height="12" rx="2.4" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="m5.4 8 6.6 5 6.6-5M5.5 17l4.4-4M18.5 17l-4.4-4" fill="none" stroke="#ffffff" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>
+  </symbol>
+
+  <symbol id="message" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="20.8" rx="7" ry="1.1" fill="#2a6267" opacity=".14"/>
+    <path d="M4.2 5.4h15.6v10.4c0 1.2-1 2.2-2.2 2.2h-6.1L7 21v-3H6.4c-1.2 0-2.2-1-2.2-2.2Z" fill="url(#ic3d-blue)" filter="url(#ic3d-soft-shadow)"/>
+    <path d="M8 9.5h8M8 13h5.8" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round" opacity=".9"/>
+  </symbol>
+</svg>

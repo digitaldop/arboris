@@ -7,6 +7,7 @@ from .iscrizioni import (
     IscrizioneForm,
     RataIscrizionePagamentoForm,
     RataIscrizionePagamentoRapidoForm,
+    RimodulazioneRateFutureForm,
     RitiroAnticipatoIscrizioneForm,
 )
 from .scambio_retta import TariffaScambioRettaForm, ScambioRettaForm, PrestazioneScambioRettaForm
@@ -21,6 +22,7 @@ __all__ = [
     "IscrizioneForm",
     "RataIscrizionePagamentoForm",
     "RataIscrizionePagamentoRapidoForm",
+    "RimodulazioneRateFutureForm",
     "RitiroAnticipatoIscrizioneForm",
     "TariffaScambioRettaForm",
     "ScambioRettaForm",

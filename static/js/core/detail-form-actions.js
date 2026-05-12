@@ -1,5 +1,6 @@
 (function () {
     const APP_STACK_KEY = "arboris:application-navigation-stack:v1";
+    const APP_PENDING_BACK_KEY = "arboris:application-navigation-pending-back:v1";
     const APP_STACK_MAX_LENGTH = 80;
     const TRANSIENT_QUERY_PARAMS = [
         "popup",
@@ -179,6 +180,90 @@
         return getNormalizedApplicationUrl(window.location.href);
     }
 
+    function buildReturnBackUrl(value) {
+        const url = normalizeInternalUrl(value);
+        if (!url) {
+            return "";
+        }
+
+        url.searchParams.delete("popup");
+        url.searchParams.delete("return_to");
+
+        return url.pathname + url.search + url.hash;
+    }
+
+    function getCurrentReturnBackUrl() {
+        return buildReturnBackUrl(window.location.href);
+    }
+
+    function readPendingBackNavigation() {
+        const storage = getStableBackStorage();
+        if (!storage) {
+            return null;
+        }
+
+        try {
+            const pending = JSON.parse(storage.getItem(APP_PENDING_BACK_KEY) || "null");
+            if (!pending || typeof pending.target !== "string" || typeof pending.source !== "string") {
+                return null;
+            }
+
+            if (Date.now() - (Number(pending.timestamp) || 0) > 10 * 60 * 1000) {
+                storage.removeItem(APP_PENDING_BACK_KEY);
+                return null;
+            }
+
+            return pending;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function clearPendingBackNavigation() {
+        const storage = getStableBackStorage();
+        if (!storage) {
+            return;
+        }
+
+        try {
+            storage.removeItem(APP_PENDING_BACK_KEY);
+        } catch (e) {}
+    }
+
+    function rememberBackForNavigation(targetValue) {
+        const storage = getStableBackStorage();
+        const source = getCurrentReturnBackUrl();
+        const target = getNormalizedApplicationUrl(targetValue);
+        if (!storage || !source || !target || source === target || isPopupPage()) {
+            return "";
+        }
+
+        const targetUrl = normalizeInternalUrl(targetValue);
+        if (!targetUrl || hasTransientPathPart(targetUrl.pathname) || targetUrl.searchParams.get("popup") === "1") {
+            return "";
+        }
+
+        try {
+            storage.setItem(APP_PENDING_BACK_KEY, JSON.stringify({
+                source,
+                target,
+                timestamp: Date.now(),
+            }));
+        } catch (e) {}
+
+        return source;
+    }
+
+    function getPendingBackUrlForCurrentPage() {
+        const pending = readPendingBackNavigation();
+        const currentUrl = getCurrentApplicationUrl();
+        if (!pending || !currentUrl || pending.target !== currentUrl || pending.source === currentUrl) {
+            return "";
+        }
+
+        return pending.source;
+    }
+
     function readApplicationStack() {
         const storage = getStableBackStorage();
         if (!storage) {
@@ -355,6 +440,77 @@
         return Array.from(new Set(explicitButtons.concat(implicitLinks)));
     }
 
+    function isApplicationBackButton(element) {
+        if (!element) {
+            return false;
+        }
+
+        if (element.classList && element.classList.contains("js-page-back-btn")) {
+            return true;
+        }
+
+        return isImplicitApplicationBackLink(element);
+    }
+
+    function shouldRememberLinkBack(anchor) {
+        if (!anchor || !anchor.href || isApplicationBackButton(anchor)) {
+            return false;
+        }
+
+        if (anchor.target && anchor.target !== "_self") {
+            return false;
+        }
+
+        if (anchor.hasAttribute("download")) {
+            return false;
+        }
+
+        if (anchor.dataset && (
+            anchor.dataset.windowPopup === "1" ||
+            anchor.dataset.calendarEventPopup === "1" ||
+            anchor.dataset.calendarSelectedCreate === "1" ||
+            anchor.dataset.popupUrl ||
+            anchor.dataset.noBackMemory === "1"
+        )) {
+            return false;
+        }
+
+        const destination = normalizeInternalUrl(anchor.href);
+        if (!destination || destination.origin !== window.location.origin) {
+            return false;
+        }
+
+        if (destination.pathname === window.location.pathname && destination.search === window.location.search) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function bindForwardNavigationMemory(container) {
+        const root = container || document;
+        if (root.dataset && root.dataset.backMemoryBound === "1") {
+            return;
+        }
+
+        if (root.dataset) {
+            root.dataset.backMemoryBound = "1";
+        }
+
+        root.addEventListener("click", function (event) {
+            if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+                return;
+            }
+
+            const anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+            if (!shouldRememberLinkBack(anchor)) {
+                return;
+            }
+
+            rememberBackForNavigation(anchor.href);
+        }, true);
+    }
+
     function buildFallbackBackUrl(fallback) {
         const fallbackUrl = normalizeInternalUrl(fallback) || normalizeInternalUrl("/");
         return fallbackUrl ? fallbackUrl.pathname + fallbackUrl.search + fallbackUrl.hash : "/";
@@ -385,6 +541,16 @@
                 writeApplicationStack(stack);
             }
             return explicitBackUrl;
+        }
+
+        const pendingBackUrl = getPendingBackUrlForCurrentPage();
+        if (pendingBackUrl) {
+            if (cfg.commit && currentUrl) {
+                stack = stack.filter(entry => entry.url !== currentUrl);
+                writeApplicationStack(stack);
+                clearPendingBackNavigation();
+            }
+            return pendingBackUrl;
         }
 
         if (currentUrl) {
@@ -429,11 +595,13 @@
         });
 
         recordCurrentApplicationPage();
+        bindForwardNavigationMemory(document);
         bindBackButtons(document);
     });
 
     window.ArborisAppNavigation = {
         recordCurrentPage: recordCurrentApplicationPage,
+        rememberBackForNavigation,
         resolveBackUrl: function (fallback) {
             return resolveApplicationBackUrl(fallback, { commit: false });
         },

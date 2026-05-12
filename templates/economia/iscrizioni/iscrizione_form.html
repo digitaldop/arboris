@@ -25,6 +25,7 @@
                         {% csrf_token %}
                         <button type="submit" class="btn btn-rate-recalc">Ricalcola rate</button>
                     </form>
+                    <a href="{% url 'rimodula_rate_iscrizione' iscrizione.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-secondary">Rimodula rate</a>
                     <form
                         method="post"
                         action="{% url 'riconcilia_pagamenti_iscrizione' iscrizione.pk %}"
@@ -211,6 +212,35 @@
                             </div>
                         </div>
                         {{ form.condizione_iscrizione.errors }}
+                    </td>
+                </tr>
+                <tr class="iscrizione-rate-custom-row">
+                    <th>{{ form.rate_custom.label_tag }}</th>
+                    <td>
+                        <div class="mode-view-only readonly-display readonly-display-plain">
+                            {% if iscrizione and iscrizione.rate_custom %}
+                                {{ iscrizione.rate_custom }} rate personalizzate
+                            {% elif riepilogo_economico.numero_mensilita_default %}
+                                Default condizione: {{ riepilogo_economico.numero_mensilita_default }} rate
+                            {% else %}
+                                <span class="table-muted">Default condizione</span>
+                            {% endif %}
+                        </div>
+                        <div class="mode-edit-field" data-rate-custom-control>
+                            <label class="calendar-event-check-field" for="id_rate_custom_enabled">
+                                <input
+                                    type="checkbox"
+                                    id="id_rate_custom_enabled"
+                                    data-rate-custom-toggle
+                                    {% if form.rate_custom.value %}checked{% endif %}
+                                    {% if form.rate_custom.field.disabled %}disabled{% endif %}
+                                >
+                                <span>Personalizza numero rate</span>
+                            </label>
+                            {{ form.rate_custom }}
+                            {% if form.rate_custom.help_text %}<div class="help-text">{{ form.rate_custom.help_text }}</div>{% endif %}
+                            {{ form.rate_custom.errors }}
+                        </div>
                     </td>
                 </tr>
                 <tr class="iscrizione-agevolazione-row">
@@ -433,7 +463,7 @@
     <script src="{% static 'js/core/related-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}"></script>
-    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=8"></script>
+    <script src="{% static 'js/pages/iscrizione-form.js' %}?v=9"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

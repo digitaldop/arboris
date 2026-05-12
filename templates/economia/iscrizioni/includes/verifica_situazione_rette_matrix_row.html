@@ -1,8 +1,8 @@
 {% load currency %}
 
-<tr>
+<tr data-rate-matrix-row data-student-id="{{ riga.studente.pk }}" aria-selected="false">
     <td class="sticky-col studente-col">
-        <a href="{% url 'modifica_studente' riga.studente.pk %}" class="studente-link" title="Apri scheda studente">
+        <a href="{% url 'modifica_studente' riga.studente.pk %}{% if matrix_return_url %}?next={{ matrix_return_url|urlencode }}{% endif %}" class="studente-link" title="Apri scheda studente" data-preserve-back="1">
             <div class="studente-nome">{{ riga.studente.cognome }} {{ riga.studente.nome }}</div>
             {% if show_classe_label %}
                 <div class="studente-classe-label">{{ riga.classe_label }}</div>
@@ -11,8 +11,14 @@
     </td>
     {% for cella in riga.celle %}
         {% if cella.rata %}
-            <td class="verifica-rette-cell cella-{{ cella.stato }}">
-                <a href="{{ cella.url }}" class="cell-link" title="Apri dettaglio rata">
+            <td class="verifica-rette-cell cella-{{ cella.stato }}" data-rate-matrix-cell>
+                <a
+                    href="{{ cella.url }}"
+                    class="cell-link"
+                    data-rate-detail-link
+                    data-floating-text="{{ riga.studente.cognome }} {{ riga.studente.nome }} - {{ cella.colonna.label }}&#10;Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro: apri il dettaglio rata."
+                    aria-label="Rata di {{ riga.studente.cognome }} {{ riga.studente.nome }}. Doppio click su una cella per evidenziare la riga, tieni premuto e trascina per scorrere, tasto destro per aprire il dettaglio."
+                >
                     <div class="cell-amount">
                         <span class="label">Dovuto</span>
                         <span class="value">&euro; {{ cella.rata.importo_finale|euro }}</span>
@@ -31,7 +37,7 @@
                 </a>
             </td>
         {% else %}
-            <td class="verifica-rette-cell cella-assente">
+            <td class="verifica-rette-cell cella-assente" data-rate-matrix-cell>
                 <div class="cell-empty">&mdash;</div>
             </td>
         {% endif %}

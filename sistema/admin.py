@@ -86,6 +86,8 @@ class SistemaImpostazioniGeneraliAdmin(admin.ModelAdmin):
         "terminologia_studente",
         "mostra_dashboard_prossimo_anno_scolastico",
         "interfaccia_colorata_attiva",
+        "stile_streamline_attivo",
+        "stile_iconscout_3d_attivo",
         "cronologia_retention_mesi",
         "gestione_iscrizione_corso_anno",
         "font_principale",

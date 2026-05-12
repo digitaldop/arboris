@@ -21,6 +21,7 @@ from economia.forms import (
     IscrizioneForm,
     RataIscrizionePagamentoForm,
     RataIscrizionePagamentoRapidoForm,
+    RimodulazioneRateFutureForm,
     RitiroAnticipatoIscrizioneForm,
 )
 from economia.models import (
@@ -38,6 +39,7 @@ from economia.services import (
     build_rate_batch_feedback,
     build_riconciliazione_batch_feedback,
     ricalcola_rate_anno_scolastico as ricalcola_rate_anno_scolastico_service,
+    rimodula_rate_future,
 )
 from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
@@ -668,6 +670,67 @@ def ricalcola_rate_iscrizione(request, pk):
     return redirect("modifica_iscrizione", pk=iscrizione.pk)
 
 
+def rimodula_rate_iscrizione(request, pk):
+    iscrizione = get_object_or_404(
+        Iscrizione.objects.select_related("studente", "anno_scolastico", "condizione_iscrizione"),
+        pk=pk,
+    )
+    popup = is_popup_request(request)
+    fallback_url = reverse("modifica_iscrizione", kwargs={"pk": iscrizione.pk})
+    next_url = get_safe_next_url(request, fallback_url)
+
+    if request.method == "POST":
+        form = RimodulazioneRateFutureForm(request.POST, iscrizione=iscrizione)
+        if form.is_valid():
+            try:
+                rimodulazione = rimodula_rate_future(
+                    iscrizione,
+                    rata_decorrenza=form.cleaned_data["rata_decorrenza"],
+                    modalita=form.cleaned_data["modalita"],
+                    numero_rate_future=form.cleaned_data["numero_rate_future"],
+                    importo_mensile=form.cleaned_data.get("importo_mensile"),
+                    totale_residuo=form.cleaned_data.get("totale_residuo"),
+                    note=form.cleaned_data.get("note") or "",
+                    utente=request.user,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(
+                    request,
+                    (
+                        "Rate future rimodulate correttamente: "
+                        f"{rimodulazione.rate_sostituite} rate aggiornate su "
+                        f"{rimodulazione.numero_rate_future} rate future."
+                    ),
+                )
+                if popup:
+                    return render(
+                        request,
+                        "popup/popup_close.html",
+                        {"message": "Rate future rimodulate correttamente."},
+                    )
+                return redirect(next_url)
+    else:
+        form = RimodulazioneRateFutureForm(iscrizione=iscrizione)
+
+    rate_future = list(form.fields["rata_decorrenza"].queryset)
+    totale_future = sum(importo_rata_residuo(rata) for rata in rate_future)
+
+    return render(
+        request,
+        "economia/iscrizioni/rimodula_rate_iscrizione_form.html",
+        {
+            "form": form,
+            "iscrizione": iscrizione,
+            "rate_future": rate_future,
+            "totale_future": totale_future,
+            "popup": popup,
+            "next_url": next_url,
+        },
+    )
+
+
 @require_POST
 def ricalcola_rate_anno_scolastico(request):
     anno = get_object_or_404(AnnoScolastico, pk=request.POST.get("anno_scolastico"), attivo=True)
@@ -1232,7 +1295,7 @@ def verifica_situazione_rette(request):
     - colonne: Preiscrizione + mensilita' settembre -> giugno;
     - ogni cella mostra importo dovuto, importo pagato e data pagamento
       con un colore semantico (verde/giallo/rosso);
-    - click sulla cella -> form di gestione della rata.
+    - tasto destro sulla cella -> form di gestione della rata.
     """
 
     anni_scolastici = list(AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id"))
@@ -1443,5 +1506,6 @@ def verifica_situazione_rette(request):
             "righe_per_classe": righe_per_classe,
             "righe_matrice_alfabetica": righe_matrice_alfabetica,
             "num_colonne": len(colonne) + 1,  # +1 per la prima colonna "Studente"
+            "matrix_return_url": request.get_full_path(),
         },
     )

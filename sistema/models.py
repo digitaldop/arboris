@@ -488,6 +488,20 @@ class SistemaImpostazioniGenerali(models.Model):
             "Disattivala per un'interfaccia piu uniforme."
         ),
     )
+    stile_streamline_attivo = models.BooleanField(
+        default=False,
+        help_text=(
+            "Quando attivo usa icone emozionali multicolore per dashboard, riepiloghi e intestazioni. "
+            "Le icone funzionali di menu, pulsanti, tabelle e form restano lineari."
+        ),
+    )
+    stile_iconscout_3d_attivo = models.BooleanField(
+        default=False,
+        help_text=(
+            "Quando attivo usa icone emozionali in stile 3D per dashboard, riepiloghi e intestazioni. "
+            "Se attivo insieme allo Streamline, lo stile 3D ha priorita sulle icone principali."
+        ),
+    )
     font_principale = models.CharField(
         max_length=40,
         choices=GoogleFontChoice.choices,
