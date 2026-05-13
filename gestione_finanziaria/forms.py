@@ -662,7 +662,13 @@ class SpesaOperativaForm(forms.ModelForm):
         widgets = {
             "data_scadenza": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "data_pagamento": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
-            "note": forms.Textarea(attrs={"rows": 3}),
+            "note": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Aggiungi una nota...",
+                    "data-rich-notes-skip": "true",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -670,6 +676,7 @@ class SpesaOperativaForm(forms.ModelForm):
         optional_fields = [
             "categoria",
             "fornitore",
+            "importo_pagato",
             "data_pagamento",
             "conto_bancario",
             "movimento_finanziario",
@@ -689,6 +696,9 @@ class SpesaOperativaForm(forms.ModelForm):
             self.fields[field_name].input_formats = ["%Y-%m-%d"]
         for field_name in ("importo_previsto", "importo_pagato"):
             apply_eur_currency_widget(self.fields[field_name])
+        if not self.is_bound and not getattr(self.instance, "pk", None):
+            self.initial["importo_pagato"] = ""
+            self.fields["importo_pagato"].initial = ""
         make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
         make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
@@ -700,7 +710,8 @@ class SpesaOperativaForm(forms.ModelForm):
         importo_previsto = cleaned.get("importo_previsto") or Decimal("0.00")
         importo_pagato = cleaned.get("importo_pagato") or Decimal("0.00")
         if movimento and not importo_pagato:
-            cleaned["importo_pagato"] = abs(movimento.importo or Decimal("0.00"))
+            importo_pagato = abs(movimento.importo or Decimal("0.00"))
+        cleaned["importo_pagato"] = importo_pagato
         if cleaned.get("tipo") == TipoSpesaOperativa.CONTANTI and not cleaned.get("data_pagamento") and cleaned.get("importo_pagato"):
             cleaned["data_pagamento"] = cleaned.get("data_scadenza")
         if importo_pagato > importo_previsto:
@@ -737,7 +748,13 @@ class PianoRatealeSpesaForm(forms.ModelForm):
         }
         widgets = {
             "data_prima_scadenza": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
-            "note": forms.Textarea(attrs={"rows": 3}),
+            "note": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Aggiungi una nota...",
+                    "data-rich-notes-skip": "true",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):

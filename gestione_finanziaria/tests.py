@@ -2487,6 +2487,18 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'relatedType: "categoria_spesa"')
         self.assertContains(response, 'id="add-spesa-fornitore-btn"')
         self.assertContains(response, 'relatedType: "fornitore"')
+        self.assertContains(response, 'id="add-spesa-conto-btn"')
+        self.assertContains(response, 'id="edit-spesa-conto-btn"')
+        self.assertContains(response, 'id="delete-spesa-conto-btn"')
+        self.assertContains(response, 'relatedType: "conto_bancario"')
+        self.assertContains(response, "budget-voice-currency-field", count=2)
+        self.assertContains(response, 'name="importo_pagato"', html=False)
+        self.assertContains(response, 'placeholder="0,00"', html=False)
+        self.assertNotContains(response, 'name="importo_pagato" value="0,00"', html=False)
+        self.assertNotContains(response, 'name="importo_pagato" value="0.00"', html=False)
+        self.assertContains(response, 'name="note"', html=False)
+        self.assertContains(response, 'data-rich-notes-skip="true"', html=False)
+        self.assertContains(response, 'placeholder="Aggiungi una nota..."', html=False)
         self.assertNotContains(response, "id_dipendente")
         self.assertNotContains(response, "Dipendente")
 
@@ -2504,7 +2516,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
                 "fornitore": "",
                 "data_scadenza": "2026-05-13",
                 "importo_previsto": "25.00",
-                "importo_pagato": "0.00",
+                "importo_pagato": "",
                 "data_pagamento": "",
                 "conto_bancario": "",
                 "movimento_finanziario": "",
@@ -2515,7 +2527,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "popup/popup_close.html")
         self.assertEqual(response.context["reload_url"], reverse("spese_mensili_dashboard"))
-        self.assertTrue(SpesaOperativa.objects.filter(descrizione="Acquisto cancelleria").exists())
+        spesa = SpesaOperativa.objects.get(descrizione="Acquisto cancelleria")
+        self.assertEqual(spesa.importo_pagato, Decimal("0.00"))
 
     def test_piano_rateale_spesa_form_usa_layout_popup_e_controlli_related(self):
         response = self.client.get(
@@ -2535,6 +2548,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "data-plan-supplier-field")
         self.assertContains(response, 'typeSelect.value === "fornitore"')
         self.assertContains(response, "supplierSelect.disabled = !canUseSupplier")
+        self.assertContains(response, 'data-rich-notes-skip="true"', html=False)
 
     def test_crea_piano_rateale_popup_chiude_e_pulisce_fornitore_se_non_richiesto(self):
         categoria = crea_categoria_spesa_test("Finanziamenti")

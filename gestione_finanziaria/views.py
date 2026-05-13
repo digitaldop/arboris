@@ -1495,7 +1495,6 @@ def crea_spesa_operativa(request):
             initial={
                 "data_scadenza": timezone.localdate(),
                 "tipo": TipoSpesaOperativa.MANUALE,
-                "importo_pagato": Decimal("0.00"),
             }
         )
 

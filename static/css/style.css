@@ -3015,6 +3015,29 @@ html.arboris-long-wait .page-loading-overlay {
     display: none;
 }
 
+.budget-voice-currency-field .budget-voice-input-shell {
+    display: inline-grid;
+    grid-template-columns: 50px max-content;
+    width: auto;
+    max-width: 100%;
+}
+
+.budget-voice-currency-field .budget-voice-input-control {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.budget-voice-currency-field .currency-input-group.currency-input-group-compact {
+    max-width: 196px;
+}
+
+.budget-voice-currency-field .currency-input-group.currency-input-group-compact input {
+    width: 112px;
+    min-width: 96px;
+    max-width: 126px;
+    flex-basis: 112px;
+}
+
 .budget-voice-related-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) max-content;
@@ -3065,7 +3088,7 @@ html.arboris-long-wait .page-loading-overlay {
 .budget-voice-note-shell {
     display: grid;
     grid-template-columns: 50px minmax(0, 1fr);
-    min-height: 112px;
+    min-height: 88px;
     border: 1px solid #cbd6e2;
     border-radius: 8px;
     background: #ffffff;
@@ -3075,25 +3098,30 @@ html.arboris-long-wait .page-loading-overlay {
 
 .budget-voice-note-addon {
     align-items: flex-start;
-    padding-top: 16px;
+    padding-top: 14px;
     border-radius: 7px 0 0 7px;
 }
 
 .budget-voice-note-control textarea,
 .budget-voice-note-control .rich-note-editor,
 .budget-voice-note-control .rich-note-preview {
-    min-height: 110px;
+    min-height: 86px;
 }
 
 .budget-voice-note-control textarea {
     width: 100%;
     max-width: none;
-    padding: 14px 16px;
+    padding: 13px 16px;
     border: 0 !important;
     border-radius: 0 7px 7px 0;
     background: transparent;
     box-shadow: none !important;
     outline: none;
+    resize: vertical;
+}
+
+.budget-voice-note-control textarea::placeholder {
+    color: #8a9bad;
 }
 
 .budget-voice-form-field .errorlist {
@@ -3486,12 +3514,35 @@ html.app-modal-child .budget-voice-note-shell,
 html.app-modal-child .budget-voice-note-control textarea,
 html.app-modal-child .budget-voice-note-control .rich-note-editor,
 html.app-modal-child .budget-voice-note-control .rich-note-preview {
-    min-height: 96px;
+    min-height: 84px;
 }
 
 html.app-modal-child .budget-voice-popup-form .related-config-popup-actions {
     margin: 0 -34px;
     padding: 14px 34px 18px;
+}
+
+html.app-modal-child .budget-voice-currency-field .budget-voice-input-shell {
+    display: inline-grid;
+    grid-template-columns: 48px max-content;
+    width: auto;
+    max-width: 100%;
+}
+
+html.app-modal-child .budget-voice-currency-field .budget-voice-input-control {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+html.app-modal-child .budget-voice-currency-field .currency-input-group.currency-input-group-compact {
+    max-width: 188px;
+}
+
+html.app-modal-child .budget-voice-currency-field .currency-input-group.currency-input-group-compact input {
+    width: 108px;
+    min-width: 94px;
+    max-width: 122px;
+    flex-basis: 108px;
 }
 
 body,
