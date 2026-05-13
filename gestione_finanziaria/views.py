@@ -2858,6 +2858,7 @@ def _statistiche_pulizia_movimenti(queryset):
         "manuali": queryset.filter(origine=OrigineMovimento.MANUALE).count(),
         "riconciliati_rate": queryset.filter(rata_iscrizione__isnull=False).count(),
         "collegati_scadenze": ScadenzaPagamentoFornitore.objects.filter(movimento_finanziario__in=queryset).count(),
+        "collegati_buste": BustaPagaDipendente.objects.filter(movimento_pagamento__in=queryset).count(),
     }
 
 
@@ -2885,10 +2886,11 @@ def pulizia_movimenti_finanziari(request):
                 ricalcola_saldo_corrente_conto(conto)
 
             messaggio = f"Pulizia completata: eliminati {eliminati} movimenti."
-            if statistiche["riconciliati_rate"] or statistiche["collegati_scadenze"]:
+            if statistiche["riconciliati_rate"] or statistiche["collegati_scadenze"] or statistiche["collegati_buste"]:
                 messaggio += (
                     f" Rimosso anche il riferimento a {statistiche['riconciliati_rate']} movimenti "
-                    f"riconciliati con rate e {statistiche['collegati_scadenze']} collegati a scadenze fornitori."
+                    f"riconciliati con rate, {statistiche['collegati_scadenze']} collegati a scadenze fornitori "
+                    f"e {statistiche['collegati_buste']} collegati a buste paga."
                 )
             messages.success(request, messaggio)
             return redirect("lista_movimenti_finanziari")
@@ -2905,6 +2907,36 @@ def pulizia_movimenti_finanziari(request):
             "statistiche": statistiche,
         },
     )
+
+
+def _movimento_manuale_initial(request):
+    initial = {
+        "data_contabile": timezone.now().date(),
+        "valuta": "EUR",
+        "canale": CanaleMovimento.BANCA,
+    }
+    allowed_fields = [
+        "data_contabile",
+        "data_valuta",
+        "importo",
+        "valuta",
+        "descrizione",
+        "controparte",
+        "iban_controparte",
+        "categoria",
+        "conto",
+        "canale",
+        "incide_su_saldo_banca",
+        "sostenuta_da_terzi",
+        "rimborsabile",
+        "sostenitore",
+        "note",
+    ]
+    for field_name in allowed_fields:
+        value = (request.GET.get(field_name) or "").strip()
+        if value:
+            initial[field_name] = value
+    return initial
 
 
 def crea_movimento_manuale(request):
@@ -2931,13 +2963,7 @@ def crea_movimento_manuale(request):
             messages.success(request, "Movimento manuale registrato correttamente.")
             return redirect("lista_movimenti_finanziari")
     else:
-        form = MovimentoFinanziarioForm(
-            initial={
-                "data_contabile": timezone.now().date(),
-                "valuta": "EUR",
-                "canale": CanaleMovimento.BANCA,
-            }
-        )
+        form = MovimentoFinanziarioForm(initial=_movimento_manuale_initial(request))
 
     if popup:
         return render(
@@ -3085,6 +3111,7 @@ def elimina_movimenti_finanziari_multipla(request):
         movimento_finanziario__in=movimenti
     ).count()
     pagamenti_collegati_count = PagamentoFornitore.objects.filter(movimento_finanziario__in=movimenti).count()
+    buste_collegate_count = BustaPagaDipendente.objects.filter(movimento_pagamento__in=movimenti).count()
 
     return render(
         request,
@@ -3098,6 +3125,7 @@ def elimina_movimenti_finanziari_multipla(request):
             "riconciliazioni_rate_count": riconciliazioni_rate_count,
             "scadenze_collegate_count": scadenze_collegate_count,
             "pagamenti_collegati_count": pagamenti_collegati_count,
+            "buste_collegate_count": buste_collegate_count,
         },
     )
 

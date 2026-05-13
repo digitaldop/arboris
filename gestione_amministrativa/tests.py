@@ -1,16 +1,21 @@
 from datetime import date
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 from unittest import skip
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from anagrafica.models import Citta, Familiare, Nazione, Provincia, Regione, RelazioneFamiliare
+from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, SistemaUtentePermessi
 
+from .forms import BustaPagaDipendenteForm
 from .models import (
     BustaPagaDipendente,
     CategoriaDatoPayrollUfficiale,
@@ -441,6 +446,132 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, 'name="popup" value="1"')
         self.assertContains(response, "Periodo e dipendente")
         self.assertContains(response, "Previsione")
+        self.assertContains(response, '<select name="mese"', html=False)
+        self.assertContains(response, '<option value="10" selected>Ottobre</option>', html=True)
+        self.assertContains(response, 'data-popup-note-collapse="false"', html=False)
+        self.assertContains(response, 'data-long-wait-immediate="1"', html=False)
+        self.assertContains(response, "long-wait-cursor.js", html=False)
+        self.assertContains(response, 'id="add-busta-movimento-btn"', html=False)
+        self.assertContains(response, 'data-related-type="movimento_finanziario"', html=False)
+        self.assertNotContains(response, "Note previsione")
+
+    def test_busta_paga_file_card_usa_link_interno_e_non_widget_standard(self):
+        self.client.force_login(self.user)
+        with TemporaryDirectory() as tmpdir, override_settings(
+            MEDIA_ROOT=tmpdir,
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+            },
+        ):
+            self.busta.file_busta_paga.save("cedolino-ottobre.pdf", ContentFile(b"pdf"), save=True)
+            response = self.client.get(f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-busta-file-current")
+        self.assertContains(response, "cedolino-ottobre")
+        self.assertContains(response, reverse("apri_file_busta_paga_dipendente", args=[self.busta.pk]))
+        self.assertContains(response, 'name="svuota_file_busta_paga"', html=False)
+        self.assertNotContains(response, "Attualmente:")
+        self.assertNotContains(response, "Modifica:")
+
+    def test_busta_paga_file_viene_servito_da_arboris(self):
+        self.client.force_login(self.user)
+        with TemporaryDirectory() as tmpdir, override_settings(
+            MEDIA_ROOT=tmpdir,
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+            },
+        ):
+            self.busta.file_busta_paga.save("cedolino-ottobre.pdf", ContentFile(b"%PDF-1.4"), save=True)
+
+            response = self.client.get(reverse("apri_file_busta_paga_dipendente", args=[self.busta.pk]))
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertIn("inline", response["Content-Disposition"])
+            self.assertIn("cedolino-ottobre.pdf", response["Content-Disposition"])
+            self.assertEqual(b"".join(response.streaming_content), b"%PDF-1.4")
+
+    def test_busta_paga_file_puo_essere_svuotato_dalla_card(self):
+        self.client.force_login(self.user)
+        with TemporaryDirectory() as tmpdir, override_settings(
+            MEDIA_ROOT=tmpdir,
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+            },
+        ):
+            self.busta.file_busta_paga.save("cedolino-ottobre.pdf", ContentFile(b"%PDF-1.4"), save=True)
+            response = self.client.post(
+                f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1",
+                {
+                    "popup": "1",
+                    "dipendente": str(self.dipendente.pk),
+                    "contratto": str(self.contratto.pk),
+                    "anno": "2025",
+                    "mese": "10",
+                    "stato": StatoBustaPaga.EFFETTIVA,
+                    "valuta": "EUR",
+                    "svuota_file_busta_paga": "on",
+                    "note_effettivo": "",
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.busta.refresh_from_db()
+            self.assertFalse(self.busta.file_busta_paga)
+
+    def test_busta_paga_importi_zero_restano_placeholder(self):
+        form = BustaPagaDipendenteForm()
+
+        field = form.fields["lordo_effettivo"]
+        self.assertEqual(field.widget.attrs["placeholder"], "0,00")
+        self.assertEqual(form["lordo_effettivo"].value(), "")
+
+    def test_nuova_busta_paga_precompila_contratto_del_dipendente(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('crea_busta_paga_dipendente')}?dipendente={self.dipendente.pk}&popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'<option value="{self.contratto.pk}" selected>', html=False)
+
+    def test_busta_paga_collega_pagamento_e_compila_data_da_movimento(self):
+        self.client.force_login(self.user)
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 10, 31),
+            importo=Decimal("-1302.00"),
+            valuta="EUR",
+            descrizione="Pagamento busta paga Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.post(
+            f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1",
+            {
+                "popup": "1",
+                "dipendente": str(self.dipendente.pk),
+                "contratto": str(self.contratto.pk),
+                "anno": "2025",
+                "mese": "10",
+                "stato": StatoBustaPaga.EFFETTIVA,
+                "valuta": "EUR",
+                "netto_effettivo": "1302,00",
+                "data_pagamento_effettiva": "",
+                "movimento_pagamento": str(movimento.pk),
+                "note_previsione": self.busta.note_previsione,
+                "note_effettivo": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.busta.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(self.busta.movimento_pagamento, movimento)
+        self.assertEqual(self.busta.data_pagamento_effettiva, date(2025, 10, 31))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
     def test_modalita_semplice_busta_paga_nasconde_previsione_dettagliata(self):
         self.client.force_login(self.user)
@@ -450,9 +581,87 @@ class SimulazioneCostoDipendenteTests(TestCase):
         response = self.client.get(f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Effettivo")
+        self.assertContains(response, "Importi busta paga")
+        self.assertContains(response, "Lordo effettivo")
+        self.assertContains(response, "Netto effettivo")
+        self.assertContains(response, "File busta paga")
         self.assertNotContains(response, 'id="ga-busta-forecast-title"')
         self.assertNotContains(response, "Voci previsionali generate")
+        self.assertNotContains(response, "Contributi datore effettivi")
+        self.assertNotContains(response, "Movimento pagamento")
+
+    def test_modalita_semplice_nuova_busta_paga_mostra_upload_file(self):
+        self.client.force_login(self.user)
+        self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
+        self.impostazioni.save()
+
+        response = self.client.get(f"{reverse('crea_busta_paga_dipendente')}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Importi busta paga")
+        self.assertContains(response, "File busta paga")
+        self.assertContains(response, 'type="file"', html=False)
+        self.assertContains(response, 'name="file_busta_paga"', html=False)
+        self.assertNotContains(response, "Movimento pagamento")
+        self.assertNotContains(response, "Data pagamento effettiva")
+
+    def test_modalita_semplice_busta_paga_salva_lordo_e_netto(self):
+        self.client.force_login(self.user)
+        self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
+        self.impostazioni.save()
+
+        response = self.client.post(
+            f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1",
+            {
+                "popup": "1",
+                "dipendente": str(self.dipendente.pk),
+                "contratto": str(self.contratto.pk),
+                "anno": "2025",
+                "mese": "10",
+                "stato": StatoBustaPaga.BOZZA,
+                "valuta": "EUR",
+                "lordo_effettivo": "1500,00",
+                "netto_effettivo": "1200,00",
+                "note_previsione": self.busta.note_previsione,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.busta.refresh_from_db()
+        self.assertEqual(self.busta.lordo_effettivo, Decimal("1500.00"))
+        self.assertEqual(self.busta.netto_effettivo, Decimal("1200.00"))
+        self.assertEqual(self.busta.contributi_datore_effettivi, Decimal("0.00"))
+
+    def test_modalita_semplice_busta_paga_salva_file(self):
+        self.client.force_login(self.user)
+        self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
+        self.impostazioni.save()
+        with TemporaryDirectory() as tmpdir, override_settings(
+            MEDIA_ROOT=tmpdir,
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+            },
+        ):
+            response = self.client.post(
+                f"{reverse('modifica_busta_paga_dipendente', args=[self.busta.pk])}?popup=1",
+                {
+                    "popup": "1",
+                    "dipendente": str(self.dipendente.pk),
+                    "contratto": str(self.contratto.pk),
+                    "anno": "2025",
+                    "mese": "10",
+                    "stato": StatoBustaPaga.BOZZA,
+                    "valuta": "EUR",
+                    "lordo_effettivo": "1500,00",
+                    "netto_effettivo": "1200,00",
+                    "file_busta_paga": SimpleUploadedFile("cedolino.pdf", b"%PDF-1.4", "application/pdf"),
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.busta.refresh_from_db()
+            self.assertTrue(self.busta.file_busta_paga)
 
     def test_sidebar_modalita_semplice_nasconde_voci_avanzate_dipendenti(self):
         self.client.force_login(self.user)

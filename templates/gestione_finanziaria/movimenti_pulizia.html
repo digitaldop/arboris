@@ -28,8 +28,8 @@
             I saldi dei conti interessati verranno ricalcolati dopo la cancellazione.
         </div>
         <p class="help-text">
-            Se i movimenti eliminati erano collegati a rate o scadenze fornitori, il collegamento
-            al movimento non sara' piu' disponibile. I dati economici delle rate e delle scadenze
+            Se i movimenti eliminati erano collegati a rate, scadenze fornitori o buste paga, il collegamento
+            al movimento non sara' piu' disponibile. I dati economici delle rate, delle scadenze e delle buste
             gia' registrate non vengono modificati automaticamente.
         </p>
 
@@ -49,6 +49,10 @@
             <div class="summary-item">
                 <div class="summary-value">{{ statistiche.riconciliati_rate }}</div>
                 <div class="summary-label">Collegati a rate</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ statistiche.collegati_buste }}</div>
+                <div class="summary-label">Collegati a buste paga</div>
             </div>
         </div>
     </div>

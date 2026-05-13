@@ -9355,6 +9355,17 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     width: 100%;
 }
 
+.currency-field::placeholder,
+.currency-input-group input::placeholder {
+    color: #aebbc9;
+    opacity: 1;
+}
+
+.currency-field:focus::placeholder,
+.currency-input-group input:focus::placeholder {
+    color: transparent;
+}
+
 .currency-input-group.currency-input-group-suffix {
     width: auto;
 }
@@ -30973,8 +30984,127 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     max-width: 360px;
 }
 
+.ga-busta-file-current {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    margin: 2px 0 10px;
+    padding: 10px;
+    border: 1px solid #d7e6ee;
+    border-radius: 8px;
+    background: #f7fbfd;
+}
+
+.ga-busta-file-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: #e8f5fb;
+    color: #21789e;
+}
+
+.ga-busta-file-chip svg {
+    width: 20px;
+    height: 20px;
+}
+
+.ga-busta-file-copy {
+    min-width: 0;
+}
+
+.ga-busta-file-copy strong {
+    display: block;
+    overflow: hidden;
+    color: #10223c;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ga-busta-file-copy a {
+    display: inline-flex;
+    margin-top: 3px;
+    color: #22669d;
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.ga-busta-file-copy a:hover,
+.ga-busta-file-copy a:focus-visible {
+    text-decoration: underline;
+}
+
+.ga-busta-file-clear {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    margin: 0 0 10px;
+    color: #526985;
+    cursor: pointer;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    text-transform: none !important;
+}
+
+.ga-busta-file-clear input[type="checkbox"] {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
 .ga-busta-notes-field {
     margin: 0 20px 20px;
+}
+
+.ga-busta-payment-related {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 8px;
+    align-items: center;
+}
+
+.ga-busta-payment-related select,
+.ga-busta-payment-related .searchable-select,
+.ga-busta-payment-related .searchable-select-input {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+
+.ga-busta-payment-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 46px;
+    padding: 4px;
+    border: 1px solid #d7e6ee;
+    border-radius: 8px;
+    background: #f7fbfd;
+}
+
+.ga-busta-payment-actions .related-btn {
+    width: 34px;
+    height: 34px;
+}
+
+.ga-busta-payment-actions .related-btn-icon,
+.ga-busta-payment-actions .related-btn-icon svg {
+    display: block;
+    width: 16px;
+    height: 16px;
 }
 
 .ga-busta-voci-table-wrap {

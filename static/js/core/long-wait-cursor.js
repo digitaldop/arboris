@@ -245,6 +245,18 @@
         setVisualActive(false, true);
     }
 
+    function shouldShowFormWaitImmediately(form) {
+        if (!form || !form.querySelectorAll) {
+            return false;
+        }
+        if (form.dataset && form.dataset.longWaitImmediate === "1") {
+            return true;
+        }
+        return Array.from(form.querySelectorAll('input[type="file"]')).some(function (input) {
+            return input.files && input.files.length > 0;
+        });
+    }
+
     function documentForReloadLocation(loc) {
         try {
             if (loc === window.location) {
@@ -444,7 +456,12 @@
             }
             formArmed = false;
             rememberNextPageLoading();
-            updateVisual();
+            if (shouldShowFormWaitImmediately(event.target)) {
+                formArmed = true;
+                updateVisual();
+            } else {
+                updateVisual();
+            }
             formTimer = setTimeout(function () {
                 formTimer = null;
                 formArmed = true;

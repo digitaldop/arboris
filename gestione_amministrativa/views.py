@@ -1,11 +1,15 @@
+import mimetypes
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
 from django.db.utils import OperationalError, ProgrammingError
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import content_disposition_header
 
 from anagrafica.contact_services import sync_principal_contacts
 from anagrafica.forms import (
@@ -15,8 +19,11 @@ from anagrafica.forms import (
     save_anagrafica_contact_formsets,
 )
 from anagrafica.models import Familiare, Nazione, RelazioneFamiliare
+from anagrafica.storage_utils import DOCUMENT_STORAGE_ERROR_TYPES, build_document_storage_error_message
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from economia.models import Iscrizione
+from gestione_finanziaria.models import MovimentoFinanziario
+from gestione_finanziaria.services import aggiorna_stato_riconciliazione_movimento
 from sistema.models import SistemaImpostazioniGenerali
 from scuola.utils import resolve_default_anno_scolastico
 
@@ -41,7 +48,7 @@ from .models import (
     StatoDipendente,
     TipoContrattoDipendente,
 )
-from .services import crea_o_aggiorna_previsione_busta_paga
+from .services import contratto_applicabile, crea_o_aggiorna_previsione_busta_paga
 
 
 ZERO = Decimal("0.00")
@@ -68,6 +75,20 @@ def redirect_if_dipendenti_simple(request):
 def _current_period():
     today = timezone.localdate()
     return today.year, today.month
+
+
+def _aggiorna_riconciliazione_movimenti_busta(*movimento_ids):
+    ids = {int(movimento_id) for movimento_id in movimento_ids if movimento_id}
+    if not ids:
+        return
+    for movimento in MovimentoFinanziario.objects.filter(pk__in=ids):
+        aggiorna_stato_riconciliazione_movimento(movimento)
+
+
+def _busta_paga_file_name(busta):
+    if not busta or not busta.file_busta_paga:
+        return ""
+    return Path(busta.file_busta_paga.name).name
 
 
 def _ruoli_for_scope(scope):
@@ -968,12 +989,18 @@ def crea_busta_paga_dipendente(request):
     initial["mese"] = mese
     dipendente_id = (request.GET.get("dipendente") or "").strip()
     if dipendente_id.isdigit():
-        initial["dipendente"] = int(dipendente_id)
+        dipendente = Dipendente.objects.filter(pk=int(dipendente_id)).first()
+        if dipendente:
+            initial["dipendente"] = dipendente.pk
+            contratto = contratto_applicabile(dipendente, anno, mese)
+            if contratto:
+                initial["contratto"] = contratto.pk
 
     if request.method == "POST":
         form = BustaPagaDipendenteForm(request.POST, request.FILES, detailed_mode=detailed_mode)
         if form.is_valid():
             busta = form.save()
+            _aggiorna_riconciliazione_movimenti_busta(busta.movimento_pagamento_id)
             if popup:
                 return popup_select_response(
                     request,
@@ -992,6 +1019,7 @@ def crea_busta_paga_dipendente(request):
         {
             "form": form,
             "busta": None,
+            "file_busta_paga_name": "",
             "popup": popup,
             "gestione_dipendenti_dettagliata_attiva": detailed_mode,
         },
@@ -1010,6 +1038,7 @@ def modifica_busta_paga_dipendente(request, pk):
     )
     popup = is_popup_request(request)
     detailed_mode = gestione_dipendenti_dettagliata_attiva()
+    movimento_precedente_id = busta.movimento_pagamento_id
     if request.method == "POST":
         form = BustaPagaDipendenteForm(
             request.POST,
@@ -1019,6 +1048,7 @@ def modifica_busta_paga_dipendente(request, pk):
         )
         if form.is_valid():
             busta = form.save()
+            _aggiorna_riconciliazione_movimenti_busta(movimento_precedente_id, busta.movimento_pagamento_id)
             if popup:
                 return popup_select_response(
                     request,
@@ -1037,6 +1067,7 @@ def modifica_busta_paga_dipendente(request, pk):
         {
             "form": form,
             "busta": busta,
+            "file_busta_paga_name": _busta_paga_file_name(busta),
             "voci": busta.voci.all(),
             "popup": popup,
             "gestione_dipendenti_dettagliata_attiva": detailed_mode,
@@ -1044,12 +1075,36 @@ def modifica_busta_paga_dipendente(request, pk):
     )
 
 
+def apri_file_busta_paga_dipendente(request, pk):
+    busta = get_object_or_404(
+        BustaPagaDipendente.objects.select_related("dipendente"),
+        pk=pk,
+    )
+    if not busta.file_busta_paga:
+        raise Http404("La busta paga non ha alcun file associato.")
+
+    try:
+        file_handle = busta.file_busta_paga.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404("Il file della busta paga non e disponibile sul server.") from exc
+    except DOCUMENT_STORAGE_ERROR_TYPES as exc:
+        raise Http404(build_document_storage_error_message(exc)) from exc
+
+    filename = _busta_paga_file_name(busta) or f"busta-paga-{busta.pk}.pdf"
+    content_type, _encoding = mimetypes.guess_type(filename)
+    response = FileResponse(file_handle, content_type=content_type or "application/octet-stream")
+    response["Content-Disposition"] = content_disposition_header(False, filename)
+    return response
+
+
 def elimina_busta_paga_dipendente(request, pk):
     busta = get_object_or_404(BustaPagaDipendente.objects.select_related("dipendente"), pk=pk)
     popup = is_popup_request(request)
     if request.method == "POST":
         object_id = busta.pk
+        movimento_pagamento_id = busta.movimento_pagamento_id
         busta.delete()
+        _aggiorna_riconciliazione_movimenti_busta(movimento_pagamento_id)
         if popup:
             return popup_delete_response(request, field_name="busta_paga", object_id=object_id)
         messages.success(request, "Busta paga eliminata correttamente.")

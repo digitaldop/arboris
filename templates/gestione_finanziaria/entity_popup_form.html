@@ -1,47 +1,110 @@
 {% extends "popup_base.html" %}
+{% load static %}
 
 {% block title %}{{ popup_title }} - Arboris{% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{{ popup_title }}</h1>
-    </div>
+<div class="content-card related-config-popup-card budget-voice-popup-card">
+    <button type="button" class="budget-voice-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+    </button>
 
-    <form method="post" class="detail-form" autocomplete="off">
+    <form method="post" class="related-config-popup-form budget-voice-popup-form" autocomplete="off">
         {% csrf_token %}
         <input type="hidden" name="popup" value="1">
         <input type="hidden" name="target_input_name" value="{{ target_input_name|default:'' }}">
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
 
-        <div class="content-card">
-            <table class="form-table">
-                {% for hidden in form.hidden_fields %}
-                    {{ hidden }}
-                {% endfor %}
+        <div class="budget-voice-popup-hero">
+            <span class="budget-voice-icon-tile" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+            </span>
+            <div class="budget-voice-popup-title-block">
+                <div class="related-config-kicker">Gestione finanziaria</div>
+                <h1 class="page-title">{{ popup_title }}</h1>
+                <p>Aggiorna le informazioni e salva per riportare subito il valore nel campo di partenza.</p>
+            </div>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="message message-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="related-config-popup-editor budget-voice-popup-editor">
+            <div class="budget-voice-popup-grid">
                 {% for field in form.visible_fields %}
-                    <tr>
-                        <th>{{ field.label_tag }}</th>
-                        <td>
-                            {{ field }}
+                    {% if field.field.widget.input_type == "checkbox" %}
+                        <div class="budget-voice-form-field budget-voice-field-wide">
+                            <label class="budget-voice-check" for="{{ field.id_for_label }}">
+                                {{ field }}
+                                <span>{{ field.label }}</span>
+                            </label>
                             {{ field.errors }}
                             {% if field.help_text %}
                                 <div class="help-text">{{ field.help_text }}</div>
                             {% endif %}
-                        </td>
-                    </tr>
+                        </div>
+                    {% elif field.name == "note" %}
+                        <div class="budget-voice-form-field budget-voice-field-wide budget-voice-field-notes">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="budget-voice-note-shell">
+                                <span class="budget-voice-note-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                                </span>
+                                <div class="budget-voice-note-control">
+                                    {{ field }}
+                                </div>
+                            </div>
+                            {{ field.errors }}
+                            {% if field.help_text %}
+                                <div class="help-text">{{ field.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="budget-voice-form-field{% if field.name == 'nome_conto' or field.name == 'denominazione' or field.name == 'descrizione' or field.name == 'iban' or field.name == 'intestatario' or field.name == 'connessione' %} budget-voice-field-wide{% endif %}">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <div class="budget-voice-input-shell">
+                                <span class="budget-voice-input-addon" aria-hidden="true">
+                                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if field.name == 'tipo_conto' or field.name == 'tipo' %}arrows-up-down{% elif field.name == 'banca' or field.name == 'provider' or field.name == 'connessione' or field.name == 'conto' %}bank{% elif field.name == 'iban' or field.name == 'bic' or field.name == 'valuta' %}coins{% elif field.name == 'intestatario' %}user{% elif field.name == 'categoria_spesa' or field.name == 'categoria' or field.name == 'parent' %}archive{% else %}document{% endif %}"></use></svg>
+                                </span>
+                                <div class="budget-voice-input-control">
+                                    {{ field }}
+                                </div>
+                            </div>
+                            {{ field.errors }}
+                            {% if field.help_text %}
+                                <div class="help-text">{{ field.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 {% endfor %}
-            </table>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
             </div>
         </div>
-    </form>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            if (window.ArborisFamigliaAutocomplete) {
-                ArborisFamigliaAutocomplete.init(document);
-            }
-        });
-    </script>
+        <div class="related-config-popup-actions">
+            <button type="submit" class="btn btn-save-soft btn-icon-text">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+                <span class="btn-label">Salva</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                </span>
+                <span class="btn-label">Annulla</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        if (window.ArborisFamigliaAutocomplete) {
+            ArborisFamigliaAutocomplete.init(document);
+        }
+    });
+</script>
 {% endblock %}

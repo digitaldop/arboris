@@ -19,7 +19,7 @@ from .utils import citta_choice_label, validate_and_normalize_phone_number
 from economia.models import Iscrizione, StatoIscrizione, CondizioneIscrizione, Agevolazione
 from scuola.utils import resolve_default_anno_scolastico
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
-from arboris.form_widgets import italian_decimal_to_python, merge_widget_classes
+from arboris.form_widgets import apply_eur_currency_widget, italian_decimal_to_python, merge_widget_classes
 
 from django.forms import inlineformset_factory, modelformset_factory
 from .models import (
@@ -2004,16 +2004,8 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             self.fields["rate_custom"].help_text = "Per modificare un piano avviato usa Rimodula rate future."
             self.fields["rate_custom"].widget.attrs["data-rate-custom-locked"] = "1"
         self.fields["importo_riduzione_speciale"].label = "Importo riduzione speciale"
-        self.fields["importo_riduzione_speciale"].widget = forms.TextInput()
-        self.fields["importo_riduzione_speciale"].widget.attrs.update(
-            {
-                "autocomplete": "off",
-                "inputmode": "decimal",
-                "data-currency": "EUR",
-                "placeholder": "0,00",
-                "maxlength": "12",
-            }
-        )
+        apply_eur_currency_widget(self.fields["importo_riduzione_speciale"])
+        self.fields["importo_riduzione_speciale"].widget.attrs["maxlength"] = "12"
         self.fields["modalita_pagamento_retta"].label = "Modalita pagamento retta"
         self.fields["sconto_unica_soluzione_tipo"].label = "Sconto unica soluzione"
         self.fields["sconto_unica_soluzione_valore"].label = "Valore sconto"

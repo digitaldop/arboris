@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django import forms
 
+from arboris.form_widgets import apply_eur_currency_widget
 from scuola.models import AnnoScolastico
 
 from ..models import MovimentoFondo, PianoAccantonamento, TipoModalitaPiano
@@ -56,6 +57,7 @@ class PianoAccantonamentoForm(forms.ModelForm):
         self.fields["descrizione"].required = False
         self.fields["descrizione"].widget = forms.Textarea(attrs={"rows": 3})
         self.fields["coordinate_riferimento"].widget = forms.Textarea(attrs={"rows": 2})
+        apply_eur_currency_widget(self.fields["importo_versamento_periodico"])
 
     def clean(self):
         data = super().clean()
@@ -127,6 +129,7 @@ class VersamentoFondoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["note"].widget = forms.Textarea(attrs={"rows": 2})
+        apply_eur_currency_widget(self.fields["importo"])
 
 
 class PrelievoFondoForm(forms.ModelForm):
@@ -147,6 +150,7 @@ class PrelievoFondoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["motivo"].widget = forms.Textarea(attrs={"rows": 1})
         self.fields["note"].widget = forms.Textarea(attrs={"rows": 2})
+        apply_eur_currency_widget(self.fields["importo"])
 
     def clean(self):
         d = super().clean()

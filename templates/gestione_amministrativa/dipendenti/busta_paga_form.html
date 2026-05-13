@@ -92,10 +92,11 @@
             </section>
         {% endif %}
 
-        <form method="post" enctype="multipart/form-data" id="ga-busta-form" class="scambio-retta-form detail-form">
+        <form method="post" enctype="multipart/form-data" id="ga-busta-form" class="scambio-retta-form detail-form" data-long-wait-immediate="1">
             {% csrf_token %}
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
             {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
 
             {% if form.non_field_errors %}
                 <div class="message message-error">{{ form.non_field_errors }}</div>
@@ -123,16 +124,18 @@
                             {{ form.dipendente.errors }}
                         </div>
                     </div>
-                    <div class="scambio-retta-field">
-                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.contratto.id_for_label }}">{{ form.contratto.label }}</label>
-                            {{ form.contratto }}
-                            {{ form.contratto.errors }}
+                    {% if gestione_dipendenti_dettagliata_attiva %}
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.contratto.id_for_label }}">{{ form.contratto.label }}</label>
+                                {{ form.contratto }}
+                                {{ form.contratto.errors }}
+                            </div>
                         </div>
-                    </div>
+                    {% endif %}
                     <div class="scambio-retta-field">
                         <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
                             <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
@@ -153,26 +156,28 @@
                             {{ form.mese.errors }}
                         </div>
                     </div>
-                    <div class="scambio-retta-field">
-                        <span class="scambio-retta-field-icon is-green" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.stato.id_for_label }}">{{ form.stato.label }}</label>
-                            {{ form.stato }}
-                            {{ form.stato.errors }}
+                    {% if gestione_dipendenti_dettagliata_attiva %}
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.stato.id_for_label }}">{{ form.stato.label }}</label>
+                                {{ form.stato }}
+                                {{ form.stato.errors }}
+                            </div>
                         </div>
-                    </div>
-                    <div class="scambio-retta-field ga-busta-currency-field">
-                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.valuta.id_for_label }}">{{ form.valuta.label }}</label>
-                            {{ form.valuta }}
-                            {{ form.valuta.errors }}
+                        <div class="scambio-retta-field ga-busta-currency-field">
+                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.valuta.id_for_label }}">{{ form.valuta.label }}</label>
+                                {{ form.valuta }}
+                                {{ form.valuta.errors }}
+                            </div>
                         </div>
-                    </div>
+                    {% endif %}
                 </div>
             </section>
 
@@ -204,23 +209,6 @@
                             {% endif %}
                         {% endfor %}
                     </div>
-
-                    <details class="ga-dipendente-notes-field ga-busta-notes-field" {% if form.note_previsione.errors or form.note_previsione.value %}open{% endif %}>
-                        <summary title="Clicca per espandere">
-                            <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
-                            </span>
-                            <span>
-                                <strong>{{ form.note_previsione.label }}</strong>
-                                <small>Clicca per espandere</small>
-                            </span>
-                        </summary>
-                        <div class="ga-dipendente-notes-body">
-                            <label class="sr-only" for="{{ form.note_previsione.id_for_label }}">{{ form.note_previsione.label }}</label>
-                            {{ form.note_previsione }}
-                            {{ form.note_previsione.errors }}
-                        </div>
-                    </details>
                 </section>
             {% endif %}
 
@@ -230,14 +218,14 @@
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
                     </span>
                     <div>
-                        <h2 id="ga-busta-real-title">Effettivo</h2>
-                        <p>Dati reali della busta caricata, pagamento e movimento collegato.</p>
+                        <h2 id="ga-busta-real-title">{% if gestione_dipendenti_dettagliata_attiva %}Effettivo{% else %}Importi busta paga{% endif %}</h2>
+                        <p>{% if gestione_dipendenti_dettagliata_attiva %}Dati reali della busta caricata, pagamento e movimento collegato.{% else %}Inserisci solo lordo e netto della busta paga.{% endif %}</p>
                     </div>
                 </div>
 
                 <div class="scambio-retta-grid ga-busta-form-grid">
                     {% for field in form %}
-                        {% if field.name == "lordo_effettivo" or field.name == "contributi_datore_effettivi" or field.name == "contributi_dipendente_effettivi" or field.name == "rateo_tredicesima_effettivo" or field.name == "rateo_tfr_effettivo" or field.name == "altri_oneri_effettivi" or field.name == "netto_effettivo" or field.name == "costo_azienda_effettivo" %}
+                        {% if gestione_dipendenti_dettagliata_attiva and field.name == "lordo_effettivo" or gestione_dipendenti_dettagliata_attiva and field.name == "contributi_datore_effettivi" or gestione_dipendenti_dettagliata_attiva and field.name == "contributi_dipendente_effettivi" or gestione_dipendenti_dettagliata_attiva and field.name == "rateo_tredicesima_effettivo" or gestione_dipendenti_dettagliata_attiva and field.name == "rateo_tfr_effettivo" or gestione_dipendenti_dettagliata_attiva and field.name == "altri_oneri_effettivi" or field.name == "lordo_effettivo" or field.name == "netto_effettivo" or gestione_dipendenti_dettagliata_attiva and field.name == "costo_azienda_effettivo" %}
                             <div class="scambio-retta-field">
                                 <span class="scambio-retta-field-icon is-green" aria-hidden="true">
                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
@@ -257,48 +245,82 @@
                         </span>
                         <div>
                             <label for="{{ form.file_busta_paga.id_for_label }}">{{ form.file_busta_paga.label }}</label>
+                            {% if busta and busta.file_busta_paga %}
+                                <div class="ga-busta-file-current">
+                                    <span class="ga-busta-file-chip" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                                    </span>
+                                    <div class="ga-busta-file-copy">
+                                        <strong>{{ file_busta_paga_name|default:"File busta paga" }}</strong>
+                                        <a href="{% url 'apri_file_busta_paga_dipendente' busta.pk %}" target="_blank" rel="noopener">Apri file</a>
+                                    </div>
+                                </div>
+                                <label class="ga-busta-file-clear" for="{{ form.svuota_file_busta_paga.id_for_label }}">
+                                    {{ form.svuota_file_busta_paga }}
+                                    <span>{{ form.svuota_file_busta_paga.label }}</span>
+                                </label>
+                            {% endif %}
                             {{ form.file_busta_paga }}
                             {{ form.file_busta_paga.errors }}
+                            {{ form.svuota_file_busta_paga.errors }}
                         </div>
                     </div>
-                    <div class="scambio-retta-field">
-                        <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.data_pagamento_effettiva.id_for_label }}">{{ form.data_pagamento_effettiva.label }}</label>
-                            {{ form.data_pagamento_effettiva }}
-                            {{ form.data_pagamento_effettiva.errors }}
+
+                    {% if gestione_dipendenti_dettagliata_attiva %}
+                        <div class="scambio-retta-field">
+                            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.data_pagamento_effettiva.id_for_label }}">{{ form.data_pagamento_effettiva.label }}</label>
+                                {{ form.data_pagamento_effettiva }}
+                                {{ form.data_pagamento_effettiva.errors }}
+                            </div>
                         </div>
-                    </div>
-                    <div class="scambio-retta-field is-wide">
-                        <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.movimento_pagamento.id_for_label }}">{{ form.movimento_pagamento.label }}</label>
-                            {{ form.movimento_pagamento }}
-                            {{ form.movimento_pagamento.errors }}
+                        <div class="scambio-retta-field is-wide">
+                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                            </span>
+                            <div>
+                                <label for="{{ form.movimento_pagamento.id_for_label }}">{{ form.movimento_pagamento.label }}</label>
+                                <div class="ga-busta-payment-related">
+                                    {{ form.movimento_pagamento }}
+                                    <div class="related-actions ga-busta-payment-actions">
+                                        <button type="button" class="related-btn related-btn-add" id="add-busta-movimento-btn" data-related-type="movimento_finanziario" aria-label="Nuovo pagamento" title="Nuovo pagamento" data-floating-text="Nuovo pagamento">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="related-btn related-btn-edit" id="edit-busta-movimento-btn" data-related-type="movimento_finanziario" aria-label="Modifica pagamento" title="Modifica pagamento" data-floating-text="Modifica pagamento">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                        </button>
+                                        <button type="button" class="related-btn related-btn-delete" id="delete-busta-movimento-btn" data-related-type="movimento_finanziario" aria-label="Elimina pagamento" title="Elimina pagamento" data-floating-text="Elimina pagamento">
+                                            <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                {{ form.movimento_pagamento.errors }}
+                            </div>
                         </div>
-                    </div>
+                    {% endif %}
                 </div>
 
-                <details class="ga-dipendente-notes-field ga-busta-notes-field" {% if form.note_effettivo.errors or form.note_effettivo.value %}open{% endif %}>
-                    <summary title="Clicca per espandere">
-                        <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
-                        </span>
-                        <span>
-                            <strong>{{ form.note_effettivo.label }}</strong>
-                            <small>Clicca per espandere</small>
-                        </span>
-                    </summary>
-                    <div class="ga-dipendente-notes-body">
-                        <label class="sr-only" for="{{ form.note_effettivo.id_for_label }}">{{ form.note_effettivo.label }}</label>
-                        {{ form.note_effettivo }}
-                        {{ form.note_effettivo.errors }}
-                    </div>
-                </details>
+                {% if gestione_dipendenti_dettagliata_attiva %}
+                    <details class="ga-dipendente-notes-field ga-busta-notes-field" {% if form.note_effettivo.errors or form.note_effettivo.value %}open{% endif %}>
+                        <summary title="Clicca per espandere">
+                            <span class="fondo-plan-field-icon is-purple" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                            </span>
+                            <span>
+                                <strong>{{ form.note_effettivo.label }}</strong>
+                                <small>Clicca per espandere</small>
+                            </span>
+                        </summary>
+                        <div class="ga-dipendente-notes-body">
+                            <label class="sr-only" for="{{ form.note_effettivo.id_for_label }}">{{ form.note_effettivo.label }}</label>
+                            {{ form.note_effettivo }}
+                            {{ form.note_effettivo.errors }}
+                        </div>
+                    </details>
+                {% endif %}
             </section>
 
             {% if busta and gestione_dipendenti_dettagliata_attiva %}
@@ -362,4 +384,111 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const routes = window.ArborisRelatedEntityRoutes;
+            const relatedPopups = routes && routes.initRelatedPopups();
+            const select = document.getElementById("id_movimento_pagamento");
+            if (!routes || !relatedPopups || !select || typeof routes.wireCustomCrudButtonsById !== "function") {
+                return;
+            }
+
+            function parseCurrency(value) {
+                const normalized = String(value || "").trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+                const parsed = Number.parseFloat(normalized);
+                return Number.isFinite(parsed) ? parsed : null;
+            }
+
+            function field(name) {
+                return document.querySelector("[name='" + name + "']");
+            }
+
+            function fieldValue(name) {
+                const element = field(name);
+                return element ? (element.value || "").trim() : "";
+            }
+
+            function selectedText(name) {
+                const element = field(name);
+                if (!element || !element.options) {
+                    return "";
+                }
+                const option = element.options[element.selectedIndex];
+                return option ? (option.textContent || "").trim() : "";
+            }
+
+            function pad(number) {
+                return String(number).padStart(2, "0");
+            }
+
+            function suggestedPaymentDate() {
+                const explicitDate = fieldValue("data_pagamento_effettiva");
+                if (explicitDate) {
+                    return explicitDate;
+                }
+                const year = Number.parseInt(fieldValue("anno"), 10);
+                const month = Number.parseInt(fieldValue("mese"), 10);
+                if (!year || !month) {
+                    return "";
+                }
+                const lastDay = new Date(year, month, 0).getDate();
+                return year + "-" + pad(month) + "-" + pad(lastDay);
+            }
+
+            function appendParams(url, params) {
+                if (!url) {
+                    return "";
+                }
+                const separator = url.indexOf("?") >= 0 ? "&" : "?";
+                const search = new URLSearchParams();
+                Object.keys(params).forEach(function (key) {
+                    if (params[key]) {
+                        search.set(key, params[key]);
+                    }
+                });
+                const queryString = search.toString();
+                return queryString ? url + separator + queryString : url;
+            }
+
+            function paymentInitialParams() {
+                const dipendente = selectedText("dipendente");
+                const mese = selectedText("mese") || fieldValue("mese");
+                const anno = fieldValue("anno");
+                const netto = parseCurrency(fieldValue("netto_effettivo"));
+                const params = {
+                    data_contabile: suggestedPaymentDate(),
+                    valuta: fieldValue("valuta") || "EUR",
+                    canale: "banca",
+                    descrizione: "Pagamento busta paga " + [dipendente, mese, anno].filter(Boolean).join(" - "),
+                };
+                if (netto && netto !== 0) {
+                    params.importo = (-Math.abs(netto)).toFixed(2);
+                }
+                return params;
+            }
+
+            function movementUrls(selectedId) {
+                return routes.buildCrudUrls("movimento_finanziario", selectedId, select.name) || {};
+            }
+
+            routes.wireCustomCrudButtonsById({
+                select: select,
+                addBtnId: "add-busta-movimento-btn",
+                editBtnId: "edit-busta-movimento-btn",
+                deleteBtnId: "delete-busta-movimento-btn",
+                addUrl: function () {
+                    return appendParams(movementUrls("").addUrl, paymentInitialParams());
+                },
+                editUrl: function (selectedId) {
+                    return movementUrls(selectedId).editUrl;
+                },
+                deleteUrl: function (selectedId) {
+                    return movementUrls(selectedId).deleteUrl;
+                },
+                openRelatedPopup: relatedPopups.openRelatedPopup,
+                bindKey: "busta-movimento-pagamento",
+            });
+        });
+    </script>
 {% endblock %}

@@ -3,11 +3,13 @@ from decimal import Decimal
 from unittest import skip
 from unittest.mock import patch
 
+from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
+from arboris.form_widgets import apply_eur_currency_widget
 from anagrafica.models import (
     Familiare,
     RelazioneFamiliare,
@@ -89,6 +91,28 @@ class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
 
 
 class EconomiaCurrencyWidgetTests(TestCase):
+    def test_optional_zero_initial_currency_field_renders_as_placeholder(self):
+        field = forms.DecimalField(required=False, initial=Decimal("0.00"))
+
+        apply_eur_currency_widget(field)
+
+        self.assertEqual(field.initial, "")
+        self.assertEqual(field.widget.attrs["placeholder"], "0,00")
+
+    def test_optional_italian_zero_initial_currency_field_renders_as_placeholder(self):
+        field = forms.DecimalField(required=False, initial="0,00")
+
+        apply_eur_currency_widget(field)
+
+        self.assertEqual(field.initial, "")
+
+    def test_required_zero_initial_currency_field_renders_as_placeholder(self):
+        field = forms.DecimalField(required=True, initial=Decimal("0.00"))
+
+        apply_eur_currency_widget(field)
+
+        self.assertEqual(field.initial, "")
+
     def test_agevolazione_form_marks_annual_amount_as_compact_euro_field(self):
         form = AgevolazioneForm()
 

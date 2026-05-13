@@ -75,6 +75,7 @@ from .fatture_in_cloud import (
 )
 from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
+from .forms import DocumentoFornitoreForm
 from .services import (
     annulla_pagamento_fornitore,
     anteprima_riconcilia_fornitori_automaticamente,
@@ -865,6 +866,33 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "dismissRelatedPopup")
         self.assertContains(response, "categoria_spesa")
         self.assertContains(response, str(categoria.pk))
+
+    def test_conto_bancario_popup_usa_stile_globale(self):
+        response = self.client.get(f"{reverse('crea_conto_bancario')}?popup=1&target_input_name=conto_bancario")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'body class="popup-page"', html=False)
+        self.assertContains(response, "budget-voice-popup-card")
+        self.assertContains(response, "budget-voice-input-shell")
+        self.assertContains(response, "budget-voice-note-shell")
+        self.assertContains(response, "btn-save-soft")
+        self.assertContains(response, "Nuovo conto")
+        self.assertContains(response, "Nome conto")
+        self.assertContains(response, "IBAN")
+        self.assertContains(response, '<input type="hidden" name="target_input_name" value="conto_bancario">', html=False)
+        self.assertContains(response, 'placeholder="Aggiungi una nota..."', html=False)
+        self.assertContains(response, 'data-rich-notes-skip="true"', html=False)
+        self.assertNotContains(response, "form-table")
+        self.assertNotContains(response, "detail-form")
+
+    def test_documento_fornitore_importi_zero_default_restano_placeholder(self):
+        form = DocumentoFornitoreForm()
+
+        for field_name in ("imponibile", "iva", "totale"):
+            with self.subTest(field_name=field_name):
+                self.assertEqual(form.fields[field_name].initial, "")
+                self.assertEqual(form[field_name].value(), "")
+                self.assertEqual(form.fields[field_name].widget.attrs["placeholder"], "0,00")
 
     def test_documento_fornitore_creates_scadenza_and_calculates_totals(self):
         categoria = crea_categoria_spesa_test("Manutenzioni")
@@ -3413,6 +3441,25 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         response = self.client.get(reverse("crea_movimento_manuale"))
         self.assertContains(response, "movimento-finanziario-form.js")
+
+    def test_movimento_popup_accetta_prefill_da_busta_paga(self):
+        response = self.client.get(
+            reverse("crea_movimento_manuale"),
+            {
+                "popup": "1",
+                "target_input_name": "movimento_pagamento",
+                "data_contabile": "2025-10-31",
+                "importo": "-1302.00",
+                "descrizione": "Pagamento busta paga Mario Rossi",
+                "valuta": "EUR",
+                "canale": CanaleMovimento.BANCA,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="target_input_name" value="movimento_pagamento"', html=False)
+        self.assertContains(response, "Pagamento busta paga Mario Rossi")
+        self.assertContains(response, 'value="-1302.00"', html=False)
 
     def test_dashboard_mostra_saldi_per_tipo_conto(self):
         conto = ContoBancario.objects.create(

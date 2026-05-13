@@ -33,10 +33,35 @@ def merge_widget_classes(widget, *extra_classes):
     widget.attrs["class"] = " ".join(existing_classes).strip()
 
 
-def apply_eur_currency_widget(field, *, placeholder="0,00", compact=True):
+def _is_zero_value(value):
+    if value in forms.Field.empty_values:
+        return False
+
+    raw_value = str(value).strip().replace(" ", "")
+    if "," in raw_value:
+        raw_value = raw_value.replace(".", "").replace(",", ".")
+
+    try:
+        return Decimal(raw_value) == Decimal("0.00")
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+class CurrencyTextInput(forms.TextInput):
+    def format_value(self, value):
+        if self.attrs.get("data-zero-as-placeholder") == "1" and _is_zero_value(value):
+            return ""
+        return super().format_value(value)
+
+
+def apply_eur_currency_widget(field, *, placeholder="0,00", compact=True, zero_as_placeholder=None):
     field.localize = True
     field.to_python = lambda value, _field=field: italian_decimal_to_python(_field, value)
-    field.widget = forms.TextInput()
+    if zero_as_placeholder is None:
+        zero_as_placeholder = True
+    if zero_as_placeholder and _is_zero_value(field.initial):
+        field.initial = ""
+    field.widget = CurrencyTextInput(attrs=dict(field.widget.attrs))
     field.widget.is_localized = True
     merge_widget_classes(field.widget, "currency-field", "currency-field-suffix")
     if compact:
@@ -48,6 +73,7 @@ def apply_eur_currency_widget(field, *, placeholder="0,00", compact=True):
             "inputmode": "decimal",
             "data-currency": "EUR",
             "data-currency-display": "suffix",
+            "data-zero-as-placeholder": "1" if zero_as_placeholder else "0",
             "placeholder": placeholder,
         }
     )

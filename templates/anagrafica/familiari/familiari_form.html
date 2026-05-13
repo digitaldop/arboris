@@ -2242,7 +2242,7 @@
                                             <strong>{{ busta.periodo_label }}</strong>
                                             <span>{{ busta.get_stato_display }}{% if busta.contratto_id %} - {{ busta.contratto.tipo_contratto|default:"Contratto" }}{% endif %}</span>
                                             {% if busta.file_busta_paga %}
-                                                <a href="{{ busta.file_busta_paga.url }}" target="_blank" rel="noopener">File busta paga</a>
+                                                <a href="{% url 'apri_file_busta_paga_dipendente' busta.pk %}" target="_blank" rel="noopener">File busta paga</a>
                                             {% endif %}
                                             {% for documento in busta.documenti.all %}
                                                 <a href="{{ documento.file.url }}" target="_blank" rel="noopener">{{ documento.titolo }}</a>

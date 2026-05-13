@@ -2204,9 +2204,22 @@ def _importo_movimento_fornitori_riconciliato(movimento):
     return movimento.pagamenti_fornitori.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
 
 
+def _importo_movimento_buste_paga_riconciliato(movimento):
+    if movimento is None or not getattr(movimento, "pk", None):
+        return Decimal("0.00")
+
+    totale = Decimal("0.00")
+    for busta in movimento.buste_paga_dipendenti.only("netto_effettivo", "netto_previsto"):
+        importo = busta.netto_effettivo or busta.netto_previsto or Decimal("0.00")
+        totale += abs(importo)
+    return totale
+
+
 def importo_movimento_disponibile_fornitori(movimento):
     return max(
-        _importo_movimento_assoluto(movimento) - _importo_movimento_fornitori_riconciliato(movimento),
+        _importo_movimento_assoluto(movimento)
+        - _importo_movimento_fornitori_riconciliato(movimento)
+        - _importo_movimento_buste_paga_riconciliato(movimento),
         Decimal("0.00"),
     )
 
@@ -2219,7 +2232,8 @@ def aggiorna_stato_riconciliazione_movimento(movimento):
 
     ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or movimento.riconciliazioni_rate.exists()
     ha_collegamenti_fornitori = movimento.pagamenti_fornitori.exists()
-    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori
+    ha_collegamenti_buste = movimento.buste_paga_dipendenti.exists()
+    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
 
     if movimento.importo is not None and movimento.importo < 0:
         residuo = importo_movimento_disponibile_fornitori(movimento)

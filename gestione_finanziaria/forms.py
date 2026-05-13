@@ -911,7 +911,9 @@ class ContoBancarioForm(forms.ModelForm):
             "note": "Note",
         }
         widgets = {
-            "note": forms.Textarea(attrs={"rows": 3}),
+            "note": forms.Textarea(
+                attrs={"rows": 3, "placeholder": "Aggiungi una nota...", "data-rich-notes-skip": "true"}
+            ),
             "iban": forms.TextInput(attrs={"placeholder": "IT00 X0000 0000 0000000000000"}),
             "bic": forms.TextInput(attrs={"placeholder": "ABCDITMMXXX"}),
             "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
@@ -1074,6 +1076,7 @@ class MovimentoFinanziarioForm(forms.ModelForm):
         self.fields["sostenuta_da_terzi"].help_text = (
             "Usa questa opzione per spese pagate da soci/genitori senza uscita dal conto della scuola."
         )
+        apply_eur_currency_widget(self.fields["importo"], compact=False)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1179,6 +1182,8 @@ class RegolaCategorizzazioneForm(forms.ModelForm):
         self.fields["importo_max"].required = False
         self.fields["segno_filtro"].required = False
         self.fields["note"].required = False
+        for field_name in ("importo_min", "importo_max"):
+            apply_eur_currency_widget(self.fields[field_name], compact=False)
 
         self.fields["categoria_da_assegnare"].queryset = (
             CategoriaFinanziaria.objects.filter(attiva=True).order_by("parent__nome", "nome")

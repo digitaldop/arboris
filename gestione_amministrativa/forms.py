@@ -4,6 +4,7 @@ from decimal import Decimal
 from django import forms
 from django.db.models import Q
 
+from arboris.form_widgets import apply_eur_currency_widget
 from anagrafica.contact_services import sync_principal_contacts
 from anagrafica.forms import (
     classe_principale_reference_choices,
@@ -25,7 +26,24 @@ from .models import (
     RuoloAziendaleDipendente,
     SessoDipendente,
     SimulazioneCostoDipendente,
+    StatoBustaPaga,
     TipoContrattoDipendente,
+)
+
+
+MONTH_CHOICES = (
+    (1, "Gennaio"),
+    (2, "Febbraio"),
+    (3, "Marzo"),
+    (4, "Aprile"),
+    (5, "Maggio"),
+    (6, "Giugno"),
+    (7, "Luglio"),
+    (8, "Agosto"),
+    (9, "Settembre"),
+    (10, "Ottobre"),
+    (11, "Novembre"),
+    (12, "Dicembre"),
 )
 
 
@@ -537,6 +555,17 @@ class ContrattoDipendenteForm(forms.ModelForm):
         self.detailed_mode = kwargs.pop("detailed_mode", False)
         super().__init__(*args, **kwargs)
         self.simple_mode = not self.detailed_mode
+        for field_name in [
+            "costo_azienda_ipotizzato",
+            "lordo_ipotizzato",
+            "netto_ipotizzato",
+            "contributi_mensili_ipotizzati",
+            "retribuzione_lorda_mensile",
+            "tariffa_oraria",
+            "superminimo_mensile",
+            "indennita_fisse_mensili",
+        ]:
+            apply_eur_currency_widget(self.fields[field_name])
         tipo_contratto_id = self.data.get(self.add_prefix("tipo_contratto")) if self.is_bound else self.initial.get(
             "tipo_contratto",
             getattr(self.instance, "tipo_contratto_id", None),
@@ -786,6 +815,29 @@ class ParametroCalcoloStipendioForm(forms.ModelForm):
 
 
 class SimulazioneCostoDipendenteForm(forms.ModelForm):
+    AMOUNT_FIELDS = [
+        "netto_mensile",
+        "lordo_mensile",
+        "costo_azienda_mensile",
+        "contributi_previdenziali_azienda",
+        "contributi_assicurativi_azienda",
+        "contributi_previdenza_complementare_azienda",
+        "contributi_previdenziali_dipendente",
+        "contributi_assicurativi_dipendente",
+        "contributi_previdenza_complementare_dipendente",
+        "irpef_lorda",
+        "irpef_netto",
+        "addizionale_regionale",
+        "addizionale_comunale",
+        "bonus_fiscali",
+        "trattamento_fine_rapporto",
+        "costo_mensilita_aggiuntive",
+        "costo_rateo_ferie",
+        "costo_rateo_permessi",
+        "costo_rateo_rol",
+        "costo_rateo_ex_festivita",
+    ]
+
     class Meta:
         model = SimulazioneCostoDipendente
         fields = [
@@ -874,6 +926,8 @@ class SimulazioneCostoDipendenteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field_name in self.AMOUNT_FIELDS:
+            apply_eur_currency_widget(self.fields[field_name])
         contratto_id = self.data.get(self.add_prefix("contratto")) if self.is_bound else self.initial.get(
             "contratto",
             getattr(self.instance, "contratto_id", None),
@@ -903,6 +957,8 @@ class SimulazioneCostoDipendenteForm(forms.ModelForm):
 
 
 class BustaPagaDipendenteForm(forms.ModelForm):
+    svuota_file_busta_paga = forms.BooleanField(label="Svuota file", required=False)
+
     FORECAST_AMOUNT_FIELDS = [
         "lordo_previsto",
         "contributi_datore_previsti",
@@ -982,13 +1038,15 @@ class BustaPagaDipendenteForm(forms.ModelForm):
             "data_pagamento_effettiva": "Data pagamento effettiva",
             "movimento_pagamento": "Movimento pagamento",
             "note_previsione": "Note previsione",
-            "note_effettivo": "Note effettivo",
+            "note_effettivo": "Note",
         }
         widgets = {
+            "mese": forms.Select(choices=MONTH_CHOICES),
             "data_pagamento_effettiva": html5_date_input(),
             "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
-            "note_previsione": forms.Textarea(attrs={"rows": 3}),
-            "note_effettivo": forms.Textarea(attrs={"rows": 3}),
+            "file_busta_paga": forms.FileInput(attrs={"accept": ".pdf,application/pdf"}),
+            "note_previsione": forms.Textarea(attrs={"rows": 3, "data-popup-note-collapse": "false"}),
+            "note_effettivo": forms.Textarea(attrs={"rows": 3, "data-popup-note-collapse": "false"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -996,12 +1054,17 @@ class BustaPagaDipendenteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["contratto"].required = False
         self.fields["file_busta_paga"].required = False
+        self.fields["svuota_file_busta_paga"].required = False
         self.fields["data_pagamento_effettiva"].required = False
         self.fields["movimento_pagamento"].required = False
         self.fields["note_previsione"].required = False
         self.fields["note_effettivo"].required = False
+        self.fields["note_previsione"].widget = forms.HiddenInput()
         for field_name in self.FORECAST_AMOUNT_FIELDS + self.REAL_AMOUNT_FIELDS:
             self.fields[field_name].required = False
+            apply_eur_currency_widget(self.fields[field_name])
+        if not self.detailed_mode:
+            self._setup_simple_mode()
         self.fields["dipendente"].queryset = Dipendente.objects.order_by(
             "persona_collegata__cognome", "persona_collegata__nome"
         )
@@ -1015,7 +1078,57 @@ class BustaPagaDipendenteForm(forms.ModelForm):
             "-data_inizio",
         )
         self.fields["contratto"].empty_label = "--- nessun contratto collegato ---"
+        movimento_id = self._selected_movimento_pagamento_id()
+        movimenti_filter = Q(importo__lt=0)
+        if movimento_id:
+            movimenti_filter |= Q(pk=movimento_id)
+        self.fields["movimento_pagamento"].queryset = (
+            self.fields["movimento_pagamento"]
+            .queryset.model.objects.select_related("conto", "categoria")
+            .filter(movimenti_filter)
+            .order_by("-data_contabile", "-id")
+        )
         self.fields["movimento_pagamento"].empty_label = "--- nessun movimento collegato ---"
+        self.fields["movimento_pagamento"].label_from_instance = self._movimento_pagamento_label
+        make_searchable_select(self.fields["movimento_pagamento"], "Cerca un pagamento...")
+
+    def _selected_movimento_pagamento_id(self):
+        value = None
+        if self.is_bound:
+            value = self.data.get(self.add_prefix("movimento_pagamento"))
+        if not value:
+            value = self.initial.get("movimento_pagamento") or getattr(self.instance, "movimento_pagamento_id", None)
+        try:
+            return int(value) if value else None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _movimento_pagamento_label(movimento):
+        descrizione = (movimento.descrizione or "").strip() or movimento.get_canale_display()
+        if len(descrizione) > 70:
+            descrizione = f"{descrizione[:67]}..."
+        importo = movimento.importo or Decimal("0.00")
+        return f"{movimento.data_contabile:%d/%m/%Y} - {importo} {movimento.valuta} - {descrizione}"
+
+    def _setup_simple_mode(self):
+        visible_fields = {
+            "dipendente",
+            "anno",
+            "mese",
+            "lordo_effettivo",
+            "netto_effettivo",
+            "file_busta_paga",
+            "svuota_file_busta_paga",
+        }
+        for field_name, field in self.fields.items():
+            if field_name in visible_fields:
+                continue
+            field.required = False
+            field.widget = forms.HiddenInput()
+        if not self.is_bound:
+            self.initial.setdefault("stato", StatoBustaPaga.BOZZA)
+            self.initial.setdefault("valuta", "EUR")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -1023,7 +1136,21 @@ class BustaPagaDipendenteForm(forms.ModelForm):
         contratto = cleaned_data.get("contratto")
         if dipendente and contratto and contratto.dipendente_id != dipendente.pk:
             self.add_error("contratto", "Il contratto selezionato appartiene a un altro dipendente.")
+        movimento = cleaned_data.get("movimento_pagamento")
+        if movimento and not cleaned_data.get("data_pagamento_effettiva"):
+            cleaned_data["data_pagamento_effettiva"] = movimento.data_contabile
         for field_name in self.FORECAST_AMOUNT_FIELDS + self.REAL_AMOUNT_FIELDS:
             if cleaned_data.get(field_name) is None:
                 cleaned_data[field_name] = Decimal("0.00")
         return cleaned_data
+
+    def save(self, commit=True):
+        busta = super().save(commit=False)
+        uploaded_file = self.files.get(self.add_prefix("file_busta_paga")) if hasattr(self, "files") else None
+        if self.cleaned_data.get("svuota_file_busta_paga") and not uploaded_file and busta.file_busta_paga:
+            busta.file_busta_paga.delete(save=False)
+            busta.file_busta_paga = ""
+        if commit:
+            busta.save()
+            self.save_m2m()
+        return busta
