@@ -1459,15 +1459,37 @@ def _redirect_spese_mensili_for_date(value):
     return f"{reverse('spese_mensili_dashboard')}?{urlencode(params)}"
 
 
+def _spesa_operativa_success_response(request, message, date_value, popup):
+    target_url = (
+        _safe_next_url(request, "spese_mensili_dashboard")
+        if request.POST.get("next")
+        else _redirect_spese_mensili_for_date(date_value)
+    )
+    messages.success(request, message)
+    if popup:
+        return render(
+            request,
+            "popup/popup_close.html",
+            {"message": message, "reload_url": target_url},
+        )
+    return redirect(target_url)
+
+
+def _spese_mensili_next_url(request):
+    if request.GET.get("next") or request.POST.get("next"):
+        return _safe_next_url(request, "spese_mensili_dashboard")
+    return ""
+
+
 def crea_spesa_operativa(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = SpesaOperativaForm(request.POST)
         if form.is_valid():
             spesa = form.save(commit=False)
             spesa.creato_da = request.user if request.user.is_authenticated else None
             spesa.save()
-            messages.success(request, "Spesa registrata correttamente.")
-            return redirect(_safe_next_url(request, "spese_mensili_dashboard") if request.POST.get("next") else _redirect_spese_mensili_for_date(spesa.data_scadenza))
+            return _spesa_operativa_success_response(request, "Spesa registrata correttamente.", spesa.data_scadenza, popup)
     else:
         form = SpesaOperativaForm(
             initial={
@@ -1480,25 +1502,35 @@ def crea_spesa_operativa(request):
     return render(
         request,
         "gestione_finanziaria/spesa_operativa_form.html",
-        {"form": form, "spesa": None, "next_url": request.GET.get("next") or ""},
+        {
+            "form": form,
+            "spesa": None,
+            "next_url": _spese_mensili_next_url(request),
+            "popup": popup,
+        },
     )
 
 
 def modifica_spesa_operativa(request, pk):
+    popup = is_popup_request(request)
     spesa = get_object_or_404(SpesaOperativa, pk=pk)
     if request.method == "POST":
         form = SpesaOperativaForm(request.POST, instance=spesa)
         if form.is_valid():
             spesa = form.save()
-            messages.success(request, "Spesa aggiornata correttamente.")
-            return redirect(_safe_next_url(request, "spese_mensili_dashboard") if request.POST.get("next") else _redirect_spese_mensili_for_date(spesa.data_scadenza))
+            return _spesa_operativa_success_response(request, "Spesa aggiornata correttamente.", spesa.data_scadenza, popup)
     else:
         form = SpesaOperativaForm(instance=spesa)
 
     return render(
         request,
         "gestione_finanziaria/spesa_operativa_form.html",
-        {"form": form, "spesa": spesa, "next_url": request.GET.get("next") or ""},
+        {
+            "form": form,
+            "spesa": spesa,
+            "next_url": _spese_mensili_next_url(request),
+            "popup": popup,
+        },
     )
 
 
@@ -1536,7 +1568,24 @@ def _genera_rate_piano_spesa(piano):
         )
 
 
+def _piano_rateale_spesa_success_response(request, message, date_value, popup):
+    target_url = (
+        _safe_next_url(request, "spese_mensili_dashboard")
+        if request.POST.get("next")
+        else _redirect_spese_mensili_for_date(date_value)
+    )
+    messages.success(request, message)
+    if popup:
+        return render(
+            request,
+            "popup/popup_close.html",
+            {"message": message, "reload_url": target_url},
+        )
+    return redirect(target_url)
+
+
 def crea_piano_rateale_spesa(request):
+    popup = is_popup_request(request)
     if request.method == "POST":
         form = PianoRatealeSpesaForm(request.POST)
         if form.is_valid():
@@ -1545,8 +1594,12 @@ def crea_piano_rateale_spesa(request):
                 piano.creato_da = request.user if request.user.is_authenticated else None
                 piano.save()
                 _genera_rate_piano_spesa(piano)
-            messages.success(request, "Piano rateale creato e rate generate correttamente.")
-            return redirect(_redirect_spese_mensili_for_date(piano.data_prima_scadenza))
+            return _piano_rateale_spesa_success_response(
+                request,
+                "Piano rateale creato e rate generate correttamente.",
+                piano.data_prima_scadenza,
+                popup,
+            )
     else:
         form = PianoRatealeSpesaForm(
             initial={
@@ -1559,7 +1612,7 @@ def crea_piano_rateale_spesa(request):
     return render(
         request,
         "gestione_finanziaria/piano_rateale_spesa_form.html",
-        {"form": form},
+        {"form": form, "popup": popup, "next_url": _spese_mensili_next_url(request)},
     )
 
 

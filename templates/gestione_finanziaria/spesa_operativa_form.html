@@ -1,47 +1,284 @@
-{% extends "base.html" %}
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static %}
 
 {% block title %}{% if spesa %}Modifica spesa{% else %}Nuova spesa{% endif %} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
-    <div class="breadcrumb">
-        <a href="{% url 'home' %}">Home</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <a href="{% url 'spese_mensili_dashboard' %}">Spese mensili</a>
-        <span class="breadcrumb-sep">&gt;</span>
-        <span>{% if spesa %}Modifica{% else %}Nuova{% endif %}</span>
-    </div>
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'spese_mensili_dashboard' %}">Spese mensili</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>{% if spesa %}Modifica{% else %}Nuova{% endif %}</span>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">{% if spesa %}Modifica spesa{% else %}Nuova spesa{% endif %}</h1>
-        <div class="page-head-actions">
-            <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'spese_mensili_dashboard' %}{% endif %}" class="btn btn-secondary">Torna al riepilogo</a>
-        </div>
-    </div>
+<div class="content-card related-config-popup-card budget-voice-popup-card{% if not popup %} is-standalone{% endif %}">
+    {% if popup %}
+        <button type="button" class="budget-voice-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+        </button>
+    {% endif %}
 
-    <form method="post" class="detail-form">
+    <form method="post" class="related-config-popup-form budget-voice-popup-form">
         {% csrf_token %}
+        {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
         {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-        <div class="content-card">
-            <table class="form-table">
-                {% for field in form.visible_fields %}
-                    <tr>
-                        <th>{{ field.label_tag }}</th>
-                        <td>
-                            {{ field }}
-                            {{ field.errors }}
-                            {% if field.help_text %}<div class="help-text">{{ field.help_text }}</div>{% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Salva</button>
-                <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'spese_mensili_dashboard' %}{% endif %}" class="btn btn-secondary">Annulla</a>
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+        <div class="budget-voice-popup-hero">
+            <span class="budget-voice-icon-tile" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="budget-voice-popup-title-block">
+                <div class="related-config-kicker">Spese mensili</div>
+                <h1 class="page-title">{% if spesa %}{{ spesa.descrizione }}{% else %}Nuova spesa{% endif %}</h1>
+                <p>Registra una spesa manuale, un pagamento in contanti o una voce da seguire nel riepilogo mensile.</p>
             </div>
         </div>
+
+        <div class="budget-voice-popup-info">
+            <span class="budget-voice-popup-info-icon" aria-hidden="true">i</span>
+            <div>
+                <p>La spesa comparira' nel mese della scadenza con gli stessi colori del riepilogo: cremisi se resta un residuo, verde se risulta saldata.</p>
+            </div>
+        </div>
+
+        {% if form.non_field_errors %}
+            <div class="message message-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="related-config-popup-editor budget-voice-popup-editor">
+            <div class="budget-voice-popup-grid">
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.tipo.id_for_label }}">{{ form.tipo.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#arrows-up-down"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.tipo }}
+                        </div>
+                    </div>
+                    {{ form.tipo.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.data_scadenza.id_for_label }}">{{ form.data_scadenza.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.data_scadenza }}
+                        </div>
+                    </div>
+                    {{ form.data_scadenza.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.descrizione.id_for_label }}">{{ form.descrizione.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.descrizione }}
+                        </div>
+                    </div>
+                    {{ form.descrizione.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.categoria.id_for_label }}">{{ form.categoria.label }}</label>
+                    <div class="budget-voice-related-row">
+                        <div class="budget-voice-input-shell">
+                            <span class="budget-voice-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                            </span>
+                            <div class="budget-voice-input-control">
+                                {{ form.categoria }}
+                            </div>
+                        </div>
+                        <div class="related-actions budget-voice-related-actions">
+                            <button type="button" class="related-btn related-btn-add" id="add-spesa-categoria-btn" aria-label="Nuova categoria" title="Nuova categoria" data-floating-text="Nuova categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-edit" id="edit-spesa-categoria-btn" aria-label="Modifica categoria" title="Modifica categoria" data-floating-text="Modifica categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-delete" id="delete-spesa-categoria-btn" aria-label="Elimina categoria" title="Elimina categoria" data-floating-text="Elimina categoria">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            </button>
+                        </div>
+                    </div>
+                    {{ form.categoria.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.fornitore.id_for_label }}">{{ form.fornitore.label }}</label>
+                    <div class="budget-voice-related-row">
+                        <div class="budget-voice-input-shell">
+                            <span class="budget-voice-input-addon" aria-hidden="true">
+                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg>
+                            </span>
+                            <div class="budget-voice-input-control">
+                                {{ form.fornitore }}
+                            </div>
+                        </div>
+                        <div class="related-actions budget-voice-related-actions">
+                            <button type="button" class="related-btn related-btn-add" id="add-spesa-fornitore-btn" aria-label="Nuovo fornitore" title="Nuovo fornitore" data-floating-text="Nuovo fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-edit" id="edit-spesa-fornitore-btn" aria-label="Modifica fornitore" title="Modifica fornitore" data-floating-text="Modifica fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                            </button>
+                            <button type="button" class="related-btn related-btn-delete" id="delete-spesa-fornitore-btn" aria-label="Elimina fornitore" title="Elimina fornitore" data-floating-text="Elimina fornitore">
+                                <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            </button>
+                        </div>
+                    </div>
+                    {{ form.fornitore.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.importo_previsto.id_for_label }}">{{ form.importo_previsto.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.importo_previsto }}
+                        </div>
+                    </div>
+                    {{ form.importo_previsto.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.importo_pagato.id_for_label }}">{{ form.importo_pagato.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.importo_pagato }}
+                        </div>
+                    </div>
+                    {{ form.importo_pagato.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.data_pagamento.id_for_label }}">{{ form.data_pagamento.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.data_pagamento }}
+                        </div>
+                    </div>
+                    {{ form.data_pagamento.errors }}
+                </div>
+
+                <div class="budget-voice-form-field">
+                    <label for="{{ form.conto_bancario.id_for_label }}">{{ form.conto_bancario.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.conto_bancario }}
+                        </div>
+                    </div>
+                    {{ form.conto_bancario.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide">
+                    <label for="{{ form.movimento_finanziario.id_for_label }}">{{ form.movimento_finanziario.label }}</label>
+                    <div class="budget-voice-input-shell">
+                        <span class="budget-voice-input-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                        </span>
+                        <div class="budget-voice-input-control">
+                            {{ form.movimento_finanziario }}
+                        </div>
+                    </div>
+                    {{ form.movimento_finanziario.errors }}
+                </div>
+
+                <div class="budget-voice-form-field budget-voice-field-wide budget-voice-field-notes">
+                    <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                    <div class="budget-voice-note-shell">
+                        <span class="budget-voice-note-addon" aria-hidden="true">
+                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                        </span>
+                        <div class="budget-voice-note-control">
+                            {{ form.note }}
+                        </div>
+                    </div>
+                    {{ form.note.errors }}
+                </div>
+            </div>
+        </div>
+
+        <div class="related-config-popup-actions">
+            <button type="submit" class="btn btn-save-soft btn-icon-text">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                </span>
+                <span class="btn-label">Salva spesa</span>
+            </button>
+            {% if popup %}
+                <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Annulla</span>
+                </button>
+            {% else %}
+                <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'spese_mensili_dashboard' %}{% endif %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                    </span>
+                    <span class="btn-label">Indietro</span>
+                </a>
+            {% endif %}
+        </div>
     </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const routes = window.ArborisRelatedEntityRoutes;
+        const relatedPopups = routes && routes.initRelatedPopups();
+        if (!routes || !relatedPopups || typeof routes.wireCrudButtonsById !== "function") {
+            return;
+        }
+
+        routes.wireCrudButtonsById({
+            selectId: "id_categoria",
+            relatedType: "categoria_spesa",
+            addBtnId: "add-spesa-categoria-btn",
+            editBtnId: "edit-spesa-categoria-btn",
+            deleteBtnId: "delete-spesa-categoria-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+
+        routes.wireCrudButtonsById({
+            selectId: "id_fornitore",
+            relatedType: "fornitore",
+            addBtnId: "add-spesa-fornitore-btn",
+            editBtnId: "edit-spesa-fornitore-btn",
+            deleteBtnId: "delete-spesa-fornitore-btn",
+            openRelatedPopup: relatedPopups.openRelatedPopup,
+        });
+    });
+</script>
 {% endblock %}

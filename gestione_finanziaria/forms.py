@@ -29,6 +29,7 @@ from .models import (
     SpesaOperativa,
     StatoScadenzaFornitore,
     TipoCategoriaFinanziaria,
+    TipoPianoRatealeSpesa,
     TipoSpesaOperativa,
     VoceBudgetRicorrente,
 )
@@ -637,7 +638,6 @@ class SpesaOperativaForm(forms.ModelForm):
             "descrizione",
             "categoria",
             "fornitore",
-            "dipendente",
             "data_scadenza",
             "importo_previsto",
             "importo_pagato",
@@ -651,7 +651,6 @@ class SpesaOperativaForm(forms.ModelForm):
             "descrizione": "Descrizione",
             "categoria": "Categoria",
             "fornitore": "Fornitore",
-            "dipendente": "Dipendente",
             "data_scadenza": "Scadenza",
             "importo_previsto": "Importo previsto",
             "importo_pagato": "Importo pagato",
@@ -668,7 +667,14 @@ class SpesaOperativaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        optional_fields = ["categoria", "fornitore", "dipendente", "data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
+        optional_fields = [
+            "categoria",
+            "fornitore",
+            "data_pagamento",
+            "conto_bancario",
+            "movimento_finanziario",
+            "note",
+        ]
         for field_name in optional_fields:
             self.fields[field_name].required = False
         self.fields["categoria"].queryset = categorie_spesa_queryset()
@@ -685,7 +691,6 @@ class SpesaOperativaForm(forms.ModelForm):
             apply_eur_currency_widget(self.fields[field_name])
         make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
-        make_searchable_select(self.fields["dipendente"], "Cerca un dipendente...")
         make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
         make_searchable_select(self.fields["movimento_finanziario"], "Cerca un movimento...")
 
@@ -747,6 +752,12 @@ class PianoRatealeSpesaForm(forms.ModelForm):
         apply_eur_currency_widget(self.fields["importo_totale"])
         make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("tipo") != TipoPianoRatealeSpesa.FORNITORE:
+            cleaned["fornitore"] = None
+        return cleaned
 
 
 class FattureInCloudConnessioneForm(forms.ModelForm):

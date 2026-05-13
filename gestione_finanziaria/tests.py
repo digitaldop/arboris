@@ -2462,6 +2462,109 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
 
+    def test_spese_mensili_dashboard_apre_nuova_spesa_in_popup(self):
+        response = self.client.get(reverse("spese_mensili_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'{reverse("crea_spesa_operativa")}?popup=1')
+        self.assertContains(response, 'data-window-popup="1"')
+        self.assertContains(response, 'data-popup-window-name="arboris-spesa-mensile-popup"')
+        self.assertContains(response, f'{reverse("crea_piano_rateale_spesa")}?popup=1')
+        self.assertContains(response, 'data-popup-window-name="arboris-piano-rateale-spesa-popup"')
+
+    def test_spesa_operativa_form_usa_layout_popup_e_controlli_related(self):
+        response = self.client.get(
+            f'{reverse("crea_spesa_operativa")}?popup=1&next={reverse("spese_mensili_dashboard")}'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'body class="popup-page"', html=False)
+        self.assertContains(response, "budget-voice-popup-card")
+        self.assertContains(response, '<input type="hidden" name="popup" value="1">', html=False)
+        self.assertContains(response, 'id="add-spesa-categoria-btn"')
+        self.assertContains(response, 'id="edit-spesa-categoria-btn"')
+        self.assertContains(response, 'id="delete-spesa-categoria-btn"')
+        self.assertContains(response, 'relatedType: "categoria_spesa"')
+        self.assertContains(response, 'id="add-spesa-fornitore-btn"')
+        self.assertContains(response, 'relatedType: "fornitore"')
+        self.assertNotContains(response, "id_dipendente")
+        self.assertNotContains(response, "Dipendente")
+
+    def test_crea_spesa_operativa_popup_chiude_e_ricarica_riepilogo(self):
+        categoria = crea_categoria_spesa_test("Spese manuali")
+
+        response = self.client.post(
+            f'{reverse("crea_spesa_operativa")}?popup=1',
+            {
+                "popup": "1",
+                "next": reverse("spese_mensili_dashboard"),
+                "tipo": TipoSpesaOperativa.MANUALE,
+                "descrizione": "Acquisto cancelleria",
+                "categoria": categoria.pk,
+                "fornitore": "",
+                "data_scadenza": "2026-05-13",
+                "importo_previsto": "25.00",
+                "importo_pagato": "0.00",
+                "data_pagamento": "",
+                "conto_bancario": "",
+                "movimento_finanziario": "",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertEqual(response.context["reload_url"], reverse("spese_mensili_dashboard"))
+        self.assertTrue(SpesaOperativa.objects.filter(descrizione="Acquisto cancelleria").exists())
+
+    def test_piano_rateale_spesa_form_usa_layout_popup_e_controlli_related(self):
+        response = self.client.get(
+            f'{reverse("crea_piano_rateale_spesa")}?popup=1&next={reverse("spese_mensili_dashboard")}'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'body class="popup-page"', html=False)
+        self.assertContains(response, "budget-voice-popup-card")
+        self.assertContains(response, '<input type="hidden" name="popup" value="1">', html=False)
+        self.assertContains(response, 'id="add-piano-categoria-btn"')
+        self.assertContains(response, 'id="edit-piano-categoria-btn"')
+        self.assertContains(response, 'id="delete-piano-categoria-btn"')
+        self.assertContains(response, 'relatedType: "categoria_spesa"')
+        self.assertContains(response, 'id="add-piano-fornitore-btn"')
+        self.assertContains(response, 'relatedType: "fornitore"')
+        self.assertContains(response, "data-plan-supplier-field")
+        self.assertContains(response, 'typeSelect.value === "fornitore"')
+        self.assertContains(response, "supplierSelect.disabled = !canUseSupplier")
+
+    def test_crea_piano_rateale_popup_chiude_e_pulisce_fornitore_se_non_richiesto(self):
+        categoria = crea_categoria_spesa_test("Finanziamenti")
+        fornitore = Fornitore.objects.create(denominazione="Banca Test")
+
+        response = self.client.post(
+            f'{reverse("crea_piano_rateale_spesa")}?popup=1',
+            {
+                "popup": "1",
+                "next": reverse("spese_mensili_dashboard"),
+                "tipo": TipoPianoRatealeSpesa.FINANZIAMENTO,
+                "descrizione": "Finanziamento laboratorio",
+                "categoria": categoria.pk,
+                "fornitore": fornitore.pk,
+                "importo_totale": "100.00",
+                "numero_rate": "2",
+                "frequenza_mesi": "1",
+                "data_prima_scadenza": "2026-05-31",
+                "giorno_scadenza": "31",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertEqual(response.context["reload_url"], reverse("spese_mensili_dashboard"))
+        piano = PianoRatealeSpesa.objects.get(descrizione="Finanziamento laboratorio")
+        self.assertIsNone(piano.fornitore)
+        self.assertEqual(piano.rate.count(), 2)
+
     def test_crea_piano_rateale_spesa_genera_rate(self):
         categoria = crea_categoria_spesa_test("Finanziamenti")
 
