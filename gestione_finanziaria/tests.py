@@ -36,6 +36,7 @@ from .models import (
     MovimentoFinanziario,
     NotificaFinanziaria,
     PagamentoFornitore,
+    PianoRatealeSpesa,
     OrigineDocumentoFornitore,
     OrigineMovimento,
     ProviderBancario,
@@ -47,9 +48,12 @@ from .models import (
     StatoRiconciliazione,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
+    SpesaOperativa,
     TipoCategoriaFinanziaria,
     TipoContoFinanziario,
+    TipoPianoRatealeSpesa,
     TipoProviderBancario,
+    TipoSpesaOperativa,
     TipoDocumentoFornitore,
     TipoVoceBudget,
     VoceBudgetRicorrente,
@@ -601,6 +605,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pagamento fornitore registrato correttamente.")
+        self.assertContains(response, r"gestione\u002Dfinanziaria/documenti\u002Dfornitori")
+        self.assertContains(response, "handleReloadToUrl")
+        self.assertContains(response, "popup-close-fallback")
         pagamento = PagamentoFornitore.objects.get(scadenza=scadenza)
         self.assertEqual(pagamento.movimento_finanziario, movimento)
         self.assertEqual(pagamento.metodo, MetodoPagamentoFornitore.BANCA)
@@ -609,6 +616,68 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         movimento.refresh_from_db()
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_documento_fornitore_popup_annulla_pagamento_usa_popup_gestito(self):
+        scadenza, movimento = self._crea_scadenza_pagamento_test()
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": scadenza.documento.pk})
+        annulla_url = f"{reverse('elimina_pagamento_fornitore', kwargs={'pk': pagamento.pk})}?popup=1"
+
+        response = self.client.get(f"{documento_url}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, annulla_url)
+        self.assertContains(response, 'data-window-popup="1"')
+        self.assertContains(response, f'data-popup-url="{annulla_url}"')
+        self.assertContains(response, 'data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"')
+
+    def test_documento_fornitore_popup_mostra_elimina_movimento_in_sola_lettura(self):
+        scadenza, movimento = self._crea_scadenza_pagamento_test()
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": scadenza.documento.pk})
+        annulla_url = f"{reverse('elimina_pagamento_fornitore', kwargs={'pk': pagamento.pk})}?popup=1"
+
+        response = self.client.get(f"{documento_url}?popup=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "is-view-mode")
+        self.assertContains(response, "Elimina movimento")
+        self.assertContains(response, f'href="{annulla_url}"')
+        content = response.content.decode()
+        anchor_start = content.index(f'href="{annulla_url}"')
+        anchor_end = content.index(">", anchor_start)
+        self.assertNotIn("mode-edit-only", content[anchor_start:anchor_end])
+        actions_start = content.rfind('data-label="Azioni"', 0, anchor_start)
+        payments_start = content.rfind('data-label="Pagamenti"', 0, anchor_start)
+        self.assertGreater(actions_start, payments_start)
+        actions_end = content.index("</td>", actions_start)
+        self.assertIn("Elimina movimento", content[actions_start:actions_end])
+
+    def test_elimina_pagamento_fornitore_popup_usa_layout_e_chiude(self):
+        scadenza, movimento = self._crea_scadenza_pagamento_test()
+        pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
+        annulla_url = f"{reverse('elimina_pagamento_fornitore', kwargs={'pk': pagamento.pk})}?popup=1"
+
+        response = self.client.get(annulla_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="popup-page"', html=False)
+        self.assertContains(response, "supplier-payment-shell is-popup")
+        self.assertContains(response, '<input type="hidden" name="popup" value="1">', html=False)
+        self.assertContains(response, 'onclick="window.close()"')
+        self.assertNotContains(response, "NAVIGAZIONE")
+
+        response = self.client.post(annulla_url, {"popup": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pagamento fornitore annullato.")
+        self.assertContains(response, r"gestione\u002Dfinanziaria/documenti\u002Dfornitori")
+        self.assertContains(response, "handleReloadToUrl")
+        self.assertContains(response, "popup-close-fallback")
+        self.assertContains(response, "handleReload")
+        self.assertFalse(PagamentoFornitore.objects.filter(pk=pagamento.pk).exists())
+        movimento.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
 
     def test_categoria_spesa_crud_pages(self):
         response = self.client.get(reverse("crea_categoria_spesa"))
@@ -942,6 +1011,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "supplier-document-edit-table")
         self.assertContains(response, "is-view-mode")
         self.assertContains(response, 'id="enable-edit-documento-fornitore-btn"')
+        self.assertContains(response, "Collega movimento bancario")
         self.assertContains(response, "mode-edit-only-table-cell")
         self.assertContains(response, "Movimento storico collegato")
         self.assertNotContains(response, "Movimento storico non collegato")
@@ -2209,6 +2279,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             reverse("lista_documenti_fornitori"),
             reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
             reverse("scadenziario_fornitori"),
+            reverse("fatture_scadenze_fornitori"),
         ]
 
         for url in urls:
@@ -2223,7 +2294,254 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-live-list-form')
         self.assertContains(response, 'data-live-list-input')
         self.assertContains(response, 'id="documenti-fornitori-results"')
+        self.assertContains(response, 'title="Seleziona tutto"')
+        self.assertNotContains(response, ">Seleziona Tutto<")
         self.assertContains(response, "live-list-search.js")
+
+    def test_fatture_scadenze_fornitori_fonde_fatture_e_scadenziario(self):
+        categoria = crea_categoria_spesa_test("Servizi")
+        fornitore = Fornitore.objects.create(
+            denominazione="Fusioni Srl",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+        )
+        documento_da_pagare = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FUS-1",
+            data_documento=date(2026, 5, 1),
+            descrizione="Canone sede",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+        )
+        scadenza_da_pagare = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_da_pagare,
+            data_scadenza=date(2020, 1, 31),
+            importo_previsto=Decimal("122.00"),
+            importo_pagato=Decimal("0.00"),
+        )
+        documento_pagato = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FUS-2",
+            data_documento=date(2026, 5, 2),
+            descrizione="Materiali",
+            imponibile=Decimal("50.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("50.00"),
+            stato=StatoDocumentoFornitore.PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_pagato,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("50.00"),
+            importo_pagato=Decimal("50.00"),
+        )
+
+        response = self.client.get(reverse("fatture_scadenze_fornitori"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fatture e scadenze")
+        self.assertContains(response, "Tutte le fatture")
+        self.assertContains(response, "Solo fatture insolute")
+        self.assertContains(response, f'{reverse("fatture_scadenze_fornitori")}?vista=insolute')
+        self.assertContains(response, "Totale previsto")
+        self.assertContains(response, "Totale pagato")
+        self.assertContains(response, "Totale residuo")
+        self.assertContains(response, "<th>Scadenza</th>", html=False)
+        self.assertContains(response, "<th>Fornitore</th>", html=False)
+        self.assertContains(response, "<th>Categoria</th>", html=False)
+        self.assertContains(response, "Previsto")
+        self.assertContains(response, "Pagato")
+        self.assertContains(response, "Residuo")
+        self.assertNotContains(response, "<th>Fattura</th>", html=False)
+        self.assertNotContains(response, "<th>IVA</th>", html=False)
+        self.assertContains(response, "Da pagare")
+        self.assertContains(response, "Pagata")
+        self.assertContains(response, "Scaduta")
+        self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
+        self.assertContains(response, "supplier-invoice-row-paid", count=1)
+        self.assertContains(
+            response,
+            f'data-row-popup-url="{reverse("modifica_documento_fornitore", kwargs={"pk": documento_da_pagare.pk})}?popup=1"',
+        )
+        pagamento_url = (
+            f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza_da_pagare.pk})}"
+            f"?popup=1&reload_url={reverse('fatture_scadenze_fornitori')}"
+        )
+        self.assertContains(response, "Registra pagamento")
+        self.assertContains(response, pagamento_url)
+
+        response = self.client.get(reverse("fatture_scadenze_fornitori"), {"vista": "insolute"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["totale_previsto"], Decimal("172.00"))
+        self.assertEqual(response.context["totale_pagato"], Decimal("50.00"))
+        self.assertEqual(response.context["totale_residuo"], Decimal("122.00"))
+        self.assertContains(response, "Solo fatture insolute")
+        self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
+        self.assertNotContains(response, "supplier-invoice-row-paid")
+        self.assertNotContains(response, "Materiali")
+
+    def test_spese_mensili_dashboard_unisce_fatture_spese_e_introiti(self):
+        categoria = crea_categoria_spesa_test("Servizi generali")
+        fornitore = Fornitore.objects.create(
+            denominazione="Supermercato Verde",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="MAG-1",
+            data_documento=date(2026, 5, 3),
+            descrizione="Materiale didattico",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+            importo_pagato=Decimal("0.00"),
+        )
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.CONTANTI,
+            descrizione="Spesa supermercato",
+            categoria=categoria,
+            fornitore=fornitore,
+            data_scadenza=date(2026, 5, 12),
+            importo_previsto=Decimal("48.50"),
+            importo_pagato=Decimal("48.50"),
+        )
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.F24,
+            descrizione="F24 contributi maggio",
+            categoria=categoria,
+            data_scadenza=date(2026, 5, 16),
+            importo_previsto=Decimal("300.00"),
+            importo_pagato=Decimal("120.00"),
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 20),
+            importo=Decimal("850.00"),
+            descrizione="Incasso rette maggio",
+            controparte="Famiglie",
+            origine=OrigineMovimento.BANCA,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-05"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Spese mensili")
+        self.assertContains(response, "Mag 2026")
+        self.assertContains(response, "Materiale didattico")
+        self.assertContains(response, "Spesa supermercato")
+        self.assertContains(response, "F24 contributi maggio")
+        self.assertContains(response, "Incasso rette maggio")
+        self.assertContains(response, "Introiti 850,00")
+        selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-05")
+        self.assertEqual(selected_month["totale_spese"], Decimal("470.50"))
+        self.assertEqual(selected_month["residuo"], Decimal("302.00"))
+        self.assertEqual(selected_month["spese_count"], 3)
+        self.assertEqual(selected_month["insolute_count"], 2)
+        self.assertContains(response, "supplier-invoice-row-unpaid", count=2)
+        self.assertContains(response, "supplier-invoice-row-paid", count=1)
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-05", "vista": "insolute"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Materiale didattico")
+        self.assertContains(response, "F24 contributi maggio")
+        self.assertNotContains(response, "Spesa supermercato")
+
+    def test_crea_piano_rateale_spesa_genera_rate(self):
+        categoria = crea_categoria_spesa_test("Finanziamenti")
+
+        response = self.client.post(
+            reverse("crea_piano_rateale_spesa"),
+            {
+                "tipo": TipoPianoRatealeSpesa.FINANZIAMENTO,
+                "descrizione": "Finanziamento cucina",
+                "categoria": categoria.pk,
+                "fornitore": "",
+                "importo_totale": "100.00",
+                "numero_rate": "3",
+                "frequenza_mesi": "1",
+                "data_prima_scadenza": "2026-05-31",
+                "giorno_scadenza": "31",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        piano = PianoRatealeSpesa.objects.get(descrizione="Finanziamento cucina")
+        rate = list(piano.rate.order_by("numero_rata"))
+        self.assertEqual(len(rate), 3)
+        self.assertEqual([rata.importo_previsto for rata in rate], [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")])
+        self.assertEqual([rata.data_scadenza for rata in rate], [date(2026, 5, 31), date(2026, 6, 30), date(2026, 7, 31)])
+        self.assertEqual(rate[0].tipo, TipoSpesaOperativa.FINANZIAMENTO)
+
+    def test_lista_documenti_fornitori_mostra_riepilogo_e_colori_stato(self):
+        fornitore = Fornitore.objects.create(
+            denominazione="Riepilogo Srl",
+            tipo_soggetto="azienda",
+        )
+        DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="APER-1",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+        )
+        documento_parziale = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="PARZ-1",
+            data_documento=date(2026, 5, 2),
+            imponibile=Decimal("200.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("200.00"),
+            stato=StatoDocumentoFornitore.PARZIALMENTE_PAGATO,
+        )
+        documento_pagato = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="PAG-1",
+            data_documento=date(2026, 5, 3),
+            imponibile=Decimal("80.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("80.00"),
+            stato=StatoDocumentoFornitore.PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_parziale,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("200.00"),
+            importo_pagato=Decimal("50.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_pagato,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("80.00"),
+            importo_pagato=Decimal("80.00"),
+        )
+
+        response = self.client.get(reverse("lista_documenti_fornitori"))
+
+        self.assertEqual(response.context["totale_documenti_non_saldati"], Decimal("272.00"))
+        self.assertEqual(response.context["numero_documenti_non_saldati"], 2)
+        self.assertContains(response, "Totale fatture non saldate")
+        self.assertContains(response, "272,00")
+        self.assertContains(response, "supplier-invoice-row-unpaid", count=2)
+        self.assertContains(response, "supplier-invoice-row-paid", count=1)
 
     def test_eliminazione_multipla_documenti_fornitori_con_conferma(self):
         fornitore = Fornitore.objects.create(

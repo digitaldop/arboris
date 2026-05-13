@@ -3,39 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <title>Chiusura finestra</title>
+    <style>
+        html,
+        body {
+            min-height: 0;
+            margin: 0;
+            background: transparent;
+        }
+
+        body {
+            opacity: 0;
+        }
+
+        body.popup-close-show-fallback {
+            opacity: 1;
+            min-height: 100vh;
+            padding: 24px;
+            background: #fff;
+            color: #14213d;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            box-sizing: border-box;
+        }
+
+        .popup-close-fallback {
+            display: none;
+        }
+
+        body.popup-close-show-fallback .popup-close-fallback {
+            display: block;
+        }
+    </style>
+    <noscript>
+        <style>
+            body {
+                opacity: 1;
+                min-height: 100vh;
+                padding: 24px;
+                background: #fff;
+            }
+
+            .popup-close-fallback {
+                display: block;
+            }
+        </style>
+    </noscript>
 </head>
 <body>
     <script>
-        function getModalHost() {
-            try {
-                if (window.parent && window.parent !== window && window.parent.ArborisModalPopups) {
-                    return window.parent.ArborisModalPopups;
+        (function () {
+            const reloadUrl = "{{ reload_url|default:''|escapejs }}";
+            window.setTimeout(function () {
+                document.body.classList.add("popup-close-show-fallback");
+            }, 1500);
+
+            function navigateToReloadUrl(targetWindow) {
+                if (!reloadUrl || !targetWindow || !targetWindow.location) {
+                    return false;
                 }
-                if (window.top && window.top !== window && window.top.ArborisModalPopups) {
-                    return window.top.ArborisModalPopups;
+
+                try {
+                    targetWindow.location.href = new URL(reloadUrl, targetWindow.location.href).toString();
+                    return true;
+                } catch (error) {
+                    return false;
                 }
-            } catch (error) {
+            }
+
+            function getModalHost() {
+                try {
+                    if (window.parent && window.parent !== window && window.parent.ArborisModalPopups) {
+                        return window.parent.ArborisModalPopups;
+                    }
+                    if (window.top && window.top !== window && window.top.ArborisModalPopups) {
+                        return window.top.ArborisModalPopups;
+                    }
+                } catch (error) {
+                    return null;
+                }
                 return null;
             }
-            return null;
-        }
 
-        const modalHost = getModalHost();
-        if (modalHost && typeof modalHost.handleReload === "function") {
-            modalHost.handleReload(window);
-        } else {
-        if (window.opener) {
-            if (typeof window.opener.ArborisReloadWithLongWait === "function") {
-                window.opener.ArborisReloadWithLongWait();
-            } else {
-                window.opener.location.reload();
+            const modalHost = getModalHost();
+            if (reloadUrl && modalHost && typeof modalHost.handleReloadToUrl === "function") {
+                modalHost.handleReloadToUrl(window, reloadUrl);
+                return;
             }
-        }
-        window.close();
-        }
+
+            if (reloadUrl) {
+                try {
+                    if (window.top && window.top !== window && navigateToReloadUrl(window.top)) {
+                        return;
+                    }
+                } catch (error) {
+                    // Fall back to opener or standard popup closing below.
+                }
+
+                try {
+                    if (window.parent && window.parent !== window && navigateToReloadUrl(window.parent)) {
+                        return;
+                    }
+                } catch (error) {
+                    // Fall back to opener or standard popup closing below.
+                }
+
+                if (window.opener && !window.opener.closed && navigateToReloadUrl(window.opener)) {
+                    window.close();
+                    return;
+                }
+                if (navigateToReloadUrl(window)) {
+                    return;
+                }
+            }
+
+            if (modalHost && typeof modalHost.handleReload === "function") {
+                modalHost.handleReload(window);
+            } else {
+                if (window.opener) {
+                    if (typeof window.opener.ArborisReloadWithLongWait === "function") {
+                        window.opener.ArborisReloadWithLongWait();
+                    } else {
+                        window.opener.location.reload();
+                    }
+                }
+                window.close();
+            }
+        })();
     </script>
 
-    <p>{{ message }}</p>
-    <p>Puoi chiudere questa finestra.</p>
+    <div class="popup-close-fallback">
+        <p>{{ message }}</p>
+        <p>Puoi chiudere questa finestra.</p>
+    </div>
 </body>
 </html>

@@ -599,6 +599,10 @@
                                         <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
                                         <span class="sidebar-link-text">Budgeting</span>
                                     </a>
+                                    <a href="{% url 'spese_mensili_dashboard' %}" class="{% if request.resolver_match.url_name == 'spese_mensili_dashboard' or request.resolver_match.url_name == 'crea_spesa_operativa' or request.resolver_match.url_name == 'modifica_spesa_operativa' or request.resolver_match.url_name == 'crea_piano_rateale_spesa' %}active{% endif %}">
+                                        <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                        <span class="sidebar-link-text">Spese mensili</span>
+                                    </a>
                                     <div class="sidebar-subsection">
                                         <button
                                             type="button"
@@ -613,21 +617,13 @@
                                         </button>
                                         <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-gestione-finanziaria-fornitori-panel">
                                             <nav class="sidebar-nav sidebar-subnav">
+                                                <a href="{% url 'fatture_scadenze_fornitori' %}" class="{% if request.resolver_match.url_name == 'fatture_scadenze_fornitori' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                                    <span class="sidebar-link-text">Fatture e scadenze</span>
+                                                </a>
                                                 <a href="{% url 'lista_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_fornitori' or request.resolver_match.url_name == 'crea_fornitore' or request.resolver_match.url_name == 'modifica_fornitore' or request.resolver_match.url_name == 'elimina_fornitore' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg></span>
-                                                    <span class="sidebar-link-text">Fornitori</span>
-                                                </a>
-                                                <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' or request.resolver_match.url_name == 'elimina_documenti_fornitori_multipla' %}active{% endif %}">
-                                                    <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
-                                                    <span class="sidebar-link-text">Fatture fornitori</span>
-                                                </a>
-                                                <a href="{% url 'scadenziario_fornitori' %}" class="{% if request.resolver_match.url_name == 'scadenziario_fornitori' %}active{% endif %}">
-                                                    <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                                    <span class="sidebar-link-text">Scadenziario fornitori</span>
-                                                </a>
-                                                <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare_fornitori' or request.resolver_match.url_name == 'riconcilia_movimento_fornitore' %}active{% endif %}">
-                                                    <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                                    <span class="sidebar-link-text">Pagamenti fornitori</span>
+                                                    <span class="sidebar-link-text">Rubrica Fornitori</span>
                                                 </a>
                                                 <div class="sidebar-subsection sidebar-subsection-nested">
                                                     <button
@@ -772,7 +768,7 @@
                         </div>
                     {% endif %}
 
-                    {% if can_view_system_tables and can_view_economia %}
+                    {% if can_view_system_tables and can_view_economia or can_view_system_tables and can_view_gestione_finanziaria %}
                         <div class="sidebar-section" data-sidebar-section-key="parcheggio">
                             <button
                                 type="button"
@@ -786,38 +782,54 @@
                                 </span>
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-parcheggio-panel">
-                                <div class="sidebar-subsection">
-                                    <button
-                                        type="button"
-                                        class="sidebar-collapsible collapsible-title is-open"
-                                        data-target="sidebar-parcheggio-iscrizioni-panel"
-                                        data-storage-key="arboris-sidebar-parcheggio-iscrizioni"
-                                        data-default-open="true"
-                                    >
-                                        <span>Iscrizioni</span>
-                                    </button>
-                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-parcheggio-iscrizioni-panel">
-                                        <nav class="sidebar-nav sidebar-subnav">
-                                            <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' or request.resolver_match.url_name == 'crea_iscrizione' or request.resolver_match.url_name == 'modifica_iscrizione' or request.resolver_match.url_name == 'elimina_iscrizione' or request.resolver_match.url_name == 'ritiro_anticipato_iscrizione' or request.resolver_match.url_name == 'ricalcola_rate_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
-                                                <span class="sidebar-link-text">Iscrizioni</span>
-                                            </a>
-                                            <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' or request.resolver_match.url_name == 'crea_stato_iscrizione' or request.resolver_match.url_name == 'modifica_stato_iscrizione' or request.resolver_match.url_name == 'elimina_stato_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
-                                                <span class="sidebar-link-text">Stati iscrizione</span>
-                                            </a>
-                                            <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' or request.resolver_match.url_name == 'pagamento_rapido_rata_iscrizione' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                                <span class="sidebar-link-text">Rate iscrizione</span>
-                                            </a>
-                                        </nav>
+                                {% if can_view_economia %}
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-parcheggio-iscrizioni-panel"
+                                            data-storage-key="arboris-sidebar-parcheggio-iscrizioni"
+                                            data-default-open="true"
+                                        >
+                                            <span>Iscrizioni</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-parcheggio-iscrizioni-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                <a href="{% url 'lista_iscrizioni' %}" class="{% if request.resolver_match.url_name == 'lista_iscrizioni' or request.resolver_match.url_name == 'crea_iscrizione' or request.resolver_match.url_name == 'modifica_iscrizione' or request.resolver_match.url_name == 'elimina_iscrizione' or request.resolver_match.url_name == 'ritiro_anticipato_iscrizione' or request.resolver_match.url_name == 'ricalcola_rate_iscrizione' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                                                    <span class="sidebar-link-text">Iscrizioni</span>
+                                                </a>
+                                                <a href="{% url 'lista_stati_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_stati_iscrizione' or request.resolver_match.url_name == 'crea_stato_iscrizione' or request.resolver_match.url_name == 'modifica_stato_iscrizione' or request.resolver_match.url_name == 'elimina_stato_iscrizione' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                                    <span class="sidebar-link-text">Stati iscrizione</span>
+                                                </a>
+                                                <a href="{% url 'lista_rate_iscrizione' %}" class="{% if request.resolver_match.url_name == 'lista_rate_iscrizione' or request.resolver_match.url_name == 'modifica_rata_iscrizione' or request.resolver_match.url_name == 'pagamento_rapido_rata_iscrizione' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                                    <span class="sidebar-link-text">Rate iscrizione</span>
+                                                </a>
+                                            </nav>
+                                        </div>
                                     </div>
-                                </div>
+                                {% endif %}
                                 <nav class="sidebar-nav sidebar-subnav">
-                                    <a href="{% url 'lista_notifiche_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_notifiche_finanziarie' %}active{% endif %}">
-                                        <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
-                                        <span class="sidebar-link-text">Notifiche</span>
-                                    </a>
+                                    {% if can_view_gestione_finanziaria %}
+                                        <a href="{% url 'lista_documenti_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_documenti_fornitori' or request.resolver_match.url_name == 'crea_documento_fornitore' or request.resolver_match.url_name == 'modifica_documento_fornitore' or request.resolver_match.url_name == 'elimina_documento_fornitore' or request.resolver_match.url_name == 'elimina_documenti_fornitori_multipla' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                                            <span class="sidebar-link-text">Fatture fornitori</span>
+                                        </a>
+                                        <a href="{% url 'scadenziario_fornitori' %}" class="{% if request.resolver_match.url_name == 'scadenziario_fornitori' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                            <span class="sidebar-link-text">Scadenziario fornitori</span>
+                                        </a>
+                                        <a href="{% url 'lista_movimenti_da_riconciliare_fornitori' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_da_riconciliare_fornitori' or request.resolver_match.url_name == 'riconcilia_movimento_fornitore' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                            <span class="sidebar-link-text">Pagamenti fornitori</span>
+                                        </a>
+                                        <a href="{% url 'lista_notifiche_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_notifiche_finanziarie' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
+                                            <span class="sidebar-link-text">Notifiche</span>
+                                        </a>
+                                    {% endif %}
                                 </nav>
                             </div>
                         </div>
@@ -1088,7 +1100,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/inline-formsets.js' %}?v=6"></script>
     <script src="{% static 'js/core/anagrafica-contacts.js' %}?v=1"></script>
-    <script src="{% static 'js/core/modal-popups.js' %}?v=7"></script>
+    <script src="{% static 'js/core/modal-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/related-popups.js' %}?v=10"></script>
     <script src="{% static 'js/core/popup-window-triggers.js' %}?v=2"></script>
     <script src="{% static 'js/core/rate-recalc-actions.js' %}?v=1"></script>

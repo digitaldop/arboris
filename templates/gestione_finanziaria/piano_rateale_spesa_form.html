@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Nuovo piano rateale - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'spese_mensili_dashboard' %}">Spese mensili</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Nuovo piano rateale</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head">
+        <h1 class="page-title">Nuovo piano rateale</h1>
+        <div class="page-head-actions">
+            <a href="{% url 'spese_mensili_dashboard' %}" class="btn btn-secondary">Torna al riepilogo</a>
+        </div>
+    </div>
+
+    <form method="post" class="detail-form">
+        {% csrf_token %}
+        <div class="content-card">
+            <table class="form-table">
+                {% for field in form.visible_fields %}
+                    <tr>
+                        <th>{{ field.label_tag }}</th>
+                        <td>
+                            {{ field }}
+                            {{ field.errors }}
+                            {% if field.help_text %}<div class="help-text">{{ field.help_text }}</div>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Crea piano e rate</button>
+                <a href="{% url 'spese_mensili_dashboard' %}" class="btn btn-secondary">Annulla</a>
+            </div>
+        </div>
+    </form>
+{% endblock %}

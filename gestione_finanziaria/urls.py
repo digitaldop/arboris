@@ -41,6 +41,26 @@ urlpatterns = [
         gf_edit(views.toggle_voce_budget),
         name="toggle_voce_budget",
     ),
+    path(
+        "gestione-finanziaria/spese-mensili/",
+        gf_view(views.spese_mensili_dashboard),
+        name="spese_mensili_dashboard",
+    ),
+    path(
+        "gestione-finanziaria/spese-mensili/spese/nuova/",
+        gf_manage(views.crea_spesa_operativa),
+        name="crea_spesa_operativa",
+    ),
+    path(
+        "gestione-finanziaria/spese-mensili/spese/<int:pk>/modifica/",
+        gf_edit(views.modifica_spesa_operativa),
+        name="modifica_spesa_operativa",
+    ),
+    path(
+        "gestione-finanziaria/spese-mensili/piani-rateali/nuovo/",
+        gf_manage(views.crea_piano_rateale_spesa),
+        name="crea_piano_rateale_spesa",
+    ),
 
     # Fornitori e documenti passivi
     path(
@@ -112,6 +132,11 @@ urlpatterns = [
         "gestione-finanziaria/scadenziario-fornitori/",
         gf_view(views.scadenziario_fornitori),
         name="scadenziario_fornitori",
+    ),
+    path(
+        "gestione-finanziaria/fatture-scadenze-fornitori/",
+        gf_view(views.fatture_scadenze_fornitori),
+        name="fatture_scadenze_fornitori",
     ),
     path(
         "gestione-finanziaria/fatture-in-cloud/",

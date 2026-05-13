@@ -46,6 +46,7 @@
             {% csrf_token %}
             <input type="hidden" name="scadenza" value="{{ scadenza.pk }}">
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+            {% if reload_url %}<input type="hidden" name="reload_url" value="{{ reload_url }}">{% endif %}
 
             {% if form.non_field_errors %}
                 <div class="settings-warning-box calendar-event-form-errors">

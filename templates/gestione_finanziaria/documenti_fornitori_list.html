@@ -85,6 +85,16 @@
     </div>
 
     <div id="documenti-fornitori-results" class="live-list-results">
+        <div class="supplier-invoice-list-summary" aria-label="Riepilogo fatture fornitori">
+            <span class="supplier-invoice-list-summary-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
+            </span>
+            <div class="supplier-invoice-list-summary-body">
+                <span class="supplier-invoice-list-summary-label">Totale fatture non saldate</span>
+                <strong class="supplier-invoice-list-summary-value">{{ totale_documenti_non_saldati|euro }} &euro;</strong>
+                <span class="supplier-invoice-list-summary-meta">Documenti ancora aperti: {{ numero_documenti_non_saldati }}</span>
+            </div>
+        </div>
         <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
             <div class="panel-body">
                 {% if documenti %}
@@ -101,11 +111,26 @@
                                 <span class="btn-label">Elimina selezionati</span>
                             </button>
                         </div>
-                        <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table">
+                        <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table supplier-invoice-table">
+                            <colgroup>
+                                <col class="supplier-invoice-col-select">
+                                <col class="supplier-invoice-col-document">
+                                <col class="supplier-invoice-col-supplier">
+                                <col class="supplier-invoice-col-date">
+                                <col class="supplier-invoice-col-date">
+                                <col class="supplier-invoice-col-category">
+                                <col class="supplier-invoice-col-money">
+                                <col class="supplier-invoice-col-money supplier-invoice-col-vat">
+                                <col class="supplier-invoice-col-money supplier-invoice-col-total">
+                                <col class="supplier-invoice-col-status">
+                                <col class="supplier-invoice-col-actions">
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th class="finance-bulk-select-col">
-                                        <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all aria-label="Seleziona tutte le fatture visibili">
+                                        <label class="finance-bulk-select-all">
+                                            <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all aria-label="Seleziona tutte le fatture visibili" title="Seleziona tutto">
+                                        </label>
                                     </th>
                                     <th>Fattura</th>
                                     <th>Fornitore</th>
@@ -121,7 +146,7 @@
                             </thead>
                             <tbody>
                                 {% for documento in documenti %}
-                                    <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
+                                    <tr class="list-row-link {% if documento.stato == 'pagato' %}supplier-invoice-row-paid{% elif documento.stato == 'da_pagare' or documento.stato == 'parzialmente_pagato' %}supplier-invoice-row-unpaid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
                                         <td class="finance-bulk-select-col">
                                             <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ documento.pk }}" data-bulk-checkbox aria-label="Seleziona fattura {{ documento.numero_documento }}">
                                         </td>

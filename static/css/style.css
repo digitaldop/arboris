@@ -8373,6 +8373,8 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
 }
 
 .popup-page .supplier-document-detail-shell.is-popup .supplier-payments-table .actions-cell {
+    grid-template-rows: auto 1fr;
+    align-content: stretch;
     justify-items: start;
 }
 
@@ -8383,8 +8385,7 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
 
 .popup-page .supplier-document-detail-shell.is-popup .supplier-payment-line {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    gap: 4px 10px;
+    gap: 4px;
     align-items: center;
     padding: 8px;
     border: 1px solid #e2ebf2;
@@ -8403,8 +8404,11 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     font-size: 11px;
 }
 
-.popup-page .supplier-document-detail-shell.is-popup .supplier-payment-line .btn {
-    grid-row: span 2;
+.popup-page .supplier-document-detail-shell.is-popup .supplier-payment-action-stack {
+    display: grid;
+    align-self: center;
+    justify-items: start;
+    gap: 8px;
 }
 
 .popup-page .supplier-document-detail-shell.is-popup .supplier-payments-table .actions-cell .btn {
@@ -26724,6 +26728,279 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     align-items: flex-end;
 }
 
+.module-gestione_finanziaria .supplier-invoice-list-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border: 1px solid #f0c6cf;
+    border-radius: 8px;
+    background: #fff8f9;
+    box-shadow: 0 8px 22px rgba(120, 23, 45, 0.06);
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: #fde7ec;
+    color: #a30f2d;
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-body {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-label,
+.module-gestione_finanziaria .supplier-invoice-list-summary-meta {
+    color: #60738d;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-label {
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .supplier-invoice-list-summary-value {
+    color: #a30f2d;
+    font-size: 24px;
+    font-weight: 850;
+    line-height: 1.1;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0 0 16px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card.is-expected,
+.module-gestione_finanziaria .supplier-fusion-summary-card.is-unpaid {
+    border-color: #f0c6cf;
+    background: #fff1f4;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card.is-paid {
+    border-color: #cdebd7;
+    background: #eefaf2;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    background: rgba(163, 15, 45, 0.08);
+    color: #a30f2d;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card.is-paid .supplier-fusion-summary-icon {
+    background: rgba(31, 128, 72, 0.1);
+    color: #1f8048;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card div {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card span,
+.module-gestione_finanziaria .supplier-fusion-summary-card small {
+    color: #60738d;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card strong {
+    color: #a30f2d;
+    font-size: 24px;
+    font-weight: 850;
+    line-height: 1.1;
+}
+
+.module-gestione_finanziaria .supplier-fusion-summary-card.is-paid strong {
+    color: #1f8048;
+}
+
+.module-gestione_finanziaria .supplier-fusion-toolbar {
+    display: grid;
+    gap: 12px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 4px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-switch a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 0 12px;
+    border-radius: 6px;
+    color: #52637c;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-switch a:hover,
+.module-gestione_finanziaria .supplier-fusion-view-switch a:focus-visible {
+    color: #a30f2d;
+    background: #fff1f4;
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-switch a.is-active {
+    color: #a30f2d;
+    background: #ffffff;
+    box-shadow: 0 6px 14px rgba(120, 23, 45, 0.08);
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 17px;
+    width: 17px;
+    height: 17px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-view-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-toolbar {
+    margin-bottom: 12px;
+}
+
+.module-gestione_finanziaria .monthly-expense-timeline {
+    display: flex;
+    gap: 10px;
+    margin: 0 0 18px;
+    padding: 2px 0 8px;
+    overflow-x: auto;
+}
+
+.module-gestione_finanziaria .monthly-expense-month {
+    display: grid;
+    gap: 6px;
+    flex: 0 0 172px;
+    min-height: 122px;
+    padding: 12px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #243145;
+    text-decoration: none;
+    box-shadow: 0 8px 18px rgba(32, 54, 69, 0.05);
+    transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.module-gestione_finanziaria .monthly-expense-month:hover,
+.module-gestione_finanziaria .monthly-expense-month:focus-visible {
+    border-color: #b9d2e4;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(32, 54, 69, 0.08);
+}
+
+.module-gestione_finanziaria .monthly-expense-month.is-selected {
+    border-color: #e6aebb;
+    background: #fff1f4;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-name,
+.module-gestione_finanziaria .monthly-expense-month-meta,
+.module-gestione_finanziaria .monthly-expense-month-income {
+    color: #60738d;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-name {
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-main {
+    display: grid;
+    gap: 2px;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-main strong {
+    color: #a30f2d;
+    font-size: 18px;
+    font-weight: 850;
+    line-height: 1.12;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-main em {
+    color: #1f8048;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 850;
+}
+
+.module-gestione_finanziaria .monthly-expense-detail-panel .finance-section-head,
+.module-gestione_finanziaria .monthly-expense-income-panel .finance-section-head {
+    align-items: center;
+    padding-bottom: 12px;
+}
+
+.module-gestione_finanziaria .monthly-expense-table {
+    min-width: 1240px;
+}
+
+.module-gestione_finanziaria .monthly-income-table {
+    min-width: 940px;
+}
+
 .module-gestione_finanziaria .finance-modern-table {
     min-width: 100%;
     border: 0;
@@ -26732,6 +27009,78 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     border-radius: 0;
     overflow: visible;
     font-size: 0.92rem;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table {
+    min-width: 1436px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-select {
+    width: 54px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-document {
+    width: 258px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-supplier {
+    width: 190px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-date {
+    width: 108px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-category {
+    width: 190px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-money {
+    width: 112px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-vat {
+    width: 104px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-total {
+    width: 116px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-status {
+    width: 124px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .supplier-invoice-col-actions {
+    width: 72px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table {
+    min-width: 1120px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-date {
+    width: 130px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-supplier {
+    width: 270px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-category {
+    width: 220px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-money {
+    width: 130px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-status {
+    width: 150px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table .supplier-fusion-col-actions {
+    width: 90px;
 }
 
 .module-gestione_finanziaria .finance-modern-table th,
@@ -26777,6 +27126,66 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .finance-modern-table tbody tr:hover td {
     border-color: #c4d9e8;
     box-shadow: 0 8px 18px rgba(32, 54, 69, 0.07);
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-unpaid td {
+    border-color: #f0c6cf;
+    background: #fff1f4;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-paid td {
+    border-color: #cdebd7;
+    background: #eefaf2;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-unpaid:hover td {
+    border-color: #e6aebb;
+    background: #ffe7ed;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-paid:hover td {
+    border-color: #b8e2c8;
+    background: #e3f6e9;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table th.column-right,
+.module-gestione_finanziaria .supplier-invoice-table td.column-right,
+.module-gestione_finanziaria .supplier-invoice-table .finance-money-cell {
+    white-space: nowrap;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .finance-bulk-select-col {
+    width: 54px;
+    min-width: 54px;
+    max-width: 54px;
+    padding-right: 6px;
+    padding-left: 6px;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .finance-bulk-select-all {
+    flex-direction: column;
+    gap: 4px;
+    width: 42px;
+    margin: 0 auto;
+    font-size: 10px;
+    line-height: 1.05;
+}
+
+.module-gestione_finanziaria .supplier-invoice-table .finance-bulk-select-all span {
+    max-width: 42px;
+}
+
+.module-gestione_finanziaria .supplier-fusion-table th.column-right,
+.module-gestione_finanziaria .supplier-fusion-table td.column-right,
+.module-gestione_finanziaria .supplier-fusion-table .finance-money-cell {
+    white-space: nowrap;
+}
+
+.module-gestione_finanziaria .supplier-fusion-state-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
 }
 
 .module-gestione_finanziaria .finance-row-unread td {
@@ -26871,8 +27280,27 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 }
 
 .module-gestione_finanziaria .finance-bulk-select-col {
-    width: 42px;
+    width: 86px;
     text-align: center;
+}
+
+.module-gestione_finanziaria .finance-bulk-select-all {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: #52637c;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-transform: none;
+    cursor: pointer;
+    white-space: normal;
+}
+
+.module-gestione_finanziaria .finance-bulk-select-all span {
+    display: inline-block;
+    max-width: 52px;
 }
 
 .module-gestione_finanziaria .finance-bulk-checkbox {
@@ -27373,6 +27801,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     .module-gestione_finanziaria .finance-import-csv-grid,
     .module-gestione_finanziaria .finance-toggle-grid,
     .module-gestione_finanziaria .finance-summary-strip,
+    .module-gestione_finanziaria .supplier-fusion-summary-grid,
     .module-gestione_finanziaria .finance-form-side {
         grid-template-columns: 1fr;
     }
@@ -27390,6 +27819,22 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     .module-gestione_finanziaria .finance-inline-match-form input,
     .module-gestione_finanziaria .finance-inline-match-form .btn {
         width: 100%;
+    }
+
+    .module-gestione_finanziaria .supplier-fusion-view-switch {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+
+    .module-gestione_finanziaria .supplier-fusion-view-switch a {
+        white-space: normal;
+    }
+
+    .module-gestione_finanziaria .monthly-expense-detail-panel .finance-section-head,
+    .module-gestione_finanziaria .monthly-expense-income-panel .finance-section-head {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
 

@@ -527,9 +527,33 @@ window.ArborisModalPopups = (function () {
         }
     }
 
+    function navigateWindow(targetWindow, url) {
+        if (!targetWindow || !targetWindow.location || !url) {
+            return false;
+        }
+
+        try {
+            targetWindow.location.href = new URL(url, targetWindow.location.href).toString();
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     function handleReload(sourceWindow) {
         reloadOpener(getOpenerWindow(sourceWindow));
         closeForWindow(sourceWindow);
+    }
+
+    function handleReloadToUrl(sourceWindow, url) {
+        const openerWindow = getOpenerWindow(sourceWindow);
+        if (openerWindow && openerWindow !== window) {
+            reloadOpener(openerWindow);
+        }
+        closeForWindow(sourceWindow);
+        if (!navigateWindow(window, url)) {
+            reloadOpener(window);
+        }
     }
 
     document.addEventListener("focusin", function (event) {
@@ -560,6 +584,7 @@ window.ArborisModalPopups = (function () {
         focusTopLayer: focusTopLayer,
         handleRelatedSelection: handleRelatedSelection,
         handleReload: handleReload,
+        handleReloadToUrl: handleReloadToUrl,
         open: open,
         requestResizeForWindow: requestResizeForWindow,
     };

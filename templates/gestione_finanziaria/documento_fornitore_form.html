@@ -30,6 +30,18 @@
             </div>
             {% if documento %}
                 <div class="calendar-category-hero-actions supplier-document-hero-actions">
+                    {% if scadenza_collegamento_movimento %}
+                        <a
+                            href="{% url 'registra_pagamento_scadenza_fornitore' scadenza_collegamento_movimento.pk %}?popup=1"
+                            class="btn btn-secondary btn-icon-text"
+                            data-window-popup="1"
+                            data-popup-url="{% url 'registra_pagamento_scadenza_fornitore' scadenza_collegamento_movimento.pk %}?popup=1"
+                            data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                        >
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                            <span class="btn-label">Collega movimento bancario</span>
+                        </a>
+                    {% endif %}
                     <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-documento-fornitore-btn">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
                         <span class="btn-label">Modifica</span>
@@ -457,10 +469,6 @@
                                                         {% if pagamento.movimento_finanziario %}
                                                             <small>{{ pagamento.movimento_finanziario }}</small>
                                                         {% endif %}
-                                                        <a href="{% url 'elimina_pagamento_fornitore' pagamento.pk %}" class="btn btn-danger btn-sm btn-icon-text mode-edit-only">
-                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                                            <span class="btn-label">Annulla</span>
-                                                        </a>
                                                     </div>
                                                 {% empty %}
                                                     <span class="table-muted">Nessun pagamento registrato.</span>
@@ -469,14 +477,32 @@
                                         </td>
                                         <td data-label="Residuo">{{ scadenza.importo_residuo|euro }} &euro;</td>
                                         <td class="actions-cell" data-label="Azioni">
-                                            {% if scadenza.importo_residuo %}
-                                                <a href="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1" class="btn btn-secondary btn-sm btn-icon-text" data-window-popup="1" data-popup-url="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1" data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes">
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
-                                                    <span class="btn-label">Registra pagamento</span>
-                                                </a>
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% with pagamenti=scadenza.pagamenti.all %}
+                                                {% if pagamenti or scadenza.importo_residuo %}
+                                                    <div class="supplier-payment-action-stack">
+                                                        {% for pagamento in pagamenti %}
+                                                            <a
+                                                                href="{% url 'elimina_pagamento_fornitore' pagamento.pk %}?popup=1"
+                                                                class="btn btn-danger btn-sm btn-icon-text{% if not pagamento.movimento_finanziario %} mode-edit-only{% endif %}"
+                                                                data-window-popup="1"
+                                                                data-popup-url="{% url 'elimina_pagamento_fornitore' pagamento.pk %}?popup=1"
+                                                                data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                                                            >
+                                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                                <span class="btn-label">{% if pagamento.movimento_finanziario %}Elimina movimento{% else %}Annulla{% endif %}</span>
+                                                            </a>
+                                                        {% endfor %}
+                                                        {% if scadenza.importo_residuo %}
+                                                            <a href="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1" class="btn btn-secondary btn-sm btn-icon-text" data-window-popup="1" data-popup-url="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1" data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes">
+                                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                                                                <span class="btn-label">Registra pagamento</span>
+                                                            </a>
+                                                        {% endif %}
+                                                    </div>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            {% endwith %}
                                         </td>
                                     </tr>
                                 {% empty %}

@@ -365,6 +365,7 @@ class SidebarEconomiaTests(TestCase):
             user=admin_user,
             ruolo=RuoloUtente.AMMINISTRATORE,
             permesso_economia=LivelloPermesso.VISUALIZZAZIONE,
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
         )
         self.client.force_login(admin_user)
 
@@ -381,7 +382,12 @@ class SidebarEconomiaTests(TestCase):
         self.assertIn(f'href="{reverse("lista_iscrizioni")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_stati_iscrizione")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_rate_iscrizione")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_documenti_fornitori")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("scadenziario_fornitori")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_movimenti_da_riconciliare_fornitori")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_notifiche_finanziarie")}"', parcheggio_section)
+        self.assertLess(parcheggio_section.index("Fatture fornitori"), parcheggio_section.index("Scadenziario fornitori"))
+        self.assertLess(parcheggio_section.index("Scadenziario fornitori"), parcheggio_section.index("Pagamenti fornitori"))
 
 
 class SidebarGestioneFinanziariaTests(TestCase):
@@ -410,11 +416,10 @@ class SidebarGestioneFinanziariaTests(TestCase):
         labels_in_order = [
             "Dashboard",
             "Budgeting",
+            "Spese mensili",
             "<span>Fornitori</span>",
-            "Fornitori",
-            "Fatture fornitori",
-            "Scadenziario fornitori",
-            "Pagamenti fornitori",
+            "Fatture e scadenze",
+            "Rubrica Fornitori",
             "<span>Impostazioni Fornitori</span>",
             "Fatture in Cloud",
             "Categorie di spesa",
@@ -438,7 +443,10 @@ class SidebarGestioneFinanziariaTests(TestCase):
             current_index = gestione_finanziaria_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
+        self.assertNotIn("Fatture fornitori", gestione_finanziaria_section)
+        self.assertNotIn("Scadenziario fornitori", gestione_finanziaria_section)
         self.assertNotIn("Notifiche", gestione_finanziaria_section)
+        self.assertNotIn("Pagamenti fornitori", gestione_finanziaria_section)
 
     def test_home_renders_financial_dashboard_block(self):
         self.client.force_login(self.user)

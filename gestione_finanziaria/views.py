@@ -53,6 +53,7 @@ from .forms import (
     MovimentoFinanziarioForm,
     NuovaConnessioneBancariaForm,
     PagamentoFornitoreForm,
+    PianoRatealeSpesaForm,
     PianificazioneSincronizzazioneForm,
     PuliziaMovimentiFinanziariForm,
     ProviderBancarioForm,
@@ -61,9 +62,11 @@ from .forms import (
     SaldoContoForm,
     ScadenzaPagamentoFornitoreCreateFormSet,
     ScadenzaPagamentoFornitoreFormSet,
+    SpesaOperativaForm,
     VoceBudgetRicorrenteForm,
     movimenti_fornitore_recenti_ids,
 )
+from gestione_amministrativa.models import BustaPagaDipendente
 from .importers import (
     Camt053Parser,
     CsvImporter,
@@ -90,18 +93,22 @@ from .models import (
     NotificaFinanziaria,
     NotificaFinanziariaLettura,
     PagamentoFornitore,
+    PianoRatealeSpesa,
     OrigineMovimento,
     ProviderBancario,
     RegolaCategorizzazione,
     SaldoConto,
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
+    SpesaOperativa,
     StatoConnessioneBancaria,
     StatoConnessioneFattureInCloud,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
     StatoRiconciliazione,
     TipoCategoriaFinanziaria,
+    TipoPianoRatealeSpesa,
+    TipoSpesaOperativa,
     TipoProviderBancario,
     VoceBudgetRicorrente,
 )
@@ -722,11 +729,31 @@ def lista_documenti_fornitori(request):
     if stato:
         documenti = documenti.filter(stato=stato)
 
+    documenti = list(documenti)
+    stati_non_saldati = {
+        StatoDocumentoFornitore.DA_PAGARE,
+        StatoDocumentoFornitore.PARZIALMENTE_PAGATO,
+    }
+    totale_documenti_non_saldati = Decimal("0.00")
+    numero_documenti_non_saldati = 0
+    for documento in documenti:
+        if documento.stato not in stati_non_saldati:
+            continue
+        numero_documenti_non_saldati += 1
+        importo_pagato = sum(
+            (scadenza.importo_pagato or Decimal("0.00") for scadenza in documento.scadenze.all()),
+            Decimal("0.00"),
+        )
+        residuo = (documento.totale or Decimal("0.00")) - importo_pagato
+        totale_documenti_non_saldati += max(residuo, Decimal("0.00"))
+
     return render(
         request,
         "gestione_finanziaria/documenti_fornitori_list.html",
         {
             "documenti": documenti,
+            "totale_documenti_non_saldati": totale_documenti_non_saldati,
+            "numero_documenti_non_saldati": numero_documenti_non_saldati,
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
             "categorie": _categorie_spesa_queryset(attive_solo=True),
             "stati": StatoDocumentoFornitore.choices,
@@ -738,12 +765,24 @@ def lista_documenti_fornitori(request):
     )
 
 
+def _scadenza_documento_da_collegare(documento):
+    if not documento:
+        return None
+
+    stati_chiusi = {StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA}
+    for scadenza in documento.scadenze.all():
+        if scadenza.stato not in stati_chiusi and scadenza.importo_residuo > Decimal("0.00"):
+            return scadenza
+    return None
+
+
 def _documento_form_context(form, formset, documento, popup=False):
     return {
         "form": form,
         "formset": formset,
         "documento": documento,
         "popup": popup,
+        "scadenza_collegamento_movimento": _scadenza_documento_da_collegare(documento),
     }
 
 
@@ -918,6 +957,17 @@ def _safe_next_url(request, fallback_url_name):
     return reverse(fallback_url_name)
 
 
+def _safe_reload_url(request, fallback_url_name):
+    reload_url = request.GET.get("reload_url") or request.POST.get("reload_url") or ""
+    if reload_url and url_has_allowed_host_and_scheme(
+        reload_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return reload_url
+    return reverse(fallback_url_name)
+
+
 def elimina_documenti_fornitori_multipla(request):
     if request.method != "POST":
         return redirect("lista_documenti_fornitori")
@@ -1008,6 +1058,508 @@ def scadenziario_fornitori(request):
             "categoria_selezionata": categoria_id,
             "fornitore_selezionato": fornitore_id,
         },
+    )
+
+
+def fatture_scadenze_fornitori(request):
+    q = (request.GET.get("q") or "").strip()
+    stato = request.GET.get("stato") or ""
+    vista = (request.GET.get("vista") or "tutte").strip()
+    if vista not in {"tutte", "insolute"}:
+        vista = "tutte"
+    categoria_id = request.GET.get("categoria") or ""
+    fornitore_id = request.GET.get("fornitore") or ""
+    oggi = timezone.localdate()
+
+    scadenze = (
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__fornitore",
+            "documento__fornitore__categoria_spesa",
+            "documento__categoria_spesa",
+        )
+        .exclude(stato=StatoScadenzaFornitore.ANNULLATA)
+        .order_by("data_scadenza", "id")
+    )
+    if q:
+        scadenze = scadenze.filter(
+            Q(documento__numero_documento__icontains=q)
+            | Q(documento__descrizione__icontains=q)
+            | Q(documento__fornitore__denominazione__icontains=q)
+        )
+    if fornitore_id.isdigit():
+        scadenze = scadenze.filter(documento__fornitore_id=int(fornitore_id))
+    if categoria_id.isdigit():
+        categoria_pk = int(categoria_id)
+        scadenze = scadenze.filter(
+            Q(documento__categoria_spesa_id=categoria_pk)
+            | Q(documento__categoria_spesa__isnull=True, documento__fornitore__categoria_spesa_id=categoria_pk)
+        )
+    if stato == "pagata":
+        scadenze = scadenze.filter(stato=StatoScadenzaFornitore.PAGATA)
+    elif stato == "da_pagare":
+        scadenze = scadenze.exclude(stato=StatoScadenzaFornitore.PAGATA)
+    elif stato == "scaduta":
+        scadenze = scadenze.exclude(stato=StatoScadenzaFornitore.PAGATA).filter(data_scadenza__lt=oggi)
+
+    scadenze_tutte = list(scadenze)
+    for scadenza in scadenze_tutte:
+        scadenza.mostra_badge_scaduta = (
+            scadenza.importo_residuo > Decimal("0.00")
+            and scadenza.data_scadenza
+            and scadenza.data_scadenza < oggi
+        )
+
+    totale_previsto = sum((scadenza.importo_previsto or Decimal("0.00") for scadenza in scadenze_tutte), Decimal("0.00"))
+    totale_pagato = sum((scadenza.importo_pagato or Decimal("0.00") for scadenza in scadenze_tutte), Decimal("0.00"))
+    totale_residuo = sum((scadenza.importo_residuo for scadenza in scadenze_tutte), Decimal("0.00"))
+    scadenze_scadute_count = sum(1 for scadenza in scadenze_tutte if scadenza.mostra_badge_scaduta)
+
+    scadenze = scadenze_tutte
+    if vista == "insolute":
+        scadenze = [scadenza for scadenza in scadenze if scadenza.importo_residuo > Decimal("0.00")]
+
+    switch_params = {}
+    if q:
+        switch_params["q"] = q
+    if fornitore_id:
+        switch_params["fornitore"] = fornitore_id
+    if categoria_id:
+        switch_params["categoria"] = categoria_id
+
+    def switch_url(vista_value):
+        params = {**switch_params, "vista": vista_value}
+        return f"{reverse('fatture_scadenze_fornitori')}?{urlencode(params)}"
+
+    return render(
+        request,
+        "gestione_finanziaria/fatture_scadenze_fornitori.html",
+        {
+            "scadenze": scadenze,
+            "totale_previsto": totale_previsto,
+            "totale_pagato": totale_pagato,
+            "totale_residuo": totale_residuo,
+            "scadenze_scadute_count": scadenze_scadute_count,
+            "q": q,
+            "stato": stato,
+            "vista": vista,
+            "vista_tutte_url": switch_url("tutte"),
+            "vista_insolute_url": switch_url("insolute"),
+            "categorie": _categorie_spesa_queryset(attive_solo=True),
+            "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
+            "categoria_selezionata": categoria_id,
+            "fornitore_selezionato": fornitore_id,
+        },
+    )
+
+
+MESI_BREVI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
+
+
+def _first_day(value):
+    return date(value.year, value.month, 1)
+
+
+def _last_day(value):
+    return date(value.year, value.month, monthrange(value.year, value.month)[1])
+
+
+def _add_months(value, months, day=None):
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    target_day = day or value.day
+    return date(year, month, min(target_day, monthrange(year, month)[1]))
+
+
+def _month_key(value):
+    return f"{value.year}-{value.month:02d}"
+
+
+def _month_from_key(value, fallback):
+    try:
+        year, month = (int(part) for part in (value or "").split("-", 1))
+        return date(year, month, 1)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _periodo_spese_mensili(request):
+    oggi = timezone.localdate()
+    periodo = request.GET.get("periodo") or "solare"
+    if periodo not in {"solare", "scolastico"}:
+        periodo = "solare"
+
+    anni_scolastici = list(AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id"))
+    anno_scolastico = None
+    anno_scolastico_id = request.GET.get("anno_scolastico") or ""
+    if anno_scolastico_id.isdigit():
+        anno_scolastico = next((anno for anno in anni_scolastici if anno.pk == int(anno_scolastico_id)), None)
+    if anno_scolastico is None:
+        anno_scolastico = next((anno for anno in anni_scolastici if anno.is_corrente), None)
+    if anno_scolastico is None and anni_scolastici:
+        anno_scolastico = anni_scolastici[0]
+
+    anno_raw = request.GET.get("anno") or str(oggi.year)
+    anno = int(anno_raw) if str(anno_raw).isdigit() else oggi.year
+    anni_solari = list(range(oggi.year - 3, oggi.year + 4))
+    if anno not in anni_solari:
+        anni_solari.append(anno)
+        anni_solari.sort()
+
+    if periodo == "scolastico" and anno_scolastico:
+        start = _first_day(anno_scolastico.data_inizio)
+    else:
+        periodo = "solare"
+        start = date(anno, 1, 1)
+
+    mesi = [_add_months(start, offset, day=1) for offset in range(12)]
+    selected_month = _month_from_key(request.GET.get("mese"), _first_day(oggi))
+    if _month_key(selected_month) not in {_month_key(mese) for mese in mesi}:
+        selected_month = mesi[0]
+    end = _last_day(mesi[-1])
+
+    return {
+        "periodo": periodo,
+        "anno": anno,
+        "anni_solari": anni_solari,
+        "anni_scolastici": anni_scolastici,
+        "anno_scolastico": anno_scolastico,
+        "start": start,
+        "end": end,
+        "mesi": mesi,
+        "selected_month": selected_month,
+    }
+
+
+def _base_period_params(periodo_data, selected_month=None, vista=None):
+    params = {"periodo": periodo_data["periodo"]}
+    if periodo_data["periodo"] == "scolastico" and periodo_data["anno_scolastico"]:
+        params["anno_scolastico"] = periodo_data["anno_scolastico"].pk
+    else:
+        params["anno"] = periodo_data["anno"]
+    if selected_month:
+        params["mese"] = _month_key(selected_month)
+    if vista:
+        params["vista"] = vista
+    return params
+
+
+def _spesa_row(
+    *,
+    data_scadenza,
+    tipo,
+    descrizione,
+    soggetto="",
+    categoria=None,
+    importo_previsto=Decimal("0.00"),
+    importo_pagato=Decimal("0.00"),
+    detail_url="",
+    action_url="",
+    action_label="",
+):
+    importo_previsto = importo_previsto or Decimal("0.00")
+    importo_pagato = importo_pagato or Decimal("0.00")
+    residuo = max(importo_previsto - importo_pagato, Decimal("0.00"))
+    return {
+        "data_scadenza": data_scadenza,
+        "mese_key": _month_key(data_scadenza),
+        "tipo": tipo,
+        "descrizione": descrizione,
+        "soggetto": soggetto or "-",
+        "categoria": categoria or "-",
+        "importo_previsto": importo_previsto,
+        "importo_pagato": importo_pagato,
+        "residuo": residuo,
+        "pagata": residuo <= Decimal("0.00"),
+        "scaduta": residuo > Decimal("0.00") and data_scadenza < timezone.localdate(),
+        "detail_url": detail_url,
+        "action_url": action_url,
+        "action_label": action_label,
+    }
+
+
+def _spese_mensili_rows(request, start, end):
+    rows = []
+
+    scadenze = (
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__fornitore",
+            "documento__categoria_spesa",
+            "documento__fornitore__categoria_spesa",
+        )
+        .exclude(stato=StatoScadenzaFornitore.ANNULLATA)
+        .filter(data_scadenza__gte=start, data_scadenza__lte=end)
+        .order_by("data_scadenza", "id")
+    )
+    for scadenza in scadenze:
+        documento = scadenza.documento
+        residuo = scadenza.importo_residuo
+        payment_url = ""
+        if residuo > Decimal("0.00"):
+            payment_url = (
+                f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?"
+                f"{urlencode({'popup': '1', 'reload_url': request.get_full_path()})}"
+            )
+        rows.append(
+            _spesa_row(
+                data_scadenza=scadenza.data_scadenza,
+                tipo="Fattura",
+                descrizione=documento.descrizione or f"Fattura {documento.numero_documento}",
+                soggetto=documento.fornitore.denominazione,
+                categoria=documento.categoria_spesa_effettiva,
+                importo_previsto=scadenza.importo_previsto,
+                importo_pagato=scadenza.importo_pagato,
+                detail_url=f"{reverse('modifica_documento_fornitore', kwargs={'pk': documento.pk})}?popup=1",
+                action_url=payment_url,
+                action_label="Registra pagamento",
+            )
+        )
+
+    spese = (
+        SpesaOperativa.objects.select_related("categoria", "fornitore", "dipendente", "piano_rateale")
+        .filter(data_scadenza__gte=start, data_scadenza__lte=end)
+        .order_by("data_scadenza", "id")
+    )
+    for spesa in spese:
+        rows.append(
+            _spesa_row(
+                data_scadenza=spesa.data_scadenza,
+                tipo=spesa.get_tipo_display(),
+                descrizione=spesa.descrizione,
+                soggetto=str(spesa.soggetto_label) if spesa.soggetto_label else "",
+                categoria=spesa.categoria,
+                importo_previsto=spesa.importo_previsto,
+                importo_pagato=spesa.importo_pagato,
+                detail_url=reverse("modifica_spesa_operativa", kwargs={"pk": spesa.pk}),
+                action_url=reverse("modifica_spesa_operativa", kwargs={"pk": spesa.pk}) if spesa.importo_residuo else "",
+                action_label="Aggiorna pagamento",
+            )
+        )
+
+    buste = BustaPagaDipendente.objects.select_related("dipendente").filter(
+        anno__gte=start.year,
+        anno__lte=end.year,
+    )
+    for busta in buste:
+        data_scadenza = date(busta.anno, busta.mese, monthrange(busta.anno, busta.mese)[1])
+        if data_scadenza < start or data_scadenza > end:
+            continue
+        importo_previsto = (
+            busta.costo_azienda_effettivo
+            or busta.costo_azienda_previsto
+            or busta.netto_effettivo
+            or busta.netto_previsto
+            or Decimal("0.00")
+        )
+        if importo_previsto <= Decimal("0.00"):
+            continue
+        importo_pagato = importo_previsto if busta.data_pagamento_effettiva or busta.movimento_pagamento_id else Decimal("0.00")
+        rows.append(
+            _spesa_row(
+                data_scadenza=data_scadenza,
+                tipo="Busta paga",
+                descrizione=f"Busta paga {busta.periodo_label}",
+                soggetto=str(busta.dipendente),
+                categoria="-",
+                importo_previsto=importo_previsto,
+                importo_pagato=importo_pagato,
+                detail_url=reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta.pk}),
+                action_url=reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta.pk}) if importo_pagato < importo_previsto else "",
+                action_label="Apri busta paga",
+            )
+        )
+
+    return sorted(rows, key=lambda row: (row["data_scadenza"], row["descrizione"]))
+
+
+def _introiti_mensili(start, end):
+    return list(
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .filter(data_contabile__gte=start, data_contabile__lte=end, importo__gt=0)
+        .filter(Q(origine__in=[OrigineMovimento.BANCA, OrigineMovimento.IMPORT_FILE]) | Q(incide_su_saldo_banca=True))
+        .order_by("data_contabile", "id")
+    )
+
+
+def spese_mensili_dashboard(request):
+    periodo_data = _periodo_spese_mensili(request)
+    vista = request.GET.get("vista") or "tutte"
+    if vista not in {"tutte", "insolute"}:
+        vista = "tutte"
+
+    rows = _spese_mensili_rows(request, periodo_data["start"], periodo_data["end"])
+    introiti = _introiti_mensili(periodo_data["start"], periodo_data["end"])
+    month_stats = {
+        _month_key(mese): {
+            "date": mese,
+            "key": _month_key(mese),
+            "label": f"{MESI_BREVI[mese.month - 1]} {mese.year}",
+            "totale_spese": Decimal("0.00"),
+            "residuo": Decimal("0.00"),
+            "spese_count": 0,
+            "insolute_count": 0,
+            "introiti": Decimal("0.00"),
+            "url": f"{reverse('spese_mensili_dashboard')}?{urlencode(_base_period_params(periodo_data, mese, vista))}",
+            "is_selected": _month_key(mese) == _month_key(periodo_data["selected_month"]),
+        }
+        for mese in periodo_data["mesi"]
+    }
+
+    for row in rows:
+        stats = month_stats.get(row["mese_key"])
+        if not stats:
+            continue
+        stats["totale_spese"] += row["importo_previsto"]
+        stats["residuo"] += row["residuo"]
+        stats["spese_count"] += 1
+        if row["residuo"] > Decimal("0.00"):
+            stats["insolute_count"] += 1
+
+    for movimento in introiti:
+        stats = month_stats.get(_month_key(movimento.data_contabile))
+        if stats:
+            stats["introiti"] += movimento.importo or Decimal("0.00")
+
+    selected_key = _month_key(periodo_data["selected_month"])
+    selected_rows_all = [row for row in rows if row["mese_key"] == selected_key]
+    selected_rows = (
+        [row for row in selected_rows_all if row["residuo"] > Decimal("0.00")]
+        if vista == "insolute"
+        else selected_rows_all
+    )
+    selected_introiti = [movimento for movimento in introiti if _month_key(movimento.data_contabile) == selected_key]
+
+    switch_params = _base_period_params(periodo_data, periodo_data["selected_month"])
+    vista_tutte_url = f"{reverse('spese_mensili_dashboard')}?{urlencode({**switch_params, 'vista': 'tutte'})}"
+    vista_insolute_url = f"{reverse('spese_mensili_dashboard')}?{urlencode({**switch_params, 'vista': 'insolute'})}"
+
+    return render(
+        request,
+        "gestione_finanziaria/spese_mensili_dashboard.html",
+        {
+            **periodo_data,
+            "month_stats": list(month_stats.values()),
+            "selected_month_key": selected_key,
+            "selected_month_label": f"{MESI_BREVI[periodo_data['selected_month'].month - 1]} {periodo_data['selected_month'].year}",
+            "selected_rows": selected_rows,
+            "selected_rows_all_count": len(selected_rows_all),
+            "selected_introiti": selected_introiti,
+            "selected_introiti_total": sum((movimento.importo or Decimal("0.00") for movimento in selected_introiti), Decimal("0.00")),
+            "vista": vista,
+            "vista_tutte_url": vista_tutte_url,
+            "vista_insolute_url": vista_insolute_url,
+        },
+    )
+
+
+def _redirect_spese_mensili_for_date(value):
+    params = {"periodo": "solare", "anno": value.year, "mese": _month_key(value)}
+    return f"{reverse('spese_mensili_dashboard')}?{urlencode(params)}"
+
+
+def crea_spesa_operativa(request):
+    if request.method == "POST":
+        form = SpesaOperativaForm(request.POST)
+        if form.is_valid():
+            spesa = form.save(commit=False)
+            spesa.creato_da = request.user if request.user.is_authenticated else None
+            spesa.save()
+            messages.success(request, "Spesa registrata correttamente.")
+            return redirect(_safe_next_url(request, "spese_mensili_dashboard") if request.POST.get("next") else _redirect_spese_mensili_for_date(spesa.data_scadenza))
+    else:
+        form = SpesaOperativaForm(
+            initial={
+                "data_scadenza": timezone.localdate(),
+                "tipo": TipoSpesaOperativa.MANUALE,
+                "importo_pagato": Decimal("0.00"),
+            }
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/spesa_operativa_form.html",
+        {"form": form, "spesa": None, "next_url": request.GET.get("next") or ""},
+    )
+
+
+def modifica_spesa_operativa(request, pk):
+    spesa = get_object_or_404(SpesaOperativa, pk=pk)
+    if request.method == "POST":
+        form = SpesaOperativaForm(request.POST, instance=spesa)
+        if form.is_valid():
+            spesa = form.save()
+            messages.success(request, "Spesa aggiornata correttamente.")
+            return redirect(_safe_next_url(request, "spese_mensili_dashboard") if request.POST.get("next") else _redirect_spese_mensili_for_date(spesa.data_scadenza))
+    else:
+        form = SpesaOperativaForm(instance=spesa)
+
+    return render(
+        request,
+        "gestione_finanziaria/spesa_operativa_form.html",
+        {"form": form, "spesa": spesa, "next_url": request.GET.get("next") or ""},
+    )
+
+
+def _tipo_spesa_da_piano(piano):
+    if piano.tipo == TipoPianoRatealeSpesa.F24:
+        return TipoSpesaOperativa.F24
+    if piano.tipo == TipoPianoRatealeSpesa.FINANZIAMENTO:
+        return TipoSpesaOperativa.FINANZIAMENTO
+    return TipoSpesaOperativa.RATA_PIANO
+
+
+def _genera_rate_piano_spesa(piano):
+    piano.rate.all().delete()
+    importo_base = (piano.importo_totale / Decimal(piano.numero_rate)).quantize(Decimal("0.01"))
+    totale_precedente = Decimal("0.00")
+    giorno_scadenza = piano.giorno_scadenza or piano.data_prima_scadenza.day
+    for index in range(piano.numero_rate):
+        if index == piano.numero_rate - 1:
+            importo_rata = piano.importo_totale - totale_precedente
+        else:
+            importo_rata = importo_base
+            totale_precedente += importo_rata
+        SpesaOperativa.objects.create(
+            piano_rateale=piano,
+            numero_rata=index + 1,
+            totale_rate=piano.numero_rate,
+            tipo=_tipo_spesa_da_piano(piano),
+            descrizione=f"{piano.descrizione} - rata {index + 1}/{piano.numero_rate}",
+            categoria=piano.categoria,
+            fornitore=piano.fornitore,
+            data_scadenza=_add_months(piano.data_prima_scadenza, index * piano.frequenza_mesi, day=giorno_scadenza),
+            importo_previsto=importo_rata,
+            importo_pagato=Decimal("0.00"),
+            creato_da=piano.creato_da,
+        )
+
+
+def crea_piano_rateale_spesa(request):
+    if request.method == "POST":
+        form = PianoRatealeSpesaForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                piano = form.save(commit=False)
+                piano.creato_da = request.user if request.user.is_authenticated else None
+                piano.save()
+                _genera_rate_piano_spesa(piano)
+            messages.success(request, "Piano rateale creato e rate generate correttamente.")
+            return redirect(_redirect_spese_mensili_for_date(piano.data_prima_scadenza))
+    else:
+        form = PianoRatealeSpesaForm(
+            initial={
+                "data_prima_scadenza": timezone.localdate(),
+                "numero_rate": 12,
+                "frequenza_mesi": 1,
+            }
+        )
+
+    return render(
+        request,
+        "gestione_finanziaria/piano_rateale_spesa_form.html",
+        {"form": form},
     )
 
 
@@ -1398,7 +1950,10 @@ def registra_pagamento_scadenza_fornitore(request, pk):
                     return render(
                         request,
                         "popup/popup_close.html",
-                        {"message": "Pagamento fornitore registrato correttamente."},
+                        {
+                            "message": "Pagamento fornitore registrato correttamente.",
+                            "reload_url": _safe_reload_url(request, "lista_documenti_fornitori"),
+                        },
                     )
                 return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
             except ValidationError as exc:
@@ -1416,11 +1971,18 @@ def registra_pagamento_scadenza_fornitore(request, pk):
     return render(
         request,
         "gestione_finanziaria/pagamento_fornitore_form.html",
-        {"form": form, "scadenza": scadenza, "popup": popup, "candidati_movimento": candidati_movimento},
+        {
+            "form": form,
+            "scadenza": scadenza,
+            "popup": popup,
+            "candidati_movimento": candidati_movimento,
+            "reload_url": request.GET.get("reload_url") or request.POST.get("reload_url") or "",
+        },
     )
 
 
 def elimina_pagamento_fornitore(request, pk):
+    popup = is_popup_request(request)
     pagamento = get_object_or_404(
         PagamentoFornitore.objects.select_related("scadenza", "scadenza__documento", "scadenza__documento__fornitore"),
         pk=pk,
@@ -1428,12 +1990,22 @@ def elimina_pagamento_fornitore(request, pk):
     documento_id = pagamento.scadenza.documento_id
     if request.method == "POST":
         annulla_pagamento_fornitore(pagamento)
-        messages.success(request, "Pagamento fornitore annullato.")
+        messaggio = "Pagamento fornitore annullato."
+        if popup:
+            return render(
+                request,
+                "popup/popup_close.html",
+                {
+                    "message": messaggio,
+                    "reload_url": _safe_reload_url(request, "lista_documenti_fornitori"),
+                },
+            )
+        messages.success(request, messaggio)
         return redirect("modifica_documento_fornitore", pk=documento_id)
     return render(
         request,
         "gestione_finanziaria/pagamento_fornitore_confirm_delete.html",
-        {"pagamento": pagamento},
+        {"pagamento": pagamento, "popup": popup, "reload_url": request.GET.get("reload_url") or request.POST.get("reload_url") or ""},
     )
 
 

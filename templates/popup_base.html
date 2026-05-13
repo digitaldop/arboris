@@ -85,7 +85,7 @@
             ArborisTerminology.init();
         }
     </script>
-    <script src="{% static 'js/core/modal-popups.js' %}?v=7"></script>
+    <script src="{% static 'js/core/modal-popups.js' %}?v=8"></script>
     <script src="{% static 'js/core/related-popups.js' %}?v=9"></script>
     <script src="{% static 'js/core/citta-autocomplete.js' %}?v=7"></script>
     <script src="{% static 'js/core/famiglia-autocomplete.js' %}?v=9"></script>
@@ -156,6 +156,9 @@
             }
             if (window.ArborisButtonIntents) {
                 ArborisButtonIntents.init(document);
+            }
+            if (window.ArborisPopupWindowTriggers) {
+                ArborisPopupWindowTriggers.wire(document);
             }
             if (window.ArborisCopyActions) {
                 ArborisCopyActions.init(document);

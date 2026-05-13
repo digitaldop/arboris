@@ -575,6 +575,200 @@ class PagamentoFornitore(models.Model):
         return f"{self.scadenza} - {self.importo}"
 
 
+class TipoSpesaOperativa(models.TextChoices):
+    MANUALE = "manuale", "Spesa manuale"
+    CONTANTI = "contanti", "Contanti"
+    BUSTA_PAGA = "busta_paga", "Busta paga"
+    F24 = "f24", "F24 / contributi"
+    RATA_PIANO = "rata_piano", "Rata piano"
+    FINANZIAMENTO = "finanziamento", "Finanziamento"
+    ALTRO = "altro", "Altro"
+
+
+class TipoPianoRatealeSpesa(models.TextChoices):
+    FINANZIAMENTO = "finanziamento", "Finanziamento"
+    F24 = "f24", "F24 / contributi"
+    FORNITORE = "fornitore", "Rateizzazione fornitore"
+    ALTRO = "altro", "Altro piano rateale"
+
+
+class PianoRatealeSpesa(models.Model):
+    descrizione = models.CharField(max_length=180)
+    tipo = models.CharField(
+        max_length=30,
+        choices=TipoPianoRatealeSpesa.choices,
+        default=TipoPianoRatealeSpesa.FINANZIAMENTO,
+    )
+    categoria = models.ForeignKey(
+        CategoriaFinanziaria,
+        on_delete=models.PROTECT,
+        related_name="piani_rateali_spesa",
+        blank=True,
+        null=True,
+    )
+    fornitore = models.ForeignKey(
+        Fornitore,
+        on_delete=models.SET_NULL,
+        related_name="piani_rateali_spesa",
+        blank=True,
+        null=True,
+    )
+    importo_totale = models.DecimalField(max_digits=12, decimal_places=2)
+    numero_rate = models.PositiveSmallIntegerField(default=1)
+    frequenza_mesi = models.PositiveSmallIntegerField(default=1)
+    data_prima_scadenza = models.DateField(db_index=True)
+    giorno_scadenza = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text="Giorno del mese da usare per le rate successive. Se vuoto usa il giorno della prima scadenza.",
+    )
+    attivo = models.BooleanField(default=True)
+    note = models.TextField(blank=True)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="piani_rateali_spesa_creati",
+        blank=True,
+        null=True,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_piano_rateale_spesa"
+        ordering = ["data_prima_scadenza", "id"]
+        verbose_name = "Piano rateale di spesa"
+        verbose_name_plural = "Piani rateali di spesa"
+        indexes = [
+            models.Index(fields=["data_prima_scadenza", "attivo"], name="gf_piano_spesa_data_idx"),
+            models.Index(fields=["categoria"], name="gf_piano_spesa_cat_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(importo_totale__gt=0), name="gf_piano_spesa_importo_pos"),
+            models.CheckConstraint(check=models.Q(numero_rate__gt=0), name="gf_piano_spesa_rate_pos"),
+            models.CheckConstraint(check=models.Q(frequenza_mesi__gt=0), name="gf_piano_spesa_freq_pos"),
+        ]
+
+    def __str__(self):
+        return self.descrizione
+
+    def clean(self):
+        super().clean()
+        if self.categoria_id and self.categoria.tipo != TipoCategoriaFinanziaria.SPESA:
+            raise ValidationError({"categoria": "La categoria deve essere di tipo spesa."})
+        if self.giorno_scadenza and not 1 <= self.giorno_scadenza <= 31:
+            raise ValidationError({"giorno_scadenza": "Il giorno scadenza deve essere compreso tra 1 e 31."})
+
+
+class SpesaOperativa(models.Model):
+    piano_rateale = models.ForeignKey(
+        PianoRatealeSpesa,
+        on_delete=models.CASCADE,
+        related_name="rate",
+        blank=True,
+        null=True,
+    )
+    numero_rata = models.PositiveSmallIntegerField(blank=True, null=True)
+    totale_rate = models.PositiveSmallIntegerField(blank=True, null=True)
+    tipo = models.CharField(
+        max_length=30,
+        choices=TipoSpesaOperativa.choices,
+        default=TipoSpesaOperativa.MANUALE,
+    )
+    descrizione = models.CharField(max_length=220)
+    categoria = models.ForeignKey(
+        CategoriaFinanziaria,
+        on_delete=models.PROTECT,
+        related_name="spese_operative",
+        blank=True,
+        null=True,
+    )
+    fornitore = models.ForeignKey(
+        Fornitore,
+        on_delete=models.SET_NULL,
+        related_name="spese_operative",
+        blank=True,
+        null=True,
+    )
+    dipendente = models.ForeignKey(
+        "gestione_amministrativa.Dipendente",
+        on_delete=models.SET_NULL,
+        related_name="spese_operative",
+        blank=True,
+        null=True,
+    )
+    data_scadenza = models.DateField(db_index=True)
+    importo_previsto = models.DecimalField(max_digits=12, decimal_places=2)
+    importo_pagato = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    data_pagamento = models.DateField(blank=True, null=True)
+    conto_bancario = models.ForeignKey(
+        "ContoBancario",
+        on_delete=models.SET_NULL,
+        related_name="spese_operative",
+        blank=True,
+        null=True,
+    )
+    movimento_finanziario = models.ForeignKey(
+        "MovimentoFinanziario",
+        on_delete=models.SET_NULL,
+        related_name="spese_operative",
+        blank=True,
+        null=True,
+    )
+    note = models.TextField(blank=True)
+    creato_da = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="spese_operative_create",
+        blank=True,
+        null=True,
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_spesa_operativa"
+        ordering = ["data_scadenza", "id"]
+        verbose_name = "Spesa operativa"
+        verbose_name_plural = "Spese operative"
+        indexes = [
+            models.Index(fields=["data_scadenza", "tipo"], name="gf_spesa_op_data_tipo_idx"),
+            models.Index(fields=["categoria", "data_scadenza"], name="gf_spesa_op_cat_data_idx"),
+            models.Index(fields=["piano_rateale"], name="gf_spesa_op_piano_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(importo_previsto__gt=0), name="gf_spesa_op_previsto_pos"),
+            models.CheckConstraint(check=models.Q(importo_pagato__gte=0), name="gf_spesa_op_pagato_gte0"),
+        ]
+
+    def __str__(self):
+        return self.descrizione
+
+    @property
+    def soggetto_label(self):
+        return self.fornitore or self.dipendente or ""
+
+    @property
+    def importo_residuo(self):
+        residuo = (self.importo_previsto or Decimal("0.00")) - (self.importo_pagato or Decimal("0.00"))
+        return max(residuo, Decimal("0.00"))
+
+    @property
+    def e_pagata(self):
+        return self.importo_residuo <= Decimal("0.00")
+
+    @property
+    def e_scaduta(self):
+        return self.importo_residuo > Decimal("0.00") and self.data_scadenza and self.data_scadenza < timezone.localdate()
+
+    def clean(self):
+        super().clean()
+        if self.categoria_id and self.categoria.tipo != TipoCategoriaFinanziaria.SPESA:
+            raise ValidationError({"categoria": "La categoria deve essere di tipo spesa."})
+        if self.importo_pagato and self.importo_previsto and self.importo_pagato > self.importo_previsto:
+            raise ValidationError({"importo_pagato": "L'importo pagato non puo superare l'importo previsto."})
+
+
 # =========================================================================
 #  Provider bancari e connessioni
 # =========================================================================

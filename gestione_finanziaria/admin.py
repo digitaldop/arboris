@@ -12,11 +12,13 @@ from .models import (
     NotificaFinanziaria,
     NotificaFinanziariaLettura,
     PagamentoFornitore,
+    PianoRatealeSpesa,
     ProviderBancario,
     RegolaCategorizzazione,
     SaldoConto,
     ScadenzaPagamentoFornitore,
     SincronizzazioneLog,
+    SpesaOperativa,
     TipoCategoriaFinanziaria,
     VoceBudgetRicorrente,
 )
@@ -96,6 +98,30 @@ class VoceBudgetRicorrenteAdmin(admin.ModelAdmin):
     list_filter = ("tipo", "frequenza", "attiva")
     search_fields = ("nome", "categoria__nome", "fornitore__denominazione")
     autocomplete_fields = ("categoria", "fornitore")
+
+
+class SpesaOperativaInline(admin.TabularInline):
+    model = SpesaOperativa
+    extra = 0
+    autocomplete_fields = ("categoria", "fornitore", "dipendente", "conto_bancario", "movimento_finanziario")
+
+
+@admin.register(PianoRatealeSpesa)
+class PianoRatealeSpesaAdmin(admin.ModelAdmin):
+    list_display = ("descrizione", "tipo", "importo_totale", "numero_rate", "frequenza_mesi", "data_prima_scadenza", "attivo")
+    list_filter = ("tipo", "attivo", "categoria")
+    search_fields = ("descrizione", "fornitore__denominazione")
+    autocomplete_fields = ("categoria", "fornitore", "creato_da")
+    inlines = [SpesaOperativaInline]
+
+
+@admin.register(SpesaOperativa)
+class SpesaOperativaAdmin(admin.ModelAdmin):
+    list_display = ("data_scadenza", "tipo", "descrizione", "importo_previsto", "importo_pagato", "categoria", "fornitore")
+    list_filter = ("tipo", "categoria", "data_scadenza")
+    search_fields = ("descrizione", "fornitore__denominazione", "dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome")
+    date_hierarchy = "data_scadenza"
+    autocomplete_fields = ("piano_rateale", "categoria", "fornitore", "dipendente", "conto_bancario", "movimento_finanziario", "creato_da")
 
 
 @admin.register(FattureInCloudConnessione)

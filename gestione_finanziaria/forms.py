@@ -20,13 +20,16 @@ from .models import (
     MetodoPagamentoFornitore,
     MovimentoFinanziario,
     PagamentoFornitore,
+    PianoRatealeSpesa,
     PianificazioneSincronizzazione,
     ProviderBancario,
     RegolaCategorizzazione,
     SaldoConto,
     ScadenzaPagamentoFornitore,
+    SpesaOperativa,
     StatoScadenzaFornitore,
     TipoCategoriaFinanziaria,
+    TipoSpesaOperativa,
     VoceBudgetRicorrente,
 )
 
@@ -624,6 +627,126 @@ class PagamentoFornitoreForm(forms.ModelForm):
         if importo <= Decimal("0.00"):
             raise forms.ValidationError("L'importo deve essere maggiore di zero.")
         return importo
+
+
+class SpesaOperativaForm(forms.ModelForm):
+    class Meta:
+        model = SpesaOperativa
+        fields = [
+            "tipo",
+            "descrizione",
+            "categoria",
+            "fornitore",
+            "dipendente",
+            "data_scadenza",
+            "importo_previsto",
+            "importo_pagato",
+            "data_pagamento",
+            "conto_bancario",
+            "movimento_finanziario",
+            "note",
+        ]
+        labels = {
+            "tipo": "Tipo spesa",
+            "descrizione": "Descrizione",
+            "categoria": "Categoria",
+            "fornitore": "Fornitore",
+            "dipendente": "Dipendente",
+            "data_scadenza": "Scadenza",
+            "importo_previsto": "Importo previsto",
+            "importo_pagato": "Importo pagato",
+            "data_pagamento": "Data pagamento",
+            "conto_bancario": "Conto",
+            "movimento_finanziario": "Movimento collegato",
+            "note": "Note",
+        }
+        widgets = {
+            "data_scadenza": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "data_pagamento": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        optional_fields = ["categoria", "fornitore", "dipendente", "data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
+        for field_name in optional_fields:
+            self.fields[field_name].required = False
+        self.fields["categoria"].queryset = categorie_spesa_queryset()
+        self.fields["categoria"].empty_label = "--- nessuna ---"
+        self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
+        self.fields["fornitore"].empty_label = "--- nessuno ---"
+        self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+        self.fields["conto_bancario"].empty_label = "--- nessuno ---"
+        self.fields["movimento_finanziario"].queryset = MovimentoFinanziario.objects.order_by("-data_contabile", "-id")
+        self.fields["movimento_finanziario"].empty_label = "--- nessuno ---"
+        for field_name in ("data_scadenza", "data_pagamento"):
+            self.fields[field_name].input_formats = ["%Y-%m-%d"]
+        for field_name in ("importo_previsto", "importo_pagato"):
+            apply_eur_currency_widget(self.fields[field_name])
+        make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
+        make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
+        make_searchable_select(self.fields["dipendente"], "Cerca un dipendente...")
+        make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
+        make_searchable_select(self.fields["movimento_finanziario"], "Cerca un movimento...")
+
+    def clean(self):
+        cleaned = super().clean()
+        movimento = cleaned.get("movimento_finanziario")
+        importo_previsto = cleaned.get("importo_previsto") or Decimal("0.00")
+        importo_pagato = cleaned.get("importo_pagato") or Decimal("0.00")
+        if movimento and not importo_pagato:
+            cleaned["importo_pagato"] = abs(movimento.importo or Decimal("0.00"))
+        if cleaned.get("tipo") == TipoSpesaOperativa.CONTANTI and not cleaned.get("data_pagamento") and cleaned.get("importo_pagato"):
+            cleaned["data_pagamento"] = cleaned.get("data_scadenza")
+        if importo_pagato > importo_previsto:
+            self.add_error("importo_pagato", "L'importo pagato non puo superare l'importo previsto.")
+        return cleaned
+
+
+class PianoRatealeSpesaForm(forms.ModelForm):
+    class Meta:
+        model = PianoRatealeSpesa
+        fields = [
+            "tipo",
+            "descrizione",
+            "categoria",
+            "fornitore",
+            "importo_totale",
+            "numero_rate",
+            "frequenza_mesi",
+            "data_prima_scadenza",
+            "giorno_scadenza",
+            "note",
+        ]
+        labels = {
+            "tipo": "Tipo piano",
+            "descrizione": "Descrizione",
+            "categoria": "Categoria",
+            "fornitore": "Fornitore / creditore",
+            "importo_totale": "Importo totale",
+            "numero_rate": "Numero rate",
+            "frequenza_mesi": "Frequenza (mesi)",
+            "data_prima_scadenza": "Prima scadenza",
+            "giorno_scadenza": "Giorno rate successive",
+            "note": "Note",
+        }
+        widgets = {
+            "data_prima_scadenza": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "note": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("categoria", "fornitore", "giorno_scadenza", "note"):
+            self.fields[field_name].required = False
+        self.fields["categoria"].queryset = categorie_spesa_queryset()
+        self.fields["categoria"].empty_label = "--- nessuna ---"
+        self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
+        self.fields["fornitore"].empty_label = "--- nessuno ---"
+        self.fields["data_prima_scadenza"].input_formats = ["%Y-%m-%d"]
+        apply_eur_currency_widget(self.fields["importo_totale"])
+        make_searchable_select(self.fields["categoria"], "Cerca una categoria...")
+        make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
 
 
 class FattureInCloudConnessioneForm(forms.ModelForm):

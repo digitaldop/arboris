@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Fatture e scadenze fornitori - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Fatture e scadenze</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Fatture e scadenze</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ scadenze|length }} righe
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                Scadenze, fornitori, importi pagati e residui delle fatture fornitore
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
+            <a href="{% url 'crea_documento_fornitore' %}?popup=1" class="btn btn-primary btn-icon-text btn-add-action" data-window-popup="1" data-popup-url="{% url 'crea_documento_fornitore' %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Nuova fattura</span>
+            </a>
+        </div>
+    </div>
+
+    <section class="supplier-fusion-summary-grid" aria-label="Riepilogo fatture e scadenze fornitori">
+        <article class="supplier-fusion-summary-card is-expected">
+            <span class="supplier-fusion-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+            <div>
+                <span>Totale previsto</span>
+                <strong>{{ totale_previsto|euro }} &euro;</strong>
+            </div>
+        </article>
+        <article class="supplier-fusion-summary-card is-paid">
+            <span class="supplier-fusion-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+            <div>
+                <span>Totale pagato</span>
+                <strong>{{ totale_pagato|euro }} &euro;</strong>
+            </div>
+        </article>
+        <article class="supplier-fusion-summary-card is-unpaid">
+            <span class="supplier-fusion-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+            <div>
+                <span>Totale residuo</span>
+                <strong>{{ totale_residuo|euro }} &euro;</strong>
+                <small>Scadute: {{ scadenze_scadute_count }}</small>
+            </div>
+        </article>
+    </section>
+
+    <div class="list-toolbar anagrafica-list-toolbar-card finance-filter-toolbar supplier-fusion-toolbar">
+        <div class="supplier-fusion-view-switch" role="group" aria-label="Vista fatture fornitori">
+            <a href="{{ vista_tutte_url }}" class="{% if vista == 'tutte' %}is-active{% endif %}" aria-pressed="{% if vista == 'tutte' %}true{% else %}false{% endif %}">
+                <span class="supplier-fusion-view-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                <span>Tutte le fatture</span>
+            </a>
+            <a href="{{ vista_insolute_url }}" class="{% if vista == 'insolute' %}is-active{% endif %}" aria-pressed="{% if vista == 'insolute' %}true{% else %}false{% endif %}">
+                <span class="supplier-fusion-view-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
+                <span>Solo fatture insolute</span>
+            </a>
+        </div>
+        <form method="get" class="search-form anagrafica-search-form">
+            <input type="hidden" name="vista" value="{{ vista }}">
+            <label class="anagrafica-search-field">
+                <span class="anagrafica-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <input type="search" name="q" value="{{ q }}" placeholder="Cerca fornitore, numero o descrizione..." class="search-input">
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Fornitore</span>
+                <select name="fornitore">
+                    <option value="">Tutti i fornitori</option>
+                    {% for fornitore in fornitori %}
+                        <option value="{{ fornitore.pk }}" {% if fornitore_selezionato == fornitore.pk|stringformat:"s" %}selected{% endif %}>{{ fornitore.denominazione }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Categoria</span>
+                <select name="categoria">
+                    <option value="">Tutte le categorie</option>
+                    {% for categoria in categorie %}
+                        <option value="{{ categoria.pk }}" {% if categoria_selezionata == categoria.pk|stringformat:"s" %}selected{% endif %}>{{ categoria.nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                <span class="btn-label">Filtra</span>
+            </button>
+            <a href="{% url 'fatture_scadenze_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                <span class="btn-label">Reset</span>
+            </a>
+        </form>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="panel-body">
+            {% if scadenze %}
+                <table class="list-table anagrafica-list-table finance-modern-table supplier-fusion-table">
+                    <colgroup>
+                        <col class="supplier-fusion-col-date">
+                        <col class="supplier-fusion-col-supplier">
+                        <col class="supplier-fusion-col-category">
+                        <col class="supplier-fusion-col-money">
+                        <col class="supplier-fusion-col-money">
+                        <col class="supplier-fusion-col-money">
+                        <col class="supplier-fusion-col-status">
+                        <col class="supplier-fusion-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Scadenza</th>
+                            <th>Fornitore</th>
+                            <th>Categoria</th>
+                            <th class="column-right">Previsto</th>
+                            <th class="column-right">Pagato</th>
+                            <th class="column-right">Residuo</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for scadenza in scadenze %}
+                            <tr class="list-row-link {% if scadenza.importo_residuo %}supplier-invoice-row-unpaid{% else %}supplier-invoice-row-paid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ scadenza.documento.numero_documento }}">
+                                <td>
+                                    <strong>{{ scadenza.data_scadenza|date:"d/m/Y" }}</strong>
+                                </td>
+                                <td class="anagrafica-record-cell">
+                                    <span class="anagrafica-record-link anagrafica-record-link-compact">
+                                        <span class="finance-record-icon finance-record-icon-supplier" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg>
+                                        </span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ scadenza.documento.fornitore.denominazione }}</span>
+                                            <span class="table-subtext">{{ scadenza.documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
+                                        </span>
+                                    </span>
+                                </td>
+                                <td>{{ scadenza.documento.categoria_spesa_effettiva|default:"-" }}</td>
+                                <td class="column-right">{{ scadenza.importo_previsto|euro }} &euro;</td>
+                                <td class="column-right">{{ scadenza.importo_pagato|euro }} &euro;</td>
+                                <td class="column-right finance-money-cell">{{ scadenza.importo_residuo|euro }} &euro;</td>
+                                <td>
+                                    <div class="supplier-fusion-state-stack">
+                                        <span class="anagrafica-status-chip {% if scadenza.importo_residuo %}is-muted{% else %}is-success{% endif %}">
+                                            {% if scadenza.importo_residuo %}Da pagare{% else %}Pagata{% endif %}
+                                        </span>
+                                        {% if scadenza.mostra_badge_scaduta %}
+                                            <span class="anagrafica-status-chip is-danger">Scaduta</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="actions-cell">
+                                    <div class="table-icon-actions anagrafica-row-actions">
+                                        {% if scadenza.importo_residuo %}
+                                            <a
+                                                class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                                href="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1&reload_url={{ request.get_full_path|urlencode }}"
+                                                title="Registra pagamento"
+                                                aria-label="Registra pagamento"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'registra_pagamento_scadenza_fornitore' scadenza.pk %}?popup=1&reload_url={{ request.get_full_path|urlencode }}"
+                                                data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"
+                                            ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></a>
+                                        {% else %}
+                                            <span class="table-muted">-</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessuna scadenza fornitore trovata.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
+{% endblock %}
