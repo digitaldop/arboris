@@ -20050,6 +20050,65 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     opacity: 1;
 }
 
+/* Keep the main sidebar available while scrolling long data pages. */
+@media (min-width: 981px) {
+    .app-layout {
+        align-items: start;
+    }
+
+    .sidebar {
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - var(--app-header-height));
+        max-height: calc(100vh - var(--app-header-height));
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .sidebar-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(82, 103, 129, 0.22) transparent;
+    }
+
+    .sidebar-content:hover,
+    .sidebar-content:focus-within {
+        scrollbar-color: rgba(82, 103, 129, 0.34) transparent;
+    }
+
+    .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-content::-webkit-scrollbar-thumb {
+        border: 2px solid transparent;
+        border-radius: 999px;
+        background-color: rgba(82, 103, 129, 0.18);
+        background-clip: content-box;
+    }
+
+    .sidebar-content:hover::-webkit-scrollbar-thumb,
+    .sidebar-content:focus-within::-webkit-scrollbar-thumb {
+        background-color: rgba(82, 103, 129, 0.32);
+    }
+
+    body.sidebar-is-collapsed .sidebar {
+        height: calc(100vh - var(--app-header-height));
+        max-height: calc(100vh - var(--app-header-height));
+    }
+}
+
 /* Anagrafica list/search pages */
 .anagrafica-list-head {
     margin-bottom: 18px;
@@ -27195,6 +27254,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     background: #fff1f4;
 }
 
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-partial td {
+    border-color: #d8a83b;
+    background: #fff4d7;
+}
+
 .module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-paid td {
     border-color: #cdebd7;
     background: #eefaf2;
@@ -27203,6 +27267,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-unpaid:hover td {
     border-color: #e6aebb;
     background: #ffe7ed;
+}
+
+.module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-partial:hover td {
+    border-color: #c28e1d;
+    background: #ffe9ad;
 }
 
 .module-gestione_finanziaria .finance-modern-table tbody tr.supplier-invoice-row-paid:hover td {

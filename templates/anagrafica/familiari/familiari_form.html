@@ -2249,10 +2249,29 @@
                                             {% endfor %}
                                         </div>
                                         <div class="relative-work-row-value">
-                                            <strong>{{ busta.netto_effettivo|default:busta.netto_previsto|euro }} &euro;</strong>
-                                            <span>Costo {{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</span>
+                                            <strong>{{ busta.importo_netto_riepilogo|euro }} &euro;</strong>
+                                            {% if busta.ha_costo_azienda_riepilogo %}
+                                                <span>Costo azienda {{ busta.costo_azienda_riepilogo|euro }} &euro;</span>
+                                            {% elif busta.risulta_pagata %}
+                                                <span>{% if busta.data_pagamento_effettiva %}Pagata il {{ busta.data_pagamento_effettiva|date:"d/m/Y" }}{% else %}Pagamento collegato{% endif %}</span>
+                                            {% else %}
+                                                <span>Non pagata</span>
+                                            {% endif %}
                                         </div>
                                         <div class="relative-work-row-actions">
+                                            {% if can_manage_gestione_amministrativa and can_manage_gestione_finanziaria and not busta.risulta_pagata %}
+                                                <a
+                                                    href="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                    class="btn btn-save-soft btn-sm btn-icon-text"
+                                                    data-window-popup="1"
+                                                    data-popup-url="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                    data-popup-window-name="arboris-busta-paga-payment-popup"
+                                                    data-popup-window-features="width=960,height=760,resizable=yes,scrollbars=yes"
+                                                >
+                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                                    <span class="btn-label">Inserisci pagamento</span>
+                                                </a>
+                                            {% endif %}
                                             <a
                                                 href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
                                                 class="btn btn-secondary btn-sm btn-icon-text"

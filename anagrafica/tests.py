@@ -1218,6 +1218,29 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, reverse("crea_busta_paga_dipendente"))
         self.assertContains(response, reverse("modifica_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
         self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+        self.assertContains(response, "Costo azienda")
+        self.assertContains(response, reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+
+    def test_modifica_familiare_busta_senza_costo_mostra_stato_pagamento(self):
+        busta_senza_costo = BustaPagaDipendente.objects.create(
+            dipendente=self.profilo,
+            contratto=self.contratto,
+            anno=2026,
+            mese=4,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_effettivo=Decimal("1326.00"),
+        )
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "04/2026")
+        self.assertContains(response, "Non pagata")
+        self.assertNotContains(response, "Costo 0,00")
+        self.assertContains(
+            response,
+            reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": busta_senza_costo.pk}),
+        )
 
     def test_modifica_familiare_labels_work_reference_as_materia_when_no_class(self):
         self.profilo.materia = "Francese"

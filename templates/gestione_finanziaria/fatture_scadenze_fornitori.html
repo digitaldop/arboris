@@ -139,7 +139,7 @@
                     </thead>
                     <tbody>
                         {% for scadenza in scadenze %}
-                            <tr class="list-row-link {% if scadenza.importo_residuo %}supplier-invoice-row-unpaid{% else %}supplier-invoice-row-paid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ scadenza.documento.numero_documento }}">
+                            <tr class="list-row-link {% if scadenza.pagamento_parziale %}supplier-invoice-row-partial{% elif scadenza.importo_residuo %}supplier-invoice-row-unpaid{% else %}supplier-invoice-row-paid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ scadenza.documento.numero_documento }}">
                                 <td>
                                     <strong>{{ scadenza.data_scadenza|date:"d/m/Y" }}</strong>
                                 </td>
@@ -160,8 +160,8 @@
                                 <td class="column-right finance-money-cell">{{ scadenza.importo_residuo|euro }} &euro;</td>
                                 <td>
                                     <div class="supplier-fusion-state-stack">
-                                        <span class="anagrafica-status-chip {% if scadenza.importo_residuo %}is-muted{% else %}is-success{% endif %}">
-                                            {% if scadenza.importo_residuo %}Da pagare{% else %}Pagata{% endif %}
+                                        <span class="anagrafica-status-chip {% if scadenza.pagamento_parziale %}is-amber{% elif scadenza.importo_residuo %}is-muted{% else %}is-success{% endif %}">
+                                            {% if scadenza.pagamento_parziale %}Parziale{% elif scadenza.importo_residuo %}Da pagare{% else %}Pagata{% endif %}
                                         </span>
                                         {% if scadenza.mostra_badge_scaduta %}
                                             <span class="anagrafica-status-chip is-danger">Scaduta</span>

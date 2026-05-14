@@ -1,3 +1,5 @@
+from calendar import monthrange
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.contenttypes.fields import GenericRelation
@@ -905,6 +907,29 @@ class BustaPagaDipendente(models.Model):
     @property
     def periodo_label(self):
         return f"{self.mese:02d}/{self.anno}"
+
+    @property
+    def importo_netto_riepilogo(self):
+        return self.netto_effettivo or self.netto_previsto or ZERO
+
+    @property
+    def costo_azienda_riepilogo(self):
+        return self.costo_azienda_effettivo or self.costo_azienda_previsto or ZERO
+
+    @property
+    def ha_costo_azienda_riepilogo(self):
+        return bool(self.costo_azienda_effettivo or self.costo_azienda_previsto)
+
+    @property
+    def risulta_pagata(self):
+        return bool(self.data_pagamento_effettiva or self.movimento_pagamento_id)
+
+    @property
+    def data_pagamento_suggerita(self):
+        if self.data_pagamento_effettiva:
+            return self.data_pagamento_effettiva
+        last_day = monthrange(self.anno, self.mese)[1]
+        return date(self.anno, self.mese, last_day)
 
     @property
     def ha_previsione(self):

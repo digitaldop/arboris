@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from anagrafica.models import Familiare, RelazioneFamiliare, Studente, StudenteFamiliare
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione
+from gestione_amministrativa.models import BustaPagaDipendente, Dipendente
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
@@ -2365,6 +2366,22 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             importo_previsto=Decimal("50.00"),
             importo_pagato=Decimal("50.00"),
         )
+        documento_parziale = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FUS-3",
+            data_documento=date(2026, 5, 3),
+            descrizione="Pulizie",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("100.00"),
+            stato=StatoDocumentoFornitore.PARZIALMENTE_PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_parziale,
+            data_scadenza=date(2026, 5, 30),
+            importo_previsto=Decimal("100.00"),
+            importo_pagato=Decimal("40.00"),
+        )
 
         response = self.client.get(reverse("fatture_scadenze_fornitori"))
 
@@ -2385,9 +2402,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertNotContains(response, "<th>Fattura</th>", html=False)
         self.assertNotContains(response, "<th>IVA</th>", html=False)
         self.assertContains(response, "Da pagare")
+        self.assertContains(response, "Parziale")
         self.assertContains(response, "Pagata")
         self.assertContains(response, "Scaduta")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
+        self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
         self.assertContains(
             response,
@@ -2403,11 +2422,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         response = self.client.get(reverse("fatture_scadenze_fornitori"), {"vista": "insolute"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["totale_previsto"], Decimal("172.00"))
-        self.assertEqual(response.context["totale_pagato"], Decimal("50.00"))
-        self.assertEqual(response.context["totale_residuo"], Decimal("122.00"))
+        self.assertEqual(response.context["totale_previsto"], Decimal("272.00"))
+        self.assertEqual(response.context["totale_pagato"], Decimal("90.00"))
+        self.assertEqual(response.context["totale_residuo"], Decimal("182.00"))
         self.assertContains(response, "Solo fatture insolute")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
+        self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertNotContains(response, "supplier-invoice-row-paid")
         self.assertNotContains(response, "Materiali")
 
@@ -2472,12 +2492,14 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertContains(response, "Incasso rette maggio")
         self.assertContains(response, "Introiti 850,00")
+        self.assertContains(response, "Parziale")
         selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-05")
         self.assertEqual(selected_month["totale_spese"], Decimal("470.50"))
         self.assertEqual(selected_month["residuo"], Decimal("302.00"))
         self.assertEqual(selected_month["spese_count"], 3)
         self.assertEqual(selected_month["insolute_count"], 2)
-        self.assertContains(response, "supplier-invoice-row-unpaid", count=2)
+        self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
+        self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
 
         response = self.client.get(
@@ -3460,6 +3482,51 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'name="target_input_name" value="movimento_pagamento"', html=False)
         self.assertContains(response, "Pagamento busta paga Mario Rossi")
         self.assertContains(response, 'value="-1302.00"', html=False)
+
+    def test_movimento_popup_collega_pagamento_a_busta_paga(self):
+        dipendente = Dipendente.objects.create(
+            nome="Mario",
+            cognome="Rossi",
+            codice_fiscale="RSSMRA80A01H501U",
+        )
+        busta = BustaPagaDipendente.objects.create(
+            dipendente=dipendente,
+            anno=2025,
+            mese=10,
+            netto_effettivo=Decimal("1302.00"),
+        )
+
+        response = self.client.post(
+            f"{reverse('crea_movimento_manuale')}?popup=1",
+            {
+                "popup": "1",
+                "target_input_name": "movimento_pagamento",
+                "busta_paga_pagamento": str(busta.pk),
+                "conto": "",
+                "canale": CanaleMovimento.BANCA,
+                "data_contabile": "2025-10-31",
+                "data_valuta": "",
+                "importo": "-1302.00",
+                "valuta": "EUR",
+                "descrizione": "Pagamento busta paga Mario Rossi",
+                "controparte": "Mario Rossi",
+                "iban_controparte": "",
+                "categoria": "",
+                "incide_su_saldo_banca": "",
+                "sostenuta_da_terzi": "",
+                "rimborsabile": "",
+                "sostenitore": "",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        movimento = MovimentoFinanziario.objects.get(descrizione="Pagamento busta paga Mario Rossi")
+        busta.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(busta.movimento_pagamento, movimento)
+        self.assertEqual(busta.data_pagamento_effettiva, date(2025, 10, 31))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
     def test_dashboard_mostra_saldi_per_tipo_conto(self):
         conto = ContoBancario.objects.create(

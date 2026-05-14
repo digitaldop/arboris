@@ -13,6 +13,9 @@
         {% csrf_token %}
         <input type="hidden" name="popup" value="1">
         <input type="hidden" name="target_input_name" value="{{ target_input_name|default:'' }}">
+        {% if busta_paga_pagamento_id %}
+            <input type="hidden" name="busta_paga_pagamento" value="{{ busta_paga_pagamento_id }}">
+        {% endif %}
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
         {% endfor %}

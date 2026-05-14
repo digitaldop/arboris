@@ -1,6 +1,7 @@
 import mimetypes
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
@@ -1095,6 +1096,27 @@ def apri_file_busta_paga_dipendente(request, pk):
     response = FileResponse(file_handle, content_type=content_type or "application/octet-stream")
     response["Content-Disposition"] = content_disposition_header(False, filename)
     return response
+
+
+def inserisci_pagamento_busta_paga_dipendente(request, pk):
+    busta = get_object_or_404(
+        BustaPagaDipendente.objects.select_related("dipendente"),
+        pk=pk,
+    )
+    data_pagamento = busta.data_pagamento_suggerita
+    importo = -(abs(busta.importo_netto_riepilogo or ZERO))
+    params = {
+        "popup": "1",
+        "target_input_name": "movimento_pagamento",
+        "busta_paga_pagamento": str(busta.pk),
+        "data_contabile": data_pagamento.isoformat(),
+        "valuta": busta.valuta or "EUR",
+        "canale": "banca",
+        "descrizione": f"Pagamento busta paga {busta.dipendente} - {busta.periodo_label}",
+    }
+    if importo:
+        params["importo"] = f"{importo:.2f}"
+    return redirect(f"{reverse('crea_movimento_manuale')}?{urlencode(params)}")
 
 
 def elimina_busta_paga_dipendente(request, pk):

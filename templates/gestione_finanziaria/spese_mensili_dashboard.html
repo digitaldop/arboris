@@ -126,7 +126,7 @@
                     </thead>
                     <tbody>
                         {% for row in selected_rows %}
-                            <tr class="{% if row.pagata %}supplier-invoice-row-paid{% else %}supplier-invoice-row-unpaid{% endif %}">
+                            <tr class="{% if row.parziale %}supplier-invoice-row-partial{% elif row.pagata %}supplier-invoice-row-paid{% else %}supplier-invoice-row-unpaid{% endif %}">
                                 <td><strong>{{ row.data_scadenza|date:"d/m/Y" }}</strong></td>
                                 <td><span class="anagrafica-status-chip is-muted">{{ row.tipo }}</span></td>
                                 <td>{{ row.descrizione }}</td>
@@ -137,7 +137,7 @@
                                 <td class="column-right finance-money-cell">{{ row.residuo|euro }} &euro;</td>
                                 <td>
                                     <div class="supplier-fusion-state-stack">
-                                        <span class="anagrafica-status-chip {% if row.pagata %}is-success{% else %}is-muted{% endif %}">{% if row.pagata %}Pagata{% else %}Da pagare{% endif %}</span>
+                                        <span class="anagrafica-status-chip {% if row.pagata %}is-success{% elif row.parziale %}is-amber{% else %}is-muted{% endif %}">{% if row.pagata %}Pagata{% elif row.parziale %}Parziale{% else %}Da pagare{% endif %}</span>
                                         {% if row.scaduta %}<span class="anagrafica-status-chip is-danger">Scaduta</span>{% endif %}
                                     </div>
                                 </td>

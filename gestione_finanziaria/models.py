@@ -476,6 +476,10 @@ class ScadenzaPagamentoFornitore(models.Model):
         residuo = (self.importo_previsto or Decimal("0.00")) - (self.importo_pagato or Decimal("0.00"))
         return max(residuo, Decimal("0.00"))
 
+    @property
+    def pagamento_parziale(self):
+        return (self.importo_pagato or Decimal("0.00")) > Decimal("0.00") and self.importo_residuo > Decimal("0.00")
+
     def calcola_stato_automatico(self):
         if self.stato == StatoScadenzaFornitore.ANNULLATA:
             return self.stato
@@ -756,6 +760,10 @@ class SpesaOperativa(models.Model):
     @property
     def e_pagata(self):
         return self.importo_residuo <= Decimal("0.00")
+
+    @property
+    def pagamento_parziale(self):
+        return (self.importo_pagato or Decimal("0.00")) > Decimal("0.00") and self.importo_residuo > Decimal("0.00")
 
     @property
     def e_scaduta(self):

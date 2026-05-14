@@ -136,6 +136,7 @@ from .scheduler import (
     prossima_esecuzione_prevista,
 )
 from .services import (
+    aggiorna_stato_riconciliazione_movimento,
     annulla_riconciliazione,
     annulla_pagamento_fornitore,
     anteprima_riconcilia_fornitori_automaticamente,
@@ -1272,6 +1273,7 @@ def _spesa_row(
         "importo_pagato": importo_pagato,
         "residuo": residuo,
         "pagata": residuo <= Decimal("0.00"),
+        "parziale": importo_pagato > Decimal("0.00") and residuo > Decimal("0.00"),
         "scaduta": residuo > Decimal("0.00") and data_scadenza < timezone.localdate(),
         "detail_url": detail_url,
         "action_url": action_url,
@@ -2939,8 +2941,37 @@ def _movimento_manuale_initial(request):
     return initial
 
 
+def _busta_paga_pagamento_id(request):
+    value = (request.GET.get("busta_paga_pagamento") or request.POST.get("busta_paga_pagamento") or "").strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _collega_movimento_a_busta_paga(movimento, busta_id):
+    if not busta_id:
+        return
+    busta = BustaPagaDipendente.objects.filter(pk=busta_id).first()
+    if not busta:
+        return
+    movimento_precedente_id = busta.movimento_pagamento_id
+    busta.movimento_pagamento = movimento
+    update_fields = ["movimento_pagamento", "data_aggiornamento"]
+    if not busta.data_pagamento_effettiva:
+        busta.data_pagamento_effettiva = movimento.data_contabile
+        update_fields.append("data_pagamento_effettiva")
+    busta.save(update_fields=update_fields)
+    movimento_ids = {movimento_id for movimento_id in (movimento_precedente_id, movimento.pk) if movimento_id}
+    for movimento_collegato in MovimentoFinanziario.objects.filter(pk__in=movimento_ids):
+        aggiorna_stato_riconciliazione_movimento(movimento_collegato)
+
+
 def crea_movimento_manuale(request):
     popup = is_popup_request(request)
+    busta_paga_pagamento_id = _busta_paga_pagamento_id(request)
     if request.method == "POST":
         form = MovimentoFinanziarioForm(request.POST)
         if form.is_valid():
@@ -2954,6 +2985,7 @@ def crea_movimento_manuale(request):
                 applica_regole_a_movimento(movimento)
 
             movimento.save()
+            _collega_movimento_a_busta_paga(movimento, busta_paga_pagamento_id)
 
             if movimento.conto_id and movimento.incide_su_saldo_banca:
                 ricalcola_saldo_corrente_conto(movimento.conto)
@@ -2966,10 +2998,12 @@ def crea_movimento_manuale(request):
         form = MovimentoFinanziarioForm(initial=_movimento_manuale_initial(request))
 
     if popup:
+        context = _generic_popup_form_context(request, form, "Nuovo movimento")
+        context["busta_paga_pagamento_id"] = busta_paga_pagamento_id
         return render(
             request,
             "gestione_finanziaria/entity_popup_form.html",
-            _generic_popup_form_context(request, form, "Nuovo movimento"),
+            context,
         )
 
     return render(
