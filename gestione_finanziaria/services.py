@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-import time
+import time as time_module
 import unicodedata
 from calendar import monthrange
 from collections import Counter
@@ -1035,7 +1035,7 @@ def sincronizza_conto_psd2(
     from .providers import adapter_for_provider
     from .providers.registry import ProviderConfigurazioneMancante
 
-    start = time.monotonic()
+    start = time_module.monotonic()
     messaggi = []
     inseriti = 0
     aggiornati = 0
@@ -1177,7 +1177,7 @@ def sincronizza_conto_psd2(
             ultimo_errore="" if not errori_fatali else messaggi[-1][:1000],
         )
 
-    durata_ms = int((time.monotonic() - start) * 1000)
+    durata_ms = int((time_module.monotonic() - start) * 1000)
     esito = EsitoSincronizzazione.ERRORE if errori_fatali else EsitoSincronizzazione.OK
     if not errori_fatali and sync_movimenti and inseriti == 0:
         esito = EsitoSincronizzazione.OK  # ok: semplicemente non c'erano nuovi movimenti

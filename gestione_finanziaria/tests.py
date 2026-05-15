@@ -25,6 +25,7 @@ from .models import (
     CategoriaFinanziaria,
     CanaleMovimento,
     CondizioneRegolaCategorizzazione,
+    ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
     EsitoSincronizzazione,
@@ -164,6 +165,40 @@ class Psd2SchedulerTests(TestCase):
 
         self.assertIsNone(risultato)
         mock_sincronizza_conto.assert_not_called()
+
+    @patch("gestione_finanziaria.providers.adapter_for_provider")
+    def test_psd2_account_sync_uses_real_time_module_for_duration(self, mock_adapter_for_provider):
+        from gestione_finanziaria.services import sincronizza_conto_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Provider PSD2 test",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "test"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Connessione test",
+            external_connection_id="session-test",
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto PSD2 test",
+            provider=provider,
+            connessione=connessione,
+            external_account_id="account-test",
+            attivo=True,
+        )
+        adapter = Mock()
+        adapter.saldo_conto.return_value = []
+        adapter.movimenti_conto.return_value = []
+        mock_adapter_for_provider.return_value = adapter
+
+        log = sincronizza_conto_psd2(conto)
+
+        self.assertEqual(log.esito, EsitoSincronizzazione.OK)
+        self.assertEqual(log.movimenti_inseriti, 0)
+        self.assertIsNotNone(log.durata_millisecondi)
+        adapter.saldo_conto.assert_called_once_with("account-test")
+        adapter.movimenti_conto.assert_called_once()
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
