@@ -1482,6 +1482,31 @@ class ProviderPsd2ConfigForm(forms.Form):
         ),
     )
 
+    def __init__(self, *args, provider: Optional[ProviderBancario] = None, **kwargs) -> None:
+        self._provider = provider
+        super().__init__(*args, **kwargs)
+        adapter = ((provider.configurazione or {}).get("adapter") or "") if provider else ""
+        if adapter == "enablebanking":
+            self.fields["base_url"].help_text = (
+                "Endpoint API Enable Banking. Lascia vuoto per usare "
+                "https://api.enablebanking.com. Non inserire qui il redirect/callback "
+                "di Arboris: quello va nel campo Redirect URI."
+            )
+
+    def clean_base_url(self) -> str:
+        value = (self.cleaned_data.get("base_url") or "").strip().rstrip("/")
+        if not value:
+            return ""
+        adapter = ((self._provider.configurazione or {}).get("adapter") or "") if self._provider else ""
+        if adapter == "enablebanking" and (
+            "/callback" in value.lower() or "/integrations/enable-banking" in value.lower()
+        ):
+            raise forms.ValidationError(
+                "Questo sembra un redirect/callback di Arboris, non la Base URL API. "
+                "Per Enable Banking lascia vuoto oppure usa https://api.enablebanking.com."
+            )
+        return value
+
 
 class PianificazioneSincronizzazioneForm(forms.ModelForm):
     """Configurazione dello scheduler PSD2 (singleton)."""

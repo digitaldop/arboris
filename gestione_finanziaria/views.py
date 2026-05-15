@@ -3901,7 +3901,7 @@ def configura_provider_psd2(request, pk):
     cfg_attuale = provider.configurazione or {}
 
     if request.method == "POST":
-        form = ProviderPsd2ConfigForm(request.POST)
+        form = ProviderPsd2ConfigForm(request.POST, provider=provider)
         if form.is_valid():
             nuova_cfg = dict(cfg_attuale)
             nuova_cfg["adapter"] = cfg_attuale.get("adapter") or "gocardless_bad"
@@ -3912,6 +3912,8 @@ def configura_provider_psd2(request, pk):
                 nuova_cfg["environment"] = form.cleaned_data["environment"]
             if form.cleaned_data.get("base_url"):
                 nuova_cfg["base_url"] = form.cleaned_data["base_url"]
+            else:
+                nuova_cfg.pop("base_url", None)
             if form.cleaned_data.get("redirect_uri"):
                 nuova_cfg["redirect_uri"] = form.cleaned_data["redirect_uri"]
             else:
@@ -3954,6 +3956,7 @@ def configura_provider_psd2(request, pk):
             return redirect("lista_connessioni_bancarie")
     else:
         form = ProviderPsd2ConfigForm(
+            provider=provider,
             initial={
                 "secret_id": cfg_attuale.get("secret_id", ""),
                 "environment": cfg_attuale.get("environment", ""),
