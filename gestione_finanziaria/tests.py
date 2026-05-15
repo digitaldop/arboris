@@ -38,6 +38,7 @@ from .models import (
     NotificaFinanziaria,
     PagamentoFornitore,
     PianoRatealeSpesa,
+    PianificazioneSincronizzazione,
     OrigineDocumentoFornitore,
     OrigineMovimento,
     ProviderBancario,
@@ -102,6 +103,67 @@ CBI_CSV_SAMPLE = (
     '"IL SOLE E L\'ALTRE STELLE SRL IMPRESA SOCIALE";"05034";"37060";"000000003228";"24/04/2026";'
     '"24/04/2026";"-24,40";"50";"C";"ADDEBITO DIRETTO SDD - PayPal Europe";"";""\n'
 )
+
+
+class Psd2SchedulerTests(TestCase):
+    @patch("gestione_finanziaria.scheduler.sincronizza_conto_psd2")
+    @patch("gestione_finanziaria.scheduler.conti_target")
+    def test_force_sync_runs_even_when_automatic_schedule_is_inactive(
+        self,
+        mock_conti_target,
+        mock_sincronizza_conto,
+    ):
+        from gestione_finanziaria.scheduler import maybe_run_scheduled_sync
+
+        PianificazioneSincronizzazione.objects.update_or_create(
+            pk=1,
+            defaults={
+                "attivo": False,
+                "sync_saldo": True,
+                "sync_movimenti": True,
+                "giorni_storico": 14,
+                "in_corso": False,
+            },
+        )
+        conto = Mock(nome_conto="Conto PSD2")
+        mock_conti_target.return_value = [conto]
+        mock_sincronizza_conto.return_value = Mock(
+            esito=EsitoSincronizzazione.OK,
+            messaggio="ok",
+        )
+
+        risultato = maybe_run_scheduled_sync(force=True)
+
+        self.assertIsNotNone(risultato)
+        risultato.refresh_from_db()
+        self.assertFalse(risultato.in_corso)
+        self.assertEqual(risultato.conti_sincronizzati, 1)
+        self.assertEqual(risultato.conti_in_errore, 0)
+        self.assertIsNotNone(risultato.ultimo_run_at)
+        mock_sincronizza_conto.assert_called_once_with(
+            conto,
+            sync_saldo=True,
+            sync_movimenti=True,
+            giorni_storico=14,
+        )
+
+    @patch("gestione_finanziaria.scheduler.sincronizza_conto_psd2")
+    def test_force_sync_keeps_in_progress_lock(self, mock_sincronizza_conto):
+        from gestione_finanziaria.scheduler import maybe_run_scheduled_sync
+
+        PianificazioneSincronizzazione.objects.update_or_create(
+            pk=1,
+            defaults={
+                "attivo": False,
+                "in_corso": True,
+                "avviato_at": timezone.now(),
+            },
+        )
+
+        risultato = maybe_run_scheduled_sync(force=True)
+
+        self.assertIsNone(risultato)
+        mock_sincronizza_conto.assert_not_called()
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")

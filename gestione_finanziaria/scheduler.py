@@ -65,13 +65,13 @@ def conti_target():
     ).exclude(external_account_id="")
 
 
-def _acquire_lock(now) -> Optional[PianificazioneSincronizzazione]:
+def _acquire_lock(now, *, force: bool = False) -> Optional[PianificazioneSincronizzazione]:
     """Tenta di prendere il lock di esecuzione. Ritorna la config se preso, None altrimenti."""
     try:
         with transaction.atomic():
             config = PianificazioneSincronizzazione.objects.select_for_update().get(pk=1)
 
-            if not is_sync_due(config, now=now):
+            if not force and not is_sync_due(config, now=now):
                 return None
 
             is_stuck = (
@@ -96,15 +96,26 @@ def _acquire_lock(now) -> Optional[PianificazioneSincronizzazione]:
         return None
 
 
-def maybe_run_scheduled_sync(triggered_by=None) -> Optional[PianificazioneSincronizzazione]:
+def maybe_run_scheduled_sync(
+    triggered_by=None,
+    *,
+    force: bool = False,
+) -> Optional[PianificazioneSincronizzazione]:
     """
     Se la pianificazione e' attiva e la prossima esecuzione e' dovuta,
     esegue la sincronizzazione di tutti i conti PSD2 attivi e aggiorna il
     singleton con l'esito complessivo. Ritorna la configurazione se
     l'esecuzione e' partita, None altrimenti.
+
+    Con ``force=True`` salta finestra temporale, cache di throttling e flag
+    ``attivo``: e' pensato per avvii manuali espliciti. Il lock ``in_corso``
+    resta comunque rispettato.
     """
 
-    if not cache.add(SYNC_SCHEDULE_CHECK_CACHE_KEY, True, SYNC_SCHEDULE_CHECK_TTL_SECONDS):
+    if (
+        not force
+        and not cache.add(SYNC_SCHEDULE_CHECK_CACHE_KEY, True, SYNC_SCHEDULE_CHECK_TTL_SECONDS)
+    ):
         return None
 
     now = timezone.now()
@@ -127,10 +138,10 @@ def maybe_run_scheduled_sync(triggered_by=None) -> Optional[PianificazioneSincro
     except (OperationalError, ProgrammingError, PianificazioneSincronizzazione.DoesNotExist):
         return None
 
-    if config_snapshot is None or not is_sync_due(config_snapshot, now=now):
+    if config_snapshot is None or (not force and not is_sync_due(config_snapshot, now=now)):
         return None
 
-    config = _acquire_lock(now)
+    config = _acquire_lock(now, force=force)
     if config is None:
         return None
 

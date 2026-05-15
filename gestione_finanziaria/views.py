@@ -4381,18 +4381,16 @@ def pianificazione_sincronizzazione(request):
         azione = request.POST.get("azione", "salva")
 
         if azione == "esegui":
-            config.ultimo_run_at = None
-            config.save(update_fields=["ultimo_run_at", "data_aggiornamento"])
             try:
-                risultato = maybe_run_scheduled_sync(triggered_by=request.user)
+                risultato = maybe_run_scheduled_sync(triggered_by=request.user, force=True)
             except Exception as exc:
                 messages.error(request, f"Esecuzione fallita: {exc}")
             else:
                 if risultato is None:
                     messages.warning(
                         request,
-                        "Impossibile avviare la sincronizzazione: pianificazione disattivata "
-                        "o un'altra esecuzione e' gia' in corso.",
+                        "Impossibile avviare la sincronizzazione: un'altra esecuzione "
+                        "e' gia' in corso.",
                     )
                 else:
                     messages.success(

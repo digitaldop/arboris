@@ -13,13 +13,10 @@ Invocazione tipica da scheduler di sistema:
 La logica di "e' ora di eseguire?" e' dentro :func:`maybe_run_scheduled_sync`,
 quindi e' sicuro chiamare il comando anche piu' frequentemente
 dell'intervallo configurato: verra' ignorato se non e' ancora il momento.
-Usa ``--force`` per forzare l'esecuzione anche fuori finestra.
+Usa ``--force`` per forzare l'esecuzione manuale anche fuori finestra.
 """
 
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from gestione_finanziaria.scheduler import (
     get_or_create_singleton,
@@ -34,21 +31,22 @@ class Command(BaseCommand):
         parser.add_argument(
             "--force",
             action="store_true",
-            help="Forza l'esecuzione anche se l'intervallo non e' scaduto.",
+            help="Forza l'esecuzione manuale anche se l'intervallo non e' scaduto o la pianificazione automatica e' disattivata.",
         )
 
     def handle(self, *args, **options):
-        config = get_or_create_singleton()
-        if options["force"]:
-            config.ultimo_run_at = timezone.now() - timedelta(days=365)
-            config.save(update_fields=["ultimo_run_at", "data_aggiornamento"])
+        get_or_create_singleton()
 
-        risultato = maybe_run_scheduled_sync()
+        risultato = maybe_run_scheduled_sync(force=options["force"])
         if risultato is None:
-            self.stdout.write(self.style.NOTICE(
-                "Nessuna sincronizzazione eseguita (pianificazione disattivata, "
-                "non ancora dovuta o gia' in corso)."
-            ))
+            if options["force"]:
+                messaggio = "Nessuna sincronizzazione eseguita (gia' in corso o lock non disponibile)."
+            else:
+                messaggio = (
+                    "Nessuna sincronizzazione eseguita (pianificazione disattivata, "
+                    "non ancora dovuta o gia' in corso)."
+                )
+            self.stdout.write(self.style.NOTICE(messaggio))
             return
 
         self.stdout.write(self.style.SUCCESS(
