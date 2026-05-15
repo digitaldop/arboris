@@ -19,9 +19,13 @@ def get_current_permission_module(request):
     view_module = getattr(resolver_match.func, "__module__", "")
     if view_module.startswith("anagrafica."):
         return "anagrafica"
+    if view_module.startswith("osservazioni."):
+        return "anagrafica"
     if view_module.startswith("famiglie_interessate."):
         return "famiglie_interessate"
     if view_module.startswith("economia."):
+        return "economia"
+    if view_module.startswith("fondo_accantonamento."):
         return "economia"
     if view_module.startswith("calendario."):
         return "calendario"
@@ -32,6 +36,8 @@ def get_current_permission_module(request):
     if view_module.startswith("gestione_amministrativa."):
         return "gestione_amministrativa"
     if view_module.startswith("archivio_storico."):
+        return "sistema"
+    if view_module.startswith("scuola."):
         return "sistema"
     if view_module.startswith("sistema."):
         return "sistema"
@@ -74,6 +80,9 @@ def general_settings_context(request):
     interfaccia_colorata_attiva = bool(
         getattr(general_settings, "interfaccia_colorata_attiva", True)
     )
+    interfaccia_professionale_attiva = bool(
+        getattr(general_settings, "interfaccia_professionale_attiva", False)
+    )
     stile_streamline_attivo = bool(
         getattr(general_settings, "stile_streamline_attivo", False)
     )
@@ -84,6 +93,7 @@ def general_settings_context(request):
     return {
         "general_settings": general_settings,
         "interfaccia_colorata_attiva": interfaccia_colorata_attiva,
+        "interfaccia_professionale_attiva": interfaccia_professionale_attiva,
         "stile_streamline_attivo": stile_streamline_attivo,
         "stile_iconscout_3d_attivo": stile_iconscout_3d_attivo,
         "gestione_dipendenti_dettagliata_attiva": bool(

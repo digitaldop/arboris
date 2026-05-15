@@ -126,7 +126,7 @@
                     </thead>
                     <tbody>
                         {% for row in selected_rows %}
-                            <tr class="{% if row.parziale %}supplier-invoice-row-partial{% elif row.pagata %}supplier-invoice-row-paid{% else %}supplier-invoice-row-unpaid{% endif %}">
+                            <tr class="{% if row.detail_url %}list-row-link {% endif %}{% if row.parziale %}supplier-invoice-row-partial{% elif row.pagata %}supplier-invoice-row-paid{% else %}supplier-invoice-row-unpaid{% endif %}"{% if row.detail_url %} data-row-href="{{ row.detail_url }}"{% endif %}{% if row.popup_url %} data-row-popup-url="{{ row.popup_url }}" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"{% if row.popup_title %} data-popup-title="{{ row.popup_title }}"{% endif %}{% endif %}>
                                 <td><strong>{{ row.data_scadenza|date:"d/m/Y" }}</strong></td>
                                 <td><span class="anagrafica-status-chip is-muted">{{ row.tipo }}</span></td>
                                 <td>{{ row.descrizione }}</td>
@@ -146,6 +146,8 @@
                                         <a href="{{ row.action_url }}" class="table-icon-link anagrafica-action-btn anagrafica-action-open" title="{{ row.action_label }}" aria-label="{{ row.action_label }}" {% if row.action_label == "Registra pagamento" %}data-window-popup="1" data-popup-url="{{ row.action_url }}" data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"{% endif %}>
                                             <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
                                         </a>
+                                    {% elif row.popup_url %}
+                                        <a href="{{ row.popup_url }}" class="table-link" data-window-popup="1" data-popup-url="{{ row.popup_url }}" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">Apri</a>
                                     {% elif row.detail_url %}
                                         <a href="{{ row.detail_url }}" class="table-link">Apri</a>
                                     {% else %}
@@ -200,4 +202,12 @@
             {% endif %}
         </div>
     </section>
+    <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+        });
+    </script>
 {% endblock %}

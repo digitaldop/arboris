@@ -488,6 +488,13 @@ class SistemaImpostazioniGenerali(models.Model):
             "Disattivala per un'interfaccia piu uniforme."
         ),
     )
+    interfaccia_professionale_attiva = models.BooleanField(
+        default=False,
+        help_text=(
+            "Quando attiva applica un layout piu SaaS e professionale: sidebar lineare, "
+            "tabelle piu compatte, card meno arrotondate e spaziature piu operative."
+        ),
+    )
     stile_streamline_attivo = models.BooleanField(
         default=False,
         help_text=(

@@ -157,6 +157,101 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, "GESTIONE FINANZIARIA")
 
 
+class ProfessionalInterfaceSettingsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.password = "Password123!"
+        self.admin = User.objects.create_user(
+            username="ui-admin@example.com",
+            email="ui-admin@example.com",
+            password=self.password,
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.admin,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+
+    def settings_payload(self, **overrides):
+        payload = {
+            "terminologia_studente": "studente",
+            "terminologia_familiare": "familiare",
+            "terminologia_educatore": "educatore",
+            "interfaccia_colorata_attiva": "on",
+            "modulo_anagrafica_attivo": "on",
+            "modulo_famiglie_interessate_attivo": "on",
+            "modulo_economia_attivo": "on",
+            "modulo_calendario_attivo": "on",
+            "modulo_gestione_finanziaria_attivo": "on",
+            "modulo_gestione_amministrativa_attivo": "on",
+            "modulo_servizi_extra_attivo": "on",
+            "formato_visualizzazione_telefono": "it_plus_n3_2_2_3",
+            "cronologia_retention_mesi": "24",
+            "gestione_iscrizione_corso_anno": "mese_iscrizione_intero",
+            "giorno_soglia_iscrizione_corso_anno": "15",
+            "font_principale": "manrope",
+            "font_titoli": "manrope",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_professional_interface_setting_adds_body_class(self):
+        SistemaImpostazioniGenerali.objects.create(interfaccia_professionale_attiva=True)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-professional-interface")
+
+    def test_professional_interface_keeps_anagrafica_sidebar_state_on_observation_links(self):
+        SistemaImpostazioniGenerali.objects.create(interfaccia_professionale_attiva=True)
+        SistemaUtentePermessi.objects.filter(user=self.admin).update(
+            permesso_anagrafica=LivelloPermesso.GESTIONE
+        )
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi")
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("osservazioni_studente", kwargs={"studente_pk": studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-professional-interface module-anagrafica")
+        self.assertContains(response, f'href="{reverse("lista_studenti")}" class="active"', html=False)
+
+    def test_professional_interface_maps_integrated_apps_to_parent_sidebar_modules(self):
+        SistemaImpostazioniGenerali.objects.create(interfaccia_professionale_attiva=True)
+        SistemaUtentePermessi.objects.filter(user=self.admin).update(
+            permesso_economia=LivelloPermesso.VISUALIZZAZIONE
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("fondo_piano_lista"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-professional-interface module-economia")
+
+        response = self.client.get(reverse("lista_anni_scolastici"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ui-professional-interface module-sistema")
+
+    def test_settings_form_renders_and_saves_professional_toggle(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("impostazioni_generali_sistema"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Interfaccia professionale")
+
+        response = self.client.post(
+            reverse("impostazioni_generali_sistema"),
+            self.settings_payload(interfaccia_professionale_attiva="on"),
+        )
+
+        self.assertRedirects(response, reverse("impostazioni_generali_sistema"))
+        impostazioni = SistemaImpostazioniGenerali.objects.get()
+        self.assertTrue(impostazioni.interfaccia_professionale_attiva)
+
+
 class GlobalSearchTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(

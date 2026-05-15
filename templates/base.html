@@ -80,7 +80,7 @@
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=6"></script>
 </head>
-<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if stile_streamline_attivo %} ui-streamline-icons{% endif %}{% if stile_iconscout_3d_attivo %} ui-iconscout-3d-icons{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}" data-streamline-icons-url="{% static 'images/arboris-streamline-icons.svg' %}" data-iconscout-3d-icons-url="{% static 'images/arboris-iconscout-3d-icons.svg' %}">
+<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if interfaccia_professionale_attiva %} ui-professional-interface{% endif %}{% if stile_streamline_attivo %} ui-streamline-icons{% endif %}{% if stile_iconscout_3d_attivo %} ui-iconscout-3d-icons{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}" data-streamline-icons-url="{% static 'images/arboris-streamline-icons.svg' %}" data-iconscout-3d-icons-url="{% static 'images/arboris-iconscout-3d-icons.svg' %}">
     <div id="arboris-page-loading-overlay" class="page-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
         <div class="page-loading-overlay-card">
             <span class="page-loading-spinner" aria-hidden="true"></span>
@@ -299,7 +299,7 @@
                             </button>
                             <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-anagrafica-panel">
                                 <nav class="sidebar-nav sidebar-subnav">
-                                    <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' or request.resolver_match.url_name == 'crea_studente' or request.resolver_match.url_name == 'modifica_studente' or request.resolver_match.url_name == 'stampa_studente' or request.resolver_match.url_name == 'stampa_studente_opzioni' or request.resolver_match.url_name == 'elimina_studente' %}active{% endif %}">
+                                    <a href="{% url 'lista_studenti' %}" class="{% if request.resolver_match.url_name == 'lista_studenti' or request.resolver_match.url_name == 'crea_studente' or request.resolver_match.url_name == 'modifica_studente' or request.resolver_match.url_name == 'stampa_studente' or request.resolver_match.url_name == 'stampa_studente_opzioni' or request.resolver_match.url_name == 'elimina_studente' or request.resolver_match.url_name == 'osservazioni_studente' or request.resolver_match.url_name == 'modifica_osservazione_studente' or request.resolver_match.url_name == 'elimina_osservazione_studente' %}active{% endif %}">
                                         <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
                                         <span class="sidebar-link-text">{{ student_terminology.selected_plural|default:"Studenti" }}</span>
                                     </a>

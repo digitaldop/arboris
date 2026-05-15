@@ -2442,7 +2442,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             fornitore=fornitore,
             numero_documento="MAG-1",
             data_documento=date(2026, 5, 3),
-            descrizione="Materiale didattico",
+            descrizione="Materiale didattico da Supermercato Verde",
             imponibile=Decimal("100.00"),
             iva=Decimal("22.00"),
             totale=Decimal("122.00"),
@@ -2488,11 +2488,16 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Spese mensili")
         self.assertContains(response, "Mag 2026")
         self.assertContains(response, "Materiale didattico")
+        self.assertNotContains(response, "da Supermercato Verde")
         self.assertContains(response, "Spesa supermercato")
         self.assertContains(response, "F24 contributi maggio")
         self.assertContains(response, "Incasso rette maggio")
         self.assertContains(response, "Introiti 850,00")
         self.assertContains(response, "Parziale")
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+        self.assertContains(response, f'data-row-href="{documento_url}"')
+        self.assertContains(response, f'data-row-popup-url="{documento_url}?popup=1"')
+        self.assertContains(response, "js/core/list-row-links.js")
         selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-05")
         self.assertEqual(selected_month["totale_spese"], Decimal("470.50"))
         self.assertEqual(selected_month["residuo"], Decimal("302.00"))

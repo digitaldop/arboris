@@ -1256,6 +1256,8 @@ def _spesa_row(
     importo_previsto=Decimal("0.00"),
     importo_pagato=Decimal("0.00"),
     detail_url="",
+    popup_url="",
+    popup_title="",
     action_url="",
     action_label="",
 ):
@@ -1276,9 +1278,38 @@ def _spesa_row(
         "parziale": importo_pagato > Decimal("0.00") and residuo > Decimal("0.00"),
         "scaduta": residuo > Decimal("0.00") and data_scadenza < timezone.localdate(),
         "detail_url": detail_url,
+        "popup_url": popup_url,
+        "popup_title": popup_title,
         "action_url": action_url,
         "action_label": action_label,
     }
+
+
+def _descrizione_spesa_mensile_documento(documento):
+    descrizione = (documento.descrizione or "").strip()
+    fallback = f"Fattura {documento.numero_documento}".strip()
+    if not descrizione:
+        return fallback
+
+    fornitore = (getattr(getattr(documento, "fornitore", None), "denominazione", "") or "").strip()
+    if not fornitore:
+        return descrizione
+
+    supplier_pattern = re.escape(fornitore)
+    cleaned = re.sub(
+        rf"\s*(?:[-,;:]\s*)?\bda\s+{supplier_pattern}\s*$",
+        "",
+        descrizione,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(
+        rf"^\s*\bda\s+{supplier_pattern}\b\s*(?:[-,;:]\s*)?",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" -,;:")
+    return cleaned or fallback
 
 
 def _spese_mensili_rows(request, start, end):
@@ -1298,6 +1329,8 @@ def _spese_mensili_rows(request, start, end):
     for scadenza in scadenze:
         documento = scadenza.documento
         residuo = scadenza.importo_residuo
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+        documento_popup_url = f"{documento_url}?popup=1"
         payment_url = ""
         if residuo > Decimal("0.00"):
             payment_url = (
@@ -1308,12 +1341,14 @@ def _spese_mensili_rows(request, start, end):
             _spesa_row(
                 data_scadenza=scadenza.data_scadenza,
                 tipo="Fattura",
-                descrizione=documento.descrizione or f"Fattura {documento.numero_documento}",
+                descrizione=_descrizione_spesa_mensile_documento(documento),
                 soggetto=documento.fornitore.denominazione,
                 categoria=documento.categoria_spesa_effettiva,
                 importo_previsto=scadenza.importo_previsto,
                 importo_pagato=scadenza.importo_pagato,
-                detail_url=f"{reverse('modifica_documento_fornitore', kwargs={'pk': documento.pk})}?popup=1",
+                detail_url=documento_url,
+                popup_url=documento_popup_url,
+                popup_title=f"Fattura {documento.numero_documento}",
                 action_url=payment_url,
                 action_label="Registra pagamento",
             )
