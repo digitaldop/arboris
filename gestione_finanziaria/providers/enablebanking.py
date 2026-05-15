@@ -232,8 +232,17 @@ class EnableBankingAdapter(BasePsd2Adapter):
         if r.status_code == 204:
             return None
         if r.status_code >= 400:
+            dettaglio = self._parse_error_body(r.text)
+            if r.status_code == 401 and "wrong signature" in dettaglio.lower():
+                dettaglio = (
+                    f"{dettaglio} - Firma JWT non riconosciuta da Enable Banking. "
+                    "Controlla che l'Application ID configurato in Arboris sia quello "
+                    "della stessa app per cui e' stata generata/caricata la private key "
+                    "PEM, e che la public key/certificato corrispondente sia associata "
+                    "a quella app nel Control Panel Enable Banking."
+                )
             raise EnableBankingError(
-                f"HTTP {r.status_code} {method} {path}: {self._parse_error_body(r.text)}"
+                f"HTTP {r.status_code} {method} {path}: {dettaglio}"
             )
         if not (r.text or "").strip():
             return None
