@@ -6,6 +6,7 @@ from .models import (
     SistemaBackupDatabaseConfigurazione,
     SistemaDatabaseBackup,
     SistemaDatabaseRestoreJob,
+    SidebarPersonalizzazione,
     Scuola,
     ScuolaSocial,
     ScuolaTelefono,
@@ -78,6 +79,13 @@ class SistemaUtentePermessiAdmin(admin.ModelAdmin):
         "permesso_servizi_extra",
     )
     search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
+
+
+@admin.register(SidebarPersonalizzazione)
+class SidebarPersonalizzazioneAdmin(admin.ModelAdmin):
+    list_display = ("user", "data_aggiornamento")
+    search_fields = ("user__username", "user__email", "user__first_name", "user__last_name")
+    readonly_fields = ("data_creazione", "data_aggiornamento")
 
 
 @admin.register(SistemaImpostazioniGenerali)

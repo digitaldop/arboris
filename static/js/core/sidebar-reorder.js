@@ -104,7 +104,9 @@ window.ArborisSidebarReorder = (function () {
 
         let draggedSection = null;
 
-        applyStoredOrder(container);
+        if (!window.ArborisSidebarCustomization || !window.ArborisSidebarCustomization.hasPersistentOrder()) {
+            applyStoredOrder(container);
+        }
         setReorderEnabled(container, false);
         toggle.checked = false;
 

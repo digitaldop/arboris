@@ -18,6 +18,7 @@
     <div class="page-head">
         <h1 class="page-title">Movimenti finanziari</h1>
         <div class="page-head-actions">
+            <a href="{% url 'report_categorie_mensile' %}" class="btn btn-secondary">Resoconto Spese per categoria</a>
             <a href="{% url 'pulizia_movimenti_finanziari' %}" class="btn btn-secondary">Ripulisci movimenti</a>
             <a href="{% url 'crea_movimento_manuale' %}" class="btn btn-primary">Nuovo movimento manuale</a>
         </div>
@@ -99,7 +100,12 @@
                                 <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all aria-label="Seleziona tutti i movimenti visibili">
                             </th>
                             <th>Data contabile</th>
-                            <th>Conto</th>
+                            <th>
+                                <span class="finance-category-heading" tabindex="0" data-floating-text="Clic destro sulla cella Conto: modifica rapidamente il nome mostrato nelle liste. Salva con il pulsante o con un nuovo clic destro sulla stessa cella; durante la modifica le altre azioni sono bloccate.">
+                                    <span>Conto</span>
+                                    <span class="finance-category-heading-help" aria-hidden="true">?</span>
+                                </span>
+                            </th>
                             <th>Origine</th>
                             <th>Canale</th>
                             <th>Descrizione</th>
@@ -121,7 +127,20 @@
                                     <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ movimento.pk }}" data-bulk-checkbox aria-label="Seleziona movimento del {{ movimento.data_contabile|date:'d/m/Y' }}">
                                 </td>
                                 <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
-                                <td>{{ movimento.conto|default:"-" }}</td>
+                                <td class="finance-account-cell"
+                                    {% if movimento.conto %}
+                                        data-movement-account-cell
+                                        data-account-id="{{ movimento.conto_id }}"
+                                        data-update-url="{% url 'aggiorna_nome_conto_bancario' movimento.conto.pk %}"
+                                    {% endif %}>
+                                    {% if movimento.conto %}
+                                        <span class="finance-account-cell-inner">
+                                            <span class="finance-account-name" data-account-name>{{ movimento.conto.nome_conto }}</span>
+                                        </span>
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ movimento.get_origine_display }}</td>
                                 <td>
                                     <span class="finance-channel-badge finance-channel-badge-{{ movimento.canale }}">
@@ -196,7 +215,7 @@
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/pages/movimenti-list.js' %}?v=2"></script>
+    <script src="{% static 'js/pages/movimenti-list.js' %}?v=3"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

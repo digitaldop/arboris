@@ -63,6 +63,7 @@ from .models import (
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
+    SidebarPersonalizzazione,
     SistemaUtentePermessi,
     StatoFeedbackSegnalazione,
     StatoRipristinoDatabase,
@@ -93,6 +94,24 @@ CRONOLOGIA_RESULT_LIMIT = 250
 FEEDBACK_PER_PAGE = 20
 GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
 GLOBAL_SEARCH_MAX_RESULTS = 12
+SIDEBAR_CONFIG_MAX_HIDDEN = 600
+SIDEBAR_CONFIG_MAX_ORDER_GROUPS = 160
+SIDEBAR_CONFIG_MAX_CUSTOM_SECTIONS = 16
+SIDEBAR_CONFIG_MAX_CUSTOM_LINKS = 40
+SIDEBAR_ICON_CHOICES = {
+    "list",
+    "home",
+    "calendar",
+    "finance",
+    "bank",
+    "coins",
+    "document",
+    "briefcase",
+    "user",
+    "family",
+    "student",
+    "settings",
+}
 logger = logging.getLogger(__name__)
 
 
@@ -115,6 +134,101 @@ def json_or_redirect(request, payload, *, status=200, fallback_url=None, message
     ):
         redirect_url = "home"
     return redirect(redirect_url)
+
+
+def clean_sidebar_key(value, *, max_length=180):
+    value = str(value or "").strip()
+    if not value or len(value) > max_length:
+        return ""
+    if not re.match(r"^[A-Za-z0-9:_./?=&%#-]+$", value):
+        return ""
+    return value
+
+
+def clean_sidebar_label(value, *, max_length=80):
+    return str(value or "").strip()[:max_length]
+
+
+def clean_sidebar_icon(value):
+    value = str(value or "list").strip().lower()
+    return value if value in SIDEBAR_ICON_CHOICES else "list"
+
+
+def clean_sidebar_url(value):
+    value = str(value or "").strip()
+    if not value or len(value) > 240:
+        return ""
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    if value.startswith("#"):
+        return value
+    if value.startswith(("http://", "https://")):
+        return value
+    return ""
+
+
+def normalize_sidebar_config(raw_config):
+    if not isinstance(raw_config, dict):
+        return {"version": 1, "hidden": [], "order": {}, "custom_sections": []}
+
+    hidden = []
+    for value in raw_config.get("hidden", [])[:SIDEBAR_CONFIG_MAX_HIDDEN]:
+        key = clean_sidebar_key(value)
+        if key and key not in hidden:
+            hidden.append(key)
+
+    order = {}
+    raw_order = raw_config.get("order", {})
+    if isinstance(raw_order, dict):
+        for parent_key, child_keys in list(raw_order.items())[:SIDEBAR_CONFIG_MAX_ORDER_GROUPS]:
+            clean_parent_key = clean_sidebar_key(parent_key, max_length=220)
+            if not clean_parent_key or not isinstance(child_keys, list):
+                continue
+            clean_child_keys = []
+            for child_key in child_keys[:SIDEBAR_CONFIG_MAX_HIDDEN]:
+                clean_child_key = clean_sidebar_key(child_key)
+                if clean_child_key and clean_child_key not in clean_child_keys:
+                    clean_child_keys.append(clean_child_key)
+            if clean_child_keys:
+                order[clean_parent_key] = clean_child_keys
+
+    custom_sections = []
+    for section_index, section in enumerate(raw_config.get("custom_sections", [])[:SIDEBAR_CONFIG_MAX_CUSTOM_SECTIONS]):
+        if not isinstance(section, dict):
+            continue
+        section_id = clean_sidebar_key(section.get("id"), max_length=60) or f"custom-{section_index + 1}"
+        label = clean_sidebar_label(section.get("label"), max_length=60) or "Menu personalizzato"
+        links = []
+        for link_index, link in enumerate(section.get("links", [])[:SIDEBAR_CONFIG_MAX_CUSTOM_LINKS]):
+            if not isinstance(link, dict):
+                continue
+            link_label = clean_sidebar_label(link.get("label")) or "Link"
+            link_url = clean_sidebar_url(link.get("url"))
+            if not link_url:
+                continue
+            links.append(
+                {
+                    "id": clean_sidebar_key(link.get("id"), max_length=60) or f"link-{link_index + 1}",
+                    "label": link_label,
+                    "url": link_url,
+                    "icon": clean_sidebar_icon(link.get("icon")),
+                }
+            )
+        custom_sections.append(
+            {
+                "id": section_id,
+                "label": label,
+                "icon": clean_sidebar_icon(section.get("icon")),
+                "links": links,
+            }
+        )
+
+    return {
+        "version": 1,
+        "hidden": hidden,
+        "order": order,
+        "custom_sections": custom_sections,
+    }
 
 
 def compact_join(parts, separator=" - "):
@@ -187,6 +301,33 @@ def toggle_active_state(request):
         {"ok": True, "value": new_value, "message": message},
         message_level="success",
     )
+
+
+@authenticated_user_required
+def sidebar_personalizzazione_sistema(request):
+    if request.method == "GET":
+        personalizzazione = SidebarPersonalizzazione.objects.filter(user=request.user).first()
+        config = normalize_sidebar_config(personalizzazione.config if personalizzazione else {})
+        return JsonResponse({"ok": True, "config": config})
+
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "Metodo non consentito."}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "message": "Configurazione non valida."}, status=400)
+
+    if payload.get("reset"):
+        SidebarPersonalizzazione.objects.filter(user=request.user).delete()
+        return JsonResponse({"ok": True, "config": normalize_sidebar_config({})})
+
+    config = normalize_sidebar_config(payload.get("config", {}))
+    personalizzazione, _created = SidebarPersonalizzazione.objects.get_or_create(user=request.user)
+    personalizzazione.config = config
+    personalizzazione.save(update_fields=["config", "data_aggiornamento"])
+
+    return JsonResponse({"ok": True, "config": config})
 
 
 def build_anagrafica_global_search_results(query, remaining):

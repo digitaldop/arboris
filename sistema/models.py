@@ -1044,6 +1044,31 @@ def readable_text_color(background_color):
     return "#203642" if luminance > 0.62 else "#ffffff"
 
 
+class SidebarPersonalizzazione(models.Model):
+    """
+    Preferenze personali della navigazione laterale.
+    I permessi restano applicati a monte: questa configurazione puo solo
+    riordinare/nascondere cio che l'utente vede gia o aggiungere link custom.
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sidebar_personalizzazione",
+    )
+    config = models.JSONField(default=dict, blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sistema_sidebar_personalizzazione"
+        verbose_name = "Personalizzazione sidebar"
+        verbose_name_plural = "Personalizzazioni sidebar"
+
+    def __str__(self):
+        return f"Sidebar {self.user}"
+
+
 class SistemaRuoloPermessi(models.Model):
     nome = models.CharField(max_length=120, unique=True)
     descrizione = models.TextField(blank=True)

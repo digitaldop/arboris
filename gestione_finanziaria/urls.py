@@ -248,6 +248,11 @@ urlpatterns = [
         name="modifica_conto_bancario",
     ),
     path(
+        "gestione-finanziaria/conti/<int:pk>/nome/",
+        gf_edit(views.aggiorna_nome_conto_bancario),
+        name="aggiorna_nome_conto_bancario",
+    ),
+    path(
         "gestione-finanziaria/conti/<int:pk>/elimina/",
         gf_manage(views.elimina_conto_bancario),
         name="elimina_conto_bancario",

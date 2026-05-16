@@ -411,6 +411,53 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertEqual(movimento.categorizzato_da, self.user)
         self.assertIsNotNone(movimento.categorizzato_il)
 
+    def test_aggiorna_nome_conto_bancario_da_lista(self):
+        conto = ContoBancario.objects.create(nome_conto="01e65d55-d434-4928-bd80-c51ea68d4d07")
+
+        response = self.client.post(
+            reverse("aggiorna_nome_conto_bancario", args=[conto.pk]),
+            {"nome_conto": "Banco BPM - Principale"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["account_id"], str(conto.pk))
+        self.assertEqual(payload["account_name"], "Banco BPM - Principale")
+        conto.refresh_from_db()
+        self.assertEqual(conto.nome_conto, "Banco BPM - Principale")
+
+    def test_aggiorna_nome_conto_bancario_rifiuta_nome_vuoto(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+
+        response = self.client.post(
+            reverse("aggiorna_nome_conto_bancario", args=[conto.pk]),
+            {"nome_conto": "   "},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        conto.refresh_from_db()
+        self.assertEqual(conto.nome_conto, "Conto operativo")
+
+    def test_lista_movimenti_usa_click_destro_per_rinominare_conto(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto PSD2 grezzo")
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("-12.00"),
+            descrizione="Spese bancarie",
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-movement-account-cell")
+        self.assertContains(response, reverse("aggiorna_nome_conto_bancario", args=[conto.pk]))
+        self.assertContains(response, "data-account-name")
+        self.assertNotContains(response, "finance-account-edit-link")
+
 
 class MovimentoRiconciliazioneLayoutTests(TestCase):
     def setUp(self):

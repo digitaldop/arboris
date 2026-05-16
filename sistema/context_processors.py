@@ -1,7 +1,13 @@
 from django.core.cache import cache
 from django.db.utils import OperationalError, ProgrammingError
 
-from .models import LivelloPermesso, Scuola, SistemaImpostazioniGenerali, get_site_font_settings
+from .models import (
+    LivelloPermesso,
+    Scuola,
+    SidebarPersonalizzazione,
+    SistemaImpostazioniGenerali,
+    get_site_font_settings,
+)
 from .permissions import (
     get_user_permission_profile,
     user_can_access_database_backups,
@@ -262,6 +268,14 @@ def sistema_permissions_context(request):
     role_theme = profilo.role_theme_variables if profilo else None
     notifiche_finanziarie_non_lette = 0
     notifiche_finanziarie_recenti = []
+    sidebar_personalizzazione_config = {}
+
+    if getattr(user, "is_authenticated", False):
+        try:
+            personalizzazione = SidebarPersonalizzazione.objects.filter(user=user).first()
+            sidebar_personalizzazione_config = personalizzazione.config if personalizzazione else {}
+        except (OperationalError, ProgrammingError):
+            sidebar_personalizzazione_config = {}
 
     if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
         try:
@@ -304,6 +318,7 @@ def sistema_permissions_context(request):
         "can_access_database_backups": user_can_access_database_backups(user),
         "notifiche_finanziarie_non_lette": notifiche_finanziarie_non_lette,
         "notifiche_finanziarie_recenti": notifiche_finanziarie_recenti,
+        "sidebar_personalizzazione_config": sidebar_personalizzazione_config,
     }
 
 

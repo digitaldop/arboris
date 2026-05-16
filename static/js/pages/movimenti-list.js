@@ -55,7 +55,15 @@ window.ArborisMovimentiList = (function () {
         button.appendChild(svg);
     }
 
-    function updateDisplay(cell, data) {
+    function stopEditorPropagation(editor) {
+        ["click", "mousedown", "mouseup"].forEach(eventName => {
+            editor.addEventListener(eventName, function (event) {
+                event.stopPropagation();
+            });
+        });
+    }
+
+    function updateCategoryDisplay(cell, data) {
         const name = cell.querySelector("[data-category-name]");
         const auto = cell.querySelector("[data-category-auto]");
         const categoryId = data.category_id || "";
@@ -71,12 +79,36 @@ window.ArborisMovimentiList = (function () {
         }
     }
 
+    function updateAccountDisplay(cell, data) {
+        const accountId = data.account_id || cell.dataset.accountId || "";
+        const accountName = data.account_name || "";
+        if (!accountName) {
+            return;
+        }
+
+        document.querySelectorAll("[data-movement-account-cell]").forEach(accountCell => {
+            if (accountCell.dataset.accountId !== accountId) {
+                return;
+            }
+            const name = accountCell.querySelector("[data-account-name]");
+            if (name) {
+                name.textContent = accountName;
+            }
+        });
+
+        document.querySelectorAll('select[name="conto"] option').forEach(option => {
+            if (option.value === accountId) {
+                option.textContent = accountName;
+            }
+        });
+    }
+
     function closeEditor() {
         if (!activeEdit) {
             return;
         }
         activeEdit.cell.classList.remove("is-editing");
-        const editor = activeEdit.cell.querySelector("[data-category-editor]");
+        const editor = activeEdit.cell.querySelector("[data-category-editor], [data-account-editor]");
         if (editor) {
             editor.remove();
         }
@@ -92,7 +124,7 @@ window.ArborisMovimentiList = (function () {
         if (!activeEdit) {
             return;
         }
-        const input = activeEdit.cell.querySelector(".searchable-select-input") || activeEdit.select;
+        const input = activeEdit.input || activeEdit.cell.querySelector(".searchable-select-input") || activeEdit.select;
         input?.focus();
     }
 
@@ -123,9 +155,19 @@ window.ArborisMovimentiList = (function () {
             return;
         }
 
-        const { cell, select } = activeEdit;
+        const { cell, type } = activeEdit;
         const formData = new FormData();
-        formData.append("categoria", select.value || "");
+        if (type === "account") {
+            const accountName = activeEdit.input.value.trim();
+            if (!accountName) {
+                setStatus("Inserisci un nome conto.", "error");
+                activeEdit.input.focus();
+                return;
+            }
+            formData.append("nome_conto", accountName);
+        } else {
+            formData.append("categoria", activeEdit.select.value || "");
+        }
         setSavingState(true);
         setStatus("Salvataggio...", "");
 
@@ -144,7 +186,11 @@ window.ArborisMovimentiList = (function () {
                 return response.json();
             })
             .then(data => {
-                updateDisplay(cell, data);
+                if (type === "account") {
+                    updateAccountDisplay(cell, data);
+                } else {
+                    updateCategoryDisplay(cell, data);
+                }
                 closeEditor();
             })
             .catch(error => {
@@ -156,7 +202,7 @@ window.ArborisMovimentiList = (function () {
             });
     }
 
-    function startEditor(cell) {
+    function startCategoryEditor(cell) {
         if (activeEdit) {
             return;
         }
@@ -172,6 +218,7 @@ window.ArborisMovimentiList = (function () {
         const editor = document.createElement("div");
         editor.className = "finance-category-editor";
         editor.setAttribute("data-category-editor", "1");
+        stopEditorPropagation(editor);
 
         const fieldRow = document.createElement("div");
         fieldRow.className = "finance-category-editor-field";
@@ -226,7 +273,7 @@ window.ArborisMovimentiList = (function () {
         editor.appendChild(status);
         cell.appendChild(editor);
 
-        activeEdit = { cell, select, status, saveButton, cancelButton, saving: false };
+        activeEdit = { type: "category", cell, select, status, saveButton, cancelButton, saving: false };
 
         if (window.ArborisFamigliaAutocomplete) {
             window.ArborisFamigliaAutocomplete.init(editor, { force: true });
@@ -235,6 +282,84 @@ window.ArborisMovimentiList = (function () {
         const input = editor.querySelector(".searchable-select-input") || select;
         input.focus();
         input.select?.();
+    }
+
+    function startAccountEditor(cell) {
+        if (activeEdit || !cell.dataset.updateUrl) {
+            return;
+        }
+
+        const currentName = cell.querySelector("[data-account-name]")?.textContent.trim() || "";
+        ensureOverlay();
+        document.body.classList.add("finance-category-editing");
+        cell.classList.add("is-editing");
+
+        const editor = document.createElement("div");
+        editor.className = "finance-account-editor";
+        editor.setAttribute("data-account-editor", "1");
+        stopEditorPropagation(editor);
+
+        const fieldRow = document.createElement("div");
+        fieldRow.className = "finance-account-editor-field";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 150;
+        input.className = "finance-account-editor-input";
+        input.setAttribute("aria-label", "Nome conto");
+        input.value = currentName;
+
+        const actions = document.createElement("div");
+        actions.className = "finance-account-editor-actions";
+
+        const saveButton = document.createElement("button");
+        saveButton.type = "button";
+        saveButton.className = "table-icon-link finance-account-editor-btn finance-account-editor-save";
+        saveButton.setAttribute("aria-label", "Salva nome conto");
+        saveButton.setAttribute("data-floating-text", "Salva");
+        appendIcon(saveButton, "check");
+
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "table-icon-link table-icon-link-danger finance-account-editor-btn finance-account-editor-cancel";
+        cancelButton.setAttribute("aria-label", "Annulla modifica nome conto");
+        cancelButton.setAttribute("data-floating-text", "Annulla");
+        appendIcon(cancelButton, "x");
+
+        saveButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            saveActiveEditor();
+        });
+
+        cancelButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeEditor();
+        });
+
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                saveActiveEditor();
+            }
+        });
+
+        const status = document.createElement("div");
+        status.className = "finance-account-editor-status";
+        status.setAttribute("aria-live", "polite");
+
+        actions.appendChild(saveButton);
+        actions.appendChild(cancelButton);
+        fieldRow.appendChild(input);
+        fieldRow.appendChild(actions);
+        editor.appendChild(fieldRow);
+        editor.appendChild(status);
+        cell.appendChild(editor);
+
+        activeEdit = { type: "account", cell, input, status, saveButton, cancelButton, saving: false };
+        input.focus();
+        input.select();
     }
 
     function bind(root) {
@@ -247,7 +372,9 @@ window.ArborisMovimentiList = (function () {
         }
 
         document.addEventListener("contextmenu", function (event) {
-            const cell = event.target.closest("[data-movement-category-cell]");
+            const categoryCell = event.target.closest("[data-movement-category-cell]");
+            const accountCell = event.target.closest("[data-movement-account-cell]");
+            const cell = categoryCell || accountCell;
             if (activeEdit) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -261,7 +388,11 @@ window.ArborisMovimentiList = (function () {
             }
             event.preventDefault();
             event.stopPropagation();
-            startEditor(cell);
+            if (categoryCell) {
+                startCategoryEditor(categoryCell);
+            } else {
+                startAccountEditor(accountCell);
+            }
         }, true);
 
         document.addEventListener("click", function (event) {

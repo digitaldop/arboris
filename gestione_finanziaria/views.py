@@ -2362,6 +2362,30 @@ def modifica_conto_bancario(request, pk):
     )
 
 
+@require_POST
+def aggiorna_nome_conto_bancario(request, pk):
+    conto = get_object_or_404(ContoBancario, pk=pk)
+    nome_conto = (request.POST.get("nome_conto") or "").strip()
+
+    if not nome_conto:
+        return JsonResponse({"ok": False, "error": "Inserisci un nome conto."}, status=400)
+
+    if len(nome_conto) > ContoBancario._meta.get_field("nome_conto").max_length:
+        return JsonResponse({"ok": False, "error": "Il nome conto e' troppo lungo."}, status=400)
+
+    if conto.nome_conto != nome_conto:
+        conto.nome_conto = nome_conto
+        conto.save(update_fields=["nome_conto", "data_aggiornamento"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "account_id": str(conto.pk),
+            "account_name": conto.nome_conto,
+        }
+    )
+
+
 def elimina_conto_bancario(request, pk):
     popup = is_popup_request(request)
     conto = get_object_or_404(ContoBancario, pk=pk)

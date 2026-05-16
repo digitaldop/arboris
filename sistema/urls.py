@@ -18,6 +18,11 @@ urlpatterns = [
     path("crediti/", views.crediti, name="crediti"),
     path("sistema/ricerca-globale/", views.ricerca_globale_sistema, name="ricerca_globale_sistema"),
     path("sistema/toggle-attivo/", views.toggle_active_state, name="toggle_active_state"),
+    path(
+        "sistema/sidebar-personalizzazione/",
+        views.sidebar_personalizzazione_sistema,
+        name="sidebar_personalizzazione_sistema",
+    ),
     path("feedback/beta/", views.crea_feedback_beta, name="crea_feedback_beta"),
     path("sistema/scuola/", sistema_edit(views.scuola_sistema), name="scuola_sistema"),
     path("sistema/scuola/indirizzi/nuovo/", sistema_edit(anagrafica_views.crea_indirizzo), name="scuola_crea_indirizzo"),
