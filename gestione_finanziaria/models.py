@@ -935,6 +935,26 @@ class ContoBancario(models.Model):
         help_text="Solo per provider PSD2: riferimento alla connessione/consenso.",
     )
     external_account_id = models.CharField(max_length=120, blank=True)
+    external_account_hash = models.CharField(
+        max_length=512,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Identificativo stabile lato provider, se disponibile. Per Enable Banking "
+            "corrisponde a identification_hash e aiuta a riconoscere lo stesso conto "
+            "fra sessioni diverse."
+        ),
+    )
+    external_account_type = models.CharField(
+        max_length=40,
+        blank=True,
+        help_text="Tipo conto lato provider (es. Enable Banking cash_account_type: CACC, CARD, SVGS).",
+    )
+    external_account_product = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Prodotto/dettaglio conto restituito dal provider PSD2, se disponibile.",
+    )
     attivo = models.BooleanField(default=True)
     saldo_corrente = models.DecimalField(
         max_digits=14,

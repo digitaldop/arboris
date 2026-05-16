@@ -107,6 +107,7 @@ from .models import (
     StatoScadenzaFornitore,
     StatoRiconciliazione,
     TipoCategoriaFinanziaria,
+    TipoContoFinanziario,
     TipoPianoRatealeSpesa,
     TipoSpesaOperativa,
     TipoProviderBancario,
@@ -2832,6 +2833,46 @@ def scarica_template_saldi_conti_csv(_request):
 # =========================================================================
 
 
+def _categorie_finanziarie_attive_per_select():
+    categorie = list(
+        CategoriaFinanziaria.objects.filter(attiva=True)
+        .select_related("parent")
+        .order_by("ordine", "nome", "id")
+    )
+    categorie_ids = {categoria.pk for categoria in categorie}
+    figli_by_parent = {}
+
+    for categoria in categorie:
+        parent_id = categoria.parent_id if categoria.parent_id in categorie_ids else None
+        figli_by_parent.setdefault(parent_id, []).append(categoria)
+
+    def sort_key(categoria):
+        return (
+            categoria.ordine is None,
+            categoria.ordine or 0,
+            categoria.nome.casefold(),
+            categoria.pk,
+        )
+
+    for figli in figli_by_parent.values():
+        figli.sort(key=sort_key)
+
+    categorie_ordinate = []
+
+    def add_categoria(categoria, livello=0):
+        categoria.select_level = livello
+        categoria.select_parent_label = categoria.parent.percorso_label if categoria.parent_id else ""
+        categoria.select_tipo_label = categoria.get_tipo_display()
+        categorie_ordinate.append(categoria)
+        for figlia in figli_by_parent.get(categoria.pk, []):
+            add_categoria(figlia, livello + 1)
+
+    for categoria in figli_by_parent.get(None, []):
+        add_categoria(categoria)
+
+    return categorie_ordinate
+
+
 def lista_movimenti_finanziari(request):
     movimenti = (
         MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
@@ -2864,9 +2905,7 @@ def lista_movimenti_finanziari(request):
         {
             "movimenti": movimenti,
             "conti_disponibili": ContoBancario.objects.filter(attivo=True).order_by("nome_conto"),
-            "categorie_disponibili": CategoriaFinanziaria.objects.filter(attiva=True).order_by(
-                "parent__nome", "nome"
-            ),
+            "categorie_disponibili": _categorie_finanziarie_attive_per_select(),
             "origini_disponibili": OrigineMovimento.choices,
             "canali_disponibili": CanaleMovimento.choices,
             "conto_selezionato": conti_filter or "",
@@ -3097,6 +3136,44 @@ def modifica_movimento_finanziario(request, pk):
         request,
         "gestione_finanziaria/movimento_form.html",
         {"form": form, "movimento": movimento},
+    )
+
+
+@require_POST
+def aggiorna_categoria_movimento(request, pk):
+    movimento = get_object_or_404(MovimentoFinanziario, pk=pk)
+    raw_categoria = (request.POST.get("categoria") or "").strip()
+    categoria = None
+
+    if raw_categoria:
+        categoria = get_object_or_404(CategoriaFinanziaria, pk=raw_categoria, attiva=True)
+
+    categoria_precedente_id = movimento.categoria_id
+    nuova_categoria_id = categoria.pk if categoria else None
+
+    if categoria_precedente_id != nuova_categoria_id:
+        movimento.categoria = categoria
+        movimento.categorizzazione_automatica = False
+        movimento.regola_categorizzazione = None
+        movimento.categorizzato_da = request.user if request.user.is_authenticated else None
+        movimento.categorizzato_il = timezone.now()
+        movimento.save(
+            update_fields=[
+                "categoria",
+                "categorizzazione_automatica",
+                "regola_categorizzazione",
+                "categorizzato_da",
+                "categorizzato_il",
+                "data_aggiornamento",
+            ]
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "category_id": str(nuova_categoria_id or ""),
+            "category_label": str(categoria) if categoria else "non categorizzato",
+        }
     )
 
 
@@ -4088,6 +4165,124 @@ def nuova_connessione_psd2(request, provider_pk):
     )
 
 
+def _istituto_label_da_connessione(connessione):
+    raw = (connessione.external_institution_id or "").strip()
+    if "|" in raw:
+        name, _country = raw.rsplit("|", 1)
+        return name.strip()
+    return raw
+
+
+def _testo_provider_account(account):
+    return " ".join(
+        str(piece or "").lower()
+        for piece in (
+            getattr(account, "account_type", ""),
+            getattr(account, "account_product", ""),
+            getattr(account, "name", ""),
+            getattr(account, "institution_id", ""),
+        )
+    )
+
+
+def _tipo_conto_da_provider_account(account):
+    account_type = (getattr(account, "account_type", "") or "").strip().upper()
+    testo = _testo_provider_account(account)
+
+    if "prepag" in testo or "prepaid" in testo:
+        return TipoContoFinanziario.CARTA_PREPAGATA
+    if "carta di credito" in testo or "credit card" in testo:
+        return TipoContoFinanziario.CARTA_CREDITO
+    if account_type == "CARD":
+        return TipoContoFinanziario.CARTA_PREPAGATA
+    if account_type == "CACC":
+        return TipoContoFinanziario.CONTO_CORRENTE
+    if account_type in {"CASH", "LOAN", "OTHR", "SVGS"}:
+        return TipoContoFinanziario.ALTRO
+    return TipoContoFinanziario.CONTO_CORRENTE
+
+
+def _nome_conto_da_provider_account(connessione, account):
+    identificativo = (account.iban or account.external_account_id or "").strip()
+    suffix = identificativo[-4:] if len(identificativo) >= 4 else identificativo
+    base = (account.name or "").strip()
+    if not base:
+        base = f"Conto {suffix}" if suffix else "Conto PSD2"
+    if suffix and suffix not in base and len(base) <= 120:
+        base = f"{base} {suffix}"
+    if connessione.etichetta and connessione.etichetta.lower() not in base.lower():
+        return f"{connessione.etichetta} - {base}"[:150]
+    return base[:150]
+
+
+def _aggiorna_conto_da_provider_account(conto, connessione, account, *, is_new):
+    provider = connessione.provider
+    inferred_tipo = _tipo_conto_da_provider_account(account)
+    banca = _istituto_label_da_connessione(connessione) or account.institution_id
+    update_fields = []
+
+    def set_if_changed(field, value):
+        if value is None:
+            return
+        if getattr(conto, field) != value:
+            setattr(conto, field, value)
+            update_fields.append(field)
+
+    set_if_changed("provider", provider)
+    set_if_changed("connessione", connessione)
+    set_if_changed("external_account_id", (account.external_account_id or "")[:120])
+    set_if_changed("external_account_hash", (getattr(account, "identification_hash", "") or "")[:512])
+    set_if_changed("external_account_type", (getattr(account, "account_type", "") or "")[:40])
+    set_if_changed("external_account_product", (getattr(account, "account_product", "") or "")[:200])
+    set_if_changed("valuta", (account.currency or "EUR")[:3].upper())
+
+    if is_new:
+        set_if_changed("nome_conto", _nome_conto_da_provider_account(connessione, account))
+        set_if_changed("tipo_conto", inferred_tipo)
+        set_if_changed("attivo", True)
+    elif inferred_tipo != TipoContoFinanziario.CONTO_CORRENTE and conto.tipo_conto in {
+        TipoContoFinanziario.CONTO_CORRENTE,
+        TipoContoFinanziario.ALTRO,
+    }:
+        set_if_changed("tipo_conto", inferred_tipo)
+
+    if account.iban and (is_new or not conto.iban):
+        set_if_changed("iban", account.iban[:34])
+    if account.owner_name and (is_new or not conto.intestatario):
+        set_if_changed("intestatario", account.owner_name[:200])
+    if banca and (is_new or not conto.banca):
+        set_if_changed("banca", banca[:150])
+
+    if update_fields and conto.pk:
+        update_fields.append("data_aggiornamento")
+        conto.save(update_fields=sorted(set(update_fields)))
+    elif not conto.pk:
+        conto.save()
+    return conto
+
+
+def _conto_da_provider_account(*, provider, connessione, account):
+    if not (account.external_account_id or "").strip():
+        raise ValueError("Account PSD2 senza external_account_id.")
+
+    queryset = ContoBancario.objects.filter(provider=provider, connessione=connessione)
+    conto = None
+    identification_hash = (getattr(account, "identification_hash", "") or "").strip()
+    if identification_hash:
+        conto = queryset.filter(external_account_hash=identification_hash).first()
+    if conto is None:
+        conto = queryset.filter(external_account_id=account.external_account_id).first()
+
+    if conto is None:
+        conto = ContoBancario()
+        is_new = True
+    else:
+        is_new = False
+
+    _aggiorna_conto_da_provider_account(conto, connessione, account, is_new=is_new)
+    return conto, is_new
+
+
 def _finalizza_connessione_psd2(request, connessione, adapter):
     """
     Step comune a tutti i provider dopo che il consenso e' stato concesso:
@@ -4106,26 +4301,15 @@ def _finalizza_connessione_psd2(request, connessione, adapter):
 
     provider = connessione.provider
     creati = 0
+    aggiornati = 0
     for account in conti_provider:
-        conto, is_new = ContoBancario.objects.get_or_create(
+        conto, is_new = _conto_da_provider_account(
             provider=provider,
-            external_account_id=account.external_account_id,
-            defaults={
-                "nome_conto": account.name or f"Conto {account.iban or account.external_account_id}",
-                "iban": account.iban,
-                "intestatario": account.owner_name,
-                "valuta": account.currency or "EUR",
-                "connessione": connessione,
-                "attivo": True,
-            },
+            connessione=connessione,
+            account=account,
         )
         if not is_new:
-            conto.connessione = connessione
-            if account.iban and not conto.iban:
-                conto.iban = account.iban
-            if account.owner_name and not conto.intestatario:
-                conto.intestatario = account.owner_name
-            conto.save()
+            aggiornati += 1
         else:
             creati += 1
 
@@ -4143,8 +4327,8 @@ def _finalizza_connessione_psd2(request, connessione, adapter):
 
     messages.success(
         request,
-        f"Connessione autorizzata. Conti collegati: {len(conti_provider)} "
-        f"(nuovi: {creati}).",
+        f"Connessione autorizzata. Conti/carte collegati: {len(conti_provider)} "
+        f"(nuovi: {creati}, aggiornati: {aggiornati}).",
     )
     return redirect("lista_connessioni_bancarie")
 

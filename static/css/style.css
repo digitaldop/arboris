@@ -4750,6 +4750,184 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     color: #4f5d66;
 }
 
+.module-gestione_finanziaria .finance-movements-table-shell {
+    overflow-x: auto;
+}
+
+.module-gestione_finanziaria .finance-movements-table {
+    table-layout: fixed;
+    min-width: 1220px;
+}
+
+.module-gestione_finanziaria .finance-movements-col-select {
+    width: 44px;
+}
+
+.module-gestione_finanziaria .finance-movements-col-date {
+    width: 92px;
+}
+
+.module-gestione_finanziaria .finance-movements-col-account {
+    width: 10%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-origin {
+    width: 7%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-channel {
+    width: 7%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-description {
+    width: 21%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-category {
+    width: 18%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-amount {
+    width: 104px;
+}
+
+.module-gestione_finanziaria .finance-movements-col-status {
+    width: 8%;
+}
+
+.module-gestione_finanziaria .finance-movements-col-actions {
+    width: 118px;
+}
+
+.module-gestione_finanziaria .finance-movements-table th,
+.module-gestione_finanziaria .finance-movements-table td {
+    line-height: 1.35;
+}
+
+.module-gestione_finanziaria .finance-movements-actions-head,
+.module-gestione_finanziaria .finance-movements-actions-cell {
+    text-align: center;
+}
+
+.module-gestione_finanziaria .finance-movement-icon-actions {
+    justify-content: center;
+    gap: 4px;
+}
+
+.module-gestione_finanziaria .finance-movement-icon-actions .table-icon-link {
+    flex: 0 0 26px;
+    width: 26px;
+    height: 26px;
+}
+
+.module-gestione_finanziaria .finance-category-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: help;
+}
+
+.module-gestione_finanziaria .finance-category-heading-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1px solid #b9c8d2;
+    border-radius: 999px;
+    color: #3b6f87;
+    background: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.module-gestione_finanziaria .finance-category-cell {
+    position: relative;
+    cursor: context-menu;
+}
+
+.module-gestione_finanziaria .finance-category-cell.is-editing {
+    z-index: 10002;
+    background: #fff;
+    box-shadow: inset 0 0 0 2px #3b6f87;
+}
+
+.module-gestione_finanziaria .finance-category-display {
+    display: block;
+    min-height: 20px;
+}
+
+.module-gestione_finanziaria .finance-category-editor {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    z-index: 10004;
+    width: min(430px, 56vw);
+    transform: translateY(-50%);
+}
+
+.module-gestione_finanziaria .finance-category-editor-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.module-gestione_finanziaria .finance-category-editor .searchable-select {
+    flex: 1 1 auto;
+    max-width: none;
+}
+
+.module-gestione_finanziaria .finance-category-editor .searchable-select-input {
+    min-height: 34px;
+    border-color: #8eb4c4;
+    box-shadow: 0 10px 24px rgba(32, 54, 69, 0.16);
+}
+
+.module-gestione_finanziaria .finance-category-editor-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 4px;
+}
+
+.module-gestione_finanziaria .finance-category-editor-btn {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.module-gestione_finanziaria .finance-category-editor-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+.module-gestione_finanziaria .finance-category-editor-btn:disabled {
+    opacity: 0.58;
+    cursor: wait;
+}
+
+.module-gestione_finanziaria .finance-category-editor-status {
+    min-height: 16px;
+    margin-top: 4px;
+    color: #52637c;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.module-gestione_finanziaria .finance-category-editor-status[data-tone="error"] {
+    color: #ba2121;
+}
+
+.finance-category-edit-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(15, 23, 42, 0.04);
+    cursor: not-allowed;
+}
+
 .finance-balance-summary .summary-grid {
     margin: 0;
 }
@@ -7299,6 +7477,120 @@ select:focus {
 .searchable-select-option.is-selected {
     background: #e2eef4;
     color: #244b5e;
+}
+
+.searchable-select-category-tree .searchable-select-dropdown {
+    max-height: 320px;
+    border-color: #c9d8e2;
+    border-radius: 8px;
+    box-shadow: 0 14px 30px rgba(34, 54, 69, 0.14);
+}
+
+.searchable-select-category-tree .searchable-select-option {
+    padding: 0;
+}
+
+.searchable-select-category-tree .searchable-select-empty {
+    padding: 10px 12px;
+}
+
+.searchable-select-option-category {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 7px 10px 7px calc(10px + var(--category-indent, 0px));
+}
+
+.searchable-select-category-branch {
+    position: relative;
+    flex: 0 0 14px;
+    width: 14px;
+    height: 28px;
+}
+
+.searchable-select-option-category.is-nested .searchable-select-category-branch::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: -8px;
+    bottom: 13px;
+    border-left: 1px solid #c9d8e2;
+}
+
+.searchable-select-option-category.is-nested .searchable-select-category-branch::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 13px;
+    width: 10px;
+    border-bottom: 1px solid #c9d8e2;
+}
+
+.searchable-select-option-category:not(.is-nested) .searchable-select-category-branch::before {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #9fb4c2;
+}
+
+.searchable-select-category-swatch {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 28px;
+    border: 1px solid rgba(34, 54, 69, 0.12);
+    border-radius: 999px;
+    background: #dbe5eb;
+}
+
+.searchable-select-option-category[data-category-kind="entrata"] .searchable-select-category-swatch {
+    background: #8fd5a3;
+}
+
+.searchable-select-option-category[data-category-kind="spesa"] .searchable-select-category-swatch {
+    background: #f0b3b3;
+}
+
+.searchable-select-option-category[data-category-kind="trasferimento"] .searchable-select-category-swatch {
+    background: #93c8e8;
+}
+
+.searchable-select-option-category.is-empty-category .searchable-select-category-swatch {
+    background: repeating-linear-gradient(
+        135deg,
+        #eef2f5,
+        #eef2f5 3px,
+        #cbd6de 3px,
+        #cbd6de 6px
+    );
+}
+
+.searchable-select-category-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.searchable-select-category-name,
+.searchable-select-category-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.searchable-select-category-name {
+    color: #223249;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.searchable-select-category-meta {
+    color: #637487;
+    font-size: 11px;
 }
 
 .searchable-select.is-disabled .searchable-select-input {
@@ -27792,6 +28084,99 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
 }
 
+.module-gestione_finanziaria .finance-reconciliation-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.module-gestione_finanziaria .finance-reconciliation-summary .summary-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-panel {
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-panel .finance-section-head,
+.module-gestione_finanziaria .finance-reconciliation-candidates-panel .finance-section-head {
+    padding: 16px 18px;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 18px 18px;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-item {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid #dce7ef;
+    border-radius: 8px;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-item.is-full {
+    grid-column: 1 / -1;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-item span {
+    display: block;
+    margin-bottom: 6px;
+    color: #52637c;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-detail-item strong {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #102033;
+    font-size: 15px;
+    line-height: 1.35;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-candidates-table {
+    min-width: 1080px;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-choice {
+    cursor: pointer;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-choice input[type="radio"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0 2px 0 0;
+    accent-color: #417690;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 18px 18px;
+    border-top: 1px solid #e4edf3;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-action-bar .form-actions {
+    margin: 0;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-action-bar-empty {
+    justify-content: flex-end;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-paid-toggle {
+    margin: 0;
+}
+
 .module-gestione_finanziaria .finance-reasons {
     display: flex;
     flex-wrap: wrap;
@@ -27949,6 +28334,21 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
     .module-gestione_finanziaria .finance-inline-match-form input,
     .module-gestione_finanziaria .finance-inline-match-form .btn {
+        width: 100%;
+    }
+
+    .module-gestione_finanziaria .finance-reconciliation-detail-grid,
+    .module-gestione_finanziaria .finance-reconciliation-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .module-gestione_finanziaria .finance-reconciliation-action-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .module-gestione_finanziaria .finance-reconciliation-action-bar .form-actions,
+    .module-gestione_finanziaria .finance-reconciliation-action-bar .btn {
         width: 100%;
     }
 

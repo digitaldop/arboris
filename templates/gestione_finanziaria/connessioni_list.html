@@ -76,7 +76,7 @@
                     <th>Etichetta</th>
                     <th>Stato</th>
                     <th>Istituto</th>
-                    <th>Conti collegati</th>
+                    <th>Conti/carte collegati</th>
                     <th>Ultimo refresh</th>
                     <th>Azioni</th>
                 </tr>
@@ -88,7 +88,17 @@
                         <td>{{ connessione.etichetta }}</td>
                         <td>{{ connessione.get_stato_display }}</td>
                         <td>{{ connessione.external_institution_id|default:"-" }}</td>
-                        <td>{{ connessione.conti.count }}</td>
+                        <td>
+                            {{ connessione.conti.count }}
+                            {% if connessione.conti.all %}
+                                <br>
+                                {% for conto in connessione.conti.all %}
+                                    <small class="table-muted">
+                                        {{ conto.nome_conto }}{% if conto.tipo_conto %} · {{ conto.get_tipo_conto_display }}{% endif %}
+                                    </small>{% if not forloop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </td>
                         <td>
                             {% if connessione.ultimo_refresh_at %}
                                 {{ connessione.ultimo_refresh_at|date:"d/m/Y H:i" }}

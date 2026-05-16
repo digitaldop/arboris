@@ -172,6 +172,7 @@ class ConnessioneBancariaAdmin(admin.ModelAdmin):
 class ContoBancarioAdmin(admin.ModelAdmin):
     list_display = (
         "nome_conto",
+        "tipo_conto",
         "banca",
         "iban",
         "provider",
@@ -180,8 +181,15 @@ class ContoBancarioAdmin(admin.ModelAdmin):
         "saldo_corrente_aggiornato_al",
         "attivo",
     )
-    list_filter = ("provider", "attivo")
-    search_fields = ("nome_conto", "iban", "intestatario", "banca")
+    list_filter = ("tipo_conto", "provider", "attivo")
+    search_fields = (
+        "nome_conto",
+        "iban",
+        "intestatario",
+        "banca",
+        "external_account_id",
+        "external_account_hash",
+    )
 
 
 @admin.register(SaldoConto)

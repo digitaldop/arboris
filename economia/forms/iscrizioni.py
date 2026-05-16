@@ -400,6 +400,8 @@ class RataIscrizionePagamentoForm(forms.ModelForm):
         apply_eur_currency_widget(self.fields["importo_pagato"])
         apply_eur_currency_widget(self.fields["credito_applicato"])
         apply_eur_currency_widget(self.fields["altri_sgravi"])
+        self.fields["credito_applicato"].required = False
+        self.fields["altri_sgravi"].required = False
         self.fields["metodo_pagamento"].required = False
         self.fields["metodo_pagamento"].queryset = self.fields["metodo_pagamento"].queryset.filter(attivo=True).order_by(
             "metodo_pagamento"
@@ -420,6 +422,8 @@ class RataIscrizionePagamentoForm(forms.ModelForm):
         importo_pagato = cleaned_data.get("importo_pagato") or Decimal("0.00")
         credito_applicato = cleaned_data.get("credito_applicato") or Decimal("0.00")
         altri_sgravi = cleaned_data.get("altri_sgravi") or Decimal("0.00")
+        cleaned_data["credito_applicato"] = credito_applicato
+        cleaned_data["altri_sgravi"] = altri_sgravi
         importo_finale = max((self.instance.importo_dovuto or Decimal("0.00")) - credito_applicato - altri_sgravi, Decimal("0.00"))
         previously_marked_as_paid = bool(
             self.instance.pk

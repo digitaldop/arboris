@@ -35,6 +35,9 @@ class ProviderAccount:
     owner_name: str = ""
     name: str = ""
     institution_id: str = ""
+    identification_hash: str = ""
+    account_type: str = ""
+    account_product: str = ""
 
 
 @dataclass

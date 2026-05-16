@@ -59,7 +59,16 @@
                 {% for conto in conti %}
                     <tr class="list-row-link" data-row-href="{% url 'modifica_conto_bancario' conto.pk %}">
                         <td>{{ conto.nome_conto }}</td>
-                        <td>{{ conto.get_tipo_conto_display }}</td>
+                        <td>
+                            {{ conto.get_tipo_conto_display }}
+                            {% if conto.external_account_type or conto.external_account_product %}
+                                <br><small class="table-muted">
+                                    {% if conto.external_account_type %}{{ conto.external_account_type }}{% endif %}
+                                    {% if conto.external_account_type and conto.external_account_product %} · {% endif %}
+                                    {% if conto.external_account_product %}{{ conto.external_account_product|truncatechars:40 }}{% endif %}
+                                </small>
+                            {% endif %}
+                        </td>
                         <td>{{ conto.banca|default:"-" }}</td>
                         <td>{{ conto.iban|default:"-" }}</td>
                         <td>{{ conto.provider|default:"-" }}</td>

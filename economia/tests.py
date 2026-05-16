@@ -20,6 +20,7 @@ from economia.forms import (
     AgevolazioneForm,
     CondizioneIscrizioneForm,
     IscrizioneForm,
+    RataIscrizionePagamentoForm,
     RimodulazioneRateFutureForm,
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
@@ -692,6 +693,30 @@ class RateCustomizationAndRemodulationTests(TestCase):
         )
         self.assertContains(response, "Click sul nome: apri la scheda studente.")
 
+    def test_rate_detail_form_allows_empty_credit_and_discount_fields(self):
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+
+        form = RataIscrizionePagamentoForm(
+            data={
+                "data_scadenza": rata.data_scadenza.isoformat(),
+                "pagata": "on",
+                "importo_pagato": "120,00",
+                "data_pagamento": rata.data_scadenza.isoformat(),
+                "metodo_pagamento": "",
+                "credito_applicato": "",
+                "altri_sgravi": "",
+                "note": "",
+            },
+            instance=rata,
+        )
+
+        self.assertFalse(form.fields["credito_applicato"].required)
+        self.assertFalse(form.fields["altri_sgravi"].required)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved_rata = form.save()
+        self.assertEqual(saved_rata.credito_applicato, Decimal("0.00"))
+        self.assertEqual(saved_rata.altri_sgravi, Decimal("0.00"))
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class EconomiaBatchRateTests(TestCase):

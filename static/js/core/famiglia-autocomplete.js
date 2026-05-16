@@ -20,6 +20,12 @@
             disabled: option.disabled,
             priority: option.dataset.searchablePriority === "1",
             group: option.dataset.searchableGroup || "",
+            categoryName: option.dataset.categoryName || "",
+            categoryParent: option.dataset.categoryParent || "",
+            categoryLevel: Math.max(0, parseInt(option.dataset.categoryLevel || "0", 10) || 0),
+            categoryType: option.dataset.categoryType || "",
+            categoryKind: option.dataset.categoryKind || "",
+            categoryColor: option.dataset.categoryColor || "",
         }));
     }
 
@@ -74,6 +80,59 @@
         );
     }
 
+    function renderCategoryOption(row, item) {
+        const level = Math.min(item.categoryLevel || 0, 5);
+        row.classList.add("searchable-select-option-category");
+        row.classList.add(`searchable-select-option-category-level-${level}`);
+        row.classList.toggle("is-nested", level > 0);
+        row.classList.toggle("is-empty-category", !item.value);
+        row.dataset.categoryKind = item.categoryKind || "";
+        row.style.setProperty("--category-level", level);
+        row.style.setProperty("--category-indent", `${level * 16}px`);
+
+        const branch = document.createElement("span");
+        branch.className = "searchable-select-category-branch";
+        branch.setAttribute("aria-hidden", "true");
+
+        const swatch = document.createElement("span");
+        swatch.className = "searchable-select-category-swatch";
+        if (item.categoryColor) {
+            swatch.style.backgroundColor = item.categoryColor;
+        }
+        swatch.setAttribute("aria-hidden", "true");
+
+        const text = document.createElement("span");
+        text.className = "searchable-select-category-text";
+
+        const name = document.createElement("span");
+        name.className = "searchable-select-category-name";
+        name.textContent = item.categoryName || item.label;
+
+        const meta = document.createElement("span");
+        meta.className = "searchable-select-category-meta";
+        if (!item.value) {
+            meta.textContent = item.categoryType || "Senza categoria";
+        } else if (item.categoryParent) {
+            meta.textContent = `${item.categoryParent} / ${item.categoryType || "Categoria"}`;
+        } else {
+            meta.textContent = `Categoria principale / ${item.categoryType || "Categoria"}`;
+        }
+
+        text.appendChild(name);
+        text.appendChild(meta);
+        row.appendChild(branch);
+        row.appendChild(swatch);
+        row.appendChild(text);
+    }
+
+    function renderOptionContent(row, item, select) {
+        if (select.dataset.searchableVariant === "category-tree") {
+            renderCategoryOption(row, item);
+            return;
+        }
+        row.textContent = item.label;
+    }
+
     function closeAllExcept(currentWrapper) {
         Array.from(openWrappers).forEach(wrapper => {
             if (wrapper !== currentWrapper) {
@@ -105,6 +164,9 @@
 
         const wrapper = document.createElement("div");
         wrapper.className = "searchable-select";
+        if (select.dataset.searchableVariant) {
+            wrapper.classList.add(`searchable-select-${select.dataset.searchableVariant}`);
+        }
 
         const input = document.createElement("input");
         input.type = "text";
@@ -179,7 +241,8 @@
             },
             getFilteredItems: function () {
                 const query = normalize(input.value);
-                const source = state.getItems().filter(item => item.value && !item.disabled);
+                const allowEmpty = select.dataset.searchableAllowEmpty === "1";
+                const source = state.getItems().filter(item => (allowEmpty || item.value) && !item.disabled);
                 const prioritySource = source.filter(item => item.priority);
 
                 if (!query) {
@@ -238,7 +301,7 @@
                     if (index === state.highlightedIndex) {
                         row.classList.add("is-highlighted");
                     }
-                    row.textContent = item.label;
+                    renderOptionContent(row, item, select);
                     row.addEventListener("mousedown", function (event) {
                         event.preventDefault();
                         state.selectValue(item.value);

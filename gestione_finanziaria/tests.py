@@ -8,10 +8,11 @@ from unittest import skip
 from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -79,6 +80,8 @@ from .fatture_in_cloud import (
 from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
 from .forms import DocumentoFornitoreForm
+from .providers.base import ProviderAccount
+from .providers.enablebanking import EnableBankingAdapter, EnableBankingCredentials
 from .services import (
     annulla_pagamento_fornitore,
     anteprima_riconcilia_fornitori_automaticamente,
@@ -199,6 +202,244 @@ class Psd2SchedulerTests(TestCase):
         self.assertIsNotNone(log.durata_millisecondi)
         adapter.saldo_conto.assert_called_once_with("account-test")
         adapter.movimenti_conto.assert_called_once()
+
+
+class Psd2ConnectionImportTests(TestCase):
+    def _request(self):
+        request = RequestFactory().get("/")
+        request.session = self.client.session
+        request._messages = FallbackStorage(request)
+        return request
+
+    def test_finalizzazione_psd2_mantiene_connessioni_multiple_stessa_banca(self):
+        from .views import _finalizza_connessione_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking test multi",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione_prima = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM - Conto principale",
+            external_institution_id="Banco BPM|IT",
+            external_connection_id="session-1",
+        )
+        connessione_seconda = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM - Secondo accesso",
+            external_institution_id="Banco BPM|IT",
+            external_connection_id="session-2",
+        )
+        account = ProviderAccount(
+            external_account_id="account-shared-id",
+            iban="IT60X0542811101000000123456",
+            currency="EUR",
+            owner_name="Scuola test",
+            name="Conto operativo",
+            account_type="CACC",
+            identification_hash="hash-stesso-conto",
+        )
+
+        _finalizza_connessione_psd2(self._request(), connessione_prima, Mock(lista_conti=Mock(return_value=[account])))
+        _finalizza_connessione_psd2(self._request(), connessione_seconda, Mock(lista_conti=Mock(return_value=[account])))
+
+        conti = ContoBancario.objects.filter(
+            provider=provider,
+            external_account_id="account-shared-id",
+        ).order_by("connessione_id")
+        self.assertEqual(conti.count(), 2)
+        self.assertEqual(conti[0].connessione, connessione_prima)
+        self.assertEqual(conti[1].connessione, connessione_seconda)
+
+    def test_finalizzazione_psd2_importa_carte_enablebanking_come_prepagate(self):
+        from .views import _finalizza_connessione_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking test card",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Unicredit - Carte",
+            external_institution_id="Unicredit|IT",
+            external_connection_id="session-card",
+        )
+        account = ProviderAccount(
+            external_account_id="card-account-id",
+            currency="EUR",
+            owner_name="Scuola test",
+            name="Carta scuola",
+            account_type="CARD",
+            account_product="Carta prepagata business",
+            identification_hash="hash-carta-prepagata",
+        )
+
+        _finalizza_connessione_psd2(self._request(), connessione, Mock(lista_conti=Mock(return_value=[account])))
+
+        conto = ContoBancario.objects.get(external_account_id="card-account-id")
+        self.assertEqual(conto.connessione, connessione)
+        self.assertEqual(conto.tipo_conto, TipoContoFinanziario.CARTA_PREPAGATA)
+        self.assertEqual(conto.external_account_type, "CARD")
+        self.assertEqual(conto.external_account_product, "Carta prepagata business")
+        self.assertEqual(conto.external_account_hash, "hash-carta-prepagata")
+        self.assertEqual(conto.banca, "Unicredit")
+
+    def test_enablebanking_usa_account_details_restituiti_da_post_sessions(self):
+        adapter = EnableBankingAdapter(
+            EnableBankingCredentials(
+                app_id="app-test",
+                private_key_pem="private-key-non-usata",
+            )
+        )
+
+        def fake_request(method, path, **_kwargs):
+            if method == "POST" and path == "/sessions":
+                return {
+                    "session_id": "session-rich",
+                    "accounts": [
+                        {
+                            "uid": "card-account-id",
+                            "account_id": {"iban": "IT60X0542811101000000123456"},
+                            "cash_account_type": "CARD",
+                            "product": "Carta prepagata",
+                            "details": "Prepaid business",
+                            "name": "Scuola test",
+                            "currency": "EUR",
+                            "identification_hash": "hash-card",
+                        }
+                    ],
+                }
+            raise AssertionError("La lista conti deve usare i dati gia' restituiti da /sessions.")
+
+        adapter._request = fake_request
+
+        session_id = adapter.scambia_codice_sessione("auth-code")
+        accounts = adapter.lista_conti(session_id)
+
+        self.assertEqual(session_id, "session-rich")
+        self.assertEqual(len(accounts), 1)
+        self.assertEqual(accounts[0].external_account_id, "card-account-id")
+        self.assertEqual(accounts[0].account_type, "CARD")
+        self.assertEqual(accounts[0].account_product, "Carta prepagata - Prepaid business")
+        self.assertEqual(accounts[0].identification_hash, "hash-card")
+
+    def test_enablebanking_arricchisce_sessione_minima_con_account_details(self):
+        adapter = EnableBankingAdapter(
+            EnableBankingCredentials(
+                app_id="app-test",
+                private_key_pem="private-key-non-usata",
+            )
+        )
+
+        def fake_request(method, path, **_kwargs):
+            if method == "GET" and path == "/sessions/session-minimal":
+                return {
+                    "accounts": ["card-account-id"],
+                    "accounts_data": [
+                        {
+                            "uid": "card-account-id",
+                            "identification_hash": "hash-card",
+                        }
+                    ],
+                }
+            if method == "GET" and path == "/accounts/card-account-id/details":
+                return {
+                    "uid": "card-account-id",
+                    "cash_account_type": "CARD",
+                    "product": "Carta prepagata",
+                    "details": "Prepaid business",
+                    "currency": "EUR",
+                    "identification_hash": "hash-card",
+                }
+            raise AssertionError(f"Chiamata inattesa: {method} {path}")
+
+        adapter._request = fake_request
+
+        accounts = adapter.lista_conti("session-minimal")
+
+        self.assertEqual(len(accounts), 1)
+        self.assertEqual(accounts[0].account_type, "CARD")
+        self.assertEqual(accounts[0].account_product, "Carta prepagata - Prepaid business")
+        self.assertEqual(accounts[0].identification_hash, "hash-card")
+
+
+class MovimentoCategoriaInlineTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="finanza-inline@example.com",
+            email="finanza-inline@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(self.user)
+
+    def test_aggiorna_categoria_movimento_da_lista(self):
+        categoria_iniziale = CategoriaFinanziaria.objects.create(
+            nome="Da rivedere",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        categoria_nuova = CategoriaFinanziaria.objects.create(
+            nome="Commissioni bancarie",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("-12.00"),
+            descrizione="Spese bancarie",
+            categoria=categoria_iniziale,
+            categorizzazione_automatica=True,
+        )
+
+        response = self.client.post(
+            reverse("aggiorna_categoria_movimento", args=[movimento.pk]),
+            {"categoria": str(categoria_nuova.pk)},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["category_id"], str(categoria_nuova.pk))
+        movimento.refresh_from_db()
+        self.assertEqual(movimento.categoria, categoria_nuova)
+        self.assertFalse(movimento.categorizzazione_automatica)
+        self.assertEqual(movimento.categorizzato_da, self.user)
+        self.assertIsNotNone(movimento.categorizzato_il)
+
+
+class MovimentoRiconciliazioneLayoutTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="admin-riconciliazione@example.com",
+            email="admin-riconciliazione@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+
+    def test_riconciliazione_movimento_usa_layout_finanziario_moderno(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("410.00"),
+            descrizione="Bonifico retta Scamporlino",
+            controparte="Scamporlino",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.get(reverse("riconcilia_movimento", args=[movimento.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "finance-reconciliation-page-head")
+        self.assertContains(response, "finance-reconciliation-summary")
+        self.assertContains(response, "finance-reconciliation-candidates-panel")
+        self.assertContains(response, "finance-reconciliation-action-bar")
+        self.assertContains(response, "formnovalidate")
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")

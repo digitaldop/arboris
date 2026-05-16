@@ -40,7 +40,7 @@
                     <option value="">Tutte</option>
                     <option value="none" {% if categoria_selezionata == "none" %}selected{% endif %}>Non categorizzati</option>
                     {% for cat in categorie_disponibili %}
-                        <option value="{{ cat.pk }}" {% if categoria_selezionata == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat }}</option>
+                        <option value="{{ cat.pk }}" {% if categoria_selezionata == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.percorso_label }}</option>
                     {% endfor %}
                 </select>
             </label>
@@ -79,7 +79,20 @@
                     </div>
                     <button type="submit" class="btn btn-danger" data-bulk-submit>Elimina selezionati</button>
                 </div>
-                <table class="list-table finance-bulk-table">
+                <div class="finance-movements-table-shell">
+                <table class="list-table finance-bulk-table finance-movements-table">
+                    <colgroup>
+                        <col class="finance-movements-col-select">
+                        <col class="finance-movements-col-date">
+                        <col class="finance-movements-col-account">
+                        <col class="finance-movements-col-origin">
+                        <col class="finance-movements-col-channel">
+                        <col class="finance-movements-col-description">
+                        <col class="finance-movements-col-category">
+                        <col class="finance-movements-col-amount">
+                        <col class="finance-movements-col-status">
+                        <col class="finance-movements-col-actions">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th class="finance-bulk-select-col">
@@ -90,11 +103,15 @@
                             <th>Origine</th>
                             <th>Canale</th>
                             <th>Descrizione</th>
-                            <th>Controparte</th>
-                            <th>Categoria</th>
+                            <th>
+                                <span class="finance-category-heading" tabindex="0" data-floating-text="Clic destro sulla cella Categoria: la cella diventa modificabile e apre un menu con ricerca. Seleziona la categoria desiderata; clic destro di nuovo sulla stessa cella per salvare e uscire. Durante la modifica le altre azioni sono bloccate.">
+                                    <span>Categoria</span>
+                                    <span class="finance-category-heading-help" aria-hidden="true">?</span>
+                                </span>
+                            </th>
                             <th class="column-right">Importo</th>
                             <th>Stato</th>
-                            <th>Azioni</th>
+                            <th class="finance-movements-actions-head">Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -115,32 +132,60 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ movimento.descrizione|truncatechars:80|default:"-" }}</td>
-                                <td>{{ movimento.controparte|default:"-" }}</td>
-                                <td>
-                                    {% if movimento.categoria %}
-                                        {{ movimento.categoria }}
-                                        {% if movimento.categorizzazione_automatica %}<br><small class="table-muted">auto</small>{% endif %}
-                                    {% else %}
-                                        <span class="table-muted">non categorizzato</span>
-                                    {% endif %}
+                                <td class="finance-category-cell"
+                                    data-movement-category-cell
+                                    data-update-url="{% url 'aggiorna_categoria_movimento' movimento.pk %}"
+                                    data-category-id="{{ movimento.categoria_id|default:'' }}">
+                                    <span class="finance-category-display" data-category-display>
+                                        <span class="{% if not movimento.categoria %}table-muted{% endif %}" data-category-name>
+                                            {% if movimento.categoria %}{{ movimento.categoria }}{% else %}non categorizzato{% endif %}
+                                        </span>
+                                        <small class="table-muted" data-category-auto {% if not movimento.categoria or not movimento.categorizzazione_automatica %}hidden{% endif %}>auto</small>
+                                    </span>
                                 </td>
                                 <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
                                 <td>{{ movimento.get_stato_riconciliazione_display }}</td>
-                                <td class="actions-cell">
-                                    <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}" class="table-link">Modifica</a>
-                                    <span class="table-muted">|</span>
-                                    <a href="{% url 'riconcilia_movimento' movimento.pk %}" class="table-link">Riconcilia</a>
+                                <td class="actions-cell finance-movements-actions-cell">
+                                    <span class="table-icon-actions finance-movement-icon-actions">
+                                    <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}" class="table-icon-link" aria-label="Modifica movimento" data-floating-text="Modifica">
+                                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                                    </a>
+                                    <a href="{% url 'riconcilia_movimento' movimento.pk %}" class="table-icon-link" aria-label="Collega pagamento al movimento" data-floating-text="Collega Pagamento">
+                                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                                    </a>
                                     {% if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate_count or movimento.pagamenti_fornitori_count %}
-                                        <span class="table-muted">|</span>
-                                        <a href="{% url 'annulla_riconciliazione_movimento' movimento.pk %}?next={{ request.get_full_path|urlencode }}" class="table-link table-link-danger">Annulla riconciliazione</a>
+                                        <a href="{% url 'annulla_riconciliazione_movimento' movimento.pk %}?next={{ request.get_full_path|urlencode }}" class="table-icon-link table-icon-link-danger" aria-label="Annulla riconciliazione" data-floating-text="Annulla riconciliazione">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+                                        </a>
                                     {% endif %}
-                                    <span class="table-muted">|</span>
-                                    <a href="{% url 'elimina_movimento_finanziario' movimento.pk %}" class="table-link table-link-danger">Elimina</a>
+                                    <a href="{% url 'elimina_movimento_finanziario' movimento.pk %}" class="table-icon-link table-icon-link-danger" aria-label="Elimina movimento" data-floating-text="Elimina">
+                                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
+                                    </a>
+                                    </span>
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                </div>
+                <template id="movement-category-options-template">
+                    <option value=""
+                            data-category-name="Non categorizzato"
+                            data-category-level="0"
+                            data-category-type="Senza categoria"
+                            data-category-kind="none"
+                            data-search-text="non categorizzato senza categoria">Non categorizzato</option>
+                    {% for cat in categorie_disponibili %}
+                        <option value="{{ cat.pk }}"
+                                data-category-name="{{ cat.nome }}"
+                                data-category-parent="{{ cat.select_parent_label }}"
+                                data-category-level="{{ cat.select_level }}"
+                                data-category-type="{{ cat.select_tipo_label }}"
+                                data-category-kind="{{ cat.tipo }}"
+                                {% if cat.colore %}data-category-color="{{ cat.colore }}"{% endif %}
+                                data-search-text="{{ cat.percorso_label }} {{ cat.select_tipo_label }}">{{ cat.percorso_label }}</option>
+                    {% endfor %}
+                </template>
             </form>
         {% else %}
             <div class="empty-state">
@@ -151,6 +196,7 @@
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
+    <script src="{% static 'js/pages/movimenti-list.js' %}?v=2"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {
@@ -158,6 +204,9 @@
             }
             if (window.ArborisBulkActions) {
                 ArborisBulkActions.init(document);
+            }
+            if (window.ArborisMovimentiList) {
+                ArborisMovimentiList.init(document);
             }
         });
     </script>

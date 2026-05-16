@@ -315,6 +315,11 @@ urlpatterns = [
         name="modifica_movimento_finanziario",
     ),
     path(
+        "gestione-finanziaria/movimenti/<int:pk>/categoria/",
+        gf_edit(views.aggiorna_categoria_movimento),
+        name="aggiorna_categoria_movimento",
+    ),
+    path(
         "gestione-finanziaria/movimenti/<int:pk>/elimina/",
         gf_manage(views.elimina_movimento_finanziario),
         name="elimina_movimento_finanziario",

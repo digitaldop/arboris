@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static currency %}
 
 {% block title %}Riconciliazione movimento - Arboris School Management{% endblock %}
 
@@ -15,131 +16,210 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Riconciliazione movimento</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary">Indietro</a>
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head finance-reconciliation-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Riconciliazione movimento</h1>
+                <span class="family-status-pill {% if not gia_riconciliato %}is-muted{% endif %}">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {% if gia_riconciliato %}Riconciliato{% else %}{{ candidati|length }} candidati{% endif %}
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                {{ movimento.descrizione|truncatechars:120|default:"Movimento bancario" }}
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
+            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+                <span class="btn-label">Elenco</span>
+            </a>
         </div>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Dettaglio movimento</h2>
-        <table class="list-table">
-            <tbody>
-                <tr><th>Data contabile</th><td>{{ movimento.data_contabile|date:"d/m/Y" }}</td></tr>
-                <tr><th>Conto</th><td>{{ movimento.conto.nome_conto|default:"-" }}</td></tr>
-                <tr><th>Importo</th><td><strong>{{ movimento.importo }} {{ movimento.valuta }}</strong></td></tr>
-                <tr><th>Controparte</th><td>{{ movimento.controparte|default:"-" }}</td></tr>
-                <tr><th>IBAN controparte</th><td>{{ movimento.iban_controparte|default:"-" }}</td></tr>
-                <tr><th>Descrizione</th><td>{{ movimento.descrizione|default:"-" }}</td></tr>
-                <tr><th>Categoria</th><td>{{ movimento.categoria.nome|default:"-" }}</td></tr>
-                <tr><th>Stato riconciliazione</th><td>{{ movimento.get_stato_riconciliazione_display }}</td></tr>
-                {% if movimento.rata_iscrizione %}
-                    <tr><th>Rata collegata</th><td>{{ movimento.rata_iscrizione }}</td></tr>
-                {% endif %}
-            </tbody>
-        </table>
-
-        {% if gia_riconciliato %}
-            <form method="post" class="inline-form" style="margin-top:1em">
-                {% csrf_token %}
-                <button type="submit" name="azione" value="annulla" class="btn btn-danger"
-                        onclick="return confirm('Annullare la riconciliazione di questo movimento? Rate e importi pagati verranno aggiornati.');">
-                    Annulla riconciliazione
-                </button>
-            </form>
-        {% endif %}
+    <div class="finance-summary-strip finance-reconciliation-summary">
+        <div class="summary-item">
+            <div class="summary-value">{{ movimento.data_contabile|date:"d/m/Y" }}</div>
+            <div class="summary-label">Data movimento</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ movimento.importo|euro }} &euro;</div>
+            <div class="summary-label">Importo</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ movimento.conto.nome_conto|default:"-" }}</div>
+            <div class="summary-label">Conto</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ movimento.get_stato_riconciliazione_display }}</div>
+            <div class="summary-label">Stato</div>
+        </div>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Rate candidate ({{ candidati|length }})</h2>
-        <p class="help-text">
-            Le rate sono cercate per importo simile (+/- 1 EUR) e ordinate per punteggio di
-            compatibilita'. Marca la rata come pagata per propagare il pagamento al modulo
-            Economia.
-        </p>
-
-        <form method="post">
-            {% csrf_token %}
-            <table class="list-table">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>Rata</th>
-                        <th>Iscrizione</th>
-                        <th>Famiglia / studente</th>
-                        <th>Scadenza</th>
-                        <th class="column-right">Importo finale</th>
-                        <th>Pagata</th>
-                        <th class="column-right">Match</th>
-                        <th>Motivazioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for c in candidati %}
-                        <tr>
-                            <td><input type="radio" name="rata_pk" value="{{ c.rata.pk }}" required></td>
-                            <td>{{ c.rata.display_label }}</td>
-                            <td>{{ c.rata.iscrizione }}</td>
-                            <td>
-                                {% with studente=c.rata.iscrizione.studente %}
-                                    {{ studente.cognome }} {{ studente.nome }}
-                                {% endwith %}
-                            </td>
-                            <td>{% if c.rata.data_scadenza %}{{ c.rata.data_scadenza|date:"d/m/Y" }}{% else %}-{% endif %}</td>
-                            <td class="column-right">{{ c.rata.importo_finale }} EUR</td>
-                            <td>{% if c.rata.pagata %}SI{% else %}No{% endif %}</td>
-                            <td class="column-right">{{ c.score_percentuale }}%</td>
-                            <td>
-                                <ul class="motivazioni-list">
-                                    {% for motivo in c.motivazioni %}
-                                        <li>{{ motivo }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="9">
-                                <div class="empty-state">
-                                    Nessuna rata candidata trovata per questo movimento. Verifica
-                                    importo/data oppure usa "Marca come da ignorare".
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            {% if candidati %}
-                <div class="form-row" style="margin-top:1em">
-                    <label>
-                        <input type="checkbox" name="marca_rata_pagata" value="1" checked>
-                        Marca la rata come pagata alla data contabile del movimento
-                    </label>
-                </div>
-                <div class="form-actions">
+    <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-reconciliation-detail-panel">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Dettaglio movimento</h2>
+                <p class="finance-section-subtitle">Verifica i dati bancari prima di collegare il movimento a una rata.</p>
+            </div>
+            {% if gia_riconciliato %}
+                <form method="post" class="page-head-inline-form">
+                    {% csrf_token %}
                     <button
                         type="submit"
                         name="azione"
-                        value="collega"
-                        class="btn btn-primary"
-                        onclick="return confirm('Confermi la riconciliazione con la rata selezionata? La rata e il movimento bancario verranno aggiornati.');"
+                        value="annulla"
+                        class="btn btn-danger btn-icon-text"
+                        onclick="return confirm('Annullare la riconciliazione di questo movimento? Rate e importi pagati verranno aggiornati.');"
                     >
-                        Collega movimento alla rata
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla riconciliazione</span>
                     </button>
-                    <button type="submit" name="azione" value="ignora" class="btn btn-secondary"
-                            onclick="return confirm('Marcare il movimento come \"da ignorare\"? Non apparira\' piu\' tra quelli da riconciliare.');">
-                        Marca come da ignorare
-                    </button>
-                </div>
-            {% else %}
-                <div class="form-actions">
-                    <button type="submit" name="azione" value="ignora" class="btn btn-secondary">
-                        Marca come da ignorare
-                    </button>
+                </form>
+            {% endif %}
+        </div>
+        <div class="finance-reconciliation-detail-grid">
+            <div class="finance-reconciliation-detail-item">
+                <span>Controparte</span>
+                <strong>{{ movimento.controparte|default:"-" }}</strong>
+            </div>
+            <div class="finance-reconciliation-detail-item">
+                <span>IBAN controparte</span>
+                <strong>{{ movimento.iban_controparte|default:"-" }}</strong>
+            </div>
+            <div class="finance-reconciliation-detail-item">
+                <span>Categoria</span>
+                <strong>{{ movimento.categoria.nome|default:"-" }}</strong>
+            </div>
+            <div class="finance-reconciliation-detail-item is-full">
+                <span>Descrizione</span>
+                <strong>{{ movimento.descrizione|default:"-" }}</strong>
+            </div>
+            {% if movimento.rata_iscrizione %}
+                <div class="finance-reconciliation-detail-item is-full">
+                    <span>Rata collegata</span>
+                    <strong>{{ movimento.rata_iscrizione }}</strong>
                 </div>
             {% endif %}
-        </form>
-    </div>
+        </div>
+    </section>
+
+    <form method="post" class="finance-reconciliation-form">
+        {% csrf_token %}
+        <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-reconciliation-candidates-panel">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title">Rate candidate</h2>
+                    <p class="finance-section-subtitle">
+                        Le rate sono ordinate per compatibilita' su importo, data e dati anagrafici.
+                    </p>
+                </div>
+                <span class="anagrafica-status-chip is-muted">{{ candidati|length }} risultati</span>
+            </div>
+            <div class="panel-body">
+                {% if candidati %}
+                    <table class="list-table anagrafica-list-table finance-modern-table finance-reconciliation-candidates-table">
+                        <thead>
+                            <tr>
+                                <th>Rata candidata</th>
+                                <th>Famiglia / studente</th>
+                                <th>Scadenza</th>
+                                <th class="column-right">Importo finale</th>
+                                <th>Stato</th>
+                                <th class="column-right">Match</th>
+                                <th>Motivazioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in candidati %}
+                                <tr>
+                                    <td class="anagrafica-record-cell">
+                                        <label class="anagrafica-record-link anagrafica-record-link-compact finance-reconciliation-choice">
+                                            <input type="radio" name="rata_pk" value="{{ c.rata.pk }}" required>
+                                            <span class="finance-record-icon finance-record-icon-bank" aria-hidden="true">
+                                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                                            </span>
+                                            <span class="anagrafica-record-main">
+                                                <span class="table-main-text">{{ c.rata.display_label }}</span>
+                                                <span class="table-subtext">{{ c.rata.iscrizione }}</span>
+                                            </span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        {% with studente=c.rata.iscrizione.studente %}
+                                            <strong>{{ studente.cognome }} {{ studente.nome }}</strong>
+                                        {% endwith %}
+                                    </td>
+                                    <td>{% if c.rata.data_scadenza %}{{ c.rata.data_scadenza|date:"d/m/Y" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
+                                    <td class="column-right finance-money-cell">{{ c.rata.importo_finale|euro }} &euro;</td>
+                                    <td>
+                                        <span class="anagrafica-status-chip {% if c.rata.pagata %}is-success{% else %}is-muted{% endif %}">
+                                            {% if c.rata.pagata %}Pagata{% else %}Da pagare{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="column-right">
+                                        <span class="anagrafica-status-chip {% if c.score_percentuale >= 80 %}is-success{% elif c.score_percentuale >= 60 %}is-amber{% else %}is-muted{% endif %}">
+                                            {{ c.score_percentuale }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="finance-reasons">
+                                            {% for motivo in c.motivazioni %}
+                                                <span>{{ motivo }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <div class="finance-reconciliation-action-bar">
+                        <label class="calendar-event-check-field finance-reconciliation-paid-toggle">
+                            <input type="checkbox" name="marca_rata_pagata" value="1" checked>
+                            <span>Marca la rata come pagata alla data contabile del movimento</span>
+                        </label>
+                        <div class="form-actions">
+                            <button
+                                type="submit"
+                                name="azione"
+                                value="collega"
+                                class="btn btn-primary btn-icon-text"
+                                onclick="return confirm('Confermi la riconciliazione con la rata selezionata? La rata e il movimento bancario verranno aggiornati.');"
+                            >
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                <span class="btn-label">Collega movimento</span>
+                            </button>
+                            <button
+                                type="submit"
+                                name="azione"
+                                value="ignora"
+                                class="btn btn-secondary btn-icon-text"
+                                formnovalidate
+                                onclick="return confirm('Marcare il movimento come da ignorare? Non apparira piu tra quelli da riconciliare.');"
+                            >
+                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                                <span class="btn-label">Ignora movimento</span>
+                            </button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        Nessuna rata candidata trovata. Verifica importo e data oppure marca il movimento come da ignorare.
+                    </div>
+                    <div class="finance-reconciliation-action-bar finance-reconciliation-action-bar-empty">
+                        <button type="submit" name="azione" value="ignora" class="btn btn-secondary btn-icon-text" formnovalidate>
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                            <span class="btn-label">Ignora movimento</span>
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </form>
 {% endblock %}

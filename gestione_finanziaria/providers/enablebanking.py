@@ -133,6 +133,8 @@ class EnableBankingAdapter(BasePsd2Adapter):
         self.credentials = credentials
         self._private_key: Any = None
         self._private_key_err: Optional[str] = None
+        self._last_session_id = ""
+        self._last_session_accounts: List[Any] = []
 
     def _carica_private_key(self) -> Any:
         if self._private_key is not None or self._private_key_err:
@@ -317,14 +319,66 @@ class EnableBankingAdapter(BasePsd2Adapter):
         sid = str((data or {}).get("session_id") or "").strip()
         if not sid:
             raise EnableBankingError("Risposta /sessions senza session_id.")
+        accounts = (data or {}).get("accounts")
+        accounts_data = (data or {}).get("accounts_data")
+        if isinstance(accounts, list) and accounts:
+            self._last_session_accounts = accounts
+            self._last_session_id = sid
+        elif isinstance(accounts_data, list) and accounts_data:
+            self._last_session_accounts = accounts_data
+            self._last_session_id = sid
         return sid
 
-    def _account_record_from_session_payload(self, acc: Dict[str, Any]) -> ProviderAccount:
-        uid = str(acc.get("uid") or "").strip()
+    @staticmethod
+    def _extract_iban(acc: Dict[str, Any]) -> str:
         iban = ""
         acct = acc.get("account_id")
         if isinstance(acct, dict):
             iban = str(acct.get("iban") or "").strip()
+        for key in ("all_account_ids", "allAccountIds", "identifications"):
+            if iban:
+                break
+            values = acc.get(key)
+            if not isinstance(values, list):
+                continue
+            for item in values:
+                if not isinstance(item, dict):
+                    continue
+                scheme = str(
+                    item.get("scheme_name")
+                    or item.get("schemeName")
+                    or item.get("scheme")
+                    or ""
+                ).upper()
+                if scheme == "IBAN":
+                    iban = str(item.get("identification") or "").strip()
+                    break
+        return iban
+
+    @staticmethod
+    def _parse_account_id(acc: Dict[str, Any]) -> str:
+        raw_account_id = acc.get("account_id")
+        if isinstance(raw_account_id, str):
+            return raw_account_id.strip()
+        return str(acc.get("uid") or acc.get("accountId") or "").strip()
+
+    def _account_record_from_session_payload(self, acc: Dict[str, Any]) -> ProviderAccount:
+        uid = self._parse_account_id(acc)
+        iban = self._extract_iban(acc)
+        owner = str(acc.get("name") or acc.get("holder") or "").strip()
+        details = str(acc.get("details") or "").strip()
+        product = str(acc.get("product") or "").strip()
+        account_product = " - ".join(part for part in (product, details) if part)
+        account_type = str(
+            acc.get("cash_account_type")
+            or acc.get("cashAccountType")
+            or ""
+        ).strip().upper()
+        identification_hash = str(
+            acc.get("identification_hash")
+            or acc.get("identificationHash")
+            or ""
+        ).strip()
         name = str(acc.get("name") or "").strip()
         cur = str(acc.get("currency") or "EUR").upper() or "EUR"
         aspsp = acc.get("account_servicer") or {}
@@ -333,10 +387,48 @@ class EnableBankingAdapter(BasePsd2Adapter):
             external_account_id=uid,
             iban=iban,
             currency=cur,
-            owner_name=name,
-            name=name or iban or uid,
+            owner_name=owner,
+            name=details or product or name or iban or uid,
             institution_id=bic,
+            identification_hash=identification_hash,
+            account_type=account_type,
+            account_product=account_product,
         )
+
+    def _account_records_from_payload_list(self, items: List[Any]) -> List[ProviderAccount]:
+        records: List[ProviderAccount] = []
+        for item in items:
+            if isinstance(item, dict):
+                if item.get("uid") or item.get("accountId") or item.get("account_id"):
+                    record = self._account_record_from_session_payload(item)
+                    if record.external_account_id:
+                        records.append(record)
+            elif str(item or "").strip():
+                uid = str(item).strip()
+                records.append(
+                    ProviderAccount(
+                        external_account_id=uid,
+                        name=f"Conto {uid[:8]}",
+                        iban="",
+                        currency="EUR",
+                    )
+                )
+        return records
+
+    def _enrich_account_details(self, record: ProviderAccount) -> ProviderAccount:
+        if record.iban or record.account_type or record.account_product:
+            return record
+        try:
+            data = self._request("GET", f"/accounts/{record.external_account_id}/details")
+        except EnableBankingError:
+            return record
+        if not isinstance(data, dict):
+            return record
+        data.setdefault("uid", record.external_account_id)
+        if record.identification_hash:
+            data.setdefault("identification_hash", record.identification_hash)
+        enriched = self._account_record_from_session_payload(data)
+        return enriched if enriched.external_account_id else record
 
     def lista_conti(self, external_connection_id: str) -> List[ProviderAccount]:
         sid = (external_connection_id or "").strip()
@@ -344,25 +436,20 @@ class EnableBankingAdapter(BasePsd2Adapter):
             raise EnableBankingError(
                 "Session ID mancante: completare il callback di autorizzazione."
             )
+        if sid == self._last_session_id and self._last_session_accounts:
+            return self._account_records_from_payload_list(self._last_session_accounts)
         data = self._request("GET", f"/sessions/{sid}")
         accounts_data = (data or {}).get("accounts_data")
         if isinstance(accounts_data, list) and accounts_data:
             return [
-                self._account_record_from_session_payload(a)
-                for a in accounts_data
-                if isinstance(a, dict) and a.get("uid")
+                self._enrich_account_details(record)
+                for record in self._account_records_from_payload_list(accounts_data)
             ]
         uuids = (data or {}).get("accounts")
         if isinstance(uuids, list) and uuids:
             return [
-                ProviderAccount(
-                    external_account_id=str(u).strip(),
-                    name=f"Conto {str(u)[:8]}",
-                    iban="",
-                    currency="EUR",
-                )
-                for u in uuids
-                if str(u).strip()
+                self._enrich_account_details(record)
+                for record in self._account_records_from_payload_list(uuids)
             ]
         return []
 
