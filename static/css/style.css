@@ -28643,6 +28643,34 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     min-width: 1080px;
 }
 
+.module-gestione_finanziaria .finance-reconciliation-list-table {
+    min-width: 1060px;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(1) {
+    width: 36%;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(2) {
+    width: 18%;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(3) {
+    width: 16%;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(4) {
+    width: 14%;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(5) {
+    width: 12%;
+}
+
+.module-gestione_finanziaria .finance-reconciliation-list-table th:nth-child(6) {
+    width: 72px;
+}
+
 .module-gestione_finanziaria .finance-reconciliation-choice {
     cursor: pointer;
 }

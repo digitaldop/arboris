@@ -69,17 +69,30 @@ window.ArborisSidebarCustomization = (function () {
         }
     }
 
-    function uiIconHref(iconName) {
+    function uiIconSpriteUrl() {
         const body = document.body;
-        const spriteHref = body?.dataset.streamlineIconsUrl ? "/static/images/arboris-ui-icons.svg" : "/static/images/arboris-ui-icons.svg";
-        return `${spriteHref}#${iconName || "list"}`;
+        if (body?.dataset.uiIconsUrl) {
+            return body.dataset.uiIconsUrl;
+        }
+        const existingUse = document.querySelector('svg use[href*="arboris-ui-icons.svg"]');
+        const existingHref = existingUse?.getAttribute("href") || "";
+        if (existingHref.includes("#")) {
+            return existingHref.split("#")[0];
+        }
+        return "/static/images/arboris-ui-icons.svg";
+    }
+
+    function uiIconHref(iconName) {
+        return `${uiIconSpriteUrl()}#${iconName || "list"}`;
     }
 
     function appendIcon(target, iconName) {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
         svg.setAttribute("aria-hidden", "true");
-        use.setAttribute("href", uiIconHref(iconName));
+        const href = uiIconHref(iconName);
+        use.setAttribute("href", href);
+        use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", href);
         svg.appendChild(use);
         target.appendChild(svg);
     }

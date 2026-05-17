@@ -955,6 +955,21 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertEqual(saved_rata.credito_applicato, Decimal("0.00"))
         self.assertEqual(saved_rata.altri_sgravi, Decimal("0.00"))
 
+    def test_rate_detail_has_reconciliation_button_in_view_mode(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        reconciliation_url = f"{reverse('riconcilia_rata_iscrizione', kwargs={'pk': rata.pk})}?popup=1"
+
+        response = self.client.get(reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "detail-form is-view-mode")
+        self.assertContains(response, "Collega un pagamento")
+        self.assertContains(response, f'href="{reconciliation_url}"')
+        self.assertContains(response, f'data-popup-url="{reconciliation_url}"')
+
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class EconomiaBatchRateTests(TestCase):
     def setUp(self):

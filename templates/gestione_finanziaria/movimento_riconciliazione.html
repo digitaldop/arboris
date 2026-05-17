@@ -35,9 +35,9 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Dashboard</span>
             </a>
-            <a href="{% url 'lista_movimenti_da_riconciliare' %}" class="btn btn-secondary btn-icon-text">
+            <a href="{{ return_url }}" class="btn btn-secondary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                <span class="btn-label">Elenco</span>
+                <span class="btn-label">Torna</span>
             </a>
         </div>
     </div>
@@ -70,6 +70,7 @@
             {% if gia_riconciliato %}
                 <form method="post" class="page-head-inline-form">
                     {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ return_url }}">
                     <button
                         type="submit"
                         name="azione"
@@ -111,6 +112,7 @@
 
     <form method="post" class="finance-reconciliation-form">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ return_url }}">
         <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-reconciliation-candidates-panel">
             <div class="finance-section-head">
                 <div>

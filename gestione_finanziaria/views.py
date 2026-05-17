@@ -4643,14 +4643,28 @@ def pianificazione_sincronizzazione(request):
 # =========================================================================
 
 
+def _safe_reconciliation_return_url(request, fallback_url):
+    raw_url = request.POST.get("next") or request.GET.get("next") or ""
+    if not raw_url and request.method == "GET":
+        raw_url = request.META.get("HTTP_REFERER", "")
+    if raw_url and url_has_allowed_host_and_scheme(
+        raw_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return raw_url
+    return fallback_url
+
+
 def lista_movimenti_da_riconciliare(request):
     """Elenco dei movimenti non ancora riconciliati, con filtri base."""
-    queryset = (
+    base_queryset = (
         MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione")
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
         .filter(stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO)
         .filter(rata_iscrizione__isnull=True)
     )
+    queryset = base_queryset
 
     conto_id = request.GET.get("conto") or ""
     if conto_id.isdigit():
@@ -4666,8 +4680,14 @@ def lista_movimenti_da_riconciliare(request):
     else:
         queryset = queryset.order_by("-data_contabile", "-id")
 
-    movimenti = list(queryset[:200])
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
+    statistiche = {
+        "totale_da_lavorare": base_queryset.count(),
+        "filtrati": queryset.count(),
+        "entrate_filtrate": queryset.filter(importo__gt=0).count(),
+        "conti_attivi": conti.count(),
+    }
+    movimenti = list(queryset[:200])
 
     return render(
         request,
@@ -4679,6 +4699,7 @@ def lista_movimenti_da_riconciliare(request):
             "solo_entrate": solo_entrate,
             "ordinamento": ordinamento,
             "totale_visualizzati": len(movimenti),
+            "statistiche": statistiche,
         },
     )
 
@@ -4691,6 +4712,10 @@ def riconcilia_movimento(request, pk):
         ),
         pk=pk,
     )
+    fallback_return_url = reverse("lista_movimenti_da_riconciliare")
+    return_url = _safe_reconciliation_return_url(request, fallback_return_url)
+    current_url = reverse("riconcilia_movimento", kwargs={"pk": movimento.pk})
+    current_url_with_return = f"{current_url}?{urlencode({'next': return_url})}"
 
     if request.method == "POST":
         azione = request.POST.get("azione", "")
@@ -4698,13 +4723,13 @@ def riconcilia_movimento(request, pk):
         if azione == "annulla":
             annulla_riconciliazione(movimento)
             messages.success(request, "Riconciliazione annullata.")
-            return redirect("riconcilia_movimento", pk=movimento.pk)
+            return redirect(return_url)
 
         if azione == "ignora":
             movimento.stato_riconciliazione = StatoRiconciliazione.IGNORATO
             movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
             messages.success(request, "Movimento marcato come da ignorare.")
-            return redirect("lista_movimenti_da_riconciliare")
+            return redirect(return_url)
 
         rata_pk = request.POST.get("rata_pk")
         if not rata_pk or not rata_pk.isdigit():
@@ -4717,7 +4742,7 @@ def riconcilia_movimento(request, pk):
                 ).get(pk=int(rata_pk))
             except RataIscrizione.DoesNotExist:
                 messages.error(request, "Rata selezionata non trovata.")
-                return redirect("riconcilia_movimento", pk=movimento.pk)
+                return redirect(current_url_with_return)
 
             marca = request.POST.get("marca_rata_pagata") == "1"
             try:
@@ -4731,7 +4756,7 @@ def riconcilia_movimento(request, pk):
                     f"Movimento riconciliato con {rata}. "
                     + ("Rata marcata come pagata." if marca else "Rata non modificata."),
                 )
-                return redirect("lista_movimenti_da_riconciliare")
+                return redirect(return_url)
 
     candidati = trova_rate_candidate(movimento)
 
@@ -4742,6 +4767,7 @@ def riconcilia_movimento(request, pk):
             "movimento": movimento,
             "candidati": candidati,
             "gia_riconciliato": movimento.rata_iscrizione_id is not None or movimento.riconciliazioni_rate.exists(),
+            "return_url": return_url,
         },
     )
 

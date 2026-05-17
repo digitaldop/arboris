@@ -80,7 +80,7 @@
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
     <script src="{% static 'js/core/detail-form-actions.js' %}?v=6"></script>
 </head>
-<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if interfaccia_professionale_attiva %} ui-professional-interface{% endif %}{% if stile_streamline_attivo %} ui-streamline-icons{% endif %}{% if stile_iconscout_3d_attivo %} ui-iconscout-3d-icons{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}" data-streamline-icons-url="{% static 'images/arboris-streamline-icons.svg' %}" data-iconscout-3d-icons-url="{% static 'images/arboris-iconscout-3d-icons.svg' %}">
+<body class="{% if interfaccia_colorata_attiva %}ui-colorful-modules{% else %}ui-uniform-modules{% endif %}{% if interfaccia_professionale_attiva %} ui-professional-interface{% endif %}{% if stile_streamline_attivo %} ui-streamline-icons{% endif %}{% if stile_iconscout_3d_attivo %} ui-iconscout-3d-icons{% endif %}{% if current_permission_module %} module-{{ current_permission_module }}{% endif %}{% if current_module_view_only %} module-view-only{% endif %}" data-ui-icons-url="{% static 'images/arboris-ui-icons.svg' %}" data-streamline-icons-url="{% static 'images/arboris-streamline-icons.svg' %}" data-iconscout-3d-icons-url="{% static 'images/arboris-iconscout-3d-icons.svg' %}">
     <div id="arboris-page-loading-overlay" class="page-loading-overlay" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
         <div class="page-loading-overlay-card">
             <span class="page-loading-spinner" aria-hidden="true"></span>
@@ -1102,7 +1102,7 @@
     <script src="{% static 'js/core/button-intents.js' %}?v=2"></script>
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
     <script src="{% static 'js/core/sidebar-collapse.js' %}?v=3"></script>
-    <script src="{% static 'js/core/sidebar-customization.js' %}?v=5"></script>
+    <script src="{% static 'js/core/sidebar-customization.js' %}?v=6"></script>
     <script src="{% static 'js/core/sidebar-reorder.js' %}?v=2"></script>
     <script src="{% static 'js/core/global-search.js' %}?v=1"></script>
     <script src="{% static 'js/core/beta-feedback.js' %}?v=1"></script>

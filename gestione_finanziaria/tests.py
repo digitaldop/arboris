@@ -468,6 +468,31 @@ class MovimentoRiconciliazioneLayoutTests(TestCase):
         )
         self.client.force_login(self.user)
 
+    def test_lista_riconciliazione_usa_layout_finanziario_moderno(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("410.00"),
+            descrizione="Bonifico retta Scamporlino",
+            controparte="Scamporlino",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.get(reverse("lista_movimenti_da_riconciliare"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "finance-page-head")
+        self.assertContains(response, "finance-reconciliation-summary")
+        self.assertContains(response, "finance-filter-toolbar")
+        self.assertContains(response, "finance-reconciliation-list-panel")
+        self.assertContains(response, "finance-reconciliation-list-table")
+        self.assertContains(
+            response,
+            f'data-row-href="{reverse("riconcilia_movimento", args=[movimento.pk])}?next=/gestione-finanziaria/riconciliazione/"',
+        )
+        self.assertContains(response, 'data-floating-text="Collega pagamento"')
+
     def test_riconciliazione_movimento_usa_layout_finanziario_moderno(self):
         conto = ContoBancario.objects.create(nome_conto="Conto operativo")
         movimento = MovimentoFinanziario.objects.create(
@@ -487,6 +512,43 @@ class MovimentoRiconciliazioneLayoutTests(TestCase):
         self.assertContains(response, "finance-reconciliation-candidates-panel")
         self.assertContains(response, "finance-reconciliation-action-bar")
         self.assertContains(response, "formnovalidate")
+
+    def test_riconciliazione_movimento_conserva_pagina_di_ritorno(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("410.00"),
+            descrizione="Bonifico retta Scamporlino",
+            controparte="Scamporlino",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        return_url = reverse("lista_movimenti_finanziari")
+
+        response = self.client.get(reverse("riconcilia_movimento", args=[movimento.pk]), {"next": return_url})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{return_url}"')
+        self.assertContains(response, f'name="next" value="{return_url}"')
+
+    def test_riconciliazione_movimento_post_torna_alla_pagina_origine(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("410.00"),
+            descrizione="Bonifico retta Scamporlino",
+            controparte="Scamporlino",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        return_url = reverse("lista_movimenti_finanziari")
+
+        response = self.client.post(
+            reverse("riconcilia_movimento", args=[movimento.pk]),
+            {"azione": "ignora", "next": return_url},
+        )
+
+        self.assertRedirects(response, return_url, fetch_redirect_response=False)
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
