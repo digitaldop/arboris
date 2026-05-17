@@ -182,6 +182,7 @@
                                                 type="checkbox"
                                                 name="destinatari"
                                                 value="{{ destinatario.key }}"
+                                                data-recipient-email="{{ destinatario.email }}"
                                                 {% if destinatario.key in selected_keys %}checked{% endif %}
                                             >
                                             <span class="family-communication-recipient-main">
@@ -240,6 +241,10 @@
                     </div>
                 </div>
                 <div class="family-communication-actions-row">
+                    <button type="button" class="btn btn-secondary btn-icon-text" data-open-mail-client {% if not destinatari %}disabled{% endif %}>
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                        <span class="btn-label">Apri client email (CCN)</span>
+                    </button>
                     <button type="submit" name="action" value="send" class="btn btn-primary btn-icon-text" {% if not destinatari %}disabled{% endif %}>
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
                         <span class="btn-label">Invia comunicazione</span>
@@ -251,6 +256,34 @@
 
     <script>
         (function () {
+            var MAX_MAILTO_LENGTH = 1800;
+
+            function getSelectedEmails() {
+                var emails = [];
+                var seen = new Set();
+                document.querySelectorAll('input[name="destinatari"]:checked').forEach(function (checkbox) {
+                    var email = (checkbox.getAttribute("data-recipient-email") || "").trim();
+                    var key = email.toLowerCase();
+                    if (!email || seen.has(key)) {
+                        return;
+                    }
+                    seen.add(key);
+                    emails.push(email);
+                });
+                return emails;
+            }
+
+            function buildMailto(emails, subject, body, includeBody) {
+                var params = ["bcc=" + encodeURIComponent(emails.join(","))];
+                if (subject) {
+                    params.push("subject=" + encodeURIComponent(subject));
+                }
+                if (includeBody && body) {
+                    params.push("body=" + encodeURIComponent(body));
+                }
+                return "mailto:?" + params.join("&");
+            }
+
             document.addEventListener("click", function (event) {
                 var button = event.target.closest("[data-recipient-action]");
                 if (!button) {
@@ -264,6 +297,32 @@
                 list.querySelectorAll('input[name="destinatari"]').forEach(function (checkbox) {
                     checkbox.checked = checked;
                 });
+            });
+
+            document.addEventListener("click", function (event) {
+                var button = event.target.closest("[data-open-mail-client]");
+                if (!button) {
+                    return;
+                }
+                var emails = getSelectedEmails();
+                if (!emails.length) {
+                    window.alert("Seleziona almeno un destinatario.");
+                    return;
+                }
+
+                var subjectField = document.querySelector('[name="{{ form.oggetto.html_name }}"]');
+                var messageField = document.querySelector('[name="{{ form.messaggio.html_name }}"]');
+                var subject = subjectField ? subjectField.value.trim() : "";
+                var body = messageField ? messageField.value.trim() : "";
+                var mailtoUrl = buildMailto(emails, subject, body, true);
+                if (mailtoUrl.length > MAX_MAILTO_LENGTH && body) {
+                    mailtoUrl = buildMailto(emails, subject, "", false);
+                }
+                if (mailtoUrl.length > MAX_MAILTO_LENGTH) {
+                    window.alert("Troppi indirizzi per aprire il client email tramite link. Riduci la selezione oppure usa l'invio da Arboris.");
+                    return;
+                }
+                window.location.href = mailtoUrl;
             });
         })();
     </script>

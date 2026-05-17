@@ -26,9 +26,11 @@ from economia.forms import (
     TariffaCondizioneIscrizioneForm,
 )
 from economia.comunicazioni_famiglie import (
+    ComunicazioneFamiglieSMTPError,
     costruisci_destinatari_famiglie,
     crea_connessione_smtp,
     invia_comunicazione_famiglie,
+    invia_email_test_smtp,
 )
 from economia.models import (
     Agevolazione,
@@ -252,12 +254,39 @@ class ComunicazioniFamiglieTests(TestCase):
 
         self.assertLessEqual(get_connection_mock.call_args.kwargs["timeout"], 6)
 
+    def test_invio_test_smtp_traduce_timeout_in_messaggio_operativo(self):
+        configurazione = ConfigurazioneEmailSMTP.objects.create(
+            host="smtp.example.com",
+            port=587,
+            timeout_secondi=120,
+            email_mittente="segreteria@example.com",
+        )
+
+        class DummyConnection:
+            def close(self):
+                return None
+
+        with patch("economia.comunicazioni_famiglie.crea_connessione_smtp", return_value=DummyConnection()):
+            with patch("economia.comunicazioni_famiglie.invia_email_singola", side_effect=TimeoutError("timed out")):
+                with self.assertRaises(ComunicazioneFamiglieSMTPError) as context:
+                    invia_email_test_smtp(
+                        configurazione,
+                        destinatario="destinatario@example.com",
+                        oggetto="Test",
+                        messaggio="Messaggio",
+                    )
+
+        self.assertIn("Connessione SMTP scaduta", str(context.exception))
+        self.assertIn("smtp.example.com:587", str(context.exception))
+
     def test_pagina_comunicazioni_mostra_destinatari_e_disclaimer(self):
         response = self.client.get(reverse("comunicazioni_famiglie"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Comunicazioni alle famiglie")
         self.assertContains(response, "famiglia@example.com")
+        self.assertContains(response, 'data-recipient-email="famiglia@example.com"', html=False)
+        self.assertContains(response, "data-open-mail-client")
         self.assertContains(response, "invia una sola email")
 
     def test_storico_comunicazioni_mostra_log_e_destinatari(self):

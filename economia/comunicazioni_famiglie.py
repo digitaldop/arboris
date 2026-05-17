@@ -1,6 +1,8 @@
 from collections import Counter, OrderedDict
 from email.utils import formataddr
 from hashlib import sha1
+import socket
+import smtplib
 
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage, get_connection
@@ -21,6 +23,10 @@ class ComunicazioneFamiglieError(Exception):
     pass
 
 
+class ComunicazioneFamiglieSMTPError(ComunicazioneFamiglieError):
+    pass
+
+
 SMTP_WEB_TIMEOUT_SECONDS = 6
 
 
@@ -30,6 +36,38 @@ def smtp_timeout_sicuro(value=None):
     except (TypeError, ValueError):
         timeout = SMTP_WEB_TIMEOUT_SECONDS
     return max(1, min(timeout, SMTP_WEB_TIMEOUT_SECONDS))
+
+
+def descrivi_errore_smtp(exc, configurazione=None):
+    host = getattr(configurazione, "host", "") or "server SMTP"
+    port = getattr(configurazione, "port", "") or "porta configurata"
+
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return (
+            f"Connessione SMTP scaduta verso {host}:{port}. "
+            "Il server non risponde da Render: verifica host, porta e sicurezza. "
+            "Di solito si usa 587 con STARTTLS oppure 465 con SSL/TLS; evita la porta 25."
+        )
+
+    if isinstance(exc, socket.gaierror):
+        return f"Server SMTP non risolto: {host}. Verifica che l'host sia scritto correttamente."
+
+    if isinstance(exc, ConnectionRefusedError):
+        return f"Connessione rifiutata da {host}:{port}. Verifica porta e tipo di sicurezza SMTP."
+
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return "Autenticazione SMTP non riuscita. Verifica username, password o app password del provider."
+
+    if isinstance(exc, smtplib.SMTPConnectError):
+        return f"Il server SMTP {host}:{port} ha rifiutato la connessione iniziale."
+
+    if isinstance(exc, smtplib.SMTPServerDisconnected):
+        return "Il server SMTP ha chiuso la connessione. Verifica sicurezza, porta e credenziali."
+
+    if isinstance(exc, smtplib.SMTPException):
+        return f"Errore SMTP: {exc}"
+
+    return str(exc)
 
 
 def normalizza_email(value):
@@ -205,6 +243,8 @@ def invia_email_test_smtp(configurazione, *, destinatario, oggetto, messaggio):
             messaggio=messaggio,
             connection=connection,
         )
+    except Exception as exc:
+        raise ComunicazioneFamiglieSMTPError(descrivi_errore_smtp(exc, configurazione)) from exc
     finally:
         if connection is not None:
             try:
@@ -237,7 +277,7 @@ def invia_comunicazione_famiglie(*, configurazione, destinatari, oggetto, messag
     try:
         connection.open()
     except Exception as exc:  # noqa: BLE001 - il log deve registrare anche errori infrastrutturali.
-        errore_generale = str(exc)
+        errore_generale = descrivi_errore_smtp(exc, configurazione)
         fallite = len(destinatari_unici)
         for destinatario in destinatari_unici.values():
             dettagli.append({**destinatario, "esito": "errore", "errore": errore_generale})
@@ -254,7 +294,13 @@ def invia_comunicazione_famiglie(*, configurazione, destinatari, oggetto, messag
                     )
                 except Exception as exc:  # noqa: BLE001 - gli altri destinatari devono continuare a partire.
                     fallite += 1
-                    dettagli.append({**destinatario, "esito": "errore", "errore": str(exc)})
+                    dettagli.append(
+                        {
+                            **destinatario,
+                            "esito": "errore",
+                            "errore": descrivi_errore_smtp(exc, configurazione),
+                        }
+                    )
                 else:
                     inviate += 1
                     dettagli.append({**destinatario, "esito": "inviata", "errore": ""})
