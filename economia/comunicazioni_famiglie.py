@@ -21,6 +21,17 @@ class ComunicazioneFamiglieError(Exception):
     pass
 
 
+SMTP_WEB_TIMEOUT_SECONDS = 6
+
+
+def smtp_timeout_sicuro(value=None):
+    try:
+        timeout = int(value or SMTP_WEB_TIMEOUT_SECONDS)
+    except (TypeError, ValueError):
+        timeout = SMTP_WEB_TIMEOUT_SECONDS
+    return max(1, min(timeout, SMTP_WEB_TIMEOUT_SECONDS))
+
+
 def normalizza_email(value):
     return (value or "").strip().lower()
 
@@ -144,17 +155,18 @@ def destinatari_da_chiavi(destinatari, chiavi_selezionate):
     return [destinatario for destinatario in destinatari if destinatario["key"] in chiavi]
 
 
-def crea_connessione_smtp(configurazione):
+def crea_connessione_smtp(configurazione, *, timeout_secondi=None):
     if not configurazione or not configurazione.configurata:
         raise ComunicazioneFamiglieError("Configura il server SMTP prima di inviare comunicazioni alle famiglie.")
 
+    timeout = timeout_secondi if timeout_secondi is not None else configurazione.timeout_secondi
     kwargs = {
         "backend": "django.core.mail.backends.smtp.EmailBackend",
         "host": configurazione.host,
         "port": configurazione.port,
         "username": configurazione.username or None,
         "password": configurazione.password or None,
-        "timeout": configurazione.timeout_secondi,
+        "timeout": smtp_timeout_sicuro(timeout),
         "use_tls": configurazione.sicurezza == SicurezzaEmailSMTP.STARTTLS,
         "use_ssl": configurazione.sicurezza == SicurezzaEmailSMTP.SSL,
     }
@@ -180,8 +192,12 @@ def invia_email_singola(configurazione, *, destinatario, oggetto, messaggio, con
 
 
 def invia_email_test_smtp(configurazione, *, destinatario, oggetto, messaggio):
-    connection = crea_connessione_smtp(configurazione)
+    connection = None
     try:
+        connection = crea_connessione_smtp(
+            configurazione,
+            timeout_secondi=SMTP_WEB_TIMEOUT_SECONDS,
+        )
         return invia_email_singola(
             configurazione,
             destinatario=destinatario,
@@ -190,7 +206,11 @@ def invia_email_test_smtp(configurazione, *, destinatario, oggetto, messaggio):
             connection=connection,
         )
     finally:
-        connection.close()
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
 
 def invia_comunicazione_famiglie(*, configurazione, destinatari, oggetto, messaggio, anni_scolastici, utente=None):

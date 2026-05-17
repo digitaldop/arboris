@@ -983,10 +983,11 @@ def configurazione_email_smtp(request):
                 except ComunicazioneFamiglieError as exc:
                     messages.error(request, str(exc))
                 except Exception as exc:  # noqa: BLE001 - il test deve mostrare l'errore SMTP reale.
+                    logger.exception("Invio test email SMTP non riuscito.")
                     messages.error(request, f"Invio test non riuscito: {exc}")
                 else:
                     messages.success(request, "Email di test inviata correttamente.")
-                    return redirect("configurazione_email_smtp")
+                return redirect("configurazione_email_smtp")
         else:
             form = ConfigurazioneEmailSMTPForm(request.POST, instance=configurazione)
             if form.is_valid():

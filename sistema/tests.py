@@ -193,6 +193,31 @@ class ConfigurazioneEmailSMTPFormTests(TestCase):
         configurazione.refresh_from_db()
         self.assertEqual(configurazione.password, "password-esistente")
 
+    def test_test_smtp_failure_renders_error_message_without_500(self):
+        user = User.objects.create_superuser(username="smtp-admin@example.com", password="admin")
+        self.client.login(username="smtp-admin@example.com", password="admin")
+        ConfigurazioneEmailSMTP.objects.create(
+            pk=1,
+            host="smtp.example.com",
+            port=587,
+            sicurezza="starttls",
+            email_mittente="segreteria@example.com",
+        )
+
+        with patch("sistema.views.invia_email_test_smtp", side_effect=RuntimeError("SMTP KO")):
+            with patch("sistema.views.logger.exception"):
+                response = self.client.post(
+                    reverse("configurazione_email_smtp"),
+                    {
+                        "action": "test",
+                        "test-destinatario": "destinatario@example.com",
+                        "test-oggetto": "Test",
+                        "test-messaggio": "Messaggio",
+                    },
+                )
+
+        self.assertRedirects(response, reverse("configurazione_email_smtp"))
+
 
 class ProfessionalInterfaceSettingsTests(TestCase):
     def setUp(self):

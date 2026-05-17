@@ -284,7 +284,7 @@
                 </div>
 
                 <div class="sidebar-reorder-list" id="sidebar-reorder-list">
-                    {% if can_view_anagrafica or can_view_gestione_finanziaria %}
+                    {% if can_view_anagrafica or can_view_gestione_finanziaria or can_manage_economia %}
                         <div class="sidebar-section" data-sidebar-section-key="anagrafica">
                             <button
                                 type="button"
@@ -340,6 +340,13 @@
                                         <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                                         <span class="sidebar-link-text">Ricerche</span>
                                     </a>
+                                    {% endif %}
+
+                                    {% if can_manage_economia %}
+                                        <a href="{% url 'comunicazioni_famiglie' %}" class="{% if request.resolver_match.url_name == 'comunicazioni_famiglie' or request.resolver_match.url_name == 'storico_comunicazioni_famiglie' or request.resolver_match.url_name == 'dettaglio_comunicazione_famiglia' %}active{% endif %}">
+                                            <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                                            <span class="sidebar-link-text">Comunicazioni alle famiglie</span>
+                                        </a>
                                     {% endif %}
                                 </nav>
                             </div>
@@ -428,16 +435,6 @@
                                             <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
                                             <span class="sidebar-link-text">Scambi Retta</span>
                                         </a>
-                                        {% if can_manage_economia %}
-                                            <a href="{% url 'comunicazioni_famiglie' %}" class="{% if request.resolver_match.url_name == 'comunicazioni_famiglie' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
-                                                <span class="sidebar-link-text">Comunicazioni alle famiglie</span>
-                                            </a>
-                                            <a href="{% url 'storico_comunicazioni_famiglie' %}" class="{% if request.resolver_match.url_name == 'storico_comunicazioni_famiglie' or request.resolver_match.url_name == 'dettaglio_comunicazione_famiglia' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-slate" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
-                                                <span class="sidebar-link-text">Storico comunicazioni</span>
-                                            </a>
-                                        {% endif %}
                                     {% endif %}
                                     {% if can_view_gestione_finanziaria %}
                                         <a href="{% url 'spese_mensili_dashboard' %}" class="{% if request.resolver_match.url_name == 'spese_mensili_dashboard' or request.resolver_match.url_name == 'crea_spesa_operativa' or request.resolver_match.url_name == 'modifica_spesa_operativa' or request.resolver_match.url_name == 'crea_piano_rateale_spesa' %}active{% endif %}">

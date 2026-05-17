@@ -27,6 +27,7 @@ from economia.forms import (
 )
 from economia.comunicazioni_famiglie import (
     costruisci_destinatari_famiglie,
+    crea_connessione_smtp,
     invia_comunicazione_famiglie,
 )
 from economia.models import (
@@ -217,7 +218,7 @@ class ComunicazioniFamiglieTests(TestCase):
             def close(self):
                 return None
 
-        with patch("economia.comunicazioni_famiglie.crea_connessione_smtp", return_value=DummyConnection()):
+        with patch("economia.comunicazioni_famiglie.crea_connessione_smtp", return_value=DummyConnection()) as connection_mock:
             with patch("economia.comunicazioni_famiglie.invia_email_singola", return_value=1) as invia_mock:
                 riepilogo = invia_comunicazione_famiglie(
                     configurazione=configurazione,
@@ -229,6 +230,7 @@ class ComunicazioniFamiglieTests(TestCase):
                 )
 
         self.assertEqual(invia_mock.call_count, 1)
+        connection_mock.assert_called_once_with(configurazione)
         self.assertEqual(riepilogo["inviate"], 1)
         self.assertEqual(riepilogo["duplicati_saltati"], 1)
         log = ComunicazioneFamigliaLog.objects.get()
@@ -236,6 +238,19 @@ class ComunicazioniFamiglieTests(TestCase):
         self.assertEqual(log.destinatari_unici, 1)
         self.assertEqual(log.inviate, 1)
         self.assertEqual(log.duplicati_saltati, 1)
+
+    def test_connessione_smtp_usa_timeout_breve_per_non_bloccare_worker_web(self):
+        configurazione = ConfigurazioneEmailSMTP.objects.create(
+            host="smtp.example.com",
+            port=587,
+            timeout_secondi=120,
+            email_mittente="segreteria@example.com",
+        )
+
+        with patch("economia.comunicazioni_famiglie.get_connection") as get_connection_mock:
+            crea_connessione_smtp(configurazione)
+
+        self.assertLessEqual(get_connection_mock.call_args.kwargs["timeout"], 6)
 
     def test_pagina_comunicazioni_mostra_destinatari_e_disclaimer(self):
         response = self.client.get(reverse("comunicazioni_famiglie"))

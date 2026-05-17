@@ -341,7 +341,7 @@ class ConfigurazioneEmailSMTPForm(forms.ModelForm):
             "host": "Esempio: smtp.gmail.com o smtp.office365.com.",
             "username": "Lascia vuoto se il server SMTP non richiede autenticazione.",
             "reply_to": "Opzionale. Le risposte delle famiglie arriveranno a questo indirizzo.",
-            "timeout_secondi": "Tempo massimo di attesa per la connessione SMTP.",
+            "timeout_secondi": "Tempo massimo desiderato. Negli invii web Arboris applica comunque un limite breve per evitare blocchi del server.",
         }
         widgets = {
             "host": forms.TextInput(attrs={"placeholder": "smtp.dominio.it"}),
