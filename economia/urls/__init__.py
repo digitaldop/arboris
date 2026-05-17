@@ -2,6 +2,7 @@ from django.urls import path
 
 from economia.views import iscrizioni as iscrizioni_views
 from economia.views import impostazioni as impostazioni_views
+from economia.views import comunicazioni as comunicazioni_views
 from economia.views import scambio_retta as scambio_retta_views
 from sistema.permissions import module_edit_permission_required, module_permission_required
 
@@ -45,6 +46,21 @@ urlpatterns = [
     path("economia/rate-iscrizione/<int:pk>/pagamento-rapido/", economia_manage(iscrizioni_views.pagamento_rapido_rata_iscrizione), name="pagamento_rapido_rata_iscrizione"),
     path("economia/rate-iscrizione/<int:pk>/riconcilia/", economia_manage(iscrizioni_views.riconcilia_rata_iscrizione), name="riconcilia_rata_iscrizione"),
     path("economia/verifica-situazione-rette/", economia_view(iscrizioni_views.verifica_situazione_rette), name="verifica_situazione_rette"),
+    path(
+        "economia/comunicazioni-famiglie/",
+        economia_manage(comunicazioni_views.comunicazioni_famiglie),
+        name="comunicazioni_famiglie",
+    ),
+    path(
+        "economia/comunicazioni-famiglie/storico/",
+        economia_manage(comunicazioni_views.storico_comunicazioni_famiglie),
+        name="storico_comunicazioni_famiglie",
+    ),
+    path(
+        "economia/comunicazioni-famiglie/storico/<int:pk>/",
+        economia_manage(comunicazioni_views.dettaglio_comunicazione_famiglia),
+        name="dettaglio_comunicazione_famiglia",
+    ),
     path("economia/scambio-retta/", economia_view(scambio_retta_views.lista_scambi_retta), name="lista_scambi_retta"),
     path("economia/scambio-retta/nuovo/", economia_manage(scambio_retta_views.crea_scambio_retta), name="crea_scambio_retta"),
     path("economia/scambio-retta/<int:pk>/modifica/", economia_edit(scambio_retta_views.modifica_scambio_retta), name="modifica_scambio_retta"),

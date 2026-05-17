@@ -42,6 +42,11 @@ urlpatterns = [
         name="impostazioni_generali_sistema",
     ),
     path(
+        "sistema/email-smtp/",
+        sistema_manage(views.configurazione_email_smtp),
+        name="configurazione_email_smtp",
+    ),
+    path(
         "sistema/impostazioni-generali/importa-dati-base/",
         sistema_manage(views.importa_dati_base_anagrafica),
         name="importa_dati_base_anagrafica",

@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    ComunicazioneFamigliaLog,
+    ConfigurazioneEmailSMTP,
     FeedbackSegnalazione,
     SistemaOperazioneCronologia,
     SistemaBackupDatabaseConfigurazione,
@@ -112,6 +114,46 @@ class SistemaBackupDatabaseConfigurazioneAdmin(admin.ModelAdmin):
         "backup_automatico_in_corso",
         "data_aggiornamento",
     )
+
+
+@admin.register(ConfigurazioneEmailSMTP)
+class ConfigurazioneEmailSMTPAdmin(admin.ModelAdmin):
+    list_display = ("host", "port", "sicurezza", "email_mittente", "data_aggiornamento")
+    readonly_fields = ("data_creazione", "data_aggiornamento")
+
+
+@admin.register(ComunicazioneFamigliaLog)
+class ComunicazioneFamigliaLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "data_creazione",
+        "stato",
+        "oggetto",
+        "utente",
+        "destinatari_unici",
+        "inviate",
+        "fallite",
+        "duplicati_saltati",
+    )
+    list_filter = ("stato", "data_creazione")
+    search_fields = ("oggetto", "messaggio", "utente__username", "utente__email")
+    readonly_fields = (
+        "utente",
+        "stato",
+        "oggetto",
+        "messaggio",
+        "anni_scolastici",
+        "destinatari_selezionati",
+        "destinatari_unici",
+        "inviate",
+        "fallite",
+        "duplicati_saltati",
+        "dettagli_destinatari",
+        "errore_generale",
+        "data_creazione",
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(SistemaDatabaseBackup)

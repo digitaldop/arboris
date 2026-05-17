@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Storico comunicazioni famiglie - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Gestione Economica</span>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'comunicazioni_famiglie' %}">Comunicazioni alle famiglie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Storico</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="family-communication-shell">
+        <div class="page-head settings-page-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg>
+                </span>
+                <div>
+                    <h1 class="page-title">Storico comunicazioni</h1>
+                    <p class="family-page-address">Archivio degli invii email alle famiglie, con oggetto, testo, data e destinatari.</p>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'comunicazioni_famiglie' %}" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                    <span class="btn-label">Nuova comunicazione</span>
+                </a>
+            </div>
+        </div>
+
+        <section class="settings-card family-communication-history-card">
+            <div class="settings-card-head family-communication-section-head">
+                <span class="settings-card-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+                <div>
+                    <h2>Invii registrati</h2>
+                    <p>{{ total_count }} comunicazioni in storico.</p>
+                </div>
+                <form method="get" class="family-communication-history-search">
+                    <input type="search" name="q" value="{{ q }}" placeholder="Cerca per oggetto o messaggio">
+                    <button type="submit" class="btn btn-secondary">Cerca</button>
+                    {% if q %}
+                        <a href="{% url 'storico_comunicazioni_famiglie' %}" class="btn btn-secondary">Reset</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="system-user-table-wrap family-communication-history-table-wrap">
+                <table class="list-table family-communication-history-table">
+                    <thead>
+                        <tr>
+                            <th>Data e ora</th>
+                            <th>Oggetto</th>
+                            <th>Esito</th>
+                            <th>Destinatari</th>
+                            <th>Operatore</th>
+                            <th class="actions-head">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ log.data_creazione|date:"d/m/Y" }}</strong>
+                                    <span class="table-muted">{{ log.data_creazione|date:"H:i" }}</span>
+                                </td>
+                                <td class="family-communication-history-subject">
+                                    <strong>{{ log.oggetto }}</strong>
+                                    <span>{{ log.messaggio|truncatechars:110 }}</span>
+                                </td>
+                                <td>
+                                    <span class="family-communication-status-pill is-{{ log.stato }}">{{ log.get_stato_display }}</span>
+                                </td>
+                                <td>
+                                    <div class="family-communication-history-counts">
+                                        <span>{{ log.destinatari_unici }} email uniche</span>
+                                        <span>{{ log.inviate }} inviate</span>
+                                        {% if log.fallite %}<span>{{ log.fallite }} errori</span>{% endif %}
+                                        {% if log.duplicati_saltati %}<span>{{ log.duplicati_saltati }} duplicati</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username|default:"Sistema" }}</td>
+                                <td class="actions-cell">
+                                    <a href="{% url 'dettaglio_comunicazione_famiglia' log.pk %}" class="table-icon-link" aria-label="Apri dettaglio comunicazione" data-floating-text="Dettaglio">
+                                        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="empty-state">Nessuna comunicazione salvata nello storico.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj.paginator.num_pages > 1 %}
+                <nav class="pagination">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Precedente</a>
+                    {% endif %}
+                    <span>Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}">Successiva</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

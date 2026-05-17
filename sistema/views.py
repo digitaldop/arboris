@@ -24,7 +24,9 @@ from django.views.decorators.http import require_POST
 from .inline_context import scuola_inline_head
 from .forms import (
     ArborisAuthenticationForm,
+    ConfigurazioneEmailSMTPForm,
     FeedbackSegnalazioneForm,
+    InvioEmailTestSMTPForm,
     SistemaBackupDatabaseConfigurazioneForm,
     SistemaBackupDatabaseRestoreConfirmForm,
     SistemaBackupDatabaseStorageReferenceForm,
@@ -53,6 +55,7 @@ from .database_backups import (
 from .restore_scheduler import schedule_restore_job
 from .models import (
     AzioneOperazioneCronologia,
+    ConfigurazioneEmailSMTP,
     FeedbackSegnalazione,
     LivelloPermesso,
     MODULE_TOGGLE_DEFINITIONS,
@@ -69,6 +72,7 @@ from .models import (
     StatoRipristinoDatabase,
     TipoFeedbackSegnalazione,
 )
+from economia.comunicazioni_famiglie import ComunicazioneFamiglieError, invia_email_test_smtp
 from anagrafica.dati_base_import import (
     default_gi_file_path,
     default_nazioni_belfiore_file_path,
@@ -955,6 +959,50 @@ def impostazioni_generali_sistema(request):
             "dati_base_file_path": str(p),
             "nazioni_belfiore_file_ready": nazioni_path.is_file(),
             "nazioni_belfiore_file_path": str(nazioni_path),
+        },
+    )
+
+
+def configurazione_email_smtp(request):
+    configurazione = ConfigurazioneEmailSMTP.get_solo()
+    test_form = InvioEmailTestSMTPForm(prefix="test")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "test":
+            form = ConfigurazioneEmailSMTPForm(instance=configurazione)
+            test_form = InvioEmailTestSMTPForm(request.POST, prefix="test")
+            if test_form.is_valid():
+                try:
+                    invia_email_test_smtp(
+                        configurazione,
+                        destinatario=test_form.cleaned_data["destinatario"],
+                        oggetto=test_form.cleaned_data["oggetto"],
+                        messaggio=test_form.cleaned_data["messaggio"],
+                    )
+                except ComunicazioneFamiglieError as exc:
+                    messages.error(request, str(exc))
+                except Exception as exc:  # noqa: BLE001 - il test deve mostrare l'errore SMTP reale.
+                    messages.error(request, f"Invio test non riuscito: {exc}")
+                else:
+                    messages.success(request, "Email di test inviata correttamente.")
+                    return redirect("configurazione_email_smtp")
+        else:
+            form = ConfigurazioneEmailSMTPForm(request.POST, instance=configurazione)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Configurazione SMTP salvata correttamente.")
+                return redirect("configurazione_email_smtp")
+    else:
+        form = ConfigurazioneEmailSMTPForm(instance=configurazione)
+
+    return render(
+        request,
+        "sistema/configurazione_email_smtp.html",
+        {
+            "form": form,
+            "test_form": test_form,
+            "configurazione": configurazione,
         },
     )
 

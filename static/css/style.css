@@ -38355,3 +38355,428 @@ body.ui-professional-interface .sidebar-nav a.active::after {
 body.ui-professional-interface .sidebar-home-section {
     margin-bottom: 16px;
 }
+
+/* Comunicazioni famiglie e configurazione SMTP */
+.family-communication-shell,
+.email-smtp-settings-shell {
+    display: grid;
+    gap: 18px;
+    width: 100%;
+    max-width: 1240px;
+    margin: 0 auto;
+}
+
+.family-communication-form {
+    display: grid;
+    gap: 18px;
+}
+
+.family-communication-alert {
+    padding: 12px 14px;
+    border: 1px solid #d9e6f1;
+    border-radius: 8px;
+    background: #f6fbfe;
+    color: #29415b;
+    line-height: 1.45;
+}
+
+.family-communication-alert.is-warning {
+    border-color: #f2d392;
+    background: #fff9e9;
+    color: #684900;
+}
+
+.family-communication-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px;
+    border: 1px solid #d7eadf;
+    border-radius: 8px;
+    background: #f3fbf6;
+}
+
+.family-communication-summary h2 {
+    margin: 0;
+    color: #172131;
+    font-size: 19px;
+}
+
+.family-communication-summary p {
+    margin: 4px 0 0;
+    color: #5e7188;
+}
+
+.family-communication-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(92px, 1fr));
+    gap: 10px;
+}
+
+.family-communication-summary-grid span {
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid #d7eadf;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #62748a;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.family-communication-summary-grid strong {
+    color: #183348;
+    font-size: 20px;
+}
+
+.family-communication-year-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.family-communication-year-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 10px 12px;
+    border: 1px solid #dce5ef;
+    border-radius: 7px;
+    background: #f9fcfe;
+    color: #1f354c;
+    font-weight: 800;
+}
+
+.family-communication-year-option input,
+.family-communication-recipient input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+
+.family-communication-actions-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.family-communication-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.family-communication-section-head {
+    align-items: center;
+}
+
+.family-communication-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.family-communication-recipient-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.family-communication-student-card {
+    overflow: hidden;
+    border: 1px solid #dde7f1;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.family-communication-student-card header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e7eef5;
+    background: #f8fbfd;
+}
+
+.family-communication-student-card header div,
+.family-communication-recipient-main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.family-communication-student-card header strong,
+.family-communication-recipient-main strong {
+    color: #172131;
+    font-weight: 850;
+}
+
+.family-communication-student-card header span,
+.family-communication-recipient-main span {
+    color: #65768d;
+    font-size: 12px;
+}
+
+.family-communication-student-card header em {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #e8f2f7;
+    color: var(--primary);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 850;
+}
+
+.family-communication-recipient-stack {
+    display: grid;
+}
+
+.family-communication-recipient {
+    display: grid;
+    grid-template-columns: auto minmax(180px, 1fr) minmax(220px, 0.9fr) 112px;
+    align-items: center;
+    gap: 12px;
+    min-height: 58px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.family-communication-recipient:last-child {
+    border-bottom: 0;
+}
+
+.family-communication-recipient.is-duplicate {
+    background: #fffaf0;
+}
+
+.family-communication-recipient-email {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: #29415b;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.family-communication-chip {
+    justify-self: start;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff2cf;
+    color: #855b00;
+    font-size: 11px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.family-communication-chip-placeholder {
+    visibility: hidden;
+}
+
+.family-communication-empty {
+    margin: 0;
+    padding: 16px;
+    color: #6b7d93;
+}
+
+.family-communication-message-field textarea {
+    min-height: 180px;
+}
+
+.family-communication-history-search {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.family-communication-history-search input {
+    min-width: min(340px, 100%);
+}
+
+.family-communication-history-table-wrap {
+    margin-top: 16px;
+}
+
+.family-communication-history-table td {
+    vertical-align: top;
+}
+
+.family-communication-history-subject,
+.family-communication-history-counts {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.family-communication-history-subject strong {
+    color: #172131;
+}
+
+.family-communication-history-subject span,
+.family-communication-history-counts span {
+    color: #65768d;
+    font-size: 12px;
+}
+
+.family-communication-status-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 4px 9px;
+    border: 1px solid #dce6ee;
+    border-radius: 999px;
+    background: #f5f8fb;
+    color: #41546f;
+    font-size: 11px;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+
+.family-communication-status-pill.is-inviata {
+    border-color: #cbe8d5;
+    background: #edf9f1;
+    color: #137045;
+}
+
+.family-communication-status-pill.is-parziale,
+.family-communication-status-pill.is-duplicato {
+    border-color: #f0dca3;
+    background: #fff8e3;
+    color: #805900;
+}
+
+.family-communication-status-pill.is-errore {
+    border-color: #f3c5cd;
+    background: #fff0f3;
+    color: #a5293c;
+}
+
+.family-communication-detail-list {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.family-communication-detail-list div {
+    display: grid;
+    gap: 5px;
+    padding: 12px 14px;
+    border: 1px solid #e2ebf3;
+    border-radius: 7px;
+    background: #f9fcfe;
+}
+
+.family-communication-detail-list dt {
+    color: #66768c;
+    font-size: 11px;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+
+.family-communication-detail-list dd {
+    margin: 0;
+    color: #172131;
+    font-weight: 800;
+}
+
+.family-communication-message-body {
+    padding: 16px;
+    border: 1px solid #e1eaf2;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #24384f;
+    line-height: 1.55;
+    white-space: normal;
+}
+
+.email-smtp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.email-smtp-status-list {
+    display: grid;
+    gap: 10px;
+    margin: 16px 0 0;
+}
+
+.email-smtp-status-list div {
+    display: grid;
+    gap: 3px;
+    padding: 10px 12px;
+    border: 1px solid #e2ebf3;
+    border-radius: 7px;
+    background: #f9fcfe;
+}
+
+.email-smtp-status-list dt {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 850;
+    text-transform: uppercase;
+}
+
+.email-smtp-status-list dd {
+    margin: 0;
+    color: #172131;
+    overflow-wrap: anywhere;
+    font-weight: 800;
+}
+
+.email-smtp-side-field {
+    display: grid;
+    gap: 7px;
+}
+
+.email-smtp-test-submit {
+    width: 100%;
+    margin-top: 16px;
+}
+
+@media (max-width: 980px) {
+    .family-communication-summary {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .family-communication-summary-grid,
+    .family-communication-kpi-grid,
+    .email-smtp-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .family-communication-recipient {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .family-communication-recipient-email,
+    .family-communication-chip {
+        grid-column: 2;
+    }
+}
+
+@media (max-width: 620px) {
+    .family-communication-summary-grid,
+    .family-communication-kpi-grid,
+    .email-smtp-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .family-communication-selection-actions,
+    .family-communication-actions-row {
+        justify-content: stretch;
+    }
+
+    .family-communication-selection-actions .btn,
+    .family-communication-actions-row .btn {
+        flex: 1 1 auto;
+    }
+}

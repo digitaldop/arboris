@@ -30,7 +30,9 @@ from .database_backups import (
     reset_public_schema_for_restore,
     restore_stderr_has_blocking_errors,
 )
+from .forms import ConfigurazioneEmailSMTPForm
 from .models import (
+    ConfigurazioneEmailSMTP,
     FeedbackSegnalazione,
     LivelloPermesso,
     RuoloUtente,
@@ -156,6 +158,40 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_dipendenti")}"', html=False)
         self.assertNotContains(response, "GESTIONE FINANZIARIA")
+
+
+class ConfigurazioneEmailSMTPFormTests(TestCase):
+    def test_password_vuota_preserva_password_salvata(self):
+        configurazione = ConfigurazioneEmailSMTP.objects.create(
+            host="smtp.example.com",
+            port=587,
+            sicurezza="starttls",
+            username="segreteria",
+            password="password-esistente",
+            email_mittente="segreteria@example.com",
+            nome_mittente="Segreteria",
+            timeout_secondi=20,
+        )
+
+        form = ConfigurazioneEmailSMTPForm(
+            {
+                "host": "smtp.example.com",
+                "port": "587",
+                "sicurezza": "starttls",
+                "username": "segreteria",
+                "password": "",
+                "email_mittente": "segreteria@example.com",
+                "nome_mittente": "Segreteria",
+                "reply_to": "",
+                "timeout_secondi": "20",
+            },
+            instance=configurazione,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        configurazione.refresh_from_db()
+        self.assertEqual(configurazione.password, "password-esistente")
 
 
 class ProfessionalInterfaceSettingsTests(TestCase):

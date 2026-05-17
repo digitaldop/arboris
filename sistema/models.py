@@ -1069,6 +1069,94 @@ class SidebarPersonalizzazione(models.Model):
         return f"Sidebar {self.user}"
 
 
+class SicurezzaEmailSMTP(models.TextChoices):
+    NESSUNA = "none", "Nessuna"
+    STARTTLS = "starttls", "STARTTLS"
+    SSL = "ssl", "SSL/TLS"
+
+
+class ConfigurazioneEmailSMTP(models.Model):
+    host = models.CharField(max_length=255, blank=True)
+    port = models.PositiveIntegerField(
+        default=587,
+        validators=[MinValueValidator(1), MaxValueValidator(65535)],
+    )
+    sicurezza = models.CharField(
+        max_length=16,
+        choices=SicurezzaEmailSMTP.choices,
+        default=SicurezzaEmailSMTP.STARTTLS,
+    )
+    username = models.CharField(max_length=255, blank=True)
+    password = models.CharField(max_length=255, blank=True)
+    email_mittente = models.EmailField(blank=True)
+    nome_mittente = models.CharField(max_length=255, blank=True, default="Arboris")
+    reply_to = models.EmailField(blank=True)
+    timeout_secondi = models.PositiveSmallIntegerField(
+        default=20,
+        validators=[MinValueValidator(1), MaxValueValidator(120)],
+    )
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sistema_configurazione_email_smtp"
+        verbose_name = "Configurazione email SMTP"
+        verbose_name_plural = "Configurazioni email SMTP"
+
+    def __str__(self):
+        return self.host or "Configurazione email SMTP"
+
+    @classmethod
+    def get_solo(cls):
+        configurazione, _created = cls.objects.get_or_create(pk=1)
+        return configurazione
+
+    @property
+    def configurata(self):
+        return bool(self.host and self.port and self.email_mittente)
+
+
+class StatoComunicazioneFamiglia(models.TextChoices):
+    INVIATA = "inviata", "Inviata"
+    PARZIALE = "parziale", "Parziale"
+    ERRORE = "errore", "Errore"
+
+
+class ComunicazioneFamigliaLog(models.Model):
+    utente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="comunicazioni_famiglie",
+        blank=True,
+        null=True,
+    )
+    stato = models.CharField(
+        max_length=16,
+        choices=StatoComunicazioneFamiglia.choices,
+        default=StatoComunicazioneFamiglia.INVIATA,
+    )
+    oggetto = models.CharField(max_length=255)
+    messaggio = models.TextField()
+    anni_scolastici = models.JSONField(default=list, blank=True)
+    destinatari_selezionati = models.PositiveIntegerField(default=0)
+    destinatari_unici = models.PositiveIntegerField(default=0)
+    inviate = models.PositiveIntegerField(default=0)
+    fallite = models.PositiveIntegerField(default=0)
+    duplicati_saltati = models.PositiveIntegerField(default=0)
+    dettagli_destinatari = models.JSONField(default=list, blank=True)
+    errore_generale = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "sistema_comunicazione_famiglia_log"
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Log comunicazione famiglie"
+        verbose_name_plural = "Log comunicazioni famiglie"
+
+    def __str__(self):
+        return f"{self.oggetto} - {self.data_creazione:%d/%m/%Y %H:%M}"
+
+
 class SistemaRuoloPermessi(models.Model):
     nome = models.CharField(max_length=120, unique=True)
     descrizione = models.TextField(blank=True)

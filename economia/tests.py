@@ -25,6 +25,10 @@ from economia.forms import (
     ScambioRettaForm,
     TariffaCondizioneIscrizioneForm,
 )
+from economia.comunicazioni_famiglie import (
+    costruisci_destinatari_famiglie,
+    invia_comunicazione_famiglie,
+)
 from economia.models import (
     Agevolazione,
     CondizioneIscrizione,
@@ -46,7 +50,12 @@ from economia.services import (
 )
 from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
 from scuola.models import AnnoScolastico, Classe
-from sistema.models import GestioneIscrizioneCorsoAnno, SistemaImpostazioniGenerali
+from sistema.models import (
+    ComunicazioneFamigliaLog,
+    ConfigurazioneEmailSMTP,
+    GestioneIscrizioneCorsoAnno,
+    SistemaImpostazioniGenerali,
+)
 
 
 class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
@@ -89,6 +98,190 @@ class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
         form = ScambioRettaForm()
 
         self.assertEqual(form.initial["anno_scolastico"], self.anno_corrente.pk)
+
+
+class ComunicazioniFamiglieTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="admin", password="admin", email="admin@example.com")
+        self.client.login(username="admin", password="admin")
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        self.stato_attivo = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        self.stato_annullato = StatoIscrizione.objects.create(stato_iscrizione="Annullata", ordine=2, attiva=True)
+        self.condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+            attiva=True,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Genitore", ordine=1)
+        self.studente = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        self.studente_senza_email = Studente.objects.create(nome="Marta", cognome="Verdi", attivo=True)
+        self.studente_annullato = Studente.objects.create(nome="Anna", cognome="Bianchi", attivo=True)
+        self.madre = Familiare.objects.create(
+            nome="Ada",
+            cognome="Rossi",
+            email="famiglia@example.com",
+            relazione_familiare=self.relazione,
+        )
+        self.padre = Familiare.objects.create(
+            nome="Marco",
+            cognome="Rossi",
+            email="famiglia@example.com",
+            relazione_familiare=self.relazione,
+        )
+        self.familiare_senza_email = Familiare.objects.create(
+            nome="Giulia",
+            cognome="Verdi",
+            email="",
+            relazione_familiare=self.relazione,
+        )
+        self.familiare_annullato = Familiare.objects.create(
+            nome="Paolo",
+            cognome="Bianchi",
+            email="annullata@example.com",
+            relazione_familiare=self.relazione,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.madre,
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.padre,
+            relazione_familiare=self.relazione,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente_senza_email,
+            familiare=self.familiare_senza_email,
+            relazione_familiare=self.relazione,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente_annullato,
+            familiare=self.familiare_annullato,
+            relazione_familiare=self.relazione,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_attivo,
+            condizione_iscrizione=self.condizione,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente_senza_email,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_attivo,
+            condizione_iscrizione=self.condizione,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente_annullato,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_annullato,
+            condizione_iscrizione=self.condizione,
+            attiva=True,
+        )
+
+    def test_destinatari_partono_da_iscrizioni_attive_non_annullate(self):
+        gruppi, destinatari, statistiche = costruisci_destinatari_famiglie([self.anno])
+
+        self.assertEqual(statistiche["studenti"], 2)
+        self.assertEqual(statistiche["studenti_senza_email"], 1)
+        self.assertEqual(statistiche["destinatari"], 2)
+        self.assertEqual(statistiche["email_uniche"], 1)
+        self.assertEqual(statistiche["duplicati"], 1)
+        self.assertEqual({destinatario["email"] for destinatario in destinatari}, {"famiglia@example.com"})
+        self.assertNotIn("annullata@example.com", {destinatario["email"] for destinatario in destinatari})
+        self.assertTrue(any(not gruppo["destinatari"] for gruppo in gruppi))
+
+    def test_invio_comunicazione_deduplica_e_scrive_log(self):
+        _gruppi, destinatari, _statistiche = costruisci_destinatari_famiglie([self.anno])
+        configurazione = ConfigurazioneEmailSMTP.objects.create(
+            host="smtp.example.com",
+            port=587,
+            email_mittente="segreteria@example.com",
+        )
+
+        class DummyConnection:
+            def open(self):
+                return True
+
+            def close(self):
+                return None
+
+        with patch("economia.comunicazioni_famiglie.crea_connessione_smtp", return_value=DummyConnection()):
+            with patch("economia.comunicazioni_famiglie.invia_email_singola", return_value=1) as invia_mock:
+                riepilogo = invia_comunicazione_famiglie(
+                    configurazione=configurazione,
+                    destinatari=destinatari,
+                    oggetto="Comunicazione",
+                    messaggio="Testo",
+                    anni_scolastici=[self.anno],
+                    utente=self.user,
+                )
+
+        self.assertEqual(invia_mock.call_count, 1)
+        self.assertEqual(riepilogo["inviate"], 1)
+        self.assertEqual(riepilogo["duplicati_saltati"], 1)
+        log = ComunicazioneFamigliaLog.objects.get()
+        self.assertEqual(log.destinatari_selezionati, 2)
+        self.assertEqual(log.destinatari_unici, 1)
+        self.assertEqual(log.inviate, 1)
+        self.assertEqual(log.duplicati_saltati, 1)
+
+    def test_pagina_comunicazioni_mostra_destinatari_e_disclaimer(self):
+        response = self.client.get(reverse("comunicazioni_famiglie"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Comunicazioni alle famiglie")
+        self.assertContains(response, "famiglia@example.com")
+        self.assertContains(response, "invia una sola email")
+
+    def test_storico_comunicazioni_mostra_log_e_destinatari(self):
+        log = ComunicazioneFamigliaLog.objects.create(
+            utente=self.user,
+            oggetto="Avviso riunione",
+            messaggio="Testo della comunicazione salvata.",
+            anni_scolastici=[{"id": self.anno.pk, "label": str(self.anno)}],
+            destinatari_selezionati=1,
+            destinatari_unici=1,
+            inviate=1,
+            fallite=0,
+            duplicati_saltati=0,
+            dettagli_destinatari=[
+                {
+                    "esito": "inviata",
+                    "familiare_label": "Rossi Ada",
+                    "relazione_label": "Genitore",
+                    "email": "famiglia@example.com",
+                    "studente_label": "Rossi Luca",
+                    "anno_label": str(self.anno),
+                    "errore": "",
+                }
+            ],
+        )
+
+        response = self.client.get(reverse("storico_comunicazioni_famiglie"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Storico comunicazioni")
+        self.assertContains(response, "Avviso riunione")
+        self.assertContains(response, "1 email uniche")
+
+        detail_response = self.client.get(reverse("dettaglio_comunicazione_famiglia", args=[log.pk]))
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "Testo della comunicazione salvata.")
+        self.assertContains(detail_response, "famiglia@example.com")
+        self.assertContains(detail_response, "Rossi Luca")
 
 
 class EconomiaCurrencyWidgetTests(TestCase):

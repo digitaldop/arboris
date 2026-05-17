@@ -8,6 +8,7 @@ from anagrafica.models import Indirizzo
 from anagrafica.forms import make_searchable_select
 from anagrafica.utils import validate_and_normalize_phone_number
 from .models import (
+    ConfigurazioneEmailSMTP,
     FeedbackSegnalazione,
     Scuola,
     ScuolaSocial,
@@ -303,6 +304,80 @@ class SistemaBackupDatabaseRestoreConfirmForm(forms.Form):
         if value != "RIPRISTINA DATABASE":
             raise forms.ValidationError("Per sicurezza devi digitare esattamente RIPRISTINA DATABASE.")
         return value
+
+
+class ConfigurazioneEmailSMTPForm(forms.ModelForm):
+    password = forms.CharField(
+        label="Password SMTP",
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="In modifica lascia vuoto per mantenere la password salvata.",
+    )
+
+    class Meta:
+        model = ConfigurazioneEmailSMTP
+        fields = [
+            "host",
+            "port",
+            "sicurezza",
+            "username",
+            "password",
+            "email_mittente",
+            "nome_mittente",
+            "reply_to",
+            "timeout_secondi",
+        ]
+        labels = {
+            "host": "Server SMTP",
+            "port": "Porta",
+            "sicurezza": "Sicurezza",
+            "username": "Username",
+            "email_mittente": "Email mittente",
+            "nome_mittente": "Nome mittente",
+            "reply_to": "Reply-to",
+            "timeout_secondi": "Timeout",
+        }
+        help_texts = {
+            "host": "Esempio: smtp.gmail.com o smtp.office365.com.",
+            "username": "Lascia vuoto se il server SMTP non richiede autenticazione.",
+            "reply_to": "Opzionale. Le risposte delle famiglie arriveranno a questo indirizzo.",
+            "timeout_secondi": "Tempo massimo di attesa per la connessione SMTP.",
+        }
+        widgets = {
+            "host": forms.TextInput(attrs={"placeholder": "smtp.dominio.it"}),
+            "port": forms.NumberInput(attrs={"min": "1", "max": "65535"}),
+            "email_mittente": forms.EmailInput(attrs={"placeholder": "segreteria@scuola.it"}),
+            "reply_to": forms.EmailInput(attrs={"placeholder": "segreteria@scuola.it"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._password_salvata = self.instance.password if self.instance and self.instance.pk else ""
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if not self.cleaned_data.get("password") and self.instance and self.instance.pk:
+            instance.password = self._password_salvata
+        if commit:
+            instance.save()
+        return instance
+
+
+class InvioEmailTestSMTPForm(forms.Form):
+    destinatario = forms.EmailField(
+        label="Email destinatario test",
+        widget=forms.EmailInput(attrs={"placeholder": "destinatario@example.com"}),
+    )
+    oggetto = forms.CharField(
+        label="Oggetto",
+        max_length=255,
+        initial="Test configurazione email Arboris",
+    )
+    messaggio = forms.CharField(
+        label="Messaggio",
+        initial="Questa e una email di test inviata da Arboris.",
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
 
 
 class FeedbackSegnalazioneForm(forms.ModelForm):

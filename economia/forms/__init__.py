@@ -1,4 +1,5 @@
 from .impostazioni import MetodoPagamentoForm, TipoMovimentoCreditoForm
+from .comunicazioni import ComunicazioneFamiglieForm
 from .iscrizioni import (
     StatoIscrizioneForm,
     CondizioneIscrizioneForm,
@@ -15,6 +16,7 @@ from .scambio_retta import TariffaScambioRettaForm, ScambioRettaForm, Prestazion
 __all__ = [
     "MetodoPagamentoForm",
     "TipoMovimentoCreditoForm",
+    "ComunicazioneFamiglieForm",
     "StatoIscrizioneForm",
     "CondizioneIscrizioneForm",
     "TariffaCondizioneIscrizioneForm",

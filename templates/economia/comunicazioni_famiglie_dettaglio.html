@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dettaglio comunicazione - Arboris{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Gestione Economica</span>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'comunicazioni_famiglie' %}">Comunicazioni alle famiglie</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'storico_comunicazioni_famiglie' %}">Storico</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Dettaglio</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="family-communication-shell">
+        <div class="page-head settings-page-head">
+            <div class="page-head-title-block">
+                <span class="page-head-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg>
+                </span>
+                <div>
+                    <h1 class="page-title">Dettaglio comunicazione</h1>
+                    <p class="family-page-address">Invio #{{ log.pk }} del {{ log.data_creazione|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+            <div class="page-head-actions">
+                <a href="{% url 'storico_comunicazioni_famiglie' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
+                    <span class="btn-label">Storico</span>
+                </a>
+                <a href="{% url 'comunicazioni_famiglie' %}" class="btn btn-primary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#mail"></use></svg></span>
+                    <span class="btn-label">Nuova comunicazione</span>
+                </a>
+            </div>
+        </div>
+
+        <section class="family-communication-summary" aria-label="Riepilogo invio">
+            <div>
+                <h2>{{ log.oggetto }}</h2>
+                <p>
+                    Operatore:
+                    {{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username|default:"Sistema" }}
+                    - Stato: {{ log.get_stato_display }}
+                </p>
+            </div>
+            <div class="family-communication-summary-grid">
+                <span><strong>{{ log.inviate }}</strong> inviate</span>
+                <span><strong>{{ log.fallite }}</strong> errori</span>
+                <span><strong>{{ log.duplicati_saltati }}</strong> duplicati</span>
+                <span><strong>{{ log.destinatari_unici }}</strong> email uniche</span>
+            </div>
+        </section>
+
+        <section class="settings-card family-communication-message-card">
+            <div class="settings-card-head">
+                <span class="settings-card-icon is-violet" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#message"></use></svg>
+                </span>
+                <div>
+                    <h2>Messaggio inviato</h2>
+                    <p>Oggetto e testo conservati nello storico.</p>
+                </div>
+            </div>
+            <dl class="family-communication-detail-list">
+                <div>
+                    <dt>Oggetto</dt>
+                    <dd>{{ log.oggetto }}</dd>
+                </div>
+                <div>
+                    <dt>Data e ora invio</dt>
+                    <dd>{{ log.data_creazione|date:"d/m/Y H:i:s" }}</dd>
+                </div>
+                <div>
+                    <dt>Anni scolastici</dt>
+                    <dd>
+                        {% for anno in log.anni_scolastici %}
+                            <span class="family-communication-chip">{{ anno.label }}</span>
+                        {% empty %}
+                            <span class="table-muted">-</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+            </dl>
+            <div class="family-communication-message-body">{{ log.messaggio|linebreaksbr }}</div>
+            {% if log.errore_generale %}
+                <div class="family-communication-alert is-warning">
+                    <strong>Errore generale:</strong> {{ log.errore_generale }}
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="settings-card">
+            <div class="settings-card-head family-communication-section-head">
+                <span class="settings-card-icon is-green" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg>
+                </span>
+                <div>
+                    <h2>Destinatari memorizzati</h2>
+                    <p>{{ dettagli|length }} righe nello storico, inclusi duplicati saltati ed eventuali errori.</p>
+                </div>
+            </div>
+            <div class="system-user-table-wrap family-communication-history-table-wrap">
+                <table class="list-table family-communication-history-table">
+                    <thead>
+                        <tr>
+                            <th>Esito</th>
+                            <th>Destinatario</th>
+                            <th>Email</th>
+                            <th>Studente</th>
+                            <th>Anno</th>
+                            <th>Errore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for destinatario in dettagli %}
+                            <tr>
+                                <td>
+                                    <span class="family-communication-status-pill is-{{ destinatario.esito }}">{{ destinatario.esito|default:"-" }}</span>
+                                </td>
+                                <td>
+                                    <strong>{{ destinatario.familiare_label|default:"-" }}</strong>
+                                    <span class="table-muted">{{ destinatario.relazione_label|default:"" }}</span>
+                                </td>
+                                <td>{{ destinatario.email|default:"-" }}</td>
+                                <td>{{ destinatario.studente_label|default:"-" }}</td>
+                                <td>{{ destinatario.anno_label|default:"-" }}</td>
+                                <td>{{ destinatario.errore|default:"-" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="empty-state">Nessun destinatario registrato.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+{% endblock %}
