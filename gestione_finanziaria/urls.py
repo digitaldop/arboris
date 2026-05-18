@@ -243,6 +243,11 @@ urlpatterns = [
         name="crea_conto_bancario",
     ),
     path(
+        "gestione-finanziaria/conti/fondi/",
+        gf_manage(views.fondi_conti_bancari),
+        name="fondi_conti_bancari",
+    ),
+    path(
         "gestione-finanziaria/conti/<int:pk>/modifica/",
         gf_edit(views.modifica_conto_bancario),
         name="modifica_conto_bancario",

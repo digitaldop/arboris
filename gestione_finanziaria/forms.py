@@ -938,6 +938,46 @@ class ContoBancarioForm(forms.ModelForm):
         self.fields["connessione"].empty_label = "--- nessuna ---"
 
 
+class FusioneContiBancariForm(forms.Form):
+    conto_sorgente = forms.ModelChoiceField(
+        queryset=ContoBancario.objects.none(),
+        label="Conto da fondere",
+        help_text="Il conto che verra' assorbito e poi disattivato.",
+    )
+    conto_destinazione = forms.ModelChoiceField(
+        queryset=ContoBancario.objects.none(),
+        label="Conto destinazione",
+        help_text="Il conto che conservera' movimenti, saldi e collegamenti. Di norma scegli il conto PSD2.",
+    )
+    conferma_operazione = forms.BooleanField(
+        required=False,
+        label="Confermo la fusione dei conti",
+        help_text="La fusione sposta i riferimenti sul conto destinazione e disattiva il conto assorbito.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        conti = ContoBancario.objects.order_by("nome_conto", "id")
+        self.fields["conto_sorgente"].queryset = conti
+        self.fields["conto_destinazione"].queryset = conti.filter(attivo=True)
+
+        self.fields["conto_sorgente"].empty_label = "--- scegli il conto da assorbire ---"
+        self.fields["conto_destinazione"].empty_label = "--- scegli il conto destinazione ---"
+
+    def clean(self):
+        cleaned = super().clean()
+        sorgente = cleaned.get("conto_sorgente")
+        destinazione = cleaned.get("conto_destinazione")
+
+        if sorgente and destinazione and sorgente.pk == destinazione.pk:
+            raise forms.ValidationError("Scegli due conti diversi da fondere.")
+
+        if destinazione and not destinazione.attivo:
+            self.add_error("conto_destinazione", "Il conto destinazione deve essere attivo.")
+
+        return cleaned
+
+
 # =========================================================================
 #  Saldi conti
 # =========================================================================

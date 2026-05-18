@@ -49,6 +49,7 @@ from .models import (
     SaldoConto,
     ScadenzaPagamentoFornitore,
     SegnoMovimento,
+    SincronizzazioneLog,
     StatoRiconciliazione,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
@@ -89,6 +90,7 @@ from .services import (
     importo_movimento_disponibile_fornitori,
     applica_anteprima_riconciliazione_fornitori,
     build_budgeting_dashboard_data,
+    calcola_hash_deduplica_movimento,
     riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
     trova_scadenze_fornitori_candidate,
@@ -457,6 +459,152 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, reverse("aggiorna_nome_conto_bancario", args=[conto.pk]))
         self.assertContains(response, "data-account-name")
         self.assertNotContains(response, "finance-account-edit-link")
+
+
+class FusioneContiBancariTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="finanza-fusione@example.com",
+            email="finanza-fusione@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(self.user)
+
+    def test_fusione_conti_sposta_riferimenti_e_disattiva_sorgente(self):
+        provider, _created = ProviderBancario.objects.get_or_create(
+            nome="Enable Banking Fusione Test",
+            defaults={
+                "tipo": TipoProviderBancario.PSD2,
+                "attivo": True,
+            },
+        )
+        conto_sorgente = ContoBancario.objects.create(
+            nome_conto="Banco BPM storico import manuale",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            attivo=True,
+        )
+        conto_destinazione = ContoBancario.objects.create(
+            nome_conto="Banco BPM PSD2",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            provider=provider,
+            external_account_id="psd2-account-id",
+            attivo=True,
+        )
+        saldo = SaldoConto.objects.create(
+            conto=conto_sorgente,
+            data_riferimento=timezone.make_aware(datetime(2026, 4, 1, 23, 59)),
+            saldo_contabile=Decimal("1000.00"),
+            fonte=FonteSaldo.MANUALE,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto_sorgente,
+            canale=CanaleMovimento.BANCA,
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-100.00"),
+            descrizione="Pagamento fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+            hash_deduplica=calcola_hash_deduplica_movimento(
+                conto_id=conto_sorgente.pk,
+                data_contabile=date(2026, 4, 2),
+                importo=Decimal("-100.00"),
+                descrizione="Pagamento fornitore",
+                controparte="Fornitore SRL",
+                iban_controparte="",
+            ),
+        )
+        log = SincronizzazioneLog.objects.create(
+            conto=conto_sorgente,
+            tipo_operazione="import_file",
+            esito=EsitoSincronizzazione.OK,
+            movimenti_inseriti=1,
+        )
+
+        response = self.client.post(
+            reverse("fondi_conti_bancari"),
+            {
+                "azione": "conferma",
+                "conto_sorgente": str(conto_sorgente.pk),
+                "conto_destinazione": str(conto_destinazione.pk),
+                "conferma_operazione": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_conti_bancari"))
+        movimento.refresh_from_db()
+        saldo.refresh_from_db()
+        log.refresh_from_db()
+        conto_sorgente.refresh_from_db()
+        conto_destinazione.refresh_from_db()
+
+        self.assertEqual(movimento.conto, conto_destinazione)
+        self.assertEqual(
+            movimento.hash_deduplica,
+            calcola_hash_deduplica_movimento(
+                conto_id=conto_destinazione.pk,
+                data_contabile=movimento.data_contabile,
+                importo=movimento.importo,
+                descrizione=movimento.descrizione,
+                controparte=movimento.controparte,
+                iban_controparte=movimento.iban_controparte,
+            ),
+        )
+        self.assertEqual(saldo.conto, conto_destinazione)
+        self.assertEqual(log.conto, conto_destinazione)
+        self.assertFalse(conto_sorgente.attivo)
+        self.assertIn("Fuso nel conto", conto_sorgente.note)
+        self.assertEqual(conto_sorgente.saldo_corrente, Decimal("0.00"))
+        self.assertEqual(conto_destinazione.saldo_corrente, Decimal("900.00"))
+
+    def test_fusione_conti_mostra_anteprima_con_possibili_duplicati(self):
+        conto_sorgente = ContoBancario.objects.create(nome_conto="Conto importato")
+        conto_destinazione = ContoBancario.objects.create(nome_conto="Conto PSD2")
+        MovimentoFinanziario.objects.create(
+            conto=conto_sorgente,
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-100.00"),
+            descrizione="Pagamento fornitore",
+            controparte="Fornitore SRL",
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto_destinazione,
+            data_contabile=date(2026, 4, 2),
+            importo=Decimal("-100.00"),
+            descrizione="Pagamento fornitore",
+            controparte="Fornitore SRL",
+        )
+
+        response = self.client.post(
+            reverse("fondi_conti_bancari"),
+            {
+                "azione": "anteprima",
+                "conto_sorgente": str(conto_sorgente.pk),
+                "conto_destinazione": str(conto_destinazione.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Possibili duplicati")
+        self.assertContains(response, "stessa data, importo e descrizione")
+
+    def test_fusione_conti_richiede_conti_diversi(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+
+        response = self.client.post(
+            reverse("fondi_conti_bancari"),
+            {
+                "azione": "anteprima",
+                "conto_sorgente": str(conto.pk),
+                "conto_destinazione": str(conto.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Scegli due conti diversi")
 
 
 class MovimentoRiconciliazioneLayoutTests(TestCase):

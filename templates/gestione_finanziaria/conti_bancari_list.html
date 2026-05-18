@@ -21,6 +21,7 @@
             <a href="{% url 'import_estratto_conto' %}" class="btn btn-primary">Import estratto conto</a>
             <a href="{% url 'lista_saldi_conti' %}" class="btn btn-secondary">Saldi conti</a>
             <a href="{% url 'crea_saldo_conto' %}" class="btn btn-secondary">Inserisci saldo manuale</a>
+            <a href="{% url 'fondi_conti_bancari' %}" class="btn btn-secondary">Fondi conti</a>
             <a href="{% url 'crea_conto_bancario' %}" class="btn btn-secondary">Nuovo conto</a>
         </div>
     </div>
@@ -100,6 +101,8 @@
                                     <button type="submit" class="table-link" style="background:none;border:none;cursor:pointer;padding:0;">Sincronizza</button>
                                 </form>
                             {% endif %}
+                            <span class="table-muted">|</span>
+                            <a href="{% url 'fondi_conti_bancari' %}?conto_sorgente={{ conto.pk }}" class="table-link">Fondi</a>
                             <span class="table-muted">|</span>
                             <a href="{% url 'elimina_conto_bancario' conto.pk %}" class="table-link table-link-danger">Elimina</a>
                         </td>

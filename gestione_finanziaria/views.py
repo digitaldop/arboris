@@ -47,6 +47,7 @@ from .forms import (
     ContoBancarioForm,
     DocumentoFornitoreForm,
     FattureInCloudConnessioneForm,
+    FusioneContiBancariForm,
     FornitoreForm,
     ImportEstrattoContoForm,
     ImportSaldiContoCsvForm,
@@ -2285,6 +2286,199 @@ def elimina_provider_bancario(request, pk):
 # =========================================================================
 
 
+def _normalizza_testo_fusione_conto(value):
+    text = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _movimento_signature_fusione(movimento):
+    return (
+        movimento.data_contabile,
+        movimento.importo,
+        _normalizza_testo_fusione_conto(movimento.descrizione),
+        _normalizza_testo_fusione_conto(movimento.controparte),
+        _normalizza_testo_fusione_conto(movimento.iban_controparte),
+    )
+
+
+def _anteprima_fusione_conti(conto_sorgente, conto_destinazione, *, esempi_limit=10):
+    movimenti_sorgente = list(
+        MovimentoFinanziario.objects.filter(conto=conto_sorgente)
+        .select_related("categoria")
+        .only(
+            "id",
+            "conto_id",
+            "data_contabile",
+            "importo",
+            "descrizione",
+            "controparte",
+            "iban_controparte",
+            "provider_transaction_id",
+            "hash_deduplica",
+            "categoria__nome",
+        )
+        .order_by("-data_contabile", "-id")
+    )
+
+    source_dates = {movimento.data_contabile for movimento in movimenti_sorgente}
+    source_amounts = {movimento.importo for movimento in movimenti_sorgente}
+    movimenti_destinazione = []
+    if source_dates and source_amounts:
+        movimenti_destinazione = list(
+            MovimentoFinanziario.objects.filter(
+                conto=conto_destinazione,
+                data_contabile__in=source_dates,
+                importo__in=source_amounts,
+            ).only(
+                "id",
+                "data_contabile",
+                "importo",
+                "descrizione",
+                "controparte",
+                "iban_controparte",
+                "provider_transaction_id",
+                "hash_deduplica",
+            )
+        )
+
+    dest_by_provider = {
+        movimento.provider_transaction_id: movimento
+        for movimento in movimenti_destinazione
+        if movimento.provider_transaction_id
+    }
+    dest_by_hash = {
+        movimento.hash_deduplica: movimento
+        for movimento in movimenti_destinazione
+        if movimento.hash_deduplica
+    }
+    dest_by_signature = {}
+    for movimento in movimenti_destinazione:
+        dest_by_signature.setdefault(_movimento_signature_fusione(movimento), movimento)
+
+    duplicati = []
+    conflitti_provider = 0
+    for movimento in movimenti_sorgente:
+        motivo = ""
+        destinazione_match = None
+        if movimento.provider_transaction_id and movimento.provider_transaction_id in dest_by_provider:
+            motivo = "stesso identificativo provider"
+            destinazione_match = dest_by_provider[movimento.provider_transaction_id]
+            conflitti_provider += 1
+        else:
+            hash_destinazione = calcola_hash_deduplica_movimento(
+                conto_id=conto_destinazione.pk,
+                data_contabile=movimento.data_contabile,
+                importo=movimento.importo,
+                descrizione=movimento.descrizione,
+                controparte=movimento.controparte,
+                iban_controparte=movimento.iban_controparte,
+            )
+            if hash_destinazione and hash_destinazione in dest_by_hash:
+                motivo = "stessa impronta di deduplica"
+                destinazione_match = dest_by_hash[hash_destinazione]
+            else:
+                destinazione_match = dest_by_signature.get(_movimento_signature_fusione(movimento))
+                if destinazione_match:
+                    motivo = "stessa data, importo e descrizione"
+
+        if destinazione_match:
+            duplicati.append(
+                {
+                    "sorgente": movimento,
+                    "destinazione": destinazione_match,
+                    "motivo": motivo,
+                }
+            )
+
+    return {
+        "movimenti": len(movimenti_sorgente),
+        "saldi": conto_sorgente.storico_saldi.count(),
+        "scadenze_fornitori": conto_sorgente.scadenze_fornitori.count(),
+        "pagamenti_fornitori": conto_sorgente.pagamenti_fornitori.count(),
+        "spese_operative": conto_sorgente.spese_operative.count(),
+        "log_sincronizzazioni": conto_sorgente.log_sincronizzazioni.count(),
+        "duplicati_count": len(duplicati),
+        "duplicati_esempi": duplicati[:esempi_limit],
+        "conflitti_provider_count": conflitti_provider,
+        "saldo_sorgente": calcola_saldo_conto_alla_data(conto_sorgente),
+        "saldo_destinazione": calcola_saldo_conto_alla_data(conto_destinazione),
+    }
+
+
+@transaction.atomic
+def _esegui_fusione_conti(conto_sorgente_id, conto_destinazione_id):
+    conti_lock = {
+        conto.pk: conto
+        for conto in ContoBancario.objects.select_for_update()
+        .filter(pk__in=[conto_sorgente_id, conto_destinazione_id])
+        .order_by("pk")
+    }
+    conto_sorgente = conti_lock.get(conto_sorgente_id)
+    conto_destinazione = conti_lock.get(conto_destinazione_id)
+
+    if not conto_sorgente or not conto_destinazione:
+        raise ValidationError("Uno dei conti selezionati non esiste piu'.")
+    if conto_sorgente.pk == conto_destinazione.pk:
+        raise ValidationError("Scegli due conti diversi da fondere.")
+    if not conto_destinazione.attivo:
+        raise ValidationError("Il conto destinazione deve essere attivo.")
+
+    anteprima = _anteprima_fusione_conti(conto_sorgente, conto_destinazione)
+    if anteprima["conflitti_provider_count"]:
+        raise ValidationError(
+            "La fusione non puo' proseguire: alcuni movimenti hanno lo stesso identificativo provider "
+            "gia' presente sul conto destinazione."
+        )
+
+    now = timezone.now()
+    movimenti = list(MovimentoFinanziario.objects.select_for_update().filter(conto=conto_sorgente).order_by("pk"))
+    for movimento in movimenti:
+        movimento.conto = conto_destinazione
+        movimento.hash_deduplica = calcola_hash_deduplica_movimento(
+            conto_id=conto_destinazione.pk,
+            data_contabile=movimento.data_contabile,
+            importo=movimento.importo,
+            descrizione=movimento.descrizione,
+            controparte=movimento.controparte,
+            iban_controparte=movimento.iban_controparte,
+        )
+        movimento.data_aggiornamento = now
+    if movimenti:
+        MovimentoFinanziario.objects.bulk_update(
+            movimenti,
+            ["conto", "hash_deduplica", "data_aggiornamento"],
+            batch_size=500,
+        )
+
+    SaldoConto.objects.filter(conto=conto_sorgente).update(conto=conto_destinazione)
+    ScadenzaPagamentoFornitore.objects.filter(conto_bancario=conto_sorgente).update(
+        conto_bancario=conto_destinazione
+    )
+    PagamentoFornitore.objects.filter(conto_bancario=conto_sorgente).update(conto_bancario=conto_destinazione)
+    SpesaOperativa.objects.filter(conto_bancario=conto_sorgente).update(conto_bancario=conto_destinazione)
+    SincronizzazioneLog.objects.filter(conto=conto_sorgente).update(conto=conto_destinazione)
+
+    nota_fusione = (
+        f"Fuso nel conto '{conto_destinazione.nome_conto}' (ID {conto_destinazione.pk}) "
+        f"il {timezone.localtime(now):%d/%m/%Y %H:%M}."
+    )
+    conto_sorgente.note = f"{conto_sorgente.note}\n{nota_fusione}".strip()
+    conto_sorgente.attivo = False
+    conto_sorgente.saldo_corrente = Decimal("0.00")
+    conto_sorgente.saldo_corrente_aggiornato_al = now
+    conto_sorgente.save(update_fields=["note", "attivo", "saldo_corrente", "saldo_corrente_aggiornato_al", "data_aggiornamento"])
+
+    saldo_destinazione = ricalcola_saldo_corrente_conto(conto_destinazione)
+
+    return {
+        **anteprima,
+        "conto_sorgente": conto_sorgente,
+        "conto_destinazione": conto_destinazione,
+        "saldo_destinazione_finale": saldo_destinazione,
+    }
+
+
 def lista_conti_bancari(request):
     conti = list(
         ContoBancario.objects.select_related("provider", "connessione")
@@ -2458,6 +2652,72 @@ def ricalcola_saldo_conto_bancario(request, pk):
         return redirect("lista_conti_bancari")
 
     return redirect("lista_conti_bancari")
+
+
+def fondi_conti_bancari(request):
+    anteprima = None
+    conto_sorgente = None
+    conto_destinazione = None
+
+    if request.method == "POST":
+        form = FusioneContiBancariForm(request.POST)
+        azione = request.POST.get("azione")
+        if form.is_valid():
+            conto_sorgente = form.cleaned_data["conto_sorgente"]
+            conto_destinazione = form.cleaned_data["conto_destinazione"]
+            anteprima = _anteprima_fusione_conti(conto_sorgente, conto_destinazione)
+
+            if azione == "conferma":
+                if not form.cleaned_data.get("conferma_operazione"):
+                    form.add_error("conferma_operazione", "Conferma esplicitamente la fusione prima di procedere.")
+                elif anteprima["conflitti_provider_count"]:
+                    messages.error(
+                        request,
+                        "Fusione interrotta: alcuni movimenti hanno gia' lo stesso identificativo provider "
+                        "sul conto destinazione.",
+                    )
+                else:
+                    try:
+                        risultato = _esegui_fusione_conti(conto_sorgente.pk, conto_destinazione.pk)
+                    except ValidationError as exc:
+                        for error in exc.messages:
+                            form.add_error(None, error)
+                    else:
+                        messages.success(
+                            request,
+                            (
+                                f"Fusione completata: {risultato['movimenti']} movimenti, "
+                                f"{risultato['saldi']} saldi e {risultato['log_sincronizzazioni']} log "
+                                f"spostati su \"{conto_destinazione.nome_conto}\". "
+                                f"Il conto \"{conto_sorgente.nome_conto}\" e' stato disattivato."
+                            ),
+                        )
+                        if risultato["duplicati_count"]:
+                            messages.warning(
+                                request,
+                                (
+                                    f"Sono stati rilevati {risultato['duplicati_count']} possibili duplicati: "
+                                    "controlla i movimenti del conto unificato."
+                                ),
+                            )
+                        return redirect("lista_conti_bancari")
+    else:
+        initial = {}
+        conto_sorgente_id = request.GET.get("conto_sorgente")
+        if conto_sorgente_id:
+            initial["conto_sorgente"] = conto_sorgente_id
+        form = FusioneContiBancariForm(initial=initial)
+
+    return render(
+        request,
+        "gestione_finanziaria/conto_fusione.html",
+        {
+            "form": form,
+            "anteprima": anteprima,
+            "conto_sorgente": conto_sorgente,
+            "conto_destinazione": conto_destinazione,
+        },
+    )
 
 
 # =========================================================================
