@@ -31,6 +31,17 @@
             <div class="scambio-retta-head-actions">
                 {% if busta and can_manage_gestione_amministrativa %}
                     <a
+                        href="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                        class="btn btn-save-soft btn-icon-text"
+                        data-window-popup="1"
+                        data-popup-url="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                        data-popup-window-name="arboris-busta-paga-reconcile-popup"
+                        data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <span class="btn-label">Collega pagamento</span>
+                    </a>
+                    <a
                         href="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
                         class="btn btn-danger btn-icon-text"
                         data-window-popup="1"

@@ -23,8 +23,8 @@ from anagrafica.models import Familiare, Nazione, RelazioneFamiliare
 from anagrafica.storage_utils import DOCUMENT_STORAGE_ERROR_TYPES, build_document_storage_error_message
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from economia.models import Iscrizione
-from gestione_finanziaria.models import MovimentoFinanziario
-from gestione_finanziaria.services import aggiorna_stato_riconciliazione_movimento
+from gestione_finanziaria.models import MovimentoFinanziario, OrigineMovimento, StatoRiconciliazione
+from gestione_finanziaria.services import aggiorna_stato_riconciliazione_movimento, importo_movimento_disponibile_fornitori
 from sistema.models import SistemaImpostazioniGenerali
 from scuola.utils import resolve_default_anno_scolastico
 
@@ -84,6 +84,100 @@ def _aggiorna_riconciliazione_movimenti_busta(*movimento_ids):
         return
     for movimento in MovimentoFinanziario.objects.filter(pk__in=ids):
         aggiorna_stato_riconciliazione_movimento(movimento)
+
+
+def _importo_busta_paga_da_riconciliare(busta):
+    return abs(busta.importo_netto_riepilogo or ZERO)
+
+
+def _movimento_disponibile_per_busta(movimento, busta, importo_busta):
+    disponibile = importo_movimento_disponibile_fornitori(movimento)
+    if busta.movimento_pagamento_id == movimento.pk:
+        disponibile += importo_busta
+    return disponibile
+
+
+def _score_movimento_busta(movimento, busta, importo_busta, disponibile):
+    score = 0
+    motivazioni = []
+    importo_assoluto = abs(movimento.importo or ZERO)
+    if importo_assoluto == importo_busta:
+        score += 55
+        motivazioni.append("Importo identico al netto della busta")
+    elif disponibile == importo_busta:
+        score += 45
+        motivazioni.append("Disponibile identico al netto della busta")
+    elif disponibile > importo_busta:
+        score += 25
+        motivazioni.append("Movimento capiente per questa busta")
+
+    data_suggerita = busta.data_pagamento_suggerita
+    if data_suggerita and movimento.data_contabile:
+        delta_giorni = abs((movimento.data_contabile - data_suggerita).days)
+        if delta_giorni <= 7:
+            score += 25
+            motivazioni.append(f"Data vicina al pagamento previsto (+/- {delta_giorni} gg)")
+        elif delta_giorni <= 30:
+            score += 10
+            motivazioni.append(f"Data entro 30 giorni dal pagamento previsto ({delta_giorni} gg)")
+
+    testo_movimento = " ".join(
+        [
+            movimento.descrizione or "",
+            movimento.controparte or "",
+            movimento.sostenitore or "",
+        ]
+    ).lower()
+    dipendente = busta.dipendente
+    nome = (getattr(dipendente, "nome", "") or "").strip().lower()
+    cognome = (getattr(dipendente, "cognome", "") or "").strip().lower()
+    if nome and cognome and nome in testo_movimento and cognome in testo_movimento:
+        score += 30
+        motivazioni.append("Nome e cognome del dipendente presenti nella causale")
+    elif cognome and cognome in testo_movimento:
+        score += 15
+        motivazioni.append("Cognome del dipendente presente nella causale")
+
+    if busta.movimento_pagamento_id == movimento.pk:
+        score += 80
+        motivazioni.insert(0, "Movimento gia collegato a questa busta")
+
+    return min(score, 100), motivazioni or ["Movimento disponibile per riconciliazione manuale"]
+
+
+def _movimenti_candidati_busta_paga(busta, *, limite=20):
+    importo_busta = _importo_busta_paga_da_riconciliare(busta)
+    if importo_busta <= ZERO:
+        return []
+
+    queryset = (
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .filter(importo__lt=0)
+        .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
+        .filter(Q(origine__in=[OrigineMovimento.BANCA, OrigineMovimento.IMPORT_FILE]) | Q(incide_su_saldo_banca=True) | Q(pk=busta.movimento_pagamento_id))
+        .order_by("-data_contabile", "-id")
+    )
+
+    candidati = []
+    for movimento in queryset[:300]:
+        disponibile = _movimento_disponibile_per_busta(movimento, busta, importo_busta)
+        if movimento.pk != busta.movimento_pagamento_id and disponibile < importo_busta:
+            continue
+        score, motivazioni = _score_movimento_busta(movimento, busta, importo_busta, disponibile)
+        candidati.append(
+            {
+                "movimento": movimento,
+                "importo_disponibile": disponibile,
+                "score_percentuale": score,
+                "motivazioni": motivazioni,
+                "is_current": movimento.pk == busta.movimento_pagamento_id,
+            }
+        )
+
+    return sorted(
+        candidati,
+        key=lambda item: (0 if item["is_current"] else 1, -item["score_percentuale"], -item["movimento"].data_contabile.toordinal(), -item["movimento"].pk),
+    )[:limite]
 
 
 def _busta_paga_file_name(busta):
@@ -1117,6 +1211,91 @@ def inserisci_pagamento_busta_paga_dipendente(request, pk):
     if importo:
         params["importo"] = f"{importo:.2f}"
     return redirect(f"{reverse('crea_movimento_manuale')}?{urlencode(params)}")
+
+
+def riconcilia_busta_paga_dipendente(request, pk):
+    busta = get_object_or_404(
+        BustaPagaDipendente.objects.select_related(
+            "dipendente",
+            "contratto",
+            "contratto__tipo_contratto",
+            "movimento_pagamento",
+        ),
+        pk=pk,
+    )
+    popup = is_popup_request(request)
+    importo_busta = _importo_busta_paga_da_riconciliare(busta)
+
+    if request.method == "POST":
+        azione = request.POST.get("azione", "")
+
+        if azione == "annulla":
+            movimento_precedente = busta.movimento_pagamento
+            movimento_precedente_id = busta.movimento_pagamento_id
+            if not movimento_precedente_id:
+                messages.info(request, "Questa busta paga non ha un movimento collegato.")
+            else:
+                update_fields = ["movimento_pagamento", "data_aggiornamento"]
+                if busta.data_pagamento_effettiva == movimento_precedente.data_contabile:
+                    busta.data_pagamento_effettiva = None
+                    update_fields.append("data_pagamento_effettiva")
+                busta.movimento_pagamento = None
+                busta.save(update_fields=update_fields)
+                _aggiorna_riconciliazione_movimenti_busta(movimento_precedente_id)
+                messages.success(request, "Collegamento pagamento annullato.")
+
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": "Collegamento pagamento annullato."})
+            return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
+
+        if importo_busta <= ZERO:
+            messages.error(request, "Inserisci il netto della busta paga prima di collegare un pagamento.")
+        else:
+            movimento_pk = request.POST.get("movimento_pk") or ""
+            if not movimento_pk.isdigit():
+                messages.error(request, "Seleziona un movimento bancario da collegare.")
+            else:
+                movimento = get_object_or_404(
+                    MovimentoFinanziario.objects.select_related("conto", "categoria"),
+                    pk=int(movimento_pk),
+                    importo__lt=0,
+                )
+                disponibile = _movimento_disponibile_per_busta(movimento, busta, importo_busta)
+                if movimento.stato_riconciliazione == StatoRiconciliazione.IGNORATO:
+                    messages.error(request, "Il movimento selezionato e marcato come da ignorare.")
+                elif movimento.pk != busta.movimento_pagamento_id and disponibile < importo_busta:
+                    messages.error(
+                        request,
+                        "Il movimento selezionato non ha disponibilita sufficiente per il netto della busta paga.",
+                    )
+                else:
+                    movimento_precedente_id = busta.movimento_pagamento_id
+                    busta.movimento_pagamento = movimento
+                    update_fields = ["movimento_pagamento", "data_aggiornamento"]
+                    if not busta.data_pagamento_effettiva:
+                        busta.data_pagamento_effettiva = movimento.data_contabile
+                        update_fields.append("data_pagamento_effettiva")
+                    busta.save(update_fields=update_fields)
+                    _aggiorna_riconciliazione_movimenti_busta(movimento_precedente_id, movimento.pk)
+                    messages.success(request, "Pagamento collegato alla busta paga.")
+                    if popup:
+                        return render(
+                            request,
+                            "popup/popup_close.html",
+                            {"message": "Pagamento collegato alla busta paga."},
+                        )
+                    return redirect("modifica_busta_paga_dipendente", pk=busta.pk)
+
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/busta_paga_riconciliazione_popup.html",
+        {
+            "busta": busta,
+            "importo_busta": importo_busta,
+            "candidati": _movimenti_candidati_busta_paga(busta),
+            "popup": popup,
+        },
+    )
 
 
 def elimina_busta_paga_dipendente(request, pk):

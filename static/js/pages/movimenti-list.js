@@ -226,7 +226,7 @@ window.ArborisMovimentiList = (function () {
         const select = document.createElement("select");
         select.setAttribute("data-searchable-select", "1");
         select.setAttribute("data-searchable-placeholder", "Cerca categoria...");
-        select.setAttribute("data-searchable-variant", "category-tree");
+        select.setAttribute("data-searchable-variant", "movement-category-tree");
         select.setAttribute("data-searchable-allow-empty", "1");
         select.className = "finance-category-editor-select";
         select.innerHTML = template.innerHTML;

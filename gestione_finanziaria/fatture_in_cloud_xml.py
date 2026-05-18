@@ -178,7 +178,7 @@ def content_kind(data, content_type):
     return "binary"
 
 
-def download_bytes(url, *, timeout):
+def download_bytes(url, *, timeout, max_bytes=MAX_ATTACHMENT_BYTES):
     parsed = urlparse(url or "")
     if parsed.scheme not in {"http", "https"}:
         return None, {"download_status": "invalid_url"}
@@ -203,8 +203,8 @@ def download_bytes(url, *, timeout):
         if not chunk:
             continue
         total += len(chunk)
-        if total > MAX_ATTACHMENT_BYTES:
-            remaining = MAX_ATTACHMENT_BYTES - sum(len(item) for item in chunks)
+        if total > max_bytes:
+            remaining = max_bytes - sum(len(item) for item in chunks)
             if remaining > 0:
                 chunks.append(chunk[:remaining])
             truncated = True

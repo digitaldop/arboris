@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import time
+import re
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from json import JSONDecodeError
-from urllib.parse import urlencode
+from pathlib import PurePosixPath
+from urllib.parse import unquote, urlencode, urlparse
 
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.text import get_valid_filename
 
 from .models import (
     EsitoSincronizzazione,
@@ -29,7 +33,7 @@ from .models import (
 )
 from .security import cifra_testo, decifra_testo_safe
 from .services import aggiorna_stato_documento_da_scadenze, crea_notifica_finanziaria
-from .fatture_in_cloud_xml import supplier_from_attachment_payload
+from .fatture_in_cloud_xml import content_kind, download_bytes, extension_from_name, supplier_from_attachment_payload
 
 
 FIC_SOURCE = "fatture_in_cloud"
@@ -42,6 +46,7 @@ DEFAULT_SCOPES = "received_documents:r entity.suppliers:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
 DEFAULT_SYNC_MAX_SECONDS = 18.0
+DEFAULT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 SUPPLIER_DETAILS_SCOPE_WARNING = (
     "Dati anagrafici completi dei fornitori non disponibili: "
     "ricollega Fatture in Cloud autorizzando anche la lettura dei fornitori."
@@ -79,6 +84,15 @@ def _api_timeout():
 def _sync_max_seconds():
     value = _positive_float_setting("FATTURE_IN_CLOUD_SYNC_MAX_SECONDS", DEFAULT_SYNC_MAX_SECONDS)
     return value if value > 0 else None
+
+
+def _attachment_max_bytes():
+    value = getattr(settings, "FATTURE_IN_CLOUD_ATTACHMENT_MAX_BYTES", DEFAULT_ATTACHMENT_MAX_BYTES)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = DEFAULT_ATTACHMENT_MAX_BYTES
+    return max(parsed, 1024)
 
 
 def oauth_env_configured():
@@ -238,6 +252,126 @@ def _limit_model_field(model, field_name, value):
     max_length = getattr(field, "max_length", None)
     value = str(value)
     return value[:max_length] if max_length else value
+
+
+def _attachment_url_from_item(item):
+    item = _as_dict(item)
+    return (
+        item.get("url")
+        or item.get("download_url")
+        or item.get("attachment_url")
+        or item.get("downloadUrl")
+        or ""
+    )
+
+
+def _primary_attachment_source(document_data):
+    url = document_data.get("attachment_url") or document_data.get("attachment_preview_url") or ""
+    if url:
+        return {
+            "url": url,
+            "filename": (
+                document_data.get("filename")
+                or document_data.get("attachment_filename")
+                or document_data.get("attachment_name")
+                or ""
+            ),
+            "source": "attachment_url" if document_data.get("attachment_url") else "attachment_preview_url",
+        }
+
+    for index, attachment in enumerate(document_data.get("other_attachments") or []):
+        url = _attachment_url_from_item(attachment)
+        if url:
+            return {
+                "url": url,
+                "filename": attachment.get("filename") or attachment.get("name") or "",
+                "source": f"other_attachments[{index}]",
+            }
+    return {}
+
+
+def _extension_from_content(data, content_type):
+    kind = content_kind(data or b"", content_type or "")
+    if kind == "pdf":
+        return ".pdf"
+    if kind == "xml_like" or kind == "binary_with_embedded_xml":
+        return ".xml"
+    if kind == "zip":
+        return ".zip"
+    if kind == "binary_p7m_like":
+        return ".p7m"
+    content_type = (content_type or "").lower()
+    if "pdf" in content_type:
+        return ".pdf"
+    if "xml" in content_type:
+        return ".xml"
+    if "zip" in content_type:
+        return ".zip"
+    if "pkcs7" in content_type or "p7m" in content_type:
+        return ".p7m"
+    return ".bin"
+
+
+def _attachment_filename(documento, document_data, attachment_source, data, download_info):
+    raw_name = (
+        attachment_source.get("filename")
+        or document_data.get("filename")
+        or PurePosixPath(unquote(urlparse(attachment_source.get("url") or "").path)).name
+    )
+    ext = extension_from_name(raw_name) or extension_from_name(attachment_source.get("url"))
+    if not ext:
+        ext = _extension_from_content(data, download_info.get("content_type", ""))
+
+    numero = re.sub(r"[^A-Za-z0-9._-]+", "_", documento.numero_documento or "")
+    external_id = re.sub(r"[^A-Za-z0-9._-]+", "_", documento.external_id or str(document_data.get("id") or ""))
+    base = numero or external_id or "documento"
+    filename = get_valid_filename(f"FIC_{external_id}_{base}{ext}")
+    return filename[:180]
+
+
+def _external_payload_with_attachment_result(documento, attachment_result):
+    payload = dict(documento.external_payload or {})
+    payload["_arboris_attachment_import"] = attachment_result
+    documento.external_payload = payload
+
+
+def _salva_allegato_fatture_in_cloud(documento, document_data):
+    if documento.allegato:
+        return {"saved": False, "skipped": "already_present"}
+
+    attachment_source = _primary_attachment_source(document_data)
+    if not attachment_source:
+        return {"saved": False, "skipped": "missing_url"}
+
+    data, download_info = download_bytes(
+        attachment_source["url"],
+        timeout=_api_timeout(),
+        max_bytes=_attachment_max_bytes(),
+    )
+    if data is None:
+        return {
+            "saved": False,
+            "source": attachment_source.get("source", ""),
+            "download": download_info,
+            "error": "download_failed",
+        }
+    if download_info.get("truncated"):
+        return {
+            "saved": False,
+            "source": attachment_source.get("source", ""),
+            "download": download_info,
+            "error": "attachment_too_large",
+        }
+
+    filename = _attachment_filename(documento, document_data, attachment_source, data, download_info)
+    documento.allegato.save(filename, ContentFile(data), save=False)
+    return {
+        "saved": True,
+        "source": attachment_source.get("source", ""),
+        "filename": filename,
+        "storage_name": documento.allegato.name,
+        "download": download_info,
+    }
 
 
 def _response_json(response, error_prefix):
@@ -912,6 +1046,11 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
 
     _update_document_fields(documento, document_data, fornitore, pending)
     documento.save()
+
+    attachment_result = _salva_allegato_fatture_in_cloud(documento, document_data)
+    if attachment_result.get("saved") or attachment_result.get("error"):
+        _external_payload_with_attachment_result(documento, attachment_result)
+        documento.save(update_fields=["allegato", "external_payload", "data_aggiornamento"])
 
     scadenze_create = _sync_document_deadlines(documento, _payment_deadlines(document_data))
 

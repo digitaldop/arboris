@@ -193,6 +193,10 @@
                             data-category-level="0"
                             data-category-type="Senza categoria"
                             data-category-kind="none"
+                            data-category-icon=""
+                            data-category-path="Non categorizzato"
+                            data-category-has-children="0"
+                            data-category-children-count="0"
                             data-search-text="non categorizzato senza categoria">Non categorizzato</option>
                     {% for cat in categorie_disponibili %}
                         <option value="{{ cat.pk }}"
@@ -201,6 +205,10 @@
                                 data-category-level="{{ cat.select_level }}"
                                 data-category-type="{{ cat.select_tipo_label }}"
                                 data-category-kind="{{ cat.tipo }}"
+                                data-category-icon="{{ cat.icona }}"
+                                data-category-path="{{ cat.percorso_label }}"
+                                data-category-has-children="{{ cat.select_has_children|yesno:'1,0' }}"
+                                data-category-children-count="{{ cat.select_children_count }}"
                                 {% if cat.colore %}data-category-color="{{ cat.colore }}"{% endif %}
                                 data-search-text="{{ cat.percorso_label }} {{ cat.select_tipo_label }}">{{ cat.percorso_label }}</option>
                     {% endfor %}
@@ -215,7 +223,7 @@
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
-    <script src="{% static 'js/pages/movimenti-list.js' %}?v=3"></script>
+    <script src="{% static 'js/pages/movimenti-list.js' %}?v=4"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

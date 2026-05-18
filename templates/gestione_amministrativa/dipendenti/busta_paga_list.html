@@ -197,7 +197,13 @@
                                         </span>
                                     </a>
                                 </td>
-                                <td>{{ busta.dipendente }}</td>
+                                <td>
+                                    <a
+                                        href="{% url 'modifica_dipendente' busta.dipendente.pk %}"
+                                        class="table-link"
+                                        onclick="event.stopPropagation();"
+                                    >{{ busta.dipendente }}</a>
+                                </td>
                                 <td>
                                     <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
                                 </td>
@@ -207,6 +213,21 @@
                                 <td class="column-right">{{ busta.costo_azienda_effettivo|euro }} &euro;</td>
                                 <td class="actions-cell">
                                     <div class="table-icon-actions scambio-list-actions ga-buste-actions">
+                                        {% if can_manage_gestione_amministrativa %}
+                                            <a
+                                                href="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                class="table-icon-link"
+                                                title="Collega pagamento"
+                                                aria-label="Collega pagamento busta paga"
+                                                data-floating-text="Collega pagamento"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                data-popup-window-name="arboris-busta-paga-reconcile-popup"
+                                                data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                            >
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg>
+                                            </a>
+                                        {% endif %}
                                         <a
                                             href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
                                             class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit"

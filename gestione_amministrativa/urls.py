@@ -147,6 +147,11 @@ urlpatterns = [
         name="inserisci_pagamento_busta_paga_dipendente",
     ),
     path(
+        "gestione-amministrativa/dipendenti/buste-paga/<int:pk>/riconcilia/",
+        ga_manage(views.riconcilia_busta_paga_dipendente),
+        name="riconcilia_busta_paga_dipendente",
+    ),
+    path(
         "gestione-amministrativa/dipendenti/buste-paga/<int:pk>/elimina/",
         ga_manage(views.elimina_busta_paga_dipendente),
         name="elimina_busta_paga_dipendente",

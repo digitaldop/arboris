@@ -277,7 +277,9 @@ class OrigineDocumentoFornitore(models.TextChoices):
     FATTURE_IN_CLOUD = "fatture_in_cloud", "Fatture in Cloud"
 
 
-def documento_fornitore_upload_to(_instance, filename):
+def documento_fornitore_upload_to(instance, filename):
+    if getattr(instance, "external_source", "") == "fatture_in_cloud":
+        return f"fatture_fornitori/{timezone.localdate():%Y/%m}/{filename}"
     return f"documenti_fornitori/{timezone.localdate():%Y/%m}/{filename}"
 
 

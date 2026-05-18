@@ -3144,9 +3144,12 @@ def _categorie_finanziarie_attive_per_select():
     categorie_ordinate = []
 
     def add_categoria(categoria, livello=0):
+        figli_count = len(figli_by_parent.get(categoria.pk, []))
         categoria.select_level = livello
         categoria.select_parent_label = categoria.parent.percorso_label if categoria.parent_id else ""
         categoria.select_tipo_label = categoria.get_tipo_display()
+        categoria.select_children_count = figli_count
+        categoria.select_has_children = figli_count > 0
         categorie_ordinate.append(categoria)
         for figlia in figli_by_parent.get(categoria.pk, []):
             add_categoria(figlia, livello + 1)

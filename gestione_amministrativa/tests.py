@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from anagrafica.models import Citta, Familiare, Nazione, Provincia, Regione, RelazioneFamiliare
-from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
+from gestione_finanziaria.models import MovimentoFinanziario, OrigineMovimento, StatoRiconciliazione
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, SistemaUtentePermessi
 
@@ -572,6 +572,108 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(self.busta.movimento_pagamento, movimento)
         self.assertEqual(self.busta.data_pagamento_effettiva, date(2025, 10, 31))
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_riconciliazione_busta_paga_mostra_movimenti_capienti_per_singola_busta(self):
+        self.client.force_login(self.user)
+        movimento_cumulativo = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 10, 31),
+            importo=Decimal("-2604.00"),
+            valuta="EUR",
+            descrizione="Bonifico stipendi Rossi e Bianchi",
+            origine=OrigineMovimento.BANCA,
+        )
+        movimento_piccolo = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 10, 30),
+            importo=Decimal("-1000.00"),
+            valuta="EUR",
+            descrizione="Bonifico non capiente",
+            origine=OrigineMovimento.BANCA,
+        )
+        altro_dipendente = Dipendente.objects.create(
+            nome="Luigi",
+            cognome="Bianchi",
+            codice_fiscale="BNCLGU80A01H501U",
+        )
+        BustaPagaDipendente.objects.create(
+            dipendente=altro_dipendente,
+            anno=2025,
+            mese=10,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_effettivo=Decimal("1302.00"),
+            movimento_pagamento=movimento_cumulativo,
+        )
+
+        response = self.client.get(reverse("riconcilia_busta_paga_dipendente", args=[self.busta.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Netto da riconciliare EUR 1.302,00")
+        self.assertContains(response, movimento_cumulativo.descrizione)
+        self.assertContains(response, "Disponibile EUR 1.302,00")
+        self.assertNotContains(response, movimento_piccolo.descrizione)
+
+    def test_riconciliazione_busta_paga_collega_movimento_su_quota_singola(self):
+        self.client.force_login(self.user)
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 10, 31),
+            importo=Decimal("-2604.00"),
+            valuta="EUR",
+            descrizione="Bonifico stipendi cumulativo",
+            origine=OrigineMovimento.BANCA,
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        altro_dipendente = Dipendente.objects.create(
+            nome="Luigi",
+            cognome="Bianchi",
+            codice_fiscale="BNCLGU80A01H501U",
+        )
+        BustaPagaDipendente.objects.create(
+            dipendente=altro_dipendente,
+            anno=2025,
+            mese=10,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_effettivo=Decimal("1302.00"),
+            movimento_pagamento=movimento,
+        )
+
+        response = self.client.post(
+            reverse("riconcilia_busta_paga_dipendente", args=[self.busta.pk]),
+            {
+                "azione": "riconcilia",
+                "movimento_pk": str(movimento.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.busta.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(self.busta.movimento_pagamento, movimento)
+        self.assertEqual(self.busta.data_pagamento_effettiva, date(2025, 10, 31))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_riconciliazione_busta_paga_blocca_movimento_non_capiente(self):
+        self.client.force_login(self.user)
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 10, 31),
+            importo=Decimal("-1000.00"),
+            valuta="EUR",
+            descrizione="Bonifico parziale",
+            origine=OrigineMovimento.BANCA,
+        )
+
+        response = self.client.post(
+            reverse("riconcilia_busta_paga_dipendente", args=[self.busta.pk]),
+            {
+                "azione": "riconcilia",
+                "movimento_pk": str(movimento.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.busta.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertIsNone(self.busta.movimento_pagamento)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertContains(response, "non ha disponibilita sufficiente")
 
     def test_modalita_semplice_busta_paga_nasconde_previsione_dettagliata(self):
         self.client.force_login(self.user)

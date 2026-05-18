@@ -26,6 +26,10 @@
             categoryType: option.dataset.categoryType || "",
             categoryKind: option.dataset.categoryKind || "",
             categoryColor: option.dataset.categoryColor || "",
+            categoryIcon: option.dataset.categoryIcon || "",
+            categoryPath: option.dataset.categoryPath || "",
+            categoryHasChildren: option.dataset.categoryHasChildren === "1",
+            categoryChildrenCount: Math.max(0, parseInt(option.dataset.categoryChildrenCount || "0", 10) || 0),
         }));
     }
 
@@ -80,6 +84,60 @@
         );
     }
 
+    function iconNameForCategory(item) {
+        const map = {
+            banknote: "coins",
+            receipt: "document",
+            wallet: "coins",
+            "credit-card": "bank",
+            bank: "bank",
+            cart: "supplier",
+            home: "home",
+            school: "student",
+            book: "document",
+            users: "family",
+            heart: "hands-heart",
+            bolt: "lightbulb",
+            droplet: "finance",
+            wifi: "settings",
+            tool: "settings",
+            briefcase: "briefcase",
+            calendar: "calendar",
+            transfer: "refresh",
+        };
+        if (!item.value) {
+            return "archive";
+        }
+        if (item.categoryIcon && map[item.categoryIcon]) {
+            return map[item.categoryIcon];
+        }
+        if (item.categoryKind === "entrata") {
+            return "coins";
+        }
+        if (item.categoryKind === "trasferimento") {
+            return "refresh";
+        }
+        return item.categoryHasChildren ? "list" : "document";
+    }
+
+    function spriteHref() {
+        const existingUse = document.querySelector("svg use[href*='arboris-ui-icons']");
+        const existingHref = existingUse ? existingUse.getAttribute("href") : "";
+        if (existingHref && existingHref.includes("#")) {
+            return existingHref.split("#")[0];
+        }
+        return "/static/images/arboris-ui-icons.svg";
+    }
+
+    function appendSpriteIcon(target, iconName) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+        svg.setAttribute("aria-hidden", "true");
+        use.setAttribute("href", `${spriteHref()}#${iconName}`);
+        svg.appendChild(use);
+        target.appendChild(svg);
+    }
+
     function renderCategoryOption(row, item) {
         const level = Math.min(item.categoryLevel || 0, 5);
         row.classList.add("searchable-select-option-category");
@@ -125,7 +183,69 @@
         row.appendChild(text);
     }
 
+    function renderMovementCategoryOption(row, item, select) {
+        const level = Math.min(item.categoryLevel || 0, 6);
+        row.classList.add("searchable-select-option-category");
+        row.classList.add("searchable-select-option-movement-category");
+        row.classList.add(`searchable-select-option-category-level-${level}`);
+        row.classList.toggle("is-nested", level > 0);
+        row.classList.toggle("is-empty-category", !item.value);
+        row.classList.toggle("has-children", item.categoryHasChildren);
+        row.dataset.categoryKind = item.categoryKind || "";
+        row.style.setProperty("--category-level", level);
+        row.style.setProperty("--category-indent", `${level * 18}px`);
+
+        const branch = document.createElement("span");
+        branch.className = "searchable-select-category-branch";
+        branch.setAttribute("aria-hidden", "true");
+
+        const icon = document.createElement("span");
+        icon.className = "searchable-select-category-icon";
+        if (item.categoryColor) {
+            icon.style.setProperty("--category-color", item.categoryColor);
+        }
+        appendSpriteIcon(icon, iconNameForCategory(item));
+
+        const text = document.createElement("span");
+        text.className = "searchable-select-category-text";
+
+        const name = document.createElement("span");
+        name.className = "searchable-select-category-name";
+        name.textContent = item.categoryName || item.label;
+
+        const meta = document.createElement("span");
+        meta.className = "searchable-select-category-meta";
+        if (!item.value) {
+            meta.textContent = item.categoryType || "Senza categoria";
+        } else if (item.categoryParent) {
+            meta.textContent = `${item.categoryParent} / ${item.categoryType || "Categoria"}`;
+        } else {
+            meta.textContent = `Categoria principale / ${item.categoryType || "Categoria"}`;
+        }
+
+        text.appendChild(name);
+        text.appendChild(meta);
+
+        const affordance = document.createElement("span");
+        affordance.className = "searchable-select-category-affordance";
+        affordance.setAttribute("aria-hidden", "true");
+        if (item.value === select.value) {
+            appendSpriteIcon(affordance, "check");
+        } else if (item.categoryHasChildren) {
+            affordance.textContent = "›";
+        }
+
+        row.appendChild(branch);
+        row.appendChild(icon);
+        row.appendChild(text);
+        row.appendChild(affordance);
+    }
+
     function renderOptionContent(row, item, select) {
+        if (select.dataset.searchableVariant === "movement-category-tree") {
+            renderMovementCategoryOption(row, item, select);
+            return;
+        }
         if (select.dataset.searchableVariant === "category-tree") {
             renderCategoryOption(row, item);
             return;
@@ -278,6 +398,7 @@
             },
             renderDropdown: function () {
                 const filtered = state.getFilteredItems();
+                const isMovementCategoryTree = select.dataset.searchableVariant === "movement-category-tree";
                 dropdown.innerHTML = "";
 
                 if (!filtered.length) {
@@ -290,6 +411,13 @@
                     dropdown.appendChild(empty);
                     state.updateDropdownPosition();
                     return;
+                }
+
+                if (isMovementCategoryTree) {
+                    const heading = document.createElement("div");
+                    heading.className = "searchable-select-section-heading";
+                    heading.textContent = normalize(input.value) ? "Risultati categorie" : "Categorie principali";
+                    dropdown.appendChild(heading);
                 }
 
                 filtered.forEach((item, index) => {
@@ -308,6 +436,13 @@
                     });
                     dropdown.appendChild(row);
                 });
+
+                if (isMovementCategoryTree) {
+                    const hint = document.createElement("div");
+                    hint.className = "searchable-select-keyboard-hint";
+                    hint.innerHTML = "<kbd>Invio</kbd><span>per confermare</span>";
+                    dropdown.appendChild(hint);
+                }
 
                 state.updateDropdownPosition();
             },

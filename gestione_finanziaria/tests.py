@@ -460,6 +460,36 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, "data-account-name")
         self.assertNotContains(response, "finance-account-edit-link")
 
+    def test_lista_movimenti_prepara_dropdown_categorie_gerarchico(self):
+        padre = CategoriaFinanziaria.objects.create(
+            nome="Spese di Gestione",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            icona="briefcase",
+        )
+        figlia = CategoriaFinanziaria.objects.create(
+            nome="Utenze e Servizi",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            parent=padre,
+            icona="bolt",
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("-82.96"),
+            descrizione="Pagamento utenza",
+            categoria=figlia,
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="movement-category-options-template"', html=False)
+        self.assertContains(response, 'data-category-name="Spese di Gestione"', html=False)
+        self.assertContains(response, 'data-category-has-children="1"', html=False)
+        self.assertContains(response, 'data-category-name="Utenze e Servizi"', html=False)
+        self.assertContains(response, 'data-category-level="1"', html=False)
+        self.assertContains(response, 'data-category-parent="Spese di Gestione"', html=False)
+        self.assertContains(response, 'data-category-icon="bolt"', html=False)
+
 
 class FusioneContiBancariTests(TestCase):
     def setUp(self):
@@ -1953,7 +1983,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(fornitore.banca, "Banca Test")
         self.assertFalse(fornitore.attivo)
 
-    def test_importa_documento_fatture_in_cloud_accetta_url_allegato_lunghi(self):
+    @patch("gestione_finanziaria.fatture_in_cloud.download_bytes")
+    def test_importa_documento_fatture_in_cloud_accetta_url_allegato_lunghi(self, mock_download_bytes):
+        mock_download_bytes.return_value = (None, {"download_status": "request_error"})
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
             company_id=123,
@@ -1981,6 +2013,81 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             DocumentoFornitore._meta.get_field("external_url").max_length,
             1000,
         )
+
+    @patch("gestione_finanziaria.fatture_in_cloud.download_bytes")
+    def test_importa_documento_fatture_in_cloud_salva_allegato_in_fatture_fornitori(self, mock_download_bytes):
+        mock_download_bytes.return_value = (
+            b"%PDF-1.4\nfattura",
+            {
+                "download_status": "ok",
+                "http_status": 200,
+                "content_type": "application/pdf",
+                "downloaded_bytes": 16,
+                "truncated": False,
+            },
+        )
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 990,
+            "type": "expense",
+            "description": "Documento con allegato",
+            "invoice_number": "FC/44",
+            "date": "2026-04-21",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "attachment_url": "https://files.example.com/fattura.pdf",
+            "entity": {"name": "Attachment Supplier Srl", "vat_number": "IT12345678904"},
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="990")
+        self.assertTrue(documento.allegato.name.startswith("fatture_fornitori/"))
+        self.assertTrue(documento.allegato.name.endswith(".pdf"))
+        self.assertEqual(documento.allegato.read(), b"%PDF-1.4\nfattura")
+        self.assertTrue(documento.external_payload["_arboris_attachment_import"]["saved"])
+        self.assertEqual(documento.external_payload["_arboris_attachment_import"]["source"], "attachment_url")
+
+    @patch("gestione_finanziaria.fatture_in_cloud.download_bytes")
+    def test_importa_documento_fatture_in_cloud_non_sovrascrive_allegato_esistente(self, mock_download_bytes):
+        mock_download_bytes.return_value = (
+            b"%PDF-1.4\nprima-versione",
+            {
+                "download_status": "ok",
+                "http_status": 200,
+                "content_type": "application/pdf",
+                "downloaded_bytes": 23,
+                "truncated": False,
+            },
+        )
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": 991,
+            "type": "expense",
+            "description": "Documento con allegato",
+            "invoice_number": "FC-45",
+            "date": "2026-04-21",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "attachment_url": "https://files.example.com/fattura.pdf",
+            "entity": {"name": "Attachment Supplier Due Srl", "vat_number": "IT12345678905"},
+        }
+        importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+        documento = DocumentoFornitore.objects.get(external_id="991")
+        original_name = documento.allegato.name
+
+        mock_download_bytes.reset_mock()
+        importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        documento.refresh_from_db()
+        self.assertEqual(documento.allegato.name, original_name)
+        mock_download_bytes.assert_not_called()
 
     def test_importa_documento_fatture_in_cloud_legge_fornitore_e_scadenza_da_e_invoice(self):
         connessione = FattureInCloudConnessione.objects.create(
@@ -2384,8 +2491,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(fornitore.email, "fornitore.xml@example.com")
         documento = DocumentoFornitore.objects.get(external_id="998")
         self.assertEqual(documento.fornitore, fornitore)
+        self.assertTrue(documento.allegato.name.startswith("fatture_fornitori/"))
         self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 6, 4))
-        mock_requests_get.assert_called_once()
+        self.assertEqual(mock_requests_get.call_count, 2)
 
     @patch("gestione_finanziaria.management.commands.debug_fatture_in_cloud_payload.FattureInCloudClient")
     def test_debug_fatture_in_cloud_payload_maschera_dati_sensibili(self, mock_client_class):
