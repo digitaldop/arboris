@@ -3320,6 +3320,62 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         documento.refresh_from_db()
         self.assertEqual(documento.categoria_spesa, categoria_nuova)
 
+    def test_spese_mensili_dashboard_rende_modificabile_categoria_busta_paga(self):
+        categoria = crea_categoria_spesa_test("Dipendenti")
+        dipendente = Dipendente.objects.create(
+            nome="Mario",
+            cognome="Rossi",
+            codice_fiscale="RSSMRA80A01H501U",
+        )
+        busta = BustaPagaDipendente.objects.create(
+            dipendente=dipendente,
+            anno=2026,
+            mese=4,
+            costo_azienda_previsto=Decimal("2186.94"),
+            categoria=categoria,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-04", "vista": "tutte"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Busta paga")
+        self.assertContains(response, "Rossi Mario")
+        self.assertContains(response, "Dipendenti")
+        self.assertContains(response, 'data-category-options-template="monthly-expense-category-options-template"', html=False)
+        self.assertContains(response, reverse("aggiorna_categoria_busta_paga", args=[busta.pk]))
+        self.assertContains(response, f'data-category-id="{categoria.pk}"', html=False)
+
+    def test_aggiorna_categoria_busta_paga_da_spese_mensili(self):
+        categoria_iniziale = crea_categoria_spesa_test("Personale")
+        categoria_nuova = crea_categoria_spesa_test("Dipendenti")
+        dipendente = Dipendente.objects.create(
+            nome="Mario",
+            cognome="Rossi",
+            codice_fiscale="RSSMRA80A01H501U",
+        )
+        busta = BustaPagaDipendente.objects.create(
+            dipendente=dipendente,
+            anno=2026,
+            mese=4,
+            costo_azienda_previsto=Decimal("2186.94"),
+            categoria=categoria_iniziale,
+        )
+
+        response = self.client.post(
+            reverse("aggiorna_categoria_busta_paga", args=[busta.pk]),
+            {"categoria": categoria_nuova.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["category_id"], str(categoria_nuova.pk))
+        self.assertEqual(response.json()["category_label"], "Dipendenti")
+        busta.refresh_from_db()
+        self.assertEqual(busta.categoria, categoria_nuova)
+
     def test_spese_mensili_dashboard_apre_nuova_spesa_in_popup(self):
         response = self.client.get(reverse("spese_mensili_dashboard"))
 

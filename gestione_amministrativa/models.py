@@ -850,6 +850,14 @@ class BustaPagaDipendente(models.Model):
         choices=StatoBustaPaga.choices,
         default=StatoBustaPaga.BOZZA,
     )
+    categoria = models.ForeignKey(
+        "gestione_finanziaria.CategoriaFinanziaria",
+        on_delete=models.SET_NULL,
+        related_name="buste_paga",
+        blank=True,
+        null=True,
+        help_text="Categoria finanziaria usata nei riepiloghi mensili delle spese.",
+    )
     valuta = models.CharField(max_length=3, default="EUR")
 
     lordo_previsto = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO)
@@ -903,6 +911,11 @@ class BustaPagaDipendente(models.Model):
 
     def __str__(self):
         return f"{self.dipendente} - {self.periodo_label}"
+
+    def clean(self):
+        super().clean()
+        if self.categoria_id and self.categoria.tipo != "spesa":
+            raise ValidationError({"categoria": "La categoria della busta paga deve essere di tipo spesa."})
 
     @property
     def periodo_label(self):

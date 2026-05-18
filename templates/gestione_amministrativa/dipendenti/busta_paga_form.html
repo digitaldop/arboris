@@ -29,6 +29,12 @@
                 <p>{% if busta %}{{ busta.dipendente }} - {{ busta.get_stato_display }}{% else %}Registra una busta paga o una previsione payroll.{% endif %}</p>
             </div>
             <div class="scambio-retta-head-actions">
+                {% if not popup %}
+                    <button type="button" class="btn btn-secondary btn-icon-text js-page-back-btn" data-fallback-url="{% url 'lista_buste_paga_dipendenti' %}">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                        <span class="btn-label">Indietro</span>
+                    </button>
+                {% endif %}
                 {% if busta and can_manage_gestione_amministrativa %}
                     <a
                         href="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"

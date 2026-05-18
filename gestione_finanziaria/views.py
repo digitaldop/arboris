@@ -1383,7 +1383,7 @@ def _spese_mensili_rows(request, start, end):
             )
         )
 
-    buste = BustaPagaDipendente.objects.select_related("dipendente").filter(
+    buste = BustaPagaDipendente.objects.select_related("dipendente", "categoria").filter(
         anno__gte=start.year,
         anno__lte=end.year,
     )
@@ -1407,12 +1407,13 @@ def _spese_mensili_rows(request, start, end):
                 tipo="Busta paga",
                 descrizione=f"Busta paga {busta.periodo_label}",
                 soggetto=str(busta.dipendente),
-                categoria="-",
+                categoria=busta.categoria,
                 importo_previsto=importo_previsto,
                 importo_pagato=importo_pagato,
                 detail_url=reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta.pk}),
                 action_url=reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta.pk}) if importo_pagato < importo_previsto else "",
                 action_label="Apri busta paga",
+                category_update_url=reverse("aggiorna_categoria_busta_paga", kwargs={"pk": busta.pk}),
             )
         )
 
@@ -1619,6 +1620,16 @@ def aggiorna_categoria_documento_fornitore(request, pk):
         documento.save(update_fields=["categoria_spesa", "data_aggiornamento"])
     categoria_effettiva = documento.categoria_spesa_effettiva
     return JsonResponse(_categoria_rapida_payload(categoria_effettiva))
+
+
+@require_POST
+def aggiorna_categoria_busta_paga(request, pk):
+    busta = get_object_or_404(BustaPagaDipendente, pk=pk)
+    categoria = _categoria_spesa_da_request(request)
+    if busta.categoria_id != (categoria.pk if categoria else None):
+        busta.categoria = categoria
+        busta.save(update_fields=["categoria", "data_aggiornamento"])
+    return JsonResponse(_categoria_rapida_payload(categoria))
 
 
 def _tipo_spesa_da_piano(piano):

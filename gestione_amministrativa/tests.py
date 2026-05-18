@@ -455,6 +455,17 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, 'data-related-type="movimento_finanziario"', html=False)
         self.assertNotContains(response, "Note previsione")
 
+    def test_busta_paga_form_mostra_indietro_con_navigazione_globale(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("modifica_busta_paga_dipendente", args=[self.busta.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "js-page-back-btn")
+        self.assertContains(response, f'data-fallback-url="{reverse("lista_buste_paga_dipendenti")}"')
+        self.assertContains(response, "<span class=\"btn-label\">Indietro</span>", html=False)
+        self.assertContains(response, "#chevron-left")
+
     def test_busta_paga_file_card_usa_link_interno_e_non_widget_standard(self):
         self.client.force_login(self.user)
         with TemporaryDirectory() as tmpdir, override_settings(

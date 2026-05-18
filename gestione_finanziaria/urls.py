@@ -67,6 +67,11 @@ urlpatterns = [
         name="aggiorna_categoria_documento_fornitore",
     ),
     path(
+        "gestione-finanziaria/spese-mensili/buste-paga/<int:pk>/categoria/",
+        gf_edit(views.aggiorna_categoria_busta_paga),
+        name="aggiorna_categoria_busta_paga",
+    ),
+    path(
         "gestione-finanziaria/spese-mensili/piani-rateali/nuovo/",
         gf_manage(views.crea_piano_rateale_spesa),
         name="crea_piano_rateale_spesa",
