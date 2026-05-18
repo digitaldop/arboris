@@ -33,8 +33,9 @@ window.ArborisMovimentiList = (function () {
         return lockOverlay;
     }
 
-    function optionTemplate() {
-        return document.getElementById("movement-category-options-template");
+    function optionTemplate(cell) {
+        const templateId = cell?.dataset.categoryOptionsTemplate || "movement-category-options-template";
+        return document.getElementById(templateId);
     }
 
     function uiIconHref(iconName) {
@@ -206,7 +207,7 @@ window.ArborisMovimentiList = (function () {
         if (activeEdit) {
             return;
         }
-        const template = optionTemplate();
+        const template = optionTemplate(cell);
         if (!template || !cell.dataset.updateUrl) {
             return;
         }

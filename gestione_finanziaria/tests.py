@@ -3220,6 +3220,105 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
 
+    def test_spese_mensili_dashboard_prepara_click_destro_categoria(self):
+        padre = CategoriaFinanziaria.objects.create(
+            nome="Spese di Gestione",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            icona="briefcase",
+        )
+        figlia = CategoriaFinanziaria.objects.create(
+            nome="Utenze e Servizi",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            parent=padre,
+            icona="bolt",
+        )
+        entrata = CategoriaFinanziaria.objects.create(
+            nome="Rette",
+            tipo=TipoCategoriaFinanziaria.ENTRATA,
+            icona="coins",
+        )
+        spesa = SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Pagamento energia",
+            categoria=figlia,
+            data_scadenza=date(2026, 5, 14),
+            importo_previsto=Decimal("82.96"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 20),
+            importo=Decimal("480.00"),
+            descrizione="Incasso retta",
+            origine=OrigineMovimento.BANCA,
+            categoria=entrata,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-05"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="monthly-expense-category-options-template"', html=False)
+        self.assertContains(response, 'id="monthly-all-category-options-template"', html=False)
+        self.assertContains(response, 'data-category-options-template="monthly-expense-category-options-template"', html=False)
+        self.assertContains(response, 'data-category-options-template="monthly-all-category-options-template"', html=False)
+        self.assertContains(response, reverse("aggiorna_categoria_spesa_operativa", args=[spesa.pk]))
+        self.assertContains(response, reverse("aggiorna_categoria_movimento", args=[movimento.pk]))
+        self.assertContains(response, 'data-category-name="Spese di Gestione"', html=False)
+        self.assertContains(response, 'data-category-has-children="1"', html=False)
+        self.assertContains(response, 'data-category-name="Utenze e Servizi"', html=False)
+        self.assertContains(response, 'data-category-level="1"', html=False)
+        self.assertContains(response, 'data-category-parent="Spese di Gestione"', html=False)
+        self.assertContains(response, 'data-category-icon="bolt"', html=False)
+        self.assertContains(response, "js/pages/movimenti-list.js")
+
+    def test_aggiorna_categoria_spesa_operativa_da_spese_mensili(self):
+        categoria_iniziale = crea_categoria_spesa_test("Cancelleria")
+        categoria_nuova = crea_categoria_spesa_test("Utenze")
+        spesa = SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Acquisto materiale",
+            categoria=categoria_iniziale,
+            data_scadenza=date(2026, 5, 12),
+            importo_previsto=Decimal("35.00"),
+        )
+
+        response = self.client.post(
+            reverse("aggiorna_categoria_spesa_operativa", args=[spesa.pk]),
+            {"categoria": categoria_nuova.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["category_id"], str(categoria_nuova.pk))
+        self.assertEqual(response.json()["category_label"], "Utenze")
+        spesa.refresh_from_db()
+        self.assertEqual(spesa.categoria, categoria_nuova)
+
+    def test_aggiorna_categoria_documento_fornitore_da_spese_mensili(self):
+        categoria_iniziale = crea_categoria_spesa_test("Materiali")
+        categoria_nuova = crea_categoria_spesa_test("Servizi")
+        fornitore = Fornitore.objects.create(denominazione="Fornitore Test")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="DOC-1",
+            data_documento=date(2026, 5, 3),
+            totale=Decimal("122.00"),
+            categoria_spesa=categoria_iniziale,
+        )
+
+        response = self.client.post(
+            reverse("aggiorna_categoria_documento_fornitore", args=[documento.pk]),
+            {"categoria": categoria_nuova.pk},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["category_id"], str(categoria_nuova.pk))
+        self.assertEqual(response.json()["category_label"], "Servizi")
+        documento.refresh_from_db()
+        self.assertEqual(documento.categoria_spesa, categoria_nuova)
+
     def test_spese_mensili_dashboard_apre_nuova_spesa_in_popup(self):
         response = self.client.get(reverse("spese_mensili_dashboard"))
 

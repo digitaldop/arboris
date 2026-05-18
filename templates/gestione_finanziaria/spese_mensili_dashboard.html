@@ -131,7 +131,19 @@
                                 <td><span class="anagrafica-status-chip is-muted">{{ row.tipo }}</span></td>
                                 <td>{{ row.descrizione }}</td>
                                 <td>{{ row.soggetto }}</td>
-                                <td>{{ row.categoria }}</td>
+                                {% if row.categoria_update_url %}
+                                    <td class="finance-category-cell"
+                                        data-movement-category-cell
+                                        data-category-options-template="monthly-expense-category-options-template"
+                                        data-update-url="{{ row.categoria_update_url }}"
+                                        data-category-id="{{ row.categoria_id }}">
+                                        <span class="finance-category-display" data-category-display>
+                                            <span class="{% if not row.categoria_id %}table-muted{% endif %}" data-category-name>{{ row.categoria }}</span>
+                                        </span>
+                                    </td>
+                                {% else %}
+                                    <td>{{ row.categoria }}</td>
+                                {% endif %}
                                 <td class="column-right">{{ row.importo_previsto|euro }} &euro;</td>
                                 <td class="column-right">{{ row.importo_pagato|euro }} &euro;</td>
                                 <td class="column-right finance-money-cell">{{ row.residuo|euro }} &euro;</td>
@@ -191,7 +203,17 @@
                                 <td>{{ movimento.conto|default:"-" }}</td>
                                 <td>{{ movimento.descrizione|truncatechars:90|default:"-" }}</td>
                                 <td>{{ movimento.controparte|default:"-" }}</td>
-                                <td>{{ movimento.categoria|default:"-" }}</td>
+                                <td class="finance-category-cell"
+                                    data-movement-category-cell
+                                    data-category-options-template="monthly-all-category-options-template"
+                                    data-update-url="{% url 'aggiorna_categoria_movimento' movimento.pk %}"
+                                    data-category-id="{{ movimento.categoria_id|default:'' }}">
+                                    <span class="finance-category-display" data-category-display>
+                                        <span class="{% if not movimento.categoria %}table-muted{% endif %}" data-category-name>
+                                            {% if movimento.categoria %}{{ movimento.categoria }}{% else %}non categorizzato{% endif %}
+                                        </span>
+                                    </span>
+                                </td>
                                 <td class="column-right finance-money-cell">{{ movimento.importo|euro }} &euro;</td>
                             </tr>
                         {% endfor %}
@@ -202,11 +224,67 @@
             {% endif %}
         </div>
     </section>
+    <template id="monthly-expense-category-options-template">
+        <option value=""
+                data-category-name="Non categorizzato"
+                data-category-level="0"
+                data-category-type="Senza categoria"
+                data-category-kind="none"
+                data-category-icon=""
+                data-category-path="Non categorizzato"
+                data-category-has-children="0"
+                data-category-children-count="0"
+                data-search-text="non categorizzato senza categoria">Non categorizzato</option>
+        {% for cat in categorie_spesa_disponibili %}
+            <option value="{{ cat.pk }}"
+                    data-category-name="{{ cat.nome }}"
+                    data-category-parent="{{ cat.select_parent_label }}"
+                    data-category-level="{{ cat.select_level }}"
+                    data-category-type="{{ cat.select_tipo_label }}"
+                    data-category-kind="{{ cat.tipo }}"
+                    data-category-icon="{{ cat.icona }}"
+                    data-category-path="{{ cat.percorso_label }}"
+                    data-category-has-children="{{ cat.select_has_children|yesno:'1,0' }}"
+                    data-category-children-count="{{ cat.select_children_count }}"
+                    {% if cat.colore %}data-category-color="{{ cat.colore }}"{% endif %}
+                    data-search-text="{{ cat.percorso_label }} {{ cat.select_tipo_label }}">{{ cat.percorso_label }}</option>
+        {% endfor %}
+    </template>
+    <template id="monthly-all-category-options-template">
+        <option value=""
+                data-category-name="Non categorizzato"
+                data-category-level="0"
+                data-category-type="Senza categoria"
+                data-category-kind="none"
+                data-category-icon=""
+                data-category-path="Non categorizzato"
+                data-category-has-children="0"
+                data-category-children-count="0"
+                data-search-text="non categorizzato senza categoria">Non categorizzato</option>
+        {% for cat in categorie_disponibili %}
+            <option value="{{ cat.pk }}"
+                    data-category-name="{{ cat.nome }}"
+                    data-category-parent="{{ cat.select_parent_label }}"
+                    data-category-level="{{ cat.select_level }}"
+                    data-category-type="{{ cat.select_tipo_label }}"
+                    data-category-kind="{{ cat.tipo }}"
+                    data-category-icon="{{ cat.icona }}"
+                    data-category-path="{{ cat.percorso_label }}"
+                    data-category-has-children="{{ cat.select_has_children|yesno:'1,0' }}"
+                    data-category-children-count="{{ cat.select_children_count }}"
+                    {% if cat.colore %}data-category-color="{{ cat.colore }}"{% endif %}
+                    data-search-text="{{ cat.percorso_label }} {{ cat.select_tipo_label }}">{{ cat.percorso_label }}</option>
+        {% endfor %}
+    </template>
     <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/movimenti-list.js' %}?v=5"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {
                 ArborisListRowLinks.init();
+            }
+            if (window.ArborisMovimentiList) {
+                ArborisMovimentiList.init(document);
             }
         });
     </script>

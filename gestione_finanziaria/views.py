@@ -1262,10 +1262,12 @@ def _spesa_row(
     popup_title="",
     action_url="",
     action_label="",
+    category_update_url="",
 ):
     importo_previsto = importo_previsto or Decimal("0.00")
     importo_pagato = importo_pagato or Decimal("0.00")
     residuo = max(importo_previsto - importo_pagato, Decimal("0.00"))
+    categoria_id = getattr(categoria, "pk", None)
     return {
         "data_scadenza": data_scadenza,
         "mese_key": _month_key(data_scadenza),
@@ -1273,6 +1275,8 @@ def _spesa_row(
         "descrizione": descrizione,
         "soggetto": soggetto or "-",
         "categoria": categoria or "-",
+        "categoria_id": str(categoria_id or ""),
+        "categoria_update_url": category_update_url,
         "importo_previsto": importo_previsto,
         "importo_pagato": importo_pagato,
         "residuo": residuo,
@@ -1353,6 +1357,7 @@ def _spese_mensili_rows(request, start, end):
                 popup_title=f"Fattura {documento.numero_documento}",
                 action_url=payment_url,
                 action_label="Registra pagamento",
+                category_update_url=reverse("aggiorna_categoria_documento_fornitore", kwargs={"pk": documento.pk}),
             )
         )
 
@@ -1374,6 +1379,7 @@ def _spese_mensili_rows(request, start, end):
                 detail_url=reverse("modifica_spesa_operativa", kwargs={"pk": spesa.pk}),
                 action_url=reverse("modifica_spesa_operativa", kwargs={"pk": spesa.pk}) if spesa.importo_residuo else "",
                 action_label="Aggiorna pagamento",
+                category_update_url=reverse("aggiorna_categoria_spesa_operativa", kwargs={"pk": spesa.pk}),
             )
         )
 
@@ -1486,6 +1492,8 @@ def spese_mensili_dashboard(request):
             "selected_rows_all_count": len(selected_rows_all),
             "selected_introiti": selected_introiti,
             "selected_introiti_total": sum((movimento.importo or Decimal("0.00") for movimento in selected_introiti), Decimal("0.00")),
+            "categorie_disponibili": _categorie_finanziarie_attive_per_select(),
+            "categorie_spesa_disponibili": _categorie_finanziarie_attive_per_select(TipoCategoriaFinanziaria.SPESA),
             "vista": vista,
             "vista_tutte_url": vista_tutte_url,
             "vista_insolute_url": vista_insolute_url,
@@ -1570,6 +1578,47 @@ def modifica_spesa_operativa(request, pk):
             "popup": popup,
         },
     )
+
+
+def _categoria_spesa_da_request(request):
+    raw_categoria = (request.POST.get("categoria") or "").strip()
+    if not raw_categoria:
+        return None
+    return get_object_or_404(
+        CategoriaFinanziaria,
+        pk=raw_categoria,
+        attiva=True,
+        tipo=TipoCategoriaFinanziaria.SPESA,
+    )
+
+
+def _categoria_rapida_payload(categoria, empty_label="non categorizzato"):
+    return {
+        "ok": True,
+        "category_id": str(getattr(categoria, "pk", "") or ""),
+        "category_label": str(categoria) if categoria else empty_label,
+    }
+
+
+@require_POST
+def aggiorna_categoria_spesa_operativa(request, pk):
+    spesa = get_object_or_404(SpesaOperativa, pk=pk)
+    categoria = _categoria_spesa_da_request(request)
+    if spesa.categoria_id != (categoria.pk if categoria else None):
+        spesa.categoria = categoria
+        spesa.save(update_fields=["categoria", "data_aggiornamento"])
+    return JsonResponse(_categoria_rapida_payload(categoria))
+
+
+@require_POST
+def aggiorna_categoria_documento_fornitore(request, pk):
+    documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
+    categoria = _categoria_spesa_da_request(request)
+    if documento.categoria_spesa_id != (categoria.pk if categoria else None):
+        documento.categoria_spesa = categoria
+        documento.save(update_fields=["categoria_spesa", "data_aggiornamento"])
+    categoria_effettiva = documento.categoria_spesa_effettiva
+    return JsonResponse(_categoria_rapida_payload(categoria_effettiva))
 
 
 def _tipo_spesa_da_piano(piano):
@@ -3117,12 +3166,11 @@ def scarica_template_saldi_conti_csv(_request):
 # =========================================================================
 
 
-def _categorie_finanziarie_attive_per_select():
-    categorie = list(
-        CategoriaFinanziaria.objects.filter(attiva=True)
-        .select_related("parent")
-        .order_by("ordine", "nome", "id")
-    )
+def _categorie_finanziarie_attive_per_select(tipo=None):
+    queryset = CategoriaFinanziaria.objects.filter(attiva=True)
+    if tipo:
+        queryset = queryset.filter(tipo=tipo)
+    categorie = list(queryset.select_related("parent").order_by("ordine", "nome", "id"))
     categorie_ids = {categoria.pk for categoria in categorie}
     figli_by_parent = {}
 

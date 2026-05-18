@@ -57,6 +57,16 @@ urlpatterns = [
         name="modifica_spesa_operativa",
     ),
     path(
+        "gestione-finanziaria/spese-mensili/spese/<int:pk>/categoria/",
+        gf_edit(views.aggiorna_categoria_spesa_operativa),
+        name="aggiorna_categoria_spesa_operativa",
+    ),
+    path(
+        "gestione-finanziaria/spese-mensili/documenti/<int:pk>/categoria/",
+        gf_edit(views.aggiorna_categoria_documento_fornitore),
+        name="aggiorna_categoria_documento_fornitore",
+    ),
+    path(
         "gestione-finanziaria/spese-mensili/piani-rateali/nuovo/",
         gf_manage(views.crea_piano_rateale_spesa),
         name="crea_piano_rateale_spesa",
