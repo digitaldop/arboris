@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><ns3:FatturaElettronica versione="FPR12" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>03019191208</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>F609D5</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>M5UXCR1</CodiceDestinatario>
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>01707381206</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>TRCMRM68C05D122P</CodiceFiscale>
+                <Anagrafica>
+                    <Nome>Mario Armando</Nome>
+                    <Cognome>Trocino</Cognome>
+                </Anagrafica>
+                <RegimeFiscale>RF01</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>via G.A.Sacco n. 4</Indirizzo>
+                <CAP>40127</CAP>
+                <Comune>Bologna</Comune>
+                <Nazione>IT</Nazione>
+            </Sede>
+            <Contatti>
+                <Email>consultingdinamica@gmail.it</Email>
+            </Contatti>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>04223931207</IdCodice>
+                </IdFiscaleIVA>
+                <Anagrafica>
+                    <Denominazione>IL SOLE E L'ALTRE STELLE - IMPRESA SOCIALE</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA CIRCONDARIA OVEST 53</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>SANT'AGATA BOLOGNESE</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>2026-04-24</Data>
+                <Numero>26</Numero>
+                <DatiRitenuta>
+                    <TipoRitenuta>RT01</TipoRitenuta>
+                    <ImportoRitenuta>120.00</ImportoRitenuta>
+                    <AliquotaRitenuta>20.00</AliquotaRitenuta>
+                    <CausalePagamento>A</CausalePagamento>
+                </DatiRitenuta>
+                <DatiCassaPrevidenziale>
+                    <TipoCassa>TC02</TipoCassa>
+                    <AlCassa>4.00</AlCassa>
+                    <ImportoContributoCassa>24.00</ImportoContributoCassa>
+                    <ImponibileCassa>600.00</ImponibileCassa>
+                    <AliquotaIVA>22.00</AliquotaIVA>
+                </DatiCassaPrevidenziale>
+                <ImportoTotaleDocumento>761.28</ImportoTotaleDocumento>
+                <Causale>CORRISPETTIVO SALDATO</Causale>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            <DettaglioLinee>
+                <NumeroLinea>1</NumeroLinea>
+                <Descrizione>COMPENSI PER ATTIVITA' DI CONSULENZA e assistenza gestione bando comune di Calderara di Reno (BO) </Descrizione>
+                <PrezzoUnitario>600.00</PrezzoUnitario>
+                <PrezzoTotale>600.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>2</NumeroLinea>
+                <Descrizione>RIMBORSO SPESE FORFETTARIE</Descrizione>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+            </DettaglioLinee>
+            <DatiRiepilogo>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <ImponibileImporto>624.00</ImponibileImporto>
+                <Imposta>137.28</Imposta>
+            </DatiRiepilogo>
+        </DatiBeniServizi>
+        <DatiPagamento>
+            <CondizioniPagamento>TP02</CondizioniPagamento>
+            <DettaglioPagamento>
+                <ModalitaPagamento>MP05</ModalitaPagamento>
+                <DataScadenzaPagamento>2026-04-24</DataScadenzaPagamento>
+                <ImportoPagamento>641.28</ImportoPagamento>
+                <IstitutoFinanziario>MEDIOLANUM</IstitutoFinanziario>
+                <IBAN>IT25Y0306234210000002552071</IBAN>
+            </DettaglioPagamento>
+        </DatiPagamento>
+        <Allegati>
+            <NomeAttachment>2026044TROC000066.pdf</NomeAttachment>
+            <Attachment>JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKL0xhbmcgKHgtdW5rbm93bikKL01ldGFkYXRhIDMgMCBSCi9QYWdlTGFiZWxzIDQgMCBSCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9DcmVhdG9yIChBcGFjaGUgRk9QIFZlcnNpb24gU1ZOIGJyYW5jaGVzL2ZvcC0yXzIvZm9wLWNvcmUpCi9Qcm9kdWNlciAoQXBhY2hlIEZPUCBWZXJzaW9uIFNWTiBicmFuY2hlcy9mb3AtMl8yL2ZvcC1jb3JlKQovQ3JlYXRpb25EYXRlIChEOjIwMjYwNDI3MDkxMjM5KzAyJzAwJykKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9Db3VudCAxCi9LaWRzIFs2IDAgUl0KPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0xlbmd0aCA5MTcKL1R5cGUgL01ldGFkYXRhCi9TdWJ0eXBlIC9YTUwKPj4Kc3RyZWFtDQo8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iPgo8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgo8cmRmOkRlc2NyaXB0aW9uIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIgcmRmOmFib3V0PSIiPgo8ZGM6Zm9ybWF0PmFwcGxpY2F0aW9uL3BkZjwvZGM6Zm9ybWF0Pgo8ZGM6bGFuZ3VhZ2U+eC11bmtub3duPC9kYzpsYW5ndWFnZT4KPGRjOmRhdGU+MjAyNi0wNC0yN1QwOToxMjozOSswMjowMDwvZGM6ZGF0ZT4KPC9yZGY6RGVzY3JpcHRpb24+CjxyZGY6RGVzY3JpcHRpb24geG1sbnM6cGRmPSJodHRwOi8vbnMuYWRvYmUuY29tL3BkZi8xLjMvIiByZGY6YWJvdXQ9IiI+CjxwZGY6UHJvZHVjZXI+QXBhY2hlIEZPUCBWZXJzaW9uIFNWTiBicmFuY2hlcy9mb3AtMl8yL2ZvcC1jb3JlPC9wZGY6UHJvZHVjZXI+CjxwZGY6UERGVmVyc2lvbj4xLjQ8L3BkZjpQREZWZXJzaW9uPgo8L3JkZjpEZXNjcmlwdGlvbj4KPHJkZjpEZXNjcmlwdGlvbiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHJkZjphYm91dD0iIj4KPHhtcDpDcmVhdG9yVG9vbD5BcGFjaGUgRk9QIFZlcnNpb24gU1ZOIGJyYW5jaGVzL2ZvcC0yXzIvZm9wLWNvcmU8L3htcDpDcmVhdG9yVG9vbD4KPHhtcDpNZXRhZGF0YURhdGU+MjAyNi0wNC0yN1QwOToxMjozOSswMjowMDwveG1wOk1ldGFkYXRhRGF0ZT4KPHhtcDpDcmVhdGVEYXRlPjIwMjYtMDQtMjdUMDk6MTI6MzkrMDI6MDA8L3htcDpDcmVhdGVEYXRlPgo8L3JkZjpEZXNjcmlwdGlvbj4KPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT48P3hwYWNrZXQgZW5kPSJyIj8+Cg0KZW5kc3RyZWFtCmVuZG9iago0IDAgb2JqCjw8Ci9OdW1zIFswIDcgMCBSXQo+PgplbmRvYmoKNiAwIG9iago8PAovUmVzb3VyY2VzIDggMCBSCi9UeXBlIC9QYWdlCi9NZWRpYUJveCBbMCAwIDU5NS4yNzUgODQxLjg4OV0KL0Nyb3BCb3ggWzAgMCA1OTUuMjc1IDg0MS44ODldCi9CbGVlZEJveCBbMCAwIDU5NS4yNzUgODQxLjg4OV0KL1RyaW1Cb3ggWzAgMCA1OTUuMjc1IDg0MS44ODldCi9QYXJlbnQgMiAwIFIKL0NvbnRlbnRzIDkgMCBSCj4+CmVuZG9iago3IDAgb2JqCjw8Ci9TIC9ECj4+CmVuZG9iago4IDAgb2JqCjw8Ci9Gb250IDw8Ci9GMSAxMCAwIFIKL0YzIDExIDAgUgo+PgovUHJvY1NldCBbL1BERiAvSW1hZ2VCIC9JbWFnZUMgL1RleHRdCi9Db2xvclNwYWNlIDw8Ci9EZWZhdWx0UkdCIFsvSUNDQmFzZWQgMTIgMCBSXQo+Pgo+PgplbmRvYmoKOSAwIG9iago8PAovTGVuZ3RoIDI1NjQKL0ZpbHRlciAv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iiqNmo62ii6NnomxijkQMxtrE1seOxfnEFcV9zreNb42fjHBO+FEwnJiUGJbEi4pPOkcj8pL4PVtVty8ZfNQsk5yfrIgxSLlYMo834PfmAqlbkjtSqMLf8wD6Zrp36VPZFhnVGe8zwzMPLtFYgtvy8BW7a17t05nOWcdz0Zlc7J7c5RzduVMbLPbVrcd2h65vXeH6o68HVM7XXae3EXYlbDrdq5Bbmnu291Bu7vzFPJ25k1+5/JdS75YPj9/bI/lntrvUd/HfT+4d/Xeyr1fCrgFNwsNCssLPxVxim7+YPhDxQ/L+6L3DRabFh8pwZTwSkb32+w/WSpRmlU6ecDrQEcZs6yg7O3BTQdvlBuX1x4iHEo/JKjwrOiqVKssqfxUFVs1Um1f3VYjX7O3ZvEw9/DwEdsjrbUKtYW1H4/GHX1Q51LXUa9RX34Mcyzj2POGwIb+4+zjTY2yjYWNn0/wTghO+p3sazJramqWby5ugVvSW2ZPhZ26+6Pjj12tuq11bYy2wtPgdPrpFz+F/zR6xuNM71n22daf1X+uaae1F3RAHVs75jtjOwVdIV1D59zP9XZbdrf/ovfLifPK56svSF4o7iH05PUsX8y6uHAp+dLc5ZjLk72beh9fCb5yv8+3b/Cqx9Xr15yvXem367943er6+RsWN87dZN/svGV6q2PAZKD9tsnt9kHTwY47Zne67prf7R5aM9QzbDN8+Z7jvWv33e7fGlk7MjQaMPpgLGxM8ID7YOZh4sPXjzIeLT3eOY4eL3gi/qT8qfzT+l+1fm0TmAouTDhODDxb9+zxJGfy5W+pv32ayntOfl4+rTTdNGM0c37Wefbui/Uvpl4mv1yay/9d4veaV5qvfv7D9o+B+eD5qdf818t/Fr2ReXPirfHb3gWfhafvkt4tLRa8l3l/8gP7Q//HoI/TS5mfsJ8qPmt97v7i8WV8OWl5WeQCIhcQuYDIBUQuIHIBkQuIXEDkAiIXELmAyAVELiByAZEL/B+7wNezG2EhK8OxMQD8swHwvA1AZRUAGtEAUML+AniKAzQNCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDEzCjAwMDAwMDAwMDAgNjU1MzUgZg0KMDAwMDAwMDAxNSAwMDAwMCBuDQowMDAwMDAwMjk4IDAwMDAwIG4NCjAwMDAwMDAzNTUgMDAwMDAgbg0KMDAwMDAwMTM1NSAwMDAwMCBuDQowMDAwMDAwMTE2IDAwMDAwIG4NCjAwMDAwMDEzOTIgMDAwMDAgbg0KMDAwMDAwMTU5OCAwMDAwMCBuDQowMDAwMDAxNjI1IDAwMDAwIG4NCjAwMDAwMDE3NjcgMDAwMDAgbg0KMDAwMDAwNDQwNiAwMDAwMCBuDQowMDAwMDA0NTA0IDAwMDAwIG4NCjAwMDAwMDQ2MDcgMDAwMDAgbg0KdHJhaWxlcgo8PAovUm9vdCAxIDAgUgovSW5mbyA1IDAgUgovSUQgWzw1NjI5MTJDMzlBQURERDU4NzczOUVDRkY2QzU2RjQ1Rj4gPDU2MjkxMkMzOUFBRERENTg3NzM5RUNGRjZDNTZGNDVGPl0KL1NpemUgMTMKPj4Kc3RhcnR4cmVmCjcxMDcKJSVFT0YK</Attachment>
+        </Allegati>
+    </FatturaElettronicaBody>
+</ns3:FatturaElettronica>

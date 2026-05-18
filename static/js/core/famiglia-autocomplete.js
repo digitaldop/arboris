@@ -323,10 +323,18 @@
             },
             updateDropdownPosition: function () {
                 const inputRect = input.getBoundingClientRect();
-                const desiredHeight = Math.min(dropdown.scrollHeight || 260, 260);
+                const defaultMaxHeight = select.dataset.searchableVariant === "movement-category-tree" ? 420 : 260;
+                const configuredMaxHeight = parseInt(select.dataset.searchableMaxHeight || "", 10);
+                const maxHeight = Number.isFinite(configuredMaxHeight) && configuredMaxHeight > 0
+                    ? configuredMaxHeight
+                    : defaultMaxHeight;
+                const desiredHeight = Math.min(dropdown.scrollHeight || maxHeight, maxHeight);
                 const availableBelow = Math.max(0, window.innerHeight - inputRect.bottom - 12);
                 const availableAbove = Math.max(0, inputRect.top - 12);
                 const openUpward = availableBelow < Math.min(180, desiredHeight) && availableAbove > availableBelow;
+                const availableSpace = openUpward ? availableAbove : availableBelow;
+                const resolvedHeight = Math.max(160, Math.min(desiredHeight, maxHeight, availableSpace || desiredHeight));
+                dropdown.style.maxHeight = `${resolvedHeight}px`;
                 wrapper.classList.toggle("is-open-upward", openUpward);
             },
             openDropdown: function () {

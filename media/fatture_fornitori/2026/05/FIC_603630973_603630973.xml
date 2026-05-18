@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><ns3:FatturaElettronica versione="FPR12" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>01879020517</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>162</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>M5UXCR1</CodiceDestinatario>
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>01259200762</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>LRNNTN61B08H730O</CodiceFiscale>
+                <Anagrafica>
+                    <Nome>ANTONIO</Nome>
+                    <Cognome>LAURINO</Cognome>
+                    <Titolo>CDL</Titolo>
+                </Anagrafica>
+                <AlboProfessionale>CONSULENTI DEL LAVORO</AlboProfessionale>
+                <ProvinciaAlbo>PZ</ProvinciaAlbo>
+                <NumeroIscrizioneAlbo>211</NumeroIscrizioneAlbo>
+                <RegimeFiscale>RF18</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA DELL'EDILIZIA (PAL. MAROSCIA)</Indirizzo>
+                <CAP>85100</CAP>
+                <Comune>Potenza</Comune>
+                <Provincia>PZ</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+            <Contatti>
+                <Telefono>09711944413</Telefono>
+                <Email>consulentelaurino@gmail.com</Email>
+            </Contatti>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>04223931207</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>04223931207</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>IL SOLE E L'ALTRE STELLE - IMPRESA SOCIALE S.R.L.</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA CIRCONDARIA OVEST, 53</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>SANT'AGATA BOLOGNESE</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>2026-04-30</Data>
+                <Numero>FPR 162/26</Numero>
+                <DatiRitenuta>
+                    <TipoRitenuta>RT01</TipoRitenuta>
+                    <ImportoRitenuta>21.60</ImportoRitenuta>
+                    <AliquotaRitenuta>20.00</AliquotaRitenuta>
+                    <CausalePagamento>A</CausalePagamento>
+                </DatiRitenuta>
+                <DatiCassaPrevidenziale>
+                    <TipoCassa>TC08</TipoCassa>
+                    <AlCassa>4.00</AlCassa>
+                    <ImportoContributoCassa>4.32</ImportoContributoCassa>
+                    <ImponibileCassa>108.00</ImponibileCassa>
+                    <AliquotaIVA>22.00</AliquotaIVA>
+                </DatiCassaPrevidenziale>
+                <ImportoTotaleDocumento>137.03</ImportoTotaleDocumento>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            <DettaglioLinee>
+                <NumeroLinea>1</NumeroLinea>
+                <Descrizione>Consulenza e assistenza in materia di lavoro MESE DI FEBBRAIO 2026</Descrizione>
+                <Quantita>1.00</Quantita>
+                <PrezzoUnitario>108.00</PrezzoUnitario>
+                <PrezzoTotale>108.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <Ritenuta>SI</Ritenuta>
+            </DettaglioLinee>
+            <DatiRiepilogo>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <ImponibileImporto>112.32</ImponibileImporto>
+                <Imposta>24.71</Imposta>
+                <EsigibilitaIVA>I</EsigibilitaIVA>
+            </DatiRiepilogo>
+        </DatiBeniServizi>
+        <DatiPagamento>
+            <CondizioniPagamento>TP02</CondizioniPagamento>
+            <DettaglioPagamento>
+                <Beneficiario>LAURINO ANTONIO</Beneficiario>
+                <ModalitaPagamento>MP05</ModalitaPagamento>
+                <DataScadenzaPagamento>2026-04-30</DataScadenzaPagamento>
+                <ImportoPagamento>115.43</ImportoPagamento>
+                <IstitutoFinanziario>BPER</IstitutoFinanziario>
+                <IBAN>IT57W0538704203000009335308</IBAN>
+            </DettaglioPagamento>
+        </DatiPagamento>
+    </FatturaElettronicaBody>
+</ns3:FatturaElettronica>

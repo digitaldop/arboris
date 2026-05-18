@@ -116,7 +116,12 @@
                             <th>Tipo</th>
                             <th>Descrizione</th>
                             <th>Soggetto</th>
-                            <th>Categoria</th>
+                            <th>
+                                <span class="finance-category-heading" tabindex="0" data-floating-text="Clic destro sulla cella Categoria: la cella diventa modificabile e apre un menu con ricerca. Seleziona la categoria desiderata; salva con il pulsante o con un nuovo clic destro sulla stessa cella. Durante la modifica le altre azioni sono bloccate.">
+                                    Categoria
+                                    <span class="finance-category-heading-help" aria-hidden="true">?</span>
+                                </span>
+                            </th>
                             <th class="column-right">Previsto</th>
                             <th class="column-right">Pagato</th>
                             <th class="column-right">Residuo</th>
@@ -192,7 +197,12 @@
                             <th>Conto</th>
                             <th>Descrizione</th>
                             <th>Controparte</th>
-                            <th>Categoria</th>
+                            <th>
+                                <span class="finance-category-heading" tabindex="0" data-floating-text="Clic destro sulla cella Categoria: la cella diventa modificabile e apre un menu con ricerca. Seleziona la categoria desiderata; salva con il pulsante o con un nuovo clic destro sulla stessa cella. Durante la modifica le altre azioni sono bloccate.">
+                                    Categoria
+                                    <span class="finance-category-heading-help" aria-hidden="true">?</span>
+                                </span>
+                            </th>
                             <th class="column-right">Importo</th>
                         </tr>
                     </thead>
@@ -277,7 +287,7 @@
         {% endfor %}
     </template>
     <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
-    <script src="{% static 'js/pages/movimenti-list.js' %}?v=5"></script>
+    <script src="{% static 'js/pages/movimenti-list.js' %}?v=6"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             if (window.ArborisListRowLinks) {

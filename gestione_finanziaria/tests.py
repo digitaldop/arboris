@@ -3271,6 +3271,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-category-parent="Spese di Gestione"', html=False)
         self.assertContains(response, 'data-category-icon="bolt"', html=False)
         self.assertContains(response, "js/pages/movimenti-list.js")
+        self.assertContains(response, "Clic destro sulla cella Categoria")
 
     def test_aggiorna_categoria_spesa_operativa_da_spese_mensili(self):
         categoria_iniziale = crea_categoria_spesa_test("Cancelleria")

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><ns3:FatturaElettronica versione="FPR12" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>00865310221</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>1</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>M5UXCR1</CodiceDestinatario>
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>03877251201</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>STRNTN68T10A662O</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>STRAGAPEDE ANTONIO</Denominazione>
+                </Anagrafica>
+                <RegimeFiscale>RF19</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA CASONA 31</Indirizzo>
+                <CAP>40043</CAP>
+                <Comune>MARZABOTTO</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>04223931207</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>04223931207</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>Il SOLE E L ALTRE STELLE IMPR SOC SRL</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>Via Circondaria Ovest 53</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>Sant Agata Bolognese</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+        <TerzoIntermediarioOSoggettoEmittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>01530760220</IdCodice>
+                </IdFiscaleIVA>
+                <Anagrafica>
+                    <Denominazione>SEAC SPA</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+        </TerzoIntermediarioOSoggettoEmittente>
+        <SoggettoEmittente>TZ</SoggettoEmittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>2026-05-12</Data>
+                <Numero>13/00</Numero>
+                <DatiBollo>
+                    <BolloVirtuale>SI</BolloVirtuale>
+                    <ImportoBollo>2.00</ImportoBollo>
+                </DatiBollo>
+                <ImportoTotaleDocumento>672.00</ImportoTotaleDocumento>
+                <Causale>Operazione effettuata ai sensi dell'art.1, comma da 54 a 89 , della Legge n. 190/2014 e articolo 1, commi da 111 a 113 , della Legge n. 208/2015 e Legge n. 145/18 - Regime Forfettario ; Si richiede la</Causale>
+                <Causale> non applicazione della ritenuta d'acconto ai sensi e per gli effetti del Provv. Agenzia delle Entrate n.185820 del 22/12/2011</Causale>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            <DettaglioLinee>
+                <NumeroLinea>1</NumeroLinea>
+                <Descrizione>COMPENSO Lezioni di musica aprile 2026</Descrizione>
+                <Quantita>1.00000000</Quantita>
+                <PrezzoUnitario>672.00000000</PrezzoUnitario>
+                <PrezzoTotale>672.00000000</PrezzoTotale>
+                <AliquotaIVA>0.00</AliquotaIVA>
+                <Natura>N2.2</Natura>
+            </DettaglioLinee>
+            <DatiRiepilogo>
+                <AliquotaIVA>0.00</AliquotaIVA>
+                <Natura>N2.2</Natura>
+                <ImponibileImporto>672.00</ImponibileImporto>
+                <Imposta>0.00</Imposta>
+                <RiferimentoNormativo>Op. senza appl. IVA ai sensi dell'art.1, comma 58, Legge n.190/2014</RiferimentoNormativo>
+            </DatiRiepilogo>
+        </DatiBeniServizi>
+        <DatiPagamento>
+            <CondizioniPagamento>TP02</CondizioniPagamento>
+            <DettaglioPagamento>
+                <ModalitaPagamento>MP05</ModalitaPagamento>
+                <ImportoPagamento>672.00</ImportoPagamento>
+                <IstitutoFinanziario>POSTE ITALIANE SPA</IstitutoFinanziario>
+                <IBAN>IT46E0760102400000009496495</IBAN>
+            </DettaglioPagamento>
+        </DatiPagamento>
+    </FatturaElettronicaBody>
+</ns3:FatturaElettronica>

@@ -23,7 +23,7 @@ window.ArborisMovimentiList = (function () {
         lockOverlay = document.createElement("div");
         lockOverlay.className = "finance-category-edit-overlay";
         lockOverlay.setAttribute("aria-hidden", "true");
-        ["click", "mousedown", "mouseup", "contextmenu"].forEach(eventName => {
+        ["click", "mousedown", "mouseup", "contextmenu", "wheel", "touchmove"].forEach(eventName => {
             lockOverlay.addEventListener(eventName, function (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -57,11 +57,51 @@ window.ArborisMovimentiList = (function () {
     }
 
     function stopEditorPropagation(editor) {
-        ["click", "mousedown", "mouseup"].forEach(eventName => {
+        ["click", "mousedown", "mouseup", "contextmenu"].forEach(eventName => {
             editor.addEventListener(eventName, function (event) {
                 event.stopPropagation();
             });
         });
+    }
+
+    function clamp(value, min, max) {
+        if (max < min) {
+            return min;
+        }
+        return Math.max(min, Math.min(value, max));
+    }
+
+    function positionFloatingEditor(edit) {
+        if (!edit || !edit.editor || !edit.cell) {
+            return;
+        }
+        const rect = edit.cell.getBoundingClientRect();
+        const viewportPadding = 12;
+        const maxWidth = edit.type === "category" ? 520 : 380;
+        const minWidth = edit.type === "category" ? 420 : 300;
+        const availableWidth = Math.max(240, window.innerWidth - viewportPadding * 2);
+        const targetWidth = Math.min(maxWidth, availableWidth);
+        const width = Math.min(
+            availableWidth,
+            Math.max(Math.min(minWidth, availableWidth), Math.min(targetWidth, Math.max(rect.width + 90, rect.width)))
+        );
+
+        edit.editor.style.width = `${width}px`;
+        const editorWidth = edit.editor.offsetWidth || width;
+        const left = clamp(rect.left - 8, viewportPadding, window.innerWidth - editorWidth - viewportPadding);
+        const top = clamp(rect.top - 4, viewportPadding, window.innerHeight - 84);
+        edit.editor.style.left = `${left}px`;
+        edit.editor.style.top = `${top}px`;
+    }
+
+    function isInsideActiveEdit(target) {
+        return Boolean(
+            activeEdit
+            && (
+                activeEdit.cell.contains(target)
+                || (activeEdit.editor && activeEdit.editor.contains(target))
+            )
+        );
     }
 
     function updateCategoryDisplay(cell, data) {
@@ -109,7 +149,7 @@ window.ArborisMovimentiList = (function () {
             return;
         }
         activeEdit.cell.classList.remove("is-editing");
-        const editor = activeEdit.cell.querySelector("[data-category-editor], [data-account-editor]");
+        const editor = activeEdit.editor || activeEdit.cell.querySelector("[data-category-editor], [data-account-editor]");
         if (editor) {
             editor.remove();
         }
@@ -125,7 +165,7 @@ window.ArborisMovimentiList = (function () {
         if (!activeEdit) {
             return;
         }
-        const input = activeEdit.input || activeEdit.cell.querySelector(".searchable-select-input") || activeEdit.select;
+        const input = activeEdit.input || activeEdit.editor?.querySelector(".searchable-select-input") || activeEdit.select;
         input?.focus();
     }
 
@@ -272,13 +312,15 @@ window.ArborisMovimentiList = (function () {
         fieldRow.appendChild(actions);
         editor.appendChild(fieldRow);
         editor.appendChild(status);
-        cell.appendChild(editor);
+        document.body.appendChild(editor);
 
-        activeEdit = { type: "category", cell, select, status, saveButton, cancelButton, saving: false };
+        activeEdit = { type: "category", cell, editor, select, status, saveButton, cancelButton, saving: false };
+        positionFloatingEditor(activeEdit);
 
         if (window.ArborisFamigliaAutocomplete) {
             window.ArborisFamigliaAutocomplete.init(editor, { force: true });
         }
+        positionFloatingEditor(activeEdit);
 
         const input = editor.querySelector(".searchable-select-input") || select;
         input.focus();
@@ -356,9 +398,10 @@ window.ArborisMovimentiList = (function () {
         fieldRow.appendChild(actions);
         editor.appendChild(fieldRow);
         editor.appendChild(status);
-        cell.appendChild(editor);
+        document.body.appendChild(editor);
 
-        activeEdit = { type: "account", cell, input, status, saveButton, cancelButton, saving: false };
+        activeEdit = { type: "account", cell, editor, input, status, saveButton, cancelButton, saving: false };
+        positionFloatingEditor(activeEdit);
         input.focus();
         input.select();
     }
@@ -379,8 +422,10 @@ window.ArborisMovimentiList = (function () {
             if (activeEdit) {
                 event.preventDefault();
                 event.stopPropagation();
-                if (cell === activeEdit.cell || activeEdit.cell.contains(event.target)) {
+                if (cell === activeEdit.cell && !activeEdit.editor?.contains(event.target)) {
                     saveActiveEditor();
+                } else {
+                    focusActiveEditor();
                 }
                 return;
             }
@@ -397,7 +442,7 @@ window.ArborisMovimentiList = (function () {
         }, true);
 
         document.addEventListener("click", function (event) {
-            if (!activeEdit || activeEdit.cell.contains(event.target)) {
+            if (!activeEdit || isInsideActiveEdit(event.target)) {
                 return;
             }
             event.preventDefault();
@@ -405,7 +450,7 @@ window.ArborisMovimentiList = (function () {
         }, true);
 
         document.addEventListener("focusin", function (event) {
-            if (!activeEdit || activeEdit.cell.contains(event.target)) {
+            if (!activeEdit || isInsideActiveEdit(event.target)) {
                 return;
             }
             event.preventDefault();
@@ -421,6 +466,14 @@ window.ArborisMovimentiList = (function () {
                 event.preventDefault();
                 closeEditor();
             }
+        }, true);
+
+        window.addEventListener("resize", function () {
+            positionFloatingEditor(activeEdit);
+        });
+
+        window.addEventListener("scroll", function () {
+            positionFloatingEditor(activeEdit);
         }, true);
     }
 

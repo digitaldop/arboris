@@ -5257,12 +5257,12 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 }
 
 .module-gestione_finanziaria .finance-account-editor {
-    position: absolute;
-    left: 8px;
-    top: 50%;
+    position: fixed;
+    left: 12px;
+    top: 12px;
     z-index: 10004;
-    width: min(360px, 44vw);
-    transform: translateY(-50%);
+    width: min(380px, calc(100vw - 24px));
+    transform: none;
 }
 
 .module-gestione_finanziaria .finance-account-editor-field {
@@ -5359,12 +5359,12 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 }
 
 .module-gestione_finanziaria .finance-category-editor {
-    position: absolute;
-    left: 8px;
-    top: 50%;
+    position: fixed;
+    left: 12px;
+    top: 12px;
     z-index: 10004;
-    width: min(430px, 56vw);
-    transform: translateY(-50%);
+    width: min(520px, calc(100vw - 24px));
+    transform: none;
 }
 
 .module-gestione_finanziaria .finance-category-editor-field {
@@ -5376,6 +5376,7 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 .module-gestione_finanziaria .finance-category-editor .searchable-select {
     flex: 1 1 auto;
     max-width: none;
+    min-width: 0;
 }
 
 .module-gestione_finanziaria .finance-category-editor .searchable-select-input {
@@ -5424,8 +5425,21 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     position: fixed;
     inset: 0;
     z-index: 10000;
-    background: rgba(15, 23, 42, 0.04);
+    background: rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(1px);
     cursor: not-allowed;
+}
+
+body.finance-category-editing .list-row-link {
+    cursor: default;
+}
+
+body.finance-category-editing .anagrafica-list-table tbody tr:hover {
+    transform: none;
+}
+
+body.finance-category-editing .anagrafica-list-table tbody tr:hover td {
+    box-shadow: none;
 }
 
 .finance-balance-summary .summary-grid {
@@ -7940,7 +7954,7 @@ select:focus {
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    max-height: 260px;
+    max-height: var(--searchable-select-dropdown-max-height, 260px);
     overflow-y: auto;
     background: #fff;
     border: 1px solid #cfd6dc;
@@ -8138,7 +8152,7 @@ select:focus {
 }
 
 .searchable-select-movement-category-tree .searchable-select-dropdown {
-    max-height: 420px;
+    max-height: var(--searchable-select-dropdown-max-height, 420px);
     overflow-y: auto;
     border-color: #d6e3ec;
     border-radius: 12px;
