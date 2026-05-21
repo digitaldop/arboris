@@ -642,7 +642,7 @@ class SidebarGestioneFinanziariaTests(TestCase):
             "Fatture Fornitori",
             "Budgeting",
             "<span>Conti Correnti</span>",
-            "Movimenti",
+            "Movimenti Bancari",
             "Categorie movimenti",
             "Riconciliazione",
             "Report categorie",

@@ -3186,6 +3186,8 @@ window.ArborisStudenteForm = (function () {
             const cfg = options || {};
             const subformRow = getFamiliareSubformRow(row);
             const roots = [row, subformRow].filter(Boolean);
+            const relationSelect = row ? row.querySelector('select[name$="-relazione_familiare"]') : null;
+            const sexSelect = subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null;
 
             setRelativeRowBundleEnabled(row, true);
 
@@ -3225,9 +3227,10 @@ window.ArborisStudenteForm = (function () {
             initEditorEnhancements(editor);
             if (personRules && typeof personRules.bindSexFromRelation === "function") {
                 personRules.bindSexFromRelation({
-                    relationSelect: row.querySelector('select[name$="-relazione_familiare"]'),
-                    sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
+                    relationSelect: relationSelect,
+                    sexSelect: sexSelect,
                     bindFlag: "studentParentiRelationSexBound",
+                    overwriteExisting: Boolean(cfg.isNew) || !inlineFormsets.isRowPersisted(row),
                 });
             }
             wireRelativeCardActions(editor);

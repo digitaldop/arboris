@@ -483,7 +483,7 @@
                                                 <nav class="sidebar-nav sidebar-subnav">
                                                     <a href="{% url 'lista_movimenti_finanziari' %}" class="{% if request.resolver_match.url_name == 'lista_movimenti_finanziari' or request.resolver_match.url_name == 'crea_movimento_manuale' or request.resolver_match.url_name == 'modifica_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimento_finanziario' or request.resolver_match.url_name == 'elimina_movimenti_finanziari_multipla' %}active{% endif %}">
                                                         <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
-                                                        <span class="sidebar-link-text">Movimenti</span>
+                                                        <span class="sidebar-link-text">Movimenti Bancari</span>
                                                     </a>
                                                     <a href="{% url 'lista_categorie_finanziarie' %}" class="{% if request.resolver_match.url_name == 'lista_categorie_finanziarie' or request.resolver_match.url_name == 'crea_categoria_finanziaria' or request.resolver_match.url_name == 'modifica_categoria_finanziaria' or request.resolver_match.url_name == 'elimina_categoria_finanziaria' %}active{% endif %}">
                                                         <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>

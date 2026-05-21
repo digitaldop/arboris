@@ -4429,12 +4429,7 @@ def modifica_studente(request, pk):
     allowed_edit_targets = {"iscrizioni", "parenti", "documenti"}
     active_inline_tab = resolve_active_inline_tab(request, allowed_display_targets, "iscrizioni")
     prefer_initial_active_tab = should_prefer_initial_famiglia_tab(request, allowed_display_targets)
-    lazy_sections_requested = request.GET.get("_lazy") == "student-sections"
-    lazy_sections_enabled = (
-        request.method == "GET"
-        and edit_scope == "view"
-        and not lazy_sections_requested
-    )
+    lazy_sections_enabled = False
     familiari_diretti_form = None
     contact_formsets = None
 

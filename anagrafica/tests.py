@@ -2568,6 +2568,22 @@ class StudenteBackNavigationTests(TestCase):
         self.assertEqual(response.context["student_back_url"], reverse("lista_studenti"))
         self.assertContains(response, f'data-fallback-url="{reverse("lista_studenti")}"')
 
+    def test_modifica_studente_carica_tutte_le_sezioni_senza_lazy_loading(self):
+        response = self.client.get(
+            reverse("modifica_studente", kwargs={"pk": self.studente.pk}),
+            {"tab": "parenti"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["studente_lazy_sections_enabled"])
+        self.assertIsNotNone(response.context["familiari_diretti_form"])
+        self.assertIsNotNone(response.context["iscrizioni_formset"])
+        self.assertIsNotNone(response.context["documenti_formset"])
+        self.assertIsNotNone(response.context["parenti_formset"])
+        self.assertNotContains(response, "data-student-lazy-section")
+        self.assertNotContains(response, "Caricamento dettagli...")
+        self.assertContains(response, 'name="parenti-TOTAL_FORMS"')
+
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class RicercheAnagraficaTests(TestCase):
