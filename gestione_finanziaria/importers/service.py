@@ -40,6 +40,7 @@ from ..models import (
 )
 from ..services import (
     calcola_hash_deduplica_movimento,
+    crea_notifica_movimento_bancario,
     ricalcola_saldo_corrente_conto,
     riconcilia_movimento_automaticamente,
     _regola_matcha_movimento,
@@ -132,6 +133,7 @@ def importa_movimenti_da_file(
         if regola_applicata is not None:
             regole_applicate[regola_applicata.pk] = regole_applicate.get(regola_applicata.pk, 0) + 1
         movimento.save()
+        crea_notifica_movimento_bancario(movimento, origine_label="import estratto conto")
         if riconcilia_automaticamente:
             candidato_riconciliazione = riconcilia_movimento_automaticamente(movimento)
             if candidato_riconciliazione is not None:

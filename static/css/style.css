@@ -3671,26 +3671,89 @@ a:hover {
     font-weight: 800;
 }
 
-.header-notification-head a {
+.header-notification-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-notification-mark-all-form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.header-notification-head a,
+.header-notification-mark-all {
     color: #23628c;
     font-size: 12px;
     font-weight: 700;
     text-decoration: none;
 }
 
+.header-notification-mark-all {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.header-notification-mark-all:hover,
+.header-notification-head a:hover {
+    text-decoration: underline;
+}
+
+.header-notification-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid #edf2f5;
+}
+
 .header-notification-item {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     gap: 3px;
+    min-width: 0;
     padding: 10px 6px;
-    border-bottom: 1px solid #edf2f5;
     color: #203642;
     text-decoration: none;
 }
 
+.header-notification-row:hover,
 .header-notification-item:hover {
     background: #f4f8fb;
     text-decoration: none;
+}
+
+.header-notification-read-form {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 0 4px;
+}
+
+.header-notification-read-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(65, 118, 144, 0.24);
+    border-radius: 6px;
+    background: #ffffff;
+    color: #23628c;
+    cursor: pointer;
+}
+
+.header-notification-read-btn:hover {
+    border-color: rgba(35, 98, 140, 0.45);
+    background: #eaf5fb;
+}
+
+.header-notification-read-btn svg {
+    width: 15px;
+    height: 15px;
 }
 
 .header-notification-title {

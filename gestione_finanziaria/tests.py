@@ -40,6 +40,7 @@ from .models import (
     MetodoPagamentoFornitore,
     MovimentoFinanziario,
     NotificaFinanziaria,
+    NotificaFinanziariaLettura,
     PagamentoFornitore,
     PianoRatealeSpesa,
     PianificazioneSincronizzazione,
@@ -83,7 +84,7 @@ from .fatture_in_cloud import (
 from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
 from .forms import DocumentoFornitoreForm
-from .providers.base import ProviderAccount
+from .providers.base import ProviderAccount, ProviderTransaction
 from .providers.enablebanking import EnableBankingAdapter, EnableBankingCredentials
 from .services import (
     annulla_pagamento_fornitore,
@@ -251,6 +252,91 @@ class Psd2SchedulerTests(TestCase):
         self.assertIsNotNone(log.durata_millisecondi)
         adapter.saldo_conto.assert_called_once_with("account-test")
         adapter.movimenti_conto.assert_called_once()
+
+    @patch("gestione_finanziaria.providers.adapter_for_provider")
+    def test_psd2_account_sync_crea_notifica_per_nuovo_movimento(self, mock_adapter_for_provider):
+        from gestione_finanziaria.services import sincronizza_conto_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Provider PSD2 notifiche",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "test"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Connessione notifiche",
+            external_connection_id="session-notify",
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto notifiche PSD2",
+            provider=provider,
+            connessione=connessione,
+            external_account_id="account-notify",
+            attivo=True,
+        )
+        adapter = Mock()
+        adapter.saldo_conto.return_value = []
+        adapter.movimenti_conto.return_value = [
+            ProviderTransaction(
+                data_contabile=date(2026, 5, 20),
+                importo=Decimal("-42.50"),
+                descrizione="Pagamento cancelleria",
+                controparte="Cartoleria",
+                provider_transaction_id="tx-notify-1",
+            )
+        ]
+        mock_adapter_for_provider.return_value = adapter
+
+        log = sincronizza_conto_psd2(conto)
+
+        self.assertEqual(log.movimenti_inseriti, 1)
+        movimento = MovimentoFinanziario.objects.get(provider_transaction_id="tx-notify-1")
+        notifica = NotificaFinanziaria.objects.get(movimento_finanziario=movimento)
+        self.assertEqual(notifica.tipo, "movimento_bancario")
+        self.assertEqual(notifica.chiave_deduplica, f"movimento-bancario:{movimento.pk}")
+        self.assertIn("Nuovo movimento bancario", notifica.titolo)
+        self.assertIn("Pagamento cancelleria", notifica.messaggio)
+
+
+class MovimentoNotificationTests(TestCase):
+    def test_importa_movimenti_da_file_crea_notifica_per_nuovo_movimento(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import notifiche",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto import notifiche",
+            provider=provider,
+            attivo=True,
+        )
+        raw_csv = (
+            "Data;Importo;Descrizione\n"
+            "20/05/2026;-18,90;Commissioni bancarie\n"
+        ).encode("utf-8")
+        config = CsvImporterConfig(
+            delimiter=";",
+            ha_intestazione=True,
+            colonna_data_contabile="Data",
+            colonna_importo="Importo",
+            colonna_descrizione="Descrizione",
+        )
+
+        risultato = importa_movimenti_da_file(
+            parser=CsvImporter(config),
+            raw_bytes=raw_csv,
+            conto=conto,
+            provider=provider,
+            nome_file="movimenti.csv",
+            riconcilia_automaticamente=False,
+        )
+
+        self.assertEqual(risultato.inseriti, 1)
+        movimento = MovimentoFinanziario.objects.get(conto=conto)
+        notifica = NotificaFinanziaria.objects.get(movimento_finanziario=movimento)
+        self.assertEqual(notifica.tipo, "movimento_bancario")
+        self.assertEqual(notifica.url, reverse("lista_movimenti_finanziari"))
+        self.assertIn("import estratto conto", notifica.titolo)
+        self.assertIn("Commissioni bancarie", notifica.messaggio)
 
 
 class DocumentoFornitoreFormsetTests(TestCase):
@@ -1869,6 +1955,44 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, f'data-popup-url="{popup_url}"', count=2)
         self.assertContains(response, 'data-window-popup="1"', count=2)
         self.assertNotContains(response, f'href="{documento_url}"')
+
+    def test_campanella_header_permette_di_segnare_notifiche_lette(self):
+        prima = NotificaFinanziaria.objects.create(
+            titolo="Nuovo movimento bancario",
+            messaggio="Conto principale - EUR 25.00",
+            tipo="movimento_bancario",
+            url=reverse("lista_movimenti_finanziari"),
+        )
+        seconda = NotificaFinanziaria.objects.create(
+            titolo="Secondo movimento bancario",
+            messaggio="Conto principale - EUR -12.00",
+            tipo="movimento_bancario",
+            url=reverse("lista_movimenti_finanziari"),
+        )
+        dashboard_url = reverse("dashboard_gestione_finanziaria")
+
+        response = self.client.get(dashboard_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "header-notification-read-form", count=2)
+        self.assertContains(response, reverse("segna_tutte_notifiche_finanziarie_lette"))
+        self.assertContains(response, reverse("segna_notifica_finanziaria_letta", kwargs={"pk": prima.pk}))
+        self.assertContains(response, '<input type="hidden" name="next" value="/gestione-finanziaria/">', html=False)
+
+        response = self.client.post(
+            reverse("segna_notifica_finanziaria_letta", kwargs={"pk": prima.pk}),
+            {"next": dashboard_url},
+        )
+        self.assertRedirects(response, dashboard_url)
+        self.assertTrue(NotificaFinanziariaLettura.objects.filter(notifica=prima, user=self.user).exists())
+        self.assertFalse(NotificaFinanziariaLettura.objects.filter(notifica=seconda, user=self.user).exists())
+
+        response = self.client.post(
+            reverse("segna_tutte_notifiche_finanziarie_lette"),
+            {"next": dashboard_url},
+        )
+        self.assertRedirects(response, dashboard_url)
+        self.assertTrue(NotificaFinanziariaLettura.objects.filter(notifica=seconda, user=self.user).exists())
 
     def test_documento_fornitore_calculates_net_and_vat_from_total(self):
         categoria = crea_categoria_spesa_test("Servizi")

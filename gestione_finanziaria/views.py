@@ -2050,6 +2050,9 @@ def segna_tutte_notifiche_finanziarie_lette(request):
             ignore_conflicts=True,
         )
         messages.success(request, "Notifiche segnate come lette.")
+        if next_url := request.POST.get("next"):
+            if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
     return redirect("lista_notifiche_finanziarie")
 
 

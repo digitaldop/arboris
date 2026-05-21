@@ -1160,6 +1160,7 @@ def sincronizza_conto_psd2(
                 )
                 applica_regole_a_movimento(movimento)
                 movimento.save()
+                crea_notifica_movimento_bancario(movimento, origine_label="PSD2")
                 inseriti += 1
             messaggi.append(
                 f"Movimenti scaricati: {len(transazioni)}, inseriti: {inseriti}"
@@ -2284,6 +2285,35 @@ def crea_notifica_finanziaria(
         )
         return notifica, created
     return NotificaFinanziaria.objects.create(**defaults), True
+
+
+def crea_notifica_movimento_bancario(movimento, *, origine_label=""):
+    if movimento is None or movimento.pk is None:
+        return None, False
+
+    from .models import TipoNotificaFinanziaria
+
+    conto_label = str(movimento.conto) if movimento.conto_id else "Conto non associato"
+    data_label = movimento.data_contabile.strftime("%d/%m/%Y") if movimento.data_contabile else "-"
+    valuta = movimento.valuta or "EUR"
+    descrizione = (movimento.descrizione or "Movimento bancario").strip()
+    fonte = f" da {origine_label}" if origine_label else ""
+    messaggio = f"{conto_label} - {data_label} - {valuta} {movimento.importo} - {descrizione}"
+
+    return crea_notifica_finanziaria(
+        titolo=f"Nuovo movimento bancario{fonte}",
+        messaggio=messaggio[:1000],
+        tipo=TipoNotificaFinanziaria.MOVIMENTO_BANCARIO,
+        livello="info",
+        url=reverse("lista_movimenti_finanziari"),
+        movimento_finanziario=movimento,
+        chiave_deduplica=f"movimento-bancario:{movimento.pk}",
+        payload={
+            "movimento_id": movimento.pk,
+            "conto_id": movimento.conto_id,
+            "origine": origine_label,
+        },
+    )
 
 
 def applica_categoria_documento_a_movimento_fornitore(movimento, scadenza, *, utente=None):

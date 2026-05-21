@@ -164,23 +164,41 @@
                             <div class="header-notification-menu">
                                 <div class="header-notification-head">
                                     <span>Notifiche finanziarie</span>
-                                    <a href="{% url 'lista_notifiche_finanziarie' %}">Apri</a>
+                                    <div class="header-notification-head-actions">
+                                        {% if notifiche_finanziarie_non_lette %}
+                                            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="header-notification-mark-all-form">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button type="submit" class="header-notification-mark-all">Segna tutte</button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="{% url 'lista_notifiche_finanziarie' %}">Apri</a>
+                                    </div>
                                 </div>
                                 {% for notifica in notifiche_finanziarie_recenti %}
-                                    {% if notifica.documento_id %}
-                                        <a
-                                            class="header-notification-item"
-                                            href="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
-                                            data-window-popup="1"
-                                            data-popup-url="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
-                                            data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
-                                        >
-                                    {% else %}
-                                        <a class="header-notification-item" href="{% if notifica.url %}{{ notifica.url }}{% else %}{% url 'lista_notifiche_finanziarie' %}{% endif %}">
-                                    {% endif %}
-                                        <span class="header-notification-title">{{ notifica.titolo }}</span>
-                                        <span class="header-notification-text">{{ notifica.messaggio|truncatechars:90 }}</span>
-                                    </a>
+                                    <div class="header-notification-row">
+                                        {% if notifica.documento_id %}
+                                            <a
+                                                class="header-notification-item"
+                                                href="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                                data-window-popup="1"
+                                                data-popup-url="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
+                                                data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                            >
+                                        {% else %}
+                                            <a class="header-notification-item" href="{% if notifica.url %}{{ notifica.url }}{% else %}{% url 'lista_notifiche_finanziarie' %}{% endif %}">
+                                        {% endif %}
+                                            <span class="header-notification-title">{{ notifica.titolo }}</span>
+                                            <span class="header-notification-text">{{ notifica.messaggio|truncatechars:90 }}</span>
+                                        </a>
+                                        <form method="post" action="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}" class="header-notification-read-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="header-notification-read-btn" title="Segna letta" aria-label="Segna letta {{ notifica.titolo }}">
+                                                <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
+                                            </button>
+                                        </form>
+                                    </div>
                                 {% empty %}
                                     <div class="header-notification-empty">Nessuna nuova notifica.</div>
                                 {% endfor %}

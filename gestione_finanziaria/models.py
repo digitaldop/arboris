@@ -1520,6 +1520,7 @@ class SincronizzazioneLog(models.Model):
 
 class TipoNotificaFinanziaria(models.TextChoices):
     FATTURA_RICEVUTA = "fattura_ricevuta", "Fattura ricevuta"
+    MOVIMENTO_BANCARIO = "movimento_bancario", "Movimento bancario"
     SCADENZA_PROSSIMA = "scadenza_prossima", "Scadenza prossima"
     SCADENZA_INSOLUTA = "scadenza_insoluta", "Scadenza insoluta"
     RICONCILIAZIONE = "riconciliazione", "Riconciliazione"
