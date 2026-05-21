@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO, StringIO
@@ -171,6 +173,51 @@ class Psd2SchedulerTests(TestCase):
         self.assertIsNone(risultato)
         mock_sincronizza_conto.assert_not_called()
 
+    @patch("gestione_finanziaria.scheduler.conti_target", side_effect=RuntimeError("boom globale"))
+    def test_scheduled_sync_releases_lock_when_global_error_occurs(self, mock_conti_target):
+        from gestione_finanziaria.scheduler import maybe_run_scheduled_sync
+
+        PianificazioneSincronizzazione.objects.update_or_create(
+            pk=1,
+            defaults={
+                "attivo": True,
+                "in_corso": False,
+                "sync_saldo": True,
+                "sync_movimenti": True,
+                "giorni_storico": 14,
+            },
+        )
+
+        risultato = maybe_run_scheduled_sync(force=True)
+
+        self.assertIsNotNone(risultato)
+        risultato.refresh_from_db()
+        self.assertFalse(risultato.in_corso)
+        self.assertEqual(risultato.conti_sincronizzati, 0)
+        self.assertEqual(risultato.conti_in_errore, 1)
+        self.assertEqual(risultato.ultimo_esito, EsitoSincronizzazione.ERRORE)
+        self.assertIn("Errore imprevisto scheduler - boom globale", risultato.ultimo_messaggio)
+        mock_conti_target.assert_called_once()
+
+    def test_background_scheduler_skips_management_commands(self):
+        from gestione_finanziaria.background_scheduler import should_start_background_scheduler
+
+        with patch.object(sys, "argv", ["manage.py", "migrate"]):
+            enabled, reason = should_start_background_scheduler()
+
+        self.assertFalse(enabled)
+        self.assertEqual(reason, "comando di management")
+
+    def test_background_scheduler_starts_for_web_process_by_default(self):
+        from gestione_finanziaria.background_scheduler import should_start_background_scheduler
+
+        with patch.object(sys, "argv", ["gunicorn", "arboris.wsgi:application"]):
+            with patch.dict(os.environ, {}, clear=True):
+                enabled, reason = should_start_background_scheduler()
+
+        self.assertTrue(enabled)
+        self.assertEqual(reason, "processo web")
+
     @patch("gestione_finanziaria.providers.adapter_for_provider")
     def test_psd2_account_sync_uses_real_time_module_for_duration(self, mock_adapter_for_provider):
         from gestione_finanziaria.services import sincronizza_conto_psd2
@@ -204,6 +251,33 @@ class Psd2SchedulerTests(TestCase):
         self.assertIsNotNone(log.durata_millisecondi)
         adapter.saldo_conto.assert_called_once_with("account-test")
         adapter.movimenti_conto.assert_called_once()
+
+
+class DocumentoFornitoreFormsetTests(TestCase):
+    def test_popup_scadenze_movimento_field_keeps_all_bank_movements_available(self):
+        from gestione_finanziaria.views import (
+            _documento_fornitore_formset_class,
+            _documento_fornitore_formset_kwargs,
+        )
+
+        movimenti = [
+            MovimentoFinanziario(
+                data_contabile=date(2026, 1, 1) + timedelta(days=index),
+                importo=Decimal("-10.00"),
+                descrizione=f"Movimento bancario {index}",
+                incide_su_saldo_banca=True,
+            )
+            for index in range(125)
+        ]
+        MovimentoFinanziario.objects.bulk_create(movimenti)
+
+        formset = _documento_fornitore_formset_class()(
+            instance=DocumentoFornitore(),
+            **_documento_fornitore_formset_kwargs(compact_movimenti=True),
+        )
+
+        queryset = formset.forms[0].fields["movimento_finanziario"].queryset
+        self.assertEqual(queryset.count(), 125)
 
 
 class Psd2ConnectionImportTests(TestCase):
@@ -1212,7 +1286,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "supplier-payment-shell is-popup")
         self.assertContains(response, "Riconciliazione bancaria")
         self.assertContains(response, "Riconcilia")
-        self.assertContains(response, "Conferma pagamento")
+        self.assertContains(response, "Aggiungi pagamento")
+        self.assertContains(response, "Salva pagamento")
+        self.assertContains(response, "Lascia vuoto il movimento bancario")
         self.assertContains(response, 'onclick="window.close()"')
         self.assertContains(response, '<span class="btn-label">Annulla</span>', html=False)
         self.assertContains(response, "Confermi la riconciliazione con questo movimento bancario")
@@ -1244,6 +1320,95 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
+    def test_pagamento_fornitore_accetta_piu_righe_manuali(self):
+        scadenza, _movimento = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+
+        for index, (data_pagamento, importo, nota) in enumerate([
+            ("2026-05-10", "35.00", "Acconto manuale"),
+            ("2026-05-15", "65.00", "Saldo manuale"),
+        ]):
+            response = self.client.post(
+                url,
+                {
+                    "popup": "1",
+                    "scadenza": str(scadenza.pk),
+                    "movimento_finanziario": "",
+                    "data_pagamento": data_pagamento,
+                    "importo": importo,
+                    "metodo": MetodoPagamentoFornitore.MANUALE,
+                    "conto_bancario": "",
+                    "note": nota,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Pagamento fornitore registrato correttamente.")
+            if index == 0:
+                response = self.client.get(url)
+                self.assertContains(response, "Pagamenti già registrati")
+                self.assertContains(response, "Registrazione manuale")
+                self.assertContains(response, "Nuova riga pagamento")
+
+        pagamenti = PagamentoFornitore.objects.filter(scadenza=scadenza).order_by("data_pagamento")
+        self.assertEqual(pagamenti.count(), 2)
+        self.assertEqual([pagamento.importo for pagamento in pagamenti], [Decimal("35.00"), Decimal("65.00")])
+        self.assertTrue(all(pagamento.movimento_finanziario_id is None for pagamento in pagamenti))
+        scadenza.refresh_from_db()
+        scadenza.documento.refresh_from_db()
+        self.assertEqual(scadenza.importo_pagato, Decimal("100.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(scadenza.documento.stato, StatoDocumentoFornitore.PAGATO)
+
+    def test_pagamento_fornitore_accetta_piu_movimenti_bancari(self):
+        scadenza, primo_movimento = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 12),
+            importo=Decimal("-60.00"),
+            descrizione="Secondo bonifico Beta Servizi",
+            controparte="Beta Servizi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+
+        response = self.client.post(
+            url,
+            {
+                "popup": "1",
+                "scadenza": str(scadenza.pk),
+                "movimento_finanziario": str(primo_movimento.pk),
+                "data_pagamento": "2026-05-10",
+                "importo": "40.00",
+                "metodo": MetodoPagamentoFornitore.BANCA,
+                "conto_bancario": "",
+                "note": "Primo pagamento",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            url,
+            {
+                "popup": "1",
+                "scadenza": str(scadenza.pk),
+                "movimento_finanziario": str(secondo_movimento.pk),
+                "data_pagamento": "2026-05-12",
+                "importo": "60.00",
+                "metodo": MetodoPagamentoFornitore.BANCA,
+                "conto_bancario": "",
+                "note": "Saldo",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(PagamentoFornitore.objects.filter(scadenza=scadenza).count(), 2)
+        scadenza.refresh_from_db()
+        primo_movimento.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        self.assertEqual(scadenza.importo_pagato, Decimal("100.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
     def test_documento_fornitore_popup_annulla_pagamento_usa_popup_gestito(self):
         scadenza, movimento = self._crea_scadenza_pagamento_test()
         pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
@@ -1254,8 +1419,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, annulla_url)
+        self.assertContains(response, "reload_url=")
         self.assertContains(response, 'data-window-popup="1"')
-        self.assertContains(response, f'data-popup-url="{annulla_url}"')
+        self.assertContains(response, f'data-popup-url="{annulla_url}&reload_url=')
         self.assertContains(response, 'data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"')
 
     def test_documento_fornitore_popup_mostra_elimina_movimento_in_sola_lettura(self):
@@ -1269,9 +1435,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "is-view-mode")
         self.assertContains(response, "Elimina movimento")
-        self.assertContains(response, f'href="{annulla_url}"')
+        self.assertContains(response, f'href="{annulla_url}&reload_url=')
         content = response.content.decode()
-        anchor_start = content.index(f'href="{annulla_url}"')
+        anchor_start = content.index(f'href="{annulla_url}&reload_url=')
         anchor_end = content.index(">", anchor_start)
         self.assertNotIn("mode-edit-only", content[anchor_start:anchor_end])
         actions_start = content.rfind('data-label="Azioni"', 0, anchor_start)
@@ -1619,7 +1785,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         response = self.client.get(reverse("lista_documenti_fornitori"), {"categoria": str(categoria.pk)})
         self.assertContains(response, "CAR-1")
 
-    def test_documento_fornitore_popup_limits_movimento_choices_but_keeps_selected_one(self):
+    def test_documento_fornitore_popup_mostra_tutti_i_movimenti_collegabili(self):
         fornitore = Fornitore.objects.create(denominazione="Tecnica Srl")
         documento = DocumentoFornitore.objects.create(
             fornitore=fornitore,
@@ -1665,13 +1831,14 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "supplier-document-edit-table")
         self.assertContains(response, "is-view-mode")
         self.assertContains(response, 'id="enable-edit-documento-fornitore-btn"')
-        self.assertContains(response, "Collega movimento bancario")
+        self.assertContains(response, "Aggiungi pagamento")
         self.assertContains(response, "mode-edit-only-table-cell")
         self.assertContains(response, "Movimento storico collegato")
-        self.assertNotContains(response, "Movimento storico non collegato")
+        self.assertContains(response, "Movimento storico non collegato")
         pagamento_url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': documento.scadenze.first().pk})}?popup=1"
-        self.assertContains(response, f'href="{pagamento_url}"')
-        self.assertContains(response, f'data-popup-url="{pagamento_url}"')
+        self.assertContains(response, pagamento_url)
+        self.assertContains(response, "reload_url=")
+        self.assertContains(response, f'data-popup-url="{pagamento_url}&reload_url=')
         self.assertContains(response, 'data-window-popup="1"')
         self.assertContains(response, 'data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"')
 

@@ -880,6 +880,32 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(len(saved.config["custom_sections"][0]["links"]), 1)
         self.assertEqual(saved.config["custom_sections"][0]["links"][0]["url"], "/gestione-finanziaria/movimenti/")
 
+    def test_sidebar_personalization_endpoint_keeps_url_like_order_keys(self):
+        self.client.force_login(self.user)
+        parent_key = "nav:section:gestione-finanziaria:0"
+        url_key = "link:/gestione-finanziaria/movimenti/?search=Rossi+Mario&filter=a;b,c(1)"
+        long_key = "link:/gestione-finanziaria/report/categorie-mensile/?q=" + ("x" * 230) + "+ok"
+        payload = {
+            "config": {
+                "hidden": [url_key],
+                "order": {
+                    parent_key: [long_key, url_key],
+                },
+                "custom_sections": [],
+            }
+        }
+
+        response = self.client.post(
+            reverse("sidebar_personalizzazione_sistema"),
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        saved = SidebarPersonalizzazione.objects.get(user=self.user)
+        self.assertEqual(saved.config["hidden"], [url_key])
+        self.assertEqual(saved.config["order"][parent_key], [long_key, url_key])
+
     def test_sidebar_personalization_endpoint_resets_user_config(self):
         SidebarPersonalizzazione.objects.create(
             user=self.user,

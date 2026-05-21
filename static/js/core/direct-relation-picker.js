@@ -124,7 +124,7 @@ window.ArborisDirectRelationPicker = (function () {
         searchLabel.insertBefore(createIcon("search", spritePath), searchInput);
 
         const toggle = picker.querySelector(".direct-relation-picker-toggle");
-        toggle.appendChild(createIcon("chevron-up", spritePath));
+        toggle.appendChild(createIcon("chevron-down", spritePath));
 
         select.insertAdjacentElement("afterend", picker);
         select.classList.add("is-enhanced-native");

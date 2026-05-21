@@ -26,9 +26,10 @@
         <h2 class="section-title">Configurazione</h2>
         <p class="help-text">
             Lo scheduler esegue automaticamente la sincronizzazione dei conti PSD2 attivi
-            quando scade l'intervallo configurato. L'attivazione avviene su due fronti:
-            durante il normale traffico applicativo (middleware) e tramite il comando
-            <code>python manage.py run_scheduled_psd2_sync</code> da Task Scheduler o cron.
+            quando scade l'intervallo configurato. L'attivazione avviene dal runner web
+            in background; il middleware resta come fallback durante il normale traffico
+            applicativo e il comando <code>python manage.py run_scheduled_psd2_sync</code>
+            resta disponibile per cron o Task Scheduler esterni.
         </p>
 
         <form method="post" class="form-grid">
@@ -94,6 +95,18 @@
                 <tr>
                     <th>Prossima esecuzione prevista</th>
                     <td>{% if prossima_esecuzione %}{{ prossima_esecuzione|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>Automazione background</th>
+                    <td>
+                        {% if background_scheduler.thread_alive %}
+                            Attiva: controllo ogni {{ background_scheduler.interval_minutes }} minuti.
+                        {% elif background_scheduler.enabled %}
+                            In attesa di avvio nel processo web ({{ background_scheduler.reason }}).
+                        {% else %}
+                            Non attiva in questo processo ({{ background_scheduler.reason }}).
+                        {% endif %}
+                    </td>
                 </tr>
                 <tr>
                     <th>Esecuzione in corso</th>

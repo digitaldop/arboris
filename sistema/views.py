@@ -99,7 +99,7 @@ FEEDBACK_PER_PAGE = 20
 GLOBAL_SEARCH_MIN_QUERY_LENGTH = 2
 GLOBAL_SEARCH_MAX_RESULTS = 12
 SIDEBAR_CONFIG_MAX_HIDDEN = 600
-SIDEBAR_CONFIG_MAX_ORDER_GROUPS = 160
+SIDEBAR_CONFIG_MAX_ORDER_GROUPS = 300
 SIDEBAR_CONFIG_MAX_CUSTOM_SECTIONS = 16
 SIDEBAR_CONFIG_MAX_CUSTOM_LINKS = 40
 SIDEBAR_ICON_CHOICES = {
@@ -140,11 +140,11 @@ def json_or_redirect(request, payload, *, status=200, fallback_url=None, message
     return redirect(redirect_url)
 
 
-def clean_sidebar_key(value, *, max_length=180):
+def clean_sidebar_key(value, *, max_length=512):
     value = str(value or "").strip()
     if not value or len(value) > max_length:
         return ""
-    if not re.match(r"^[A-Za-z0-9:_./?=&%#-]+$", value):
+    if re.search(r"[\s<>'\"`\\]", value):
         return ""
     return value
 
@@ -185,12 +185,12 @@ def normalize_sidebar_config(raw_config):
     raw_order = raw_config.get("order", {})
     if isinstance(raw_order, dict):
         for parent_key, child_keys in list(raw_order.items())[:SIDEBAR_CONFIG_MAX_ORDER_GROUPS]:
-            clean_parent_key = clean_sidebar_key(parent_key, max_length=220)
+            clean_parent_key = clean_sidebar_key(parent_key, max_length=512)
             if not clean_parent_key or not isinstance(child_keys, list):
                 continue
             clean_child_keys = []
             for child_key in child_keys[:SIDEBAR_CONFIG_MAX_HIDDEN]:
-                clean_child_key = clean_sidebar_key(child_key)
+                clean_child_key = clean_sidebar_key(child_key, max_length=512)
                 if clean_child_key and clean_child_key not in clean_child_keys:
                     clean_child_keys.append(clean_child_key)
             if clean_child_keys:

@@ -33,7 +33,13 @@ window.ArborisSidebarReorder = (function () {
         try {
             window.localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
         } catch (error) {
-            return;
+            // Il salvataggio lato server resta comunque il riferimento principale.
+        }
+
+        if (window.ArborisSidebarCustomization?.saveCurrentOrder) {
+            window.ArborisSidebarCustomization.saveCurrentOrder().catch(function () {
+                return;
+            });
         }
     }
 

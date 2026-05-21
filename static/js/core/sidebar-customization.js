@@ -216,6 +216,20 @@ window.ArborisSidebarCustomization = (function () {
         return Array.from(container.children).filter(isCustomizableChild);
     }
 
+    function getOrderContainers() {
+        if (!root) {
+            return [];
+        }
+        return [
+            root,
+            ...Array.from(root.querySelectorAll("[data-sidebar-order-parent]")),
+        ].filter(container => container?.dataset?.sidebarOrderParent);
+    }
+
+    function getOrderKeys(container) {
+        return getOrderChildren(container).map(getElementKey).filter(Boolean);
+    }
+
     function assignOrderParent(container, key) {
         if (container) {
             container.dataset.sidebarOrderParent = key;
@@ -342,7 +356,7 @@ window.ArborisSidebarCustomization = (function () {
 
     function applyOrders() {
         const orders = config.order || {};
-        document.querySelectorAll("[data-sidebar-order-parent]").forEach(container => {
+        getOrderContainers().forEach(container => {
             const order = orders[container.dataset.sidebarOrderParent];
             if (!Array.isArray(order) || !order.length) {
                 return;
@@ -351,12 +365,16 @@ window.ArborisSidebarCustomization = (function () {
             getOrderChildren(container).forEach(child => {
                 childrenByKey.set(getElementKey(child), child);
             });
+            const orderedChildren = [];
             order.forEach(childKey => {
                 const child = childrenByKey.get(childKey);
                 if (child) {
-                    container.appendChild(child);
+                    orderedChildren.push(child);
                     childrenByKey.delete(childKey);
                 }
+            });
+            [...orderedChildren, ...childrenByKey.values()].forEach(child => {
+                container.appendChild(child);
             });
         });
     }
@@ -800,13 +818,25 @@ window.ArborisSidebarCustomization = (function () {
 
     function collectOrders() {
         const order = {};
-        document.querySelectorAll("[data-sidebar-order-parent]").forEach(container => {
-            const keys = getOrderChildren(container).map(getElementKey);
+        getOrderContainers().forEach(container => {
+            const keys = getOrderKeys(container);
             if (keys.length) {
                 order[container.dataset.sidebarOrderParent] = keys;
             }
         });
         return order;
+    }
+
+    function normalizeConfigForSave() {
+        config.hidden = Array.from(hiddenKeys);
+        config.order = collectOrders();
+        (config.custom_sections || []).forEach(section => {
+            section.icon = normalizedIconValue(section.icon);
+            (section.links || []).forEach(link => {
+                link.icon = normalizedIconValue(link.icon || section.icon);
+            });
+        });
+        return config;
     }
 
     function setStatus(message, tone) {
@@ -854,24 +884,24 @@ window.ArborisSidebarCustomization = (function () {
         dialog.setAttribute("aria-hidden", "true");
     }
 
-    function saveConfig() {
-        const saveButton = dialog?.querySelector("[data-sidebar-customization-save]");
+    function persistConfig(options) {
+        const saveButton = options?.button || null;
+        const closeOnSuccess = Boolean(options?.closeOnSuccess);
+        const silent = Boolean(options?.silent);
         if (!configUrl) {
-            setStatus("Endpoint di salvataggio non disponibile. Ricarica la pagina.", "error");
-            return;
+            const error = new Error("Endpoint di salvataggio non disponibile. Ricarica la pagina.");
+            if (!silent) {
+                setStatus(error.message, "error");
+            }
+            return Promise.reject(error);
         }
-        config.hidden = Array.from(hiddenKeys);
-        config.order = collectOrders();
-        (config.custom_sections || []).forEach(section => {
-            section.icon = normalizedIconValue(section.icon);
-            (section.links || []).forEach(link => {
-                link.icon = normalizedIconValue(link.icon || section.icon);
-            });
-        });
-        setStatus("Salvataggio...", "");
+        normalizeConfigForSave();
+        if (!silent) {
+            setStatus("Salvataggio...", "");
+        }
         setActionBusy(saveButton, true, "Salvataggio...");
 
-        fetch(configUrl, {
+        return fetch(configUrl, {
             method: "POST",
             credentials: "same-origin",
             headers: {
@@ -893,15 +923,28 @@ window.ArborisSidebarCustomization = (function () {
                 applyConfig();
                 renderTreeEditor();
                 renderCustomPanel();
-                setStatus("Menu salvato.", "");
-                closeDialog();
+                if (!silent) {
+                    setStatus("Menu salvato.", "");
+                }
+                if (closeOnSuccess) {
+                    closeDialog();
+                }
+                return payload;
             })
             .catch(error => {
-                setStatus(error.message || "Salvataggio non riuscito", "error");
+                if (!silent) {
+                    setStatus(error.message || "Salvataggio non riuscito", "error");
+                }
+                throw error;
             })
             .finally(() => {
                 setActionBusy(saveButton, false);
             });
+    }
+
+    function saveConfig() {
+        const saveButton = dialog?.querySelector("[data-sidebar-customization-save]");
+        persistConfig({ button: saveButton, closeOnSuccess: true }).catch(() => {});
     }
 
     function resetConfig() {
@@ -1046,5 +1089,8 @@ window.ArborisSidebarCustomization = (function () {
     return {
         init,
         hasPersistentOrder,
+        saveCurrentOrder() {
+            return persistConfig({ silent: true });
+        },
     };
 })();

@@ -1433,6 +1433,7 @@ html.arboris-long-wait .page-loading-overlay {
     border: 1px solid #cbd6e2;
     border-radius: 8px;
     background: #ffffff;
+    overflow: hidden;
     box-shadow: 0 1px 0 rgba(23, 39, 61, 0.02);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1491,6 +1492,10 @@ html.arboris-long-wait .page-loading-overlay {
 
 .related-address-input-shell.has-trailing-icon .related-address-input-control input:not([type="hidden"]) {
     padding-right: 54px;
+}
+
+.related-address-field-cap .related-address-input-shell {
+    width: min(100%, 280px);
 }
 
 .related-address-input-trailing {
@@ -9409,6 +9414,32 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     width: 32px;
     height: 32px;
     min-height: 32px;
+}
+
+.popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .supplier-deadline-main-row td:nth-child(6),
+.popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .supplier-deadline-main-row td:nth-child(7) {
+    overflow: visible;
+}
+
+.popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .supplier-deadline-related .searchable-select {
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+}
+
+.popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .supplier-deadline-related .searchable-select-input {
+    min-height: 38px;
+    padding: 7px 32px 7px 9px;
+    font-size: 13px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+}
+
+.popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .supplier-deadline-related .searchable-select::after {
+    right: 12px;
+    width: 7px;
+    height: 7px;
+    border-width: 0 2px 2px 0;
 }
 
 .popup-page .supplier-document-detail-shell.is-popup .supplier-deadlines-table .inline-remove-btn {
@@ -19692,10 +19723,12 @@ a.header-school-compact:hover {
 .direct-relation-picker-search svg {
     position: absolute;
     left: 13px;
+    top: 50%;
     width: 18px;
     height: 18px;
     color: #6f89a5;
     pointer-events: none;
+    transform: translateY(-50%);
 }
 
 .direct-relation-picker-search input {
@@ -23983,6 +24016,10 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 #studente-detail-form.is-create-mode .student-create-overview-card {
     align-items: flex-start;
+}
+
+#studente-detail-form.is-create-mode .student-create-overview-card .student-overview-avatar {
+    align-self: flex-start;
 }
 
 #studente-detail-form.is-create-mode .student-create-main-card-editor {

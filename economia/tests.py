@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from arboris.form_widgets import apply_eur_currency_widget
@@ -45,6 +45,7 @@ from economia.models import (
     TariffaScambioRetta,
 )
 from economia.services import (
+    _format_preview_date,
     anteprima_riconcilia_pagamenti_rate_anno_scolastico,
     ricalcola_rate_anno_scolastico,
     riconcilia_pagamenti_iscrizione,
@@ -59,6 +60,12 @@ from sistema.models import (
     GestioneIscrizioneCorsoAnno,
     SistemaImpostazioniGenerali,
 )
+
+
+class RiconciliazioneRatePreviewFormattingTests(SimpleTestCase):
+    def test_movimento_preview_date_uses_italian_day_month_year(self):
+        self.assertEqual(_format_preview_date(date(2026, 5, 15)), "15-05-2026")
+        self.assertEqual(_format_preview_date(None), "")
 
 
 class EconomiaCurrentSchoolYearDefaultsTests(TestCase):
@@ -969,6 +976,36 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertContains(response, "Collega un pagamento")
         self.assertContains(response, f'href="{reconciliation_url}"')
         self.assertContains(response, f'data-popup-url="{reconciliation_url}"')
+
+    def test_rate_detail_preserves_back_url_after_save(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        source_url = f"{reverse('verifica_situazione_rette')}?anno_scolastico={self.anno.pk}"
+        detail_url = reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk})
+
+        response = self.client.get(detail_url, HTTP_REFERER=source_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'name="next" value="{source_url}"')
+
+        response = self.client.post(
+            detail_url,
+            {
+                "data_scadenza": rata.data_scadenza.isoformat(),
+                "importo_pagato": "0,00",
+                "data_pagamento": "",
+                "metodo_pagamento": "",
+                "credito_applicato": "",
+                "altri_sgravi": "",
+                "note": "Nota aggiornata",
+                "next": source_url,
+            },
+            HTTP_REFERER=detail_url,
+        )
+
+        self.assertRedirects(response, source_url, fetch_redirect_response=False)
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class EconomiaBatchRateTests(TestCase):

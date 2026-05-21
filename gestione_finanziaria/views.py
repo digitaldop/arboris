@@ -29,6 +29,7 @@ from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso
 from sistema.permissions import user_has_module_permission, user_is_operational_admin
 
+from .background_scheduler import background_scheduler_status
 from .fatture_in_cloud import (
     FIC_SOURCE,
     FattureInCloudError,
@@ -65,7 +66,6 @@ from .forms import (
     ScadenzaPagamentoFornitoreFormSet,
     SpesaOperativaForm,
     VoceBudgetRicorrenteForm,
-    movimenti_fornitore_recenti_ids,
 )
 from gestione_amministrativa.models import BustaPagaDipendente
 from .importers import (
@@ -820,8 +820,6 @@ def _documento_fornitore_detail_queryset():
 
 def _documento_fornitore_formset_kwargs(documento=None, compact_movimenti=False):
     kwargs = {}
-    if compact_movimenti:
-        kwargs["form_kwargs"] = {"movimento_choices_ids": movimenti_fornitore_recenti_ids()}
     if documento and documento.pk:
         kwargs["queryset"] = _documento_fornitore_scadenze_queryset().filter(documento=documento)
     return kwargs
@@ -4956,6 +4954,7 @@ def pianificazione_sincronizzazione(request):
             "config": config,
             "conti_target": conti,
             "prossima_esecuzione": prossima_esecuzione_prevista(config),
+            "background_scheduler": background_scheduler_status(),
         },
     )
 

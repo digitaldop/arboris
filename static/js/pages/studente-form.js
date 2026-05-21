@@ -1930,7 +1930,7 @@ window.ArborisStudenteForm = (function () {
             grid.appendChild(field);
         }
 
-        function appendSubformField(grid, subformRow, selector, extraClass, editor) {
+        function appendSubformField(grid, subformRow, selector, labelText, extraClass, editor) {
             const input = subformRow ? subformRow.querySelector(selector) : null;
             const field = input ? input.closest(".inline-subform-field") : null;
             if (!field) {
@@ -1938,6 +1938,10 @@ window.ArborisStudenteForm = (function () {
             }
 
             rememberEditorNode(editor, field);
+            const label = labelText ? field.querySelector("label") : null;
+            if (label) {
+                label.textContent = labelText;
+            }
             field.classList.add("family-student-editor-field");
             if (extraClass) {
                 field.classList.add(extraClass);

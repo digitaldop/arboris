@@ -56,9 +56,6 @@ MESE_COMPETENZA_CHOICES = [
     (12, "Dicembre"),
 ]
 
-MOVIMENTI_FORNITORE_CHOICES_LIMIT = 120
-
-
 def make_searchable_select(field, placeholder):
     field.widget.attrs.update(
         {
@@ -76,13 +73,11 @@ def categorie_spesa_queryset():
     )
 
 
-def movimenti_fornitore_recenti_ids(limit=MOVIMENTI_FORNITORE_CHOICES_LIMIT):
-    return list(
-        MovimentoFinanziario.objects.order_by("-data_contabile", "-id").values_list("pk", flat=True)[:limit]
-    )
-
-
 def movimenti_fornitore_queryset(choice_ids=None, selected_id=None):
+    base_queryset = MovimentoFinanziario.objects.only("id", "data_contabile", "importo", "descrizione")
+    if choice_ids is None:
+        return base_queryset.order_by("-data_contabile", "-id")
+
     ids = set(choice_ids or [])
     if selected_id:
         ids.add(selected_id)
@@ -91,8 +86,7 @@ def movimenti_fornitore_queryset(choice_ids=None, selected_id=None):
         return MovimentoFinanziario.objects.none()
 
     return (
-        MovimentoFinanziario.objects.filter(pk__in=ids)
-        .only("id", "data_contabile", "importo", "descrizione")
+        base_queryset.filter(pk__in=ids)
         .order_by("-data_contabile", "-id")
     )
 
@@ -519,13 +513,10 @@ class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
             self.fields[field_name].input_formats = ["%Y-%m-%d"]
         self.fields["conto_bancario"].queryset = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
         self.fields["conto_bancario"].empty_label = "--- nessuno ---"
-        if movimento_choices_ids is None:
-            self.fields["movimento_finanziario"].queryset = MovimentoFinanziario.objects.order_by("-data_contabile", "-id")
-        else:
-            self.fields["movimento_finanziario"].queryset = movimenti_fornitore_queryset(
-                movimento_choices_ids,
-                selected_id=getattr(self.instance, "movimento_finanziario_id", None),
-            )
+        self.fields["movimento_finanziario"].queryset = movimenti_fornitore_queryset(
+            movimento_choices_ids,
+            selected_id=getattr(self.instance, "movimento_finanziario_id", None),
+        )
         self.fields["movimento_finanziario"].empty_label = "--- nessuno ---"
         make_searchable_select(self.fields["conto_bancario"], "Cerca un conto...")
         make_searchable_select(self.fields["movimento_finanziario"], "Cerca un movimento...")

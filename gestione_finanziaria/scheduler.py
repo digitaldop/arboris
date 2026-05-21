@@ -7,7 +7,9 @@ configurazione e un middleware che, a ogni richiesta idonea, verifica se
 c'e' un'esecuzione in scadenza e in tal caso la lancia.
 
 Opzioni per far girare lo scheduler:
-- **Middleware** (default): comodo in dev, dipende dal traffico applicativo.
+- **Runner web in background**: controlla periodicamente le scadenze dal
+  processo web senza attendere traffico applicativo.
+- **Middleware** (fallback): comodo in dev, dipende dal traffico applicativo.
 - **Management command** ``run_scheduled_psd2_sync``: da Windows Task Scheduler
   o cron, non dipende dal traffico.
 - **APScheduler/Celery**: integrabili in futuro continuando a chiamare
@@ -96,6 +98,22 @@ def _acquire_lock(now, *, force: bool = False) -> Optional[PianificazioneSincron
         return None
 
 
+def _build_psd2_sync_summary(sincronizzati: int, in_errore: int, messaggi) -> tuple[str, str]:
+    if in_errore == 0 and sincronizzati > 0:
+        esito = EsitoSincronizzazione.OK
+    elif in_errore > 0 and sincronizzati > 0:
+        esito = EsitoSincronizzazione.PARZIALE
+    elif in_errore > 0:
+        esito = EsitoSincronizzazione.ERRORE
+    else:
+        esito = EsitoSincronizzazione.OK
+
+    testo = f"Conti sincronizzati: {sincronizzati}, in errore: {in_errore}"
+    if messaggi:
+        testo += "\n" + "\n".join(messaggi[:50])
+    return esito, testo
+
+
 def maybe_run_scheduled_sync(
     triggered_by=None,
     *,
@@ -145,43 +163,36 @@ def maybe_run_scheduled_sync(
     if config is None:
         return None
 
-    conti = list(conti_target())
     sincronizzati = 0
     in_errore = 0
     messaggi = []
+    try:
+        conti = list(conti_target())
 
-    for conto in conti:
-        try:
-            log = sincronizza_conto_psd2(
-                conto,
-                sync_saldo=config.sync_saldo,
-                sync_movimenti=config.sync_movimenti,
-                giorni_storico=config.giorni_storico,
-            )
-            if log.esito == EsitoSincronizzazione.ERRORE:
+        for conto in conti:
+            try:
+                log = sincronizza_conto_psd2(
+                    conto,
+                    sync_saldo=config.sync_saldo,
+                    sync_movimenti=config.sync_movimenti,
+                    giorni_storico=config.giorni_storico,
+                )
+                if log.esito == EsitoSincronizzazione.ERRORE:
+                    in_errore += 1
+                    messaggi.append(f"{conto.nome_conto}: ERRORE - {log.messaggio[:200]}")
+                else:
+                    sincronizzati += 1
+            except ProviderConfigurazioneMancante as exc:
                 in_errore += 1
-                messaggi.append(f"{conto.nome_conto}: ERRORE - {log.messaggio[:200]}")
-            else:
-                sincronizzati += 1
-        except ProviderConfigurazioneMancante as exc:
-            in_errore += 1
-            messaggi.append(f"{conto.nome_conto}: config mancante - {exc}")
-        except Exception as exc:
-            in_errore += 1
-            messaggi.append(f"{conto.nome_conto}: errore imprevisto - {exc}")
+                messaggi.append(f"{conto.nome_conto}: config mancante - {exc}")
+            except Exception as exc:
+                in_errore += 1
+                messaggi.append(f"{conto.nome_conto}: errore imprevisto - {exc}")
+    except Exception as exc:
+        in_errore = max(in_errore, 1)
+        messaggi.append(f"Errore imprevisto scheduler - {exc}")
 
-    if in_errore == 0 and sincronizzati > 0:
-        esito = EsitoSincronizzazione.OK
-    elif in_errore > 0 and sincronizzati > 0:
-        esito = EsitoSincronizzazione.PARZIALE
-    elif in_errore > 0:
-        esito = EsitoSincronizzazione.ERRORE
-    else:
-        esito = EsitoSincronizzazione.OK  # nessun conto da sincronizzare e' comunque "ok"
-
-    testo = f"Conti sincronizzati: {sincronizzati}, in errore: {in_errore}"
-    if messaggi:
-        testo += "\n" + "\n".join(messaggi[:50])
+    esito, testo = _build_psd2_sync_summary(sincronizzati, in_errore, messaggi)
 
     with transaction.atomic():
         config = PianificazioneSincronizzazione.objects.select_for_update().get(pk=1)

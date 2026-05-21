@@ -18,6 +18,12 @@ def _rata_reference_date(rata):
     return date(rata.anno_riferimento, rata.mese_riferimento, 1)
 
 
+def _format_preview_date(value):
+    if not value:
+        return ""
+    return value.strftime("%d-%m-%Y")
+
+
 def _split_amount(total, count):
     total = total or Decimal("0.00")
     count = max(int(count or 0), 1)
@@ -492,7 +498,7 @@ def _serializza_anteprima_riconciliazione_rate(anteprima):
                 "score": item["score"],
                 "motivazioni": item["motivazioni"],
                 "movimento_id": movimento.pk,
-                "movimento_data": movimento.data_contabile.isoformat() if movimento.data_contabile else "",
+                "movimento_data": _format_preview_date(movimento.data_contabile),
                 "movimento_descrizione": movimento.descrizione or "",
                 "movimento_controparte": movimento.controparte or "",
                 "movimento_conto": str(movimento.conto) if movimento.conto_id else "",

@@ -63,7 +63,7 @@
         <form method="post" id="rata-detail-form" class="calendar-event-form rate-detail-form detail-form is-view-mode">
             {% csrf_token %}
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
-            {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+            <input type="hidden" name="next" value="{{ back_url }}">
 
             {% if form.non_field_errors %}
                 <div class="settings-warning-box calendar-event-form-errors">
