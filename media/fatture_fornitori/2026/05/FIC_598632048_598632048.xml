@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?><ns3:FatturaElettronica versione="FPR12" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>10209790152</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>135258</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>M5UXCR1</CodiceDestinatario>
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>01994700381</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>01994700381</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>CB FOOD SERVICE SRL</Denominazione>
+                </Anagrafica>
+                <RegimeFiscale>RF01</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA C. COLOMBO</Indirizzo>
+                <NumeroCivico>37/A-B-C</NumeroCivico>
+                <CAP>44124</CAP>
+                <Comune>FERRARA</Comune>
+                <Provincia>FE</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+            <Contatti>
+                <Telefono>0532 771933</Telefono>
+                <Fax>391/1312423</Fax>
+                <Email>info@cbfood.it</Email>
+            </Contatti>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>04223931207</IdCodice>
+                </IdFiscaleIVA>
+                <Anagrafica>
+                    <Denominazione>IL SOLE E L'ALTRE STELLE IMPRESA SOCIALE SRL</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA CIRCONDARIA OVEST 53</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>SANT' AGATA BOLOGNESE</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>2026-03-30</Data>
+                <Numero>329</Numero>
+                <ImportoTotaleDocumento>663.56</ImportoTotaleDocumento>
+            </DatiGeneraliDocumento>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>9</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>2</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>10</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>3</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>11</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>4</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>12</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>5</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>13</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>6</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>14</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>7</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>15</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>8</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>16</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>9</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiOrdineAcquisto>
+                <RiferimentoNumeroLinea>17</RiferimentoNumeroLinea>
+                <IdDocumento>100</IdDocumento>
+                <Data>2026-03-11</Data>
+                <NumItem>10</NumItem>
+            </DatiOrdineAcquisto>
+            <DatiTrasporto>
+                <IndirizzoResa>
+                    <Indirizzo>VIA STELLONI LEVANTE, 37</Indirizzo>
+                    <CAP>40012</CAP>
+                    <Comune>Calderara Di Reno</Comune>
+                    <Provincia>BO</Provincia>
+                    <Nazione>IT</Nazione>
+                </IndirizzoResa>
+            </DatiTrasporto>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            <DettaglioLinee>
+                <NumeroLinea>1</NumeroLinea>
+                <Descrizione>C/O: C/O SCUOLA IL RAMO D'ORO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>2</NumeroLinea>
+                <Descrizione>Vs. richiesta ARIANNA SERRA</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>3</NumeroLinea>
+                <Descrizione>Rif. Chiamata 1079 - Intervento svolto il 02/03/2026</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>4</NumeroLinea>
+                <Descrizione>ESEGUITO CONTROLLO GENERALE ATTREZZATURE.DA RITIRARE LAVASTOVIGLIE CAPOTTINA PER PULIZIA E CONTROLLO.  DA VERIFICARE ARMADIO FRIGORIFERO SCARICO DI GAS E GUARNIZIONE PORTA ARRUGGINITA. LAVASTOVIGLIE CARICA FRONTALE DA SOSTITUIRE TAPPO SCARICO E POMPA LAVAGGIO.</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>5</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>MDT</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>MANODOPERA TECNICO</Descrizione>
+                <Quantita>2.00</Quantita>
+                <UnitaMisura>H</UnitaMisura>
+                <PrezzoUnitario>36.00</PrezzoUnitario>
+                <PrezzoTotale>72.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>N.D.</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>6</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>DIRITTO FISSO</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>DIRITTO FISSO DI CHIAMATA</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>26.00</PrezzoUnitario>
+                <PrezzoTotale>26.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>N.D.</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>7</NumeroLinea>
+                <Descrizione>C/O: C/O SCUOLA IL RAMO D'ORO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>8</NumeroLinea>
+                <Descrizione>Rif. Chiamata 1170 - Intervento svolto il 17/03/2026</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>9</NumeroLinea>
+                <Descrizione>RIPARAZIONE LAVASTOVIGLIE ZANUSSI S/N 82000030</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>10</NumeroLinea>
+                <Descrizione>.</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>11</NumeroLinea>
+                <Descrizione>CON SOSTITUZIONE TAPPO, OR E POMPA DI LAVAGGIO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>12</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>0L0126</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>POMPA DI LAVAGGIO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>258.00</PrezzoUnitario>
+                <PrezzoTotale>258.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>13</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>048842</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>TUBO TROPPOPIENO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>pezzi</UnitaMisura>
+                <PrezzoUnitario>15.00</PrezzoUnitario>
+                <PrezzoTotale>15.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>14</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>046799</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>O-RING PER TUBOP TROPPOPIENO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>pezzi</UnitaMisura>
+                <PrezzoUnitario>1.90</PrezzoUnitario>
+                <PrezzoTotale>1.90</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>15</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>MDT</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>MANODOPERA TECNICO</Descrizione>
+                <Quantita>2.00</Quantita>
+                <UnitaMisura>H</UnitaMisura>
+                <PrezzoUnitario>36.00</PrezzoUnitario>
+                <PrezzoTotale>72.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>16</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>DIRITTO FISSO</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>DIRITTO FISSO DI CHIAMATA</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>26.00</PrezzoUnitario>
+                <PrezzoTotale>26.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>17</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>RV</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>RIMBORSO 1/2 VIAGGIO</Descrizione>
+                <Quantita>55.00</Quantita>
+                <UnitaMisura>km</UnitaMisura>
+                <PrezzoUnitario>1.00</PrezzoUnitario>
+                <PrezzoTotale>55.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>S/N 82000030</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>18</NumeroLinea>
+                <Descrizione>C/O: C/O SCUOLA IL RAMO D'ORO</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>19</NumeroLinea>
+                <Descrizione>Rif. Chiamata 1169 - Intervento svolto il 17/03/2026</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>20</NumeroLinea>
+                <Descrizione>PREPARAZIONE E RITIRO LAVASTOVIGLIE PER CONTROLLO, PULIZIA ED EVENTUALE REVISIONE</Descrizione>
+                <Quantita>1.00</Quantita>
+                <UnitaMisura>n</UnitaMisura>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Descrittivo #DE#</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>21</NumeroLinea>
+                <CodiceArticolo>
+                    <CodiceTipo>AswArtFor</CodiceTipo>
+                    <CodiceValore>MDT</CodiceValore>
+                </CodiceArticolo>
+                <Descrizione>MANODOPERA TECNICO</Descrizione>
+                <Quantita>0.50</Quantita>
+                <UnitaMisura>H</UnitaMisura>
+                <PrezzoUnitario>36.00</PrezzoUnitario>
+                <PrezzoTotale>18.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Normale #NO#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswMatric</TipoDato>
+                    <RiferimentoTesto>N.D.</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswConCont</TipoDato>
+                    <RiferimentoTesto>06010101001</RiferimentoTesto>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>22</NumeroLinea>
+                <Descrizione>Riga ausiliaria contenente informazioni tecniche e aggiuntive del documento</Descrizione>
+                <PrezzoUnitario>0.00</PrezzoUnitario>
+                <PrezzoTotale>0.00</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <AltriDatiGestionali>
+                    <TipoDato>AswRelStd</TipoDato>
+                    <RiferimentoTesto>Versione #Asw0105#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTRiga</TipoDato>
+                    <RiferimentoTesto>Informazioni documento #ID#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswDestB2B</TipoDato>
+                    <RiferimentoTesto>Recipient #M5UXCR1#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTipoDoc</TipoDato>
+                    <RiferimentoTesto>Fattura #TPD01#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswCarDoc</TipoDato>
+                    <RiferimentoTesto>Vendita diretta #CD01#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswCarDoc</TipoDato>
+                    <RiferimentoTesto>Vendita Merce/Beni #CD07#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswCarDoc</TipoDato>
+                    <RiferimentoTesto>Vendita Servizi #CD08#</RiferimentoTesto>
+                </AltriDatiGestionali>
+                <AltriDatiGestionali>
+                    <TipoDato>AswTipoPag</TipoDato>
+                    <RiferimentoTesto>#TP06#</RiferimentoTesto>
+                    <RiferimentoNumero>1.00</RiferimentoNumero>
+                </AltriDatiGestionali>
+            </DettaglioLinee>
+            <DatiRiepilogo>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <ImponibileImporto>543.90</ImponibileImporto>
+                <Imposta>119.66</Imposta>
+                <EsigibilitaIVA>D</EsigibilitaIVA>
+                <RiferimentoNormativo>IVA 22%</RiferimentoNormativo>
+            </DatiRiepilogo>
+        </DatiBeniServizi>
+        <DatiPagamento>
+            <CondizioniPagamento>TP02</CondizioniPagamento>
+            <DettaglioPagamento>
+                <ModalitaPagamento>MP05</ModalitaPagamento>
+                <DataScadenzaPagamento>2026-03-30</DataScadenzaPagamento>
+                <ImportoPagamento>663.56</ImportoPagamento>
+                <IstitutoFinanziario>MEDIOLANUM</IstitutoFinanziario>
+                <IBAN>IT16B0306234210000003088830</IBAN>
+                <ABI>03062</ABI>
+                <CAB>34210</CAB>
+                <BIC>MEDBITMMXXX</BIC>
+            </DettaglioPagamento>
+        </DatiPagamento>
+    </FatturaElettronicaBody>
+</ns3:FatturaElettronica>

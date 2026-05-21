@@ -8,6 +8,7 @@
                 {% for colonna in colonne %}
                     <th class="sticky-head">{{ colonna.label }}</th>
                 {% endfor %}
+                <th class="sticky-head verifica-rette-row-summary-head">Totale / Residuo</th>
             </tr>
         </thead>
         <tbody>
@@ -26,6 +27,16 @@
                             </div>
                         </td>
                     {% endfor %}
+                    <td class="verifica-rette-total-cell verifica-rette-row-summary-total">
+                        <div class="cell-amount">
+                            <span class="label">Totale retta</span>
+                            <span class="value">&euro; {{ riepilogo_totali.totale_anno_senza_preiscrizioni|euro }}</span>
+                        </div>
+                        <div class="cell-amount">
+                            <span class="label">Residuo</span>
+                            <span class="value">&euro; {{ riepilogo_totali.rimanente_anno_senza_preiscrizioni|euro }}</span>
+                        </div>
+                    </td>
                 </tr>
             {% endif %}
 
@@ -75,6 +86,16 @@
                             </div>
                         </td>
                     {% endfor %}
+                    <td class="verifica-rette-total-cell verifica-rette-row-summary-total">
+                        <div class="cell-amount">
+                            <span class="label">Totale retta</span>
+                            <span class="value">&euro; {{ riepilogo_totali.totale_anno_senza_preiscrizioni|euro }}</span>
+                        </div>
+                        <div class="cell-amount">
+                            <span class="label">Residuo</span>
+                            <span class="value">&euro; {{ riepilogo_totali.rimanente_anno_senza_preiscrizioni|euro }}</span>
+                        </div>
+                    </td>
                 </tr>
             </tfoot>
         {% endif %}

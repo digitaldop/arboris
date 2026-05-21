@@ -10,31 +10,45 @@
         </a>
     </td>
     {% for cella in riga.celle %}
-        {% if cella.rata %}
+        {% if cella.rata or cella.rata_prevista %}
             <td class="verifica-rette-cell cella-{{ cella.stato }}" data-rate-matrix-cell>
-                <a
-                    href="{{ cella.url }}"
-                    class="cell-link"
-                    data-rate-detail-link
-                    data-floating-text="{{ riga.studente.cognome }} {{ riga.studente.nome }} - {{ cella.colonna.label }}&#10;Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro: apri il dettaglio rata."
-                    aria-label="Rata di {{ riga.studente.cognome }} {{ riga.studente.nome }}. Doppio click su una cella per evidenziare la riga, tieni premuto e trascina per scorrere, tasto destro per aprire il dettaglio."
-                >
+                {% if cella.url %}
+                    <a
+                        href="{{ cella.url }}"
+                        class="cell-link"
+                        data-rate-detail-link
+                        data-floating-text="{{ riga.studente.cognome }} {{ riga.studente.nome }} - {{ cella.colonna.label }}&#10;Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro: apri il dettaglio rata."
+                        aria-label="Rata di {{ riga.studente.cognome }} {{ riga.studente.nome }}. Doppio click su una cella per evidenziare la riga, tieni premuto e trascina per scorrere, tasto destro per aprire il dettaglio."
+                    >
+                {% else %}
+                    <div
+                        class="cell-link cell-link-static"
+                        data-floating-text="{{ riga.studente.cognome }} {{ riga.studente.nome }} - {{ cella.colonna.label }}&#10;Rata prevista dalla tariffa applicata, non ancora generata nel piano rate."
+                    >
+                {% endif %}
                     <div class="cell-amount">
                         <span class="label">Dovuto</span>
-                        <span class="value">&euro; {{ cella.rata.importo_finale|euro }}</span>
+                        <span class="value">&euro; {{ cella.importo_dovuto|euro }}</span>
                     </div>
                     <div class="cell-amount">
                         <span class="label">Pagato</span>
-                        <span class="value">&euro; {{ cella.rata.importo_pagato|euro }}</span>
+                        <span class="value">&euro; {{ cella.importo_pagato|euro }}</span>
                     </div>
                     <div class="cell-date">
-                        {% if cella.rata.data_pagamento %}
-                            {{ cella.rata.data_pagamento|it_date }}
+                        {% if cella.data_pagamento %}
+                            {{ cella.data_pagamento|it_date }}
                         {% else %}
                             &ndash;
                         {% endif %}
                     </div>
-                </a>
+                    {% if cella.rata_prevista and not cella.rata %}
+                        <div class="cell-virtual-note">Prevista</div>
+                    {% endif %}
+                {% if cella.url %}
+                    </a>
+                {% else %}
+                    </div>
+                {% endif %}
             </td>
         {% else %}
             <td class="verifica-rette-cell cella-assente" data-rate-matrix-cell>
@@ -42,4 +56,14 @@
             </td>
         {% endif %}
     {% endfor %}
+    <td class="verifica-rette-row-summary-cell">
+        <div class="cell-amount">
+            <span class="label">Totale retta</span>
+            <span class="value">&euro; {{ riga.totale_annuale_dovuto|euro }}</span>
+        </div>
+        <div class="cell-amount">
+            <span class="label">Residuo</span>
+            <span class="value">&euro; {{ riga.totale_annuale_rimanente|euro }}</span>
+        </div>
+    </td>
 </tr>

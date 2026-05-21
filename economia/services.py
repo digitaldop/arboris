@@ -271,6 +271,8 @@ def build_rate_batch_feedback(summary):
         feedback_parts.append(f"{summary['created']} piano/i rate creati")
     if summary.get("precreated"):
         feedback_parts.append(f"{summary['precreated']} preiscrizione/i aggiunte")
+    if summary.get("extended"):
+        feedback_parts.append(f"{summary['extended']} piano/i rate completati con le rate mancanti")
     if summary.get("regenerated"):
         feedback_parts.append(f"{summary['regenerated']} piano/i rate riallineati")
     if summary.get("unchanged"):

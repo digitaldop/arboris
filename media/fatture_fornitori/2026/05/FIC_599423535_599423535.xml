@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><ns3:FatturaElettronica versione="FPR12" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2">
+    <FatturaElettronicaHeader>
+        <DatiTrasmissione>
+            <IdTrasmittente>
+                <IdPaese>IT</IdPaese>
+                <IdCodice>01641790702</IdCodice>
+            </IdTrasmittente>
+            <ProgressivoInvio>000056s7zi</ProgressivoInvio>
+            <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+            <CodiceDestinatario>M5UXCR1</CodiceDestinatario>
+            <ContattiTrasmittente>
+                <Telefono>0874-60561</Telefono>
+            </ContattiTrasmittente>
+        </DatiTrasmissione>
+        <CedentePrestatore>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>03155310364</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>TSTMNC86A43D711I</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>Martinelli Vintage di Tosatti Monica</Denominazione>
+                </Anagrafica>
+                <RegimeFiscale>RF01</RegimeFiscale>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>Via II Agosto 1980 n. 34</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>Sant'Agata Bolognese</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CedentePrestatore>
+        <CessionarioCommittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>04223931207</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>04223931207</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>IL SOLE E L'ALTRE STELLE IMPRESA SOCIALE SRL</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+            <Sede>
+                <Indirizzo>VIA CIRCONDARIA OVEST 53</Indirizzo>
+                <CAP>40019</CAP>
+                <Comune>SANT'AGATA BOLOGNESE</Comune>
+                <Provincia>BO</Provincia>
+                <Nazione>IT</Nazione>
+            </Sede>
+        </CessionarioCommittente>
+        <TerzoIntermediarioOSoggettoEmittente>
+            <DatiAnagrafici>
+                <IdFiscaleIVA>
+                    <IdPaese>IT</IdPaese>
+                    <IdCodice>01641790702</IdCodice>
+                </IdFiscaleIVA>
+                <CodiceFiscale>01641790702</CodiceFiscale>
+                <Anagrafica>
+                    <Denominazione>TEAMSYSTEM SERVICE SRL</Denominazione>
+                </Anagrafica>
+            </DatiAnagrafici>
+        </TerzoIntermediarioOSoggettoEmittente>
+        <SoggettoEmittente>TZ</SoggettoEmittente>
+    </FatturaElettronicaHeader>
+    <FatturaElettronicaBody>
+        <DatiGenerali>
+            <DatiGeneraliDocumento>
+                <TipoDocumento>TD01</TipoDocumento>
+                <Divisa>EUR</Divisa>
+                <Data>2026-04-14</Data>
+                <Numero>12</Numero>
+                <ImportoTotaleDocumento>160.00</ImportoTotaleDocumento>
+                <Causale>fattura merceria</Causale>
+            </DatiGeneraliDocumento>
+        </DatiGenerali>
+        <DatiBeniServizi>
+            <DettaglioLinee>
+                <NumeroLinea>1</NumeroLinea>
+                <Descrizione>aghi da cucire</Descrizione>
+                <Quantita>1.00</Quantita>
+                <PrezzoUnitario>8.19672131</PrezzoUnitario>
+                <PrezzoTotale>8.20</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+            </DettaglioLinee>
+            <DettaglioLinee>
+                <NumeroLinea>2</NumeroLinea>
+                <Descrizione>cunfezione tuniche con passamanerie</Descrizione>
+                <Quantita>6.00</Quantita>
+                <PrezzoUnitario>20.49180328</PrezzoUnitario>
+                <PrezzoTotale>122.95</PrezzoTotale>
+                <AliquotaIVA>22.00</AliquotaIVA>
+            </DettaglioLinee>
+            <DatiRiepilogo>
+                <AliquotaIVA>22.00</AliquotaIVA>
+                <ImponibileImporto>131.15</ImponibileImporto>
+                <Imposta>28.85</Imposta>
+                <EsigibilitaIVA>I</EsigibilitaIVA>
+            </DatiRiepilogo>
+        </DatiBeniServizi>
+        <DatiPagamento>
+            <CondizioniPagamento>TP02</CondizioniPagamento>
+            <DettaglioPagamento>
+                <ModalitaPagamento>MP08</ModalitaPagamento>
+                <DataScadenzaPagamento>2026-04-14</DataScadenzaPagamento>
+                <ImportoPagamento>160.00</ImportoPagamento>
+                <IBAN>IT90C0850937090013009462995</IBAN>
+            </DettaglioPagamento>
+        </DatiPagamento>
+    </FatturaElettronicaBody>
+</ns3:FatturaElettronica>

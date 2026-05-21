@@ -755,6 +755,33 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertEqual(rate_mensili[0]["importo_dovuto"], Decimal("200.00"))
         self.assertEqual(sum(item["importo_dovuto"] for item in rate_mensili), Decimal("1200.00"))
 
+    def test_school_year_end_date_does_not_truncate_configured_rate_count(self):
+        self.anno.data_fine = date(2026, 6, 24)
+        self.anno.save(update_fields=["data_fine"])
+        self.condizione.numero_mensilita_default = 12
+        self.condizione.save(update_fields=["numero_mensilita_default"])
+        self.iscrizione.data_fine_iscrizione = self.anno.data_fine
+        self.iscrizione.save(update_fields=["data_fine_iscrizione"])
+
+        piano = self.iscrizione.build_rate_plan()
+        rate_mensili = [item for item in piano if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE]
+
+        self.assertEqual(len(rate_mensili), 12)
+        self.assertEqual((rate_mensili[-2]["anno_riferimento"], rate_mensili[-2]["mese_riferimento"]), (2026, 7))
+        self.assertEqual((rate_mensili[-1]["anno_riferimento"], rate_mensili[-1]["mese_riferimento"]), (2026, 8))
+
+    def test_explicit_early_end_date_still_truncates_rate_plan(self):
+        self.condizione.numero_mensilita_default = 12
+        self.condizione.save(update_fields=["numero_mensilita_default"])
+        self.iscrizione.data_fine_iscrizione = date(2026, 1, 15)
+        self.iscrizione.save(update_fields=["data_fine_iscrizione"])
+
+        piano = self.iscrizione.build_rate_plan()
+        rate_mensili = [item for item in piano if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE]
+
+        self.assertEqual(len(rate_mensili), 5)
+        self.assertEqual((rate_mensili[-1]["anno_riferimento"], rate_mensili[-1]["mese_riferimento"]), (2026, 1))
+
     def test_rate_custom_cannot_change_after_generated_rates(self):
         self.iscrizione.rate_custom = 6
         self.iscrizione.save()
@@ -835,6 +862,68 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertTrue(all(rata.importo_finale == Decimal("20.00") for rata in rate_aggiornate[4:]))
         self.assertTrue(all(rata.pagata for rata in rate_aggiornate[4:]))
 
+    def test_sync_rate_schedule_extends_missing_tail_without_rebuilding_paid_prefix(self):
+        self.anno.data_fine = date(2026, 6, 24)
+        self.anno.save(update_fields=["data_fine"])
+        self.condizione.numero_mensilita_default = 12
+        self.condizione.save(update_fields=["numero_mensilita_default"])
+        self.iscrizione.data_fine_iscrizione = self.anno.data_fine
+        self.iscrizione.save(update_fields=["data_fine_iscrizione"])
+        piano_mensile = [
+            item for item in self.iscrizione.build_rate_plan() if item["tipo_rata"] == RataIscrizione.TIPO_MENSILE
+        ]
+        RataIscrizione.objects.bulk_create(
+            [RataIscrizione(iscrizione=self.iscrizione, **dati_rata) for dati_rata in piano_mensile[:10]]
+        )
+        prima_rata = self._rate_mensili()[0]
+        prima_rata.pagata = True
+        prima_rata.importo_pagato = prima_rata.importo_finale
+        prima_rata.data_pagamento = prima_rata.data_scadenza
+        prima_rata.save(update_fields=["pagata", "importo_pagato", "data_pagamento"])
+
+        esito = self.iscrizione.sync_rate_schedule()
+        rate_aggiornate = self._rate_mensili()
+        prima_rata.refresh_from_db()
+
+        self.assertEqual(esito, "extended")
+        self.assertEqual(len(rate_aggiornate), 12)
+        self.assertEqual((rate_aggiornate[10].anno_riferimento, rate_aggiornate[10].mese_riferimento), (2026, 7))
+        self.assertEqual((rate_aggiornate[11].anno_riferimento, rate_aggiornate[11].mese_riferimento), (2026, 8))
+        self.assertTrue(prima_rata.pagata)
+        self.assertEqual(prima_rata.importo_pagato, Decimal("100.00"))
+
+    def test_sync_rate_schedule_does_not_extend_rimodulated_plan(self):
+        self.condizione.numero_mensilita_default = 12
+        self.condizione.save(update_fields=["numero_mensilita_default"])
+        self.iscrizione.sync_rate_schedule()
+        rate = self._rate_mensili()
+        for rata in rate[:2]:
+            rata.pagata = True
+            rata.importo_pagato = rata.importo_finale
+            rata.data_pagamento = rata.data_scadenza
+            rata.save(update_fields=["pagata", "importo_pagato", "data_pagamento"])
+
+        rimodula_rate_future(
+            self.iscrizione,
+            rata_decorrenza=rate[2],
+            modalita=RimodulazioneRetta.MODALITA_RIDISTRIBUISCI_RESIDUO,
+            numero_rate_future=6,
+        )
+
+        self.assertEqual(len(self._rate_mensili()), 8)
+        esito = self.iscrizione.sync_rate_schedule()
+
+        self.assertEqual(esito, "locked")
+        self.assertEqual(len(self._rate_mensili()), 8)
+        self.assertFalse(self.iscrizione.rate.filter(numero_rata__gt=8).exists())
+
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        response = self.client.get(reverse("verifica_situazione_rette"), {"anno_scolastico": self.anno.pk})
+        colonne_keys = [colonna["key"] for colonna in response.context["colonne"]]
+        self.assertNotIn((2026, 5), colonne_keys)
+        self.assertNotIn((2026, 8), colonne_keys)
+
     def test_rimodula_form_lists_rates_with_partial_payments(self):
         self.iscrizione.sync_rate_schedule()
         rate = self._rate_mensili()
@@ -901,6 +990,14 @@ class RateCustomizationAndRemodulationTests(TestCase):
         User.objects.create_superuser(username="admin", password="admin")
         self.client.login(username="admin", password="admin")
         self.iscrizione.sync_rate_schedule()
+        settembre = self.iscrizione.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            anno_riferimento=2025,
+            mese_riferimento=9,
+        )
+        settembre.importo_pagato = Decimal("120.00")
+        settembre.data_pagamento = date(2025, 9, 10)
+        settembre.save(update_fields=["importo_pagato", "data_pagamento"])
 
         response = self.client.get(
             reverse("verifica_situazione_rette"),
@@ -914,6 +1011,9 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertContains(response, "data-rate-detail-link")
         self.assertContains(response, "verifica-rette-scroll-help")
         self.assertContains(response, "class=\"studente-link\"")
+        self.assertContains(response, "Totale / Residuo")
+        self.assertContains(response, "Totale retta")
+        self.assertContains(response, "Residuo")
         self.assertContains(response, reverse("modifica_studente", args=[self.studente.pk]))
         self.assertContains(response, "?next=/economia/verifica-situazione-rette/%3Fanno_scolastico%3D")
         self.assertContains(response, "classe-separator-cell")
@@ -936,6 +1036,92 @@ class RateCustomizationAndRemodulationTests(TestCase):
             "Doppio click su una cella: evidenzia la riga. Tieni premuto e trascina per scorrere. Tasto destro: apri il dettaglio rata.",
         )
         self.assertContains(response, "Click sul nome: apri la scheda studente.")
+        riga = response.context["righe_matrice_alfabetica"][0]
+        self.assertEqual(riga["totale_annuale_dovuto"], Decimal("1200.00"))
+        self.assertEqual(riga["totale_annuale_rimanente"], Decimal("1080.00"))
+
+    def test_verifica_situazione_rette_extends_columns_to_longest_rate_plan(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.anno.data_fine = date(2026, 6, 24)
+        self.anno.save(update_fields=["data_fine"])
+        self.iscrizione.sync_rate_schedule()
+        condizione_dodici_rate = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno,
+            nome_condizione_iscrizione="Retta dodici rate",
+            numero_mensilita_default=12,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        TariffaCondizioneIscrizione.objects.create(
+            condizione_iscrizione=condizione_dodici_rate,
+            ordine_figlio_da=1,
+            ordine_figlio_a=None,
+            retta_annuale=Decimal("1200.00"),
+            preiscrizione=Decimal("0.00"),
+        )
+        studente_dodici_rate = Studente.objects.create(nome="Anna", cognome="Rossi")
+        iscrizione_dodici_rate = Iscrizione.objects.create(
+            studente=studente_dodici_rate,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=condizione_dodici_rate,
+            data_iscrizione=date(2025, 9, 1),
+            data_fine_iscrizione=self.anno.data_fine,
+        )
+        iscrizione_dodici_rate.sync_rate_schedule()
+        self.assertEqual(
+            iscrizione_dodici_rate.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).count(),
+            12,
+        )
+
+        response = self.client.get(
+            reverse("verifica_situazione_rette"),
+            {"anno_scolastico": self.anno.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        colonne_keys = [colonna["key"] for colonna in response.context["colonne"]]
+        self.assertIn((2026, 7), colonne_keys)
+        self.assertIn((2026, 8), colonne_keys)
+        self.assertContains(response, "Luglio")
+        self.assertContains(response, "Agosto")
+
+        riga_dieci_rate = next(
+            riga
+            for riga in response.context["righe_matrice_alfabetica"]
+            if riga["studente"].pk == self.studente.pk
+        )
+        celle_dieci_rate = {
+            cella["colonna"]["key"]: cella
+            for cella in riga_dieci_rate["celle"]
+        }
+        self.assertEqual(celle_dieci_rate[(2026, 7)]["stato"], "assente")
+        self.assertIsNone(celle_dieci_rate[(2026, 7)]["rata"])
+        self.assertEqual(celle_dieci_rate[(2026, 8)]["stato"], "assente")
+        self.assertIsNone(celle_dieci_rate[(2026, 8)]["rata"])
+        self.assertEqual(riga_dieci_rate["totale_annuale_dovuto"], Decimal("1200.00"))
+        self.assertEqual(riga_dieci_rate["totale_annuale_rimanente"], Decimal("1200.00"))
+
+        riga_dodici_rate = next(
+            riga
+            for riga in response.context["righe_matrice_alfabetica"]
+            if riga["studente"].pk == studente_dodici_rate.pk
+        )
+        celle_dodici_rate = {
+            cella["colonna"]["key"]: cella
+            for cella in riga_dodici_rate["celle"]
+        }
+        self.assertEqual(celle_dodici_rate[(2026, 7)]["stato"], "non-pagata")
+        self.assertIsNotNone(celle_dodici_rate[(2026, 7)]["rata"])
+        self.assertIsNone(celle_dodici_rate[(2026, 7)]["rata_prevista"])
+        self.assertEqual(celle_dodici_rate[(2026, 7)]["importo_dovuto"], Decimal("100.00"))
+        self.assertEqual(celle_dodici_rate[(2026, 8)]["stato"], "non-pagata")
+        self.assertIsNotNone(celle_dodici_rate[(2026, 8)]["rata"])
+        self.assertIsNone(celle_dodici_rate[(2026, 8)]["rata_prevista"])
+        self.assertEqual(celle_dodici_rate[(2026, 8)]["importo_dovuto"], Decimal("100.00"))
+        self.assertEqual(riga_dodici_rate["totale_annuale_dovuto"], Decimal("1200.00"))
+        self.assertEqual(riga_dodici_rate["totale_annuale_rimanente"], Decimal("1200.00"))
 
     def test_rate_detail_form_allows_empty_credit_and_discount_fields(self):
         self.iscrizione.sync_rate_schedule()

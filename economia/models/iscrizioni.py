@@ -529,6 +529,18 @@ class Iscrizione(models.Model):
             return self.anno_scolastico.data_fine
         return None
 
+    def get_data_fine_rateizzazione(self):
+        if not self.data_fine_iscrizione:
+            return None
+        if (
+            self.attiva
+            and self.anno_scolastico_id
+            and self.anno_scolastico
+            and self.data_fine_iscrizione == self.anno_scolastico.data_fine
+        ):
+            return None
+        return self.data_fine_iscrizione
+
     def get_prima_scadenza_rate(self):
         data_partenza = self.get_data_partenza_rate()
         if not data_partenza:
@@ -580,8 +592,11 @@ class Iscrizione(models.Model):
         importo_residuo = importo_annuo_base - (importo_base * numero_rate)
 
         mese_partenza_effettivo, applica_pro_rata = self.get_mese_partenza_effettivo_rate(prima_scadenza)
-        data_fine_effettiva = self.data_fine_effettiva
-        mese_fine_effettiva = data_fine_effettiva.replace(day=1) if data_fine_effettiva else None
+        # La fine ordinaria dell'anno scolastico non tronca il numero di rate configurate:
+        # una tariffa a 12 rate deve generare anche le mensilita' oltre giugno.
+        # Usiamo solo una fine iscrizione realmente anticipata/chiusa.
+        data_fine_rateizzazione = self.get_data_fine_rateizzazione()
+        mese_fine_iscrizione = data_fine_rateizzazione.replace(day=1) if data_fine_rateizzazione else None
         giorno_scadenza = self.get_giorno_scadenza_rate()
         piano = []
 
@@ -590,7 +605,7 @@ class Iscrizione(models.Model):
             mese_rata = data_scadenza.replace(day=1)
             if mese_partenza_effettivo and mese_rata < mese_partenza_effettivo:
                 continue
-            if mese_fine_effettiva and mese_rata > mese_fine_effettiva:
+            if mese_fine_iscrizione and mese_rata > mese_fine_iscrizione:
                 break
 
             importo_rata = importo_base + (importo_residuo if indice == numero_rate - 1 else Decimal("0.00"))
@@ -785,6 +800,57 @@ class Iscrizione(models.Model):
 
         return rata_preiscrizione
 
+    def get_missing_tail_rate_entries(self, piano_atteso):
+        if self.rimodulazioni_retta.exists():
+            return []
+
+        piano_mensile = [
+            item for item in piano_atteso if item.get("tipo_rata", RATE_TYPE_MENSILE) == RATE_TYPE_MENSILE
+        ]
+        if not piano_mensile:
+            return []
+
+        expected_by_number = {item["numero_rata"]: item for item in piano_mensile}
+        max_expected_number = max(expected_by_number)
+        rate_mensili = list(
+            self.rate.filter(tipo_rata=RATE_TYPE_MENSILE).order_by(
+                "numero_rata",
+                "anno_riferimento",
+                "mese_riferimento",
+                "id",
+            )
+        )
+        if not rate_mensili:
+            return []
+
+        existing_numbers = [rata.numero_rata for rata in rate_mensili]
+        if len(existing_numbers) != len(set(existing_numbers)):
+            return []
+
+        max_existing_number = max(existing_numbers)
+        if max_existing_number >= max_expected_number:
+            return []
+
+        if set(existing_numbers) != set(range(1, max_existing_number + 1)):
+            return []
+
+        for rata in rate_mensili:
+            attesa = expected_by_number.get(rata.numero_rata)
+            if not attesa:
+                return []
+            if (
+                rata.anno_riferimento != attesa["anno_riferimento"]
+                or rata.mese_riferimento != attesa["mese_riferimento"]
+                or rata.importo_dovuto != attesa["importo_dovuto"]
+            ):
+                return []
+
+        return [
+            expected_by_number[numero_rata]
+            for numero_rata in range(max_existing_number + 1, max_expected_number + 1)
+            if numero_rata in expected_by_number
+        ]
+
     def _sincronizza_fondo_accantonamento_su_agevolazione(self) -> None:
         """Vedi fondo_accantonamento: sconti SCONTO_RETTA su agev. collegate a un piano."""
         if not self.pk:
@@ -818,6 +884,14 @@ class Iscrizione(models.Model):
             RataIscrizione.objects.create(iscrizione=self, **rata_preiscrizione_mancante)
             self._sincronizza_fondo_accantonamento_su_agevolazione()
             return "precreated"
+
+        rate_mancanti_in_coda = self.get_missing_tail_rate_entries(piano_atteso)
+        if rate_mancanti_in_coda:
+            RataIscrizione.objects.bulk_create(
+                [RataIscrizione(iscrizione=self, **dati_rata) for dati_rata in rate_mancanti_in_coda]
+            )
+            self._sincronizza_fondo_accantonamento_su_agevolazione()
+            return "extended"
 
         if self.rate_have_payment_activity():
             self._sincronizza_fondo_accantonamento_su_agevolazione()

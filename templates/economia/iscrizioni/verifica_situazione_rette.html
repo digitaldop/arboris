@@ -241,6 +241,37 @@
             font-size: 0.76rem;
             line-height: 1.25;
         }
+        .verifica-rette-row-summary-head,
+        .verifica-rette-row-summary-cell,
+        .verifica-rette-row-summary-total {
+            min-width: 142px;
+            max-width: 168px;
+        }
+        .verifica-rette-table td.verifica-rette-row-summary-cell {
+            padding: 0.42rem 0.5rem;
+            background: #f7fbfd;
+            color: #223846;
+            font-size: 0.76rem;
+            line-height: 1.25;
+            box-shadow: inset 3px 0 0 #c8dfea;
+        }
+        .verifica-rette-row-summary-cell .cell-amount,
+        .verifica-rette-row-summary-total .cell-amount {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.45rem;
+        }
+        .verifica-rette-row-summary-cell .label,
+        .verifica-rette-row-summary-total .label {
+            color: #5f7280;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .verifica-rette-row-summary-cell .value,
+        .verifica-rette-row-summary-total .value {
+            font-weight: 800;
+        }
         .verifica-rette-total-cell .cell-amount .label {
             color: #5f7280;
             font-size: 0.72rem;
@@ -292,6 +323,9 @@
         .verifica-rette-cell .cell-link:hover {
             filter: brightness(0.96);
         }
+        .verifica-rette-cell .cell-link-static {
+            cursor: grab;
+        }
         .verifica-rette-cell .cell-link:focus-visible {
             outline: 2px solid #2f7c9b;
             outline-offset: -2px;
@@ -315,6 +349,14 @@
             text-align: right;
             color: rgba(0, 0, 0, 0.55);
             font-size: 0.75rem;
+        }
+        .verifica-rette-cell .cell-virtual-note {
+            margin-top: 3px;
+            text-align: right;
+            color: rgba(0, 0, 0, 0.62);
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
         }
         .verifica-rette-cell .cell-empty {
             color: #94a3b8;

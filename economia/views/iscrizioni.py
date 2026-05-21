@@ -135,6 +135,8 @@ def build_condizione_sync_feedback(summary):
         feedback_parts.append(f"{summary['created']} piano/i rate creati")
     if summary.get("precreated"):
         feedback_parts.append(f"{summary['precreated']} preiscrizione/i aggiunte al piano rate")
+    if summary.get("extended"):
+        feedback_parts.append(f"{summary['extended']} piano/i rate completati con le rate mancanti")
     if summary.get("regenerated"):
         feedback_parts.append(f"{summary['regenerated']} piano/i rate riallineati")
     if summary.get("unchanged"):
@@ -557,6 +559,8 @@ def crea_iscrizione(request):
                 messages.success(request, "Iscrizione creata correttamente e rate generate in automatico.")
             elif esito_rate == "precreated":
                 messages.success(request, "Iscrizione creata correttamente. La preiscrizione e stata aggiunta al piano rate.")
+            elif esito_rate == "extended":
+                messages.success(request, "Iscrizione creata correttamente. Il piano rate e stato completato con le rate mancanti.")
             elif esito_rate == "missing":
                 messages.warning(
                     request,
@@ -604,6 +608,8 @@ def modifica_iscrizione(request, pk):
                 messages.success(request, "Iscrizione aggiornata correttamente. Il piano rate e stato riallineato.")
             elif esito_rate == "precreated":
                 messages.success(request, "Iscrizione aggiornata correttamente. La preiscrizione e stata aggiunta al piano rate.")
+            elif esito_rate == "extended":
+                messages.success(request, "Iscrizione aggiornata correttamente. Il piano rate e stato completato con le rate mancanti.")
             elif esito_rate == "missing":
                 messages.warning(
                     request,
@@ -649,6 +655,8 @@ def ricalcola_rate_iscrizione(request, pk):
         messages.success(request, "Piano rate generato correttamente.")
     elif esito_rate == "precreated":
         messages.success(request, "Preiscrizione aggiunta correttamente al piano rate.")
+    elif esito_rate == "extended":
+        messages.success(request, "Piano rate completato con le rate mancanti.")
     elif esito_rate == "regenerated":
         messages.success(request, "Piano rate ricalcolato correttamente.")
     elif esito_rate == "unchanged":
@@ -1285,6 +1293,27 @@ def _classe_sort_key(iscrizione):
     )
 
 
+def _verifica_rette_piano_rateizzazione_configurata(iscrizione):
+    if not iscrizione:
+        return []
+    if iscrizione.rimodulazioni_retta.exists():
+        return []
+
+    piano = []
+    for entry in iscrizione.build_rate_plan():
+        if entry.get("tipo_rata") != RataIscrizione.TIPO_MENSILE:
+            continue
+
+        piano.append(
+            {
+                "key": (entry["anno_riferimento"], entry["mese_riferimento"]),
+                "numero_rata": entry["numero_rata"],
+                "importo_finale": entry.get("importo_finale", entry.get("importo_dovuto", Decimal("0.00"))),
+                "data_scadenza": entry.get("data_scadenza"),
+            }
+        )
+    return piano
+
 def verifica_situazione_rette(request):
     """
     Pagina "Verifica situazione rette":
@@ -1292,7 +1321,7 @@ def verifica_situazione_rette(request):
     - dropdown di selezione anno scolastico (default: quello corrente);
     - riga per ogni studente iscritto in quell'anno, con vista alfabetica
       predefinita e vista alternativa raggruppata per classe;
-    - colonne: Preiscrizione + mensilita' settembre -> giugno;
+    - colonne: Preiscrizione + mensilita' rilevate dal piano rate piu esteso;
     - ogni cella mostra importo dovuto, importo pagato e data pagamento
       con un colore semantico (verde/giallo/rosso);
     - tasto destro sulla cella -> form di gestione della rata.
@@ -1345,7 +1374,14 @@ def verifica_situazione_rette(request):
         # evita ipotesi hard-coded settembre->giugno e supporta configurazioni
         # di condizione iscrizione diverse.
         mesi_set = set()
+        piani_configurati_per_iscrizione = {}
         for iscrizione in iscrizioni:
+            piano_configurato = {
+                entry["key"]: entry
+                for entry in _verifica_rette_piano_rateizzazione_configurata(iscrizione)
+            }
+            piani_configurati_per_iscrizione[iscrizione.pk] = piano_configurato
+            mesi_set.update(piano_configurato.keys())
             for rata in iscrizione.rate.all():
                 if rata.is_preiscrizione:
                     ha_preiscrizione = True
@@ -1400,6 +1436,7 @@ def verifica_situazione_rette(request):
             for iscrizione in gruppo["iscrizioni"]:
                 # Indicizziamo le rate dell'iscrizione per chiave colonna.
                 rate_per_chiave = {}
+                piano_configurato = piani_configurati_per_iscrizione.get(iscrizione.pk, {})
                 for rata in iscrizione.rate.all():
                     if rata.is_preiscrizione:
                         rate_per_chiave["preiscrizione"] = rata
@@ -1408,12 +1445,22 @@ def verifica_situazione_rette(request):
                         rate_per_chiave.setdefault(chiave, rata)
 
                 celle = []
+                totale_riga_annuale_dovuto = Decimal("0.00")
+                totale_riga_annuale_pagato = Decimal("0.00")
                 for colonna in colonne:
                     rata = rate_per_chiave.get(colonna["key"])
+                    rata_prevista = (
+                        piano_configurato.get(colonna["key"])
+                        if not rata and colonna["tipo"] == "mese"
+                        else None
+                    )
                     stato = _calcola_stato_cella_rata(rata)
                     if rata:
                         importo_dovuto = _rata_importo_dovuto(rata)
                         importo_pagato = _rata_importo_pagato(rata)
+                        if not rata.is_preiscrizione:
+                            totale_riga_annuale_dovuto += importo_dovuto
+                            totale_riga_annuale_pagato += importo_pagato
                         totale_colonna = totali_per_chiave[colonna["key"]]
                         totale_colonna["dovuto"] += importo_dovuto
                         totale_colonna["pagato"] += importo_pagato
@@ -1430,12 +1477,32 @@ def verifica_situazione_rette(request):
                             riepilogo_totali["pagato_con_preiscrizioni"] += importo_pagato
                             if not rata.is_preiscrizione:
                                 riepilogo_totali["pagato_senza_preiscrizioni"] += importo_pagato
+                    elif rata_prevista:
+                        importo_dovuto = rata_prevista["importo_finale"]
+                        importo_pagato = Decimal("0.00")
+                        stato = "non-dovuta" if importo_dovuto <= 0 else "non-pagata"
+                        totale_riga_annuale_dovuto += importo_dovuto
+                        totale_colonna = totali_per_chiave[colonna["key"]]
+                        totale_colonna["dovuto"] += importo_dovuto
+                        riepilogo_totali["totale_anno_con_preiscrizioni"] += importo_dovuto
+                        riepilogo_totali["totale_anno_senza_preiscrizioni"] += importo_dovuto
+                        data_scadenza_prevista = rata_prevista.get("data_scadenza")
+                        if data_scadenza_prevista and data_scadenza_prevista <= today:
+                            riepilogo_totali["dovuto_con_preiscrizioni"] += importo_dovuto
+                            riepilogo_totali["dovuto_senza_preiscrizioni"] += importo_dovuto
+                    else:
+                        importo_dovuto = Decimal("0.00")
+                        importo_pagato = Decimal("0.00")
 
                     celle.append(
                         {
                             "colonna": colonna,
                             "rata": rata,
+                            "rata_prevista": rata_prevista,
                             "stato": stato,
+                            "importo_dovuto": importo_dovuto,
+                            "importo_pagato": importo_pagato,
+                            "data_pagamento": rata.data_pagamento if rata else None,
                             "url": (
                                 reverse("modifica_rata_iscrizione", args=[rata.pk])
                                 if rata
@@ -1449,6 +1516,11 @@ def verifica_situazione_rette(request):
                         "iscrizione": iscrizione,
                         "studente": iscrizione.studente,
                         "celle": celle,
+                        "totale_annuale_dovuto": totale_riga_annuale_dovuto,
+                        "totale_annuale_rimanente": max(
+                            totale_riga_annuale_dovuto - totale_riga_annuale_pagato,
+                            Decimal("0.00"),
+                        ),
                     }
                 )
 
@@ -1505,7 +1577,7 @@ def verifica_situazione_rette(request):
             "riepilogo_totali": riepilogo_totali,
             "righe_per_classe": righe_per_classe,
             "righe_matrice_alfabetica": righe_matrice_alfabetica,
-            "num_colonne": len(colonne) + 1,  # +1 per la prima colonna "Studente"
+            "num_colonne": len(colonne) + 2,  # +1 Studente, +1 Totale/Residuo
             "matrix_return_url": request.get_full_path(),
         },
     )
