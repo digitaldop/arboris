@@ -1037,6 +1037,62 @@ class FusioneContiBancariTests(TestCase):
         self.assertContains(response, "Possibili duplicati")
         self.assertContains(response, "stessa data, importo e descrizione")
 
+    def test_fusione_conti_con_duplicati_provider_prosegue_saltando_i_movimenti_doppi(self):
+        categoria = CategoriaFinanziaria.objects.create(
+            nome="Spese bancarie",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        conto_sorgente = ContoBancario.objects.create(nome_conto="Banco BPM duplicato")
+        conto_destinazione = ContoBancario.objects.create(nome_conto="Banco BPM PSD2")
+        movimento_duplicato_sorgente = MovimentoFinanziario.objects.create(
+            conto=conto_sorgente,
+            data_contabile=date(2026, 5, 15),
+            importo=Decimal("-0.80"),
+            descrizione="Commissioni",
+            provider_transaction_id="tx-duplicate",
+            categoria=categoria,
+            stato_riconciliazione=StatoRiconciliazione.RICONCILIATO,
+        )
+        movimento_duplicato_destinazione = MovimentoFinanziario.objects.create(
+            conto=conto_destinazione,
+            data_contabile=date(2026, 5, 15),
+            importo=Decimal("-0.80"),
+            descrizione="Commissioni",
+            provider_transaction_id="tx-duplicate",
+        )
+        movimento_unico = MovimentoFinanziario.objects.create(
+            conto=conto_sorgente,
+            data_contabile=date(2026, 5, 16),
+            importo=Decimal("-100.00"),
+            descrizione="Pagamento unico",
+            provider_transaction_id="tx-unique",
+        )
+        movimento_duplicato_sorgente_id = movimento_duplicato_sorgente.pk
+
+        response = self.client.post(
+            reverse("fondi_conti_bancari"),
+            {
+                "azione": "conferma",
+                "conto_sorgente": str(conto_sorgente.pk),
+                "conto_destinazione": str(conto_destinazione.pk),
+                "conferma_operazione": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_conti_bancari"))
+        conto_sorgente.refresh_from_db()
+        movimento_duplicato_destinazione.refresh_from_db()
+        movimento_unico.refresh_from_db()
+
+        self.assertFalse(conto_sorgente.attivo)
+        self.assertIn("Movimenti duplicati assorbiti: 1", conto_sorgente.note)
+        self.assertFalse(MovimentoFinanziario.objects.filter(pk=movimento_duplicato_sorgente_id).exists())
+        self.assertEqual(movimento_duplicato_destinazione.conto, conto_destinazione)
+        self.assertEqual(movimento_duplicato_destinazione.categoria, categoria)
+        self.assertEqual(movimento_duplicato_destinazione.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(movimento_unico.conto, conto_destinazione)
+        self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto_destinazione).count(), 2)
+
     def test_fusione_conti_richiede_conti_diversi(self):
         conto = ContoBancario.objects.create(nome_conto="Conto operativo")
 

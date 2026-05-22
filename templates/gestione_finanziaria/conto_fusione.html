@@ -129,19 +129,19 @@
         </section>
 
         {% if anteprima.duplicati_count %}
-            <div class="{% if anteprima.conflitti_provider_count %}finance-danger-panel{% else %}finance-guide-panel{% endif %}">
+            <div class="finance-guide-panel">
                 <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
                 <div class="finance-guide-copy">
                     <div class="finance-guide-title">Possibili duplicati rilevati</div>
                     <p>
                         Arboris ha trovato {{ anteprima.duplicati_count }} movimenti del conto sorgente che sembrano
-                        gia' presenti sul conto destinazione. La fusione sposta comunque i dati, salvo conflitti
-                        con identificativi provider.
+                        gia' presenti sul conto destinazione. La fusione spostera' i movimenti unici e assorbira'
+                        questi duplicati nel movimento gia' presente, evitando doppioni nel conto unificato.
                     </p>
                     {% if anteprima.conflitti_provider_count %}
                         <p class="help-text">
                             {{ anteprima.conflitti_provider_count }} duplicati hanno lo stesso identificativo provider:
-                            la conferma viene bloccata per proteggere l'integrita' dei dati.
+                            verranno trattati come movimenti gia' presenti sul conto destinazione.
                         </p>
                     {% endif %}
                 </div>
@@ -194,7 +194,6 @@
             <button
                 type="submit"
                 class="btn btn-danger btn-icon-text"
-                {% if anteprima.conflitti_provider_count %}disabled{% endif %}
                 onclick="return confirm('Confermare la fusione dei conti selezionati?');"
             >
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>

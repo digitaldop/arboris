@@ -97,6 +97,7 @@ from .models import (
     PianoRatealeSpesa,
     OrigineMovimento,
     ProviderBancario,
+    RiconciliazioneRataMovimento,
     RegolaCategorizzazione,
     SaldoConto,
     ScadenzaPagamentoFornitore,
@@ -2465,17 +2466,85 @@ def _anteprima_fusione_conti(conto_sorgente, conto_destinazione, *, esempi_limit
 
     return {
         "movimenti": len(movimenti_sorgente),
+        "movimenti_unici": max(len(movimenti_sorgente) - len(duplicati), 0),
         "saldi": conto_sorgente.storico_saldi.count(),
         "scadenze_fornitori": conto_sorgente.scadenze_fornitori.count(),
         "pagamenti_fornitori": conto_sorgente.pagamenti_fornitori.count(),
         "spese_operative": conto_sorgente.spese_operative.count(),
         "log_sincronizzazioni": conto_sorgente.log_sincronizzazioni.count(),
         "duplicati_count": len(duplicati),
+        "duplicati_ids": [duplicato["sorgente"].pk for duplicato in duplicati],
+        "duplicati_pairs": [
+            (duplicato["sorgente"].pk, duplicato["destinazione"].pk)
+            for duplicato in duplicati
+        ],
         "duplicati_esempi": duplicati[:esempi_limit],
         "conflitti_provider_count": conflitti_provider,
         "saldo_sorgente": calcola_saldo_conto_alla_data(conto_sorgente),
         "saldo_destinazione": calcola_saldo_conto_alla_data(conto_destinazione),
     }
+
+
+def _assorbi_collegamenti_movimento_duplicato(movimento_sorgente, movimento_destinazione, *, now):
+    update_fields = []
+
+    def set_if_empty(field, value):
+        if value in (None, ""):
+            return
+        if getattr(movimento_destinazione, field) in (None, ""):
+            setattr(movimento_destinazione, field, value)
+            update_fields.append(field)
+
+    set_if_empty("categoria_id", movimento_sorgente.categoria_id)
+    set_if_empty("regola_categorizzazione_id", movimento_sorgente.regola_categorizzazione_id)
+    set_if_empty("categorizzato_da_id", movimento_sorgente.categorizzato_da_id)
+    set_if_empty("categorizzato_il", movimento_sorgente.categorizzato_il)
+    set_if_empty("rata_iscrizione_id", movimento_sorgente.rata_iscrizione_id)
+
+    if (
+        movimento_destinazione.stato_riconciliazione == StatoRiconciliazione.NON_RICONCILIATO
+        and movimento_sorgente.stato_riconciliazione != StatoRiconciliazione.NON_RICONCILIATO
+    ):
+        movimento_destinazione.stato_riconciliazione = movimento_sorgente.stato_riconciliazione
+        update_fields.append("stato_riconciliazione")
+
+    if movimento_sorgente.note and movimento_sorgente.note not in movimento_destinazione.note:
+        movimento_destinazione.note = f"{movimento_destinazione.note}\n{movimento_sorgente.note}".strip()
+        update_fields.append("note")
+
+    if update_fields:
+        movimento_destinazione.data_aggiornamento = now
+        update_fields.append("data_aggiornamento")
+        movimento_destinazione.save(update_fields=sorted(set(update_fields)))
+
+    ScadenzaPagamentoFornitore.objects.filter(movimento_finanziario=movimento_sorgente).update(
+        movimento_finanziario=movimento_destinazione
+    )
+    SpesaOperativa.objects.filter(movimento_finanziario=movimento_sorgente).update(
+        movimento_finanziario=movimento_destinazione
+    )
+    NotificaFinanziaria.objects.filter(movimento_finanziario=movimento_sorgente).update(
+        movimento_finanziario=movimento_destinazione
+    )
+
+    for pagamento in PagamentoFornitore.objects.filter(movimento_finanziario=movimento_sorgente):
+        exists = PagamentoFornitore.objects.filter(
+            scadenza=pagamento.scadenza,
+            movimento_finanziario=movimento_destinazione,
+        ).exclude(pk=pagamento.pk).exists()
+        if not exists:
+            pagamento.movimento_finanziario = movimento_destinazione
+            pagamento.data_aggiornamento = now
+            pagamento.save(update_fields=["movimento_finanziario", "data_aggiornamento"])
+
+    for riconciliazione in RiconciliazioneRataMovimento.objects.filter(movimento=movimento_sorgente):
+        exists = RiconciliazioneRataMovimento.objects.filter(
+            movimento=movimento_destinazione,
+            rata=riconciliazione.rata,
+        ).exclude(pk=riconciliazione.pk).exists()
+        if not exists:
+            riconciliazione.movimento = movimento_destinazione
+            riconciliazione.save(update_fields=["movimento"])
 
 
 @transaction.atomic
@@ -2497,14 +2566,38 @@ def _esegui_fusione_conti(conto_sorgente_id, conto_destinazione_id):
         raise ValidationError("Il conto destinazione deve essere attivo.")
 
     anteprima = _anteprima_fusione_conti(conto_sorgente, conto_destinazione)
-    if anteprima["conflitti_provider_count"]:
-        raise ValidationError(
-            "La fusione non puo' proseguire: alcuni movimenti hanno lo stesso identificativo provider "
-            "gia' presente sul conto destinazione."
-        )
+    duplicati_ids = set(anteprima.get("duplicati_ids", []))
+    duplicati_pairs = list(anteprima.get("duplicati_pairs", []))
 
     now = timezone.now()
-    movimenti = list(MovimentoFinanziario.objects.select_for_update().filter(conto=conto_sorgente).order_by("pk"))
+    if duplicati_pairs:
+        sorgenti_duplicati = {
+            movimento.pk: movimento
+            for movimento in MovimentoFinanziario.objects.select_for_update().filter(pk__in=duplicati_ids)
+        }
+        destinazioni_duplicati = {
+            movimento.pk: movimento
+            for movimento in MovimentoFinanziario.objects.select_for_update().filter(
+                pk__in=[destinazione_id for _sorgente_id, destinazione_id in duplicati_pairs]
+            )
+        }
+        for sorgente_id, destinazione_id in duplicati_pairs:
+            movimento_sorgente = sorgenti_duplicati.get(sorgente_id)
+            movimento_destinazione = destinazioni_duplicati.get(destinazione_id)
+            if movimento_sorgente and movimento_destinazione:
+                _assorbi_collegamenti_movimento_duplicato(
+                    movimento_sorgente,
+                    movimento_destinazione,
+                    now=now,
+                )
+        MovimentoFinanziario.objects.filter(pk__in=duplicati_ids).delete()
+
+    movimenti = list(
+        MovimentoFinanziario.objects.select_for_update()
+        .filter(conto=conto_sorgente)
+        .exclude(pk__in=duplicati_ids)
+        .order_by("pk")
+    )
     for movimento in movimenti:
         movimento.conto = conto_destinazione
         movimento.hash_deduplica = calcola_hash_deduplica_movimento(
@@ -2535,6 +2628,8 @@ def _esegui_fusione_conti(conto_sorgente_id, conto_destinazione_id):
         f"Fuso nel conto '{conto_destinazione.nome_conto}' (ID {conto_destinazione.pk}) "
         f"il {timezone.localtime(now):%d/%m/%Y %H:%M}."
     )
+    if duplicati_ids:
+        nota_fusione = f"{nota_fusione} Movimenti duplicati assorbiti: {len(duplicati_ids)}."
     conto_sorgente.note = f"{conto_sorgente.note}\n{nota_fusione}".strip()
     conto_sorgente.attivo = False
     conto_sorgente.saldo_corrente = Decimal("0.00")
@@ -2545,6 +2640,8 @@ def _esegui_fusione_conti(conto_sorgente_id, conto_destinazione_id):
 
     return {
         **anteprima,
+        "movimenti_spostati": len(movimenti),
+        "movimenti_duplicati_assorbiti": len(duplicati_ids),
         "conto_sorgente": conto_sorgente,
         "conto_destinazione": conto_destinazione,
         "saldo_destinazione_finale": saldo_destinazione,
@@ -2742,12 +2839,6 @@ def fondi_conti_bancari(request):
             if azione == "conferma":
                 if not form.cleaned_data.get("conferma_operazione"):
                     form.add_error("conferma_operazione", "Conferma esplicitamente la fusione prima di procedere.")
-                elif anteprima["conflitti_provider_count"]:
-                    messages.error(
-                        request,
-                        "Fusione interrotta: alcuni movimenti hanno gia' lo stesso identificativo provider "
-                        "sul conto destinazione.",
-                    )
                 else:
                     try:
                         risultato = _esegui_fusione_conti(conto_sorgente.pk, conto_destinazione.pk)
@@ -2758,7 +2849,7 @@ def fondi_conti_bancari(request):
                         messages.success(
                             request,
                             (
-                                f"Fusione completata: {risultato['movimenti']} movimenti, "
+                                f"Fusione completata: {risultato['movimenti_spostati']} movimenti unici, "
                                 f"{risultato['saldi']} saldi e {risultato['log_sincronizzazioni']} log "
                                 f"spostati su \"{conto_destinazione.nome_conto}\". "
                                 f"Il conto \"{conto_sorgente.nome_conto}\" e' stato disattivato."
@@ -2768,8 +2859,8 @@ def fondi_conti_bancari(request):
                             messages.warning(
                                 request,
                                 (
-                                    f"Sono stati rilevati {risultato['duplicati_count']} possibili duplicati: "
-                                    "controlla i movimenti del conto unificato."
+                                    f"{risultato['movimenti_duplicati_assorbiti']} movimenti duplicati sono stati "
+                                    "assorbiti nel conto destinazione per evitare doppioni."
                                 ),
                             )
                         return redirect("lista_conti_bancari")
