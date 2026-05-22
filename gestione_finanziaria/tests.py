@@ -249,6 +249,59 @@ class Psd2SchedulerTests(TestCase):
         mock_start_background_scheduler.assert_called_once()
         mock_trigger_due_sync_check.assert_called_once()
 
+    @patch("gestione_finanziaria.views.background_scheduler_status")
+    def test_pianificazione_sincronizzazione_renderizza_layout_moderno(self, mock_background_status):
+        from gestione_finanziaria.views import pianificazione_sincronizzazione
+
+        mock_background_status.return_value = {
+            "enabled": True,
+            "thread_alive": True,
+            "interval_minutes": 5,
+            "reason": "processo web",
+        }
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking Layout",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_connection_id="session-layout",
+        )
+        ContoBancario.objects.create(
+            nome_conto="Banco BPM PSD2",
+            provider=provider,
+            connessione=connessione,
+            external_account_id="account-layout",
+            iban="IT67C0503437060000000003228",
+            attivo=True,
+        )
+        PianificazioneSincronizzazione.objects.update_or_create(
+            pk=1,
+            defaults={
+                "attivo": True,
+                "intervallo_ore": 12,
+                "sync_saldo": True,
+                "sync_movimenti": True,
+                "giorni_storico": 90,
+            },
+        )
+
+        request = RequestFactory().get("/gestione-finanziaria/pianificazione-sincronizzazione/")
+        request.session = self.client.session
+        request._messages = FallbackStorage(request)
+        request.user = User.objects.create_user("sync-layout@example.com")
+
+        response = pianificazione_sincronizzazione(request)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("finance-page-head", content)
+        self.assertIn("finance-guide-panel", content)
+        self.assertIn("finance-two-column-layout", content)
+        self.assertIn("finance-sync-summary", content)
+        self.assertIn("Banco BPM PSD2", content)
+
     @patch("gestione_finanziaria.providers.adapter_for_provider")
     def test_psd2_account_sync_uses_real_time_module_for_duration(self, mock_adapter_for_provider):
         from gestione_finanziaria.services import sincronizza_conto_psd2

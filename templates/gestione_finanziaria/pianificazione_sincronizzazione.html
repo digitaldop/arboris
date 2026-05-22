@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Pianificazione sincronizzazione PSD2 - Arboris School Management{% endblock %}
 
@@ -15,143 +16,242 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Pianificazione sincronizzazione PSD2</h1>
-        <div class="page-head-actions">
-            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary">Connessioni</a>
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Pianificazione sincronizzazione PSD2</h1>
+                <span class="family-status-pill {% if config.attivo %}is-success{% else %}is-muted{% endif %}">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {% if config.attivo %}Attiva{% else %}Disattivata{% endif %}
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                Automatizza saldo e movimenti dei conti collegati tramite PSD2
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'lista_connessioni_bancarie' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Connessioni</span>
+            </a>
+            <a href="{% url 'lista_conti_bancari' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+                <span class="btn-label">Conti</span>
+            </a>
         </div>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Configurazione</h2>
-        <p class="help-text">
-            Lo scheduler esegue automaticamente la sincronizzazione dei conti PSD2 attivi
-            quando scade l'intervallo configurato. L'attivazione avviene dal runner web
-            in background; il middleware resta come fallback durante il normale traffico
-            applicativo e il comando <code>python manage.py run_scheduled_psd2_sync</code>
-            resta disponibile per cron o Task Scheduler esterni.
-        </p>
-
-        <form method="post" class="form-grid">
-            {% csrf_token %}
-            <div class="form-row">
-                <div class="form-field">
-                    <label>
-                        {{ form.attivo }} Pianificazione attiva
-                    </label>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Intervallo (ore)</label>
-                    {{ form.intervallo_ore }}
-                    {% if form.intervallo_ore.errors %}
-                        <div class="field-error">{{ form.intervallo_ore.errors|join:" " }}</div>
-                    {% endif %}
-                </div>
-                <div class="form-field">
-                    <label>Giorni di storico da richiedere</label>
-                    {{ form.giorni_storico }}
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label>{{ form.sync_saldo }} Sincronizza saldo</label>
-                </div>
-                <div class="form-field">
-                    <label>{{ form.sync_movimenti }} Sincronizza movimenti</label>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" name="azione" value="salva" class="btn btn-primary">Salva</button>
-                <button type="submit" name="azione" value="esegui" class="btn btn-secondary"
-                        onclick="return confirm('Forzare adesso la sincronizzazione di tutti i conti PSD2 attivi?');">
-                    Esegui adesso
-                </button>
-            </div>
-        </form>
+    <div class="finance-guide-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Automazione sincronizzazione</div>
+            <p>
+                Lo scheduler esegue automaticamente la sincronizzazione dei conti PSD2 attivi quando scade
+                l'intervallo configurato. Il runner web lavora in background; il middleware resta come fallback
+                durante il normale traffico applicativo e il comando <code>python manage.py run_scheduled_psd2_sync</code>
+                resta disponibile per cron o Task Scheduler esterni.
+            </p>
+        </div>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Stato</h2>
-        <table class="list-table">
-            <tbody>
-                <tr>
-                    <th>Ultima esecuzione</th>
-                    <td>{% if config.ultimo_run_at %}{{ config.ultimo_run_at|date:"d/m/Y H:i" }}{% else %}mai{% endif %}</td>
-                </tr>
-                <tr>
-                    <th>Ultimo esito</th>
-                    <td>{{ config.get_ultimo_esito_display|default:"-" }}</td>
-                </tr>
-                <tr>
-                    <th>Conti sincronizzati (ultima run)</th>
-                    <td>{{ config.conti_sincronizzati }}</td>
-                </tr>
-                <tr>
-                    <th>Conti in errore (ultima run)</th>
-                    <td>{{ config.conti_in_errore }}</td>
-                </tr>
-                <tr>
-                    <th>Prossima esecuzione prevista</th>
-                    <td>{% if prossima_esecuzione %}{{ prossima_esecuzione|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-                </tr>
-                <tr>
-                    <th>Automazione background</th>
-                    <td>
-                        {% if background_scheduler.thread_alive %}
-                            Attiva: controllo ogni {{ background_scheduler.interval_minutes }} minuti.
-                        {% elif background_scheduler.enabled %}
-                            In attesa di avvio nel processo web ({{ background_scheduler.reason }}).
-                        {% else %}
-                            Non attiva in questo processo ({{ background_scheduler.reason }}).
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <th>Esecuzione in corso</th>
-                    <td>{% if config.in_corso %}SI (avviata {{ config.avviato_at|date:"d/m/Y H:i" }}){% else %}No{% endif %}</td>
-                </tr>
+    <div class="summary-grid finance-summary-strip finance-sync-summary">
+        <div class="summary-item">
+            <div class="summary-value">{% if config.ultimo_run_at %}{{ config.ultimo_run_at|date:"d/m H:i" }}{% else %}Mai{% endif %}</div>
+            <div class="summary-label">Ultima esecuzione</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ config.conti_sincronizzati }}</div>
+            <div class="summary-label">Conti sincronizzati</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{{ config.conti_in_errore }}</div>
+            <div class="summary-label">Conti in errore</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">{% if prossima_esecuzione %}{{ prossima_esecuzione|date:"d/m H:i" }}{% else %}-{% endif %}</div>
+            <div class="summary-label">Prossima esecuzione</div>
+        </div>
+    </div>
+
+    <div class="finance-two-column-layout">
+        <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-sync-config-panel">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title">Configurazione</h2>
+                    <p class="finance-section-subtitle">Definisci frequenza, profondita dello storico e dati da aggiornare.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form method="post" class="finance-form-grid">
+                    {% csrf_token %}
+
+                    <div class="finance-toggle-field finance-sync-main-toggle">
+                        {{ form.attivo }}
+                        <label for="{{ form.attivo.id_for_label }}">{{ form.attivo.label }}</label>
+                        <span></span>
+                        <span class="help-text">Quando e' attiva, Arboris controlla periodicamente se avviare una nuova sincronizzazione.</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label for="{{ form.intervallo_ore.id_for_label }}" class="finance-form-label">{{ form.intervallo_ore.label }}</label>
+                            {{ form.intervallo_ore }}
+                            {% if form.intervallo_ore.errors %}
+                                <div class="field-error">{{ form.intervallo_ore.errors|join:" " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-field">
+                            <label for="{{ form.giorni_storico.id_for_label }}" class="finance-form-label">{{ form.giorni_storico.label }}</label>
+                            {{ form.giorni_storico }}
+                            {% if form.giorni_storico.errors %}
+                                <div class="field-error">{{ form.giorni_storico.errors|join:" " }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="finance-sync-options">
+                        <div class="finance-toggle-field">
+                            {{ form.sync_saldo }}
+                            <label for="{{ form.sync_saldo.id_for_label }}">{{ form.sync_saldo.label }}</label>
+                        </div>
+                        <div class="finance-toggle-field">
+                            {{ form.sync_movimenti }}
+                            <label for="{{ form.sync_movimenti.id_for_label }}">{{ form.sync_movimenti.label }}</label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions finance-confirm-actions">
+                        <button type="submit" name="azione" value="salva" class="btn btn-primary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                            <span class="btn-label">Salva pianificazione</span>
+                        </button>
+                        <button type="submit" name="azione" value="esegui" class="btn btn-secondary btn-icon-text"
+                                onclick="return confirm('Forzare adesso la sincronizzazione di tutti i conti PSD2 attivi?');">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                            <span class="btn-label">Esegui adesso</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-sync-status-panel">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title">Stato</h2>
+                    <p class="finance-section-subtitle">Ultimo esito, lock di esecuzione e stato del processo background.</p>
+                </div>
+            </div>
+            <div class="panel-body">
+                <table class="list-table finance-modern-table finance-status-table">
+                    <tbody>
+                        <tr>
+                            <th>Ultima esecuzione</th>
+                            <td>{% if config.ultimo_run_at %}{{ config.ultimo_run_at|date:"d/m/Y H:i" }}{% else %}<span class="table-muted">Mai</span>{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <th>Ultimo esito</th>
+                            <td>
+                                <span class="anagrafica-status-chip {% if config.ultimo_esito == 'ok' %}is-success{% elif config.ultimo_esito == 'parziale' %}is-amber{% elif config.ultimo_esito == 'errore' %}is-danger{% else %}is-muted{% endif %}">
+                                    {{ config.get_ultimo_esito_display|default:"-" }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Prossima esecuzione prevista</th>
+                            <td>{% if prossima_esecuzione %}{{ prossima_esecuzione|date:"d/m/Y H:i" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <th>Automazione background</th>
+                            <td>
+                                {% if background_scheduler.thread_alive %}
+                                    <span class="anagrafica-status-chip is-success">Attiva</span>
+                                    <span class="table-muted">controllo ogni {{ background_scheduler.interval_minutes }} minuti</span>
+                                {% elif background_scheduler.enabled %}
+                                    <span class="anagrafica-status-chip is-amber">In attesa</span>
+                                    <span class="table-muted">{{ background_scheduler.reason }}</span>
+                                {% else %}
+                                    <span class="anagrafica-status-chip is-muted">Non attiva</span>
+                                    <span class="table-muted">{{ background_scheduler.reason }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Esecuzione in corso</th>
+                            <td>
+                                {% if config.in_corso %}
+                                    <span class="anagrafica-status-chip is-amber">Si</span>
+                                    <span class="table-muted">avviata {{ config.avviato_at|date:"d/m/Y H:i" }}</span>
+                                {% else %}
+                                    <span class="anagrafica-status-chip is-muted">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
                 {% if config.ultimo_messaggio %}
-                    <tr>
-                        <th>Dettagli ultima run</th>
-                        <td><pre class="log-block">{{ config.ultimo_messaggio }}</pre></td>
-                    </tr>
+                    <div class="finance-sync-log">
+                        <div class="finance-form-label">Dettagli ultima run</div>
+                        <pre class="log-block">{{ config.ultimo_messaggio }}</pre>
+                    </div>
                 {% endif %}
-            </tbody>
-        </table>
+            </div>
+        </section>
     </div>
 
-    <div class="content-card">
-        <h2 class="section-title">Conti target ({{ conti_target|length }})</h2>
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Provider</th>
-                    <th>Conto</th>
-                    <th>IBAN / ID esterno</th>
-                    <th>Ultimo saldo</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for conto in conti_target %}
-                    <tr>
-                        <td>{{ conto.provider.nome }}</td>
-                        <td>{{ conto.nome_conto }}</td>
-                        <td>{{ conto.iban|default:conto.external_account_id }}</td>
-                        <td>{% if conto.saldo_corrente is not None %}{{ conto.saldo_corrente }} {{ conto.valuta }}{% else %}-{% endif %}</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="4">
-                            <div class="empty-state">
-                                Nessun conto PSD2 attivo. Crea una connessione dalla pagina
-                                <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>.
-                            </div>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Conti target ({{ conti_target|length }})</h2>
+                <p class="finance-section-subtitle">Conti PSD2 attivi inclusi nella prossima sincronizzazione automatica.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            {% if conti_target %}
+                <table class="list-table anagrafica-list-table finance-modern-table">
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>Conto</th>
+                            <th>IBAN / ID esterno</th>
+                            <th>Ultimo saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conto in conti_target %}
+                            <tr>
+                                <td>{{ conto.provider.nome }}</td>
+                                <td class="anagrafica-record-cell">
+                                    <div class="anagrafica-record-link anagrafica-record-link-compact">
+                                        <span class="finance-record-icon" aria-hidden="true">
+                                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                                        </span>
+                                        <span class="anagrafica-record-main">
+                                            <span class="table-main-text">{{ conto.nome_conto }}</span>
+                                            <span class="table-subtext">{{ conto.connessione.etichetta|default:"Connessione PSD2" }}</span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>{{ conto.iban|default:conto.external_account_id }}</td>
+                                <td class="column-right">
+                                    {% if conto.saldo_corrente is not None %}
+                                        {{ conto.saldo_corrente }} {{ conto.valuta }}
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    Nessun conto PSD2 attivo. Crea una connessione dalla pagina
+                    <a href="{% url 'lista_connessioni_bancarie' %}">Connessioni PSD2</a>.
+                </div>
+            {% endif %}
+        </div>
+    </section>
 {% endblock %}
