@@ -1029,10 +1029,12 @@ def sincronizza_conto_psd2(
         OrigineMovimento,
         SaldoConto,
         SincronizzazioneLog,
+        StatoConnessioneBancaria,
         StatoRiconciliazione,
         TipoOperazioneSincronizzazione,
     )
     from .providers import adapter_for_provider
+    from .providers.enablebanking import EnableBankingSessionExpired
     from .providers.registry import ProviderConfigurazioneMancante
 
     start = time_module.monotonic()
@@ -1058,6 +1060,22 @@ def sincronizza_conto_psd2(
         )
 
     adapter = adapter_for_provider(conto.provider, connessione=conto.connessione)
+
+    def mark_connection_expired(message: str) -> None:
+        if conto.connessione_id:
+            ConnessioneBancaria.objects.filter(pk=conto.connessione_id).update(
+                stato=StatoConnessioneBancaria.SCADUTA,
+                ultimo_errore=message[:1000],
+            )
+
+    def expired_session_message(exc: Exception) -> str:
+        connessione_label = ""
+        if conto.connessione_id and getattr(conto, "connessione", None):
+            connessione_label = f" \"{conto.connessione.etichetta}\""
+        return (
+            f"Consenso PSD2 scaduto per la connessione{connessione_label}: "
+            "rinnova il consenso da Connessioni PSD2."
+        )
 
     if sync_saldo:
         try:
@@ -1107,6 +1125,11 @@ def sincronizza_conto_psd2(
                     ]
                 )
             messaggi.append(f"Saldi letti: {len(saldi)}")
+        except EnableBankingSessionExpired as exc:
+            errori_fatali = True
+            messaggio = expired_session_message(exc)
+            messaggi.append(f"Errore sync saldo: {messaggio}")
+            mark_connection_expired(messaggio)
         except Exception as exc:
             errori_fatali = True
             messaggi.append(f"Errore sync saldo: {exc}")
@@ -1165,6 +1188,11 @@ def sincronizza_conto_psd2(
             messaggi.append(
                 f"Movimenti scaricati: {len(transazioni)}, inseriti: {inseriti}"
             )
+        except EnableBankingSessionExpired as exc:
+            errori_fatali = True
+            messaggio = expired_session_message(exc)
+            messaggi.append(f"Errore sync movimenti: {messaggio}")
+            mark_connection_expired(messaggio)
         except Exception as exc:
             errori_fatali = True
             messaggi.append(f"Errore sync movimenti: {exc}")
@@ -1173,10 +1201,12 @@ def sincronizza_conto_psd2(
     conto.save(update_fields=["data_ultima_sincronizzazione", "data_aggiornamento"])
 
     if conto.connessione_id:
-        ConnessioneBancaria.objects.filter(pk=conto.connessione_id).update(
-            ultimo_refresh_at=timezone.now(),
-            ultimo_errore="" if not errori_fatali else messaggi[-1][:1000],
-        )
+        update_data = {
+            "ultimo_errore": "" if not errori_fatali else messaggi[-1][:1000],
+        }
+        if not errori_fatali:
+            update_data["ultimo_refresh_at"] = timezone.now()
+        ConnessioneBancaria.objects.filter(pk=conto.connessione_id).update(**update_data)
 
     durata_ms = int((time_module.monotonic() - start) * 1000)
     esito = EsitoSincronizzazione.ERRORE if errori_fatali else EsitoSincronizzazione.OK

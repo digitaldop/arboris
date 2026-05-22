@@ -68,7 +68,7 @@
     </div>
 
     <div class="content-card">
-        <h2 class="section-title">Connessioni attive</h2>
+        <h2 class="section-title">Connessioni registrate</h2>
         <table class="list-table">
             <thead>
                 <tr>
@@ -86,7 +86,15 @@
                     <tr>
                         <td>{{ connessione.provider.nome }}</td>
                         <td>{{ connessione.etichetta }}</td>
-                        <td>{{ connessione.get_stato_display }}</td>
+                        <td>
+                            <span class="anagrafica-status-chip {% if connessione.stato == 'attiva' %}is-success{% elif connessione.stato == 'scaduta' or connessione.stato == 'errore' %}is-danger{% else %}is-muted{% endif %}">
+                                {{ connessione.get_stato_display }}
+                            </span>
+                            {% if connessione.ultimo_errore %}
+                                <br>
+                                <small class="table-muted">{{ connessione.ultimo_errore|truncatechars:140 }}</small>
+                            {% endif %}
+                        </td>
                         <td>{{ connessione.external_institution_id|default:"-" }}</td>
                         <td>
                             {{ connessione.conti.count }}
@@ -111,6 +119,16 @@
                             {% endif %}
                         </td>
                         <td class="actions-cell">
+                            <form method="post" action="{% url 'rinnova_connessione_psd2' connessione.pk %}" style="display:inline;" onclick="event.stopPropagation();">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="table-link"
+                                        style="border:0;background:none;padding:0;"
+                                        onclick="return confirm('Avviare il rinnovo del consenso PSD2 per questa connessione?');">
+                                    Rinnova consenso
+                                </button>
+                            </form>
+                            <span class="table-muted">|</span>
                             <a href="{% url 'elimina_connessione_psd2' connessione.pk %}" class="table-link table-link-danger">Elimina</a>
                         </td>
                     </tr>

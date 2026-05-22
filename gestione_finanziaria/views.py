@@ -4474,15 +4474,7 @@ def nuova_connessione_psd2(request, provider_pk):
                     external_institution_id=form.cleaned_data["institution_id"],
                     stato=StatoConnessioneBancaria.ATTIVA,
                 )
-                # Provider OAuth2 (es. TrueLayer) richiedono un redirect_uri *fisso*
-                # pre-registrato nella console dello sviluppatore. Usiamo allora
-                # l'URL generico 'callback_oauth_psd2' e passiamo il pk via 'state'.
-                if is_redirect_callback_adapter(provider):
-                    redirect_url = _oauth_redirect_uri(request, provider)
-                else:
-                    redirect_url = request.build_absolute_uri(
-                        reverse("callback_connessione_psd2", args=[connessione.pk])
-                    )
+                redirect_url = _redirect_url_connessione_psd2(request, provider, connessione)
                 info = adapter.crea_connessione(
                     institution_id=form.cleaned_data["institution_id"],
                     redirect_url=redirect_url,
@@ -4521,6 +4513,66 @@ def nuova_connessione_psd2(request, provider_pk):
             "is_truelayer": is_oauth_adapter(provider),
         },
     )
+
+
+def _redirect_url_connessione_psd2(request, provider, connessione):
+    if is_redirect_callback_adapter(provider):
+        return _oauth_redirect_uri(request, provider)
+    return request.build_absolute_uri(
+        reverse("callback_connessione_psd2", args=[connessione.pk])
+    )
+
+
+def rinnova_connessione_psd2(request, pk):
+    connessione = get_object_or_404(
+        ConnessioneBancaria.objects.select_related("provider"),
+        pk=pk,
+    )
+    provider = connessione.provider
+
+    if request.method != "POST":
+        return redirect("lista_connessioni_bancarie")
+    if provider.tipo != TipoProviderBancario.PSD2:
+        messages.error(request, "La connessione selezionata non e' di tipo PSD2.")
+        return redirect("lista_connessioni_bancarie")
+    if not configurazione_completa(provider):
+        messages.error(
+            request,
+            "Provider non configurato: completa le credenziali tecniche prima di rinnovare il consenso.",
+        )
+        return redirect("configura_provider_psd2", pk=provider.pk)
+    if not connessione.external_institution_id and not is_oauth_adapter(provider):
+        messages.error(
+            request,
+            "Impossibile rinnovare automaticamente: istituto bancario non salvato sulla connessione.",
+        )
+        return redirect("lista_connessioni_bancarie")
+
+    try:
+        adapter = adapter_for_provider(provider)
+        info = adapter.crea_connessione(
+            institution_id=connessione.external_institution_id,
+            redirect_url=_redirect_url_connessione_psd2(request, provider, connessione),
+            reference=f"arboris-{connessione.pk}",
+            max_historical_days=90,
+            access_valid_for_days=90,
+        )
+    except Exception as exc:
+        connessione.stato = StatoConnessioneBancaria.ERRORE
+        connessione.ultimo_errore = str(exc)[:1000]
+        connessione.save(update_fields=["stato", "ultimo_errore", "data_aggiornamento"])
+        messages.error(request, f"Impossibile avviare il rinnovo del consenso: {exc}")
+        return redirect("lista_connessioni_bancarie")
+
+    connessione.external_connection_id = info.external_connection_id
+    connessione.stato = StatoConnessioneBancaria.SCADUTA
+    connessione.ultimo_errore = ""
+    update_fields = ["external_connection_id", "stato", "ultimo_errore", "data_aggiornamento"]
+    if info.expires_at:
+        connessione.consenso_scadenza = info.expires_at
+        update_fields.append("consenso_scadenza")
+    connessione.save(update_fields=update_fields)
+    return redirect(info.authorization_url)
 
 
 def _istituto_label_da_connessione(connessione):

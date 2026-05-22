@@ -406,6 +406,11 @@ urlpatterns = [
         name="nuova_connessione_psd2",
     ),
     path(
+        "gestione-finanziaria/connessioni/<int:pk>/rinnova/",
+        gf_manage(views.rinnova_connessione_psd2),
+        name="rinnova_connessione_psd2",
+    ),
+    path(
         "gestione-finanziaria/connessioni/<int:pk>/callback/",
         views.callback_connessione_psd2,
         name="callback_connessione_psd2",

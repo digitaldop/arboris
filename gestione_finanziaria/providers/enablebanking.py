@@ -72,6 +72,10 @@ class EnableBankingError(RuntimeError):
     """Errore generico di comunicazione con Enable Banking."""
 
 
+class EnableBankingSessionExpired(EnableBankingError):
+    """La sessione/consenso Enable Banking non e' piu utilizzabile."""
+
+
 def _b64url(data: bytes) -> str:
     """Base64url senza padding (stesso stile di PyJWT / RFC 7519)."""
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -235,7 +239,16 @@ class EnableBankingAdapter(BasePsd2Adapter):
             return None
         if r.status_code >= 400:
             dettaglio = self._parse_error_body(r.text)
-            if r.status_code == 401 and "wrong signature" in dettaglio.lower():
+            dettaglio_lower = dettaglio.lower()
+            if r.status_code == 401 and (
+                "expired_session" in dettaglio_lower
+                or "session is expired" in dettaglio_lower
+            ):
+                raise EnableBankingSessionExpired(
+                    "Sessione Enable Banking scaduta: rinnova il consenso "
+                    "della connessione bancaria da Connessioni PSD2."
+                )
+            if r.status_code == 401 and "wrong signature" in dettaglio_lower:
                 dettaglio = (
                     f"{dettaglio} - Firma JWT non riconosciuta da Enable Banking. "
                     "Controlla che l'Application ID configurato in Arboris sia quello "

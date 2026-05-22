@@ -30,6 +30,7 @@ from .models import (
     EsitoSincronizzazione,
     FattureInCloudConnessione,
     PianificazioneSincronizzazione,
+    StatoConnessioneBancaria,
     TipoProviderBancario,
 )
 from .providers.registry import ProviderConfigurazioneMancante
@@ -62,6 +63,7 @@ def conti_target():
 
     return ContoBancario.objects.filter(
         attivo=True,
+        connessione__stato=StatoConnessioneBancaria.ATTIVA,
         provider__attivo=True,
         provider__tipo=TipoProviderBancario.PSD2,
     ).exclude(external_account_id="")

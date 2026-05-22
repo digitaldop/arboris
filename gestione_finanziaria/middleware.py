@@ -10,7 +10,12 @@ Per esecuzioni indipendenti dal traffico si usa il management command
 
 from __future__ import annotations
 
-from .scheduler import maybe_run_scheduled_fatture_in_cloud_sync, maybe_run_scheduled_sync
+import logging
+
+from .background_scheduler import start_background_scheduler_once, trigger_due_sync_check_async
+
+
+logger = logging.getLogger(__name__)
 
 
 _EXCLUDE_PATH_PREFIXES = ("/admin/", "/media/", "/static/")
@@ -34,10 +39,10 @@ class SincronizzazionePsd2ScheduleMiddleware:
                 return response
 
         try:
-            maybe_run_scheduled_sync(triggered_by=getattr(request, "user", None))
-            maybe_run_scheduled_fatture_in_cloud_sync(triggered_by=getattr(request, "user", None))
+            start_background_scheduler_once()
+            trigger_due_sync_check_async()
         except Exception:
             # La sincronizzazione non deve mai compromettere la richiesta utente.
-            pass
+            logger.exception("Impossibile avviare il controllo asincrono delle sincronizzazioni finanziarie.")
 
         return response

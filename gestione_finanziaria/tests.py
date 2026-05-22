@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import HttpResponse
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -53,6 +54,7 @@ from .models import (
     ScadenzaPagamentoFornitore,
     SegnoMovimento,
     SincronizzazioneLog,
+    StatoConnessioneBancaria,
     StatoRiconciliazione,
     StatoDocumentoFornitore,
     StatoScadenzaFornitore,
@@ -84,7 +86,7 @@ from .fatture_in_cloud import (
 from .importers import CsvImporter, CsvImporterConfig, ExcelImporter, detect_csv_import_config, detect_excel_import_config
 from .importers.service import importa_movimenti_da_file
 from .forms import DocumentoFornitoreForm
-from .providers.base import ProviderAccount, ProviderTransaction
+from .providers.base import ProviderAccount, ProviderConnectionInfo, ProviderTransaction
 from .providers.enablebanking import EnableBankingAdapter, EnableBankingCredentials
 from .services import (
     annulla_pagamento_fornitore,
@@ -219,6 +221,34 @@ class Psd2SchedulerTests(TestCase):
         self.assertTrue(enabled)
         self.assertEqual(reason, "processo web")
 
+    def test_background_scheduler_runs_check_before_first_sleep(self):
+        from gestione_finanziaria import background_scheduler
+
+        with patch.object(background_scheduler, "_run_due_syncs") as mock_run_due_syncs:
+            with patch.object(background_scheduler.time, "sleep", side_effect=RuntimeError("stop")):
+                with self.assertRaises(RuntimeError):
+                    background_scheduler._scheduler_loop(300)
+
+        mock_run_due_syncs.assert_called_once()
+
+    @patch("gestione_finanziaria.middleware.trigger_due_sync_check_async")
+    @patch("gestione_finanziaria.middleware.start_background_scheduler_once")
+    def test_schedule_middleware_triggers_async_check_without_blocking(
+        self,
+        mock_start_background_scheduler,
+        mock_trigger_due_sync_check,
+    ):
+        from gestione_finanziaria.middleware import SincronizzazionePsd2ScheduleMiddleware
+
+        request = RequestFactory().get("/gestione-finanziaria/pianificazione-sincronizzazione/")
+        middleware = SincronizzazionePsd2ScheduleMiddleware(lambda request: HttpResponse("ok"))
+
+        response = middleware(request)
+
+        self.assertEqual(response.status_code, 200)
+        mock_start_background_scheduler.assert_called_once()
+        mock_trigger_due_sync_check.assert_called_once()
+
     @patch("gestione_finanziaria.providers.adapter_for_provider")
     def test_psd2_account_sync_uses_real_time_module_for_duration(self, mock_adapter_for_provider):
         from gestione_finanziaria.services import sincronizza_conto_psd2
@@ -252,6 +282,78 @@ class Psd2SchedulerTests(TestCase):
         self.assertIsNotNone(log.durata_millisecondi)
         adapter.saldo_conto.assert_called_once_with("account-test")
         adapter.movimenti_conto.assert_called_once()
+
+    @patch("gestione_finanziaria.providers.adapter_for_provider")
+    def test_psd2_account_sync_marks_enablebanking_expired_session(self, mock_adapter_for_provider):
+        from gestione_finanziaria.providers.enablebanking import EnableBankingSessionExpired
+        from gestione_finanziaria.services import sincronizza_conto_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking scadenza",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_connection_id="session-expired",
+            stato=StatoConnessioneBancaria.ATTIVA,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Banco BPM",
+            provider=provider,
+            connessione=connessione,
+            external_account_id="account-expired",
+            attivo=True,
+        )
+        adapter = Mock()
+        adapter.saldo_conto.side_effect = EnableBankingSessionExpired("Session is expired")
+        mock_adapter_for_provider.return_value = adapter
+
+        log = sincronizza_conto_psd2(conto)
+
+        connessione.refresh_from_db()
+        self.assertEqual(log.esito, EsitoSincronizzazione.ERRORE)
+        self.assertEqual(connessione.stato, StatoConnessioneBancaria.SCADUTA)
+        self.assertIn("Consenso PSD2 scaduto", connessione.ultimo_errore)
+        self.assertIn("rinnova il consenso", log.messaggio)
+        adapter.movimenti_conto.assert_not_called()
+
+    def test_scheduler_excludes_expired_psd2_connections(self):
+        from gestione_finanziaria.scheduler import conti_target
+
+        provider = ProviderBancario.objects.create(
+            nome="Provider PSD2 target",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione_attiva = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Connessione attiva",
+            stato=StatoConnessioneBancaria.ATTIVA,
+        )
+        connessione_scaduta = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Connessione scaduta",
+            stato=StatoConnessioneBancaria.SCADUTA,
+        )
+        conto_attivo = ContoBancario.objects.create(
+            nome_conto="Conto attivo",
+            provider=provider,
+            connessione=connessione_attiva,
+            external_account_id="account-active",
+            attivo=True,
+        )
+        conto_scaduto = ContoBancario.objects.create(
+            nome_conto="Conto scaduto",
+            provider=provider,
+            connessione=connessione_scaduta,
+            external_account_id="account-expired",
+            attivo=True,
+        )
+
+        self.assertIn(conto_attivo, conti_target())
+        self.assertNotIn(conto_scaduto, conti_target())
 
     @patch("gestione_finanziaria.providers.adapter_for_provider")
     def test_psd2_account_sync_crea_notifica_per_nuovo_movimento(self, mock_adapter_for_provider):
@@ -447,6 +549,52 @@ class Psd2ConnectionImportTests(TestCase):
         self.assertEqual(conto.external_account_product, "Carta prepagata business")
         self.assertEqual(conto.external_account_hash, "hash-carta-prepagata")
         self.assertEqual(conto.banca, "Unicredit")
+
+    @patch("gestione_finanziaria.views.adapter_for_provider")
+    def test_rinnova_connessione_psd2_riusa_connessione_esistente(self, mock_adapter_for_provider):
+        from .views import rinnova_connessione_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Provider rinnovo PSD2",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={
+                "adapter": "gocardless_bad",
+                "secret_id": "secret-id",
+                "secret_key_cifrata": "secret-key",
+            },
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_institution_id="Banco BPM|IT",
+            external_connection_id="session-old",
+            stato=StatoConnessioneBancaria.SCADUTA,
+            ultimo_errore="Consenso scaduto",
+        )
+        adapter = Mock()
+        expires_at = timezone.now() + timedelta(days=90)
+        adapter.crea_connessione.return_value = ProviderConnectionInfo(
+            external_connection_id=f"arboris-{connessione.pk}",
+            authorization_url="https://bank.example/auth",
+            institution_id="Banco BPM|IT",
+            expires_at=expires_at,
+        )
+        mock_adapter_for_provider.return_value = adapter
+
+        request = RequestFactory().post("/")
+        request.session = self.client.session
+        request._messages = FallbackStorage(request)
+
+        response = rinnova_connessione_psd2(request, connessione.pk)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://bank.example/auth")
+        connessione.refresh_from_db()
+        self.assertEqual(connessione.external_connection_id, f"arboris-{connessione.pk}")
+        self.assertEqual(connessione.stato, StatoConnessioneBancaria.SCADUTA)
+        self.assertEqual(connessione.ultimo_errore, "")
+        self.assertEqual(connessione.consenso_scadenza, expires_at)
+        adapter.crea_connessione.assert_called_once()
 
     def test_enablebanking_usa_account_details_restituiti_da_post_sessions(self):
         adapter = EnableBankingAdapter(

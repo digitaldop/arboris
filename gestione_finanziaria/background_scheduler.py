@@ -16,9 +16,12 @@ INTERVAL_ENV_VAR = "ARBORIS_BACKGROUND_SCHEDULER_INTERVAL_SECONDS"
 DEFAULT_INTERVAL_SECONDS = 300
 MIN_INTERVAL_SECONDS = 60
 RUNNER_THREAD_NAME = "arboris-finance-background-scheduler"
+KICK_THREAD_NAME = "arboris-finance-scheduler-kick"
 
 _runner_lock = threading.Lock()
 _runner_thread: threading.Thread | None = None
+_kick_lock = threading.Lock()
+_kick_thread: threading.Thread | None = None
 
 
 def _env_bool(name: str) -> bool | None:
@@ -100,14 +103,17 @@ def should_start_background_scheduler() -> tuple[bool, str]:
 
 def background_scheduler_status() -> dict[str, object]:
     enabled, reason = should_start_background_scheduler()
-    thread_alive = bool(_runner_thread and _runner_thread.is_alive())
+    runner_thread_alive = bool(_runner_thread and _runner_thread.is_alive())
+    kick_thread_alive = bool(_kick_thread and _kick_thread.is_alive())
     interval_seconds = _configured_interval_seconds()
     return {
         "enabled": enabled,
         "reason": reason,
         "interval_seconds": interval_seconds,
         "interval_minutes": max(1, round(interval_seconds / 60)),
-        "thread_alive": thread_alive,
+        "thread_alive": runner_thread_alive or kick_thread_alive,
+        "runner_thread_alive": runner_thread_alive,
+        "kick_thread_alive": kick_thread_alive,
     }
 
 
@@ -122,14 +128,16 @@ def _run_due_syncs() -> None:
         close_old_connections()
 
 
+def _run_due_syncs_safely() -> None:
+    try:
+        _run_due_syncs()
+    except Exception:
+        logger.exception("Errore durante il controllo automatico delle sincronizzazioni finanziarie.")
+
+
 def _scheduler_loop(interval_seconds: int) -> None:
-    initial_delay = min(30, interval_seconds)
-    time.sleep(initial_delay)
     while True:
-        try:
-            _run_due_syncs()
-        except Exception:
-            logger.exception("Errore durante il controllo automatico delle sincronizzazioni finanziarie.")
+        _run_due_syncs_safely()
         time.sleep(interval_seconds)
 
 
@@ -158,4 +166,32 @@ def start_background_scheduler_once() -> bool:
             interval_seconds,
             reason,
         )
+        return True
+
+
+def trigger_due_sync_check_async() -> bool:
+    """
+    Avvia un singolo controllo asincrono delle sincronizzazioni in scadenza.
+
+    Serve come fallback leggero per le richieste web: la verifica non blocca la
+    risposta HTTP e quindi non rischia di far scattare il timeout del worker.
+    """
+
+    global _kick_thread
+
+    enabled, reason = should_start_background_scheduler()
+    if not enabled:
+        logger.debug("Kick scheduler finanziario non avviato: %s", reason)
+        return False
+
+    with _kick_lock:
+        if _kick_thread and _kick_thread.is_alive():
+            return False
+
+        _kick_thread = threading.Thread(
+            target=_run_due_syncs_safely,
+            name=KICK_THREAD_NAME,
+            daemon=True,
+        )
+        _kick_thread.start()
         return True
