@@ -475,6 +475,31 @@ class Psd2ConnectionImportTests(TestCase):
         request._messages = FallbackStorage(request)
         return request
 
+    def test_lista_connessioni_renderizza_layout_moderno_e_pulsante_rinnovo(self):
+        from .views import lista_connessioni_bancarie
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking UI",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_institution_id="Banco BPM|IT",
+            stato=StatoConnessioneBancaria.SCADUTA,
+            ultimo_errore="Consenso scaduto",
+        )
+
+        response = lista_connessioni_bancarie(self._request())
+        content = response.content.decode("utf-8")
+
+        self.assertIn("finance-page-head", content)
+        self.assertIn("finance-modern-table", content)
+        self.assertIn('class="btn btn-secondary btn-sm btn-icon-text"', content)
+        self.assertIn("Rinnova consenso", content)
+        self.assertIn("Consenso scaduto", content)
+
     def test_finalizzazione_psd2_mantiene_connessioni_multiple_stessa_banca(self):
         from .views import _finalizza_connessione_psd2
 
@@ -515,6 +540,89 @@ class Psd2ConnectionImportTests(TestCase):
         self.assertEqual(conti.count(), 2)
         self.assertEqual(conti[0].connessione, connessione_prima)
         self.assertEqual(conti[1].connessione, connessione_seconda)
+
+    def test_finalizzazione_psd2_rinnovo_riusa_conto_esistente_se_account_id_cambia(self):
+        from .views import _finalizza_connessione_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking test rinnovo",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_institution_id="Banco BPM|IT",
+            external_connection_id="session-renewed",
+            stato=StatoConnessioneBancaria.SCADUTA,
+        )
+        conto = ContoBancario.objects.create(
+            provider=provider,
+            connessione=connessione,
+            nome_conto="Banco BPM",
+            external_account_id="old-enablebanking-id",
+        )
+        account = ProviderAccount(
+            external_account_id="new-enablebanking-id",
+            iban="IT67C0503437060000000003228",
+            currency="EUR",
+            owner_name="Scuola test",
+            name="CC013228",
+            account_type="CACC",
+        )
+
+        _finalizza_connessione_psd2(self._request(), connessione, Mock(lista_conti=Mock(return_value=[account])))
+
+        self.assertEqual(ContoBancario.objects.filter(connessione=connessione).count(), 1)
+        conto.refresh_from_db()
+        self.assertEqual(conto.external_account_id, "new-enablebanking-id")
+        self.assertEqual(conto.iban, "IT67C0503437060000000003228")
+        self.assertEqual(conto.nome_conto, "Banco BPM")
+
+    def test_finalizzazione_psd2_rinnovo_riconosce_conto_da_iban_anche_con_piu_conti(self):
+        from .views import _finalizza_connessione_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Enable Banking test iban",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "enablebanking"},
+        )
+        connessione = ConnessioneBancaria.objects.create(
+            provider=provider,
+            etichetta="Banco BPM",
+            external_institution_id="Banco BPM|IT",
+            external_connection_id="session-iban",
+        )
+        conto = ContoBancario.objects.create(
+            provider=provider,
+            connessione=connessione,
+            nome_conto="Banco BPM operativo",
+            external_account_id="old-account-id",
+            iban="IT67C0503437060000000003228",
+        )
+        ContoBancario.objects.create(
+            provider=provider,
+            connessione=connessione,
+            nome_conto="Banco BPM secondario",
+            external_account_id="second-account-id",
+            iban="IT67C0503437060000000009999",
+        )
+        account = ProviderAccount(
+            external_account_id="new-account-id",
+            iban="IT67 C050 3437 0600 0000 0003 228",
+            currency="EUR",
+            owner_name="Scuola test",
+            name="CC013228",
+            account_type="CACC",
+        )
+
+        _finalizza_connessione_psd2(self._request(), connessione, Mock(lista_conti=Mock(return_value=[account])))
+
+        self.assertEqual(ContoBancario.objects.filter(connessione=connessione).count(), 2)
+        conto.refresh_from_db()
+        self.assertEqual(conto.external_account_id, "new-account-id")
+        self.assertEqual(conto.nome_conto, "Banco BPM operativo")
+        self.assertFalse(ContoBancario.objects.filter(connessione=connessione, external_account_id="old-account-id").exists())
 
     def test_finalizzazione_psd2_importa_carte_enablebanking_come_prepagate(self):
         from .views import _finalizza_connessione_psd2

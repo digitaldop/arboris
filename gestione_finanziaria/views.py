@@ -4671,7 +4671,7 @@ def _aggiorna_conto_da_provider_account(conto, connessione, account, *, is_new):
     return conto
 
 
-def _conto_da_provider_account(*, provider, connessione, account):
+def _conto_da_provider_account(*, provider, connessione, account, fallback_conto=None):
     if not (account.external_account_id or "").strip():
         raise ValueError("Account PSD2 senza external_account_id.")
 
@@ -4682,6 +4682,17 @@ def _conto_da_provider_account(*, provider, connessione, account):
         conto = queryset.filter(external_account_hash=identification_hash).first()
     if conto is None:
         conto = queryset.filter(external_account_id=account.external_account_id).first()
+    if conto is None and account.iban:
+        conto = queryset.filter(iban__iexact=account.iban[:34]).first()
+    if conto is None and account.iban:
+        iban_clean = _clean_account_piece(account.iban)
+        if iban_clean:
+            for conto_esistente in queryset.exclude(iban=""):
+                if _clean_account_piece(conto_esistente.iban) == iban_clean:
+                    conto = conto_esistente
+                    break
+    if conto is None and fallback_conto is not None:
+        conto = fallback_conto
 
     if conto is None:
         conto = ContoBancario()
@@ -4710,6 +4721,13 @@ def _finalizza_connessione_psd2(request, connessione, adapter):
         return redirect("lista_connessioni_bancarie")
 
     provider = connessione.provider
+    conti_esistenti = list(
+        ContoBancario.objects.filter(provider=provider, connessione=connessione).order_by("pk")
+    )
+    fallback_conto = None
+    if len(conti_esistenti) == 1 and len(conti_provider) == 1:
+        fallback_conto = conti_esistenti[0]
+
     creati = 0
     aggiornati = 0
     for account in conti_provider:
@@ -4717,6 +4735,7 @@ def _finalizza_connessione_psd2(request, connessione, adapter):
             provider=provider,
             connessione=connessione,
             account=account,
+            fallback_conto=fallback_conto,
         )
         if not is_new:
             aggiornati += 1
