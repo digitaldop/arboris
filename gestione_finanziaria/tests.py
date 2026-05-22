@@ -1394,7 +1394,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pagamento fornitore registrato correttamente.")
-        self.assertContains(response, r"gestione\u002Dfinanziaria/documenti\u002Dfornitori")
+        self.assertContains(response, r"gestione\u002Dfinanziaria/fatture\u002Dscadenze\u002Dfornitori")
         self.assertContains(response, "handleReloadToUrl")
         self.assertContains(response, "popup-close-fallback")
         pagamento = PagamentoFornitore.objects.get(scadenza=scadenza)
@@ -1550,7 +1550,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pagamento fornitore annullato.")
-        self.assertContains(response, r"gestione\u002Dfinanziaria/documenti\u002Dfornitori")
+        self.assertContains(response, r"gestione\u002Dfinanziaria/fatture\u002Dscadenze\u002Dfornitori")
         self.assertContains(response, "handleReloadToUrl")
         self.assertContains(response, "popup-close-fallback")
         self.assertContains(response, "handleReload")
@@ -1840,6 +1840,35 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-related-type="movimento_finanziario"')
         self.assertContains(response, "Gennaio")
         self.assertContains(response, "js/pages/documento-fornitore-form.js")
+
+    def test_documento_fornitore_non_popup_apre_pagamento_in_popup_e_torna_a_scadenze(self):
+        fornitore = Fornitore.objects.create(denominazione="Pagamento Popup Srl")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="PAY-1",
+            data_documento=date(2026, 5, 10),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+            importo_pagato=Decimal("40.00"),
+        )
+        documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+        pagamento_url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+
+        response = self.client.get(documento_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{reverse("fatture_scadenze_fornitori")}"')
+        self.assertContains(response, pagamento_url)
+        self.assertContains(response, "reload_url=")
+        self.assertContains(response, f'data-popup-url="{pagamento_url}&reload_url=')
+        self.assertContains(response, 'data-window-popup="1"')
+        self.assertContains(response, 'data-popup-window-features="width=1120,height=820,resizable=yes,scrollbars=yes"')
 
     def test_documento_fornitore_popup_mostra_dati_effettivi(self):
         categoria = crea_categoria_spesa_test("Cancelleria")
@@ -2436,6 +2465,171 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         scadenza = documento.scadenze.get()
         self.assertEqual(scadenza.data_scadenza, date(2026, 6, 15))
         self.assertEqual(scadenza.importo_previsto, Decimal("122.00"))
+
+    def test_importa_documento_fatture_in_cloud_usa_descrizione_dalle_righe_xml(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 995,
+            "type": "expense",
+            "date": "2026-05-04",
+            "amount_net": "200.00",
+            "amount_vat": "44.00",
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdPaese": "IT", "IdCodice": "12345678908"},
+                            "Anagrafica": {"Denominazione": "Righe Supplier Srl"},
+                        },
+                    },
+                },
+                "FatturaElettronicaBody": {
+                    "DatiGenerali": {
+                        "DatiGeneraliDocumento": {
+                            "Numero": "RIGHE-1",
+                            "ImportoTotaleDocumento": "244.00",
+                        }
+                    },
+                    "DatiBeniServizi": {
+                        "DettaglioLinee": [
+                            {"Descrizione": "Servizio mensa maggio"},
+                            {"Descrizione": "Materiale didattico"},
+                        ]
+                    },
+                    "DatiPagamento": [
+                        {
+                            "DettaglioPagamento": [
+                                {
+                                    "DataScadenzaPagamento": "2026-06-04",
+                                    "ImportoPagamento": "244.00",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            },
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="995")
+        self.assertEqual(documento.descrizione, "Servizio mensa maggio; Materiale didattico")
+
+    def test_importa_documento_fatture_in_cloud_usa_causale_se_mancano_le_righe(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": 996,
+            "type": "expense",
+            "date": "2026-05-05",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdPaese": "IT", "IdCodice": "12345678909"},
+                            "Anagrafica": {"Denominazione": "Causale Supplier Srl"},
+                        },
+                    },
+                },
+                "FatturaElettronicaBody": {
+                    "DatiGenerali": {
+                        "DatiGeneraliDocumento": {
+                            "Numero": "CAUS-1",
+                            "ImportoTotaleDocumento": "122.00",
+                            "Causale": ["Assistenza educativa mese di maggio"],
+                        }
+                    },
+                    "DatiPagamento": [
+                        {
+                            "DettaglioPagamento": [
+                                {
+                                    "DataScadenzaPagamento": "2026-06-05",
+                                    "ImportoPagamento": "122.00",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            },
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="996")
+        self.assertEqual(documento.descrizione, "Assistenza educativa mese di maggio")
+
+    def test_importa_documento_fatture_in_cloud_marca_pagata_da_status_pagamento(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": 997,
+            "type": "expense",
+            "description": "Documento gia pagato in FIC",
+            "invoice_number": "PAID-1",
+            "date": "2026-05-06",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Paid Supplier Srl", "vat_number": "IT12345678910"},
+            "payments_list": [
+                {
+                    "due_date": "2026-05-20",
+                    "amount": "122.00",
+                    "status": "paid",
+                    "paid_date": "2026-05-18",
+                }
+            ],
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="997")
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.importo_pagato, Decimal("122.00"))
+        self.assertEqual(scadenza.data_pagamento, date(2026, 5, 18))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+
+    def test_importa_documento_fatture_in_cloud_riconosce_movimento_bancario_pagato(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        conto = ContoBancario.objects.create(nome_conto="Conto operativo")
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 5, 20),
+            importo=Decimal("-122.00"),
+            descrizione="Bonifico Auto Match Supplier Srl fattura AM-1",
+            controparte="Auto Match Supplier Srl",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        payload = {
+            "id": 998,
+            "type": "expense",
+            "description": "Servizio gia saldato tramite banca",
+            "invoice_number": "AM-1",
+            "date": "2026-05-07",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Auto Match Supplier Srl", "vat_number": "IT12345678911"},
+            "payments_list": [{"due_date": "2026-05-20", "amount": "122.00", "status": "not_paid"}],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        self.assertEqual(result["pagamenti_auto"], 1)
+        documento = DocumentoFornitore.objects.get(external_id="998")
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.importo_pagato, Decimal("122.00"))
+        movimento.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(
+            PagamentoFornitore.objects.filter(scadenza=scadenza, movimento_finanziario=movimento).count(),
+            1,
+        )
 
     def test_importa_documento_fatture_in_cloud_legge_fornitore_da_header_xml_standard(self):
         connessione = FattureInCloudConnessione.objects.create(

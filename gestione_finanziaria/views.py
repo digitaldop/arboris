@@ -2104,7 +2104,7 @@ def registra_pagamento_scadenza_fornitore(request, pk):
                         "popup/popup_close.html",
                         {
                             "message": "Pagamento fornitore registrato correttamente.",
-                            "reload_url": _safe_reload_url(request, "lista_documenti_fornitori"),
+                            "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
                         },
                     )
                 return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
@@ -2149,7 +2149,7 @@ def elimina_pagamento_fornitore(request, pk):
                 "popup/popup_close.html",
                 {
                     "message": messaggio,
-                    "reload_url": _safe_reload_url(request, "lista_documenti_fornitori"),
+                    "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
                 },
             )
         messages.success(request, messaggio)

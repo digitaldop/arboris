@@ -320,6 +320,11 @@
             -webkit-user-drag: none;
             user-select: none;
         }
+        .verifica-rette-cell .cell-link,
+        .verifica-rette-cell .cell-link * {
+            -webkit-user-drag: none;
+            user-select: none;
+        }
         .verifica-rette-cell .cell-link:hover {
             filter: brightness(0.96);
         }
@@ -1056,6 +1061,18 @@
                     }
 
                 });
+
+                scrollArea.addEventListener("dragstart", function (event) {
+                    if (closestElement(event.target, "[data-rate-matrix-cell]")) {
+                        event.preventDefault();
+                    }
+                }, true);
+
+                scrollArea.addEventListener("selectstart", function (event) {
+                    if (closestElement(event.target, "[data-rate-matrix-cell]")) {
+                        event.preventDefault();
+                    }
+                }, true);
 
                 scrollArea.addEventListener("pointermove", function (event) {
                     if (activePointerId !== event.pointerId) {

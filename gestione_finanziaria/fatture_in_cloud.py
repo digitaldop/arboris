@@ -32,7 +32,12 @@ from .models import (
     DocumentoFornitore,
 )
 from .security import cifra_testo, decifra_testo_safe
-from .services import aggiorna_stato_documento_da_scadenze, crea_notifica_finanziaria
+from .services import (
+    aggiorna_stato_documento_da_scadenze,
+    crea_notifica_finanziaria,
+    riconcilia_movimento_con_scadenza_fornitore,
+    trova_movimenti_candidati_per_scadenza_fornitore,
+)
 from .fatture_in_cloud_xml import content_kind, download_bytes, extension_from_name, supplier_from_attachment_payload
 
 
@@ -51,6 +56,30 @@ SUPPLIER_DETAILS_SCOPE_WARNING = (
     "Dati anagrafici completi dei fornitori non disponibili: "
     "ricollega Fatture in Cloud autorizzando anche la lettura dei fornitori."
 )
+FIC_AUTO_MATCH_MIN_SCORE = 85
+PAYMENT_PAID_STATUSES = {
+    "paid",
+    "payed",
+    "paid_in_full",
+    "pagata",
+    "pagato",
+    "saldata",
+    "saldato",
+    "saldate",
+    "saldati",
+    "settled",
+    "completed",
+    "complete",
+}
+PAYMENT_PARTIAL_STATUSES = {
+    "partially_paid",
+    "partial",
+    "partially_payed",
+    "parzialmente_pagata",
+    "parzialmente_pagato",
+    "pagata_parzialmente",
+    "pagato_parzialmente",
+}
 
 
 class FattureInCloudError(Exception):
@@ -202,6 +231,27 @@ def _dict_value(data, *keys):
         if value is not None:
             return value
     return None
+
+
+def _normalizza_spazi(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _unique_text_values(values, *, limit=None):
+    seen = set()
+    result = []
+    for value in values:
+        text = _normalizza_spazi(value)
+        if not text:
+            continue
+        normalized = text.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(text)
+        if limit and len(result) >= limit:
+            break
+    return result
 
 
 def _e_invoice_header(e_invoice):
@@ -645,6 +695,105 @@ def _document_total(document_data):
     )
 
 
+def _iter_invoice_line_items(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    containers = [document_data, e_invoice, *_e_invoice_bodies(e_invoice)]
+    goods_keys = (
+        "dati_beni_servizi",
+        "DatiBeniServizi",
+        "datiBeniServizi",
+        "goods_services",
+        "goodsServices",
+    )
+    line_keys = (
+        "dettaglio_linee",
+        "DettaglioLinee",
+        "dettaglioLinee",
+        "items_list",
+        "itemsList",
+        "items",
+        "lines",
+        "rows",
+        "details",
+    )
+    for container in containers:
+        if not isinstance(container, dict):
+            continue
+        for key in line_keys:
+            for item in _as_list(container.get(key)):
+                if isinstance(item, dict):
+                    yield item
+        for goods_section in _as_list(_dict_value(container, *goods_keys)):
+            goods_section = _as_dict(goods_section)
+            if not goods_section:
+                continue
+            for key in line_keys:
+                for item in _as_list(goods_section.get(key)):
+                    if isinstance(item, dict):
+                        yield item
+
+
+def _document_line_descriptions(document_data):
+    return _unique_text_values(
+        (
+            _first_present(
+                item.get("description"),
+                item.get("descrizione"),
+                item.get("Descrizione"),
+                item.get("name"),
+                item.get("Nome"),
+            )
+            for item in _iter_invoice_line_items(document_data)
+        ),
+        limit=3,
+    )
+
+
+def _document_causali(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    general_data_sources = [_document_general_data(e_invoice)]
+    for body in _e_invoice_bodies(e_invoice):
+        general_data_sources.extend(
+            [
+                _nested_dict(body, "dati_generali", "dati_generali_documento"),
+                _nested_dict(body, "DatiGenerali", "DatiGeneraliDocumento"),
+            ]
+        )
+    values = []
+    for data in general_data_sources:
+        causale = _dict_value(data, "causale", "Causale", "causali", "Causali")
+        values.extend(_as_list(causale))
+    return _unique_text_values(values, limit=3)
+
+
+def _document_description(document_data):
+    direct = _first_present(
+        document_data.get("description"),
+        document_data.get("subject"),
+        document_data.get("notes"),
+        document_data.get("note"),
+    )
+    if direct:
+        return _normalizza_spazi(direct)[:255]
+
+    line_descriptions = _document_line_descriptions(document_data)
+    if line_descriptions:
+        return "; ".join(line_descriptions)[:255]
+
+    causali = _document_causali(document_data)
+    if causali:
+        return "; ".join(causali)[:255]
+
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    fallback = _first_present(
+        e_invoice.get("description"),
+        e_invoice.get("subject"),
+        e_invoice.get("causale"),
+        e_invoice.get("Causale"),
+    )
+    return _normalizza_spazi(fallback)[:255]
+
+
 def _payment_items(document_data):
     payments = list(_as_list(document_data.get("payments_list") or document_data.get("payments")))
     e_invoice = _as_dict(document_data.get("e_invoice"))
@@ -828,18 +977,172 @@ def _payment_amount(payment):
     )
 
 
+def _payment_status(payment):
+    return _normalizza_spazi(
+        _first_present(
+            payment.get("status"),
+            payment.get("payment_status"),
+            payment.get("paymentStatus"),
+            payment.get("stato"),
+            payment.get("Stato"),
+        )
+    ).casefold()
+
+
+def _is_paid_status(status):
+    return status in PAYMENT_PAID_STATUSES
+
+
+def _is_partial_status(status):
+    return status in PAYMENT_PARTIAL_STATUSES
+
+
+def _payment_paid_date(payment):
+    return _as_date(
+        _first_present(
+            payment.get("paid_date"),
+            payment.get("paidDate"),
+            payment.get("paid_at"),
+            payment.get("paidAt"),
+            payment.get("payment_date"),
+            payment.get("paymentDate"),
+            payment.get("data_pagamento"),
+            payment.get("DataPagamento"),
+            payment.get("data_saldo"),
+            payment.get("DataSaldo"),
+        )
+    )
+
+
+def _payment_paid_amount(payment):
+    explicit = _as_decimal(
+        _first_present(
+            payment.get("paid_amount"),
+            payment.get("paidAmount"),
+            payment.get("amount_paid"),
+            payment.get("amountPaid"),
+            payment.get("paid_total"),
+            payment.get("paidTotal"),
+            payment.get("importo_pagato"),
+            payment.get("ImportoPagato"),
+        )
+    )
+    if explicit > Decimal("0.00"):
+        return explicit
+
+    status = _payment_status(payment)
+    if _is_paid_status(status) or _payment_paid_date(payment):
+        return _payment_amount(payment)
+    if _is_partial_status(status):
+        return Decimal("0.00")
+    return Decimal("0.00")
+
+
+def _document_payment_status(document_data):
+    return _normalizza_spazi(
+        _first_present(
+            document_data.get("payment_status"),
+            document_data.get("paymentStatus"),
+            document_data.get("payments_status"),
+            document_data.get("paymentsStatus"),
+            document_data.get("status"),
+            document_data.get("stato"),
+        )
+    ).casefold()
+
+
+def _document_paid_date(document_data):
+    return _as_date(
+        _first_present(
+            document_data.get("paid_date"),
+            document_data.get("paidDate"),
+            document_data.get("paid_at"),
+            document_data.get("paidAt"),
+            document_data.get("payment_date"),
+            document_data.get("paymentDate"),
+            document_data.get("data_pagamento"),
+            document_data.get("DataPagamento"),
+        )
+    )
+
+
+def _document_paid_amount(document_data, total):
+    amounts = _as_dict(document_data.get("amounts"))
+    explicit = _as_decimal(
+        _first_present(
+            document_data.get("paid_amount"),
+            document_data.get("paidAmount"),
+            document_data.get("amount_paid"),
+            document_data.get("amountPaid"),
+            document_data.get("paid_total"),
+            document_data.get("paidTotal"),
+            document_data.get("importo_pagato"),
+            document_data.get("ImportoPagato"),
+            amounts.get("paid"),
+            amounts.get("paid_amount"),
+            amounts.get("paidAmount"),
+        )
+    )
+    if explicit > Decimal("0.00"):
+        return explicit
+
+    due = _as_decimal(
+        _first_present(
+            document_data.get("amount_due"),
+            document_data.get("amountDue"),
+            document_data.get("remaining_amount"),
+            document_data.get("remainingAmount"),
+            document_data.get("residual_amount"),
+            document_data.get("residualAmount"),
+            amounts.get("due"),
+            amounts.get("amount_due"),
+            amounts.get("remaining"),
+        )
+    )
+    if total > Decimal("0.00") and due > Decimal("0.00") and due < total:
+        return total - due
+
+    status = _document_payment_status(document_data)
+    if _is_paid_status(status) or _document_paid_date(document_data):
+        return total
+    return Decimal("0.00")
+
+
+def _apply_document_payment_state_to_deadlines(document_data, deadlines):
+    if not deadlines:
+        return deadlines
+
+    total = sum((deadline["importo_previsto"] for deadline in deadlines), Decimal("0.00"))
+    paid_amount = _document_paid_amount(document_data, total)
+    paid_date = _document_paid_date(document_data)
+    if paid_amount <= Decimal("0.00"):
+        return deadlines
+
+    remaining = paid_amount
+    for deadline in deadlines:
+        if deadline["importo_pagato"] > Decimal("0.00"):
+            remaining -= deadline["importo_pagato"]
+            continue
+        if remaining <= Decimal("0.00"):
+            break
+        deadline["importo_pagato"] = min(deadline["importo_previsto"], remaining)
+        if paid_date and not deadline["data_pagamento"]:
+            deadline["data_pagamento"] = paid_date
+        remaining -= deadline["importo_pagato"]
+    return deadlines
+
+
 def _paid_amount_from_payments(payments):
     paid = Decimal("0.00")
     for payment in payments or []:
-        status = (payment.get("status") or payment.get("payment_status") or "").lower()
-        amount = _payment_amount(payment)
-        if status in {"paid", "payed", "saldata", "saldate", "paid_in_full"} or payment.get("paid_date"):
-            paid += amount
+        paid += _payment_paid_amount(payment)
     return paid
 
 
-def _state_from_document(total, payments):
+def _state_from_document(total, payments, document_data=None):
     paid = _paid_amount_from_payments(payments)
+    if document_data:
+        paid = max(paid, _document_paid_amount(document_data, total))
     if total > Decimal("0.00") and paid >= total:
         return StatoDocumentoFornitore.PAGATO
     if paid > Decimal("0.00"):
@@ -871,15 +1174,13 @@ def _payment_deadlines(document_data):
                 {
                     "data_scadenza": due_date,
                     "importo_previsto": amount,
-                    "importo_pagato": _as_decimal(payment.get("paid_amount") or payment.get("paidAmount")),
-                    "data_pagamento": _as_date(
-                        payment.get("paid_date") or payment.get("paidDate") or payment.get("data_pagamento")
-                    ),
+                    "importo_pagato": _payment_paid_amount(payment),
+                    "data_pagamento": _payment_paid_date(payment),
                 }
             )
 
     if deadlines:
-        return deadlines
+        return _apply_document_payment_state_to_deadlines(document_data, deadlines)
 
     due_date = _as_date(
         document_data.get("next_due_date")
@@ -895,14 +1196,14 @@ def _payment_deadlines(document_data):
         or document_data.get("date")
     ) or timezone.localdate()
     if total > Decimal("0.00"):
-        return [
+        return _apply_document_payment_state_to_deadlines(document_data, [
             {
                 "data_scadenza": due_date,
                 "importo_previsto": total,
                 "importo_pagato": Decimal("0.00"),
                 "data_pagamento": None,
             }
-        ]
+        ])
     return []
 
 
@@ -971,6 +1272,40 @@ def _sync_document_deadlines(documento, deadlines):
     return updated
 
 
+def _auto_reconcile_imported_supplier_deadlines(documento, *, utente=None):
+    pagamenti_creati = 0
+    scadenze = documento.scadenze.select_related("documento", "documento__fornitore").order_by("data_scadenza", "id")
+    for scadenza in scadenze:
+        if scadenza.importo_residuo <= Decimal("0.00"):
+            continue
+        candidati = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=3)
+        if not candidati:
+            continue
+
+        top_score = candidati[0].score
+        migliori = [candidato for candidato in candidati if candidato.score == top_score]
+        if top_score < FIC_AUTO_MATCH_MIN_SCORE or len(migliori) != 1:
+            continue
+
+        candidato = migliori[0]
+        importo = min(candidato.importo_disponibile, scadenza.importo_residuo)
+        if abs(importo - scadenza.importo_residuo) > Decimal("0.01"):
+            continue
+
+        try:
+            riconcilia_movimento_con_scadenza_fornitore(
+                candidato.movimento,
+                scadenza,
+                importo=importo,
+                utente=utente,
+                note="Riconciliazione automatica da import Fatture in Cloud",
+            )
+        except ValidationError:
+            continue
+        pagamenti_creati += 1
+    return pagamenti_creati
+
+
 def _update_document_fields(documento, document_data, fornitore, pending):
     e_invoice = _as_dict(document_data.get("e_invoice"))
     amounts = _as_dict(document_data.get("amounts"))
@@ -1000,14 +1335,14 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     )
     documento.anno_competenza = doc_date.year
     documento.mese_competenza = doc_date.month
-    documento.descrizione = (document_data.get("description") or document_data.get("subject") or "")[:255]
+    documento.descrizione = _document_description(document_data)
     documento.imponibile = amount_net
     documento.iva = amount_vat
     documento.totale = amount_gross
     documento.aliquota_iva = Decimal("0.00")
     if amount_net:
         documento.aliquota_iva = (amount_vat * Decimal("100") / amount_net).quantize(Decimal("0.01"))
-    documento.stato = _state_from_document(amount_gross, _payment_items(document_data))
+    documento.stato = _state_from_document(amount_gross, _payment_items(document_data), document_data)
     documento.origine = OrigineDocumentoFornitore.FATTURE_IN_CLOUD
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")
@@ -1053,6 +1388,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento.save(update_fields=["allegato", "external_payload", "data_aggiornamento"])
 
     scadenze_create = _sync_document_deadlines(documento, _payment_deadlines(document_data))
+    pagamenti_auto = _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
 
     aggiorna_stato_documento_da_scadenze(documento)
     _notifica, notifica_created = crea_notifica_finanziaria(
@@ -1071,6 +1407,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         "fornitore_created": fornitore_created,
         "fornitore_updated": fornitore_updated,
         "scadenze_create": scadenze_create,
+        "pagamenti_auto": pagamenti_auto,
         "notifica_created": notifica_created,
     }
 
@@ -1303,6 +1640,7 @@ def _add_import_result_to_stats(stats, result):
     stats["creati"] += 1 if result["created"] else 0
     stats["aggiornati"] += 1 if result["updated"] else 0
     stats["scadenze"] += result["scadenze_create"]
+    stats["pagamenti_auto"] += result.get("pagamenti_auto", 0)
     stats["notifiche"] += 1 if result["notifica_created"] else 0
     stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
     stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
@@ -1322,6 +1660,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
         "aggiornati": 0,
         "scadenze": 0,
         "notifiche": 0,
+        "pagamenti_auto": 0,
         "fornitori_creati": 0,
         "fornitori_aggiornati": 0,
         "messaggi": [],
@@ -1407,7 +1746,8 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
             stats["messaggi"].append(
                 f"Importati {stats['creati']} nuovi documenti, aggiornati {stats['aggiornati']} documenti. "
                 f"Fornitori: {stats['fornitori_creati']} creati, "
-                f"{stats['fornitori_aggiornati']} aggiornati."
+                f"{stats['fornitori_aggiornati']} aggiornati. "
+                f"Pagamenti riconosciuti: {stats['pagamenti_auto']}."
             )
     except FattureInCloudSyncBudgetExceeded as exc:
         esito = EsitoSincronizzazione.PARZIALE

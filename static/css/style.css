@@ -29063,6 +29063,44 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .finance-import-form .panel-body:has(> .finance-field-grid) {
     padding: 16px;
+    overflow: visible;
+}
+
+.module-gestione_finanziaria .finance-import-preview-panel .panel-body {
+    overflow: visible;
+}
+
+.module-gestione_finanziaria .finance-import-form .admin-section,
+.module-gestione_finanziaria .finance-import-form .admin-section > .panel,
+.module-gestione_finanziaria .finance-import-preview-panel,
+.module-gestione_finanziaria .finance-import-preview-panel > .panel,
+.module-gestione_finanziaria .finance-import-confirm-form {
+    overflow: visible;
+}
+
+.module-gestione_finanziaria .finance-import-form .finance-form-main,
+.module-gestione_finanziaria .finance-import-preview-panel {
+    position: relative;
+    z-index: 20;
+}
+
+.module-gestione_finanziaria .finance-import-form .searchable-select.is-open,
+.module-gestione_finanziaria .finance-import-preview-panel .searchable-select.is-open {
+    z-index: 12000;
+}
+
+.module-gestione_finanziaria .finance-import-form .searchable-select-dropdown,
+.module-gestione_finanziaria .finance-import-preview-panel .searchable-select-dropdown {
+    z-index: 12001;
+}
+
+.module-gestione_finanziaria .finance-import-primary-grid {
+    align-items: start;
+    overflow: visible;
+}
+
+.module-gestione_finanziaria .finance-import-primary-grid > .finance-form-field {
+    align-self: start;
 }
 
 .module-gestione_finanziaria .finance-import-related-field.inline-related-field {
@@ -29094,6 +29132,11 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .finance-import-related-actions .related-btn svg {
     width: 15px;
     height: 15px;
+}
+
+.module-gestione_finanziaria .finance-import-primary-grid .finance-import-related-field,
+.module-gestione_finanziaria .finance-import-primary-grid .finance-form-field > select {
+    min-height: 38px;
 }
 
 .module-gestione_finanziaria .finance-import-advanced .finance-token-body {
