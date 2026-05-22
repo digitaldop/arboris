@@ -46,6 +46,20 @@
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
                         <span class="btn-label">Modifica</span>
                     </button>
+                    <form
+                        method="post"
+                        action="{% url 'elimina_documento_fornitore' documento.pk %}"
+                        class="supplier-document-delete-inline-form"
+                        onsubmit="return confirm('Vuoi eliminare definitivamente questa fattura da Arboris?') && confirm('Seconda conferma: eliminando la fattura verranno rimossi anche scadenze e pagamenti collegati. Procedere?');"
+                    >
+                        {% csrf_token %}
+                        <input type="hidden" name="popup" value="1">
+                        <input type="hidden" name="reload_url" value="{% url 'fatture_scadenze_fornitori' %}">
+                        <button type="submit" class="btn btn-danger btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                            <span class="btn-label">Elimina</span>
+                        </button>
+                    </form>
                 </div>
             {% endif %}
         </div>

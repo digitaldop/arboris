@@ -8968,6 +8968,11 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     align-items: center;
 }
 
+.supplier-document-delete-inline-form {
+    display: inline-flex;
+    margin: 0;
+}
+
 .supplier-document-detail-form {
     gap: 14px;
     min-width: 0;

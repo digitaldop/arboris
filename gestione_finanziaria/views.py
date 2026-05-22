@@ -916,15 +916,26 @@ def modifica_documento_fornitore(request, pk):
 
 def elimina_documento_fornitore(request, pk):
     documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
+    popup = is_popup_request(request)
     if request.method == "POST":
         documento.delete()
-        messages.success(request, "Fattura fornitore eliminata correttamente.")
+        message = "Fattura fornitore eliminata correttamente."
+        if popup:
+            return render(
+                request,
+                "popup/popup_close.html",
+                {
+                    "message": message,
+                    "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
+                },
+            )
+        messages.success(request, message)
         return redirect("lista_documenti_fornitori")
 
     return render(
         request,
         "gestione_finanziaria/documento_fornitore_confirm_delete.html",
-        {"documento": documento},
+        {"documento": documento, "popup": popup},
     )
 
 

@@ -1900,6 +1900,52 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         response = self.client.get(reverse("lista_documenti_fornitori"), {"categoria": str(categoria.pk)})
         self.assertContains(response, "CAR-1")
 
+    def test_documento_fornitore_popup_permette_eliminazione_con_doppia_conferma(self):
+        fornitore = Fornitore.objects.create(denominazione="FIC Delete Supplier")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FIC-DEL-1",
+            data_documento=date(2026, 5, 8),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            external_source="fatture_in_cloud",
+            external_id="fic-del-1",
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+        )
+        popup_url = f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1'
+        delete_url = reverse("elimina_documento_fornitore", kwargs={"pk": documento.pk})
+        scadenze_url = reverse("fatture_scadenze_fornitori")
+
+        response = self.client.get(popup_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="supplier-document-delete-inline-form"')
+        self.assertContains(response, f'action="{delete_url}"')
+        self.assertContains(response, "Vuoi eliminare definitivamente questa fattura da Arboris?")
+        self.assertContains(response, "Seconda conferma")
+        self.assertContains(response, f'name="reload_url" value="{scadenze_url}"')
+        self.assertContains(response, '<span class="btn-label">Elimina</span>', html=False)
+
+        response = self.client.post(
+            delete_url,
+            {
+                "popup": "1",
+                "reload_url": scadenze_url,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertContains(response, "Fattura fornitore eliminata correttamente.")
+        self.assertContains(response, r"gestione\u002Dfinanziaria/fatture\u002Dscadenze\u002Dfornitori")
+        self.assertFalse(DocumentoFornitore.objects.filter(pk=documento.pk).exists())
+        self.assertFalse(ScadenzaPagamentoFornitore.objects.filter(documento_id=documento.pk).exists())
+
     def test_documento_fornitore_popup_mostra_tutti_i_movimenti_collegabili(self):
         fornitore = Fornitore.objects.create(denominazione="Tecnica Srl")
         documento = DocumentoFornitore.objects.create(
