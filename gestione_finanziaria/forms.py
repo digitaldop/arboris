@@ -6,6 +6,7 @@ from typing import Optional
 
 from django import forms
 from django.forms import inlineformset_factory
+from django.db.models import Q
 
 from arboris.form_widgets import apply_eur_currency_widget
 from .security import cifra_testo
@@ -428,9 +429,19 @@ class DocumentoFornitoreForm(forms.ModelForm):
         ]
         for field_name in optional_fields:
             self.fields[field_name].required = False
-        self.fields["fornitore"].queryset = Fornitore.objects.filter(attivo=True).order_by("denominazione")
+        fornitore_queryset = Fornitore.objects.filter(attivo=True)
+        if self.instance and self.instance.fornitore_id:
+            fornitore_queryset = Fornitore.objects.filter(
+                Q(attivo=True) | Q(pk=self.instance.fornitore_id)
+            )
+        self.fields["fornitore"].queryset = fornitore_queryset.order_by("denominazione")
         make_searchable_select(self.fields["fornitore"], "Cerca un fornitore...")
-        self.fields["categoria_spesa"].queryset = categorie_spesa_queryset()
+        categoria_queryset = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA, attiva=True)
+        if self.instance and self.instance.categoria_spesa_id:
+            categoria_queryset = CategoriaFinanziaria.objects.filter(
+                Q(tipo=TipoCategoriaFinanziaria.SPESA, attiva=True) | Q(pk=self.instance.categoria_spesa_id)
+            )
+        self.fields["categoria_spesa"].queryset = categoria_queryset.order_by("parent__nome", "ordine", "nome")
         self.fields["categoria_spesa"].empty_label = "--- usa categoria del fornitore ---"
         self.fields["mese_competenza"].choices = MESE_COMPETENZA_CHOICES
         for field_name in ("data_documento", "data_ricezione"):

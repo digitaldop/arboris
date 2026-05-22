@@ -1946,6 +1946,71 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertFalse(DocumentoFornitore.objects.filter(pk=documento.pk).exists())
         self.assertFalse(ScadenzaPagamentoFornitore.objects.filter(documento_id=documento.pk).exists())
 
+    def test_documento_fornitore_popup_salva_categoria_con_fornitore_inattivo(self):
+        categoria = crea_categoria_spesa_test("Categoria aggiornata")
+        fornitore = Fornitore.objects.create(
+            denominazione="Fornitore importato inattivo",
+            tipo_soggetto="azienda",
+            attivo=False,
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FIC-INATTIVO-1",
+            data_documento=date(2026, 5, 9),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+            external_source="fatture_in_cloud",
+            external_id="fic-inattivo-1",
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+            importo_pagato=Decimal("0.00"),
+        )
+
+        response = self.client.post(
+            f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1',
+            {
+                "popup": "1",
+                "fornitore": str(fornitore.pk),
+                "categoria_spesa": str(categoria.pk),
+                "tipo_documento": TipoDocumentoFornitore.FATTURA,
+                "numero_documento": documento.numero_documento,
+                "data_documento": "2026-05-09",
+                "data_ricezione": "",
+                "anno_competenza": "2026",
+                "mese_competenza": "5",
+                "descrizione": "Fattura importata",
+                "imponibile": "100.00",
+                "aliquota_iva": "22.00",
+                "iva": "22.00",
+                "totale": "122.00",
+                "stato": StatoDocumentoFornitore.DA_PAGARE,
+                "note": "",
+                "scadenze-TOTAL_FORMS": "1",
+                "scadenze-INITIAL_FORMS": "1",
+                "scadenze-MIN_NUM_FORMS": "0",
+                "scadenze-MAX_NUM_FORMS": "1000",
+                "scadenze-0-id": str(scadenza.pk),
+                "scadenze-0-data_scadenza": "2026-05-31",
+                "scadenze-0-importo_previsto": "122.00",
+                "scadenze-0-importo_pagato": "0.00",
+                "scadenze-0-data_pagamento": "",
+                "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
+                "scadenze-0-conto_bancario": "",
+                "scadenze-0-movimento_finanziario": "",
+                "scadenze-0-note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        documento.refresh_from_db()
+        self.assertEqual(documento.categoria_spesa, categoria)
+
     def test_documento_fornitore_popup_mostra_tutti_i_movimenti_collegabili(self):
         fornitore = Fornitore.objects.create(denominazione="Tecnica Srl")
         documento = DocumentoFornitore.objects.create(
