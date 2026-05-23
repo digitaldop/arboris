@@ -334,11 +334,6 @@
                                     </a>
 
                                     {% if can_view_gestione_amministrativa %}
-                                        <a href="{% url 'lista_educatori' %}" class="{% if request.resolver_match.url_name == 'lista_educatori' or request.resolver_match.url_name == 'crea_educatore' or request.resolver_match.url_name == 'modifica_educatore' or request.resolver_match.url_name == 'elimina_educatore' %}active{% endif %}">
-                                            <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
-                                            <span class="sidebar-link-text">{{ educator_terminology.selected_plural|default:"Educatori" }}</span>
-                                        </a>
-
                                         <a href="{% url 'lista_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_dipendenti' or request.resolver_match.url_name == 'crea_dipendente' or request.resolver_match.url_name == 'modifica_dipendente' or request.resolver_match.url_name == 'elimina_dipendente' %}active{% endif %}">
                                             <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
                                             <span class="sidebar-link-text">Dipendenti</span>
@@ -679,6 +674,10 @@
                                                         <span class="sidebar-link-text">Dashboard</span>
                                                     </a>
                                                 {% endif %}
+                                                <a href="{% url 'lista_educatori' %}" class="{% if request.resolver_match.url_name == 'lista_educatori' or request.resolver_match.url_name == 'crea_educatore' or request.resolver_match.url_name == 'modifica_educatore' or request.resolver_match.url_name == 'elimina_educatore' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                                    <span class="sidebar-link-text">{{ educator_terminology.selected_plural|default:"Educatori" }}</span>
+                                                </a>
                                                 <a href="{% url 'lista_dipendenti' %}" class="{% if request.resolver_match.url_name == 'lista_dipendenti' or request.resolver_match.url_name == 'crea_dipendente' or request.resolver_match.url_name == 'modifica_dipendente' or request.resolver_match.url_name == 'elimina_dipendente' or request.resolver_match.url_name == 'crea_contratto_dipendente' %}active{% endif %}">
                                                     <span class="sidebar-link-icon sidebar-icon-rose" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
                                                     <span class="sidebar-link-text">Dipendenti</span>

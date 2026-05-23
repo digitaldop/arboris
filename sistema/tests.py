@@ -591,6 +591,7 @@ class SidebarEconomiaTests(TestCase):
         labels_in_order = [
             "<span>Dipendenti e collaboratori</span>",
             '<span class="sidebar-link-text">Dashboard</span>',
+            '<span class="sidebar-link-text">Educatori</span>',
             '<span class="sidebar-link-text">Dipendenti</span>',
             '<span class="sidebar-link-text">Contratti</span>',
             '<span class="sidebar-link-text">Simulazioni costo</span>',
@@ -605,6 +606,34 @@ class SidebarEconomiaTests(TestCase):
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
         self.assertIn('id="sidebar-parcheggio-gestione-amministrativa-panel"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_educatori")}"', parcheggio_section)
+
+    def test_home_moves_educatori_from_anagrafiche_to_parcheggio(self):
+        user = User.objects.create_user(
+            username="educatori-parcheggio@example.com",
+            email="educatori-parcheggio@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=user,
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+            permesso_gestione_amministrativa=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        anagrafica_start = content.index('id="sidebar-anagrafica-panel"')
+        anagrafica_end = content.index('data-sidebar-section-key="parcheggio"', anagrafica_start)
+        anagrafica_section = content[anagrafica_start:anagrafica_end]
+        parcheggio_start = content.index('data-sidebar-section-key="parcheggio"')
+        parcheggio_end = content.index('data-sidebar-section-key="sistema"', parcheggio_start)
+        parcheggio_section = content[parcheggio_start:parcheggio_end]
+
+        self.assertNotIn(f'href="{reverse("lista_educatori")}"', anagrafica_section)
+        self.assertIn(f'href="{reverse("lista_educatori")}"', parcheggio_section)
 
 
 class SidebarGestioneFinanziariaTests(TestCase):

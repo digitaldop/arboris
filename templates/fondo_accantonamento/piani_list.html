@@ -171,23 +171,6 @@
                 </table>
             </div>
 
-            <div class="fondo-plans-list-footer">
-                <div class="fondo-plans-results-size">
-                    <span>Mostra</span>
-                    <select aria-label="Risultati per pagina" disabled>
-                        <option>10</option>
-                    </select>
-                    <span>risultati</span>
-                </div>
-                <span data-fondo-plans-count>
-                    {{ totale_piani }} {% if totale_piani == 1 %}piano{% else %}piani{% endif %}
-                </span>
-                <div class="fondo-plans-pager" aria-hidden="true">
-                    <button type="button" class="btn btn-secondary btn-sm" disabled>&lt;</button>
-                    <span>1</span>
-                    <button type="button" class="btn btn-secondary btn-sm" disabled>&gt;</button>
-                </div>
-            </div>
         </section>
     </div>
 
@@ -199,7 +182,6 @@
             const searchInput = document.querySelector("[data-fondo-plans-search]");
             const rows = Array.from(document.querySelectorAll("[data-fondo-plan-row]"));
             const emptyRow = document.querySelector(".fondo-plans-empty-filter-row");
-            const countNode = document.querySelector("[data-fondo-plans-count]");
 
             if (!searchInput || !rows.length) return;
 
@@ -214,7 +196,6 @@
                 });
 
                 if (emptyRow) emptyRow.hidden = visibleCount !== 0;
-                if (countNode) countNode.textContent = visibleCount + (visibleCount === 1 ? " piano" : " piani");
             });
         });
     </script>
