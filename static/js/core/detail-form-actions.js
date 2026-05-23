@@ -1,7 +1,9 @@
 (function () {
     const APP_STACK_KEY = "arboris:application-navigation-stack:v1";
     const APP_PENDING_BACK_KEY = "arboris:application-navigation-pending-back:v1";
+    const APP_REFERRER_BACK_KEY = "arboris:application-navigation-referrer-back:v1";
     const APP_STACK_MAX_LENGTH = 80;
+    const APP_REFERRER_BACK_TTL = 24 * 60 * 60 * 1000;
     const TRANSIENT_QUERY_PARAMS = [
         "popup",
         "return_to",
@@ -230,6 +232,99 @@
         } catch (e) {}
     }
 
+    function readReferrerBackMap() {
+        const storage = getStableBackStorage();
+        if (!storage) {
+            return {};
+        }
+
+        try {
+            const parsed = JSON.parse(storage.getItem(APP_REFERRER_BACK_KEY) || "{}");
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+                return {};
+            }
+
+            const now = Date.now();
+            const normalized = {};
+            Object.keys(parsed).forEach(key => {
+                const entry = parsed[key];
+                const timestamp = Number(entry && entry.timestamp) || 0;
+                if (!entry || typeof entry.url !== "string" || !timestamp || now - timestamp > APP_REFERRER_BACK_TTL) {
+                    return;
+                }
+                normalized[key] = {
+                    url: entry.url,
+                    timestamp,
+                };
+            });
+            return normalized;
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function writeReferrerBackMap(map) {
+        const storage = getStableBackStorage();
+        if (!storage) {
+            return;
+        }
+
+        try {
+            storage.setItem(APP_REFERRER_BACK_KEY, JSON.stringify(map || {}));
+        } catch (e) {}
+    }
+
+    function rememberDocumentReferrerBack() {
+        const currentUrl = getCurrentApplicationUrl();
+        const referrerUrl = normalizeInternalUrl(document.referrer);
+        if (!currentUrl || !referrerUrl || hasTransientPathPart(referrerUrl.pathname) || referrerUrl.searchParams.get("popup") === "1") {
+            return "";
+        }
+
+        const referrerBackUrl = buildReturnBackUrl(referrerUrl.href);
+        const normalizedReferrer = getNormalizedApplicationUrl(referrerUrl.href);
+        if (!referrerBackUrl || !normalizedReferrer || normalizedReferrer === currentUrl) {
+            return "";
+        }
+
+        const map = readReferrerBackMap();
+        map[currentUrl] = {
+            url: referrerBackUrl,
+            timestamp: Date.now(),
+        };
+        writeReferrerBackMap(map);
+        return referrerBackUrl;
+    }
+
+    function getReferrerBackUrlForCurrentPage() {
+        const currentUrl = getCurrentApplicationUrl();
+        if (!currentUrl) {
+            return "";
+        }
+
+        const map = readReferrerBackMap();
+        const entry = map[currentUrl];
+        if (!entry || typeof entry.url !== "string") {
+            return "";
+        }
+
+        const normalizedTarget = getNormalizedApplicationUrl(entry.url);
+        return normalizedTarget && normalizedTarget !== currentUrl ? entry.url : "";
+    }
+
+    function clearReferrerBackUrlForCurrentPage(currentUrl) {
+        const key = currentUrl || getCurrentApplicationUrl();
+        if (!key) {
+            return;
+        }
+
+        const map = readReferrerBackMap();
+        if (Object.prototype.hasOwnProperty.call(map, key)) {
+            delete map[key];
+            writeReferrerBackMap(map);
+        }
+    }
+
     function rememberBackForNavigation(targetValue) {
         const storage = getStableBackStorage();
         const source = getCurrentReturnBackUrl();
@@ -425,7 +520,7 @@
     }
 
     function isImplicitApplicationBackLink(element) {
-        if (!element || element.tagName.toLowerCase() !== "a" || !element.matches(".page-head-actions .btn[href]")) {
+        if (!element || element.tagName.toLowerCase() !== "a" || !element.matches("a.btn[href]")) {
             return false;
         }
 
@@ -435,7 +530,7 @@
 
     function getApplicationBackButtons(container) {
         const explicitButtons = Array.from(container.querySelectorAll(".js-page-back-btn"));
-        const implicitLinks = Array.from(container.querySelectorAll(".page-head-actions a.btn[href]"))
+        const implicitLinks = Array.from(container.querySelectorAll("a.btn[href]"))
             .filter(isImplicitApplicationBackLink);
         return Array.from(new Set(explicitButtons.concat(implicitLinks)));
     }
@@ -553,6 +648,16 @@
             return pendingBackUrl;
         }
 
+        const referrerBackUrl = getReferrerBackUrlForCurrentPage();
+        if (referrerBackUrl) {
+            if (cfg.commit && currentUrl) {
+                stack = stack.filter(entry => entry.url !== currentUrl);
+                writeApplicationStack(stack);
+                clearReferrerBackUrlForCurrentPage(currentUrl);
+            }
+            return referrerBackUrl;
+        }
+
         if (currentUrl) {
             const currentIndex = stack.findIndex(entry => entry.url === currentUrl);
 
@@ -594,6 +699,7 @@
             ensureHeaderSaveButton(form, actionBar, findPageHeadActionsForForm(form));
         });
 
+        rememberDocumentReferrerBack();
         recordCurrentApplicationPage();
         bindForwardNavigationMemory(document);
         bindBackButtons(document);

@@ -3507,11 +3507,18 @@ def crea_familiare(request):
     contact_formsets = None
     initial = {}
     profilo_lavorativo_iniziale = (request.GET.get("profilo_lavorativo") or "").strip().lower()
-    family_relation_required = profilo_lavorativo_iniziale not in {"dipendente", "educatore"}
+    work_profile_create = profilo_lavorativo_iniziale in {"dipendente", "educatore"}
+    show_parent_toggle = work_profile_create
+    parent_fields_enabled = not work_profile_create
+    if show_parent_toggle:
+        parent_fields_enabled = request.method == "POST" and request.POST.get("anche_genitore") == "on"
+    family_relation_required = parent_fields_enabled
+    direct_student_relations_enabled = parent_fields_enabled or show_parent_toggle
     create_profile_context = {}
     if profilo_lavorativo_iniziale in {"dipendente", "educatore"}:
         initial["profilo_dipendente_attivo"] = profilo_lavorativo_iniziale == "dipendente"
         initial["profilo_educatore_attivo"] = profilo_lavorativo_iniziale == "educatore"
+        initial["referente_principale"] = False
         if profilo_lavorativo_iniziale == "educatore":
             create_profile_context = {
                 "create_profile_scope": "educatori",
@@ -3533,7 +3540,7 @@ def crea_familiare(request):
                 "create_profile_cancel_url": "lista_dipendenti",
             }
     studente_collegato_id = (request.GET.get("studente") or "").strip()
-    if studente_collegato_id.isdigit():
+    if direct_student_relations_enabled and studente_collegato_id.isdigit():
         studente_collegato = (
             Studente.objects.filter(pk=int(studente_collegato_id), attivo=True).first()
         )
@@ -3549,7 +3556,7 @@ def crea_familiare(request):
         form = FamiliareForm(
             request.POST,
             enable_work_profile_fields=True,
-            enable_direct_relations_field=True,
+            enable_direct_relations_field=direct_student_relations_enabled,
             require_family_relation=family_relation_required,
         )
         contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
@@ -3638,7 +3645,7 @@ def crea_familiare(request):
         form = FamiliareForm(
             initial=initial,
             enable_work_profile_fields=True,
-            enable_direct_relations_field=True,
+            enable_direct_relations_field=direct_student_relations_enabled,
             require_family_relation=family_relation_required,
         )
         contact_formsets = build_anagrafica_contact_formsets()
@@ -3681,6 +3688,12 @@ def crea_familiare(request):
             "inline_target": active_inline_tab,
             "has_form_errors": has_form_errors,
             "show_family_relation_field": family_relation_required,
+            "show_parent_toggle": show_parent_toggle,
+            "parent_fields_enabled": parent_fields_enabled,
+            "render_parent_fields": parent_fields_enabled or show_parent_toggle,
+            "show_work_profile_toggle_fields": not work_profile_create,
+            "show_scambio_retta_field": not work_profile_create,
+            "show_contact_formsets": not work_profile_create,
             **create_profile_context,
             **build_familiare_lavoro_context(None),
             "familiare_inline_tabs": [

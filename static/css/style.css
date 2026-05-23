@@ -21786,6 +21786,21 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: 0 7px 16px rgba(34, 197, 94, 0.18) !important;
 }
 
+.ga-dipendenti-new-employee-btn {
+    background: #eef8ff !important;
+    border-color: #b9def5 !important;
+    color: #236f9d !important;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.12) !important;
+}
+
+.ga-dipendenti-new-employee-btn:hover,
+.ga-dipendenti-new-employee-btn:focus-visible {
+    background: #e0f2fe !important;
+    border-color: #8cccf0 !important;
+    color: #1b638e !important;
+    box-shadow: 0 7px 16px rgba(59, 130, 246, 0.18) !important;
+}
+
 .anagrafica-record-avatar-work {
     flex-basis: 56px;
     width: 56px;

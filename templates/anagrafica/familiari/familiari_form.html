@@ -98,6 +98,11 @@
         {% csrf_token %}
         <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="familiare-inline-target" value="{{ inline_target|default:'studenti' }}">
+        {% if create_profile_scope == "educatori" and form.profilo_educatore_attivo %}
+            <input type="hidden" name="{{ form.profilo_educatore_attivo.html_name }}" value="on">
+        {% elif create_profile_scope == "dipendenti" and form.profilo_dipendente_attivo %}
+            <input type="hidden" name="{{ form.profilo_dipendente_attivo.html_name }}" value="on">
+        {% endif %}
         {% if familiare %}
             <div class="relative-dashboard-view family-dashboard-view mode-view-only">
                 <div class="relative-dashboard-layout family-dashboard-layout">
@@ -432,7 +437,7 @@
                                             {% for busta in profilo_buste_paga %}
                                                 <div class="family-card-inline-row">
                                                     <span>{{ busta.periodo_label }}</span>
-                                                    <strong>{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto }} {{ busta.valuta }}</strong>
+                                                    <strong>{{ busta.importo_netto_riepilogo|euro }} {{ busta.valuta }}</strong>
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
@@ -563,8 +568,23 @@
                                         {{ form.nome.errors }}
                                     </div>
 
-                                    {% if form.studenti_collegati %}
-                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                    {% if show_parent_toggle %}
+                                        <div class="family-student-editor-field family-student-editor-field-check family-parent-toggle-field">
+                                            <label class="family-student-editor-check family-editor-switch" for="id_anche_genitore">
+                                                <span class="family-editor-switch-copy">
+                                                    <strong>Anche genitore</strong>
+                                                    <small>Mostra i campi per collegare figli, figlie e dati familiari.</small>
+                                                </span>
+                                                <span class="fondo-plan-switch-control">
+                                                    <input type="checkbox" name="anche_genitore" id="id_anche_genitore" data-relative-parent-toggle{% if parent_fields_enabled %} checked{% endif %}>
+                                                    <span class="fondo-plan-switch-ui" aria-hidden="true"></span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if form.studenti_collegati and render_parent_fields %}
+                                    <div class="family-student-editor-field family-student-editor-field-wide" data-relative-parent-field{% if show_parent_toggle and not parent_fields_enabled %} hidden{% endif %}>
                                         <label for="{{ form.studenti_collegati.id_for_label }}">Figli e figlie collegati</label>
                                         {{ form.studenti_collegati }}
                                         {% if form.studenti_collegati.help_text %}
@@ -574,8 +594,8 @@
                                     </div>
                                     {% endif %}
 
-                                    {% if show_family_relation_field %}
-                                        <div class="family-student-editor-field family-student-editor-field-third relative-main-parentela-field">
+                                    {% if render_parent_fields %}
+                                        <div class="family-student-editor-field family-student-editor-field-third relative-main-parentela-field" data-relative-parent-field{% if show_parent_toggle and not parent_fields_enabled %} hidden{% endif %}>
                                             <label for="{{ form.relazione_familiare.id_for_label }}">Parentela</label>
                                             <div class="inline-related-field mode-edit-field family-card-editor-related-control">
                                                 {{ form.relazione_familiare }}
@@ -669,7 +689,8 @@
                                         {{ form.email.errors }}
                                     </div>
 
-                                    <div class="family-student-editor-field family-student-editor-field-check">
+                                    {% if render_parent_fields %}
+                                    <div class="family-student-editor-field family-student-editor-field-check" data-relative-parent-field{% if show_parent_toggle and not parent_fields_enabled %} hidden{% endif %}>
                                         <label class="family-student-editor-check family-editor-switch" for="{{ form.convivente.id_for_label }}">
                                             <span class="family-editor-switch-copy">
                                                 <strong>Convivente</strong>
@@ -681,7 +702,7 @@
                                         </label>
                                         {{ form.convivente.errors }}
                                     </div>
-                                    <div class="family-student-editor-field family-student-editor-field-check">
+                                    <div class="family-student-editor-field family-student-editor-field-check" data-relative-parent-field{% if show_parent_toggle and not parent_fields_enabled %} hidden{% endif %}>
                                         <label class="family-student-editor-check family-editor-switch" for="{{ form.referente_principale.id_for_label }}">
                                             <span class="family-editor-switch-copy">
                                                 <strong>Referente principale</strong>
@@ -693,6 +714,8 @@
                                         </label>
                                         {{ form.referente_principale.errors }}
                                     </div>
+                                    {% endif %}
+                                    {% if show_scambio_retta_field %}
                                     <div class="family-student-editor-field family-student-editor-field-check">
                                         <label class="family-student-editor-check family-editor-switch" for="{{ form.abilitato_scambio_retta.id_for_label }}">
                                             <span class="family-editor-switch-copy">
@@ -706,7 +729,8 @@
                                         </label>
                                         {{ form.abilitato_scambio_retta.errors }}
                                     </div>
-                                    {% if form.profilo_dipendente_attivo %}
+                                    {% endif %}
+                                    {% if show_work_profile_toggle_fields and form.profilo_dipendente_attivo %}
                                         <div class="family-student-editor-field family-student-editor-field-check">
                                             <label class="family-student-editor-check family-editor-switch" for="{{ form.profilo_dipendente_attivo.id_for_label }}">
                                                 <span class="family-editor-switch-copy">
@@ -721,7 +745,7 @@
                                             {{ form.profilo_dipendente_attivo.errors }}
                                         </div>
                                     {% endif %}
-                                    {% if form.profilo_educatore_attivo %}
+                                    {% if show_work_profile_toggle_fields and form.profilo_educatore_attivo %}
                                         <div class="family-student-editor-field family-student-editor-field-check">
                                             <label class="family-student-editor-check family-editor-switch" for="{{ form.profilo_educatore_attivo.id_for_label }}">
                                                 <span class="family-editor-switch-copy">
@@ -791,7 +815,9 @@
                                 </div>
                             </div>
                         </section>
-                        {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
+                        {% if show_contact_formsets %}
+                            {% include "anagrafica/partials/anagrafica_contact_formsets.html" %}
+                        {% endif %}
                     </div>
 
                     <div class="family-stat-grid family-create-stat-grid relative-stat-grid relative-create-stat-grid is-hidden" aria-hidden="true">
@@ -2553,6 +2579,26 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const stickyCancelButton = document.getElementById("sticky-cancel-edit-familiare-btn");
+            const parentToggle = document.querySelector("[data-relative-parent-toggle]");
+            const parentFields = Array.from(document.querySelectorAll("[data-relative-parent-field]"));
+
+            function syncRelativeParentFields() {
+                if (!parentToggle) {
+                    return;
+                }
+                const enabled = parentToggle.checked;
+                parentFields.forEach(function (field) {
+                    field.hidden = !enabled;
+                    field.querySelectorAll("input, select, textarea, button").forEach(function (control) {
+                        control.disabled = !enabled;
+                    });
+                });
+            }
+
+            if (parentToggle) {
+                parentToggle.addEventListener("change", syncRelativeParentFields);
+                syncRelativeParentFields();
+            }
 
             if (window.ArborisViewMode) {
                 window.familiareViewMode = ArborisViewMode.init({

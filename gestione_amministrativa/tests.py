@@ -152,6 +152,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, f"{reverse('modifica_educatore', args=[educatore.pk])}")
         self.assertContains(response, f"{reverse('crea_educatore')}")
         self.assertContains(response, "ga-dipendenti-new-educator-btn")
+        self.assertContains(response, "ga-dipendenti-new-employee-btn")
         self.assertContains(response, "ga-dipendenti-new-profile-btn", count=2)
 
         content = response.content.decode("utf-8")
