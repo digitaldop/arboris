@@ -133,6 +133,29 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, f"{reverse('crea_dipendente')}")
         self.assertContains(response, f"{reverse('genera_previsione_busta_paga', args=[self.dipendente.pk])}")
 
+    def test_lista_dipendenti_include_educatori_sopra_i_dipendenti(self):
+        self.client.force_login(self.user)
+        educatore = Dipendente.objects.create(
+            nome="Elena",
+            cognome="Bianchi",
+            ruolo_anagrafico=RuoloAnagraficoDipendente.EDUCATORE,
+            materia="Musica",
+        )
+
+        response = self.client.get(reverse("lista_dipendenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Elenco educatori")
+        self.assertContains(response, "Elenco dipendenti")
+        self.assertContains(response, "Bianchi Elena")
+        self.assertContains(response, "Materia Musica")
+        self.assertContains(response, f"{reverse('modifica_educatore', args=[educatore.pk])}")
+        self.assertContains(response, f"{reverse('crea_educatore')}")
+
+        content = response.content.decode("utf-8")
+        self.assertLess(content.index("Elenco educatori"), content.index("Elenco dipendenti"))
+        self.assertLess(content.index("Bianchi Elena"), content.index("Rossi Mario"))
+
     def test_lista_educatori_mostra_solo_profili_educatore(self):
         self.client.force_login(self.user)
         educatore = Dipendente.objects.create(

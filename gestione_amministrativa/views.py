@@ -405,7 +405,44 @@ def dashboard_gestione_amministrativa(request):
 
 def _lista_profili_lavoro(request, scope):
     labels = _dipendente_labels(scope)
-    dipendenti = (
+    q = (request.GET.get("q") or "").strip()
+    stato = (request.GET.get("stato") or "").strip()
+    dipendenti = _profili_lavoro_queryset(scope, q=q, stato=stato)
+    dipendenti_stats = _profili_lavoro_stats(dipendenti)
+    educatori = None
+    educatori_stats = None
+    educatori_labels = None
+
+    if scope == "dipendenti":
+        educatori = _profili_lavoro_queryset("educatori", q=q, stato=stato)
+        educatori_stats = _profili_lavoro_stats(educatori)
+        educatori_labels = _dipendente_labels("educatori")
+
+    anno, mese = _current_period()
+    page_total = dipendenti_stats["totale"] + (educatori_stats["totale"] if educatori_stats else 0)
+    return render(
+        request,
+        "gestione_amministrativa/dipendenti/dipendente_list.html",
+        {
+            "dipendenti": dipendenti,
+            "educatori": educatori,
+            "dipendenti_stats": dipendenti_stats,
+            "educatori_stats": educatori_stats,
+            "dipendenti_labels": labels,
+            "educatori_labels": educatori_labels,
+            "educatori_nella_lista_dipendenti": scope == "dipendenti",
+            "page_total": page_total,
+            "q": q,
+            "stato": stato,
+            "stati": StatoDipendente.choices,
+            "anno_corrente": anno,
+            "mese_corrente": mese,
+        },
+    )
+
+
+def _profili_lavoro_queryset(scope, *, q="", stato=""):
+    profili = (
         Dipendente.objects.select_related("persona_collegata", "classe_principale", "gruppo_classe_principale")
         .annotate(
             numero_contratti=Count("contratti", distinct=True),
@@ -414,10 +451,8 @@ def _lista_profili_lavoro(request, scope):
         )
         .filter(ruolo_aziendale__in=_ruoli_for_scope(scope))
     )
-    q = (request.GET.get("q") or "").strip()
-    stato = (request.GET.get("stato") or "").strip()
     if q:
-        dipendenti = dipendenti.filter(
+        profili = profili.filter(
             Q(persona_collegata__nome__icontains=q)
             | Q(persona_collegata__cognome__icontains=q)
             | Q(persona_collegata__codice_fiscale__icontains=q)
@@ -426,32 +461,20 @@ def _lista_profili_lavoro(request, scope):
             | Q(materia__icontains=q)
         )
     if stato:
-        dipendenti = dipendenti.filter(stato=stato)
+        profili = profili.filter(stato=stato)
+    return profili
 
-    anno, mese = _current_period()
-    dipendenti_stats = {
-        "totale": dipendenti.count(),
-        "attivi": dipendenti.filter(stato=StatoDipendente.ATTIVO).count(),
-        "sospesi": dipendenti.filter(stato=StatoDipendente.SOSPESO).count(),
-        "cessati": dipendenti.filter(stato=StatoDipendente.CESSATO).count(),
-        "contratti": dipendenti.aggregate(totale=Count("contratti", distinct=True))["totale"] or 0,
-        "buste": dipendenti.aggregate(totale=Count("buste_paga", distinct=True))["totale"] or 0,
-        "documenti": dipendenti.aggregate(totale=Count("documenti", distinct=True))["totale"] or 0,
+
+def _profili_lavoro_stats(profili):
+    return {
+        "totale": profili.count(),
+        "attivi": profili.filter(stato=StatoDipendente.ATTIVO).count(),
+        "sospesi": profili.filter(stato=StatoDipendente.SOSPESO).count(),
+        "cessati": profili.filter(stato=StatoDipendente.CESSATO).count(),
+        "contratti": profili.aggregate(totale=Count("contratti", distinct=True))["totale"] or 0,
+        "buste": profili.aggregate(totale=Count("buste_paga", distinct=True))["totale"] or 0,
+        "documenti": profili.aggregate(totale=Count("documenti", distinct=True))["totale"] or 0,
     }
-    return render(
-        request,
-        "gestione_amministrativa/dipendenti/dipendente_list.html",
-        {
-            "dipendenti": dipendenti,
-            "dipendenti_stats": dipendenti_stats,
-            "dipendenti_labels": labels,
-            "q": q,
-            "stato": stato,
-            "stati": StatoDipendente.choices,
-            "anno_corrente": anno,
-            "mese_corrente": mese,
-        },
-    )
 
 
 def lista_dipendenti(request):

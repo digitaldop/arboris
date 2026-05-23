@@ -21743,6 +21743,30 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     overflow-wrap: anywhere;
 }
 
+.ga-dipendenti-list-panel + .ga-dipendenti-list-panel {
+    margin-top: 18px;
+}
+
+.ga-dipendenti-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 18px;
+    border-bottom: 1px solid #dce7ef;
+}
+
+.ga-dipendenti-section-head .section-title {
+    margin: 0;
+}
+
+.ga-dipendenti-section-subtitle {
+    margin: 4px 0 0;
+    color: #52637c;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
 .anagrafica-record-avatar-work {
     flex-basis: 56px;
     width: 56px;
