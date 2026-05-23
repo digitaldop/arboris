@@ -47,12 +47,12 @@
             </a>
             {% if can_manage_gestione_amministrativa %}
                 {% if educatori_nella_lista_dipendenti and educatori_labels %}
-                    <a href="{% url educatori_labels.create_url %}" class="btn btn-secondary btn-icon-text">
+                    <a href="{% url educatori_labels.create_url %}" class="btn btn-secondary btn-icon-text btn-add-action ga-dipendenti-new-profile-btn ga-dipendenti-new-educator-btn">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                         <span class="btn-label">{{ educatori_labels.new_label }}</span>
                     </a>
                 {% endif %}
-                <a href="{% url dipendenti_labels.create_url %}" class="btn btn-primary btn-icon-text btn-add-action">
+                <a href="{% url dipendenti_labels.create_url %}" class="btn btn-primary btn-icon-text btn-add-action ga-dipendenti-new-profile-btn">
                     <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                     <span class="btn-label">{{ dipendenti_labels.new_label|default:"Nuovo dipendente" }}</span>
                 </a>

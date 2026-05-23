@@ -1221,6 +1221,59 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, "Costo azienda")
         self.assertContains(response, reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
 
+    def test_crea_educatore_non_mostra_parentela_generale(self):
+        response = self.client.get(f"{reverse('crea_familiare')}?profilo_lavorativo=educatore")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["show_family_relation_field"])
+        self.assertFalse(response.context["form"].fields["relazione_familiare"].required)
+        self.assertContains(response, "Nuovo educatore")
+        self.assertNotContains(response, "relative-main-parentela-field")
+
+    def test_crea_familiare_standard_richiede_parentela_generale(self):
+        response = self.client.get(reverse("crea_familiare"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["show_family_relation_field"])
+        self.assertTrue(response.context["form"].fields["relazione_familiare"].required)
+        self.assertContains(response, "relative-main-parentela-field")
+
+    def test_form_profilo_lavorativo_salva_senza_parentela_generale(self):
+        form = FamiliareForm(
+            data={
+                "cognome": "Bianchi",
+                "nome": "Elena",
+                "telefono": "",
+                "email": "",
+                "codice_fiscale": "",
+                "sesso": "",
+                "data_nascita": "",
+                "luogo_nascita": "",
+                "nazione_nascita": "",
+                "luogo_nascita_custom": "",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "",
+                "abilitato_scambio_retta": "",
+                "attivo": "on",
+                "note": "",
+                "profilo_educatore_attivo": "on",
+                "classe_principale_educatore": "",
+                "materia_educatore": "Musica",
+                "profilo_mansione": "",
+                "profilo_iban": "",
+                "profilo_stato": StatoDipendente.ATTIVO,
+            },
+            enable_work_profile_fields=True,
+            enable_direct_relations_field=True,
+            require_family_relation=False,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        familiare = form.save()
+
+        self.assertIsNone(familiare.relazione_familiare)
+
     def test_modifica_familiare_busta_senza_costo_mostra_stato_pagamento(self):
         busta_senza_costo = BustaPagaDipendente.objects.create(
             dipendente=self.profilo,

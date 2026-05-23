@@ -574,24 +574,26 @@
                                     </div>
                                     {% endif %}
 
-                                    <div class="family-student-editor-field family-student-editor-field-third relative-main-parentela-field">
-                                        <label for="{{ form.relazione_familiare.id_for_label }}">Parentela</label>
-                                        <div class="inline-related-field mode-edit-field family-card-editor-related-control">
-                                            {{ form.relazione_familiare }}
-                                            <div class="related-actions inline-related-actions">
-                                                <button type="button" class="related-btn related-btn-add inline-related-add" id="add-relazione-btn" data-related-type="relazione_familiare" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                                </button>
-                                                <button type="button" class="related-btn related-btn-edit inline-related-edit" id="edit-relazione-btn" data-related-type="relazione_familiare" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                </button>
-                                                <button type="button" class="related-btn related-btn-delete inline-related-delete" id="delete-relazione-btn" data-related-type="relazione_familiare" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
-                                                    <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                                </button>
+                                    {% if show_family_relation_field %}
+                                        <div class="family-student-editor-field family-student-editor-field-third relative-main-parentela-field">
+                                            <label for="{{ form.relazione_familiare.id_for_label }}">Parentela</label>
+                                            <div class="inline-related-field mode-edit-field family-card-editor-related-control">
+                                                {{ form.relazione_familiare }}
+                                                <div class="related-actions inline-related-actions">
+                                                    <button type="button" class="related-btn related-btn-add inline-related-add" id="add-relazione-btn" data-related-type="relazione_familiare" aria-label="Nuovo valore" title="Nuovo valore" data-floating-text="Nuovo valore">
+                                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
+                                                    </button>
+                                                    <button type="button" class="related-btn related-btn-edit inline-related-edit" id="edit-relazione-btn" data-related-type="relazione_familiare" aria-label="Modifica valore" title="Modifica valore" data-floating-text="Modifica valore">
+                                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                    </button>
+                                                    <button type="button" class="related-btn related-btn-delete inline-related-delete" id="delete-relazione-btn" data-related-type="relazione_familiare" aria-label="Elimina valore" title="Elimina valore" data-floating-text="Elimina valore">
+                                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                    </button>
+                                                </div>
                                             </div>
+                                            {{ form.relazione_familiare.errors }}
                                         </div>
-                                        {{ form.relazione_familiare.errors }}
-                                    </div>
+                                    {% endif %}
                                     <div class="family-student-editor-field family-student-editor-field-third">
                                         <label for="{{ form.sesso.id_for_label }}">Sesso</label>
                                         {{ form.sesso }}

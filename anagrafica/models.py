@@ -783,6 +783,8 @@ class Familiare(models.Model):
         RelazioneFamiliare,
         on_delete=models.PROTECT,
         related_name="familiari",
+        blank=True,
+        null=True,
     )
     convivente = models.BooleanField(default=False)
     referente_principale = models.BooleanField(default=False)

@@ -1168,6 +1168,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         shared_lookups = kwargs.pop("shared_lookups", None) or {}
         enable_work_profile_fields = kwargs.pop("enable_work_profile_fields", False)
         enable_direct_relations_field = kwargs.pop("enable_direct_relations_field", False)
+        require_family_relation = kwargs.pop("require_family_relation", True)
         super().__init__(*args, **kwargs)
 
         if getattr(self.instance, "pk", None) and not self.is_bound:
@@ -1196,7 +1197,8 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             )
         else:
             bind_primed_queryset(self.fields["relazione_familiare"], relazioni)
-        self.fields["relazione_familiare"].empty_label = None
+        self.fields["relazione_familiare"].required = require_family_relation
+        self.fields["relazione_familiare"].empty_label = None if require_family_relation else "---------"
         configure_indirizzo_choice_field(self.fields["indirizzo"], shared_lookups.get("indirizzi"))
 
         self.setup_indirizzo_search()
@@ -1220,7 +1222,12 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
                 self.initial["nazionalita"] = italia_id
                 self.fields["nazionalita"].initial = italia_id
 
-        if not self.instance.pk and not self.is_bound and not self.initial.get("relazione_familiare"):
+        if (
+            require_family_relation
+            and not self.instance.pk
+            and not self.is_bound
+            and not self.initial.get("relazione_familiare")
+        ):
             prima_relazione = self.fields["relazione_familiare"].queryset.first()
             if prima_relazione:
                 self.initial["relazione_familiare"] = prima_relazione.pk

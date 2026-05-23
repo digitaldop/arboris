@@ -21767,6 +21767,25 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     line-height: 1.35;
 }
 
+.ga-dipendenti-new-profile-btn {
+    min-width: 178px;
+}
+
+.ga-dipendenti-new-educator-btn {
+    background: #ecfdf3 !important;
+    border-color: #b9e7c8 !important;
+    color: #176b3f !important;
+    box-shadow: 0 4px 10px rgba(34, 197, 94, 0.12) !important;
+}
+
+.ga-dipendenti-new-educator-btn:hover,
+.ga-dipendenti-new-educator-btn:focus-visible {
+    background: #dcf7e7 !important;
+    border-color: #8dd9a8 !important;
+    color: #115c34 !important;
+    box-shadow: 0 7px 16px rgba(34, 197, 94, 0.18) !important;
+}
+
 .anagrafica-record-avatar-work {
     flex-basis: 56px;
     width: 56px;

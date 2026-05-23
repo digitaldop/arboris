@@ -3507,6 +3507,7 @@ def crea_familiare(request):
     contact_formsets = None
     initial = {}
     profilo_lavorativo_iniziale = (request.GET.get("profilo_lavorativo") or "").strip().lower()
+    family_relation_required = profilo_lavorativo_iniziale not in {"dipendente", "educatore"}
     create_profile_context = {}
     if profilo_lavorativo_iniziale in {"dipendente", "educatore"}:
         initial["profilo_dipendente_attivo"] = profilo_lavorativo_iniziale == "dipendente"
@@ -3549,6 +3550,7 @@ def crea_familiare(request):
             request.POST,
             enable_work_profile_fields=True,
             enable_direct_relations_field=True,
+            require_family_relation=family_relation_required,
         )
         contact_formsets = build_anagrafica_contact_formsets(data=request.POST)
         studenti_formset = (
@@ -3637,6 +3639,7 @@ def crea_familiare(request):
             initial=initial,
             enable_work_profile_fields=True,
             enable_direct_relations_field=True,
+            require_family_relation=family_relation_required,
         )
         contact_formsets = build_anagrafica_contact_formsets()
         studenti_formset = build_studenti_formset(prefix="studenti")
@@ -3677,6 +3680,7 @@ def crea_familiare(request):
             "edit_scope": edit_scope,
             "inline_target": active_inline_tab,
             "has_form_errors": has_form_errors,
+            "show_family_relation_field": family_relation_required,
             **create_profile_context,
             **build_familiare_lavoro_context(None),
             "familiare_inline_tabs": [
