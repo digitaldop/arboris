@@ -99,9 +99,9 @@
         <input type="hidden" name="_edit_scope" id="familiare-edit-scope" value="{{ edit_scope|default:'view' }}">
         <input type="hidden" name="_inline_target" id="familiare-inline-target" value="{{ inline_target|default:'studenti' }}">
         {% if create_profile_scope == "educatori" and form.profilo_educatore_attivo %}
-            <input type="hidden" name="{{ form.profilo_educatore_attivo.html_name }}" value="on">
+            <input type="hidden" name="{{ form.profilo_educatore_attivo.html_name }}" id="{{ form.profilo_educatore_attivo.id_for_label }}" value="on" data-work-profile-forced="educatore">
         {% elif create_profile_scope == "dipendenti" and form.profilo_dipendente_attivo %}
-            <input type="hidden" name="{{ form.profilo_dipendente_attivo.html_name }}" value="on">
+            <input type="hidden" name="{{ form.profilo_dipendente_attivo.html_name }}" id="{{ form.profilo_dipendente_attivo.id_for_label }}" value="on" data-work-profile-forced="dipendente">
         {% endif %}
         {% if familiare %}
             <div class="relative-dashboard-view family-dashboard-view mode-view-only">
@@ -2574,7 +2574,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=37"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=38"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

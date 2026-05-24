@@ -995,6 +995,18 @@ window.ArborisFamiliareForm = (function () {
             }
         }
 
+        function isWorkProfileEnabled(toggle) {
+            if (!toggle) {
+                return false;
+            }
+
+            if (toggle.type === "hidden") {
+                return ["1", "true", "on", "yes"].indexOf(String(toggle.value || "").toLowerCase()) !== -1;
+            }
+
+            return Boolean(toggle.checked);
+        }
+
         function syncEducatorClassField(root) {
             const scope = root || document;
             const employeeToggle = scope.querySelector("#id_profilo_dipendente_attivo")
@@ -1034,8 +1046,8 @@ window.ArborisFamiliareForm = (function () {
             };
             const update = function (source) {
                 enforceExclusiveProfileChoice(source);
-                const employeeEnabled = employeeToggle ? Boolean(employeeToggle.checked) : false;
-                const educatorEnabled = educatorToggle ? Boolean(educatorToggle.checked) : false;
+                const employeeEnabled = isWorkProfileEnabled(employeeToggle);
+                const educatorEnabled = isWorkProfileEnabled(educatorToggle);
                 setFieldContainerDisabled(classField, educatorEnabled);
                 setFieldContainerDisabled(subjectField, educatorEnabled);
                 employeeFields.forEach(function (field) {
