@@ -6878,6 +6878,140 @@ select:focus {
     text-align: center;
 }
 
+.dashboard-birthday-card {
+    gap: 16px;
+}
+
+.dashboard-birthday-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.dashboard-birthday-legend,
+.dashboard-birthday-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dashboard-birthday-type-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border: 1px solid #d5e3ec;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #40516a;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+.dashboard-birthday-type-chip.is-student {
+    border-color: #b8d7f0;
+    background: #edf7ff;
+    color: #195f9a;
+}
+
+.dashboard-birthday-type-chip.is-adult {
+    border-color: #edcf9d;
+    background: #fff7e6;
+    color: #81580a;
+}
+
+.dashboard-birthday-months {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.dashboard-birthday-month {
+    min-width: 0;
+}
+
+.dashboard-birthday-month-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: #20324a;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.dashboard-birthday-month-title span:last-child {
+    color: #60738d;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.dashboard-birthday-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.dashboard-birthday-table {
+    min-width: 420px;
+}
+
+.dashboard-birthday-table th:nth-child(2),
+.dashboard-birthday-table td:nth-child(2),
+.dashboard-birthday-table th:nth-child(3),
+.dashboard-birthday-table td:nth-child(3) {
+    width: 110px;
+    white-space: nowrap;
+}
+
+.dashboard-birthday-row.is-student > td {
+    background: #f1f8ff;
+}
+
+.dashboard-birthday-row.is-adult > td {
+    background: #fff8ea;
+}
+
+.dashboard-birthday-row.is-student:hover > td {
+    background: #e5f2ff;
+}
+
+.dashboard-birthday-row.is-adult:hover > td {
+    background: #fff1d6;
+}
+
+.dashboard-birthday-person a {
+    color: #20324a;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.dashboard-birthday-person a:hover {
+    color: var(--dashboard-primary-dark);
+    text-decoration: none;
+}
+
+@media (max-width: 760px) {
+    .dashboard-birthday-head {
+        flex-direction: column;
+    }
+
+    .dashboard-birthday-months {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-birthday-legend {
+        width: 100%;
+    }
+}
+
 .dashboard-card {
     display: block;
     background: #fff;

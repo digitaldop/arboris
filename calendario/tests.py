@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.models import Documento, TipoDocumento
+from anagrafica.models import Documento, Familiare, Studente, TipoDocumento
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
@@ -27,7 +27,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
             email="calendario@example.com",
             password="Password123!",
         )
-        SistemaUtentePermessi.objects.create(
+        self.permissions = SistemaUtentePermessi.objects.create(
             user=self.user,
             permesso_calendario=LivelloPermesso.GESTIONE,
         )
@@ -134,6 +134,93 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertIn("Evento visibile", week_titles)
         self.assertNotIn("Evento nascosto dashboard", week_titles)
         self.assertEqual(dashboard_data["count_week_records"], 1)
+
+    def test_dashboard_birthdays_include_current_and_next_month(self):
+        self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
+        self.permissions.save(update_fields=["permesso_anagrafica"])
+        Studente.objects.create(
+            nome="Luca",
+            cognome="Bianchi",
+            data_nascita=date(2016, 5, 5),
+            attivo=True,
+        )
+        Studente.objects.create(
+            nome="Nina",
+            cognome="Rossi",
+            data_nascita=date(2017, 6, 2),
+            attivo=True,
+        )
+        Studente.objects.create(
+            nome="Marco",
+            cognome="Fuori",
+            data_nascita=date(2018, 7, 1),
+            attivo=True,
+        )
+        Studente.objects.create(
+            nome="Irene",
+            cognome="Nonattiva",
+            data_nascita=date(2017, 6, 3),
+            attivo=False,
+        )
+        Familiare.objects.create(
+            nome="Ada",
+            cognome="Verdi",
+            data_nascita=date(1986, 6, 10),
+        )
+
+        dashboard_data = build_dashboard_calendar_data(
+            today=date(2026, 5, 29),
+            user=self.user,
+        )
+
+        birthdays = dashboard_data["birthdays"]
+        self.assertEqual(birthdays["period_label"], "Maggio 2026 e Giugno 2026")
+        self.assertEqual(birthdays["count_records"], 3)
+        self.assertEqual([group["label"] for group in birthdays["months"]], ["Maggio 2026", "Giugno 2026"])
+        self.assertEqual([record["name"] for record in birthdays["months"][0]["records"]], ["Bianchi Luca"])
+        self.assertEqual(
+            [record["name"] for record in birthdays["months"][1]["records"]],
+            ["Rossi Nina", "Verdi Ada"],
+        )
+        self.assertEqual(birthdays["months"][0]["records"][0]["age"], 10)
+        self.assertEqual(birthdays["months"][1]["records"][1]["person_type"], "adult")
+        self.assertNotIn("Fuori Marco", [record["name"] for record in birthdays["records"]])
+        self.assertNotIn("Nonattiva Irene", [record["name"] for record in birthdays["records"]])
+
+    def test_dashboard_birthdays_respect_anagrafica_permission(self):
+        Studente.objects.create(
+            nome="Luca",
+            cognome="Bianchi",
+            data_nascita=date(2016, 5, 5),
+            attivo=True,
+        )
+
+        dashboard_data = build_dashboard_calendar_data(
+            today=date(2026, 5, 29),
+            user=self.user,
+        )
+
+        self.assertEqual(dashboard_data["birthdays"]["count_records"], 0)
+
+    def test_home_dashboard_renders_birthday_section(self):
+        self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
+        self.permissions.save(update_fields=["permesso_anagrafica"])
+        Studente.objects.create(
+            nome="Luca",
+            cognome="Bianchi",
+            data_nascita=date(2016, 5, 5),
+            attivo=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Compleanni del mese")
+        self.assertContains(response, "Bianchi Luca")
+        self.assertContains(response, "05/05/2026")
+        self.assertContains(response, "10 anni")
+        self.assertContains(response, "dashboard-birthday-row is-student")
 
     def test_category_form_exposes_dashboard_visibility_toggle(self):
         form = CategoriaCalendarioForm()

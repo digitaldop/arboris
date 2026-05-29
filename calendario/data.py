@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from anagrafica.family_logic import build_logical_family_snapshot, logical_family_detail_url
-from anagrafica.models import Documento
+from anagrafica.models import Documento, Familiare, Studente
 from economia.models import RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
@@ -31,6 +31,21 @@ ITALIAN_WEEKDAY_NAMES = (
     "Domenica",
 )
 
+ITALIAN_MONTH_NAMES = (
+    "Gennaio",
+    "Febbraio",
+    "Marzo",
+    "Aprile",
+    "Maggio",
+    "Giugno",
+    "Luglio",
+    "Agosto",
+    "Settembre",
+    "Ottobre",
+    "Novembre",
+    "Dicembre",
+)
+
 
 def format_time_value(value):
     return value.strftime("%H:%M") if value else ""
@@ -42,6 +57,10 @@ def format_compact_date_label(value):
 
 def format_weekday_date_label(value):
     return f"{ITALIAN_WEEKDAY_NAMES[value.weekday()]} {format_compact_date_label(value)}"
+
+
+def format_month_year_label(value):
+    return f"{ITALIAN_MONTH_NAMES[value.month - 1]} {value.year}"
 
 
 def build_duration_label(start_date, end_date, all_day, start_time="", end_time=""):
@@ -191,6 +210,128 @@ def overlaps_calendar_day(record, target_day):
 
 def overlaps_calendar_range(record, range_start, range_end):
     return record["start_date"] <= range_end and record["end_date"] >= range_start
+
+
+def get_next_month_start(value):
+    if value.month == 12:
+        return date(value.year + 1, 1, 1)
+    return date(value.year, value.month + 1, 1)
+
+
+def build_birthday_occurrence(birth_date, target_year):
+    try:
+        return date(target_year, birth_date.month, birth_date.day)
+    except ValueError:
+        return date(target_year, 2, 28)
+
+
+def can_include_birthday_records(user):
+    if not module_is_enabled("anagrafica"):
+        return False
+    if user is None:
+        return True
+    return user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
+
+
+def build_dashboard_birthday_record(person, person_type, target_year_by_month):
+    birth_date = person.data_nascita
+    if not birth_date:
+        return None
+
+    target_year = target_year_by_month.get(birth_date.month)
+    if not target_year:
+        return None
+
+    occurrence = build_birthday_occurrence(birth_date, target_year)
+    age = occurrence.year - birth_date.year
+    if age < 0:
+        return None
+
+    if person_type == "student":
+        type_label = "Studente"
+        url = reverse("modifica_studente", kwargs={"pk": person.pk})
+    else:
+        type_label = "Adulto"
+        url = reverse("modifica_familiare", kwargs={"pk": person.pk})
+
+    return {
+        "id": f"{person_type}-{person.pk}",
+        "name": str(person),
+        "birth_date": birth_date,
+        "date": occurrence,
+        "age": age,
+        "person_type": person_type,
+        "type_label": type_label,
+        "url": url,
+    }
+
+
+def build_dashboard_birthdays_data(today=None, user=None):
+    today = today or timezone.localdate()
+    current_month = date(today.year, today.month, 1)
+    next_month = get_next_month_start(current_month)
+    month_starts = [current_month, next_month]
+    target_year_by_month = {month_start.month: month_start.year for month_start in month_starts}
+    target_months = list(target_year_by_month.keys())
+    groups = [
+        {
+            "key": f"{month_start.year}-{month_start.month:02d}",
+            "year": month_start.year,
+            "month": month_start.month,
+            "label": format_month_year_label(month_start),
+            "records": [],
+        }
+        for month_start in month_starts
+    ]
+    group_map = {(group["year"], group["month"]): group for group in groups}
+
+    if not can_include_birthday_records(user):
+        return {
+            "period_label": " e ".join(group["label"] for group in groups),
+            "months": groups,
+            "records": [],
+            "count_records": 0,
+        }
+
+    records = []
+    studenti = (
+        Studente.objects.filter(attivo=True, data_nascita__month__in=target_months)
+        .order_by("data_nascita", "cognome", "nome", "pk")
+    )
+    for studente in studenti:
+        record = build_dashboard_birthday_record(studente, "student", target_year_by_month)
+        if record:
+            records.append(record)
+
+    adulti = (
+        Familiare.objects.filter(data_nascita__month__in=target_months)
+        .select_related("persona")
+        .order_by("data_nascita", "cognome", "nome", "pk")
+    )
+    for adulto in adulti:
+        record = build_dashboard_birthday_record(adulto, "adult", target_year_by_month)
+        if record:
+            records.append(record)
+
+    records.sort(
+        key=lambda record: (
+            record["date"],
+            0 if record["person_type"] == "student" else 1,
+            record["name"].lower(),
+            record["id"],
+        )
+    )
+    for record in records:
+        group = group_map.get((record["date"].year, record["date"].month))
+        if group:
+            group["records"].append(record)
+
+    return {
+        "period_label": " e ".join(group["label"] for group in groups),
+        "months": groups,
+        "records": records,
+        "count_records": len(records),
+    }
 
 
 def build_local_calendar_occurrence_record(evento, occurrence):
@@ -535,6 +676,7 @@ def build_calendar_list_bundle(categoria_filter="", query="", user=None):
 def build_dashboard_calendar_data(today=None, user=None, week_page_size=3):
     today = today or timezone.localdate()
     agenda_bundle = build_calendar_agenda_bundle(user=user)
+    birthdays_data = build_dashboard_birthdays_data(today=today, user=user)
     visible_dashboard_category_ids = {
         categoria.pk
         for categoria in agenda_bundle["categories"]
@@ -566,4 +708,5 @@ def build_dashboard_calendar_data(today=None, user=None, week_page_size=3):
         "week_total_pages": week_total_pages,
         "count_today_records": len(today_records),
         "count_week_records": count_week_records,
+        "birthdays": birthdays_data,
     }

@@ -800,6 +800,74 @@
                                     <div class="dashboard-stat-note">Nessun evento o scadenza nella settimana corrente.</div>
                                 {% endif %}
                             </div>
+
+                            <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-amber dashboard-birthday-card">
+                                <div class="dashboard-birthday-head">
+                                    <div>
+                                        <div class="dashboard-stat-label">Compleanni del mese</div>
+                                        <div class="dashboard-calendar-widget-meta">
+                                            {{ calendario_dashboard.birthdays.period_label }}
+                                            {% if calendario_dashboard.birthdays.count_records %}
+                                                <span class="dashboard-calendar-count">
+                                                    {{ calendario_dashboard.birthdays.count_records }} compleann{% if calendario_dashboard.birthdays.count_records == 1 %}o{% else %}i{% endif %}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="dashboard-birthday-legend" aria-label="Legenda compleanni">
+                                        <span class="dashboard-birthday-type-chip is-student">Studente</span>
+                                        <span class="dashboard-birthday-type-chip is-adult">Adulto</span>
+                                    </div>
+                                </div>
+
+                                {% if calendario_dashboard.birthdays.count_records %}
+                                    <div class="dashboard-birthday-months">
+                                        {% for birthday_month in calendario_dashboard.birthdays.months %}
+                                            <div class="dashboard-birthday-month">
+                                                <div class="dashboard-birthday-month-title">
+                                                    <span>{{ birthday_month.label }}</span>
+                                                    <span>{{ birthday_month.records|length }} compleann{% if birthday_month.records|length == 1 %}o{% else %}i{% endif %}</span>
+                                                </div>
+                                                {% if birthday_month.records %}
+                                                    <div class="dashboard-birthday-table-wrap">
+                                                        <table class="list-table dashboard-mini-table dashboard-birthday-table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Nome</th>
+                                                                    <th>Data</th>
+                                                                    <th>Anni</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for birthday in birthday_month.records %}
+                                                                    <tr class="dashboard-birthday-row is-{{ birthday.person_type }}">
+                                                                        <td>
+                                                                            <span class="dashboard-birthday-person">
+                                                                                {% if birthday.url %}
+                                                                                    <a href="{{ birthday.url }}">{{ birthday.name }}</a>
+                                                                                {% else %}
+                                                                                    {{ birthday.name }}
+                                                                                {% endif %}
+                                                                                <span class="dashboard-birthday-type-chip is-{{ birthday.person_type }}">{{ birthday.type_label }}</span>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>{{ birthday.date|date:"d/m/Y" }}</td>
+                                                                        <td>{{ birthday.age }} {% if birthday.age == 1 %}anno{% else %}anni{% endif %}</td>
+                                                                    </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                {% else %}
+                                                    <div class="dashboard-stat-note">Nessun compleanno in questo mese.</div>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessun compleanno registrato nel mese corrente o nel mese successivo.</div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
