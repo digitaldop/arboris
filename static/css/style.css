@@ -6788,6 +6788,7 @@ select:focus {
     border: 1px solid #e3eaee;
     border-radius: 8px;
     background: #f8fafb;
+    overflow-wrap: anywhere;
 }
 
 .dashboard-calendar-entry.is-dashboard-calendar-hidden {
@@ -7455,6 +7456,11 @@ a.dashboard-birthday-family-chip:hover {
     align-self: start;
 }
 
+.dashboard-section[data-dashboard-section-id="calendario"] .dashboard-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+}
+
 .dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card {
     display: block;
     grid-column: span 1;
@@ -7467,6 +7473,10 @@ a.dashboard-birthday-family-chip:hover {
 
 .dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card > * {
     grid-column: auto;
+}
+
+.dashboard-section[data-dashboard-section-id="calendario"] .dashboard-birthday-card {
+    grid-column: 1 / -1;
 }
 
 .dashboard-stat-label {
@@ -7875,6 +7885,14 @@ a.dashboard-birthday-family-chip:hover {
 @media (max-width: 900px) {
     .dashboard-page-head {
         flex-direction: column;
+    }
+
+    .dashboard-section[data-dashboard-section-id="calendario"] .dashboard-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card {
+        grid-column: 1 / -1;
     }
 
     .dashboard-page-actions {
