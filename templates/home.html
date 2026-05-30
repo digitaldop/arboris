@@ -699,7 +699,7 @@
                 <div class="panel collapsible-panel is-open" id="dashboard-riepilogo-calendario">
                     <div class="panel-body dashboard-panel-body">
                         <div class="dashboard-stats-grid">
-                            <div class="dashboard-stat-card dashboard-stat-tone-green">
+                            <div class="dashboard-stat-card dashboard-stat-tone-green dashboard-calendar-card">
                                 <div class="dashboard-stat-label">Impegni di oggi</div>
                                 <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.today_label }}</div>
                                 {% if calendario_dashboard.today_records %}
@@ -729,7 +729,7 @@
                             </div>
 
                             <div
-                                class="dashboard-stat-card dashboard-stat-tone-blue"
+                                class="dashboard-stat-card dashboard-stat-tone-blue dashboard-calendar-card"
                                 data-dashboard-calendar-week
                                 data-dashboard-calendar-page-size="{{ calendario_dashboard.week_page_size }}"
                             >
@@ -849,6 +849,13 @@
                                                                                     {{ birthday.name }}
                                                                                 {% endif %}
                                                                                 <span class="dashboard-birthday-type-chip is-{{ birthday.person_type }}">{{ birthday.type_label }}</span>
+                                                                                {% if birthday.family_label %}
+                                                                                    {% if birthday.family_url %}
+                                                                                        <a href="{{ birthday.family_url }}" class="dashboard-birthday-family-chip">{{ birthday.family_label }}</a>
+                                                                                    {% else %}
+                                                                                        <span class="dashboard-birthday-family-chip">{{ birthday.family_label }}</span>
+                                                                                    {% endif %}
+                                                                                {% endif %}
                                                                             </span>
                                                                         </td>
                                                                         <td>{{ birthday.date|date:"d/m/Y" }}</td>

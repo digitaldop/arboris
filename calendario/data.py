@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.family_logic import build_logical_family_snapshot, logical_family_detail_url
+from anagrafica.family_logic import logical_family_summary_for_person
 from anagrafica.models import Documento, Familiare, Studente
 from economia.models import RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
@@ -254,6 +254,8 @@ def build_dashboard_birthday_record(person, person_type, target_year_by_month):
         type_label = "Adulto"
         url = reverse("modifica_familiare", kwargs={"pk": person.pk})
 
+    family_summary = logical_family_summary_for_person(person)
+
     return {
         "id": f"{person_type}-{person.pk}",
         "name": str(person),
@@ -263,6 +265,8 @@ def build_dashboard_birthday_record(person, person_type, target_year_by_month):
         "person_type": person_type,
         "type_label": type_label,
         "url": url,
+        "family_label": family_summary.get("label", ""),
+        "family_url": family_summary.get("url", ""),
     }
 
 

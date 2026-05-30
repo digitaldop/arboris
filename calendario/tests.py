@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.models import Documento, Familiare, Studente, TipoDocumento
+from anagrafica.models import Documento, Familiare, Studente, StudenteFamiliare, TipoDocumento
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
@@ -138,13 +138,19 @@ class CalendarioAgendaInterfaceTests(TestCase):
     def test_dashboard_birthdays_include_current_and_next_month(self):
         self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
         self.permissions.save(update_fields=["permesso_anagrafica"])
-        Studente.objects.create(
+        luca = Studente.objects.create(
             nome="Luca",
             cognome="Bianchi",
             data_nascita=date(2016, 5, 5),
             attivo=True,
         )
-        Studente.objects.create(
+        padre = Familiare.objects.create(
+            nome="Paolo",
+            cognome="Bianchi",
+            data_nascita=date(1980, 8, 1),
+        )
+        StudenteFamiliare.objects.create(studente=luca, familiare=padre)
+        nina = Studente.objects.create(
             nome="Nina",
             cognome="Rossi",
             data_nascita=date(2017, 6, 2),
@@ -162,11 +168,12 @@ class CalendarioAgendaInterfaceTests(TestCase):
             data_nascita=date(2017, 6, 3),
             attivo=False,
         )
-        Familiare.objects.create(
+        ada = Familiare.objects.create(
             nome="Ada",
             cognome="Verdi",
             data_nascita=date(1986, 6, 10),
         )
+        StudenteFamiliare.objects.create(studente=nina, familiare=ada)
 
         dashboard_data = build_dashboard_calendar_data(
             today=date(2026, 5, 29),
@@ -183,7 +190,9 @@ class CalendarioAgendaInterfaceTests(TestCase):
             ["Rossi Nina", "Verdi Ada"],
         )
         self.assertEqual(birthdays["months"][0]["records"][0]["age"], 10)
+        self.assertEqual(birthdays["months"][0]["records"][0]["family_label"], "Famiglia Bianchi")
         self.assertEqual(birthdays["months"][1]["records"][1]["person_type"], "adult")
+        self.assertEqual(birthdays["months"][1]["records"][1]["family_label"], "Famiglia Rossi")
         self.assertNotIn("Fuori Marco", [record["name"] for record in birthdays["records"]])
         self.assertNotIn("Nonattiva Irene", [record["name"] for record in birthdays["records"]])
 
@@ -205,12 +214,18 @@ class CalendarioAgendaInterfaceTests(TestCase):
     def test_home_dashboard_renders_birthday_section(self):
         self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
         self.permissions.save(update_fields=["permesso_anagrafica"])
-        Studente.objects.create(
+        luca = Studente.objects.create(
             nome="Luca",
             cognome="Bianchi",
             data_nascita=date(2016, 5, 5),
             attivo=True,
         )
+        padre = Familiare.objects.create(
+            nome="Paolo",
+            cognome="Bianchi",
+            data_nascita=date(1980, 8, 1),
+        )
+        StudenteFamiliare.objects.create(studente=luca, familiare=padre)
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
@@ -221,6 +236,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "05/05/2026")
         self.assertContains(response, "10 anni")
         self.assertContains(response, "dashboard-birthday-row is-student")
+        self.assertContains(response, "Famiglia Bianchi")
 
     def test_category_form_exposes_dashboard_visibility_toggle(self):
         form = CategoriaCalendarioForm()

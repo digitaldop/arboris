@@ -6925,6 +6925,29 @@ select:focus {
     color: #81580a;
 }
 
+.dashboard-birthday-family-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border: 1px solid #d7e0e8;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #40516a;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+a.dashboard-birthday-family-chip:hover {
+    border-color: #b8cad9;
+    background: #f7fbfd;
+    color: #20324a;
+    text-decoration: none;
+}
+
 .dashboard-birthday-months {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7430,6 +7453,20 @@ select:focus {
 
 .dashboard-section[data-dashboard-section-id="calendario"] .dashboard-stat-card:not(.dashboard-stat-card-full)::before {
     align-self: start;
+}
+
+.dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card {
+    display: block;
+    grid-column: span 1;
+    min-height: 0;
+}
+
+.dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card::before {
+    display: none;
+}
+
+.dashboard-section[data-dashboard-section-id="calendario"] .dashboard-calendar-card > * {
+    grid-column: auto;
 }
 
 .dashboard-stat-label {
