@@ -20,7 +20,7 @@
                 <h1 class="page-title">Riconciliazione fornitori</h1>
                 <span class="family-status-pill is-muted">
                     <span class="family-status-dot" aria-hidden="true"></span>
-                    {{ movimenti_con_candidati|length }} movimenti
+                    {{ movimenti_con_proposte|length }} movimenti
                 </span>
             </div>
             <div class="family-page-address">
@@ -46,7 +46,7 @@
 
     <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
         <div class="panel-body">
-            {% if movimenti_con_candidati %}
+            {% if movimenti_con_proposte %}
                 <table class="list-table anagrafica-list-table finance-modern-table">
                     <thead>
                         <tr>
@@ -58,7 +58,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in movimenti_con_candidati %}
+                        {% for item in movimenti_con_proposte %}
                             <tr class="list-row-link" data-row-href="{% url 'riconcilia_movimento_fornitore' item.movimento.pk %}">
                                 <td class="anagrafica-record-cell">
                                     <a href="{% url 'riconcilia_movimento_fornitore' item.movimento.pk %}" class="anagrafica-record-link anagrafica-record-link-compact">
@@ -74,19 +74,28 @@
                                 </td>
                                 <td class="finance-money-cell">{{ item.movimento.residuo_fornitori|euro }} &euro;</td>
                                 <td>
-                                    {% if item.candidati %}
-                                        {% with candidato=item.candidati.0 %}
-                                            <strong>{{ candidato.scadenza.documento.fornitore }}</strong><br>
-                                            <span class="table-muted">{{ candidato.scadenza.documento.numero_documento }} - {{ candidato.scadenza.data_scadenza|date:"d/m/Y" }}</span>
+                                    {% if item.proposte_fornitore %}
+                                        {% with proposta=item.proposte_fornitore.0 scadenza=item.proposte_fornitore.0.allocazioni.0.target %}
+                                            <strong>{{ scadenza.documento.fornitore }}</strong><br>
+                                            <span class="table-muted">{{ scadenza.documento.numero_documento }} - {{ scadenza.data_scadenza|date:"d/m/Y" }}</span>
+                                        {% endwith %}
+                                    {% elif item.proposte_fornitore_cumulative %}
+                                        {% with proposta=item.proposte_fornitore_cumulative.0 scadenza=item.proposte_fornitore_cumulative.0.allocazioni.0.target %}
+                                            <strong>{{ scadenza.documento.fornitore }}</strong><br>
+                                            <span class="table-muted">{{ proposta.targets|length }} scadenze - cumulativo</span>
                                         {% endwith %}
                                     {% else %}
                                         <span class="table-muted">Nessun candidato forte</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if item.candidati %}
-                                        <span class="anagrafica-status-chip {% if item.candidati.0.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
-                                            {{ item.candidati.0.score_percentuale }}%
+                                    {% if item.proposte_fornitore %}
+                                        <span class="anagrafica-status-chip {% if item.proposte_fornitore.0.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                            {{ item.proposte_fornitore.0.score_percentuale }}%
+                                        </span>
+                                    {% elif item.proposte_fornitore_cumulative %}
+                                        <span class="anagrafica-status-chip {% if item.proposte_fornitore_cumulative.0.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                            {{ item.proposte_fornitore_cumulative.0.score_percentuale }}%
                                         </span>
                                     {% else %}
                                         <span class="table-muted">-</span>

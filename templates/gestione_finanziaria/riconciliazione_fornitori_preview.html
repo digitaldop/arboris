@@ -102,9 +102,19 @@
                                 {% if item.movimento_conto %}<br><span class="table-muted">{{ item.movimento_conto }}</span>{% endif %}
                             </td>
                             <td>
-                                <strong>{{ item.fornitore }}</strong><br>
-                                {{ item.documento }}
-                                {% if item.scadenza_data %}<br><span class="table-muted">Scadenza {{ item.scadenza_data }}</span>{% endif %}
+                                {% if item.allocazioni %}
+                                    {% for allocazione in item.allocazioni %}
+                                        <div>
+                                            <strong>{{ allocazione.fornitore }}</strong><br>
+                                            {{ allocazione.documento }}
+                                            {% if allocazione.scadenza_data %}<br><span class="table-muted">Scadenza {{ allocazione.scadenza_data }}</span>{% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <strong>{{ item.fornitore }}</strong><br>
+                                    {{ item.documento }}
+                                    {% if item.scadenza_data %}<br><span class="table-muted">Scadenza {{ item.scadenza_data }}</span>{% endif %}
+                                {% endif %}
                             </td>
                             <td>{{ item.importo|euro }} &euro;</td>
                             <td>{{ item.score }}%</td>

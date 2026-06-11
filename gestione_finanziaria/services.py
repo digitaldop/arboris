@@ -1256,6 +1256,10 @@ class CandidatoRiconciliazioneCumulativa:
     def score_percentuale(self) -> int:
         return max(0, min(100, self.score))
 
+    @property
+    def importo_totale(self) -> Decimal:
+        return sum((importo for _rata, importo in self.allocazioni), Decimal("0.00"))
+
 
 @dataclass
 class CandidatoMovimentoRiconciliazione:
@@ -1270,6 +1274,24 @@ class CandidatoMovimentoRiconciliazione:
 
 
 @dataclass
+class CandidatoMovimentiRiconciliazioneCumulativa:
+    """Gruppo di movimenti candidate per coprire un unico target."""
+
+    movimenti: list
+    allocazioni: list
+    score: int
+    motivazioni: list
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+    @property
+    def importo_totale(self) -> Decimal:
+        return sum((importo for _movimento, importo in self.allocazioni), Decimal("0.00"))
+
+
+@dataclass
 class CandidatoScadenzaFornitoreRiconciliazione:
     scadenza: object
     importo_residuo: Decimal
@@ -1279,6 +1301,96 @@ class CandidatoScadenzaFornitoreRiconciliazione:
     @property
     def score_percentuale(self) -> int:
         return max(0, min(100, self.score))
+
+
+@dataclass
+class CandidatoScadenzeFornitoriCumulativa:
+    """Gruppo di scadenze fornitore candidate per un unico movimento."""
+
+    scadenze: list
+    allocazioni: list
+    score: int
+    motivazioni: list
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+    @property
+    def importo_totale(self) -> Decimal:
+        return sum((importo for _scadenza, importo in self.allocazioni), Decimal("0.00"))
+
+
+@dataclass
+class ReconciliationAllocation:
+    """Riga normalizzata movimento -> target -> importo."""
+
+    movimento: object
+    target: object
+    target_tipo: str
+    importo: Decimal
+
+
+@dataclass
+class ReconciliationProposal:
+    """Formato unico per ogni proposta di riconciliazione."""
+
+    kind: str
+    direction: str
+    score: int
+    motivazioni: list
+    allocazioni: list
+    source: object = None
+    tipo: str = "singola"
+    key: str = ""
+
+    @property
+    def score_percentuale(self) -> int:
+        return max(0, min(100, self.score))
+
+    @property
+    def importo_totale(self) -> Decimal:
+        return sum((allocazione.importo for allocazione in self.allocazioni), Decimal("0.00"))
+
+    @property
+    def movimenti(self) -> list:
+        movimenti = []
+        visti = set()
+        for allocazione in self.allocazioni:
+            movimento = allocazione.movimento
+            chiave = getattr(movimento, "pk", None) or id(movimento)
+            if chiave in visti:
+                continue
+            visti.add(chiave)
+            movimenti.append(movimento)
+        return movimenti
+
+    @property
+    def targets(self) -> list:
+        targets = []
+        visti = set()
+        for allocazione in self.allocazioni:
+            target = allocazione.target
+            chiave = (allocazione.target_tipo, getattr(target, "pk", None) or id(target))
+            if chiave in visti:
+                continue
+            visti.add(chiave)
+            targets.append(target)
+        return targets
+
+
+@dataclass
+class ReconciliationApplicationResult:
+    """Esito normalizzato dell'applicazione di una proposta."""
+
+    proposta: ReconciliationProposal
+    movimenti: list
+    targets: list
+    pagamenti: list
+
+    @property
+    def importo_totale(self) -> Decimal:
+        return self.proposta.importo_totale
 
 
 _TOLLERANZA_IMPORTO_ESATTO = Decimal("0.01")
@@ -1297,11 +1409,19 @@ def _importo_movimento_riconciliato(movimento):
     return movimento.riconciliazioni_rate.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
 
 
+def _importo_movimento_riconciliato_totale(movimento):
+    return (
+        _importo_movimento_riconciliato(movimento)
+        + _importo_movimento_fornitori_riconciliato(movimento)
+        + _importo_movimento_buste_paga_riconciliato(movimento)
+    )
+
+
 def importo_movimento_disponibile(movimento):
     cached = getattr(movimento, "_arboris_importo_disponibile_cache", None)
     if cached is not None:
         return cached
-    return max(_importo_movimento_assoluto(movimento) - _importo_movimento_riconciliato(movimento), Decimal("0.00"))
+    return max(_importo_movimento_assoluto(movimento) - _importo_movimento_riconciliato_totale(movimento), Decimal("0.00"))
 
 
 def importo_rata_residuo(rata):
@@ -1635,6 +1755,90 @@ def _trova_sottoinsieme_rate_per_importo(rate, importo_target, movimento):
     return [item["rata"] for item in migliore]
 
 
+def _movimento_candidate_cumulative_item(candidato):
+    movimento = getattr(candidato, "movimento", None)
+    disponibile = getattr(candidato, "importo_disponibile", Decimal("0.00")) or Decimal("0.00")
+    disponibile_cents = _decimal_to_cents(disponibile)
+    if movimento is None or disponibile_cents <= 0:
+        return None
+    return {
+        "candidato": candidato,
+        "movimento": movimento,
+        "disponibile": disponibile,
+        "disponibile_cents": disponibile_cents,
+        "score": getattr(candidato, "score", 0) or 0,
+        "data": getattr(movimento, "data_contabile", None),
+        "pk": getattr(movimento, "pk", None) or 0,
+    }
+
+
+def _qualita_sottoinsieme_movimenti_items(items):
+    scores = [item["score"] for item in items]
+    score_minimo = min(scores) if scores else 0
+    score_medio = sum(scores) / len(scores) if scores else 0
+    date_movimenti = [item["data"] for item in items if item["data"]]
+    ampiezza_date = (max(date_movimenti) - min(date_movimenti)).days if len(date_movimenti) >= 2 else 0
+    return (
+        score_minimo,
+        score_medio,
+        -ampiezza_date,
+        -len(items),
+    )
+
+
+def _trova_sottoinsieme_movimenti_per_importo(candidati, importo_target):
+    target_cents = _decimal_to_cents(importo_target)
+    tolleranza_cents = _decimal_to_cents(_TOLLERANZA_IMPORTO_ESATTO)
+    if target_cents <= 0:
+        return []
+
+    items = []
+    for candidato in candidati or []:
+        item = _movimento_candidate_cumulative_item(candidato)
+        if item is None or item["disponibile_cents"] > target_cents + tolleranza_cents:
+            continue
+        items.append(item)
+
+    if len(items) < 2:
+        return []
+
+    items.sort(key=lambda item: (-item["score"], item["data"] or date.min, item["pk"]))
+    items = items[:12]
+    max_size = min(6, len(items))
+    max_checks = 4000
+    checks = 0
+    migliore = []
+    migliore_qualita = None
+
+    def visita(start, selezionati, somma_cents):
+        nonlocal checks, migliore, migliore_qualita
+        if checks >= max_checks:
+            return
+        if len(selezionati) >= 2 and abs(somma_cents - target_cents) <= tolleranza_cents:
+            qualita = _qualita_sottoinsieme_movimenti_items(selezionati)
+            if migliore_qualita is None or qualita > migliore_qualita:
+                migliore = list(selezionati)
+                migliore_qualita = qualita
+            return
+        if len(selezionati) >= max_size or somma_cents >= target_cents - tolleranza_cents:
+            return
+
+        for index in range(start, len(items)):
+            item = items[index]
+            nuova_somma = somma_cents + item["disponibile_cents"]
+            if nuova_somma > target_cents + tolleranza_cents:
+                continue
+            checks += 1
+            selezionati.append(item)
+            visita(index + 1, selezionati, nuova_somma)
+            selezionati.pop()
+            if checks >= max_checks:
+                return
+
+    visita(0, [], 0)
+    return [item["candidato"] for item in migliore]
+
+
 def _studenti_unici_da_rate(rate):
     studenti = []
     visti = set()
@@ -1703,8 +1907,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
                 "iscrizione__studente__relazioni_familiari__relazione_familiare",
             )
             .filter(
-                importo_finale__gte=importo_cerca - _TOLLERANZA_IMPORTO_APPROX,
-                importo_finale__lte=importo_cerca + _TOLLERANZA_IMPORTO_APPROX,
+                importo_finale__gte=max(importo_cerca - _TOLLERANZA_IMPORTO_APPROX, Decimal("0.00")),
             )
             .order_by("-anno_riferimento", "-mese_riferimento")
         )
@@ -1737,14 +1940,17 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         score = 0
         motivazioni = []
 
-        importo_rata_cerca = importo_rata_residuo(rata) if rate_pool is not None else rata.importo_finale
+        importo_rata_cerca = importo_rata_residuo(rata)
         diff_importo = (importo_rata_cerca - importo_cerca).copy_abs()
         if diff_importo <= _TOLLERANZA_IMPORTO_ESATTO:
             score += 50
-            motivazioni.append("Importo identico")
+            motivazioni.append("Importo identico al residuo rata")
         elif diff_importo <= _TOLLERANZA_IMPORTO_APPROX:
             score += 30
-            motivazioni.append(f"Importo simile (differenza {diff_importo} EUR)")
+            motivazioni.append(f"Importo simile al residuo rata (differenza {diff_importo} EUR)")
+        elif importo_cerca < importo_rata_cerca:
+            score += 18
+            motivazioni.append("Movimento utilizzabile come pagamento parziale della rata")
         else:
             continue
 
@@ -2005,6 +2211,45 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
     return candidati[:limite]
 
 
+def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 5):
+    if rata_principale is None:
+        return []
+
+    residuo_principale = importo_rata_residuo(rata_principale)
+    if residuo_principale <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+
+    candidati_singoli = trova_movimenti_candidati_per_rate(
+        rata_principale,
+        rate_aperte,
+        limite=30,
+    )
+    sottoinsieme = _trova_sottoinsieme_movimenti_per_importo(candidati_singoli, residuo_principale)
+    if len(sottoinsieme) < 2:
+        return []
+
+    movimenti = [candidato.movimento for candidato in sottoinsieme]
+    allocazioni = [
+        (candidato.movimento, candidato.importo_disponibile)
+        for candidato in sottoinsieme
+    ]
+    score = min(100, int(sum(candidato.score for candidato in sottoinsieme) / len(sottoinsieme)) + 18)
+    motivazioni = ["Somma di piu movimenti identica al residuo della rata selezionata"]
+    motivazioni.extend(
+        motivo
+        for candidato in sottoinsieme[:2]
+        for motivo in candidato.motivazioni[:1]
+    )
+    return [
+        CandidatoMovimentiRiconciliazioneCumulativa(
+            movimenti=movimenti,
+            allocazioni=allocazioni,
+            score=score,
+            motivazioni=motivazioni,
+        )
+    ][:limite]
+
+
 def riconcilia_movimento_automaticamente(
     movimento,
     *,
@@ -2130,9 +2375,10 @@ def riconcilia_movimento_con_rata(
     from .models import StatoRiconciliazione
 
     if marca_rata_pagata:
+        importo = min(importo_movimento_disponibile(movimento), importo_rata_residuo(rata))
         riconcilia_movimento_con_rate(
             movimento,
-            [(rata, _importo_movimento_assoluto(movimento))],
+            [(rata, importo)],
             utente=utente,
         )
         return movimento
@@ -2247,12 +2493,7 @@ def _importo_movimento_buste_paga_riconciliato(movimento):
 
 
 def importo_movimento_disponibile_fornitori(movimento):
-    return max(
-        _importo_movimento_assoluto(movimento)
-        - _importo_movimento_fornitori_riconciliato(movimento)
-        - _importo_movimento_buste_paga_riconciliato(movimento),
-        Decimal("0.00"),
-    )
+    return importo_movimento_disponibile(movimento)
 
 
 def aggiorna_stato_riconciliazione_movimento(movimento):
@@ -2539,6 +2780,192 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
     return candidati[:limite]
 
 
+def _giorni_distanza_scadenza_movimento(scadenza, movimento) -> int:
+    if not getattr(movimento, "data_contabile", None) or not getattr(scadenza, "data_scadenza", None):
+        return 9999
+    return abs((movimento.data_contabile - scadenza.data_scadenza).days)
+
+
+def _scadenza_fornitore_cumulative_item(scadenza, movimento):
+    residuo = importo_scadenza_fornitore_residuo(scadenza)
+    residuo_cents = _decimal_to_cents(residuo)
+    if residuo_cents <= 0:
+        return None
+    return {
+        "scadenza": scadenza,
+        "residuo_cents": residuo_cents,
+        "distanza": _giorni_distanza_scadenza_movimento(scadenza, movimento),
+        "data_scadenza": getattr(scadenza, "data_scadenza", None),
+        "pk": getattr(scadenza, "pk", None) or 0,
+    }
+
+
+def _qualita_sottoinsieme_scadenze_items(items):
+    distanze = [item["distanza"] for item in items]
+    max_distanza = max(distanze) if distanze else 9999
+    totale_distanza = sum(distanze)
+    return (
+        -max_distanza,
+        -totale_distanza,
+        -len(items),
+    )
+
+
+def _qualita_sottoinsieme_scadenze(scadenze, movimento):
+    items = [_scadenza_fornitore_cumulative_item(scadenza, movimento) for scadenza in scadenze]
+    items = [item for item in items if item is not None]
+    return _qualita_sottoinsieme_scadenze_items(items)
+
+
+def _trova_sottoinsieme_scadenze_fornitori_per_importo(scadenze, importo_target, movimento):
+    target_cents = _decimal_to_cents(importo_target)
+    tolleranza_cents = _decimal_to_cents(_TOLLERANZA_IMPORTO_ESATTO)
+    if target_cents <= 0:
+        return []
+
+    items = []
+    for scadenza in scadenze:
+        item = _scadenza_fornitore_cumulative_item(scadenza, movimento)
+        if item is None or item["residuo_cents"] > target_cents + tolleranza_cents:
+            continue
+        items.append(item)
+
+    if len(items) < 2:
+        return []
+
+    items.sort(key=lambda item: (item["distanza"], item["data_scadenza"] or date.max, item["pk"]))
+    items = items[:12]
+    max_size = min(6, len(items))
+    max_checks = 4000
+    checks = 0
+    migliore = []
+    migliore_qualita = None
+
+    def visita(start, selezionati, somma_cents):
+        nonlocal checks, migliore, migliore_qualita
+        if checks >= max_checks:
+            return
+        if len(selezionati) >= 2 and abs(somma_cents - target_cents) <= tolleranza_cents:
+            qualita = _qualita_sottoinsieme_scadenze_items(selezionati)
+            if migliore_qualita is None or qualita > migliore_qualita:
+                migliore = list(selezionati)
+                migliore_qualita = qualita
+            return
+        if len(selezionati) >= max_size or somma_cents >= target_cents - tolleranza_cents:
+            return
+
+        for index in range(start, len(items)):
+            item = items[index]
+            nuova_somma = somma_cents + item["residuo_cents"]
+            if nuova_somma > target_cents + tolleranza_cents:
+                continue
+            checks += 1
+            selezionati.append(item)
+            visita(index + 1, selezionati, nuova_somma)
+            selezionati.pop()
+            if checks >= max_checks:
+                return
+
+    visita(0, [], 0)
+    return [item["scadenza"] for item in migliore]
+
+
+def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5):
+    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+
+    if movimento is None or movimento.importo is None or movimento.importo >= 0:
+        return []
+
+    disponibile = importo_movimento_disponibile_fornitori(movimento)
+    if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+
+    testo_movimento = _normalizza_testo_match(
+        f"{movimento.descrizione or ''} {movimento.controparte or ''} {movimento.iban_controparte or ''}"
+    )
+    scadenze = (
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__fornitore",
+            "documento__categoria_spesa",
+        )
+        .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .order_by("documento__fornitore_id", "data_scadenza", "id")[:600]
+    )
+
+    gruppi = {}
+    for scadenza in scadenze:
+        residuo = importo_scadenza_fornitore_residuo(scadenza)
+        if residuo <= _TOLLERANZA_IMPORTO_ESATTO or residuo > disponibile + _TOLLERANZA_IMPORTO_ESATTO:
+            continue
+        fornitore = scadenza.documento.fornitore
+        chiave = getattr(fornitore, "pk", None) or id(fornitore)
+        gruppi.setdefault(chiave, {"fornitore": fornitore, "scadenze": []})["scadenze"].append(scadenza)
+
+    candidati = []
+    for gruppo in gruppi.values():
+        scadenze_gruppo = gruppo["scadenze"]
+        if len(scadenze_gruppo) < 2:
+            continue
+
+        fornitore = gruppo["fornitore"]
+        supplier_score, supplier_motivazioni = _supplier_match_score(fornitore, testo_movimento)
+        iban_fornitore = _normalizza_testo_match(getattr(fornitore, "iban", "") or "")
+        iban_movimento = _normalizza_testo_match(getattr(movimento, "iban_controparte", "") or "")
+        iban_match = bool(iban_fornitore and iban_movimento and iban_fornitore == iban_movimento)
+        if supplier_score <= 0 and not iban_match:
+            continue
+
+        sottoinsieme = _trova_sottoinsieme_scadenze_fornitori_per_importo(
+            scadenze_gruppo,
+            disponibile,
+            movimento,
+        )
+        if len(sottoinsieme) < 2:
+            continue
+
+        score = supplier_score + 50 + 10
+        motivazioni = list(supplier_motivazioni)
+        if iban_match:
+            score += 24
+            motivazioni.append("IBAN fornitore corrispondente")
+        motivazioni.append("Importo identico alla somma di piu scadenze aperte")
+        motivazioni.append("Pagamento cumulativo sullo stesso fornitore")
+
+        distanze = [
+            _giorni_distanza_scadenza_movimento(scadenza, movimento)
+            for scadenza in sottoinsieme
+            if getattr(scadenza, "data_scadenza", None)
+        ]
+        if distanze:
+            max_distanza = max(distanze)
+            if max_distanza <= _TOLLERANZA_GIORNI_VICINI:
+                score += 22
+                motivazioni.append(f"Scadenze vicine al movimento (+/- {max_distanza} gg)")
+            elif max_distanza <= _TOLLERANZA_GIORNI_ESTESA:
+                score += 8
+                motivazioni.append(f"Scadenze entro 30 giorni dal movimento ({max_distanza} gg)")
+
+        allocazioni = [(scadenza, importo_scadenza_fornitore_residuo(scadenza)) for scadenza in sottoinsieme]
+        candidati.append(
+            CandidatoScadenzeFornitoriCumulativa(
+                scadenze=sottoinsieme,
+                allocazioni=allocazioni,
+                score=score,
+                motivazioni=motivazioni,
+            )
+        )
+
+    candidati.sort(
+        key=lambda candidato: (
+            candidato.score,
+            _qualita_sottoinsieme_scadenze(candidato.scadenze, movimento),
+        ),
+        reverse=True,
+    )
+    return candidati[:limite]
+
+
 def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8):
     from .models import MovimentoFinanziario, StatoRiconciliazione
 
@@ -2616,6 +3043,364 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
     return candidati[:limite]
 
 
+def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 5):
+    if scadenza is None:
+        return []
+
+    residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
+    if residuo_scadenza <= _TOLLERANZA_IMPORTO_ESATTO:
+        return []
+
+    candidati_singoli = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=30)
+    sottoinsieme = _trova_sottoinsieme_movimenti_per_importo(candidati_singoli, residuo_scadenza)
+    if len(sottoinsieme) < 2:
+        return []
+
+    movimenti = [candidato.movimento for candidato in sottoinsieme]
+    allocazioni = [
+        (candidato.movimento, candidato.importo_disponibile)
+        for candidato in sottoinsieme
+    ]
+    score = min(100, int(sum(candidato.score for candidato in sottoinsieme) / len(sottoinsieme)) + 18)
+    motivazioni = ["Somma di piu movimenti identica al residuo della scadenza"]
+    motivazioni.extend(
+        motivo
+        for candidato in sottoinsieme[:2]
+        for motivo in candidato.motivazioni[:1]
+    )
+    return [
+        CandidatoMovimentiRiconciliazioneCumulativa(
+            movimenti=movimenti,
+            allocazioni=allocazioni,
+            score=score,
+            motivazioni=motivazioni,
+        )
+    ][:limite]
+
+
+def _build_reconciliation_key(direction, kind, tipo, allocazioni):
+    parti = []
+    for allocazione in allocazioni:
+        movimento_id = getattr(allocazione.movimento, "pk", None) or "new"
+        target_id = getattr(allocazione.target, "pk", None) or "new"
+        parti.append(f"{movimento_id}:{allocazione.target_tipo}:{target_id}:{allocazione.importo}")
+    return "|".join([direction, kind, tipo, *parti])
+
+
+def crea_proposta_riconciliazione(
+    *,
+    kind,
+    direction,
+    tipo="manuale",
+    allocazioni=None,
+    score=0,
+    motivazioni=None,
+    source=None,
+):
+    righe = []
+    for allocazione in allocazioni or []:
+        if isinstance(allocazione, ReconciliationAllocation):
+            riga = allocazione
+            riga.importo = Decimal(riga.importo or Decimal("0.00"))
+        else:
+            movimento, target, target_tipo, importo = allocazione
+            riga = ReconciliationAllocation(
+                movimento=movimento,
+                target=target,
+                target_tipo=target_tipo,
+                importo=Decimal(importo or Decimal("0.00")),
+            )
+        righe.append(riga)
+
+    return ReconciliationProposal(
+        kind=kind,
+        direction=direction,
+        tipo=tipo,
+        score=score,
+        motivazioni=motivazioni or [],
+        allocazioni=righe,
+        source=source,
+        key=_build_reconciliation_key(direction, kind, tipo, righe),
+    )
+
+
+def _proposal_for_rate_candidate(movimento, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=movimento,
+            target=candidato.rata,
+            target_tipo="rata",
+            importo=min(importo_movimento_disponibile(movimento), importo_rata_residuo(candidato.rata)),
+        )
+    ]
+    return ReconciliationProposal(
+        kind="rate",
+        direction="movimento_to_targets",
+        tipo="singola",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("movimento_to_targets", "rate", "singola", allocazioni),
+    )
+
+
+def _proposal_for_rate_cumulative_candidate(movimento, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=movimento,
+            target=rata,
+            target_tipo="rata",
+            importo=importo,
+        )
+        for rata, importo in candidato.allocazioni
+    ]
+    return ReconciliationProposal(
+        kind="rate",
+        direction="movimento_to_targets",
+        tipo="cumulativa",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("movimento_to_targets", "rate", "cumulativa", allocazioni),
+    )
+
+
+def _proposal_for_scadenza_candidate(movimento, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=movimento,
+            target=candidato.scadenza,
+            target_tipo="scadenza_fornitore",
+            importo=min(importo_movimento_disponibile_fornitori(movimento), candidato.importo_residuo),
+        )
+    ]
+    return ReconciliationProposal(
+        kind="fornitore",
+        direction="movimento_to_targets",
+        tipo="singola",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("movimento_to_targets", "fornitore", "singola", allocazioni),
+    )
+
+
+def _proposal_for_scadenze_cumulative_candidate(movimento, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=movimento,
+            target=scadenza,
+            target_tipo="scadenza_fornitore",
+            importo=importo,
+        )
+        for scadenza, importo in candidato.allocazioni
+    ]
+    return ReconciliationProposal(
+        kind="fornitore",
+        direction="movimento_to_targets",
+        tipo="cumulativa",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("movimento_to_targets", "fornitore", "cumulativa", allocazioni),
+    )
+
+
+def _proposal_for_movimento_candidate(target, target_tipo, kind, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=candidato.movimento,
+            target=target,
+            target_tipo=target_tipo,
+            importo=min(candidato.importo_disponibile, _target_residuo_for_proposal(target, target_tipo)),
+        )
+    ]
+    return ReconciliationProposal(
+        kind=kind,
+        direction="target_to_movimenti",
+        tipo="singola",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("target_to_movimenti", kind, "singola", allocazioni),
+    )
+
+
+def _proposal_for_movimenti_cumulative_candidate(target, target_tipo, kind, candidato):
+    allocazioni = [
+        ReconciliationAllocation(
+            movimento=movimento,
+            target=target,
+            target_tipo=target_tipo,
+            importo=importo,
+        )
+        for movimento, importo in candidato.allocazioni
+    ]
+    return ReconciliationProposal(
+        kind=kind,
+        direction="target_to_movimenti",
+        tipo="cumulativa",
+        score=candidato.score,
+        motivazioni=candidato.motivazioni,
+        allocazioni=allocazioni,
+        source=candidato,
+        key=_build_reconciliation_key("target_to_movimenti", kind, "cumulativa", allocazioni),
+    )
+
+
+def _target_residuo_for_proposal(target, target_tipo):
+    if target_tipo == "rata":
+        return importo_rata_residuo(target)
+    if target_tipo == "scadenza_fornitore":
+        return importo_scadenza_fornitore_residuo(target)
+    return Decimal("0.00")
+
+
+def proposte_riconciliazione_da_movimento(movimento, *, limite_singole=12, limite_cumulative=5):
+    if movimento is None or movimento.importo is None:
+        return []
+
+    proposte = []
+    if movimento.importo < 0:
+        proposte.extend(
+            _proposal_for_scadenza_candidate(movimento, candidato)
+            for candidato in trova_scadenze_fornitori_candidate(movimento, limite=limite_singole)
+        )
+        proposte.extend(
+            _proposal_for_scadenze_cumulative_candidate(movimento, candidato)
+            for candidato in trova_scadenze_fornitori_cumulative_candidate(movimento, limite=limite_cumulative)
+        )
+    else:
+        proposte.extend(
+            _proposal_for_rate_candidate(movimento, candidato)
+            for candidato in trova_rate_candidate(movimento, limite=limite_singole)
+        )
+        proposte.extend(
+            _proposal_for_rate_cumulative_candidate(movimento, candidato)
+            for candidato in trova_rate_cumulative_candidate(movimento, limite=limite_cumulative)
+        )
+    proposte.sort(key=lambda proposta: (proposta.score, proposta.importo_totale), reverse=True)
+    return proposte
+
+
+def proposte_riconciliazione_da_rata(rata, rate_aperte, *, limite_singole=12, limite_cumulative=5):
+    proposte = [
+        _proposal_for_movimento_candidate(rata, "rata", "rate", candidato)
+        for candidato in trova_movimenti_candidati_per_rate(rata, rate_aperte, limite=limite_singole)
+    ]
+    proposte.extend(
+        _proposal_for_movimenti_cumulative_candidate(rata, "rata", "rate", candidato)
+        for candidato in trova_movimenti_cumulativi_candidati_per_rate(rata, rate_aperte, limite=limite_cumulative)
+    )
+    proposte.sort(key=lambda proposta: (proposta.score, proposta.importo_totale), reverse=True)
+    return proposte
+
+
+def proposte_riconciliazione_da_scadenza_fornitore(scadenza, *, limite_singole=8, limite_cumulative=5):
+    proposte = [
+        _proposal_for_movimento_candidate(scadenza, "scadenza_fornitore", "fornitore", candidato)
+        for candidato in trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=limite_singole)
+    ]
+    proposte.extend(
+        _proposal_for_movimenti_cumulative_candidate(scadenza, "scadenza_fornitore", "fornitore", candidato)
+        for candidato in trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, limite=limite_cumulative)
+    )
+    proposte.sort(key=lambda proposta: (proposta.score, proposta.importo_totale), reverse=True)
+    return proposte
+
+
+def _group_proposal_allocazioni_per_movimento(proposta, target_tipo):
+    gruppi = []
+    gruppi_index = {}
+
+    for allocazione in proposta.allocazioni or []:
+        if allocazione.target_tipo != target_tipo:
+            raise ValidationError("La proposta contiene allocazioni non compatibili con il tipo di riconciliazione.")
+        if allocazione.movimento is None or allocazione.target is None:
+            raise ValidationError("La proposta di riconciliazione e incompleta.")
+
+        importo = Decimal(allocazione.importo or Decimal("0.00"))
+        if importo <= Decimal("0.00"):
+            continue
+
+        movimento_key = getattr(allocazione.movimento, "pk", None) or id(allocazione.movimento)
+        if movimento_key not in gruppi_index:
+            gruppi_index[movimento_key] = len(gruppi)
+            gruppi.append(
+                {
+                    "movimento": allocazione.movimento,
+                    "allocazioni": [],
+                    "target_index": {},
+                }
+            )
+
+        gruppo = gruppi[gruppi_index[movimento_key]]
+        target_key = getattr(allocazione.target, "pk", None) or id(allocazione.target)
+        if target_key not in gruppo["target_index"]:
+            gruppo["target_index"][target_key] = len(gruppo["allocazioni"])
+            gruppo["allocazioni"].append({"target": allocazione.target, "importo": Decimal("0.00")})
+
+        gruppo["allocazioni"][gruppo["target_index"][target_key]]["importo"] += importo
+
+    risultati = []
+    for gruppo in gruppi:
+        allocazioni = [
+            (item["target"], item["importo"])
+            for item in gruppo["allocazioni"]
+            if item["importo"] > Decimal("0.00")
+        ]
+        if allocazioni:
+            risultati.append((gruppo["movimento"], allocazioni))
+    if not risultati:
+        raise ValidationError("Seleziona almeno un importo da riconciliare.")
+    return risultati
+
+
+@transaction.atomic
+def applica_proposta_riconciliazione(proposta, *, utente=None, note=""):
+    if not isinstance(proposta, ReconciliationProposal):
+        raise ValidationError("Proposta di riconciliazione non valida.")
+
+    if proposta.kind == "rate":
+        movimenti = []
+        for movimento, allocazioni in _group_proposal_allocazioni_per_movimento(proposta, "rata"):
+            riconcilia_movimento_con_rate(movimento, allocazioni, utente=utente)
+            movimenti.append(movimento)
+        return ReconciliationApplicationResult(
+            proposta=proposta,
+            movimenti=movimenti,
+            targets=proposta.targets,
+            pagamenti=[],
+        )
+
+    if proposta.kind == "fornitore":
+        movimenti = []
+        pagamenti = []
+        for movimento, allocazioni in _group_proposal_allocazioni_per_movimento(proposta, "scadenza_fornitore"):
+            pagamenti.extend(
+                riconcilia_movimento_con_scadenze_fornitore(
+                    movimento,
+                    allocazioni,
+                    utente=utente,
+                    note=note,
+                )
+            )
+            movimenti.append(movimento)
+        return ReconciliationApplicationResult(
+            proposta=proposta,
+            movimenti=movimenti,
+            targets=proposta.targets,
+            pagamenti=pagamenti,
+        )
+
+    raise ValidationError("Tipo di proposta di riconciliazione non supportato.")
+
+
 @transaction.atomic
 def riconcilia_movimento_con_scadenza_fornitore(
     movimento,
@@ -2663,6 +3448,51 @@ def riconcilia_movimento_con_scadenza_fornitore(
     return pagamento
 
 
+@transaction.atomic
+def riconcilia_movimento_con_scadenze_fornitore(
+    movimento,
+    allocazioni,
+    *,
+    utente=None,
+    note="",
+):
+    if movimento.importo is None or movimento.importo >= 0:
+        raise ValidationError("La riconciliazione fornitori richiede un movimento in uscita.")
+
+    allocazioni = [
+        (scadenza, Decimal(importo))
+        for scadenza, importo in (allocazioni or [])
+        if scadenza is not None and importo and Decimal(importo) > 0
+    ]
+    if not allocazioni:
+        raise ValidationError("Seleziona almeno una scadenza e indica l'importo da riconciliare.")
+
+    disponibile = importo_movimento_disponibile_fornitori(movimento)
+    totale_allocato = sum((importo for _scadenza, importo in allocazioni), Decimal("0.00"))
+    if totale_allocato > disponibile + _TOLLERANZA_IMPORTO_ESATTO:
+        raise ValidationError("L'importo assegnato supera il residuo disponibile del movimento bancario.")
+
+    for scadenza, importo in allocazioni:
+        residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
+        if importo > residuo_scadenza + _TOLLERANZA_IMPORTO_ESATTO:
+            raise ValidationError("L'importo assegnato supera il residuo di una scadenza fornitore.")
+
+    pagamenti = []
+    for scadenza, importo in allocazioni:
+        pagamenti.append(
+            riconcilia_movimento_con_scadenza_fornitore(
+                movimento,
+                scadenza,
+                importo=importo,
+                utente=utente,
+                note=note,
+            )
+        )
+
+    aggiorna_stato_riconciliazione_movimento(movimento)
+    return pagamenti
+
+
 def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo: int = 85, limite_movimenti: int = 100):
     anteprima = anteprima_riconcilia_fornitori_automaticamente(
         punteggio_minimo=punteggio_minimo,
@@ -2693,25 +3523,44 @@ def anteprima_riconcilia_fornitori_automaticamente(*, punteggio_minimo: int = 85
         if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
             stats["gia_coperti"] += 1
             continue
-        candidati = trova_scadenze_fornitori_candidate(movimento, limite=3)
-        if not candidati:
+        candidati_singoli = trova_scadenze_fornitori_candidate(movimento, limite=3)
+        candidati_cumulativi = trova_scadenze_fornitori_cumulative_candidate(movimento, limite=3)
+        opzioni = [("singola", candidato.score, candidato) for candidato in candidati_singoli]
+        opzioni.extend(("cumulativa", candidato.score, candidato) for candidato in candidati_cumulativi)
+        if not opzioni:
             stats["senza_candidati"] += 1
             continue
-        top_score = candidati[0].score
-        migliori = [candidato for candidato in candidati if candidato.score == top_score]
+        top_score = max(score for _tipo, score, _candidato in opzioni)
+        migliori = [(tipo, candidato) for tipo, score, candidato in opzioni if score == top_score]
         if top_score < punteggio_minimo:
             stats["score_basso"] += 1
             continue
         if len(migliori) != 1:
             stats["ambigui"] += 1
             continue
-        candidato = migliori[0]
-        scadenza = candidato.scadenza
-        importo = min(disponibile, candidato.importo_residuo)
+        tipo, candidato = migliori[0]
+        if tipo == "cumulativa":
+            allocazioni = candidato.allocazioni
+            scadenze = [scadenza for scadenza, _importo in allocazioni]
+            scadenza = scadenze[0]
+            importo = candidato.importo_totale
+            documento_label = "; ".join(
+                scadenza.documento.numero_documento or str(scadenza.documento)
+                for scadenza in scadenze
+            )
+            scadenza_data = ""
+            stats["proposti_cumulativi"] += 1
+        else:
+            scadenza = candidato.scadenza
+            importo = min(disponibile, candidato.importo_residuo)
+            allocazioni = [(scadenza, importo)]
+            documento_label = scadenza.documento.numero_documento or str(scadenza.documento)
+            scadenza_data = scadenza.data_scadenza.isoformat() if scadenza.data_scadenza else ""
         stats["proposti"] += 1
         dettagli.append(
             {
-                "key": f"{movimento.pk}:{scadenza.pk}",
+                "key": f"{movimento.pk}:{'-'.join(str(scadenza.pk) for scadenza, _importo in allocazioni)}",
+                "tipo": tipo,
                 "movimento_id": movimento.pk,
                 "movimento_data": movimento.data_contabile.isoformat() if movimento.data_contabile else "",
                 "movimento_descrizione": movimento.descrizione or "",
@@ -2719,12 +3568,22 @@ def anteprima_riconcilia_fornitori_automaticamente(*, punteggio_minimo: int = 85
                 "movimento_conto": str(movimento.conto) if movimento.conto_id else "",
                 "movimento_importo": str(abs(movimento.importo or Decimal("0.00"))),
                 "scadenza_id": scadenza.pk,
-                "scadenza_data": scadenza.data_scadenza.isoformat() if scadenza.data_scadenza else "",
+                "scadenza_data": scadenza_data,
                 "fornitore": str(scadenza.documento.fornitore),
-                "documento": scadenza.documento.numero_documento or str(scadenza.documento),
+                "documento": documento_label,
                 "importo": str(importo),
                 "score": candidato.score,
                 "motivazioni": candidato.motivazioni,
+                "allocazioni": [
+                    {
+                        "scadenza_id": scadenza_allocata.pk,
+                        "fornitore": str(scadenza_allocata.documento.fornitore),
+                        "documento": scadenza_allocata.documento.numero_documento or str(scadenza_allocata.documento),
+                        "scadenza_data": scadenza_allocata.data_scadenza.isoformat() if scadenza_allocata.data_scadenza else "",
+                        "importo": str(importo_allocato),
+                    }
+                    for scadenza_allocata, importo_allocato in allocazioni
+                ],
             }
         )
     return {
@@ -2747,22 +3606,41 @@ def applica_anteprima_riconciliazione_fornitori(dettagli, selected_keys, *, uten
         stats["selezionati"] += 1
         try:
             movimento = MovimentoFinanziario.objects.get(pk=item["movimento_id"])
-            scadenza = ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore").get(
-                pk=item["scadenza_id"]
-            )
-            pagamento = riconcilia_movimento_con_scadenza_fornitore(
-                movimento,
-                scadenza,
-                importo=Decimal(str(item["importo"])),
-                utente=utente,
-                note="Riconciliazione automatica confermata",
-            )
+            allocazioni_serializzate = item.get("allocazioni") or []
+            if allocazioni_serializzate:
+                allocazioni = []
+                for allocazione in allocazioni_serializzate:
+                    scadenza = ScadenzaPagamentoFornitore.objects.select_related(
+                        "documento",
+                        "documento__fornitore",
+                    ).get(pk=allocazione["scadenza_id"])
+                    allocazioni.append((scadenza, Decimal(str(allocazione["importo"]))))
+                pagamenti_creati = riconcilia_movimento_con_scadenze_fornitore(
+                    movimento,
+                    allocazioni,
+                    utente=utente,
+                    note="Riconciliazione automatica confermata",
+                )
+                pagamenti.extend(pagamenti_creati)
+            else:
+                scadenza = ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore").get(
+                    pk=item["scadenza_id"]
+                )
+                pagamento = riconcilia_movimento_con_scadenza_fornitore(
+                    movimento,
+                    scadenza,
+                    importo=Decimal(str(item["importo"])),
+                    utente=utente,
+                    note="Riconciliazione automatica confermata",
+                )
+                pagamenti.append(pagamento)
         except (MovimentoFinanziario.DoesNotExist, ScadenzaPagamentoFornitore.DoesNotExist, InvalidOperation, ValidationError) as exc:
             stats["errori"] += 1
             errori.append(f"{item.get('movimento_descrizione') or item.get('movimento_id')}: {exc}")
             continue
         stats["riconciliati"] += 1
-        pagamenti.append(pagamento)
+        if item.get("tipo") == "cumulativa":
+            stats["riconciliati_cumulativi"] += 1
 
     return {
         "stats": dict(stats),

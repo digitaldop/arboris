@@ -46,10 +46,10 @@ from scuola.utils import resolve_default_anno_scolastico
 from arboris.form_widgets import italian_decimal_to_python
 from gestione_finanziaria.models import MovimentoFinanziario
 from gestione_finanziaria.services import (
-    importo_movimento_disponibile,
+    applica_proposta_riconciliazione,
+    crea_proposta_riconciliazione,
     importo_rata_residuo,
-    riconcilia_movimento_con_rate,
-    trova_movimenti_candidati_per_rate,
+    proposte_riconciliazione_da_rata,
 )
 
 
@@ -1127,30 +1127,84 @@ def riconcilia_rata_iscrizione(request, pk):
     rate_aperte.sort(key=lambda item: (0 if item.pk == rata.pk else 1, item.iscrizione.studente.cognome, item.iscrizione.studente.nome, item.anno_riferimento, item.mese_riferimento, item.numero_rata))
 
     if request.method == "POST":
-        movimento_pk = request.POST.get("movimento_pk") or ""
-        if not movimento_pk.isdigit():
-            messages.error(request, "Seleziona un movimento bancario da riconciliare.")
-        else:
-            movimento = get_object_or_404(MovimentoFinanziario.objects.select_related("conto"), pk=int(movimento_pk), importo__gt=0)
-            allocazioni = []
-            try:
-                for rata_aperta in rate_aperte:
-                    importo = _parse_importo_riconciliazione(request.POST.get(f"importo_rata_{rata_aperta.pk}", ""))
-                    if importo > 0:
-                        allocazioni.append((rata_aperta, importo))
-                riconcilia_movimento_con_rate(movimento, allocazioni, utente=request.user)
-            except ValidationError as exc:
-                for message in exc.messages:
-                    messages.error(request, message)
+        azione = request.POST.get("azione") or ""
+        if azione.startswith("collega_movimenti_cumulativa:"):
+            indice = azione.split(":", 1)[1]
+            movimento_ids = [
+                item
+                for item in request.POST.getlist(f"movimenti_cumulativi_{indice}_ids")
+                if item.isdigit()
+            ]
+            if not movimento_ids:
+                messages.error(request, "Seleziona una proposta cumulativa valida.")
             else:
-                messages.success(request, "Riconciliazione registrata correttamente.")
-                if popup:
-                    return render(
-                        request,
-                        "popup/popup_close.html",
-                        {"message": "Riconciliazione registrata correttamente."},
+                try:
+                    allocazioni = []
+                    movimenti = {
+                        movimento.pk: movimento
+                        for movimento in MovimentoFinanziario.objects.select_related("conto")
+                        .filter(pk__in=[int(item) for item in movimento_ids], importo__gt=0)
+                    }
+                    for movimento_id in movimento_ids:
+                        movimento = movimenti.get(int(movimento_id))
+                        if movimento is None:
+                            continue
+                        importo = _parse_importo_riconciliazione(
+                            request.POST.get(f"importo_movimento_{indice}_{movimento_id}", "")
+                        )
+                        if importo > 0:
+                            allocazioni.append((movimento, rata, "rata", importo))
+                    proposta = crea_proposta_riconciliazione(
+                        kind="rate",
+                        direction="target_to_movimenti",
+                        tipo="cumulativa",
+                        allocazioni=allocazioni,
                     )
-                return redirect("modifica_rata_iscrizione", pk=rata.pk)
+                    applica_proposta_riconciliazione(proposta, utente=request.user)
+                except ValidationError as exc:
+                    for message in exc.messages:
+                        messages.error(request, message)
+                else:
+                    messages.success(request, "Riconciliazione cumulativa registrata correttamente.")
+                    if popup:
+                        return render(
+                            request,
+                            "popup/popup_close.html",
+                            {"message": "Riconciliazione cumulativa registrata correttamente."},
+                        )
+                    return redirect("modifica_rata_iscrizione", pk=rata.pk)
+
+        else:
+            movimento_pk = request.POST.get("movimento_pk") or ""
+            if not movimento_pk.isdigit():
+                messages.error(request, "Seleziona un movimento bancario da riconciliare.")
+            else:
+                movimento = get_object_or_404(MovimentoFinanziario.objects.select_related("conto"), pk=int(movimento_pk), importo__gt=0)
+                allocazioni = []
+                try:
+                    for rata_aperta in rate_aperte:
+                        importo = _parse_importo_riconciliazione(request.POST.get(f"importo_rata_{rata_aperta.pk}", ""))
+                        if importo > 0:
+                            allocazioni.append((movimento, rata_aperta, "rata", importo))
+                    proposta = crea_proposta_riconciliazione(
+                        kind="rate",
+                        direction="movimento_to_targets",
+                        tipo="manuale",
+                        allocazioni=allocazioni,
+                    )
+                    applica_proposta_riconciliazione(proposta, utente=request.user)
+                except ValidationError as exc:
+                    for message in exc.messages:
+                        messages.error(request, message)
+                else:
+                    messages.success(request, "Riconciliazione registrata correttamente.")
+                    if popup:
+                        return render(
+                            request,
+                            "popup/popup_close.html",
+                            {"message": "Riconciliazione registrata correttamente."},
+                        )
+                    return redirect("modifica_rata_iscrizione", pk=rata.pk)
 
     rate_rows = [
         {
@@ -1163,9 +1217,17 @@ def riconcilia_rata_iscrizione(request, pk):
         for rata_aperta in rate_aperte
     ]
     altre_rate_count = sum(1 for row in rate_rows if not row["is_selected"])
-    candidati = trova_movimenti_candidati_per_rate(rata, rate_aperte)
-    for candidato in candidati:
-        candidato.movimento.importo_disponibile_riconciliazione = candidato.importo_disponibile
+    proposte_riconciliazione = proposte_riconciliazione_da_rata(rata, rate_aperte)
+    proposte_movimento = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.tipo == "singola"
+    ]
+    proposte_movimenti_cumulativi = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.tipo == "cumulativa"
+    ]
 
     return render(
         request,
@@ -1175,7 +1237,9 @@ def riconcilia_rata_iscrizione(request, pk):
             "rata_residuo": importo_rata_residuo(rata),
             "rate_rows": rate_rows,
             "altre_rate_count": altre_rate_count,
-            "candidati": candidati,
+            "proposte_riconciliazione": proposte_riconciliazione,
+            "proposte_movimento": proposte_movimento,
+            "proposte_movimenti_cumulativi": proposte_movimenti_cumulativi,
             "popup": popup,
             "success": request.GET.get("success") == "1",
         },

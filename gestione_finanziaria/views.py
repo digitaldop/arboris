@@ -91,7 +91,6 @@ from .models import (
     FonteSaldo,
     Fornitore,
     MovimentoFinanziario,
-    MetodoPagamentoFornitore,
     NotificaFinanziaria,
     NotificaFinanziariaLettura,
     PagamentoFornitore,
@@ -145,22 +144,24 @@ from .services import (
     annulla_pagamento_fornitore,
     anteprima_riconcilia_fornitori_automaticamente,
     applica_anteprima_riconciliazione_fornitori,
+    applica_proposta_riconciliazione,
     applica_regole_a_movimento,
     aggiorna_stato_documento_da_scadenze as service_aggiorna_stato_documento_da_scadenze,
     build_budgeting_dashboard_data,
     calcola_saldo_conto_alla_data,
     calcola_hash_deduplica_movimento,
+    crea_proposta_riconciliazione,
+    importo_movimento_disponibile,
     importo_movimento_disponibile_fornitori,
+    importo_rata_residuo,
     importo_scadenza_fornitore_residuo,
+    proposte_riconciliazione_da_movimento,
+    proposte_riconciliazione_da_scadenza_fornitore,
     ricalcola_saldo_corrente_conto,
     riconcilia_fornitori_automaticamente,
-    riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rata,
     registra_pagamento_fornitore,
     sincronizza_conto_psd2,
-    trova_movimenti_candidati_per_scadenza_fornitore,
-    trova_scadenze_fornitori_candidate,
-    trova_rate_candidate,
 )
 
 logger = logging.getLogger(__name__)
@@ -2082,55 +2083,167 @@ def registra_pagamento_scadenza_fornitore(request, pk):
         ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore", "conto_bancario"),
         pk=pk,
     )
-    candidati_movimento = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=5)
+    proposte_riconciliazione = proposte_riconciliazione_da_scadenza_fornitore(
+        scadenza,
+        limite_singole=5,
+        limite_cumulative=3,
+    )
+    proposte_movimento = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.tipo == "singola"
+    ]
+    proposte_movimenti_cumulativi = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.tipo == "cumulativa"
+    ]
     if request.method == "POST":
         post_data = request.POST.copy()
-        quick_movimento_id = post_data.get("quick_movimento")
-        if quick_movimento_id:
-            movimento = (
-                MovimentoFinanziario.objects.select_related("conto")
-                .filter(pk=quick_movimento_id, importo__lt=0)
-                .first()
-            )
-            if movimento is not None:
-                importo = min(importo_movimento_disponibile_fornitori(movimento), importo_scadenza_fornitore_residuo(scadenza))
-                post_data["movimento_finanziario"] = str(movimento.pk)
-                post_data["metodo"] = MetodoPagamentoFornitore.BANCA
-                post_data["data_pagamento"] = movimento.data_contabile.isoformat()
-                post_data["importo"] = str(importo)
-                if movimento.conto_id:
-                    post_data["conto_bancario"] = str(movimento.conto_id)
+        quick_cumulativa_index = post_data.get("quick_movimenti_cumulativi")
+        if quick_cumulativa_index not in (None, ""):
+            movimento_ids = [
+                item
+                for item in post_data.getlist(f"quick_movimenti_cumulativi_{quick_cumulativa_index}_ids")
+                if item.isdigit()
+            ]
+            if not movimento_ids:
+                messages.error(request, "Proposta cumulativa non valida.")
             else:
-                messages.error(request, "Movimento bancario non valido per la riconciliazione.")
-
-        form = PagamentoFornitoreForm(post_data)
-        if form.is_valid():
-            movimento = form.cleaned_data.get("movimento_finanziario")
-            try:
-                registra_pagamento_fornitore(
-                    scadenza,
-                    importo=form.cleaned_data["importo"],
-                    data_pagamento=form.cleaned_data["data_pagamento"],
-                    movimento=movimento,
-                    metodo=form.cleaned_data["metodo"],
-                    conto=form.cleaned_data.get("conto_bancario"),
-                    note=form.cleaned_data.get("note") or "",
-                    utente=request.user,
-                )
-                messages.success(request, "Pagamento fornitore registrato correttamente.")
-                if popup:
-                    return render(
-                        request,
-                        "popup/popup_close.html",
-                        {
-                            "message": "Pagamento fornitore registrato correttamente.",
-                            "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
-                        },
+                try:
+                    allocazioni = []
+                    movimenti = {
+                        movimento.pk: movimento
+                        for movimento in MovimentoFinanziario.objects.select_related("conto")
+                        .filter(pk__in=[int(item) for item in movimento_ids], importo__lt=0)
+                    }
+                    for movimento_id in movimento_ids:
+                        movimento = movimenti.get(int(movimento_id))
+                        if movimento is None:
+                            continue
+                        importo = _parse_decimal_locale(
+                            post_data.get(f"quick_movimenti_cumulativi_{quick_cumulativa_index}_importo_{movimento_id}", "")
+                        )
+                        if importo <= Decimal("0.00"):
+                            continue
+                        allocazioni.append((movimento, scadenza, "scadenza_fornitore", importo))
+                    proposta = crea_proposta_riconciliazione(
+                        kind="fornitore",
+                        direction="target_to_movimenti",
+                        tipo="cumulativa",
+                        allocazioni=allocazioni,
                     )
-                return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
-            except ValidationError as exc:
-                for message in exc.messages:
-                    messages.error(request, message)
+                    applica_proposta_riconciliazione(
+                        proposta,
+                        utente=request.user,
+                        note=post_data.get("note") or "",
+                    )
+                    messages.success(request, "Pagamenti fornitore cumulativi registrati correttamente.")
+                    if popup:
+                        return render(
+                            request,
+                            "popup/popup_close.html",
+                            {
+                                "message": "Pagamenti fornitore cumulativi registrati correttamente.",
+                                "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
+                            },
+                        )
+                    return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
+                except (ValidationError, InvalidOperation, ValueError) as exc:
+                    if isinstance(exc, ValidationError):
+                        for message in exc.messages:
+                            messages.error(request, message)
+                    else:
+                        messages.error(request, "Importo non valido.")
+
+        if quick_cumulativa_index in (None, ""):
+            quick_movimento_id = post_data.get("quick_movimento")
+            if quick_movimento_id:
+                movimento = (
+                    MovimentoFinanziario.objects.select_related("conto")
+                    .filter(pk=quick_movimento_id, importo__lt=0)
+                    .first()
+                )
+                if movimento is not None:
+                    try:
+                        importo = min(
+                            importo_movimento_disponibile_fornitori(movimento),
+                            importo_scadenza_fornitore_residuo(scadenza),
+                        )
+                        proposta = crea_proposta_riconciliazione(
+                            kind="fornitore",
+                            direction="target_to_movimenti",
+                            tipo="singola",
+                            allocazioni=[(movimento, scadenza, "scadenza_fornitore", importo)],
+                        )
+                        applica_proposta_riconciliazione(
+                            proposta,
+                            utente=request.user,
+                            note=post_data.get("note") or "",
+                        )
+                        messages.success(request, "Pagamento fornitore registrato correttamente.")
+                        if popup:
+                            return render(
+                                request,
+                                "popup/popup_close.html",
+                                {
+                                    "message": "Pagamento fornitore registrato correttamente.",
+                                    "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
+                                },
+                            )
+                        return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
+                    except (ValidationError, InvalidOperation, ValueError) as exc:
+                        if isinstance(exc, ValidationError):
+                            for message in exc.messages:
+                                messages.error(request, message)
+                        else:
+                            messages.error(request, "Importo non valido.")
+                else:
+                    messages.error(request, "Movimento bancario non valido per la riconciliazione.")
+                form = PagamentoFornitoreForm(
+                    initial={
+                        "scadenza": scadenza,
+                        "data_pagamento": timezone.localdate(),
+                        "importo": importo_scadenza_fornitore_residuo(scadenza),
+                    }
+                )
+            else:
+                form = PagamentoFornitoreForm(post_data)
+                if form.is_valid():
+                    movimento = form.cleaned_data.get("movimento_finanziario")
+                    try:
+                        registra_pagamento_fornitore(
+                            scadenza,
+                            importo=form.cleaned_data["importo"],
+                            data_pagamento=form.cleaned_data["data_pagamento"],
+                            movimento=movimento,
+                            metodo=form.cleaned_data["metodo"],
+                            conto=form.cleaned_data.get("conto_bancario"),
+                            note=form.cleaned_data.get("note") or "",
+                            utente=request.user,
+                        )
+                        messages.success(request, "Pagamento fornitore registrato correttamente.")
+                        if popup:
+                            return render(
+                                request,
+                                "popup/popup_close.html",
+                                {
+                                    "message": "Pagamento fornitore registrato correttamente.",
+                                    "reload_url": _safe_reload_url(request, "fatture_scadenze_fornitori"),
+                                },
+                            )
+                        return redirect("modifica_documento_fornitore", pk=scadenza.documento_id)
+                    except ValidationError as exc:
+                        for message in exc.messages:
+                            messages.error(request, message)
+        else:
+            form = PagamentoFornitoreForm(
+                initial={
+                    "scadenza": scadenza,
+                    "data_pagamento": timezone.localdate(),
+                    "importo": importo_scadenza_fornitore_residuo(scadenza),
+                }
+            )
     else:
         form = PagamentoFornitoreForm(
             initial={
@@ -2147,7 +2260,9 @@ def registra_pagamento_scadenza_fornitore(request, pk):
             "form": form,
             "scadenza": scadenza,
             "popup": popup,
-            "candidati_movimento": candidati_movimento,
+            "proposte_riconciliazione": proposte_riconciliazione,
+            "proposte_movimento": proposte_movimento,
+            "proposte_movimenti_cumulativi": proposte_movimenti_cumulativi,
             "reload_url": request.GET.get("reload_url") or request.POST.get("reload_url") or "",
         },
     )
@@ -2224,55 +2339,143 @@ def lista_movimenti_da_riconciliare_fornitori(request):
         .filter(importo__lt=0)
         .order_by("-data_contabile", "-id")[:100]
     )
-    movimenti_con_candidati = []
+    movimenti_con_proposte = []
     for movimento in movimenti:
         residuo = importo_movimento_disponibile_fornitori(movimento)
         if residuo <= Decimal("0.00"):
             continue
-        candidati = trova_scadenze_fornitori_candidate(movimento, limite=3)
+        proposte_movimento = proposte_riconciliazione_da_movimento(
+            movimento,
+            limite_singole=3,
+            limite_cumulative=2,
+        )
+        proposte_fornitore = [
+            proposta
+            for proposta in proposte_movimento
+            if proposta.kind == "fornitore" and proposta.tipo == "singola"
+        ]
+        proposte_fornitore_cumulative = [
+            proposta
+            for proposta in proposte_movimento
+            if proposta.kind == "fornitore" and proposta.tipo == "cumulativa"
+        ]
         movimento.residuo_fornitori = residuo
-        movimenti_con_candidati.append({"movimento": movimento, "candidati": candidati})
+        movimenti_con_proposte.append(
+            {
+                "movimento": movimento,
+                "proposte": proposte_movimento,
+                "proposte_fornitore": proposte_fornitore,
+                "proposte_fornitore_cumulative": proposte_fornitore_cumulative,
+            }
+        )
 
     return render(
         request,
         "gestione_finanziaria/riconciliazione_fornitori_list.html",
-        {"movimenti_con_candidati": movimenti_con_candidati},
+        {"movimenti_con_proposte": movimenti_con_proposte},
     )
 
 
 def riconcilia_movimento_fornitore(request, pk):
     movimento = get_object_or_404(MovimentoFinanziario.objects.select_related("conto", "categoria"), pk=pk)
-    candidati = trova_scadenze_fornitori_candidate(movimento, limite=12)
+    proposte_riconciliazione = proposte_riconciliazione_da_movimento(
+        movimento,
+        limite_singole=12,
+        limite_cumulative=5,
+    )
+    proposte_fornitore = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.kind == "fornitore" and proposta.tipo == "singola"
+    ]
+    proposte_fornitore_cumulative = [
+        proposta
+        for proposta in proposte_riconciliazione
+        if proposta.kind == "fornitore" and proposta.tipo == "cumulativa"
+    ]
     if request.method == "POST":
-        scadenza_id = request.POST.get("scadenza")
-        importo = request.POST.get("importo")
-        scadenza = ScadenzaPagamentoFornitore.objects.filter(pk=scadenza_id).select_related("documento").first()
-        if scadenza is None:
-            messages.error(request, "Seleziona una scadenza fornitore valida.")
+        azione = request.POST.get("azione", "")
+        if azione == "collega_fornitori_cumulativa":
+            scadenza_ids = [item for item in request.POST.getlist("scadenza_ids") if item.isdigit()]
+            if not scadenza_ids:
+                messages.error(request, "Seleziona almeno una scadenza fornitore da collegare.")
+            else:
+                allocazioni = []
+                try:
+                    scadenze = {
+                        scadenza.pk: scadenza
+                        for scadenza in ScadenzaPagamentoFornitore.objects.select_related(
+                            "documento",
+                            "documento__fornitore",
+                        ).filter(pk__in=[int(item) for item in scadenza_ids])
+                    }
+                    for scadenza_id in scadenza_ids:
+                        scadenza = scadenze.get(int(scadenza_id))
+                        if scadenza is None:
+                            continue
+                        importo = _parse_decimal_locale(request.POST.get(f"importo_scadenza_{scadenza_id}", ""))
+                        if importo > 0:
+                            allocazioni.append((movimento, scadenza, "scadenza_fornitore", importo))
+                    proposta = crea_proposta_riconciliazione(
+                        kind="fornitore",
+                        direction="movimento_to_targets",
+                        tipo="cumulativa",
+                        allocazioni=allocazioni,
+                    )
+                    applica_proposta_riconciliazione(
+                        proposta,
+                        utente=request.user,
+                        note=request.POST.get("note") or "",
+                    )
+                    messages.success(request, "Movimento riconciliato con piu scadenze fornitore.")
+                    return redirect("lista_movimenti_da_riconciliare_fornitori")
+                except (ValidationError, InvalidOperation, ValueError) as exc:
+                    if isinstance(exc, ValidationError):
+                        for message in exc.messages:
+                            messages.error(request, message)
+                    else:
+                        messages.error(request, "Importo non valido.")
         else:
-            try:
-                riconcilia_movimento_con_scadenza_fornitore(
-                    movimento,
-                    scadenza,
-                    importo=Decimal(str(importo).replace(",", ".")) if importo else None,
-                    utente=request.user,
-                    note=request.POST.get("note") or "",
-                )
-                messages.success(request, "Movimento riconciliato con la scadenza fornitore.")
-                return redirect("lista_movimenti_da_riconciliare_fornitori")
-            except (ValidationError, InvalidOperation, ValueError) as exc:
-                if isinstance(exc, ValidationError):
-                    for message in exc.messages:
-                        messages.error(request, message)
-                else:
-                    messages.error(request, "Importo non valido.")
+            scadenza_id = request.POST.get("scadenza")
+            importo = request.POST.get("importo")
+            scadenza = ScadenzaPagamentoFornitore.objects.filter(pk=scadenza_id).select_related("documento").first()
+            if scadenza is None:
+                messages.error(request, "Seleziona una scadenza fornitore valida.")
+            else:
+                try:
+                    importo_riconciliato = (
+                        _parse_decimal_locale(importo)
+                        if importo
+                        else min(importo_movimento_disponibile_fornitori(movimento), importo_scadenza_fornitore_residuo(scadenza))
+                    )
+                    proposta = crea_proposta_riconciliazione(
+                        kind="fornitore",
+                        direction="movimento_to_targets",
+                        tipo="singola",
+                        allocazioni=[(movimento, scadenza, "scadenza_fornitore", importo_riconciliato)],
+                    )
+                    applica_proposta_riconciliazione(
+                        proposta,
+                        utente=request.user,
+                        note=request.POST.get("note") or "",
+                    )
+                    messages.success(request, "Movimento riconciliato con la scadenza fornitore.")
+                    return redirect("lista_movimenti_da_riconciliare_fornitori")
+                except (ValidationError, InvalidOperation, ValueError) as exc:
+                    if isinstance(exc, ValidationError):
+                        for message in exc.messages:
+                            messages.error(request, message)
+                    else:
+                        messages.error(request, "Importo non valido.")
 
     return render(
         request,
         "gestione_finanziaria/riconciliazione_fornitore.html",
         {
             "movimento": movimento,
-            "candidati": candidati,
+            "proposte_riconciliazione": proposte_riconciliazione,
+            "proposte_fornitore": proposte_fornitore,
+            "proposte_fornitore_cumulative": proposte_fornitore_cumulative,
             "residuo_movimento": importo_movimento_disponibile_fornitori(movimento),
         },
     )
@@ -5213,7 +5416,8 @@ def riconcilia_movimento(request, pk):
     """Vista di riconciliazione di un singolo movimento."""
     movimento = get_object_or_404(
         MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione").prefetch_related(
-            "riconciliazioni_rate__rata"
+            "riconciliazioni_rate__rata",
+            "pagamenti_fornitori__scadenza__documento__fornitore",
         ),
         pk=pk,
     )
@@ -5221,12 +5425,17 @@ def riconcilia_movimento(request, pk):
     return_url = _safe_reconciliation_return_url(request, fallback_return_url)
     current_url = reverse("riconcilia_movimento", kwargs={"pk": movimento.pk})
     current_url_with_return = f"{current_url}?{urlencode({'next': return_url})}"
+    tipo_riconciliazione = "fornitori" if movimento.importo is not None and movimento.importo < 0 else "rate"
 
     if request.method == "POST":
         azione = request.POST.get("azione", "")
 
         if azione == "annulla":
-            annulla_riconciliazione(movimento)
+            if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate.exists():
+                annulla_riconciliazione(movimento)
+            for pagamento in list(movimento.pagamenti_fornitori.all()):
+                annulla_pagamento_fornitore(pagamento)
+            aggiorna_stato_riconciliazione_movimento(movimento)
             messages.success(request, "Riconciliazione annullata.")
             return redirect(return_url)
 
@@ -5236,42 +5445,219 @@ def riconcilia_movimento(request, pk):
             messages.success(request, "Movimento marcato come da ignorare.")
             return redirect(return_url)
 
-        rata_pk = request.POST.get("rata_pk")
-        if not rata_pk or not rata_pk.isdigit():
-            messages.error(request, "Seleziona una rata candidata da collegare.")
-        else:
-            from economia.models.iscrizioni import RataIscrizione
-            try:
-                rata = RataIscrizione.objects.select_related(
-                    "iscrizione__studente"
-                ).get(pk=int(rata_pk))
-            except RataIscrizione.DoesNotExist:
-                messages.error(request, "Rata selezionata non trovata.")
-                return redirect(current_url_with_return)
-
-            marca = request.POST.get("marca_rata_pagata") == "1"
-            try:
-                riconcilia_movimento_con_rata(movimento, rata, utente=request.user, marca_rata_pagata=marca)
-            except ValidationError as exc:
-                for message in exc.messages:
-                    messages.error(request, message)
+        if tipo_riconciliazione == "fornitori":
+            if azione == "collega_fornitori_cumulativa":
+                scadenza_ids = [item for item in request.POST.getlist("scadenza_ids") if item.isdigit()]
+                if not scadenza_ids:
+                    messages.error(request, "Seleziona almeno una scadenza fornitore da collegare.")
+                else:
+                    allocazioni = []
+                    try:
+                        scadenze = {
+                            scadenza.pk: scadenza
+                            for scadenza in ScadenzaPagamentoFornitore.objects.select_related(
+                                "documento",
+                                "documento__fornitore",
+                            ).filter(pk__in=[int(item) for item in scadenza_ids])
+                        }
+                        for scadenza_id in scadenza_ids:
+                            scadenza = scadenze.get(int(scadenza_id))
+                            if scadenza is None:
+                                continue
+                            importo = _parse_decimal_locale(request.POST.get(f"importo_scadenza_{scadenza_id}", ""))
+                            if importo > 0:
+                                allocazioni.append((movimento, scadenza, "scadenza_fornitore", importo))
+                        proposta = crea_proposta_riconciliazione(
+                            kind="fornitore",
+                            direction="movimento_to_targets",
+                            tipo="cumulativa",
+                            allocazioni=allocazioni,
+                        )
+                        applica_proposta_riconciliazione(
+                            proposta,
+                            utente=request.user,
+                            note=request.POST.get("note") or "",
+                        )
+                    except (ValidationError, InvalidOperation, ValueError) as exc:
+                        if isinstance(exc, ValidationError):
+                            for message in exc.messages:
+                                messages.error(request, message)
+                        else:
+                            messages.error(request, "Importo non valido.")
+                    else:
+                        messages.success(request, "Movimento riconciliato con piu scadenze fornitore.")
+                        return redirect(return_url)
             else:
-                messages.success(
-                    request,
-                    f"Movimento riconciliato con {rata}. "
-                    + ("Rata marcata come pagata." if marca else "Rata non modificata."),
-                )
-                return redirect(return_url)
+                scadenza_id = request.POST.get("scadenza") or request.POST.get("scadenza_pk")
+                if not scadenza_id or not scadenza_id.isdigit():
+                    messages.error(request, "Seleziona una scadenza fornitore valida.")
+                else:
+                    scadenza = ScadenzaPagamentoFornitore.objects.filter(pk=int(scadenza_id)).select_related(
+                        "documento",
+                        "documento__fornitore",
+                    ).first()
+                    if scadenza is None:
+                        messages.error(request, "Scadenza selezionata non trovata.")
+                    else:
+                        try:
+                            importo_raw = request.POST.get("importo") or ""
+                            importo = (
+                                _parse_decimal_locale(importo_raw)
+                                if importo_raw.strip()
+                                else min(
+                                    importo_movimento_disponibile_fornitori(movimento),
+                                    importo_scadenza_fornitore_residuo(scadenza),
+                                )
+                            )
+                            proposta = crea_proposta_riconciliazione(
+                                kind="fornitore",
+                                direction="movimento_to_targets",
+                                tipo="singola",
+                                allocazioni=[(movimento, scadenza, "scadenza_fornitore", importo)],
+                            )
+                            applica_proposta_riconciliazione(
+                                proposta,
+                                utente=request.user,
+                                note=request.POST.get("note") or "",
+                            )
+                        except (ValidationError, InvalidOperation, ValueError) as exc:
+                            if isinstance(exc, ValidationError):
+                                for message in exc.messages:
+                                    messages.error(request, message)
+                            else:
+                                messages.error(request, "Importo non valido.")
+                        else:
+                            messages.success(request, "Movimento riconciliato con la scadenza fornitore.")
+                            return redirect(return_url)
+        elif azione == "collega_rate_cumulativa":
+            rata_ids = [item for item in request.POST.getlist("rata_ids") if item.isdigit()]
+            if not rata_ids:
+                messages.error(request, "Seleziona almeno una rata da collegare.")
+            else:
+                from economia.models.iscrizioni import RataIscrizione
 
-    candidati = trova_rate_candidate(movimento)
+                allocazioni = []
+                try:
+                    rate = {
+                        rata.pk: rata
+                        for rata in RataIscrizione.objects.select_related(
+                            "iscrizione__studente",
+                            "iscrizione__anno_scolastico",
+                        ).filter(pk__in=[int(item) for item in rata_ids])
+                    }
+                    for rata_id in rata_ids:
+                        rata = rate.get(int(rata_id))
+                        if rata is None:
+                            continue
+                        importo = _parse_decimal_locale(request.POST.get(f"importo_rata_{rata_id}", ""))
+                        if importo > 0:
+                            allocazioni.append((movimento, rata, "rata", importo))
+                    proposta = crea_proposta_riconciliazione(
+                        kind="rate",
+                        direction="movimento_to_targets",
+                        tipo="cumulativa",
+                        allocazioni=allocazioni,
+                    )
+                    applica_proposta_riconciliazione(proposta, utente=request.user)
+                except (ValidationError, InvalidOperation, ValueError) as exc:
+                    if isinstance(exc, ValidationError):
+                        for message in exc.messages:
+                            messages.error(request, message)
+                    else:
+                        messages.error(request, "Importo non valido.")
+                else:
+                    messages.success(request, "Movimento riconciliato con piu rate.")
+                    return redirect(return_url)
+        else:
+            rata_pk = request.POST.get("rata_pk")
+            if not rata_pk or not rata_pk.isdigit():
+                messages.error(request, "Seleziona una rata candidata da collegare.")
+            else:
+                from economia.models.iscrizioni import RataIscrizione
+
+                try:
+                    rata = RataIscrizione.objects.select_related(
+                        "iscrizione__studente"
+                    ).get(pk=int(rata_pk))
+                except RataIscrizione.DoesNotExist:
+                    messages.error(request, "Rata selezionata non trovata.")
+                    return redirect(current_url_with_return)
+
+                marca = request.POST.get("marca_rata_pagata") == "1"
+                try:
+                    if marca:
+                        importo = min(importo_movimento_disponibile(movimento), importo_rata_residuo(rata))
+                        proposta = crea_proposta_riconciliazione(
+                            kind="rate",
+                            direction="movimento_to_targets",
+                            tipo="singola",
+                            allocazioni=[(movimento, rata, "rata", importo)],
+                        )
+                        applica_proposta_riconciliazione(proposta, utente=request.user)
+                    else:
+                        riconcilia_movimento_con_rata(movimento, rata, utente=request.user, marca_rata_pagata=False)
+                except ValidationError as exc:
+                    for message in exc.messages:
+                        messages.error(request, message)
+                else:
+                    messages.success(
+                        request,
+                        f"Movimento riconciliato con {rata}. "
+                        + ("Importo registrato sulla rata." if marca else "Rata non modificata."),
+                    )
+                    return redirect(return_url)
+
+    proposte_riconciliazione = proposte_riconciliazione_da_movimento(
+        movimento,
+        limite_singole=12,
+        limite_cumulative=5,
+    )
+    if tipo_riconciliazione == "fornitori":
+        proposte_fornitori = [
+            proposta
+            for proposta in proposte_riconciliazione
+            if proposta.kind == "fornitore" and proposta.tipo == "singola"
+        ]
+        proposte_fornitori_cumulative = [
+            proposta
+            for proposta in proposte_riconciliazione
+            if proposta.kind == "fornitore" and proposta.tipo == "cumulativa"
+        ]
+        proposte_rate = []
+        proposte_rate_cumulative = []
+        residuo_movimento = importo_movimento_disponibile_fornitori(movimento)
+    else:
+        proposte_rate = [
+            proposta
+            for proposta in proposte_riconciliazione
+            if proposta.kind == "rate" and proposta.tipo == "singola"
+        ]
+        proposte_rate_cumulative = [
+            proposta
+            for proposta in proposte_riconciliazione
+            if proposta.kind == "rate" and proposta.tipo == "cumulativa"
+        ]
+        proposte_fornitori = []
+        proposte_fornitori_cumulative = []
+        residuo_movimento = importo_movimento_disponibile(movimento)
 
     return render(
         request,
         "gestione_finanziaria/movimento_riconciliazione.html",
         {
             "movimento": movimento,
-            "candidati": candidati,
-            "gia_riconciliato": movimento.rata_iscrizione_id is not None or movimento.riconciliazioni_rate.exists(),
+            "tipo_riconciliazione": tipo_riconciliazione,
+            "proposte_riconciliazione": proposte_riconciliazione,
+            "proposte_rate": proposte_rate,
+            "proposte_rate_cumulative": proposte_rate_cumulative,
+            "proposte_fornitori": proposte_fornitori,
+            "proposte_fornitori_cumulative": proposte_fornitori_cumulative,
+            "residuo_movimento": residuo_movimento,
+            "gia_riconciliato": (
+                movimento.rata_iscrizione_id is not None
+                or movimento.riconciliazioni_rate.exists()
+                or movimento.pagamenti_fornitori.exists()
+            ),
             "return_url": return_url,
         },
     )

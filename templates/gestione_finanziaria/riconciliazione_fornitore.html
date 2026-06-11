@@ -22,7 +22,7 @@
                 <h1 class="page-title">Riconcilia movimento fornitore</h1>
                 <span class="family-status-pill is-muted">
                     <span class="family-status-dot" aria-hidden="true"></span>
-                    {{ candidati|length }} candidati
+                    {{ proposte_fornitore|length }} candidati
                 </span>
             </div>
             <div class="family-page-address">
@@ -55,7 +55,7 @@
 
     <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
         <div class="panel-body">
-            {% if candidati %}
+            {% if proposte_fornitore %}
                 <table class="list-table anagrafica-list-table finance-modern-table">
                     <thead>
                         <tr>
@@ -67,7 +67,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for candidato in candidati %}
+                        {% for proposta in proposte_fornitore %}
+                            {% with allocazione=proposta.allocazioni.0 scadenza=proposta.allocazioni.0.target %}
                             <tr>
                                 <td class="anagrafica-record-cell">
                                     <div class="anagrafica-record-link anagrafica-record-link-compact">
@@ -75,20 +76,20 @@
                                             <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#supplier"></use></svg>
                                         </span>
                                         <span class="anagrafica-record-main">
-                                            <span class="table-main-text">{{ candidato.scadenza.documento.fornitore }}</span>
-                                            <span class="table-subtext">{{ candidato.scadenza.documento.numero_documento }} - {{ candidato.scadenza.data_scadenza|date:"d/m/Y" }}</span>
+                                            <span class="table-main-text">{{ scadenza.documento.fornitore }}</span>
+                                            <span class="table-subtext">{{ scadenza.documento.numero_documento }} - {{ scadenza.data_scadenza|date:"d/m/Y" }}</span>
                                         </span>
                                     </div>
                                 </td>
-                                <td class="finance-money-cell">{{ candidato.importo_residuo|euro }} &euro;</td>
+                                <td class="finance-money-cell">{{ allocazione.importo|euro }} &euro;</td>
                                 <td>
-                                    <span class="anagrafica-status-chip {% if candidato.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
-                                        {{ candidato.score_percentuale }}%
+                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                        {{ proposta.score_percentuale }}%
                                     </span>
                                 </td>
                                 <td>
                                     <div class="finance-reasons">
-                                        {% for motivazione in candidato.motivazioni %}
+                                        {% for motivazione in proposta.motivazioni %}
                                             <span>{{ motivazione }}</span>
                                         {% endfor %}
                                     </div>
@@ -100,8 +101,81 @@
                                         onsubmit="return confirm('Confermi il collegamento di questa scadenza al movimento bancario? Il pagamento verra registrato e il movimento collegato.');"
                                     >
                                         {% csrf_token %}
-                                        <input type="hidden" name="scadenza" value="{{ candidato.scadenza.pk }}">
-                                        <input type="text" name="importo" value="{{ candidato.importo_residuo|floatformat:2 }}" aria-label="Importo da riconciliare">
+                                        <input type="hidden" name="scadenza" value="{{ scadenza.pk }}">
+                                        <input type="text" name="importo" value="{{ allocazione.importo|floatformat:2 }}" aria-label="Importo da riconciliare">
+                                        <button type="submit" class="btn btn-primary btn-icon-text">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+                                            <span class="btn-label">Collega</span>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">Nessuna scadenza candidata trovata.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if proposte_fornitore_cumulative %}
+        <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title">Pagamenti cumulativi proposti</h2>
+                    <p class="finance-section-subtitle">Un unico movimento puo coprire piu scadenze aperte dello stesso fornitore.</p>
+                </div>
+                <span class="anagrafica-status-chip is-muted">{{ proposte_fornitore_cumulative|length }} risultati</span>
+            </div>
+            <div class="panel-body">
+                <table class="list-table anagrafica-list-table finance-modern-table">
+                    <thead>
+                        <tr>
+                            <th>Scadenze incluse</th>
+                            <th>Importo</th>
+                            <th>Punteggio</th>
+                            <th>Motivazioni</th>
+                            <th>Riconcilia</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for proposta in proposte_fornitore_cumulative %}
+                            <tr>
+                                <td>
+                                    {% for allocazione in proposta.allocazioni %}
+                                        <div>
+                                            <strong>{{ allocazione.target.documento.fornitore }}</strong>
+                                            <span class="table-muted">{{ allocazione.target.documento.numero_documento }} - {{ allocazione.target.data_scadenza|date:"d/m/Y" }} - EUR {{ allocazione.importo|euro }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </td>
+                                <td class="finance-money-cell">{{ proposta.importo_totale|euro }} &euro;</td>
+                                <td>
+                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                        {{ proposta.score_percentuale }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="finance-reasons">
+                                        {% for motivazione in proposta.motivazioni %}
+                                            <span>{{ motivazione }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <form
+                                        method="post"
+                                        class="finance-inline-match-form"
+                                        onsubmit="return confirm('Confermi il collegamento cumulativo di queste scadenze al movimento bancario?');"
+                                    >
+                                        {% csrf_token %}
+                                        <input type="hidden" name="azione" value="collega_fornitori_cumulativa">
+                                        {% for allocazione in proposta.allocazioni %}
+                                            <input type="hidden" name="scadenza_ids" value="{{ allocazione.target.pk }}">
+                                            <input type="hidden" name="importo_scadenza_{{ allocazione.target.pk }}" value="{{ allocazione.importo }}">
+                                        {% endfor %}
                                         <button type="submit" class="btn btn-primary btn-icon-text">
                                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
                                             <span class="btn-label">Collega</span>
@@ -112,9 +186,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
-            {% else %}
-                <div class="empty-state">Nessuna scadenza candidata trovata.</div>
-            {% endif %}
+            </div>
         </div>
-    </div>
+    {% endif %}
 {% endblock %}

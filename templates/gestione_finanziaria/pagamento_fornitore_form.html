@@ -106,7 +106,7 @@
                 </section>
             {% endif %}
 
-            {% if candidati_movimento %}
+            {% if proposte_movimento %}
                 <section class="calendar-event-form-card supplier-payment-reconcile-card">
                     <div class="calendar-event-form-title">
                         <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
@@ -116,31 +116,32 @@
                         Puoi aggiungere una riga di pagamento usando direttamente uno dei movimenti bancari compatibili.
                     </p>
                     <div class="supplier-payment-candidate-list">
-                        {% for candidato in candidati_movimento %}
+                        {% for proposta in proposte_movimento %}
+                            {% with allocazione=proposta.allocazioni.0 %}
                             <article class="supplier-payment-candidate{% if forloop.first %} is-best{% endif %}">
                                 <div class="supplier-payment-candidate-main">
                                     <span class="supplier-payment-candidate-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
                                     <div>
-                                        <strong>{{ candidato.movimento.descrizione|default:"Movimento bancario"|truncatechars:95 }}</strong>
+                                        <strong>{{ allocazione.movimento.descrizione|default:"Movimento bancario"|truncatechars:95 }}</strong>
                                         <span>
-                                            {{ candidato.movimento.data_contabile|it_date }} - disponibile EUR {{ candidato.importo_disponibile|euro }}
-                                            {% if candidato.movimento.conto %}- {{ candidato.movimento.conto }}{% endif %}
+                                            {{ allocazione.movimento.data_contabile|it_date }} - disponibile EUR {{ allocazione.importo|euro }}
+                                            {% if allocazione.movimento.conto %}- {{ allocazione.movimento.conto }}{% endif %}
                                         </span>
                                         <small>
-                                            {% for motivazione in candidato.motivazioni %}
+                                            {% for motivazione in proposta.motivazioni %}
                                                 {{ motivazione }}{% if not forloop.last %}; {% endif %}
                                             {% endfor %}
                                         </small>
                                     </div>
                                 </div>
                                 <div class="supplier-payment-candidate-actions">
-                                    <span class="anagrafica-status-chip {% if candidato.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
-                                        {{ candidato.score_percentuale }}%
+                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                        {{ proposta.score_percentuale }}%
                                     </span>
                                     <button
                                         type="submit"
                                         name="quick_movimento"
-                                        value="{{ candidato.movimento.pk }}"
+                                        value="{{ allocazione.movimento.pk }}"
                                         class="btn btn-primary btn-sm"
                                         onclick="return confirm('Confermi la riconciliazione con questo movimento bancario? Il pagamento verra registrato e il movimento collegato.');"
                                     >
@@ -148,6 +149,61 @@
                                     </button>
                                 </div>
                             </article>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+
+            {% if proposte_movimenti_cumulativi %}
+                <section class="calendar-event-form-card supplier-payment-reconcile-card">
+                    <div class="calendar-event-form-title">
+                        <span class="calendar-event-form-title-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <span>Pagamenti bancari cumulativi</span>
+                    </div>
+                    <p class="supplier-payment-card-note">
+                        Usa una proposta cumulativa quando questa scadenza e stata saldata con piu movimenti bancari separati.
+                    </p>
+                    <div class="supplier-payment-candidate-list">
+                        {% for proposta in proposte_movimenti_cumulativi %}
+                            {% with idx=forloop.counter0 %}
+                                <article class="supplier-payment-candidate is-best">
+                                    <div class="supplier-payment-candidate-main">
+                                        <span class="supplier-payment-candidate-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                        <div>
+                                            <strong>EUR {{ proposta.importo_totale|euro }} da {{ proposta.movimenti|length }} movimenti</strong>
+                                            {% for allocazione in proposta.allocazioni %}
+                                                <span>
+                                                    {{ allocazione.movimento.data_contabile|it_date }} - EUR {{ allocazione.importo|euro }}
+                                                    {% if allocazione.movimento.conto %}- {{ allocazione.movimento.conto }}{% endif %}
+                                                </span>
+                                                <small>{{ allocazione.movimento.descrizione|default:"Movimento bancario"|truncatechars:95 }}</small>
+                                                <input type="hidden" name="quick_movimenti_cumulativi_{{ idx }}_ids" value="{{ allocazione.movimento.pk }}">
+                                                <input type="hidden" name="quick_movimenti_cumulativi_{{ idx }}_importo_{{ allocazione.movimento.pk }}" value="{{ allocazione.importo }}">
+                                            {% endfor %}
+                                            <small>
+                                                {% for motivazione in proposta.motivazioni %}
+                                                    {{ motivazione }}{% if not forloop.last %}; {% endif %}
+                                                {% endfor %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="supplier-payment-candidate-actions">
+                                        <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                            {{ proposta.score_percentuale }}%
+                                        </span>
+                                        <button
+                                            type="submit"
+                                            name="quick_movimenti_cumulativi"
+                                            value="{{ idx }}"
+                                            class="btn btn-primary btn-sm"
+                                            onclick="return confirm('Confermi la riconciliazione cumulativa con questi movimenti bancari?');"
+                                        >
+                                            Riconcilia
+                                        </button>
+                                    </div>
+                                </article>
+                            {% endwith %}
                         {% endfor %}
                     </div>
                 </section>
@@ -253,7 +309,7 @@
 
             form.addEventListener("submit", function (event) {
                 var submitter = event.submitter || document.activeElement;
-                if (submitter && submitter.name === "quick_movimento") {
+                if (submitter && (submitter.name === "quick_movimento" || submitter.name === "quick_movimenti_cumulativi")) {
                     return;
                 }
 

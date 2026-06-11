@@ -94,10 +94,19 @@ from .services import (
     applica_regole_a_movimento,
     importo_movimento_disponibile_fornitori,
     applica_anteprima_riconciliazione_fornitori,
+    applica_proposta_riconciliazione,
     build_budgeting_dashboard_data,
     calcola_hash_deduplica_movimento,
+    crea_proposta_riconciliazione,
+    proposte_riconciliazione_da_movimento,
+    proposte_riconciliazione_da_rata,
+    proposte_riconciliazione_da_scadenza_fornitore,
+    riconcilia_movimento_con_scadenze_fornitore,
     riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
+    trova_movimenti_cumulativi_candidati_per_rate,
+    trova_movimenti_cumulativi_candidati_per_scadenza_fornitore,
+    trova_scadenze_fornitori_cumulative_candidate,
     trova_scadenze_fornitori_candidate,
     trova_movimenti_candidati_per_rate,
     trova_rate_cumulative_candidate,
@@ -1171,6 +1180,54 @@ class MovimentoRiconciliazioneLayoutTests(TestCase):
         )
         self.client.force_login(self.user)
 
+    def _crea_rata_corrente_con_familiare(self, *, importo=Decimal("300.00")):
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore")
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Mario",
+            cognome="Rossi",
+        )
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi")
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 6, 30),
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(
+            stato_iscrizione="Attiva",
+            ordine=1,
+            attiva=True,
+        )
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            mese_prima_retta=9,
+            giorno_scadenza_rate=10,
+        )
+        iscrizione = Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione,
+            data_iscrizione=date(2025, 9, 1),
+        )
+        return RataIscrizione.objects.create(
+            iscrizione=iscrizione,
+            numero_rata=1,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+            importo_dovuto=importo,
+            importo_finale=importo,
+            data_scadenza=date(2025, 9, 10),
+        )
+
     def test_lista_riconciliazione_usa_layout_finanziario_moderno(self):
         conto = ContoBancario.objects.create(nome_conto="Conto operativo")
         movimento = MovimentoFinanziario.objects.create(
@@ -1252,6 +1309,175 @@ class MovimentoRiconciliazioneLayoutTests(TestCase):
         )
 
         self.assertRedirects(response, return_url, fetch_redirect_response=False)
+
+    def test_rate_candidate_include_movimento_parziale_da_movimento(self):
+        rata = self._crea_rata_corrente_con_familiare(importo=Decimal("300.00"))
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 11),
+            importo=Decimal("100.00"),
+            descrizione="Acconto retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_rate_candidate(movimento)
+
+        self.assertIn(rata.pk, [candidato.rata.pk for candidato in candidati])
+        candidato = next(candidato for candidato in candidati if candidato.rata.pk == rata.pk)
+        self.assertTrue(any("parziale" in motivazione for motivazione in candidato.motivazioni))
+
+    def test_proposte_riconciliazione_movimento_normalizzano_rata(self):
+        rata = self._crea_rata_corrente_con_familiare(importo=Decimal("300.00"))
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("300.00"),
+            descrizione="Bonifico retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        proposte = proposte_riconciliazione_da_movimento(movimento)
+
+        proposta = next(
+            proposta
+            for proposta in proposte
+            if proposta.kind == "rate" and proposta.tipo == "singola" and proposta.targets == [rata]
+        )
+        self.assertEqual(proposta.direction, "movimento_to_targets")
+        self.assertEqual(proposta.source.rata, rata)
+        self.assertEqual(proposta.movimenti, [movimento])
+        self.assertEqual(proposta.importo_totale, Decimal("300.00"))
+        self.assertEqual(proposta.allocazioni[0].movimento, movimento)
+        self.assertEqual(proposta.allocazioni[0].target, rata)
+        self.assertEqual(proposta.allocazioni[0].target_tipo, "rata")
+        self.assertIn("movimento_to_targets|rate|singola", proposta.key)
+
+    def test_applica_proposta_riconciliazione_rate_accetta_piu_movimenti(self):
+        rata = self._crea_rata_corrente_con_familiare(importo=Decimal("300.00"))
+        primo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Acconto retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 12),
+            importo=Decimal("200.00"),
+            descrizione="Saldo retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        proposta = crea_proposta_riconciliazione(
+            kind="rate",
+            direction="target_to_movimenti",
+            tipo="cumulativa",
+            allocazioni=[
+                (primo_movimento, rata, "rata", Decimal("100.00")),
+                (secondo_movimento, rata, "rata", Decimal("200.00")),
+            ],
+        )
+
+        risultato = applica_proposta_riconciliazione(proposta, utente=self.user)
+
+        rata.refresh_from_db()
+        primo_movimento.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        self.assertEqual(risultato.importo_totale, Decimal("300.00"))
+        self.assertEqual({movimento.pk for movimento in risultato.movimenti}, {primo_movimento.pk, secondo_movimento.pk})
+        self.assertEqual(risultato.targets, [rata])
+        self.assertTrue(rata.pagata)
+        self.assertEqual(rata.importo_pagato, Decimal("300.00"))
+        self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_riconcilia_rata_accetta_piu_movimenti_candidati(self):
+        rata = self._crea_rata_corrente_con_familiare(importo=Decimal("300.00"))
+        primo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("100.00"),
+            descrizione="Acconto retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 12),
+            importo=Decimal("200.00"),
+            descrizione="Saldo retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_movimenti_cumulativi_candidati_per_rate(rata, [rata])
+
+        self.assertEqual(len(candidati), 1)
+        self.assertEqual(
+            {movimento.pk for movimento in candidati[0].movimenti},
+            {primo_movimento.pk, secondo_movimento.pk},
+        )
+        proposte = proposte_riconciliazione_da_rata(rata, [rata])
+        proposta_cumulativa = next(proposta for proposta in proposte if proposta.tipo == "cumulativa")
+        self.assertEqual(proposta_cumulativa.kind, "rate")
+        self.assertEqual(proposta_cumulativa.direction, "target_to_movimenti")
+        self.assertEqual(proposta_cumulativa.targets, [rata])
+        self.assertEqual(
+            {movimento.pk for movimento in proposta_cumulativa.movimenti},
+            {primo_movimento.pk, secondo_movimento.pk},
+        )
+        self.assertEqual(proposta_cumulativa.importo_totale, Decimal("300.00"))
+        get_response = self.client.get(reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}))
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, "movimenti_cumulativi_0_ids")
+
+        response = self.client.post(
+            reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {
+                "azione": "collega_movimenti_cumulativa:0",
+                "movimenti_cumulativi_0_ids": [str(primo_movimento.pk), str(secondo_movimento.pk)],
+                f"importo_movimento_0_{primo_movimento.pk}": "100.00",
+                f"importo_movimento_0_{secondo_movimento.pk}": "200.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rata.refresh_from_db()
+        primo_movimento.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        self.assertTrue(rata.pagata)
+        self.assertEqual(rata.importo_pagato, Decimal("300.00"))
+        self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_riconciliazione_movimento_in_uscita_mostra_scadenze_fornitore(self):
+        fornitore = Fornitore.objects.create(denominazione="Energia Srl", tipo_soggetto="azienda")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="E-010",
+            data_documento=date(2026, 4, 1),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 4, 30),
+            importo_previsto=Decimal("122.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 29),
+            importo=Decimal("-122.00"),
+            descrizione="Bonifico Energia Srl fattura E-010",
+            controparte="Energia Srl",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.get(reverse("riconcilia_movimento", args=[movimento.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Scadenze fornitore candidate")
+        self.assertContains(response, "Energia Srl")
+        self.assertNotContains(response, "Rate candidate")
 
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
@@ -1860,6 +2086,99 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
         self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
+    def test_applica_proposta_riconciliazione_fornitore_accetta_piu_movimenti(self):
+        scadenza, primo_movimento = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        primo_movimento.importo = Decimal("-40.00")
+        primo_movimento.descrizione = "Acconto Beta Servizi"
+        primo_movimento.save(update_fields=["importo", "descrizione"])
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=timezone.localdate(),
+            importo=Decimal("-60.00"),
+            descrizione="Saldo Beta Servizi",
+            controparte="Beta Servizi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        proposta = crea_proposta_riconciliazione(
+            kind="fornitore",
+            direction="target_to_movimenti",
+            tipo="cumulativa",
+            allocazioni=[
+                (primo_movimento, scadenza, "scadenza_fornitore", Decimal("40.00")),
+                (secondo_movimento, scadenza, "scadenza_fornitore", Decimal("60.00")),
+            ],
+        )
+
+        risultato = applica_proposta_riconciliazione(proposta, utente=self.user)
+
+        scadenza.refresh_from_db()
+        primo_movimento.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        self.assertEqual(risultato.importo_totale, Decimal("100.00"))
+        self.assertEqual(len(risultato.pagamenti), 2)
+        self.assertEqual(PagamentoFornitore.objects.filter(scadenza=scadenza).count(), 2)
+        self.assertEqual(scadenza.importo_pagato, Decimal("100.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_pagamento_fornitore_popup_riconcilia_piu_movimenti_candidati(self):
+        scadenza, primo_movimento = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        primo_movimento.importo = Decimal("-40.00")
+        primo_movimento.descrizione = "Acconto Beta Servizi"
+        primo_movimento.save(update_fields=["importo", "descrizione"])
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=timezone.localdate(),
+            importo=Decimal("-60.00"),
+            descrizione="Saldo Beta Servizi",
+            controparte="Beta Servizi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza)
+
+        self.assertEqual(len(candidati), 1)
+        self.assertEqual(
+            {movimento.pk for movimento in candidati[0].movimenti},
+            {primo_movimento.pk, secondo_movimento.pk},
+        )
+        proposte = proposte_riconciliazione_da_scadenza_fornitore(scadenza)
+        proposta_cumulativa = next(proposta for proposta in proposte if proposta.tipo == "cumulativa")
+        self.assertEqual(proposta_cumulativa.kind, "fornitore")
+        self.assertEqual(proposta_cumulativa.direction, "target_to_movimenti")
+        self.assertEqual(proposta_cumulativa.targets, [scadenza])
+        self.assertEqual(
+            {movimento.pk for movimento in proposta_cumulativa.movimenti},
+            {primo_movimento.pk, secondo_movimento.pk},
+        )
+        self.assertEqual(proposta_cumulativa.importo_totale, Decimal("100.00"))
+        get_response = self.client.get(
+            f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+        )
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, "quick_movimenti_cumulativi")
+
+        response = self.client.post(
+            f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1",
+            {
+                "popup": "1",
+                "quick_movimenti_cumulativi": "0",
+                "quick_movimenti_cumulativi_0_ids": [str(primo_movimento.pk), str(secondo_movimento.pk)],
+                f"quick_movimenti_cumulativi_0_importo_{primo_movimento.pk}": "40.00",
+                f"quick_movimenti_cumulativi_0_importo_{secondo_movimento.pk}": "60.00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pagamenti fornitore cumulativi registrati correttamente.")
+        self.assertEqual(PagamentoFornitore.objects.filter(scadenza=scadenza).count(), 2)
+        scadenza.refresh_from_db()
+        primo_movimento.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        self.assertEqual(scadenza.importo_pagato, Decimal("100.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
     def test_documento_fornitore_popup_annulla_pagamento_usa_popup_gestito(self):
         scadenza, movimento = self._crea_scadenza_pagamento_test()
         pagamento = riconcilia_movimento_con_scadenza_fornitore(movimento, scadenza, utente=self.user)
@@ -2145,38 +2464,39 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             categoria_spesa=categoria,
         )
 
-        response = self.client.post(
-            reverse("crea_documento_fornitore"),
-            {
-                "fornitore": str(fornitore.pk),
-                "categoria_spesa": "",
-                "tipo_documento": "fattura",
-                "numero_documento": "F-001",
-                "data_documento": "2026-04-15",
-                "data_ricezione": "2026-04-16",
-                "anno_competenza": "",
-                "mese_competenza": "",
-                "descrizione": "Manutenzione ordinaria",
-                "imponibile": "1000.00",
-                "aliquota_iva": "22.00",
-                "iva": "",
-                "totale": "",
-                "stato": StatoDocumentoFornitore.DA_PAGARE,
-                "note": "",
-                "scadenze-TOTAL_FORMS": "1",
-                "scadenze-INITIAL_FORMS": "0",
-                "scadenze-MIN_NUM_FORMS": "0",
-                "scadenze-MAX_NUM_FORMS": "1000",
-                "scadenze-0-data_scadenza": "2026-05-31",
-                "scadenze-0-importo_previsto": "1220.00",
-                "scadenze-0-importo_pagato": "0.00",
-                "scadenze-0-data_pagamento": "",
-                "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
-                "scadenze-0-conto_bancario": "",
-                "scadenze-0-movimento_finanziario": "",
-                "scadenze-0-note": "",
-            },
-        )
+        with patch("gestione_finanziaria.models.timezone.localdate", return_value=date(2026, 5, 1)):
+            response = self.client.post(
+                reverse("crea_documento_fornitore"),
+                {
+                    "fornitore": str(fornitore.pk),
+                    "categoria_spesa": "",
+                    "tipo_documento": "fattura",
+                    "numero_documento": "F-001",
+                    "data_documento": "2026-04-15",
+                    "data_ricezione": "2026-04-16",
+                    "anno_competenza": "",
+                    "mese_competenza": "",
+                    "descrizione": "Manutenzione ordinaria",
+                    "imponibile": "1000.00",
+                    "aliquota_iva": "22.00",
+                    "iva": "",
+                    "totale": "",
+                    "stato": StatoDocumentoFornitore.DA_PAGARE,
+                    "note": "",
+                    "scadenze-TOTAL_FORMS": "1",
+                    "scadenze-INITIAL_FORMS": "0",
+                    "scadenze-MIN_NUM_FORMS": "0",
+                    "scadenze-MAX_NUM_FORMS": "1000",
+                    "scadenze-0-data_scadenza": "2026-05-31",
+                    "scadenze-0-importo_previsto": "1220.00",
+                    "scadenze-0-importo_pagato": "0.00",
+                    "scadenze-0-data_pagamento": "",
+                    "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
+                    "scadenze-0-conto_bancario": "",
+                    "scadenze-0-movimento_finanziario": "",
+                    "scadenze-0-note": "",
+                },
+            )
 
         documento = DocumentoFornitore.objects.get(numero_documento="F-001")
         self.assertRedirects(response, reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}))
@@ -4044,6 +4364,79 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertTrue(movimento.categorizzazione_automatica)
         self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0.00"))
         self.assertEqual(PagamentoFornitore.objects.count(), 1)
+
+    def test_riconciliazione_fornitore_propone_e_applica_pagamento_cumulativo(self):
+        categoria = crea_categoria_spesa_test("Materiali")
+        fornitore = Fornitore.objects.create(
+            denominazione="Beta Servizi",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+        )
+        documento_a = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="B-001",
+            data_documento=date(2026, 5, 1),
+            imponibile=Decimal("60.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("60.00"),
+        )
+        documento_b = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="B-002",
+            data_documento=date(2026, 5, 2),
+            imponibile=Decimal("40.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("40.00"),
+        )
+        scadenza_a = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_a,
+            data_scadenza=date(2026, 5, 15),
+            importo_previsto=Decimal("60.00"),
+        )
+        scadenza_b = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_b,
+            data_scadenza=date(2026, 5, 15),
+            importo_previsto=Decimal("40.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 15),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico Beta Servizi saldo fatture B-001 B-002",
+            controparte="Beta Servizi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        candidati = trova_scadenze_fornitori_cumulative_candidate(movimento)
+
+        self.assertEqual(len(candidati), 1)
+        self.assertEqual({scadenza.pk for scadenza in candidati[0].scadenze}, {scadenza_a.pk, scadenza_b.pk})
+        proposte = proposte_riconciliazione_da_movimento(movimento)
+        proposta_cumulativa = next(proposta for proposta in proposte if proposta.tipo == "cumulativa")
+        self.assertEqual(proposta_cumulativa.kind, "fornitore")
+        self.assertEqual(proposta_cumulativa.direction, "movimento_to_targets")
+        self.assertEqual(proposta_cumulativa.movimenti, [movimento])
+        self.assertEqual(
+            {scadenza.pk for scadenza in proposta_cumulativa.targets},
+            {scadenza_a.pk, scadenza_b.pk},
+        )
+        self.assertEqual(proposta_cumulativa.importo_totale, Decimal("100.00"))
+
+        pagamenti = riconcilia_movimento_con_scadenze_fornitore(
+            movimento,
+            candidati[0].allocazioni,
+            utente=self.user,
+        )
+
+        self.assertEqual(len(pagamenti), 2)
+        movimento.refresh_from_db()
+        scadenza_a.refresh_from_db()
+        scadenza_b.refresh_from_db()
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(scadenza_a.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(scadenza_b.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0.00"))
 
     def test_annulla_pagamento_fornitore_rende_movimento_riconciliabile(self):
         fornitore = Fornitore.objects.create(denominazione="Energia Srl", tipo_soggetto="azienda")
