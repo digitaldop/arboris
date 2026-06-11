@@ -1231,6 +1231,7 @@ def _empty_verifica_rette_totale():
     return {
         "dovuto": Decimal("0.00"),
         "pagato": Decimal("0.00"),
+        "rimanente": Decimal("0.00"),
     }
 
 
@@ -1554,6 +1555,10 @@ def verifica_situazione_rette(request):
                 "colonna": colonna,
                 "dovuto": totali_per_chiave[colonna["key"]]["dovuto"],
                 "pagato": totali_per_chiave[colonna["key"]]["pagato"],
+                "rimanente": (
+                    totali_per_chiave[colonna["key"]]["dovuto"]
+                    - totali_per_chiave[colonna["key"]]["pagato"]
+                ),
             }
             for colonna in colonne
         ]

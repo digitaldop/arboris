@@ -1289,8 +1289,10 @@ class EconomiaBatchRateTests(TestCase):
 
         self.assertEqual(totale_preiscrizione["dovuto"], Decimal("100.00"))
         self.assertEqual(totale_preiscrizione["pagato"], Decimal("100.00"))
+        self.assertEqual(totale_preiscrizione["rimanente"], Decimal("0.00"))
         self.assertEqual(totale_settembre["dovuto"], Decimal("100.00"))
         self.assertEqual(totale_settembre["pagato"], Decimal("50.00"))
+        self.assertEqual(totale_settembre["rimanente"], Decimal("50.00"))
         self.assertEqual(riepilogo_totali["dovuto_con_preiscrizioni"], Decimal("200.00"))
         self.assertEqual(riepilogo_totali["pagato_con_preiscrizioni"], Decimal("150.00"))
         self.assertEqual(riepilogo_totali["dovuto_senza_preiscrizioni"], Decimal("100.00"))
@@ -1299,6 +1301,7 @@ class EconomiaBatchRateTests(TestCase):
         self.assertEqual(riepilogo_totali["totale_anno_senza_preiscrizioni"], Decimal("1000.00"))
         self.assertEqual(riepilogo_totali["rimanente_anno_con_preiscrizioni"], Decimal("950.00"))
         self.assertEqual(riepilogo_totali["rimanente_anno_senza_preiscrizioni"], Decimal("950.00"))
+        self.assertContains(response, "Rimanente")
         self.assertContains(response, "Rimanente per l'anno scolastico", count=2)
 
     def test_verifica_situazione_rette_defaults_to_alphabetical_matrix(self):

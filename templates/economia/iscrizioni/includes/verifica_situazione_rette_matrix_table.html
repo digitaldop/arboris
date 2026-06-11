@@ -25,6 +25,10 @@
                                 <span class="label">Incassato</span>
                                 <span class="value">&euro; {{ totale.pagato|euro }}</span>
                             </div>
+                            <div class="cell-amount">
+                                <span class="label">Rimanente</span>
+                                <span class="value">&euro; {{ totale.rimanente|euro }}</span>
+                            </div>
                         </td>
                     {% endfor %}
                     <td class="verifica-rette-total-cell verifica-rette-row-summary-total">
@@ -83,6 +87,10 @@
                             <div class="cell-amount">
                                 <span class="label">Incassato</span>
                                 <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                            </div>
+                            <div class="cell-amount">
+                                <span class="label">Rimanente</span>
+                                <span class="value">&euro; {{ totale.rimanente|euro }}</span>
                             </div>
                         </td>
                     {% endfor %}

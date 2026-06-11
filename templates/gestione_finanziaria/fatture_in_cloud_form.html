@@ -45,6 +45,8 @@
             {% if connessione %}
                 <form method="post" action="{% url 'sincronizza_fatture_in_cloud' connessione.pk %}" class="page-head-inline-form">
                     {% csrf_token %}
+                    <label class="sr-only" for="{{ sync_form.data_inizio.id_for_label }}">{{ sync_form.data_inizio.label }}</label>
+                    {{ sync_form.data_inizio }}
                     <button type="submit" class="btn btn-primary btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
                         <span class="btn-label">Sincronizza ora</span>

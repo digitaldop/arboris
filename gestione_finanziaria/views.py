@@ -48,6 +48,7 @@ from .forms import (
     ContoBancarioForm,
     DocumentoFornitoreForm,
     FattureInCloudConnessioneForm,
+    FattureInCloudSyncForm,
     FusioneContiBancariForm,
     FornitoreForm,
     ImportEstrattoContoForm,
@@ -1794,6 +1795,7 @@ def modifica_fatture_in_cloud(request, pk):
             "oauth_render_configurato": oauth_env_configured(),
             "oauth_confermato": request.GET.get("oauth") == "ok",
             "webhook_url": webhook_url,
+            "sync_form": FattureInCloudSyncForm(),
             "logs": connessione.log_sincronizzazioni.order_by("-data_operazione", "-id")[:10],
         },
     )
@@ -1890,8 +1892,14 @@ def sincronizza_fatture_in_cloud_view(request, pk):
     connessione = get_object_or_404(FattureInCloudConnessione, pk=pk)
     if request.method != "POST":
         return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+    sync_form = FattureInCloudSyncForm(request.POST)
+    if not sync_form.is_valid():
+        messages.error(request, "Data di sincronizzazione non valida.")
+        return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
+
     try:
-        stats = sincronizza_fatture_in_cloud(connessione, utente=request.user)
+        data_inizio = sync_form.cleaned_data.get("data_inizio")
+        stats = sincronizza_fatture_in_cloud(connessione, utente=request.user, data_inizio=data_inizio)
         message = (
             f"Sincronizzazione completata: {stats['creati']} documenti nuovi, "
             f"{stats['aggiornati']} documenti aggiornati. "

@@ -1,8 +1,9 @@
 from datetime import timedelta
 
 from django.core.cache import cache
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from gestione_finanziaria.fatture_in_cloud import FattureInCloudError, sincronizza_fatture_in_cloud
 from gestione_finanziaria.models import FattureInCloudConnessione
@@ -17,6 +18,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--connessione", type=int, help="ID della connessione da sincronizzare.")
+        parser.add_argument(
+            "--dal",
+            dest="data_inizio",
+            help="Sincronizza solo i documenti con data uguale o successiva a YYYY-MM-DD.",
+        )
         parser.add_argument(
             "--scheduled",
             action="store_true",
@@ -48,6 +54,12 @@ class Command(BaseCommand):
             ))
             return
 
+        data_inizio = None
+        if options.get("data_inizio"):
+            data_inizio = parse_date(options["data_inizio"])
+            if data_inizio is None:
+                raise CommandError("Formato data non valido per --dal. Usa YYYY-MM-DD.")
+
         connessioni = FattureInCloudConnessione.objects.filter(attiva=True)
         if options.get("connessione"):
             connessioni = connessioni.filter(pk=options["connessione"])
@@ -56,7 +68,7 @@ class Command(BaseCommand):
         errori = 0
         for connessione in connessioni:
             try:
-                stats = sincronizza_fatture_in_cloud(connessione)
+                stats = sincronizza_fatture_in_cloud(connessione, data_inizio=data_inizio)
                 totale += stats["creati"] + stats["aggiornati"]
                 self.stdout.write(
                     self.style.SUCCESS(

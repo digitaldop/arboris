@@ -27,6 +27,7 @@ from .models import (
     ScadenzaPagamentoFornitore,
     StatoConnessioneFattureInCloud,
     StatoDocumentoFornitore,
+    StatoScadenzaFornitore,
     TipoDocumentoFornitore,
     TipoSyncFattureInCloud,
     DocumentoFornitore,
@@ -47,6 +48,15 @@ AUTHORIZATION_URL = "https://api-v2.fattureincloud.it/oauth/authorize"
 TOKEN_URL = "https://api-v2.fattureincloud.it/oauth/token"
 RECEIVED_DOCUMENT_TYPES = ("expense", "passive_credit_note")
 PENDING_DOCUMENT_TYPES = ("agyo", "mail", "browser")
+FIC_CREDIT_NOTE_TYPES = {
+    "credit",
+    "credit_note",
+    "passive_credit_note",
+    "nota_credito",
+    "nota di credito",
+    "td04",
+    "td08",
+}
 DEFAULT_SCOPES = "received_documents:r entity.suppliers:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
@@ -642,14 +652,38 @@ def _find_or_create_supplier(entity, document_data):
     return fornitore, False, bool(changed)
 
 
-def _document_type(document_data):
-    fic_type = (
-        document_data.get("document_type")
-        or document_data.get("documentType")
-        or document_data.get("type")
-        or ""
-    )
-    if "credit" in fic_type:
+def _raw_document_type_values(document_data, source_doc_type=None):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    dati_generali_documento = _document_general_data(e_invoice)
+    return [
+        source_doc_type,
+        document_data.get("document_type"),
+        document_data.get("documentType"),
+        document_data.get("type"),
+        e_invoice.get("document_type"),
+        e_invoice.get("documentType"),
+        e_invoice.get("tipo_documento"),
+        e_invoice.get("TipoDocumento"),
+        dati_generali_documento.get("tipo_documento"),
+        dati_generali_documento.get("TipoDocumento"),
+    ]
+
+
+def _is_credit_note_document(document_data, source_doc_type=None):
+    for raw_value in _raw_document_type_values(document_data, source_doc_type):
+        value = _normalizza_spazi(raw_value).casefold()
+        if not value:
+            continue
+        compact = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+        if value in FIC_CREDIT_NOTE_TYPES or compact in FIC_CREDIT_NOTE_TYPES:
+            return True
+        if "credit" in value or ("nota" in value and "credito" in value):
+            return True
+    return False
+
+
+def _document_type(document_data, source_doc_type=None):
+    if _is_credit_note_document(document_data, source_doc_type):
         return TipoDocumentoFornitore.NOTA_CREDITO
     return TipoDocumentoFornitore.FATTURA
 
@@ -1139,7 +1173,10 @@ def _paid_amount_from_payments(payments):
     return paid
 
 
-def _state_from_document(total, payments, document_data=None):
+def _state_from_document(total, payments, document_data=None, source_doc_type=None):
+    if document_data and _is_credit_note_document(document_data, source_doc_type):
+        return StatoDocumentoFornitore.PAGATO
+
     paid = _paid_amount_from_payments(payments)
     if document_data:
         paid = max(paid, _document_paid_amount(document_data, total))
@@ -1150,7 +1187,10 @@ def _state_from_document(total, payments, document_data=None):
     return StatoDocumentoFornitore.DA_PAGARE
 
 
-def _payment_deadlines(document_data):
+def _payment_deadlines(document_data, source_doc_type=None):
+    if _is_credit_note_document(document_data, source_doc_type):
+        return []
+
     payments = _payment_items(document_data)
     total = _document_total(document_data)
     deadlines = []
@@ -1220,6 +1260,23 @@ def _document_date(document_data):
     )
 
 
+def _document_date_for_sync_filter(document_data):
+    return _as_date(
+        document_data.get("date")
+        or document_data.get("emission_date")
+        or document_data.get("emssion_date")
+        or document_data.get("document_date")
+        or document_data.get("documentDate")
+    )
+
+
+def _document_is_before_sync_start(document_data, data_inizio):
+    if not data_inizio:
+        return False
+    document_date = _document_date_for_sync_filter(_as_dict(document_data))
+    return bool(document_date and document_date < data_inizio)
+
+
 def _scadenza_modificabile_da_import(scadenza):
     return (
         scadenza.importo_pagato == Decimal("0.00")
@@ -1243,7 +1300,18 @@ def _create_deadlines(documento, deadlines):
     return created
 
 
-def _sync_document_deadlines(documento, deadlines):
+def _sync_document_deadlines(documento, deadlines, *, clear_existing=False):
+    if clear_existing:
+        existing = list(documento.scadenze.order_by("id"))
+        if existing and all(_scadenza_modificabile_da_import(scadenza) for scadenza in existing):
+            documento.scadenze.all().delete()
+        elif existing:
+            for scadenza in existing:
+                if scadenza.stato != StatoScadenzaFornitore.ANNULLATA:
+                    scadenza.stato = StatoScadenzaFornitore.ANNULLATA
+                    scadenza.save(update_fields=["stato", "data_aggiornamento"])
+        return 0
+
     if not deadlines:
         return 0
 
@@ -1306,7 +1374,7 @@ def _auto_reconcile_imported_supplier_deadlines(documento, *, utente=None):
     return pagamenti_creati
 
 
-def _update_document_fields(documento, document_data, fornitore, pending):
+def _update_document_fields(documento, document_data, fornitore, pending, *, source_doc_type=None):
     e_invoice = _as_dict(document_data.get("e_invoice"))
     amounts = _as_dict(document_data.get("amounts"))
     doc_date = _document_date(document_data)
@@ -1325,7 +1393,7 @@ def _update_document_fields(documento, document_data, fornitore, pending):
         amount_gross = amount_net + amount_vat
 
     documento.fornitore = fornitore
-    documento.tipo_documento = _document_type(document_data)
+    documento.tipo_documento = _document_type(document_data, source_doc_type)
     documento.numero_documento = _invoice_number(document_data)
     documento.data_documento = doc_date
     documento.data_ricezione = _as_date(
@@ -1342,11 +1410,11 @@ def _update_document_fields(documento, document_data, fornitore, pending):
     documento.aliquota_iva = Decimal("0.00")
     if amount_net:
         documento.aliquota_iva = (amount_vat * Decimal("100") / amount_net).quantize(Decimal("0.01"))
-    documento.stato = _state_from_document(amount_gross, _payment_items(document_data), document_data)
+    documento.stato = _state_from_document(amount_gross, _payment_items(document_data), document_data, source_doc_type)
     documento.origine = OrigineDocumentoFornitore.FATTURE_IN_CLOUD
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")
-    documento.external_type = "pending" if pending else (document_data.get("type") or "")
+    documento.external_type = "pending" if pending else (source_doc_type or document_data.get("type") or "")
     documento.external_url = _limit_model_field(
         DocumentoFornitore,
         "external_url",
@@ -1359,7 +1427,7 @@ def _update_document_fields(documento, document_data, fornitore, pending):
 
 
 @transaction.atomic
-def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=False, utente=None):
+def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=False, utente=None, source_doc_type=None):
     if not document_data or not document_data.get("id"):
         raise ValidationError("Documento Fatture in Cloud privo di ID.")
 
@@ -1371,7 +1439,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     if documento is None:
         documento = DocumentoFornitore.objects.filter(
             fornitore=fornitore,
-            tipo_documento=_document_type(document_data),
+            tipo_documento=_document_type(document_data, source_doc_type),
             numero_documento=_invoice_number(document_data),
             data_documento=_document_date(document_data),
         ).first()
@@ -1379,7 +1447,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento = DocumentoFornitore()
         created = True
 
-    _update_document_fields(documento, document_data, fornitore, pending)
+    _update_document_fields(documento, document_data, fornitore, pending, source_doc_type=source_doc_type)
     documento.save()
 
     attachment_result = _salva_allegato_fatture_in_cloud(documento, document_data)
@@ -1387,12 +1455,21 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         _external_payload_with_attachment_result(documento, attachment_result)
         documento.save(update_fields=["allegato", "external_payload", "data_aggiornamento"])
 
-    scadenze_create = _sync_document_deadlines(documento, _payment_deadlines(document_data))
-    pagamenti_auto = _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
+    is_credit_note = documento.tipo_documento == TipoDocumentoFornitore.NOTA_CREDITO
+    scadenze_create = _sync_document_deadlines(
+        documento,
+        _payment_deadlines(document_data, source_doc_type),
+        clear_existing=is_credit_note,
+    )
+    pagamenti_auto = 0 if is_credit_note else _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
 
     aggiorna_stato_documento_da_scadenze(documento)
     _notifica, notifica_created = crea_notifica_finanziaria(
-        titolo="Nuova fattura fornitore ricevuta" if created else "Fattura fornitore aggiornata",
+        titolo="Nuova nota di credito ricevuta" if is_credit_note and created else (
+            "Nota di credito aggiornata" if is_credit_note else (
+                "Nuova fattura fornitore ricevuta" if created else "Fattura fornitore aggiornata"
+            )
+        ),
         messaggio=f"{documento.fornitore} - {documento.numero_documento} - EUR {documento.totale}",
         tipo="fattura_ricevuta",
         url=reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
@@ -1530,7 +1607,7 @@ class FattureInCloudClient:
             companies = data or []
         return [company for company in companies if isinstance(company, dict)]
 
-    def list_received_documents(self, doc_type, *, page=1, per_page=50):
+    def list_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None):
         params = {
             "type": doc_type,
             "page": page,
@@ -1538,6 +1615,8 @@ class FattureInCloudClient:
             "sort": "-date,-id",
             "fieldset": "detailed",
         }
+        if data_inizio:
+            params["date_from"] = data_inizio.isoformat()
         return self.request("GET", f"/c/{self.connessione.company_id}/received_documents", params=params)
 
     def get_received_document(self, document_id):
@@ -1554,7 +1633,7 @@ class FattureInCloudClient:
             params={"fieldset": "detailed"},
         ).get("data", {})
 
-    def list_pending_received_documents(self, doc_type, *, page=1, per_page=50):
+    def list_pending_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None):
         params = {
             "type": doc_type,
             "page": page,
@@ -1562,6 +1641,8 @@ class FattureInCloudClient:
             "sort": "-date,-id",
             "fieldset": "detailed",
         }
+        if data_inizio:
+            params["date_from"] = data_inizio.isoformat()
         return self.request("GET", f"/c/{self.connessione.company_id}/received_documents/pending", params=params)
 
     def get_pending_received_document(self, document_id):
@@ -1651,7 +1732,7 @@ def _sync_summary_label(doc_type, pending):
     return f"{prefix} {doc_type}"
 
 
-def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
+def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, data_inizio=None):
     start = time.monotonic()
     if max_seconds is None:
         max_seconds = _sync_max_seconds()
@@ -1679,7 +1760,11 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                 label = _sync_summary_label(doc_type, pending=False)
                 try:
                     _check_sync_budget(start, max_seconds)
-                    for summary in _iter_paginated(lambda page: client.list_received_documents(doc_type, page=page)):
+                    for summary in _iter_paginated(
+                        lambda page: client.list_received_documents(doc_type, page=page, data_inizio=data_inizio)
+                    ):
+                        if _document_is_before_sync_start(summary, data_inizio):
+                            break
                         _check_sync_budget(start, max_seconds)
                         try:
                             document = _document_detail_from_summary(
@@ -1688,11 +1773,14 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                                 pending=False,
                                 supplier_context=supplier_context,
                             )
+                            if _document_is_before_sync_start(document, data_inizio):
+                                continue
                             result = importa_documento_fatture_in_cloud(
                                 connessione,
                                 document,
                                 pending=False,
                                 utente=utente,
+                                source_doc_type=doc_type,
                             )
                             _add_import_result_to_stats(stats, result)
                         except FattureInCloudSyncBudgetExceeded:
@@ -1711,8 +1799,16 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                 label = _sync_summary_label(doc_type, pending=True)
                 try:
                     _check_sync_budget(start, max_seconds)
-                    documents = _iter_paginated(lambda page: client.list_pending_received_documents(doc_type, page=page))
+                    documents = _iter_paginated(
+                        lambda page: client.list_pending_received_documents(
+                            doc_type,
+                            page=page,
+                            data_inizio=data_inizio,
+                        )
+                    )
                     for summary in documents:
+                        if _document_is_before_sync_start(summary, data_inizio):
+                            break
                         _check_sync_budget(start, max_seconds)
                         try:
                             document = _document_detail_from_summary(
@@ -1721,6 +1817,8 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None):
                                 pending=True,
                                 supplier_context=supplier_context,
                             )
+                            if _document_is_before_sync_start(document, data_inizio):
+                                continue
                             result = importa_documento_fatture_in_cloud(
                                 connessione,
                                 document,

@@ -854,6 +854,15 @@ class FattureInCloudConnessioneForm(forms.ModelForm):
         return instance
 
 
+class FattureInCloudSyncForm(forms.Form):
+    data_inizio = forms.DateField(
+        label="Dal",
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
+
+
 # =========================================================================
 #  Provider bancari
 # =========================================================================

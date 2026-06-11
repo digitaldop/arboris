@@ -2718,6 +2718,40 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(DocumentoFornitore.objects.filter(external_id="987").count(), 1)
         self.assertEqual(NotificaFinanziaria.objects.filter(documento=documento).count(), 1)
 
+    def test_importa_documento_fatture_in_cloud_nota_credito_non_crea_scadenze(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 993,
+            "type": "expense",
+            "description": "Nota di credito",
+            "invoice_number": "NC-1",
+            "date": "2026-04-21",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Credit Supplier Srl", "vat_number": "IT12345678907"},
+            "payments_list": [{"due_date": "2026-05-21", "amount": "122.00"}],
+        }
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            payload,
+            pending=False,
+            utente=self.user,
+            source_doc_type="passive_credit_note",
+        )
+
+        self.assertTrue(result["created"])
+        self.assertEqual(result["scadenze_create"], 0)
+        self.assertEqual(result["pagamenti_auto"], 0)
+        documento = DocumentoFornitore.objects.get(external_id="993")
+        self.assertEqual(documento.tipo_documento, TipoDocumentoFornitore.NOTA_CREDITO)
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        self.assertFalse(documento.scadenze.exists())
+
     def test_importa_documento_fatture_in_cloud_arricchisce_fornitore_esistente(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
@@ -3261,6 +3295,54 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         scadenza = documento.scadenze.get()
         self.assertEqual(scadenza.data_scadenza, date(2026, 6, 30))
 
+    def test_importa_documento_fatture_in_cloud_nota_credito_rimuove_scadenza_precedente(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        fornitore = Fornitore.objects.create(denominazione="Fornitore nota")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="NC-OLD",
+            data_documento=date(2026, 4, 22),
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            external_source="fatture_in_cloud",
+            external_id="994",
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 22),
+            importo_previsto=Decimal("122.00"),
+        )
+        payload = {
+            "id": 994,
+            "type": "expense",
+            "document_type": "expense",
+            "description": "Nota di credito aggiornata",
+            "invoice_number": "NC-OLD",
+            "date": "2026-04-22",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Fornitore nota", "vat_number": "IT12345678908"},
+            "payments_list": [{"due_date": "2026-05-22", "amount": "122.00"}],
+        }
+
+        importa_documento_fatture_in_cloud(
+            connessione,
+            payload,
+            pending=False,
+            utente=self.user,
+            source_doc_type="passive_credit_note",
+        )
+
+        documento.refresh_from_db()
+        self.assertEqual(documento.tipo_documento, TipoDocumentoFornitore.NOTA_CREDITO)
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        self.assertFalse(documento.scadenze.exists())
+
     @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
     def test_sincronizza_fatture_in_cloud_recupera_dettaglio_prima_di_importare(self, mock_client_class):
         connessione = FattureInCloudConnessione.objects.create(
@@ -3297,6 +3379,106 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         documento = DocumentoFornitore.objects.get(external_id="991")
         self.assertEqual(documento.fornitore.denominazione, "Detailed Supplier Srl")
         self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 7, 1))
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_importa_passive_credit_note_come_nota(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_da_registrare=False,
+        )
+        client = Mock()
+
+        def list_received(doc_type, *, page=1, per_page=50, data_inizio=None):
+            if doc_type == "passive_credit_note":
+                return {"data": [{"id": 992, "date": "2026-04-24"}], "pagination": {"current_page": 1, "last_page": 1}}
+            return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
+
+        client.list_received_documents.side_effect = list_received
+        client.get_received_document.return_value = {
+            "id": 992,
+            "type": "expense",
+            "document_type": "expense",
+            "description": "Dettaglio nota credito",
+            "invoice_number": "NC-DET-1",
+            "date": "2026-04-24",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Credit Detail Supplier Srl", "vat_number": "IT12345678910"},
+            "payments_list": [{"due_date": "2026-07-01", "amount": "122.00"}],
+        }
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user)
+
+        self.assertEqual(stats["creati"], 1)
+        documento = DocumentoFornitore.objects.get(external_id="992")
+        self.assertEqual(documento.tipo_documento, TipoDocumentoFornitore.NOTA_CREDITO)
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+        self.assertFalse(documento.scadenze.exists())
+
+    @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
+    def test_sincronizza_fatture_in_cloud_filtra_da_data_inizio(self, mock_client_class):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+            sincronizza_documenti_da_registrare=False,
+        )
+        client = Mock()
+
+        def list_received(doc_type, *, page=1, per_page=50, data_inizio=None):
+            self.assertEqual(data_inizio, date(2026, 4, 1))
+            if doc_type == "expense":
+                return {
+                    "data": [
+                        {"id": 993, "date": "2026-04-02"},
+                        {"id": 994, "date": "2026-03-31"},
+                    ],
+                    "pagination": {"current_page": 1, "last_page": 1},
+                }
+            return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
+
+        client.list_received_documents.side_effect = list_received
+        client.get_received_document.return_value = {
+            "id": 993,
+            "type": "expense",
+            "invoice_number": "DATE-1",
+            "date": "2026-04-02",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {"name": "Date Supplier Srl", "vat_number": "IT12345678911"},
+            "payments_list": [{"due_date": "2026-05-02", "amount": "122.00"}],
+        }
+        mock_client_class.return_value = client
+
+        stats = sincronizza_fatture_in_cloud(connessione, utente=self.user, data_inizio=date(2026, 4, 1))
+
+        self.assertEqual(stats["creati"], 1)
+        client.get_received_document.assert_called_once_with(993)
+        self.assertTrue(DocumentoFornitore.objects.filter(external_id="993").exists())
+        self.assertFalse(DocumentoFornitore.objects.filter(external_id="994").exists())
+
+    @patch("gestione_finanziaria.views.sincronizza_fatture_in_cloud")
+    def test_sincronizza_fatture_in_cloud_view_accetta_data_inizio(self, mock_sync):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        mock_sync.return_value = {
+            "creati": 0,
+            "aggiornati": 0,
+            "fornitori_creati": 0,
+            "fornitori_aggiornati": 0,
+            "esito": EsitoSincronizzazione.OK,
+            "messaggi": [],
+        }
+
+        response = self.client.post(
+            reverse("sincronizza_fatture_in_cloud", kwargs={"pk": connessione.pk}),
+            {"data_inizio": "2026-01-01"},
+        )
+
+        self.assertRedirects(response, reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
+        mock_sync.assert_called_once_with(connessione, utente=self.user, data_inizio=date(2026, 1, 1))
 
     @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
     def test_sincronizza_fatture_in_cloud_arricchisce_fornitore_da_entity_supplier(self, mock_client_class):
@@ -3400,7 +3582,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
         client = Mock()
 
-        def list_pending(doc_type, *, page=1, per_page=50):
+        def list_pending(doc_type, *, page=1, per_page=50, data_inizio=None):
             if doc_type == "agyo":
                 return {"data": [{"id": 998}], "pagination": {"current_page": 1, "last_page": 1}}
             return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
@@ -3635,7 +3817,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
         client = Mock()
 
-        def list_pending(doc_type, *, page=1, per_page=50):
+        def list_pending(doc_type, *, page=1, per_page=50, data_inizio=None):
             if doc_type == "agyo":
                 return {"data": [{"id": 992}], "pagination": {"current_page": 1, "last_page": 1}}
             return {"data": [], "pagination": {"current_page": 1, "last_page": 1}}
