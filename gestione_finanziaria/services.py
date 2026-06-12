@@ -1424,6 +1424,11 @@ def importo_movimento_disponibile(movimento):
     return max(_importo_movimento_assoluto(movimento) - _importo_movimento_riconciliato_totale(movimento), Decimal("0.00"))
 
 
+def _clear_importo_movimento_disponibile_cache(movimento):
+    if movimento is not None and hasattr(movimento, "_arboris_importo_disponibile_cache"):
+        delattr(movimento, "_arboris_importo_disponibile_cache")
+
+
 def importo_rata_residuo(rata):
     return max((rata.importo_finale or Decimal("0.00")) - (rata.importo_pagato or Decimal("0.00")), Decimal("0.00"))
 
@@ -2296,8 +2301,7 @@ def riconcilia_movimento_con_rate(
 ):
     from .models import RiconciliazioneRataMovimento, StatoRiconciliazione
 
-    if hasattr(movimento, "_arboris_importo_disponibile_cache"):
-        delattr(movimento, "_arboris_importo_disponibile_cache")
+    _clear_importo_movimento_disponibile_cache(movimento)
 
     allocazioni = [
         (rata, importo)
@@ -2502,6 +2506,7 @@ def aggiorna_stato_riconciliazione_movimento(movimento):
 
     from .models import StatoRiconciliazione
 
+    _clear_importo_movimento_disponibile_cache(movimento)
     ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or movimento.riconciliazioni_rate.exists()
     ha_collegamenti_fornitori = movimento.pagamenti_fornitori.exists()
     ha_collegamenti_buste = movimento.buste_paga_dipendenti.exists()
@@ -2519,6 +2524,37 @@ def aggiorna_stato_riconciliazione_movimento(movimento):
     )
     movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
     return movimento
+
+
+def stato_riconciliazione_movimento_display(movimento):
+    if movimento is None:
+        return ""
+
+    from .models import StatoRiconciliazione
+
+    if movimento.stato_riconciliazione == StatoRiconciliazione.IGNORATO:
+        return movimento.get_stato_riconciliazione_display()
+
+    rate_count = getattr(movimento, "riconciliazioni_rate_count", None)
+    fornitori_count = getattr(movimento, "pagamenti_fornitori_count", None)
+    buste_count = getattr(movimento, "buste_paga_count", None)
+    ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or (
+        rate_count if rate_count is not None else movimento.riconciliazioni_rate.exists()
+    )
+    ha_collegamenti_fornitori = (
+        fornitori_count if fornitori_count is not None else movimento.pagamenti_fornitori.exists()
+    )
+    ha_collegamenti_buste = buste_count if buste_count is not None else movimento.buste_paga_dipendenti.exists()
+    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
+
+    if not ha_collegamenti:
+        return movimento.get_stato_riconciliazione_display()
+
+    _clear_importo_movimento_disponibile_cache(movimento)
+    residuo = importo_movimento_disponibile(movimento)
+    if residuo <= _TOLLERANZA_IMPORTO_ESATTO:
+        return StatoRiconciliazione.RICONCILIATO.label
+    return "Parzialmente riconciliato"
 
 
 def crea_notifica_finanziaria(
@@ -2635,6 +2671,7 @@ def registra_pagamento_fornitore(
 ):
     from .models import PagamentoFornitore, StatoRiconciliazione
 
+    _clear_importo_movimento_disponibile_cache(movimento)
     importo = Decimal(importo or Decimal("0.00"))
     if importo <= Decimal("0.00"):
         raise ValidationError("L'importo del pagamento deve essere maggiore di zero.")
@@ -2660,6 +2697,7 @@ def registra_pagamento_fornitore(
     )
     applica_categoria_documento_a_movimento_fornitore(movimento, scadenza, utente=utente)
     aggiorna_scadenza_da_pagamenti(scadenza)
+    _clear_importo_movimento_disponibile_cache(movimento)
     if movimento is not None and importo_movimento_disponibile_fornitori(movimento) <= _TOLLERANZA_IMPORTO_ESATTO:
         movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
         movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
@@ -3415,6 +3453,7 @@ def riconcilia_movimento_con_scadenza_fornitore(
     if movimento.importo is None or movimento.importo >= 0:
         raise ValidationError("La riconciliazione fornitori richiede un movimento in uscita.")
 
+    _clear_importo_movimento_disponibile_cache(movimento)
     disponibile = importo_movimento_disponibile_fornitori(movimento)
     residuo_scadenza = importo_scadenza_fornitore_residuo(scadenza)
     importo = Decimal(importo if importo is not None else min(disponibile, residuo_scadenza))
@@ -3429,6 +3468,7 @@ def riconcilia_movimento_con_scadenza_fornitore(
         utente=utente,
     )
 
+    _clear_importo_movimento_disponibile_cache(movimento)
     residuo_movimento = importo_movimento_disponibile_fornitori(movimento)
     if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO:
         movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
@@ -3459,6 +3499,7 @@ def riconcilia_movimento_con_scadenze_fornitore(
     if movimento.importo is None or movimento.importo >= 0:
         raise ValidationError("La riconciliazione fornitori richiede un movimento in uscita.")
 
+    _clear_importo_movimento_disponibile_cache(movimento)
     allocazioni = [
         (scadenza, Decimal(importo))
         for scadenza, importo in (allocazioni or [])

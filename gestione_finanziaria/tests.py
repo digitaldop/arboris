@@ -104,6 +104,7 @@ from .services import (
     riconcilia_movimento_con_scadenze_fornitore,
     riconcilia_movimento_con_scadenza_fornitore,
     riconcilia_movimento_con_rate,
+    registra_pagamento_fornitore,
     trova_movimenti_cumulativi_candidati_per_rate,
     trova_movimenti_cumulativi_candidati_per_scadenza_fornitore,
     trova_scadenze_fornitori_cumulative_candidate,
@@ -1995,6 +1996,23 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         scadenza.refresh_from_db()
         movimento.refresh_from_db()
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_registra_pagamento_fornitore_ignora_cache_residuo_stantia(self):
+        scadenza, movimento = self._crea_scadenza_pagamento_test()
+        movimento._arboris_importo_disponibile_cache = abs(movimento.importo)
+
+        registra_pagamento_fornitore(
+            scadenza,
+            importo=Decimal("100.00"),
+            data_pagamento=movimento.data_contabile,
+            movimento=movimento,
+            metodo=MetodoPagamentoFornitore.BANCA,
+            conto=movimento.conto,
+            utente=self.user,
+        )
+
+        movimento.refresh_from_db()
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
 
     def test_pagamento_fornitore_accetta_piu_righe_manuali(self):
@@ -5691,6 +5709,45 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "finance-movement-row-incoming")
         self.assertContains(response, "finance-movement-row-outgoing")
+
+    def test_lista_movimenti_mostra_stato_riconciliazione_effettivo(self):
+        scadenza_completa, movimento_completo = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        registra_pagamento_fornitore(
+            scadenza_completa,
+            importo=Decimal("100.00"),
+            data_pagamento=movimento_completo.data_contabile,
+            movimento=movimento_completo,
+            metodo=MetodoPagamentoFornitore.BANCA,
+            conto=movimento_completo.conto,
+            utente=self.user,
+        )
+        MovimentoFinanziario.objects.filter(pk=movimento_completo.pk).update(
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO
+        )
+
+        scadenza_parziale, movimento_parziale = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
+        movimento_parziale.importo = Decimal("-150.00")
+        movimento_parziale.descrizione = "Pagamento parziale Beta Servizi"
+        movimento_parziale.save(update_fields=["importo", "descrizione"])
+        registra_pagamento_fornitore(
+            scadenza_parziale,
+            importo=Decimal("100.00"),
+            data_pagamento=movimento_parziale.data_contabile,
+            movimento=movimento_parziale,
+            metodo=MetodoPagamentoFornitore.BANCA,
+            conto=movimento_parziale.conto,
+            utente=self.user,
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Riconciliato")
+        self.assertContains(response, "Parzialmente riconciliato")
+        movimento_completo.refresh_from_db()
+        movimento_parziale.refresh_from_db()
+        self.assertEqual(movimento_completo.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(movimento_parziale.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
 
     def test_eliminazione_multipla_movimenti_conferma_e_ricalcola_saldo(self):
         conto = ContoBancario.objects.create(

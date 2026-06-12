@@ -162,6 +162,7 @@ from .services import (
     riconcilia_movimento_con_rata,
     registra_pagamento_fornitore,
     sincronizza_conto_psd2,
+    stato_riconciliazione_movimento_display,
 )
 
 logger = logging.getLogger(__name__)
@@ -3539,6 +3540,7 @@ def lista_movimenti_finanziari(request):
         .annotate(
             riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
+            buste_paga_count=Count("buste_paga_dipendenti", distinct=True),
         )
         .order_by("-data_contabile", "-id")
     )
@@ -3558,6 +3560,17 @@ def lista_movimenti_finanziari(request):
         movimenti = movimenti.filter(origine=origine_filter)
     if canale_filter:
         movimenti = movimenti.filter(canale=canale_filter)
+
+    movimenti = list(movimenti)
+    for movimento in movimenti:
+        stato_display = stato_riconciliazione_movimento_display(movimento)
+        if (
+            stato_display == StatoRiconciliazione.RICONCILIATO.label
+            and movimento.stato_riconciliazione != StatoRiconciliazione.RICONCILIATO
+        ):
+            movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
+            movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
+        movimento.stato_riconciliazione_display_effettivo = stato_display
 
     return render(
         request,
