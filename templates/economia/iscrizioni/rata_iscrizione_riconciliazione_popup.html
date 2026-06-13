@@ -67,6 +67,8 @@
                                                 autocomplete="off"
                                                 data-currency="EUR"
                                                 data-currency-display="suffix"
+                                                data-rate-reconcile-primary-input
+                                                data-rate-reconcile-residuo="{{ row.residuo }}"
                                             >
                                             <span class="currency-suffix">EUR</span>
                                         </div>
@@ -139,7 +141,13 @@
                         {% for proposta in proposte_movimento %}
                             {% with allocazione=proposta.allocazioni.0 %}
                             <label class="rate-reconcile-movement{% if forloop.first %} is-best{% endif %}">
-                                <input type="radio" name="movimento_pk" value="{{ allocazione.movimento.pk }}" {% if forloop.first %}checked{% endif %}>
+                                <input
+                                    type="radio"
+                                    name="movimento_pk"
+                                    value="{{ allocazione.movimento.pk }}"
+                                    data-rate-reconcile-movement-available="{{ allocazione.importo }}"
+                                    {% if forloop.first %}checked{% endif %}
+                                >
                                 <span class="rate-reconcile-movement-body">
                                     <span class="rate-reconcile-movement-head">
                                         <strong>EUR {{ allocazione.importo|euro }}</strong>
@@ -249,13 +257,51 @@
         (function () {
             var toggle = document.querySelector("[data-rate-reconcile-multi-toggle]");
             var extraRates = document.querySelector("[data-rate-reconcile-extra-rates]");
-            if (!toggle || !extraRates) {
-                return;
+            var inputs = extraRates ? Array.prototype.slice.call(extraRates.querySelectorAll("[data-rate-reconcile-extra-input]")) : [];
+            var primaryInput = document.querySelector("[data-rate-reconcile-primary-input]");
+            var movementChoices = Array.prototype.slice.call(document.querySelectorAll("[data-rate-reconcile-movement-available]"));
+
+            function parseDecimal(value) {
+                var normalized = String(value || "")
+                    .trim()
+                    .replace(/\./g, "")
+                    .replace(",", ".");
+                var parsed = Number(normalized);
+                return Number.isFinite(parsed) ? parsed : 0;
             }
 
-            var inputs = Array.prototype.slice.call(extraRates.querySelectorAll("[data-rate-reconcile-extra-input]"));
+            function formatEuro(value) {
+                return Number(value || 0).toLocaleString("it-IT", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function syncPrimaryAmountWithMovement() {
+                if (!primaryInput) {
+                    return;
+                }
+                var selected = movementChoices.find(function (choice) {
+                    return choice.checked;
+                });
+                if (!selected) {
+                    return;
+                }
+                var residuo = Number(primaryInput.dataset.rateReconcileResiduo || "0");
+                var disponibile = Number(selected.dataset.rateReconcileMovementAvailable || "0");
+                var importoProposto = Math.min(residuo, disponibile);
+                var valoreCorrente = parseDecimal(primaryInput.value);
+                var valoreEraDefaultResiduo = Math.abs(valoreCorrente - residuo) < 0.01;
+                var valoreSuperaDisponibile = valoreCorrente > disponibile + 0.01;
+                if (importoProposto > 0 && (!primaryInput.dataset.userEdited || valoreEraDefaultResiduo || valoreSuperaDisponibile)) {
+                    primaryInput.value = formatEuro(importoProposto);
+                }
+            }
 
             function syncExtraRates() {
+                if (!toggle || !extraRates) {
+                    return;
+                }
                 var enabled = toggle.checked;
                 extraRates.hidden = !enabled;
                 inputs.forEach(function (input) {
@@ -267,8 +313,21 @@
                 });
             }
 
-            toggle.addEventListener("change", syncExtraRates);
+            if (primaryInput) {
+                primaryInput.addEventListener("input", function (event) {
+                    if (event.isTrusted) {
+                        primaryInput.dataset.userEdited = "1";
+                    }
+                });
+            }
+            movementChoices.forEach(function (choice) {
+                choice.addEventListener("change", syncPrimaryAmountWithMovement);
+            });
+            if (toggle) {
+                toggle.addEventListener("change", syncExtraRates);
+            }
             syncExtraRates();
+            syncPrimaryAmountWithMovement();
         })();
     </script>
 {% endblock %}

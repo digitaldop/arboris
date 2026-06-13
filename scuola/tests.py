@@ -162,3 +162,34 @@ class ListaAnniScolasticiTests(TestCase):
         )
         self.assertEqual(list(response.context["anni_passati"]), [anno_passato])
         self.assertContains(response, "Anni scolastici passati")
+
+    def test_lista_anni_scolastici_modifica_apre_popup_in_edit(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2099/2100",
+            data_inizio=date(2099, 9, 1),
+            data_fine=date(2100, 8, 31),
+        )
+        edit_url = f"{reverse('modifica_anno_scolastico', args=[anno.pk])}?popup=1&edit=1"
+
+        response = self.client.get(reverse("lista_anni_scolastici"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{edit_url}"')
+        self.assertContains(response, f'data-popup-url="{edit_url}"')
+        self.assertContains(response, 'data-window-popup="1"')
+        self.assertContains(response, 'data-popup-window-name="arboris-anno-scolastico-popup"')
+
+    def test_modifica_anno_scolastico_rende_date_iso_e_supporta_edit_mode(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2099/2100",
+            data_inizio=date(2099, 9, 1),
+            data_fine=date(2100, 8, 31),
+        )
+        url = reverse("modifica_anno_scolastico", args=[anno.pk])
+
+        response = self.client.get(f"{url}?edit=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="data_inizio" value="2099-09-01"')
+        self.assertContains(response, 'name="data_fine" value="2100-08-31"')
+        self.assertContains(response, "startInEditMode: true")

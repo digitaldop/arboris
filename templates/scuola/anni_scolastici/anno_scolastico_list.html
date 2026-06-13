@@ -42,7 +42,14 @@
                             <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
                             <td>{% active_toggle anno %}</td>
                             <td class="actions-cell">
-                                <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
+                                <a
+                                    href="{% url 'modifica_anno_scolastico' anno.pk %}?popup=1&edit=1"
+                                    class="table-link"
+                                    data-window-popup="1"
+                                    data-popup-url="{% url 'modifica_anno_scolastico' anno.pk %}?popup=1&edit=1"
+                                    data-popup-window-name="arboris-anno-scolastico-popup"
+                                    data-popup-window-features="width=860,height=680,resizable=yes,scrollbars=yes"
+                                >Modifica</a>
                                 <span class="table-muted">|</span>
                                 <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
                             </td>
@@ -82,7 +89,14 @@
                             <td>{% if anno.is_corrente %}Si{% else %}No{% endif %}</td>
                             <td>{% active_toggle anno %}</td>
                             <td class="actions-cell">
-                                <a href="{% url 'modifica_anno_scolastico' anno.pk %}" class="table-link">Modifica</a>
+                                <a
+                                    href="{% url 'modifica_anno_scolastico' anno.pk %}?popup=1&edit=1"
+                                    class="table-link"
+                                    data-window-popup="1"
+                                    data-popup-url="{% url 'modifica_anno_scolastico' anno.pk %}?popup=1&edit=1"
+                                    data-popup-window-name="arboris-anno-scolastico-popup"
+                                    data-popup-window-features="width=860,height=680,resizable=yes,scrollbars=yes"
+                                >Modifica</a>
                                 <span class="table-muted">|</span>
                                 <a href="{% url 'elimina_anno_scolastico' anno.pk %}" class="table-link table-link-danger">Elimina</a>
                             </td>

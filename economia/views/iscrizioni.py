@@ -48,6 +48,7 @@ from gestione_finanziaria.models import MovimentoFinanziario
 from gestione_finanziaria.services import (
     applica_proposta_riconciliazione,
     crea_proposta_riconciliazione,
+    importo_movimento_disponibile,
     importo_rata_residuo,
     proposte_riconciliazione_da_rata,
 )
@@ -65,6 +66,24 @@ def _parse_importo_riconciliazione(raw_value):
     field = forms.DecimalField(max_digits=12, decimal_places=2, required=False)
     value = italian_decimal_to_python(field, raw_value)
     return value or Decimal("0.00")
+
+
+def _cap_allocazione_rata_singola_a_disponibile_movimento(movimento, allocazioni):
+    if len(allocazioni) != 1:
+        return allocazioni
+
+    _movimento, rata, target_tipo, importo = allocazioni[0]
+    if target_tipo != "rata" or importo <= Decimal("0.00"):
+        return allocazioni
+
+    disponibile = importo_movimento_disponibile(movimento)
+    if importo <= disponibile:
+        return allocazioni
+
+    importo_riconciliabile = min(disponibile, importo_rata_residuo(rata))
+    if importo_riconciliabile <= Decimal("0.00"):
+        return allocazioni
+    return [(movimento, rata, target_tipo, importo_riconciliabile)]
 
 
 def get_stato_ritirato():
@@ -1186,6 +1205,7 @@ def riconcilia_rata_iscrizione(request, pk):
                         importo = _parse_importo_riconciliazione(request.POST.get(f"importo_rata_{rata_aperta.pk}", ""))
                         if importo > 0:
                             allocazioni.append((movimento, rata_aperta, "rata", importo))
+                    allocazioni = _cap_allocazione_rata_singola_a_disponibile_movimento(movimento, allocazioni)
                     proposta = crea_proposta_riconciliazione(
                         kind="rate",
                         direction="movimento_to_targets",

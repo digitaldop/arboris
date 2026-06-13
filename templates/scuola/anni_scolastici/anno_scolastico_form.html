@@ -79,7 +79,7 @@
                         lockContainerId: "anno-lock-container",
                         editButtonId: "enable-edit-anno-btn",
                         cancelButtonId: "cancel-edit-anno-btn",
-                        startInEditMode: {% if anno %}false{% else %}true{% endif %},
+                        startInEditMode: {% if not anno or start_in_edit %}true{% else %}false{% endif %},
                         reloadOnCancel: true
                     });
                 }

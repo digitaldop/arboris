@@ -491,6 +491,13 @@ def bind_primed_queryset(field, queryset):
     return queryset
 
 
+def first_from_primed_queryset(queryset, predicate=None):
+    for item in queryset:
+        if predicate is None or predicate(item):
+            return item
+    return None
+
+
 def indirizzo_choice_queryset():
     return (
         Indirizzo.objects
@@ -1995,6 +2002,18 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 )
             )
         bind_primed_queryset(self.fields["condizione_iscrizione"], condizione_qs)
+        default_condizione_iscrizione = shared_lookups.get("default_condizione_iscrizione")
+        if default_condizione_iscrizione is None:
+            default_anno_scolastico = shared_lookups.get("default_anno_scolastico")
+            default_anno_id = getattr(default_anno_scolastico, "pk", None)
+            default_condizione_iscrizione = (
+                first_from_primed_queryset(
+                    condizione_qs,
+                    lambda item: str(item.anno_scolastico_id) == str(default_anno_id),
+                )
+                if default_anno_id
+                else None
+            ) or first_from_primed_queryset(condizione_qs)
         self.fields["rate_custom"].label = "Numero rate personalizzato"
         self.fields["rate_custom"].required = False
         self.fields["rate_custom"].widget.attrs.update(
@@ -2070,6 +2089,19 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             if primo_stato_iscrizione:
                 self.initial["stato_iscrizione"] = primo_stato_iscrizione.pk
 
+        if not self.instance.pk and not self.is_bound and not self.initial.get("condizione_iscrizione"):
+            anno_id = self.initial.get("anno_scolastico")
+            prima_condizione = (
+                first_from_primed_queryset(
+                    condizione_qs,
+                    lambda item: str(item.anno_scolastico_id) == str(anno_id),
+                )
+                if anno_id
+                else None
+            ) or default_condizione_iscrizione
+            if prima_condizione:
+                self.initial["condizione_iscrizione"] = prima_condizione.pk
+
         if not getattr(self.instance, "pk", None):
             self.fields["data_fine_iscrizione"].widget = HiddenInput()
 
@@ -2099,7 +2131,6 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
         meaningful_text_fields = [
             "classe",
             "gruppo_classe",
-            "condizione_iscrizione",
             "rate_custom",
             "agevolazione",
             "scadenza_pagamento_unica",
@@ -2107,6 +2138,10 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
             "note",
         ]
         if any(raw_value(field_name) for field_name in meaningful_text_fields):
+            return True
+
+        condizione_value = raw_value("condizione_iscrizione")
+        if condizione_value and condizione_value != self._default_condizione_bound_value():
             return True
 
         if raw_value("modalita_pagamento_retta") == Iscrizione.MODALITA_PAGAMENTO_UNICA_SOLUZIONE:
@@ -2122,6 +2157,19 @@ class IscrizioneStudenteInlineForm(forms.ModelForm):
                 return True
 
         return False
+
+    def _default_condizione_bound_value(self):
+        anno_id = self.data.get(self.add_prefix("anno_scolastico"), "") if self.is_bound else self.initial.get("anno_scolastico")
+        condizione_qs = self.fields["condizione_iscrizione"].queryset
+        prima_condizione = (
+            first_from_primed_queryset(
+                condizione_qs,
+                lambda item: str(item.anno_scolastico_id) == str(anno_id),
+            )
+            if anno_id
+            else None
+        ) or first_from_primed_queryset(condizione_qs)
+        return str(prima_condizione.pk) if prima_condizione else ""
 
     @staticmethod
     def _decimal_bound_value_is_nonzero(value):
@@ -2176,6 +2224,17 @@ class IscrizioneStudenteInlineBaseFormSet(CachedEmptyFormSetMixin, BaseInlineFor
         except DatabaseError:
             agevolazione_queryset = Agevolazione.objects.none()
 
+        default_anno_scolastico = resolve_default_anno_scolastico(anno_scolastico_queryset)
+        default_anno_id = getattr(default_anno_scolastico, "pk", None)
+        default_condizione_iscrizione = (
+            first_from_primed_queryset(
+                condizione_queryset,
+                lambda item: str(item.anno_scolastico_id) == str(default_anno_id),
+            )
+            if default_anno_id
+            else None
+        ) or first_from_primed_queryset(condizione_queryset)
+
         self.shared_lookups = {
             "anno_scolastico_queryset": anno_scolastico_queryset,
             "classe_queryset": classe_queryset,
@@ -2183,8 +2242,9 @@ class IscrizioneStudenteInlineBaseFormSet(CachedEmptyFormSetMixin, BaseInlineFor
             "stato_iscrizione_queryset": stato_iscrizione_queryset,
             "primo_stato_iscrizione": next(iter(stato_iscrizione_queryset), None),
             "condizione_queryset": condizione_queryset,
+            "default_condizione_iscrizione": default_condizione_iscrizione,
             "agevolazione_queryset": agevolazione_queryset,
-            "default_anno_scolastico": resolve_default_anno_scolastico(anno_scolastico_queryset),
+            "default_anno_scolastico": default_anno_scolastico,
         }
 
     def get_form_kwargs(self, index):

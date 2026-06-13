@@ -78,6 +78,7 @@ def crea_anno_scolastico(request):
 def modifica_anno_scolastico(request, pk):
     anno = get_object_or_404(AnnoScolastico, pk=pk)
     popup = is_popup_request(request)
+    start_in_edit = request.method == "POST" or request.GET.get("edit") == "1"
 
     if request.method == "POST":
         form = AnnoScolasticoForm(request.POST, instance=anno)
@@ -95,7 +96,7 @@ def modifica_anno_scolastico(request, pk):
     return render(
         request,
         "scuola/anni_scolastici/anno_scolastico_form.html",
-        {"form": form, "anno": anno, "popup": popup},
+        {"form": form, "anno": anno, "popup": popup, "start_in_edit": start_in_edit},
     )
 
 

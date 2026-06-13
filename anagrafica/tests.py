@@ -1423,6 +1423,95 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertNotContains(response, "NON ISCRITTO")
 
 
+class IscrizioneInlineDefaultsTests(TestCase):
+    def test_iscrizione_inline_defaults_to_first_condition_for_default_year(self):
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=date(2026, 9, 1),
+            data_fine=date(2027, 8, 31),
+        )
+        prima_condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="A - Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="B - Retta estesa",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="A - Retta futura",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+
+        form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
+
+        self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
+        self.assertEqual(form.initial["condizione_iscrizione"], prima_condizione.pk)
+
+    def test_iscrizione_inline_empty_extra_row_ignores_default_condition(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        form = IscrizioneStudenteInlineForm(
+            data={
+                "iscrizioni-0-anno_scolastico": str(anno.pk),
+                "iscrizioni-0-condizione_iscrizione": str(condizione.pk),
+                "iscrizioni-0-data_iscrizione": "2025-09-01",
+            },
+            prefix="iscrizioni-0",
+        )
+
+        self.assertFalse(form.has_changed())
+
+    def test_iscrizione_inline_empty_extra_row_tracks_non_default_condition(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+        )
+        CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="A - Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        altra_condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="B - Retta estesa",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        form = IscrizioneStudenteInlineForm(
+            data={
+                "iscrizioni-0-anno_scolastico": str(anno.pk),
+                "iscrizioni-0-condizione_iscrizione": str(altra_condizione.pk),
+                "iscrizioni-0-data_iscrizione": "2025-09-01",
+            },
+            prefix="iscrizioni-0",
+        )
+
+        self.assertTrue(form.has_changed())
+
+
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class FamigliaInlineDefaultsTests(TestCase):
     def test_new_person_forms_default_to_italian_nationality(self):

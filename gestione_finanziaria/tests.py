@@ -93,6 +93,7 @@ from .services import (
     anteprima_riconcilia_fornitori_automaticamente,
     applica_regole_a_movimento,
     importo_movimento_disponibile_fornitori,
+    importo_rata_residuo,
     applica_anteprima_riconciliazione_fornitori,
     applica_proposta_riconciliazione,
     build_budgeting_dashboard_data,
@@ -1448,6 +1449,59 @@ class MovimentoRiconciliazioneLayoutTests(TestCase):
         self.assertEqual(rata.importo_pagato, Decimal("300.00"))
         self.assertEqual(primo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
         self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+    def test_riconcilia_rata_accetta_movimento_inferiore_al_residuo_come_parziale(self):
+        rata = self._crea_rata_corrente_con_familiare(importo=Decimal("480.00"))
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=Decimal("445.00"),
+            descrizione="Quota retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.post(
+            reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {
+                "movimento_pk": str(movimento.pk),
+                f"importo_rata_{rata.pk}": "480,00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rata.refresh_from_db()
+        movimento.refresh_from_db()
+        link = RiconciliazioneRataMovimento.objects.get(rata=rata, movimento=movimento)
+        self.assertEqual(link.importo, Decimal("445.00"))
+        self.assertEqual(rata.importo_pagato, Decimal("445.00"))
+        self.assertFalse(rata.pagata)
+        self.assertEqual(importo_rata_residuo(rata), Decimal("35.00"))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+
+        secondo_movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 12),
+            importo=Decimal("445.00"),
+            descrizione="Seconda quota retta settembre Mario Rossi",
+            controparte="Mario Rossi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+
+        response = self.client.post(
+            reverse("riconcilia_rata_iscrizione", kwargs={"pk": rata.pk}),
+            {
+                "movimento_pk": str(secondo_movimento.pk),
+                f"importo_rata_{rata.pk}": "35,00",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rata.refresh_from_db()
+        secondo_movimento.refresh_from_db()
+        secondo_link = RiconciliazioneRataMovimento.objects.get(rata=rata, movimento=secondo_movimento)
+        self.assertEqual(secondo_link.importo, Decimal("35.00"))
+        self.assertEqual(rata.importo_pagato, Decimal("480.00"))
+        self.assertTrue(rata.pagata)
+        self.assertEqual(secondo_movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
 
     def test_riconciliazione_movimento_in_uscita_mostra_scadenze_fornitore(self):
         fornitore = Fornitore.objects.create(denominazione="Energia Srl", tipo_soggetto="azienda")

@@ -7,6 +7,9 @@ from .utils import resolve_default_anno_scolastico
 class DateInput(forms.DateInput):
     input_type = "date"
 
+    def __init__(self, attrs=None, format=None):
+        super().__init__(attrs=attrs, format=format or "%Y-%m-%d")
+
 
 class AnnoScolasticoForm(forms.ModelForm):
     class Meta:
