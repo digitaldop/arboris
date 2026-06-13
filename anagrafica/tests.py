@@ -1423,6 +1423,67 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertNotContains(response, "NON ISCRITTO")
 
 
+class StudenteListEnrollmentBadgeLayoutTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="studenti-list-badges@example.com",
+            email="studenti-list-badges@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+
+    def test_studenti_list_stacks_current_and_future_enrollment_badges(self):
+        today = timezone.localdate()
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=today + timedelta(days=31),
+            data_fine=today + timedelta(days=395),
+            attivo=True,
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta standard corrente",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        condizione_futura = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="Retta standard futura",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_corrente,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno_futuro,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_futura,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("lista_studenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="studenti-iscrizione-cell"')
+        self.assertContains(response, 'class="student-enrollment-status-list"')
+        self.assertContains(response, "ISCRITTO 2025/2026")
+        self.assertContains(response, "PREISCRITTO 2026/2027")
+
+
 class IscrizioneInlineDefaultsTests(TestCase):
     def test_iscrizione_inline_defaults_to_first_condition_for_default_year(self):
         anno_corrente = AnnoScolastico.objects.create(

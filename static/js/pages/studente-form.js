@@ -3895,10 +3895,13 @@ window.ArborisStudenteForm = (function () {
             }
         }
 
-        function syncDependentSelect(select, matcher) {
+        function syncDependentSelect(select, matcher, options) {
             if (!select) return;
 
             let hasSelectedVisibleOption = false;
+            let firstVisibleOption = null;
+            const config = options || {};
+            const previousValue = select.value;
 
             Array.from(select.options).forEach(option => {
                 if (!option.value) {
@@ -3911,13 +3914,22 @@ window.ArborisStudenteForm = (function () {
                 option.hidden = !isVisible;
                 option.disabled = !isVisible;
 
+                if (isVisible && !firstVisibleOption) {
+                    firstVisibleOption = option;
+                }
                 if (isVisible && option.selected) {
                     hasSelectedVisibleOption = true;
                 }
             });
 
-            if (select.value && !hasSelectedVisibleOption) {
+            if (!hasSelectedVisibleOption && config.selectFirstVisible && firstVisibleOption) {
+                select.value = firstVisibleOption.value;
+            } else if (select.value && !hasSelectedVisibleOption) {
                 select.value = "";
+            }
+
+            if (config.dispatchChange && select.value !== previousValue) {
+                select.dispatchEvent(new Event("change", { bubbles: true }));
             }
         }
 
@@ -3981,7 +3993,11 @@ window.ArborisStudenteForm = (function () {
                         return sameYear && (!classeId || classIds.includes(classeId));
                     });
                 }
-                syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                syncDependentSelect(
+                    condizioneSelect,
+                    option => option.dataset.annoScolastico === annoScolasticoId,
+                    { selectFirstVisible: true, dispatchChange: true }
+                );
             }
 
             function selectedAnnoDate(datasetKey) {
@@ -4031,6 +4047,7 @@ window.ArborisStudenteForm = (function () {
             annoSelect.addEventListener("change", function () {
                 refreshDependentChoices();
                 syncIscrizioneDates();
+                syncRiduzioneSpecialeState();
             });
             classeSelect.addEventListener("change", refreshDependentChoices);
 

@@ -62,12 +62,15 @@ window.ArborisIscrizioneForm = (function () {
             openRelatedPopup: relatedPopups.openRelatedPopup,
         });
 
-        function syncDependentSelect(select, predicate) {
+        function syncDependentSelect(select, predicate, options) {
             if (!select) {
                 return;
             }
 
             let hasSelectedVisibleOption = false;
+            let firstVisibleOption = null;
+            const config = options || {};
+            const previousValue = select.value;
             Array.from(select.options).forEach(function (option) {
                 if (!option.value) {
                     option.hidden = false;
@@ -78,13 +81,22 @@ window.ArborisIscrizioneForm = (function () {
                 const visible = predicate(option);
                 option.hidden = !visible;
                 option.disabled = !visible;
+                if (visible && !firstVisibleOption) {
+                    firstVisibleOption = option;
+                }
                 if (visible && option.selected) {
                     hasSelectedVisibleOption = true;
                 }
             });
 
-            if (select.value && !hasSelectedVisibleOption) {
+            if (!hasSelectedVisibleOption && config.selectFirstVisible && firstVisibleOption) {
+                select.value = firstVisibleOption.value;
+            } else if (select.value && !hasSelectedVisibleOption) {
                 select.value = "";
+            }
+
+            if (config.dispatchChange && select.value !== previousValue) {
+                select.dispatchEvent(new Event("change", { bubbles: true }));
             }
         }
 
@@ -180,7 +192,11 @@ window.ArborisIscrizioneForm = (function () {
                     const classIds = (option.dataset.classIds || "").split(",").filter(Boolean);
                     return sameYear && (!classeId || classIds.includes(classeId));
                 });
-                syncDependentSelect(condizioneSelect, option => option.dataset.annoScolastico === annoScolasticoId);
+                syncDependentSelect(
+                    condizioneSelect,
+                    option => option.dataset.annoScolastico === annoScolasticoId,
+                    { selectFirstVisible: true, dispatchChange: true }
+                );
             }
 
             bindAutoManagedDate(dataIscrizioneInput, "dataInizio");
