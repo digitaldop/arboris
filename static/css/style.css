@@ -7105,6 +7105,37 @@ a.dashboard-birthday-family-chip:hover {
     flex-wrap: wrap;
 }
 
+.dashboard-year-switch-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 6px 8px 6px 12px;
+    border: 1px solid #d6e4ed;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 18px rgba(31, 54, 76, 0.045);
+}
+
+.dashboard-year-switch-form label {
+    color: #49617a;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.dashboard-year-switch-form select {
+    min-width: 156px;
+    max-width: 220px;
+    min-height: 34px;
+    border: 1px solid #cfe0ea;
+    border-radius: 7px;
+    background: #f8fbfd;
+    color: #20324a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .dashboard-head-action {
     min-height: 42px;
     border-radius: 7px;
@@ -7500,6 +7531,51 @@ a.dashboard-birthday-family-chip:hover {
     line-height: 1.45;
 }
 
+.dashboard-stat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.dashboard-class-view-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid #d6e4ed;
+    border-radius: 8px;
+    background: #eef7fb;
+}
+
+.dashboard-class-view-btn {
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #49617a;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.dashboard-class-view-btn.is-active {
+    background: #ffffff;
+    color: #275b75;
+    box-shadow: 0 4px 10px rgba(31, 54, 76, 0.08);
+}
+
+.dashboard-class-view-panel {
+    display: none;
+}
+
+.dashboard-class-view-panel.is-active {
+    display: block;
+}
+
 .dashboard-class-grid,
 .dashboard-economy-list {
     grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
@@ -7513,6 +7589,103 @@ a.dashboard-birthday-family-chip:hover {
     background: var(--dashboard-card-tint, #f8fbfd);
     padding: 14px;
     box-shadow: inset 3px 0 0 var(--dashboard-card-accent, #bfd8e5);
+}
+
+.dashboard-class-grid-expandable {
+    align-items: start;
+}
+
+.dashboard-class-expandable {
+    padding: 0;
+}
+
+.dashboard-class-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 68px;
+    padding: 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.dashboard-class-summary::-webkit-details-marker {
+    display: none;
+}
+
+.dashboard-class-summary::after {
+    content: "+";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid #cfe0ea;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #275b75;
+    flex: 0 0 auto;
+    font-weight: 800;
+}
+
+.dashboard-class-expandable[open] .dashboard-class-summary::after {
+    content: "-";
+}
+
+.dashboard-class-summary > span:first-child {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.dashboard-class-summary .dashboard-class-count {
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding-top: 2px;
+    text-align: right;
+}
+
+.dashboard-class-type,
+.dashboard-class-subtitle {
+    display: block;
+    color: var(--dashboard-muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.dashboard-class-details {
+    padding: 0 14px 14px;
+}
+
+.dashboard-class-students {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.dashboard-class-student-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    max-width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #d7e5ee;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #275b75;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+}
+
+.dashboard-class-student-link:hover,
+.dashboard-class-student-link:focus-visible {
+    border-color: #9fc4d5;
+    background: #eef7fb;
+    color: #1f4f69;
 }
 
 .dashboard-class-item:nth-child(4n+2):not(.dashboard-economy-highlight-item),
@@ -7900,6 +8073,20 @@ a.dashboard-birthday-family-chip:hover {
         width: 100%;
     }
 
+    .dashboard-year-switch-form {
+        width: 100%;
+    }
+
+    .dashboard-year-switch-form select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .dashboard-stat-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
     .dashboard-supplier-invoices-head,
     .dashboard-supplier-invoice-row,
     .dashboard-supplier-invoice-main {
@@ -7921,6 +8108,27 @@ a.dashboard-birthday-family-chip:hover {
     .dashboard-info-card {
         grid-template-columns: 1fr;
         padding: 18px;
+    }
+
+    .dashboard-year-switch-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .dashboard-class-view-switch {
+        width: 100%;
+    }
+
+    .dashboard-class-view-btn {
+        flex: 1 1 0;
+    }
+
+    .dashboard-class-summary {
+        flex-direction: column;
+    }
+
+    .dashboard-class-summary .dashboard-class-count {
+        text-align: left;
     }
 
     .dashboard-section-title,

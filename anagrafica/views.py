@@ -57,14 +57,13 @@ from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione,
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from gestione_finanziaria.services import build_home_financial_dashboard_data
 from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente, StatoDipendente
-from scuola.models import AnnoScolastico, Classe
+from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from scuola.utils import resolve_default_anno_scolastico
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
 from sistema.models import (
     AzioneOperazioneCronologia,
     LivelloPermesso,
     Scuola,
-    SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
 )
 from sistema.permissions import user_has_module_permission
@@ -153,6 +152,31 @@ def resolve_current_school_year():
     return None, f"{anno_inizio}/{anno_fine}"
 
 
+def resolve_dashboard_school_year(request, *, today=None):
+    anni_scolastici = list(AnnoScolastico.objects.order_by("-data_inizio", "-id"))
+    anno_predefinito = resolve_default_anno_scolastico(today=today)
+    anno_selezionato = anno_predefinito
+    anno_scolastico_id = (request.GET.get("anno_scolastico") or "").strip()
+
+    if anno_scolastico_id.isdigit():
+        anno_richiesto = next(
+            (anno for anno in anni_scolastici if anno.pk == int(anno_scolastico_id)),
+            None,
+        )
+        if anno_richiesto:
+            anno_selezionato = anno_richiesto
+
+    if anno_selezionato is None and anni_scolastici:
+        anno_selezionato = anni_scolastici[0]
+
+    return {
+        "anni_scolastici": anni_scolastici,
+        "anno_scolastico": anno_selezionato,
+        "anno_scolastico_id": str(anno_selezionato.pk) if anno_selezionato else "",
+        "has_year_switch": len(anni_scolastici) > 1,
+    }
+
+
 def build_school_year_status(anno_scolastico):
     if not anno_scolastico:
         return {"label": "Non configurato", "tone": "muted"}
@@ -169,6 +193,20 @@ def build_school_year_status(anno_scolastico):
     if not anno_scolastico.attivo:
         return {"label": "Non attivo", "tone": "muted"}
     return {"label": "Da verificare", "tone": "muted"}
+
+
+def resolve_dashboard_calendar_reference_date(anno_scolastico, today):
+    if not anno_scolastico:
+        return today
+
+    if anno_scolastico.data_inizio and anno_scolastico.data_fine:
+        if anno_scolastico.data_inizio <= today <= anno_scolastico.data_fine:
+            return today
+        if today < anno_scolastico.data_inizio:
+            return anno_scolastico.data_inizio
+        return anno_scolastico.data_fine
+
+    return anno_scolastico.data_inizio or anno_scolastico.data_fine or today
 
 
 def apri_documento(request, pk):
@@ -738,6 +776,32 @@ def current_iscrizione_class_display(iscrizione):
     if classe_label:
         return "Classe", classe_label
     return "", ""
+
+
+def current_year_student_iscrizione(iscrizioni, *, today=None):
+    anno_corrente = resolve_default_anno_scolastico(
+        AnnoScolastico.objects.filter(attivo=True),
+        today=today,
+    )
+    if not anno_corrente:
+        return None
+
+    iscrizioni_anno_corrente = [
+        iscrizione
+        for iscrizione in iscrizioni
+        if getattr(iscrizione, "anno_scolastico_id", None) == anno_corrente.pk
+    ]
+    if not iscrizioni_anno_corrente:
+        return None
+
+    return sorted(
+        iscrizioni_anno_corrente,
+        key=lambda iscrizione: (
+            0 if iscrizione.attiva else 1,
+            0 if iscrizione.classe_id or iscrizione.gruppo_classe_id else 1,
+            -(iscrizione.pk or 0),
+        ),
+    )[0]
 
 
 def decorate_studenti_formset_current_enrollment_labels(studenti_formset, today=None):
@@ -2119,6 +2183,29 @@ def build_balanced_rate_rows(months, max_single_row=6):
     return [months[:split_index], months[split_index:]]
 
 
+def dashboard_student_record(studente):
+    return {
+        "id": studente.pk,
+        "nome": str(studente),
+        "url": reverse("modifica_studente", kwargs={"pk": studente.pk}),
+    }
+
+
+def dashboard_students_label(count):
+    if count == 0:
+        return "Nessun Studente"
+    if count == 1:
+        return "1 Studente"
+    return f"{count} Studenti"
+
+
+def dashboard_student_records_from_map(student_map):
+    return sorted(
+        student_map.values(),
+        key=lambda item: item["nome"].lower(),
+    )
+
+
 def build_dashboard_school_year_statistics(anno_scolastico):
     data = {
         "anno_scolastico": anno_scolastico,
@@ -2126,79 +2213,127 @@ def build_dashboard_school_year_statistics(anno_scolastico):
         "count_studenti_iscritti": 0,
         "count_famiglie_iscritte": 0,
         "composizione_classi": [],
+        "composizione_pluriclassi": [],
     }
 
     if not anno_scolastico:
         return data
 
-    iscrizioni_anno = Iscrizione.objects.filter(
-        anno_scolastico=anno_scolastico,
-        attiva=True,
+    iscrizioni_anno = (
+        Iscrizione.objects.filter(
+            anno_scolastico=anno_scolastico,
+            attiva=True,
+        )
+        .select_related("studente", "classe", "gruppo_classe")
+        .order_by(
+            "classe__ordine_classe",
+            "classe__nome_classe",
+            "classe__sezione_classe",
+            "gruppo_classe__nome_gruppo_classe",
+            "studente__cognome",
+            "studente__nome",
+            "studente_id",
+        )
     )
+    iscrizioni_anno_list = list(iscrizioni_anno)
 
-    data["count_studenti_iscritti"] = iscrizioni_anno.values("studente_id").distinct().count()
-    studenti_iscritti_ids = set(iscrizioni_anno.values_list("studente_id", flat=True).distinct())
+    studenti_iscritti_ids = {iscrizione.studente_id for iscrizione in iscrizioni_anno_list}
+    data["count_studenti_iscritti"] = len(studenti_iscritti_ids)
     data["count_famiglie_iscritte"] = sum(
         1
         for snapshot in iter_logical_family_snapshots()
         if studenti_iscritti_ids.intersection(snapshot.student_ids)
     )
 
-    classi_anno = (
-        Classe.objects.filter(attiva=True)
-        .annotate(
-            count_studenti=Count(
-                "iscrizioni__studente",
-                filter=Q(iscrizioni__anno_scolastico=anno_scolastico, iscrizioni__attiva=True),
-                distinct=True,
-            )
-        )
-        .order_by("ordine_classe", "nome_classe", "sezione_classe", "id")
-    )
+    studenti_per_classe = defaultdict(dict)
+    studenti_per_gruppo = defaultdict(dict)
+    classi_extra_pluriclasse = {}
+    for iscrizione in iscrizioni_anno_list:
+        studente_record = dashboard_student_record(iscrizione.studente)
+        if iscrizione.classe_id:
+            studenti_per_classe[iscrizione.classe_id][iscrizione.studente_id] = studente_record
+
+        if iscrizione.gruppo_classe_id:
+            studenti_per_gruppo[f"gruppo:{iscrizione.gruppo_classe_id}"][iscrizione.studente_id] = studente_record
+        elif iscrizione.classe_id:
+            key = f"classe:{iscrizione.classe_id}"
+            studenti_per_gruppo[key][iscrizione.studente_id] = studente_record
+            classi_extra_pluriclasse[iscrizione.classe_id] = iscrizione.classe
+
+    classi_anno = Classe.objects.filter(attiva=True).order_by("ordine_classe", "nome_classe", "sezione_classe", "id")
 
     data["composizione_classi"] = [
         {
+            "id": f"classe-{classe.pk}",
             "nome_classe": str(classe),
-            "count_studenti": classe.count_studenti,
-            "studenti_label": (
-                "Nessun Studente"
-                if classe.count_studenti == 0
-                else f"{classe.count_studenti} Studente" if classe.count_studenti == 1 else f"{classe.count_studenti} Studenti"
-            ),
+            "tipo": "Classe",
+            "count_studenti": len(studenti_per_classe.get(classe.pk, {})),
+            "studenti_label": dashboard_students_label(len(studenti_per_classe.get(classe.pk, {}))),
+            "studenti": dashboard_student_records_from_map(studenti_per_classe.get(classe.pk, {})),
         }
         for classe in classi_anno
     ]
+
+    gruppi_anno = (
+        GruppoClasse.objects.filter(anno_scolastico=anno_scolastico, attivo=True)
+        .prefetch_related("classi")
+        .order_by("nome_gruppo_classe", "id")
+    )
+    composizione_pluriclassi = []
+    for gruppo in gruppi_anno:
+        studenti = dashboard_student_records_from_map(studenti_per_gruppo.get(f"gruppo:{gruppo.pk}", {}))
+        composizione_pluriclassi.append(
+            {
+                "id": f"gruppo-{gruppo.pk}",
+                "nome_classe": gruppo.nome_gruppo_classe,
+                "tipo": "Pluriclasse",
+                "classi_label": gruppo.classi_label,
+                "count_studenti": len(studenti),
+                "studenti_label": dashboard_students_label(len(studenti)),
+                "studenti": studenti,
+            }
+        )
+
+    for classe in sorted(
+        classi_extra_pluriclasse.values(),
+        key=lambda item: (item.ordine_classe, item.nome_classe, item.sezione_classe, item.pk),
+    ):
+        studenti = dashboard_student_records_from_map(studenti_per_gruppo.get(f"classe:{classe.pk}", {}))
+        composizione_pluriclassi.append(
+            {
+                "id": f"classe-{classe.pk}",
+                "nome_classe": str(classe),
+                "tipo": "Classe",
+                "classi_label": "",
+                "count_studenti": len(studenti),
+                "studenti_label": dashboard_students_label(len(studenti)),
+                "studenti": studenti,
+            }
+        )
+
+    data["composizione_pluriclassi"] = composizione_pluriclassi
 
     return data
 
 
 def home(request):
-    anno_corrente, anno_scolastico_corrente = resolve_current_school_year()
-    impostazioni_generali = SistemaImpostazioniGenerali.objects.first()
+    today = timezone.localdate()
+    dashboard_school_year = resolve_dashboard_school_year(request, today=today)
+    anno_corrente = dashboard_school_year["anno_scolastico"]
+    if anno_corrente:
+        anno_scolastico_corrente = anno_corrente.nome_anno_scolastico
+    else:
+        _, anno_scolastico_corrente = resolve_current_school_year()
     can_view_gestione_finanziaria = user_has_module_permission(
         request.user,
         "gestione_finanziaria",
         LivelloPermesso.VISUALIZZAZIONE,
     )
-    mostra_dashboard_prossimo_anno = bool(
-        impostazioni_generali and impostazioni_generali.mostra_dashboard_prossimo_anno_scolastico
-    )
 
     dashboard_corrente = build_dashboard_school_year_statistics(anno_corrente)
-    prossimo_anno_scolastico = resolve_next_school_year(anno_corrente) if mostra_dashboard_prossimo_anno else None
-    dashboard_prossimo_anno = (
-        build_dashboard_school_year_statistics(prossimo_anno_scolastico)
-        if prossimo_anno_scolastico
-        else build_dashboard_school_year_statistics(None)
-    )
-
     economia_dashboard = build_economia_dashboard_data(anno_corrente)
-    economia_dashboard_prossimo_anno = (
-        build_economia_dashboard_data(prossimo_anno_scolastico)
-        if prossimo_anno_scolastico
-        else build_economia_dashboard_data(None)
-    )
-    calendario_dashboard = build_dashboard_calendar_data(user=request.user)
+    calendar_reference_date = resolve_dashboard_calendar_reference_date(anno_corrente, today)
+    calendario_dashboard = build_dashboard_calendar_data(today=calendar_reference_date, user=request.user)
     gestione_finanziaria_dashboard = (
         build_home_financial_dashboard_data()
         if can_view_gestione_finanziaria
@@ -2206,16 +2341,18 @@ def home(request):
     )
 
     context = {
+        "dashboard_anni_scolastici": dashboard_school_year["anni_scolastici"],
+        "dashboard_anno_scolastico_selezionato": dashboard_school_year["anno_scolastico_id"],
+        "dashboard_has_year_switch": dashboard_school_year["has_year_switch"],
         "anno_scolastico_corrente": anno_scolastico_corrente,
         "anno_scolastico_corrente_obj": anno_corrente,
         "anno_scolastico_corrente_status": build_school_year_status(anno_corrente),
         "count_famiglie_iscritte": dashboard_corrente["count_famiglie_iscritte"],
         "count_studenti_iscritti": dashboard_corrente["count_studenti_iscritti"],
         "composizione_classi": dashboard_corrente["composizione_classi"],
+        "composizione_pluriclassi": dashboard_corrente["composizione_pluriclassi"],
         "economia_dashboard": economia_dashboard,
-        "mostra_dashboard_prossimo_anno": mostra_dashboard_prossimo_anno and bool(prossimo_anno_scolastico),
-        "dashboard_prossimo_anno": dashboard_prossimo_anno,
-        "economia_dashboard_prossimo_anno": economia_dashboard_prossimo_anno,
+        "mostra_dashboard_prossimo_anno": False,
         "calendario_dashboard": calendario_dashboard,
         "gestione_finanziaria_dashboard": gestione_finanziaria_dashboard,
     }
@@ -4657,21 +4794,7 @@ def modifica_studente(request, pk):
 
     iscrizioni_correnti_list = list(iscrizioni_queryset)
     documenti_correnti_list = [] if lazy_sections_enabled else list(documenti_queryset)
-    iscrizione_corrente = (
-        next(
-            (
-                item for item in sorted(
-                    (iscrizione for iscrizione in iscrizioni_correnti_list if iscrizione.classe_id or iscrizione.gruppo_classe_id),
-                    key=lambda iscrizione: (
-                        0 if iscrizione.attiva else 1,
-                        -(iscrizione.anno_scolastico.data_inizio.toordinal() if iscrizione.anno_scolastico and iscrizione.anno_scolastico.data_inizio else 0),
-                        -iscrizione.pk,
-                    ),
-                )
-            ),
-            None,
-        )
-    )
+    iscrizione_corrente = current_year_student_iscrizione(iscrizioni_correnti_list, today=today)
     classe_corrente_tipo, classe_corrente_label = current_iscrizione_class_display(iscrizione_corrente)
     document_counts = (
         build_studente_document_counts(studente, today)

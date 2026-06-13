@@ -17,12 +17,25 @@
                     {% endif %}
                 </div>
             </div>
-            {% if can_view_gestione_finanziaria %}
+            {% if dashboard_has_year_switch or can_view_gestione_finanziaria %}
                 <div class="dashboard-page-actions">
+                    {% if dashboard_has_year_switch %}
+                        <form method="get" class="dashboard-year-switch-form">
+                            <label for="dashboard-anno-scolastico">Anno scolastico</label>
+                            <select id="dashboard-anno-scolastico" name="anno_scolastico" onchange="this.form.submit()">
+                                {% for anno in dashboard_anni_scolastici %}
+                                    <option value="{{ anno.pk }}" {% if dashboard_anno_scolastico_selezionato == anno.pk|stringformat:"s" %}selected{% endif %}>{{ anno.nome_anno_scolastico }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-secondary btn-sm">Aggiorna</button>
+                        </form>
+                    {% endif %}
+                    {% if can_view_gestione_finanziaria %}
                     <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text dashboard-head-action">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
                         <span class="btn-label">Dashboard finanziaria</span>
                     </a>
+                    {% endif %}
                 </div>
             {% endif %}
         </div>
@@ -79,7 +92,7 @@
                             <dd>{% if anno_scolastico_corrente_obj %}{{ anno_scolastico_corrente_obj.data_fine|date:"d/m/Y" }}{% else %}-{% endif %}</dd>
                         </div>
                         <div>
-                            <dt>Settimana corrente</dt>
+                            <dt>Settimana di riferimento</dt>
                             <dd>{{ calendario_dashboard.week_label|default:"-" }}</dd>
                         </div>
                     </dl>
@@ -103,31 +116,90 @@
                 <div class="panel-body dashboard-panel-body">
                     <div class="dashboard-stats-grid">
                         <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-blue">
-                            <div class="dashboard-stat-label">Composizione delle classi</div>
-                            {% if composizione_classi %}
-                                <div class="dashboard-class-grid">
-                                    {% for classe in composizione_classi %}
-                                        <div class="dashboard-class-item">
-                                            <div class="dashboard-class-name">{{ classe.nome_classe }}</div>
-                                            <div class="dashboard-class-count">{{ classe.studenti_label }}</div>
-                                        </div>
-                                    {% endfor %}
+                            <div class="dashboard-stat-head">
+                                <div class="dashboard-stat-label">Composizione delle classi</div>
+                                <div class="dashboard-class-view-switch" data-dashboard-class-view-switch>
+                                    <button type="button" class="dashboard-class-view-btn is-active" data-dashboard-class-view="classi">Classi</button>
+                                    <button type="button" class="dashboard-class-view-btn" data-dashboard-class-view="pluriclassi">Pluriclassi</button>
                                 </div>
-                            {% else %}
-                                <div class="dashboard-stat-note">Nessuna classe configurata per l'anno scolastico corrente.</div>
-                            {% endif %}
+                            </div>
+
+                            <div class="dashboard-class-view-panel is-active" data-dashboard-class-view-panel="classi">
+                                {% if composizione_classi %}
+                                    <div class="dashboard-class-grid dashboard-class-grid-expandable">
+                                        {% for classe in composizione_classi %}
+                                            <details class="dashboard-class-item dashboard-class-expandable">
+                                                <summary class="dashboard-class-summary">
+                                                    <span>
+                                                        <span class="dashboard-class-name">{{ classe.nome_classe }}</span>
+                                                        <span class="dashboard-class-type">{{ classe.tipo }}</span>
+                                                    </span>
+                                                    <span class="dashboard-class-count">{{ classe.studenti_label }}</span>
+                                                </summary>
+                                                <div class="dashboard-class-details">
+                                                    {% if classe.studenti %}
+                                                        <div class="dashboard-class-students">
+                                                            {% for studente in classe.studenti %}
+                                                                <a href="{{ studente.url }}" class="dashboard-class-student-link">{{ studente.nome }}</a>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="dashboard-stat-note">Nessuno studente iscritto in questa classe per l'anno selezionato.</div>
+                                                    {% endif %}
+                                                </div>
+                                            </details>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessuna classe configurata per l'anno scolastico selezionato.</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="dashboard-class-view-panel" data-dashboard-class-view-panel="pluriclassi">
+                                {% if composizione_pluriclassi %}
+                                    <div class="dashboard-class-grid dashboard-class-grid-expandable">
+                                        {% for classe in composizione_pluriclassi %}
+                                            <details class="dashboard-class-item dashboard-class-expandable">
+                                                <summary class="dashboard-class-summary">
+                                                    <span>
+                                                        <span class="dashboard-class-name">{{ classe.nome_classe }}</span>
+                                                        <span class="dashboard-class-type">{{ classe.tipo }}</span>
+                                                        {% if classe.classi_label %}
+                                                            <span class="dashboard-class-subtitle">{{ classe.classi_label }}</span>
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="dashboard-class-count">{{ classe.studenti_label }}</span>
+                                                </summary>
+                                                <div class="dashboard-class-details">
+                                                    {% if classe.studenti %}
+                                                        <div class="dashboard-class-students">
+                                                            {% for studente in classe.studenti %}
+                                                                <a href="{{ studente.url }}" class="dashboard-class-student-link">{{ studente.nome }}</a>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="dashboard-stat-note">Nessuno studente iscritto in questa pluriclasse per l'anno selezionato.</div>
+                                                    {% endif %}
+                                                </div>
+                                            </details>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="dashboard-stat-note">Nessuna pluriclasse configurata o utilizzata per l'anno scolastico selezionato.</div>
+                                {% endif %}
+                            </div>
                         </div>
 
                         <div class="dashboard-stat-card dashboard-stat-tone-green">
                             <div class="dashboard-stat-label">{{ student_terminology.selected_plural }} iscritti</div>
                             <div class="dashboard-stat-value">{{ count_studenti_iscritti }}</div>
-                            <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti all'anno scolastico corrente.</div>
+                            <div class="dashboard-stat-note">Totale {{ student_terminology.selected_plural_lower }} iscritti all'anno scolastico selezionato.</div>
                         </div>
 
                         <div class="dashboard-stat-card dashboard-stat-tone-amber">
                             <div class="dashboard-stat-label">Famiglie iscritte</div>
                             <div class="dashboard-stat-value">{{ count_famiglie_iscritte }}</div>
-                            <div class="dashboard-stat-note">Totale famiglie con figli iscritti all'anno scolastico corrente.</div>
+                            <div class="dashboard-stat-note">Totale famiglie con figli iscritti all'anno scolastico selezionato.</div>
                         </div>
                     </div>
                 </div>
@@ -153,11 +225,11 @@
                                 <div class="dashboard-stat-card dashboard-stat-card-full dashboard-stat-tone-green">
                                     <div class="dashboard-stat-label">Totale {{ student_terminology.selected_plural }} iscritti</div>
                                     <div class="dashboard-class-grid dashboard-economy-highlights-grid">
-                                        <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-blue">
-                                            <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
-                                            <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_iscritti }}</div>
-                                            <div class="dashboard-economy-card-meta">Iscritti attivi nell'anno scolastico corrente.</div>
-                                        </div>
+                                            <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-blue">
+                                                <div class="dashboard-economy-card-title">Totale {{ student_terminology.selected_plural }} iscritti</div>
+                                                <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_iscritti }}</div>
+                                                <div class="dashboard-economy-card-meta">Iscritti attivi nell'anno scolastico selezionato.</div>
+                                            </div>
                                         <div class="dashboard-class-item dashboard-economy-highlight-item dashboard-tone-green">
                                             <div class="dashboard-economy-card-title">{{ student_terminology.selected_plural }} paganti</div>
                                             <div class="dashboard-economy-card-value">{{ economia_dashboard.count_studenti_paganti }}</div>
@@ -190,7 +262,7 @@
                                             {% endfor %}
                                         </div>
                                     {% else %}
-                                        <div class="dashboard-stat-note">Nessuna agevolazione collegata a {{ student_terminology.selected_plural_lower }} iscritti nell'anno corrente.</div>
+                                        <div class="dashboard-stat-note">Nessuna agevolazione collegata a {{ student_terminology.selected_plural_lower }} iscritti nell'anno selezionato.</div>
                                     {% endif %}
                                 </div>
 
@@ -249,7 +321,7 @@
                                             </tbody>
                                         </table>
                                     {% else %}
-                                        <div class="dashboard-stat-note">Nessuna agevolazione con {{ student_terminology.selected_plural_lower }} collegati nell'anno scolastico corrente.</div>
+                                        <div class="dashboard-stat-note">Nessuna agevolazione con {{ student_terminology.selected_plural_lower }} collegati nell'anno scolastico selezionato.</div>
                                     {% endif %}
 
                                     <div class="dashboard-economy-section-title">Riepilogo mensile rette</div>
@@ -291,12 +363,12 @@
                                             </table>
                                         </div>
                                     {% else %}
-                                        <div class="dashboard-stat-note">Nessun mese disponibile per il riepilogo rette dell'anno scolastico corrente.</div>
+                                        <div class="dashboard-stat-note">Nessun mese disponibile per il riepilogo rette dell'anno scolastico selezionato.</div>
                                     {% endif %}
                                 </div>
                             </div>
                         {% else %}
-                            <div class="dashboard-stat-note">Configura un anno scolastico corrente per visualizzare il riepilogo economico.</div>
+                            <div class="dashboard-stat-note">Configura un anno scolastico per visualizzare il riepilogo economico.</div>
                         {% endif %}
                     </div>
                 </div>
@@ -700,7 +772,7 @@
                     <div class="panel-body dashboard-panel-body">
                         <div class="dashboard-stats-grid">
                             <div class="dashboard-stat-card dashboard-stat-tone-green dashboard-calendar-card">
-                                <div class="dashboard-stat-label">Impegni di oggi</div>
+                                <div class="dashboard-stat-label">Impegni del giorno di riferimento</div>
                                 <div class="dashboard-calendar-widget-meta">{{ calendario_dashboard.today_label }}</div>
                                 {% if calendario_dashboard.today_records %}
                                     <div class="dashboard-calendar-list">
@@ -724,7 +796,7 @@
                                         {% endfor %}
                                     </div>
                                 {% else %}
-                                    <div class="dashboard-stat-note">Nessun impegno o scadenza previsto per oggi.</div>
+                                    <div class="dashboard-stat-note">Nessun impegno o scadenza previsto per il giorno di riferimento.</div>
                                 {% endif %}
                             </div>
 
@@ -733,7 +805,7 @@
                                 data-dashboard-calendar-week
                                 data-dashboard-calendar-page-size="{{ calendario_dashboard.week_page_size }}"
                             >
-                                <div class="dashboard-stat-label">Eventi della settimana corrente</div>
+                                <div class="dashboard-stat-label">Eventi della settimana di riferimento</div>
                                 <div class="dashboard-calendar-widget-meta">
                                     {{ calendario_dashboard.week_label }}
                                     {% if calendario_dashboard.count_week_records %}
@@ -775,7 +847,7 @@
                                         {% endfor %}
                                     </div>
                                     {% if calendario_dashboard.count_week_records > calendario_dashboard.week_page_size %}
-                                        <nav class="dashboard-calendar-pagination" aria-label="Paginazione eventi della settimana corrente">
+                                        <nav class="dashboard-calendar-pagination" aria-label="Paginazione eventi della settimana di riferimento">
                                             <button
                                                 type="button"
                                                 class="dashboard-calendar-page-btn"
@@ -884,7 +956,7 @@
     </div>
 
     <script src="{% static 'js/core/collapsible.js' %}"></script>
-    <script src="{% static 'js/pages/dashboard-layout.js' %}?v=2"></script>
+    <script src="{% static 'js/pages/dashboard-layout.js' %}?v=3"></script>
     <script src="{% static 'js/pages/dashboard-finanziaria.js' %}?v=1"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {

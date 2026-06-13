@@ -2838,6 +2838,81 @@ class StudenteBackNavigationTests(TestCase):
         self.assertContains(response, 'name="parenti-TOTAL_FORMS"')
 
 
+class StudenteHeaderCurrentEnrollmentTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="studente-header-current@example.com",
+            email="studente-header-current@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+
+    def test_header_class_uses_current_year_enrollment_not_future_pre_enrollment(self):
+        today = timezone.localdate()
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno corrente header",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno futuro header",
+            data_inizio=today + timedelta(days=31),
+            data_fine=today + timedelta(days=395),
+            attivo=True,
+        )
+        classe_corrente = Classe.objects.create(
+            nome_classe="Corrente",
+            sezione_classe="A",
+            ordine_classe=1,
+            attiva=True,
+        )
+        classe_futura = Classe.objects.create(
+            nome_classe="Futura",
+            sezione_classe="B",
+            ordine_classe=2,
+            attiva=True,
+        )
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta corrente",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        condizione_futura = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="Retta futura",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        iscrizione_corrente = Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno_corrente,
+            classe=classe_corrente,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_corrente,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente,
+            anno_scolastico=anno_futuro,
+            classe=classe_futura,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_futura,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["iscrizione_corrente"].pk, iscrizione_corrente.pk)
+        self.assertEqual(response.context["classe_corrente_tipo"], "Classe")
+        self.assertEqual(response.context["classe_corrente_label"], str(classe_corrente))
+        self.assertContains(response, f"Classe: {classe_corrente}")
+
+
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class RicercheAnagraficaTests(TestCase):
     def setUp(self):

@@ -185,6 +185,68 @@ window.ArborisDashboardLayout = (function () {
         });
     }
 
+    function initClassCompositionSwitch(container) {
+        container.querySelectorAll("[data-dashboard-class-view-switch]").forEach((switchRoot) => {
+            if (switchRoot.dataset.dashboardClassViewBound === "1") {
+                return;
+            }
+
+            const card = switchRoot.closest(".dashboard-stat-card");
+            if (!card) {
+                return;
+            }
+
+            const buttons = Array.from(switchRoot.querySelectorAll("[data-dashboard-class-view]"));
+            const panels = Array.from(card.querySelectorAll("[data-dashboard-class-view-panel]"));
+            if (!buttons.length || !panels.length) {
+                return;
+            }
+
+            switchRoot.dataset.dashboardClassViewBound = "1";
+            const storageKey = "arboris-dashboard-class-composition-view";
+
+            function viewExists(view) {
+                return buttons.some((button) => button.dataset.dashboardClassView === view);
+            }
+
+            function saveView(view) {
+                try {
+                    window.localStorage.setItem(storageKey, view);
+                } catch (error) {}
+            }
+
+            function setView(view, persist) {
+                const nextView = viewExists(view) ? view : "classi";
+
+                buttons.forEach((button) => {
+                    const active = button.dataset.dashboardClassView === nextView;
+                    button.classList.toggle("is-active", active);
+                    button.setAttribute("aria-pressed", active ? "true" : "false");
+                });
+
+                panels.forEach((panel) => {
+                    panel.classList.toggle("is-active", panel.dataset.dashboardClassViewPanel === nextView);
+                });
+
+                if (persist) {
+                    saveView(nextView);
+                }
+            }
+
+            buttons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    setView(button.dataset.dashboardClassView || "classi", true);
+                });
+            });
+
+            let storedView = "classi";
+            try {
+                storedView = window.localStorage.getItem(storageKey) || "classi";
+            } catch (error) {}
+            setView(storedView, false);
+        });
+    }
+
     function init(container = document) {
         const dashboardContainer = container.querySelector("#dashboard-sections");
         if (!dashboardContainer || dashboardContainer.dataset.dashboardLayoutBound === "1") {
@@ -196,6 +258,7 @@ window.ArborisDashboardLayout = (function () {
         applyStoredOrder(storageKey, dashboardContainer);
         bindDragAndDrop(dashboardContainer, storageKey);
         initWeeklyCalendarPagination(dashboardContainer);
+        initClassCompositionSwitch(dashboardContainer);
     }
 
     return {

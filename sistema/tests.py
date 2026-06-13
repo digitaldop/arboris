@@ -59,8 +59,9 @@ from anagrafica.models import (
 )
 from anagrafica.models import Indirizzo
 from calendario.models import CategoriaCalendario, EventoCalendario
+from economia.models import CondizioneIscrizione, Iscrizione, StatoIscrizione
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, MovimentoFinanziario, ScadenzaPagamentoFornitore
-from scuola.models import AnnoScolastico
+from scuola.models import AnnoScolastico, Classe, GruppoClasse
 
 
 class AuthenticationInterfaceTests(TestCase):
@@ -424,6 +425,7 @@ class HomeDashboardSchoolYearTests(TestCase):
         self.assertContains(response, "Corrente")
         self.assertContains(response, anno.data_inizio.strftime("%d/%m/%Y"))
         self.assertContains(response, anno.data_fine.strftime("%d/%m/%Y"))
+        self.assertEqual(response.context["calendario_dashboard"]["today"], today)
 
     def test_home_marks_future_school_year_as_upcoming(self):
         today = timezone.localdate()
@@ -439,6 +441,124 @@ class HomeDashboardSchoolYearTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Anno Scolastico 2026/2027")
         self.assertContains(response, "Prossimo")
+
+    def test_home_can_switch_school_year_dashboard_data(self):
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_economia=LivelloPermesso.VISUALIZZAZIONE
+        )
+        today = timezone.localdate()
+        anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno corrente dashboard",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        anno_futuro = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno futuro dashboard",
+            data_inizio=today + timedelta(days=31),
+            data_fine=today + timedelta(days=395),
+            attivo=True,
+        )
+        classe_corrente = Classe.objects.create(nome_classe="Corrente", sezione_classe="A", ordine_classe=1)
+        classe_futura = Classe.objects.create(nome_classe="Futura", sezione_classe="B", ordine_classe=2)
+        stato = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_corrente,
+            nome_condizione_iscrizione="Retta corrente",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        condizione_futura = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_futuro,
+            nome_condizione_iscrizione="Retta futura",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        studente_corrente = Studente.objects.create(nome="Anna", cognome="Corrente", attivo=True)
+        studente_futuro = Studente.objects.create(nome="Marco", cognome="Futuro", attivo=True)
+        Iscrizione.objects.create(
+            studente=studente_corrente,
+            anno_scolastico=anno_corrente,
+            classe=classe_corrente,
+            stato_iscrizione=stato,
+            condizione_iscrizione=condizione_corrente,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_futuro,
+            anno_scolastico=anno_futuro,
+            classe=classe_futura,
+            stato_iscrizione=stato,
+            condizione_iscrizione=condizione_futura,
+            attiva=True,
+        )
+
+        response = self.client.get(reverse("home"), {"anno_scolastico": anno_futuro.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["anno_scolastico_corrente_obj"].pk, anno_futuro.pk)
+        self.assertEqual(response.context["dashboard_anno_scolastico_selezionato"], str(anno_futuro.pk))
+        self.assertTrue(response.context["dashboard_has_year_switch"])
+        self.assertEqual(response.context["count_studenti_iscritti"], 1)
+        self.assertEqual(response.context["economia_dashboard"]["count_studenti_iscritti"], 1)
+        self.assertEqual(response.context["calendario_dashboard"]["today"], anno_futuro.data_inizio)
+        self.assertContains(response, "Anno Scolastico Anno futuro dashboard")
+        self.assertContains(response, 'name="anno_scolastico"')
+        self.assertContains(response, "Settimana di riferimento")
+        self.assertContains(response, "RIEPILOGO FINANZIARIO")
+        self.assertContains(response, str(studente_futuro))
+        self.assertContains(response, reverse("modifica_studente", kwargs={"pk": studente_futuro.pk}))
+        self.assertNotContains(response, str(studente_corrente))
+
+    def test_home_class_composition_renders_expandable_class_and_group_views(self):
+        today = timezone.localdate()
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno composizione dashboard",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        classe_prima = Classe.objects.create(nome_classe="Prima", sezione_classe="A", ordine_classe=1)
+        classe_seconda = Classe.objects.create(nome_classe="Seconda", sezione_classe="B", ordine_classe=2)
+        gruppo = GruppoClasse.objects.create(
+            nome_gruppo_classe="Primaria mista",
+            anno_scolastico=anno,
+            attivo=True,
+        )
+        gruppo.classi.add(classe_prima, classe_seconda)
+        stato = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno,
+            nome_condizione_iscrizione="Retta standard",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        luca = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        sara = Studente.objects.create(nome="Sara", cognome="Verdi", attivo=True)
+        for studente, classe in ((luca, classe_prima), (sara, classe_seconda)):
+            Iscrizione.objects.create(
+                studente=studente,
+                anno_scolastico=anno,
+                classe=classe,
+                gruppo_classe=gruppo,
+                stato_iscrizione=stato,
+                condizione_iscrizione=condizione,
+                attiva=True,
+            )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-dashboard-class-view="classi"')
+        self.assertContains(response, 'data-dashboard-class-view="pluriclassi"')
+        self.assertContains(response, 'class="dashboard-class-item dashboard-class-expandable"', count=3)
+        self.assertContains(response, "Prima A")
+        self.assertContains(response, "Seconda B")
+        self.assertContains(response, "Primaria mista")
+        self.assertContains(response, str(luca))
+        self.assertContains(response, str(sara))
+        self.assertContains(response, reverse("modifica_studente", kwargs={"pk": luca.pk}))
+        self.assertContains(response, reverse("modifica_studente", kwargs={"pk": sara.pk}))
 
     def test_home_week_calendar_uses_client_side_pagination(self):
         SistemaUtentePermessi.objects.filter(user=self.user).update(
