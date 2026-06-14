@@ -7600,10 +7600,14 @@ a.dashboard-birthday-family-chip:hover {
 }
 
 .dashboard-class-summary {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    grid-template-areas:
+        "main toggle"
+        "count toggle";
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 5px;
     min-height: 68px;
     padding: 14px;
     cursor: pointer;
@@ -7616,6 +7620,7 @@ a.dashboard-birthday-family-chip:hover {
 
 .dashboard-class-summary::after {
     content: "+";
+    grid-area: toggle;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -7634,16 +7639,18 @@ a.dashboard-birthday-family-chip:hover {
 }
 
 .dashboard-class-summary > span:first-child {
+    grid-area: main;
     display: grid;
     gap: 4px;
     min-width: 0;
 }
 
 .dashboard-class-summary .dashboard-class-count {
-    flex: 0 0 auto;
+    grid-area: count;
     margin-top: 0;
     padding-top: 2px;
-    text-align: right;
+    text-align: left;
+    min-width: 0;
 }
 
 .dashboard-class-type,
@@ -7710,6 +7717,8 @@ a.dashboard-birthday-family-chip:hover {
 .dashboard-economy-list-title {
     color: #20324a;
     font-weight: 800;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
 }
 
 .dashboard-class-count,
@@ -8121,10 +8130,6 @@ a.dashboard-birthday-family-chip:hover {
 
     .dashboard-class-view-btn {
         flex: 1 1 0;
-    }
-
-    .dashboard-class-summary {
-        flex-direction: column;
     }
 
     .dashboard-class-summary .dashboard-class-count {
