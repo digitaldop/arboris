@@ -68,6 +68,16 @@
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
 
+            {% if form.errors or formset.errors or formset.non_form_errors %}
+                <div class="calendar-event-form-errors">
+                    <ul class="errorlist">
+                        <li>La fattura non e stata salvata: controlla i campi evidenziati e riprova.</li>
+                    </ul>
+                    {{ form.non_field_errors }}
+                    {{ formset.non_form_errors }}
+                </div>
+            {% endif %}
+
             {% if documento %}
                 <section class="supplier-document-summary-grid" aria-label="Riepilogo fattura fornitore">
                     <article class="supplier-document-summary-card">
@@ -664,6 +674,15 @@
         {% csrf_token %}
         {% if popup %}
             <input type="hidden" name="popup" value="1">
+        {% endif %}
+        {% if form.errors or formset.errors or formset.non_form_errors %}
+            <div class="calendar-event-form-errors">
+                <ul class="errorlist">
+                    <li>La fattura non e stata salvata: controlla i campi evidenziati e riprova.</li>
+                </ul>
+                {{ form.non_field_errors }}
+                {{ formset.non_form_errors }}
+            </div>
         {% endif %}
         <fieldset id="documento-fornitore-lock-container" class="mode-lock-container" {% if documento and popup %}disabled{% endif %}>
         <div class="admin-section">

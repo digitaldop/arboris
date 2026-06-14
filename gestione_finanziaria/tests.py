@@ -2650,6 +2650,58 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "PRO-001")
         self.assertContains(response, "supplier-withholding-badge")
 
+    def test_documento_fornitore_popup_salva_scadenza_con_importo_senza_data(self):
+        categoria = crea_categoria_spesa_test("Consulenze vecchie")
+        fornitore = Fornitore.objects.create(
+            denominazione="Studio Professionale Verdi",
+            tipo_soggetto="professionista",
+            categoria_spesa=categoria,
+        )
+
+        response = self.client.post(
+            f"{reverse('crea_documento_fornitore')}?popup=1",
+            {
+                "popup": "1",
+                "fornitore": str(fornitore.pk),
+                "categoria_spesa": "",
+                "tipo_documento": TipoDocumentoFornitore.FATTURA,
+                "numero_documento": "PRO-NODATE",
+                "data_documento": "2025-12-15",
+                "data_ricezione": "",
+                "anno_competenza": "",
+                "mese_competenza": "",
+                "descrizione": "Parcella da inserimento rapido",
+                "imponibile": "1000.00",
+                "aliquota_iva": "22.00",
+                "iva": "",
+                "totale": "",
+                "imponibile_ritenuta_acconto": "1000.00",
+                "aliquota_ritenuta_acconto": "20.00",
+                "ritenuta_acconto": "",
+                "stato": StatoDocumentoFornitore.DA_PAGARE,
+                "note": "",
+                "scadenze-TOTAL_FORMS": "1",
+                "scadenze-INITIAL_FORMS": "0",
+                "scadenze-MIN_NUM_FORMS": "0",
+                "scadenze-MAX_NUM_FORMS": "1000",
+                "scadenze-0-data_scadenza": "",
+                "scadenze-0-importo_previsto": "1020.00",
+                "scadenze-0-importo_pagato": "0.00",
+                "scadenze-0-data_pagamento": "",
+                "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
+                "scadenze-0-conto_bancario": "",
+                "scadenze-0-movimento_finanziario": "",
+                "scadenze-0-note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fattura fornitore creata correttamente.")
+        documento = DocumentoFornitore.objects.get(numero_documento="PRO-NODATE")
+        scadenza = ScadenzaPagamentoFornitore.objects.get(documento=documento)
+        self.assertEqual(scadenza.data_scadenza, date(2025, 12, 15))
+        self.assertEqual(scadenza.importo_previsto, Decimal("1020.00"))
+
     def test_documento_fornitore_form_renders_search_popup_controls(self):
         response = self.client.get(reverse("crea_documento_fornitore"))
 

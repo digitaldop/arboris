@@ -835,12 +835,62 @@ def _documento_fornitore_formset_class(documento=None):
     return ScadenzaPagamentoFornitoreCreateFormSet
 
 
+def _post_money_non_zero(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    normalized = raw.replace(" ", "")
+    if "," in normalized:
+        normalized = normalized.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(normalized) != Decimal("0.00")
+    except InvalidOperation:
+        return True
+
+
+def _documento_fornitore_post_con_scadenze_normalizzate(post_data):
+    try:
+        total_forms = int(post_data.get("scadenze-TOTAL_FORMS") or 0)
+    except (TypeError, ValueError):
+        return post_data
+
+    data_scadenza_default = (
+        (post_data.get("data_documento") or "").strip()
+        or (post_data.get("data_ricezione") or "").strip()
+        or timezone.localdate().isoformat()
+    )
+    normalized = None
+    for index in range(total_forms):
+        prefix = f"scadenze-{index}"
+        if (post_data.get(f"{prefix}-DELETE") or "").strip():
+            continue
+        if (post_data.get(f"{prefix}-data_scadenza") or "").strip():
+            continue
+
+        has_importo = _post_money_non_zero(post_data.get(f"{prefix}-importo_previsto")) or _post_money_non_zero(
+            post_data.get(f"{prefix}-importo_pagato")
+        )
+        has_detail = any(
+            (post_data.get(f"{prefix}-{field_name}") or "").strip()
+            for field_name in ("data_pagamento", "conto_bancario", "movimento_finanziario", "note")
+        )
+        if not has_importo and not has_detail:
+            continue
+
+        if normalized is None:
+            normalized = post_data.copy()
+        normalized[f"{prefix}-data_scadenza"] = data_scadenza_default
+
+    return normalized or post_data
+
+
 def crea_documento_fornitore(request):
     popup = is_popup_request(request)
     if request.method == "POST":
-        form = DocumentoFornitoreForm(request.POST, request.FILES)
+        post_data = _documento_fornitore_post_con_scadenze_normalizzate(request.POST)
+        form = DocumentoFornitoreForm(post_data, request.FILES)
         formset = _documento_fornitore_formset_class()(
-            request.POST,
+            post_data,
             instance=DocumentoFornitore(),
             **_documento_fornitore_formset_kwargs(compact_movimenti=popup),
         )
@@ -886,9 +936,10 @@ def modifica_documento_fornitore(request, pk):
     popup = is_popup_request(request)
     documento = get_object_or_404(_documento_fornitore_detail_queryset(), pk=pk)
     if request.method == "POST":
-        form = DocumentoFornitoreForm(request.POST, request.FILES, instance=documento)
+        post_data = _documento_fornitore_post_con_scadenze_normalizzate(request.POST)
+        form = DocumentoFornitoreForm(post_data, request.FILES, instance=documento)
         formset = _documento_fornitore_formset_class(documento)(
-            request.POST,
+            post_data,
             instance=documento,
             **_documento_fornitore_formset_kwargs(documento, compact_movimenti=popup),
         )

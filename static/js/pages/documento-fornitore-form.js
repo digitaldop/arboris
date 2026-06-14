@@ -8,6 +8,10 @@ window.ArborisDocumentoFornitoreForm = (function () {
         aliquotaRitenuta: "id_aliquota_ritenuta_acconto",
         ritenuta: "id_ritenuta_acconto",
     };
+    const DATE_FIELDS = {
+        documento: "id_data_documento",
+        ricezione: "id_data_ricezione",
+    };
 
     function parseNumber(value) {
         if (window.ArborisCurrencyFields && typeof ArborisCurrencyFields.parseNumber === "function") {
@@ -60,11 +64,31 @@ window.ArborisDocumentoFornitoreForm = (function () {
         });
     }
 
+    function defaultDeadlineDate() {
+        const documentDate = document.getElementById(DATE_FIELDS.documento)?.value || "";
+        const receivedDate = document.getElementById(DATE_FIELDS.ricezione)?.value || "";
+        return documentDate || receivedDate || isoToday();
+    }
+
+    function syncDeadlineDate(row) {
+        const dateField = row?.querySelector('[name$="-data_scadenza"]');
+        if (!dateField || dateField.dataset.userEdited === "1") {
+            return;
+        }
+        if ((dateField.value || "").trim() && dateField.dataset.autoDueDate !== "1") {
+            return;
+        }
+        dateField.dataset.autoDueDate = "1";
+        dateField.value = defaultDeadlineDate();
+        dateField.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
     function syncFirstDeadlineWithNetPayable() {
         const field = document.querySelector("#scadenze-fornitore-table tbody .inline-form-row [name$='-importo_previsto']");
         if (!field || field.dataset.userEdited === "1") {
             return;
         }
+        const row = field.closest(".inline-form-row");
         const currentValue = (field.value || "").trim();
         if (currentValue && field.dataset.autoNetPayable !== "1") {
             return;
@@ -73,6 +97,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
         if (netPayable <= 0) {
             return;
         }
+        syncDeadlineDate(row);
         field.dataset.autoNetPayable = "1";
         setValue(field, netPayable);
     }
@@ -90,6 +115,8 @@ window.ArborisDocumentoFornitoreForm = (function () {
         const imponibileRitenuta = document.getElementById(MONEY_FIELDS.imponibileRitenuta);
         const aliquotaRitenuta = document.getElementById(MONEY_FIELDS.aliquotaRitenuta);
         const ritenuta = document.getElementById(MONEY_FIELDS.ritenuta);
+        const dataDocumento = document.getElementById(DATE_FIELDS.documento);
+        const dataRicezione = document.getElementById(DATE_FIELDS.ricezione);
 
         if (!imponibile || !aliquotaIva || !iva || !totale) {
             return;
@@ -157,6 +184,14 @@ window.ArborisDocumentoFornitoreForm = (function () {
         if (ritenuta) {
             ritenuta.addEventListener("input", refreshNetPayable);
         }
+        if (dataDocumento) {
+            dataDocumento.addEventListener("input", refreshNetPayable);
+            dataDocumento.addEventListener("change", refreshNetPayable);
+        }
+        if (dataRicezione) {
+            dataRicezione.addEventListener("input", refreshNetPayable);
+            dataRicezione.addEventListener("change", refreshNetPayable);
+        }
         refreshNetPayable();
     }
 
@@ -219,6 +254,13 @@ window.ArborisDocumentoFornitoreForm = (function () {
             field.addEventListener("input", applyAutoStatus);
             field.addEventListener("change", applyAutoStatus);
         });
+
+        const dataScadenza = row.querySelector('[name$="-data_scadenza"]');
+        if (dataScadenza) {
+            dataScadenza.addEventListener("input", function () {
+                dataScadenza.dataset.userEdited = "1";
+            });
+        }
 
         const importoPrevisto = row.querySelector('[name$="-importo_previsto"]');
         if (importoPrevisto) {
