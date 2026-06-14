@@ -28662,9 +28662,16 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     background: #fff1f4;
 }
 
+.module-gestione_finanziaria .monthly-expense-period-total-tab {
+    flex-basis: 230px;
+    border-color: #c8d9e8;
+    background: #f8fbfd;
+}
+
 .module-gestione_finanziaria .monthly-expense-month-name,
 .module-gestione_finanziaria .monthly-expense-month-meta,
-.module-gestione_finanziaria .monthly-expense-month-income {
+.module-gestione_finanziaria .monthly-expense-month-income,
+.module-gestione_finanziaria .monthly-expense-period-label {
     color: #60738d;
     font-size: 11px;
     font-weight: 800;
@@ -28693,6 +28700,73 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     font-weight: 850;
 }
 
+.module-gestione_finanziaria .monthly-expense-period-flow {
+    display: grid;
+    gap: 4px;
+    color: #34445a;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-flow span {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-delta {
+    font-size: 19px;
+    font-weight: 900;
+    line-height: 1.12;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-delta.is-positive,
+.module-gestione_finanziaria .monthly-expense-period-summary-item.is-positive strong {
+    color: #1f8048;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-delta.is-negative,
+.module-gestione_finanziaria .monthly-expense-period-summary-item.is-negative strong {
+    color: #b91c1c;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-delta.is-neutral,
+.module-gestione_finanziaria .monthly-expense-period-summary-item.is-neutral strong {
+    color: #5f6f84;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-summary-panel {
+    margin-bottom: 18px;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-summary-item {
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-summary-item span {
+    color: #60738d;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.module-gestione_finanziaria .monthly-expense-period-summary-item strong {
+    color: #243145;
+    font-size: 22px;
+    font-weight: 900;
+}
+
 .module-gestione_finanziaria .monthly-expense-detail-panel .finance-section-head,
 .module-gestione_finanziaria .monthly-expense-income-panel .finance-section-head {
     align-items: center;
@@ -28705,6 +28779,12 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .monthly-income-table {
     min-width: 940px;
+}
+
+@media (max-width: 820px) {
+    .module-gestione_finanziaria .monthly-expense-period-summary-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .module-gestione_finanziaria .finance-modern-table {

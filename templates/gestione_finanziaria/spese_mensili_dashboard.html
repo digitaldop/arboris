@@ -77,6 +77,17 @@
     </div>
 
     <section class="monthly-expense-timeline" aria-label="Riepilogo mensile spese e introiti">
+        <a href="#riepilogo-periodo" class="monthly-expense-month monthly-expense-period-total-tab">
+            <span class="monthly-expense-month-name">Totale periodo</span>
+            <span class="monthly-expense-period-label">{{ period_summary.label }}</span>
+            <span class="monthly-expense-period-flow">
+                <span>Entrate <strong>{{ period_summary.totale_entrate|euro }} &euro;</strong></span>
+                <span>Uscite <strong>{{ period_summary.totale_uscite|euro }} &euro;</strong></span>
+            </span>
+            <span class="monthly-expense-period-delta is-{{ period_summary.differenza_tone }}">
+                {{ period_summary.differenza_segno }}{{ period_summary.differenza_abs|euro }} &euro;
+            </span>
+        </a>
         {% for mese in month_stats %}
             <a href="{{ mese.url }}" class="monthly-expense-month {% if mese.is_selected %}is-selected{% endif %}">
                 <span class="monthly-expense-month-name">{{ mese.label }}</span>
@@ -88,6 +99,31 @@
                 <span class="monthly-expense-month-income">Introiti {{ mese.introiti|euro }} &euro;</span>
             </a>
         {% endfor %}
+    </section>
+
+    <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel monthly-expense-period-summary-panel" id="riepilogo-periodo">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Riepilogo totale {{ period_summary.label|lower }}</h2>
+                <p class="finance-section-subtitle">Somma di entrate e uscite su tutti i mesi del periodo selezionato.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="monthly-expense-period-summary-grid">
+                <div class="monthly-expense-period-summary-item">
+                    <span>Totale entrate</span>
+                    <strong>{{ period_summary.totale_entrate|euro }} &euro;</strong>
+                </div>
+                <div class="monthly-expense-period-summary-item">
+                    <span>Totale uscite</span>
+                    <strong>{{ period_summary.totale_uscite|euro }} &euro;</strong>
+                </div>
+                <div class="monthly-expense-period-summary-item is-{{ period_summary.differenza_tone }}">
+                    <span>Differenza</span>
+                    <strong>{{ period_summary.differenza_segno }}{{ period_summary.differenza_abs|euro }} &euro;</strong>
+                </div>
+            </div>
+        </div>
     </section>
 
     <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel monthly-expense-detail-panel">

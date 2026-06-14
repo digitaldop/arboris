@@ -1532,6 +1532,23 @@ def spese_mensili_dashboard(request):
         if stats:
             stats["introiti"] += movimento.importo or Decimal("0.00")
 
+    totale_entrate_periodo = sum((stats["introiti"] for stats in month_stats.values()), Decimal("0.00"))
+    totale_uscite_periodo = sum((stats["totale_spese"] for stats in month_stats.values()), Decimal("0.00"))
+    differenza_periodo = totale_entrate_periodo - totale_uscite_periodo
+    if periodo_data["periodo"] == "scolastico" and periodo_data["anno_scolastico"]:
+        periodo_label = f"Anno scolastico {periodo_data['anno_scolastico']}"
+    else:
+        periodo_label = f"Anno solare {periodo_data['anno']}"
+    if differenza_periodo > Decimal("0.00"):
+        differenza_tone = "positive"
+        differenza_segno = "+"
+    elif differenza_periodo < Decimal("0.00"):
+        differenza_tone = "negative"
+        differenza_segno = "-"
+    else:
+        differenza_tone = "neutral"
+        differenza_segno = ""
+
     selected_key = _month_key(periodo_data["selected_month"])
     selected_rows_all = [row for row in rows if row["mese_key"] == selected_key]
     selected_rows = (
@@ -1550,6 +1567,15 @@ def spese_mensili_dashboard(request):
         "gestione_finanziaria/spese_mensili_dashboard.html",
         {
             **periodo_data,
+            "period_summary": {
+                "label": periodo_label,
+                "totale_entrate": totale_entrate_periodo,
+                "totale_uscite": totale_uscite_periodo,
+                "differenza": differenza_periodo,
+                "differenza_abs": abs(differenza_periodo),
+                "differenza_segno": differenza_segno,
+                "differenza_tone": differenza_tone,
+            },
             "month_stats": list(month_stats.values()),
             "selected_month_key": selected_key,
             "selected_month_label": f"{MESI_BREVI[periodo_data['selected_month'].month - 1]} {periodo_data['selected_month'].year}",

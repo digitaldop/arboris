@@ -4939,6 +4939,15 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(selected_month["residuo"], Decimal("302.00"))
         self.assertEqual(selected_month["spese_count"], 3)
         self.assertEqual(selected_month["insolute_count"], 2)
+        self.assertEqual(response.context["period_summary"]["totale_entrate"], Decimal("850.00"))
+        self.assertEqual(response.context["period_summary"]["totale_uscite"], Decimal("470.50"))
+        self.assertEqual(response.context["period_summary"]["differenza"], Decimal("379.50"))
+        self.assertEqual(response.context["period_summary"]["differenza_segno"], "+")
+        self.assertEqual(response.context["period_summary"]["differenza_tone"], "positive")
+        self.assertContains(response, "Totale periodo")
+        self.assertContains(response, "Riepilogo totale anno solare 2026")
+        self.assertContains(response, "+379,50")
+        self.assertContains(response, "monthly-expense-period-delta is-positive")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
         self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
@@ -4952,6 +4961,37 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Materiale didattico")
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
+
+    def test_spese_mensili_dashboard_riepilogo_periodo_mostra_perdita(self):
+        categoria = crea_categoria_spesa_test("Utenze")
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Energia elettrica",
+            categoria=categoria,
+            data_scadenza=date(2026, 6, 12),
+            importo_previsto=Decimal("180.00"),
+            importo_pagato=Decimal("0.00"),
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 6, 20),
+            importo=Decimal("50.00"),
+            descrizione="Rimborso",
+            origine=OrigineMovimento.BANCA,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-06"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["period_summary"]["totale_entrate"], Decimal("50.00"))
+        self.assertEqual(response.context["period_summary"]["totale_uscite"], Decimal("180.00"))
+        self.assertEqual(response.context["period_summary"]["differenza"], Decimal("-130.00"))
+        self.assertEqual(response.context["period_summary"]["differenza_segno"], "-")
+        self.assertEqual(response.context["period_summary"]["differenza_tone"], "negative")
+        self.assertContains(response, "-130,00")
+        self.assertContains(response, "monthly-expense-period-delta is-negative")
 
     def test_spese_mensili_dashboard_prepara_click_destro_categoria(self):
         padre = CategoriaFinanziaria.objects.create(
