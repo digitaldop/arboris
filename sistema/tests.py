@@ -505,7 +505,14 @@ class HomeDashboardSchoolYearTests(TestCase):
         self.assertContains(response, "Anno Scolastico Anno futuro dashboard")
         self.assertContains(response, 'name="anno_scolastico"')
         self.assertContains(response, "Settimana di riferimento")
-        self.assertContains(response, "RIEPILOGO FINANZIARIO")
+        self.assertContains(
+            response,
+            "RIEPILOGO E INDICATORI CHIAVE - Anno Scolastico Anno futuro dashboard",
+        )
+        self.assertContains(
+            response,
+            "RIEPILOGO FINANZIARIO - Anno Scolastico Anno futuro dashboard",
+        )
         self.assertContains(response, str(studente_futuro))
         self.assertContains(response, reverse("modifica_studente", kwargs={"pk": studente_futuro.pk}))
         self.assertNotContains(response, str(studente_corrente))
