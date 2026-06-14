@@ -1093,9 +1093,17 @@ window.ArborisFamiliareForm = (function () {
         function markRelativeMainSubmitPending() {
             const form = getFamiliareForm();
             const modeInput = document.getElementById("familiare-edit-scope");
+            let mainSubmitInput = form ? form.querySelector('input[name="_relative_main_submit"]') : null;
 
             if (form) {
                 form.dataset.pendingRelativeMainSubmit = "1";
+                if (!mainSubmitInput) {
+                    mainSubmitInput = document.createElement("input");
+                    mainSubmitInput.type = "hidden";
+                    mainSubmitInput.name = "_relative_main_submit";
+                    form.appendChild(mainSubmitInput);
+                }
+                mainSubmitInput.value = "1";
             }
             if (modeInput) {
                 modeInput.value = "full";
@@ -1241,6 +1249,10 @@ window.ArborisFamiliareForm = (function () {
             const form = getFamiliareForm();
             if (form) {
                 delete form.dataset.pendingRelativeMainSubmit;
+                const mainSubmitInput = form.querySelector('input[name="_relative_main_submit"]');
+                if (mainSubmitInput) {
+                    mainSubmitInput.value = "";
+                }
             }
             if (window.familiareViewMode && typeof window.familiareViewMode.setEditing === "function") {
                 window.familiareViewMode.setEditing(false);
@@ -1378,6 +1390,10 @@ window.ArborisFamiliareForm = (function () {
                     );
 
                     if (!shouldUseMainScope) {
+                        const mainSubmitInput = form.querySelector('input[name="_relative_main_submit"]');
+                        if (mainSubmitInput) {
+                            mainSubmitInput.value = "";
+                        }
                         if (!inlineCardSubmitTarget) {
                             return;
                         }
@@ -1395,9 +1411,17 @@ window.ArborisFamiliareForm = (function () {
                     }
 
                     const modeInput = document.getElementById("familiare-edit-scope");
+                    let mainSubmitInput = form.querySelector('input[name="_relative_main_submit"]');
                     if (modeInput) {
                         modeInput.value = "full";
                     }
+                    if (!mainSubmitInput) {
+                        mainSubmitInput = document.createElement("input");
+                        mainSubmitInput.type = "hidden";
+                        mainSubmitInput.name = "_relative_main_submit";
+                        form.appendChild(mainSubmitInput);
+                    }
+                    mainSubmitInput.value = "1";
                     delete form.dataset.pendingRelativeMainSubmit;
                 });
             }, 0);

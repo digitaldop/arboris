@@ -40,6 +40,7 @@ from anagrafica.models import (
     Citta,
     Documento,
     Familiare,
+    AnagraficaEmail,
     Indirizzo,
     Nazione,
     Provincia,
@@ -1370,6 +1371,90 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, 'id="relative-card-sticky-actions"')
         self.assertContains(response, 'data-relative-card-sticky-cancel="1"')
         self.assertContains(response, 'id="relative-card-sticky-cancel"')
+
+    def test_modifica_familiare_full_save_updates_email_from_main_card(self):
+        self.familiare.email = ""
+        self.familiare.save()
+
+        response = self.client.post(
+            reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}),
+            {
+                "_edit_scope": "full",
+                "_relative_main_submit": "1",
+                "_save": "1",
+                "relazione_familiare": self.relazione.pk,
+                "indirizzo": "",
+                "nome": self.familiare.nome,
+                "cognome": self.familiare.cognome,
+                "telefono": self.familiare.telefono,
+                "email": "nuova.ada@example.com",
+                "codice_fiscale": "",
+                "sesso": "F",
+                "data_nascita": "",
+                "luogo_nascita": "",
+                "luogo_nascita_search": "",
+                "nazione_nascita": "",
+                "luogo_nascita_custom": "",
+                "nazionalita": "",
+                "convivente": "",
+                "referente_principale": "on",
+                "abilitato_scambio_retta": "",
+                "profilo_dipendente_attivo": "",
+                "profilo_educatore_attivo": "on",
+                "classe_principale_educatore": "",
+                "materia_educatore": self.profilo.materia,
+                "profilo_mansione": self.profilo.mansione,
+                "profilo_iban": self.profilo.iban,
+                "profilo_stato": self.profilo.stato,
+                "attivo": "on",
+                "note": "",
+                "contatti_indirizzi-TOTAL_FORMS": "1",
+                "contatti_indirizzi-INITIAL_FORMS": "0",
+                "contatti_indirizzi-MIN_NUM_FORMS": "0",
+                "contatti_indirizzi-MAX_NUM_FORMS": "1000",
+                "contatti_indirizzi-0-id": "",
+                "contatti_indirizzi-0-indirizzo": "",
+                "contatti_indirizzi-0-label": "",
+                "contatti_indirizzi-0-principale": "",
+                "contatti_indirizzi-0-ordine": "",
+                "contatti_indirizzi-0-note": "",
+                "contatti_indirizzi-0-DELETE": "",
+                "contatti_telefoni-TOTAL_FORMS": "1",
+                "contatti_telefoni-INITIAL_FORMS": "0",
+                "contatti_telefoni-MIN_NUM_FORMS": "0",
+                "contatti_telefoni-MAX_NUM_FORMS": "1000",
+                "contatti_telefoni-0-id": "",
+                "contatti_telefoni-0-numero": "",
+                "contatti_telefoni-0-label": "",
+                "contatti_telefoni-0-principale": "",
+                "contatti_telefoni-0-ordine": "",
+                "contatti_telefoni-0-note": "",
+                "contatti_telefoni-0-DELETE": "",
+                "contatti_email-TOTAL_FORMS": "1",
+                "contatti_email-INITIAL_FORMS": "0",
+                "contatti_email-MIN_NUM_FORMS": "0",
+                "contatti_email-MAX_NUM_FORMS": "1000",
+                "contatti_email-0-id": "",
+                "contatti_email-0-email": "",
+                "contatti_email-0-label": "",
+                "contatti_email-0-principale": "",
+                "contatti_email-0-ordine": "",
+                "contatti_email-0-note": "",
+                "contatti_email-0-DELETE": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.familiare.refresh_from_db()
+        self.familiare.persona.refresh_from_db()
+        self.assertEqual(self.familiare.email, "nuova.ada@example.com")
+        self.assertTrue(
+            AnagraficaEmail.objects.filter(
+                object_id=self.familiare.pk,
+                principale=True,
+                email="nuova.ada@example.com",
+            ).exists()
+        )
 
     def test_modifica_familiare_renders_current_and_future_student_enrollment_badges(self):
         today = timezone.localdate()

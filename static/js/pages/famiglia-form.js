@@ -3943,6 +3943,7 @@ window.ArborisFamigliaForm = (function () {
         }
 
         const indirizzoSelect = document.getElementById("id_indirizzo_principale");
+        const statoSelect = document.getElementById("id_stato");
         const cognomeFamigliaInput = document.getElementById("id_cognome_famiglia");
 
         const addIndirizzoBtn = document.getElementById("add-indirizzo-btn");

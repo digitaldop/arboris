@@ -3940,6 +3940,7 @@ def modifica_familiare(request, pk):
         inline_editing = edit_scope == "inline"
         inline_target = (request.POST.get("_inline_target") or "").strip()
         card_inline_submit = (request.POST.get("_card_inline_submit") or "").strip()
+        relative_main_submit = request.POST.get("_relative_main_submit") == "1"
         famiglia_for_studenti = famiglia_for_studenti_inline(edit_scope)
         form = (
             FamiliareForm(
@@ -3956,7 +3957,7 @@ def modifica_familiare(request, pk):
             )
         )
         contact_formsets = build_anagrafica_contact_formsets(
-            data=request.POST if not inline_editing else None,
+            data=request.POST if not inline_editing and not relative_main_submit else None,
             instance=familiare,
         )
         if inline_editing and inline_target == "documenti":
@@ -3991,7 +3992,7 @@ def modifica_familiare(request, pk):
         parenti_ok = parenti_formset.is_valid() if inline_editing and inline_target == "parenti" and parenti_formset is not None else True
         form_ok = True if inline_editing else form.is_valid()
         documenti_ok = documenti_formset.is_valid() if inline_editing and inline_target == "documenti" else True
-        contatti_ok = True if inline_editing else anagrafica_contact_formsets_are_valid(contact_formsets)
+        contatti_ok = True if inline_editing or relative_main_submit else anagrafica_contact_formsets_are_valid(contact_formsets)
 
         if form_ok and documenti_ok and studenti_ok and parenti_ok and contatti_ok:
             try:
@@ -4000,7 +4001,8 @@ def modifica_familiare(request, pk):
                     if not inline_editing:
                         familiare = form.save()
                         _, profilo_rimosso_bloccato = sync_familiare_profilo_lavorativo(familiare, form.cleaned_data)
-                        save_anagrafica_contact_formsets(familiare, contact_formsets)
+                        if not relative_main_submit:
+                            save_anagrafica_contact_formsets(familiare, contact_formsets)
                     if inline_editing and inline_target == "documenti":
                         documenti_formset.save()
                     if inline_editing and inline_target == "studenti" and card_inline_submit == "studenti" and studenti_formset is not None:
