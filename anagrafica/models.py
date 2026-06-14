@@ -805,6 +805,7 @@ class Familiare(models.Model):
         kwargs.pop("attivo", None)
         super().__init__(*args, **kwargs)
         self._pending_persona_payload = pending_persona_payload
+        self._persona_dirty_fields = set()
 
     def __str__(self):
         return self.persona.nome_completo if self.persona_id else self._pending_full_name()
@@ -828,7 +829,9 @@ class Familiare(models.Model):
         if field_name == "codice_fiscale":
             value = (value or "").upper().strip()
         if self.persona_id:
-            setattr(self.persona, field_name, value)
+            if getattr(self.persona, field_name) != value:
+                setattr(self.persona, field_name, value)
+                self._persona_dirty_fields.add(field_name)
         else:
             self._pending_persona_payload[field_name] = value
 
@@ -951,10 +954,11 @@ class Familiare(models.Model):
     def get_sesso_display(self):
         return dict(SESSO_CHOICES).get(self.sesso, self.sesso)
 
-    def _normalizzato_persona_payload(self):
+    def _normalizzato_persona_payload(self, source=None):
+        source = source if source is not None else self._pending_persona_payload
         payload = {}
         for field_name in self.PERSONA_PROXY_FIELDS:
-            value = self._pending_persona_payload.get(field_name)
+            value = source.get(field_name)
             if field_name in {"nome", "cognome", "telefono", "email", "codice_fiscale", "sesso", "luogo_nascita_custom", "note"}:
                 value = value or ""
             payload[field_name] = value
@@ -965,24 +969,41 @@ class Familiare(models.Model):
         if self.persona_id:
             payload = {field_name: getattr(self.persona, field_name) for field_name in self.PERSONA_PROXY_FIELDS}
             payload.update(self._pending_persona_payload)
-            self._pending_persona_payload = payload
+            return self._normalizzato_persona_payload(payload)
         return self._normalizzato_persona_payload()
 
     def save(self, *args, **kwargs):
+        requested_update_fields = kwargs.get("update_fields")
+        persona_update_fields = None
+        model_update_fields = None
+        if requested_update_fields is not None:
+            requested_update_fields = set(requested_update_fields)
+            persona_update_fields = requested_update_fields & self.PERSONA_PROXY_FIELDS
+            model_update_fields = requested_update_fields - self.PERSONA_PROXY_FIELDS
+            kwargs["update_fields"] = model_update_fields
+
         payload = self._persona_payload()
         if self.persona_id:
             persona = self.persona
-            changed_fields = []
+            changed_fields = set(self._persona_dirty_fields)
+            if persona_update_fields is not None:
+                changed_fields &= persona_update_fields
             for field_name, value in payload.items():
+                if persona_update_fields is not None and field_name not in persona_update_fields:
+                    continue
                 if getattr(persona, field_name) != value:
                     setattr(persona, field_name, value)
-                    changed_fields.append(field_name)
+                    changed_fields.add(field_name)
             if changed_fields:
-                persona.save(update_fields=changed_fields + ["data_aggiornamento"])
+                persona.save(update_fields=sorted(changed_fields) + ["data_aggiornamento"])
+                self._persona_dirty_fields.difference_update(changed_fields)
         else:
             self.persona = Persona.objects.create(**payload)
-        super().save(*args, **kwargs)
+        if requested_update_fields is None or model_update_fields:
+            super().save(*args, **kwargs)
         self._pending_persona_payload = {}
+        if requested_update_fields is None:
+            self._persona_dirty_fields = set()
 
     @property
     def indirizzo_effettivo(self):

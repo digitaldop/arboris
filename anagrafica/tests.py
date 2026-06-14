@@ -19,7 +19,11 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.contact_services import sync_all_student_family_relations
+from anagrafica.contact_services import (
+    sync_all_student_family_relations,
+    sync_legacy_contact_fields_from_links,
+    sync_principal_contacts,
+)
 from anagrafica.dati_base_import import run_import_dati_base, run_import_nazioni_belfiore
 from anagrafica.forms import (
     DocumentoFamigliaFormSet,
@@ -78,6 +82,57 @@ from sistema.models import (
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
 )
+
+
+class FamiliarePersonaProxySaveTests(TestCase):
+    def test_proxy_email_save_persists_on_linked_persona(self):
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore", ordine=1)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Ada",
+            cognome="Rossi",
+            email="ada.rossi@example.com",
+            telefono="3331234567",
+        )
+
+        familiare.email = "nuova.ada@example.com"
+        familiare.telefono = "3337654321"
+        familiare.save()
+
+        familiare.refresh_from_db()
+        familiare.persona.refresh_from_db()
+        self.assertEqual(familiare.email, "nuova.ada@example.com")
+        self.assertEqual(familiare.persona.email, "nuova.ada@example.com")
+        self.assertEqual(familiare.telefono, "3337654321")
+        self.assertEqual(familiare.persona.telefono, "3337654321")
+
+        familiare.email = "contatti.ada@example.com"
+        familiare.telefono = "3330000000"
+        familiare.save(update_fields=["email", "telefono"])
+
+        familiare.refresh_from_db()
+        familiare.persona.refresh_from_db()
+        self.assertEqual(familiare.email, "contatti.ada@example.com")
+        self.assertEqual(familiare.persona.email, "contatti.ada@example.com")
+        self.assertEqual(familiare.telefono, "3330000000")
+        self.assertEqual(familiare.persona.telefono, "3330000000")
+
+    def test_contact_link_sync_persists_email_on_linked_persona(self):
+        relazione = RelazioneFamiliare.objects.create(relazione="Tutore", ordine=1)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Lia",
+            cognome="Bianchi",
+            email="lia.bianchi@example.com",
+        )
+
+        sync_principal_contacts(familiare, email="contatti.lia@example.com")
+        sync_legacy_contact_fields_from_links(familiare)
+
+        familiare.refresh_from_db()
+        familiare.persona.refresh_from_db()
+        self.assertEqual(familiare.email, "contatti.lia@example.com")
+        self.assertEqual(familiare.persona.email, "contatti.lia@example.com")
 
 
 class ImportDatiBaseTests(TestCase):

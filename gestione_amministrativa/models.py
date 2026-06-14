@@ -145,6 +145,22 @@ class DipendenteQuerySet(models.QuerySet):
 
 
 class Dipendente(models.Model):
+    PERSONA_PROXY_FIELDS = {
+        "indirizzo",
+        "nome",
+        "cognome",
+        "sesso",
+        "data_nascita",
+        "luogo_nascita",
+        "nazione_nascita",
+        "luogo_nascita_custom",
+        "nazionalita",
+        "codice_fiscale",
+        "email",
+        "telefono",
+        "note",
+    }
+
     indirizzi_anagrafici = GenericRelation(
         "anagrafica.AnagraficaIndirizzo",
         related_query_name="dipendenti",
@@ -267,21 +283,28 @@ class Dipendente(models.Model):
         if self.classe_principale_id and self.gruppo_classe_principale_id:
             raise ValidationError({"classe_principale": "Scegli una sola classe principale o una sola pluriclasse."})
 
-    def _ensure_persona_collegata(self):
+    def _ensure_persona_collegata(self, update_fields=None):
         from anagrafica.models import Persona
 
         pending = getattr(self, "_persona_pending_values", {})
         dirty_fields = getattr(self, "_persona_dirty_fields", set())
 
         if self.persona_collegata_id:
+            saved_fields = set()
             if pending:
-                for field_name, value in pending.items():
+                for field_name, value in list(pending.items()):
+                    if update_fields is not None and field_name not in update_fields:
+                        continue
                     setattr(self.persona_collegata, field_name, value)
                     dirty_fields.add(field_name)
-                pending.clear()
-            if dirty_fields:
-                self.persona_collegata.save(update_fields=sorted(dirty_fields) + ["data_aggiornamento"])
-                dirty_fields.clear()
+                    pending.pop(field_name, None)
+            fields_to_save = set(dirty_fields)
+            if update_fields is not None:
+                fields_to_save &= update_fields
+            if fields_to_save:
+                self.persona_collegata.save(update_fields=sorted(fields_to_save) + ["data_aggiornamento"])
+                saved_fields.update(fields_to_save)
+            dirty_fields.difference_update(saved_fields)
             return
 
         persona_payload = {
@@ -307,8 +330,18 @@ class Dipendente(models.Model):
         dirty_fields.clear()
 
     def save(self, *args, **kwargs):
-        self._ensure_persona_collegata()
-        super().save(*args, **kwargs)
+        requested_update_fields = kwargs.get("update_fields")
+        persona_update_fields = None
+        model_update_fields = None
+        if requested_update_fields is not None:
+            requested_update_fields = set(requested_update_fields)
+            persona_update_fields = requested_update_fields & self.PERSONA_PROXY_FIELDS
+            model_update_fields = requested_update_fields - self.PERSONA_PROXY_FIELDS
+            kwargs["update_fields"] = model_update_fields
+
+        self._ensure_persona_collegata(update_fields=persona_update_fields)
+        if requested_update_fields is None or model_update_fields:
+            super().save(*args, **kwargs)
 
     @property
     def nome_completo(self):

@@ -33,6 +33,27 @@ from .models import (
 from .services import crea_o_aggiorna_previsione_busta_paga
 
 
+class DipendentePersonaProxySaveTests(TestCase):
+    def test_proxy_email_save_persists_on_linked_persona_with_update_fields(self):
+        dipendente = Dipendente.objects.create(
+            nome="Ada",
+            cognome="Rossi",
+            email="ada.rossi@example.com",
+            telefono="3331234567",
+        )
+
+        dipendente.email = "nuova.ada@example.com"
+        dipendente.telefono = "3337654321"
+        dipendente.save(update_fields=["email", "telefono"])
+
+        dipendente.refresh_from_db()
+        dipendente.persona_collegata.refresh_from_db()
+        self.assertEqual(dipendente.email, "nuova.ada@example.com")
+        self.assertEqual(dipendente.persona_collegata.email, "nuova.ada@example.com")
+        self.assertEqual(dipendente.telefono, "3337654321")
+        self.assertEqual(dipendente.persona_collegata.telefono, "3337654321")
+
+
 class SimulazioneCostoDipendenteTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="admin", password="test")
