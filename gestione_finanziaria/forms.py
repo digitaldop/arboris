@@ -554,7 +554,7 @@ class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         movimento_choices_ids = kwargs.pop("movimento_choices_ids", None)
         super().__init__(*args, **kwargs)
-        optional_fields = ["data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
+        optional_fields = ["importo_pagato", "data_pagamento", "conto_bancario", "movimento_finanziario", "note"]
         for field_name in optional_fields:
             self.fields[field_name].required = False
         for field_name in ("data_scadenza", "data_pagamento"):
@@ -573,11 +573,12 @@ class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        cleaned["importo_pagato"] = cleaned.get("importo_pagato") or Decimal("0.00")
         if "stato" not in self.changed_data:
             temp = ScadenzaPagamentoFornitore(
                 data_scadenza=cleaned.get("data_scadenza"),
                 importo_previsto=cleaned.get("importo_previsto") or Decimal("0.00"),
-                importo_pagato=cleaned.get("importo_pagato") or Decimal("0.00"),
+                importo_pagato=cleaned["importo_pagato"],
                 stato=cleaned.get("stato") or StatoScadenzaFornitore.PREVISTA,
             )
             cleaned["stato"] = temp.calcola_stato_automatico()

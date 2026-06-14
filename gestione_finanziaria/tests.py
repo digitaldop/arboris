@@ -2686,7 +2686,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
                 "scadenze-MAX_NUM_FORMS": "1000",
                 "scadenze-0-data_scadenza": "",
                 "scadenze-0-importo_previsto": "1020.00",
-                "scadenze-0-importo_pagato": "0.00",
+                "scadenze-0-importo_pagato": "",
                 "scadenze-0-data_pagamento": "",
                 "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
                 "scadenze-0-conto_bancario": "",
@@ -2701,6 +2701,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         scadenza = ScadenzaPagamentoFornitore.objects.get(documento=documento)
         self.assertEqual(scadenza.data_scadenza, date(2025, 12, 15))
         self.assertEqual(scadenza.importo_previsto, Decimal("1020.00"))
+        self.assertEqual(scadenza.importo_pagato, Decimal("0.00"))
 
     def test_documento_fornitore_form_renders_search_popup_controls(self):
         response = self.client.get(reverse("crea_documento_fornitore"))
