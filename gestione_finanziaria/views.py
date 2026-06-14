@@ -751,7 +751,7 @@ def lista_documenti_fornitori(request):
             (scadenza.importo_pagato or Decimal("0.00") for scadenza in documento.scadenze.all()),
             Decimal("0.00"),
         )
-        residuo = (documento.totale or Decimal("0.00")) - importo_pagato
+        residuo = documento.totale_da_pagare - importo_pagato
         totale_documenti_non_saldati += max(residuo, Decimal("0.00"))
 
     return render(

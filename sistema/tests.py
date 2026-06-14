@@ -50,12 +50,14 @@ from .popup_manifest import build_popup_manifest
 from .restore_job_runner import run_restore_job
 from anagrafica.models import (
     Citta,
+    Documento,
     Familiare,
     Provincia,
     Regione,
     RelazioneFamiliare,
     Studente,
     StudenteFamiliare,
+    TipoDocumento,
 )
 from anagrafica.models import Indirizzo
 from calendario.models import CategoriaCalendario, EventoCalendario
@@ -391,6 +393,71 @@ class GlobalSearchTests(TestCase):
             famiglia_results[0]["url"],
             reverse("modifica_famiglia_logica", kwargs={"key": f"s-{studente.pk}"}),
         )
+
+    def test_global_search_returns_only_people_and_suppliers(self):
+        SistemaUtentePermessi.objects.filter(user=self.user).update(
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
+            permesso_calendario=LivelloPermesso.VISUALIZZAZIONE,
+            permesso_famiglie_interessate=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        if hasattr(self.user, "_arboris_permission_profile_cache"):
+            delattr(self.user, "_arboris_permission_profile_cache")
+
+        today = timezone.localdate()
+        relazione = RelazioneFamiliare.objects.create(relazione="Genitore")
+        studente = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        familiare = Familiare.objects.create(
+            relazione_familiare=relazione,
+            nome="Giulia",
+            cognome="Rossi",
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=studente,
+            familiare=familiare,
+            relazione_familiare=relazione,
+            attivo=True,
+        )
+        tipo_documento = TipoDocumento.objects.create(tipo_documento="Documento Rossi")
+        Documento.objects.create(
+            studente=studente,
+            tipo_documento=tipo_documento,
+            descrizione="Documento Rossi",
+            file="documenti/rossi.pdf",
+        )
+        fornitore = Fornitore.objects.create(denominazione="Rossi Forniture")
+        DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="Rossi-001",
+            data_documento=today,
+            descrizione="Fattura Rossi",
+            totale=Decimal("10.00"),
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=today,
+            importo=Decimal("10.00"),
+            descrizione="Movimento Rossi",
+        )
+        categoria = CategoriaCalendario.objects.create(nome="Agenda Rossi")
+        EventoCalendario.objects.create(
+            titolo="Evento Rossi",
+            categoria_evento=categoria,
+            data_inizio=today,
+            data_fine=today,
+        )
+
+        response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "Rossi"})
+
+        self.assertEqual(response.status_code, 200)
+        categories = {item["category"] for item in response.json()["results"]}
+        self.assertIn("Famiglia", categories)
+        self.assertIn("Studente", categories)
+        self.assertIn("Familiare", categories)
+        self.assertIn("Fornitore", categories)
+        self.assertNotIn("Documento", categories)
+        self.assertNotIn("Fattura fornitore", categories)
+        self.assertNotIn("Movimento bancario", categories)
+        self.assertNotIn("Evento calendario", categories)
 
     def test_global_search_ignores_too_short_queries(self):
         response = self.client.get(reverse("ricerca_globale_sistema"), {"q": "R"})

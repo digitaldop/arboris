@@ -150,7 +150,12 @@
                                         </span>
                                         <span class="anagrafica-record-main">
                                             <span class="table-main-text">{{ scadenza.documento.fornitore.denominazione }}</span>
-                                            <span class="table-subtext">{{ scadenza.documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
+                                            <span class="table-subtext">
+                                                {{ scadenza.documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}
+                                                {% if scadenza.documento.ritenuta_acconto %}
+                                                    <span class="supplier-withholding-badge" title="Ritenuta d'acconto" aria-label="Ritenuta d'acconto">R.A.</span>
+                                                {% endif %}
+                                            </span>
                                         </span>
                                     </span>
                                 </td>

@@ -309,7 +309,12 @@
                                         {% for documento in documenti %}
                                             <tr class="list-row-link" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
                                                 <td>
-                                                    <strong>{{ documento.numero_documento|default:"Senza numero" }}</strong>
+                                                    <strong>
+                                                        {{ documento.numero_documento|default:"Senza numero" }}
+                                                        {% if documento.ritenuta_acconto %}
+                                                            <span class="supplier-withholding-badge" title="Ritenuta d'acconto" aria-label="Ritenuta d'acconto">R.A.</span>
+                                                        {% endif %}
+                                                    </strong>
                                                     <span>{{ documento.get_stato_display }}</span>
                                                 </td>
                                                 <td>{{ documento.data_documento|date:"d/m/Y" }}</td>

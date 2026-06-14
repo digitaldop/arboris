@@ -341,7 +341,7 @@ def build_anagrafica_global_search_results(query, remaining):
         logical_family_matches,
         logical_family_summary_for_person,
     )
-    from anagrafica.models import Documento, Familiare, Studente
+    from anagrafica.models import Familiare, Studente
 
     results = []
     terms = [term for term in query.split() if term]
@@ -423,39 +423,6 @@ def build_anagrafica_global_search_results(query, remaining):
         for familiare in familiari
     )
 
-    documenti = (
-        Documento.objects.filter(
-            Q(tipo_documento__tipo_documento__icontains=query)
-            | Q(descrizione__icontains=query)
-            | Q(file__icontains=query)
-            | Q(familiare__persona__nome__icontains=query)
-            | Q(familiare__persona__cognome__icontains=query)
-            | Q(studente__nome__icontains=query)
-            | Q(studente__cognome__icontains=query)
-        )
-        .select_related("tipo_documento", "familiare__persona", "studente")
-        .order_by("-data_caricamento", "-id")[:3]
-    )
-    for documento in documenti:
-        owner_label = ""
-        owner_url = documento.download_url
-        if documento.familiare_id:
-            owner_label = f"Familiare {documento.familiare}"
-            owner_url = reverse("modifica_familiare", kwargs={"pk": documento.familiare_id})
-        elif documento.studente_id:
-            owner_label = f"Studente {documento.studente}"
-            owner_url = reverse("modifica_studente", kwargs={"pk": documento.studente_id})
-        results.append(
-            search_result(
-                "Documento",
-                str(documento),
-                owner_url,
-                subtitle=compact_join([owner_label, documento.scadenza.strftime("%d/%m/%Y") if documento.scadenza else ""]),
-                module="Anagrafica",
-                icon="file-text",
-            )
-        )
-
     return results[:remaining]
 
 
@@ -514,10 +481,9 @@ def build_calendar_global_search_results(query, remaining):
     ]
 
 
-def build_financial_global_search_results(query, remaining):
-    from gestione_finanziaria.models import DocumentoFornitore, Fornitore, MovimentoFinanziario
+def build_supplier_global_search_results(query, remaining):
+    from gestione_finanziaria.models import Fornitore
 
-    results = []
     fornitori = (
         Fornitore.objects.filter(
             Q(denominazione__icontains=query)
@@ -528,9 +494,9 @@ def build_financial_global_search_results(query, remaining):
             | Q(referente__icontains=query)
         )
         .select_related("categoria_spesa")
-        .order_by("denominazione", "id")[:4]
+        .order_by("denominazione", "id")[:remaining]
     )
-    results.extend(
+    return [
         search_result(
             "Fornitore",
             fornitore.denominazione,
@@ -540,62 +506,7 @@ def build_financial_global_search_results(query, remaining):
             icon="building",
         )
         for fornitore in fornitori
-    )
-
-    documenti = (
-        DocumentoFornitore.objects.filter(
-            Q(numero_documento__icontains=query)
-            | Q(descrizione__icontains=query)
-            | Q(fornitore__denominazione__icontains=query)
-            | Q(external_id__icontains=query)
-            | Q(note__icontains=query)
-        )
-        .select_related("fornitore", "categoria_spesa")
-        .order_by("-data_documento", "-id")[:4]
-    )
-    results.extend(
-        search_result(
-            "Fattura fornitore",
-            compact_join([documento.get_tipo_documento_display(), documento.numero_documento]),
-            reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}),
-            subtitle=compact_join([
-                documento.fornitore.denominazione,
-                documento.data_documento.strftime("%d/%m/%Y"),
-                f"EUR {documento.totale}",
-            ]),
-            module="Gestione finanziaria",
-            icon="file-text",
-        )
-        for documento in documenti
-    )
-
-    movimenti = (
-        MovimentoFinanziario.objects.filter(
-            Q(descrizione__icontains=query)
-            | Q(note__icontains=query)
-            | Q(conto__nome_conto__icontains=query)
-            | Q(categoria__nome__icontains=query)
-        )
-        .select_related("conto", "categoria")
-        .order_by("-data_contabile", "-id")[:3]
-    )
-    results.extend(
-        search_result(
-            "Movimento bancario",
-            movimento.descrizione or f"Movimento {movimento.pk}",
-            reverse("modifica_movimento_finanziario", kwargs={"pk": movimento.pk}),
-            subtitle=compact_join([
-                movimento.data_contabile.strftime("%d/%m/%Y") if movimento.data_contabile else "",
-                getattr(movimento.conto, "nome_conto", ""),
-                f"EUR {movimento.importo}",
-            ]),
-            module="Gestione finanziaria",
-            icon="wallet",
-        )
-        for movimento in movimenti
-    )
-
-    return results[:remaining]
+    ]
 
 
 def build_global_search_results(user, query, limit=GLOBAL_SEARCH_MAX_RESULTS):
@@ -606,9 +517,7 @@ def build_global_search_results(user, query, limit=GLOBAL_SEARCH_MAX_RESULTS):
 
     search_plan = (
         ("anagrafica", build_anagrafica_global_search_results),
-        ("famiglie_interessate", build_interested_families_global_search_results),
-        ("calendario", build_calendar_global_search_results),
-        ("gestione_finanziaria", build_financial_global_search_results),
+        ("gestione_finanziaria", build_supplier_global_search_results),
     )
 
     for module_name, builder in search_plan:

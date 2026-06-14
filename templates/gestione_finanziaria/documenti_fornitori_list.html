@@ -140,6 +140,7 @@
                                     <th class="column-right">Imponibile</th>
                                     <th class="column-right">IVA</th>
                                     <th class="column-right">Totale</th>
+                                    <th class="column-right">Da pagare</th>
                                     <th>Stato</th>
                                     <th>Azioni</th>
                                 </tr>
@@ -156,7 +157,12 @@
                                                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
                                                 </span>
                                                 <span class="anagrafica-record-main">
-                                                    <span class="table-main-text">{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</span>
+                                                    <span class="table-main-text">
+                                                        {{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}
+                                                        {% if documento.ritenuta_acconto %}
+                                                            <span class="supplier-withholding-badge" title="Ritenuta d'acconto" aria-label="Ritenuta d'acconto">R.A.</span>
+                                                        {% endif %}
+                                                    </span>
                                                     <span class="table-subtext">{{ documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
                                                 </span>
                                             </a>
@@ -168,6 +174,7 @@
                                         <td class="column-right">{{ documento.imponibile|euro }} &euro;</td>
                                         <td class="column-right">{{ documento.iva|euro }} &euro;</td>
                                         <td class="column-right finance-money-cell">{{ documento.totale|euro }} &euro;</td>
+                                        <td class="column-right finance-money-cell">{{ documento.totale_da_pagare|euro }} &euro;</td>
                                         <td>
                                             <span class="anagrafica-status-chip {% if documento.stato == 'pagato' %}is-success{% elif documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
                                                 {{ documento.get_stato_display }}

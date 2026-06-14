@@ -2450,6 +2450,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             imponibile=Decimal("100.00"),
             iva=Decimal("22.00"),
             totale=Decimal("122.00"),
+            imponibile_ritenuta_acconto=Decimal("100.00"),
+            ritenuta_acconto=Decimal("20.00"),
         )
         ScadenzaPagamentoFornitore.objects.create(
             documento=documento,
@@ -2469,6 +2471,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Fatture recenti")
         self.assertContains(response, "Scadenze aperte")
         self.assertContains(response, "C-001")
+        self.assertContains(response, "supplier-withholding-badge")
         self.assertContains(response, "31/05/2026")
         self.assertContains(response, 'class="btn btn-secondary btn-icon-text js-page-back-btn"')
         self.assertContains(response, "view-mode.js")
@@ -2583,6 +2586,70 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Tecnica Srl")
         self.assertContains(response, "F-001")
 
+    def test_documento_fornitore_con_ritenuta_calcola_netto_da_pagare(self):
+        categoria = crea_categoria_spesa_test("Consulenze")
+        fornitore = Fornitore.objects.create(
+            denominazione="Studio Professionale Rossi",
+            tipo_soggetto="professionista",
+            categoria_spesa=categoria,
+        )
+
+        response = self.client.post(
+            reverse("crea_documento_fornitore"),
+            {
+                "fornitore": str(fornitore.pk),
+                "categoria_spesa": "",
+                "tipo_documento": TipoDocumentoFornitore.FATTURA,
+                "numero_documento": "PRO-001",
+                "data_documento": "2025-12-15",
+                "data_ricezione": "",
+                "anno_competenza": "",
+                "mese_competenza": "",
+                "descrizione": "Parcella professionale",
+                "imponibile": "1716.00",
+                "aliquota_iva": "22.00",
+                "iva": "",
+                "totale": "",
+                "imponibile_ritenuta_acconto": "1650.00",
+                "aliquota_ritenuta_acconto": "20.00",
+                "ritenuta_acconto": "",
+                "stato": StatoDocumentoFornitore.DA_PAGARE,
+                "note": "",
+                "scadenze-TOTAL_FORMS": "1",
+                "scadenze-INITIAL_FORMS": "0",
+                "scadenze-MIN_NUM_FORMS": "0",
+                "scadenze-MAX_NUM_FORMS": "1000",
+                "scadenze-0-data_scadenza": "2025-12-15",
+                "scadenze-0-importo_previsto": "1763.52",
+                "scadenze-0-importo_pagato": "1763.52",
+                "scadenze-0-data_pagamento": "2025-12-15",
+                "scadenze-0-stato": StatoScadenzaFornitore.PREVISTA,
+                "scadenze-0-conto_bancario": "",
+                "scadenze-0-movimento_finanziario": "",
+                "scadenze-0-note": "",
+            },
+        )
+
+        documento = DocumentoFornitore.objects.get(numero_documento="PRO-001")
+        self.assertRedirects(response, reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk}))
+        self.assertEqual(documento.imponibile, Decimal("1716.00"))
+        self.assertEqual(documento.iva, Decimal("377.52"))
+        self.assertEqual(documento.totale, Decimal("2093.52"))
+        self.assertEqual(documento.imponibile_ritenuta_acconto, Decimal("1650.00"))
+        self.assertEqual(documento.ritenuta_acconto, Decimal("330.00"))
+        self.assertEqual(documento.totale_da_pagare, Decimal("1763.52"))
+        self.assertEqual(documento.residuo_da_pagare, Decimal("0.00"))
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
+
+        scadenza = ScadenzaPagamentoFornitore.objects.get(documento=documento)
+        self.assertEqual(scadenza.importo_previsto, Decimal("1763.52"))
+        self.assertEqual(scadenza.importo_pagato, Decimal("1763.52"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
+
+        response = self.client.get(reverse("scadenziario_fornitori"), {"stato": StatoScadenzaFornitore.PAGATA})
+        self.assertContains(response, "PRO-001")
+        self.assertContains(response, "supplier-withholding-badge")
+
     def test_documento_fornitore_form_renders_search_popup_controls(self):
         response = self.client.get(reverse("crea_documento_fornitore"))
 
@@ -2596,6 +2663,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'data-related-type="conto_bancario"')
         self.assertContains(response, 'data-related-type="movimento_finanziario"')
         self.assertContains(response, "Gennaio")
+        self.assertContains(response, 'name="imponibile_ritenuta_acconto"')
+        self.assertContains(response, "Netto da pagare")
         self.assertContains(response, "js/pages/documento-fornitore-form.js")
 
     def test_documento_fornitore_non_popup_apre_pagamento_in_popup_e_torna_a_scadenze(self):
@@ -4653,6 +4722,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             imponibile=Decimal("100.00"),
             iva=Decimal("22.00"),
             totale=Decimal("122.00"),
+            imponibile_ritenuta_acconto=Decimal("100.00"),
+            ritenuta_acconto=Decimal("20.00"),
             stato=StatoDocumentoFornitore.DA_PAGARE,
         )
         scadenza_da_pagare = ScadenzaPagamentoFornitore.objects.create(
@@ -4716,6 +4787,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Parziale")
         self.assertContains(response, "Pagata")
         self.assertContains(response, "Scaduta")
+        self.assertContains(response, "supplier-withholding-badge")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
         self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
@@ -5181,6 +5253,32 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "272,00")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=2)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
+
+    def test_lista_documenti_fornitori_riepilogo_usa_netto_da_pagare(self):
+        fornitore = Fornitore.objects.create(
+            denominazione="Professionista Riepilogo",
+            tipo_soggetto="professionista",
+        )
+        DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="RIT-1",
+            data_documento=date(2025, 12, 15),
+            imponibile=Decimal("1716.00"),
+            iva=Decimal("377.52"),
+            totale=Decimal("2093.52"),
+            imponibile_ritenuta_acconto=Decimal("1650.00"),
+            aliquota_ritenuta_acconto=Decimal("20.00"),
+            ritenuta_acconto=Decimal("330.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+        )
+
+        response = self.client.get(reverse("lista_documenti_fornitori"))
+
+        self.assertEqual(response.context["totale_documenti_non_saldati"], Decimal("1763.52"))
+        self.assertContains(response, "1.763,52")
+        self.assertContains(response, "2.093,52")
+        self.assertContains(response, "supplier-withholding-badge")
+        self.assertContains(response, "R.A.")
 
     def test_eliminazione_multipla_documenti_fornitori_con_conferma(self):
         fornitore = Fornitore.objects.create(

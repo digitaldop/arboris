@@ -73,8 +73,22 @@
                     <article class="supplier-document-summary-card">
                         <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
                         <div>
-                            <span>Totale fattura</span>
+                            <span>Totale documento</span>
                             <strong>EUR {{ documento.totale|euro }}</strong>
+                        </div>
+                    </article>
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon is-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                        <div>
+                            <span>Ritenuta</span>
+                            <strong>EUR {{ documento.ritenuta_acconto|euro }}</strong>
+                        </div>
+                    </article>
+                    <article class="supplier-document-summary-card">
+                        <span class="supplier-document-summary-icon is-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                        <div>
+                            <span>Netto da pagare</span>
+                            <strong>EUR {{ documento.totale_da_pagare|euro }}</strong>
                         </div>
                     </article>
                     <article class="supplier-document-summary-card">
@@ -259,6 +273,45 @@
                                 <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.totale|euro }}</div>
                                 <div class="mode-edit-field">{{ form.totale }}</div>
                                 {{ form.totale.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.imponibile_ritenuta_acconto.id_for_label }}">{{ form.imponibile_ritenuta_acconto.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.imponibile_ritenuta_acconto|euro }}</div>
+                                <div class="mode-edit-field">{{ form.imponibile_ritenuta_acconto }}</div>
+                                {{ form.imponibile_ritenuta_acconto.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.aliquota_ritenuta_acconto.id_for_label }}">{{ form.aliquota_ritenuta_acconto.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.aliquota_ritenuta_acconto }}%</div>
+                                <div class="mode-edit-field">{{ form.aliquota_ritenuta_acconto }}</div>
+                                {{ form.aliquota_ritenuta_acconto.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.ritenuta_acconto.id_for_label }}">{{ form.ritenuta_acconto.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.ritenuta_acconto|euro }}</div>
+                                <div class="mode-edit-field">{{ form.ritenuta_acconto }}</div>
+                                {{ form.ritenuta_acconto.errors }}
+                            </div>
+                        </div>
+
+                        <div class="supplier-document-field">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label>Netto da pagare</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">EUR {{ documento.totale_da_pagare|euro }}</div>
+                                <div class="mode-edit-field readonly-display readonly-display-plain" data-supplier-net-payable-preview>EUR {{ documento.totale_da_pagare|euro }}</div>
                             </div>
                         </div>
 
@@ -671,6 +724,10 @@
                         <tr><th>{{ form.aliquota_iva.label_tag }}</th><td>{{ form.aliquota_iva }} {{ form.aliquota_iva.errors }}</td></tr>
                         <tr><th>{{ form.iva.label_tag }}</th><td>{{ form.iva }}{{ form.iva.errors }}</td></tr>
                         <tr><th>{{ form.totale.label_tag }}</th><td>{{ form.totale }}{{ form.totale.errors }}</td></tr>
+                        <tr><th>{{ form.imponibile_ritenuta_acconto.label_tag }}</th><td>{{ form.imponibile_ritenuta_acconto }}{{ form.imponibile_ritenuta_acconto.errors }}</td></tr>
+                        <tr><th>{{ form.aliquota_ritenuta_acconto.label_tag }}</th><td>{{ form.aliquota_ritenuta_acconto }} {{ form.aliquota_ritenuta_acconto.errors }}</td></tr>
+                        <tr><th>{{ form.ritenuta_acconto.label_tag }}</th><td>{{ form.ritenuta_acconto }}{{ form.ritenuta_acconto.errors }}</td></tr>
+                        <tr><th>Netto da pagare</th><td><span class="readonly-display readonly-display-plain" data-supplier-net-payable-preview>EUR {{ documento.totale_da_pagare|euro }}</span></td></tr>
                         <tr><th>{{ form.stato.label_tag }}</th><td>{{ form.stato }} {{ form.stato.errors }}</td></tr>
                         <tr><th>{{ form.allegato.label_tag }}</th><td>{{ form.allegato }} {{ form.allegato.errors }}</td></tr>
                         <tr><th>{{ form.note.label_tag }}</th><td>{{ form.note }} {{ form.note.errors }}</td></tr>

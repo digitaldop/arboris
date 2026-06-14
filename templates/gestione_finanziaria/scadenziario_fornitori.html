@@ -133,6 +133,9 @@
                                 <td>
                                     <a href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" class="anagrafica-inline-link" data-window-popup="1" data-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
                                         {{ scadenza.documento.get_tipo_documento_display }} {{ scadenza.documento.numero_documento }}
+                                        {% if scadenza.documento.ritenuta_acconto %}
+                                            <span class="supplier-withholding-badge" title="Ritenuta d'acconto" aria-label="Ritenuta d'acconto">R.A.</span>
+                                        {% endif %}
                                     </a>
                                 </td>
                                 <td>{{ scadenza.documento.categoria_spesa|default:"-" }}</td>

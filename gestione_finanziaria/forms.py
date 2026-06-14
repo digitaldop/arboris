@@ -383,6 +383,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "aliquota_iva",
             "iva",
             "totale",
+            "imponibile_ritenuta_acconto",
+            "aliquota_ritenuta_acconto",
+            "ritenuta_acconto",
             "stato",
             "allegato",
             "note",
@@ -401,6 +404,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "aliquota_iva": "Aliquota IVA %",
             "iva": "IVA",
             "totale": "Totale fattura",
+            "imponibile_ritenuta_acconto": "Imponibile ritenuta d'acconto",
+            "aliquota_ritenuta_acconto": "Aliquota ritenuta %",
+            "ritenuta_acconto": "Ritenuta d'acconto",
             "stato": "Stato",
             "allegato": "Allegato",
             "note": "Note",
@@ -424,6 +430,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "imponibile",
             "iva",
             "totale",
+            "imponibile_ritenuta_acconto",
+            "aliquota_ritenuta_acconto",
+            "ritenuta_acconto",
             "allegato",
             "note",
         ]
@@ -446,8 +455,10 @@ class DocumentoFornitoreForm(forms.ModelForm):
         self.fields["mese_competenza"].choices = MESE_COMPETENZA_CHOICES
         for field_name in ("data_documento", "data_ricezione"):
             self.fields[field_name].input_formats = ["%Y-%m-%d"]
-        for field_name in ("imponibile", "iva", "totale"):
+        for field_name in ("imponibile", "iva", "totale", "imponibile_ritenuta_acconto", "ritenuta_acconto"):
             apply_eur_currency_widget(self.fields[field_name], compact=False)
+        if not self.is_bound and not getattr(self.instance, "pk", None):
+            self.initial.setdefault("aliquota_ritenuta_acconto", Decimal("20.00"))
 
     def clean(self):
         cleaned = super().clean()
@@ -455,6 +466,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
         aliquota_iva = cleaned.get("aliquota_iva") or Decimal("0.00")
         iva = cleaned.get("iva")
         totale = cleaned.get("totale")
+        imponibile_ritenuta = cleaned.get("imponibile_ritenuta_acconto") or Decimal("0.00")
+        aliquota_ritenuta = cleaned.get("aliquota_ritenuta_acconto")
+        ritenuta = cleaned.get("ritenuta_acconto")
 
         if imponibile in (None, "") and totale in (None, ""):
             self.add_error("imponibile", "Inserisci l'imponibile oppure il totale fattura.")
@@ -476,12 +490,35 @@ class DocumentoFornitoreForm(forms.ModelForm):
             cleaned["imponibile"] = imponibile
             cleaned["iva"] = iva
             cleaned["totale"] = totale.quantize(Decimal("0.01"))
-            return cleaned
+            totale = cleaned["totale"]
 
-        if imponibile not in (None, ""):
+        elif imponibile not in (None, ""):
             iva = (imponibile * aliquota_iva / Decimal("100")).quantize(Decimal("0.01"))
             cleaned["iva"] = iva
             cleaned["totale"] = (imponibile + iva).quantize(Decimal("0.01"))
+            totale = cleaned["totale"]
+
+        if aliquota_ritenuta in (None, ""):
+            aliquota_ritenuta = Decimal("20.00")
+        if aliquota_ritenuta < Decimal("0.00"):
+            self.add_error("aliquota_ritenuta_acconto", "L'aliquota ritenuta non puo essere negativa.")
+        if imponibile_ritenuta < Decimal("0.00"):
+            self.add_error("imponibile_ritenuta_acconto", "L'imponibile ritenuta non puo essere negativo.")
+
+        if imponibile_ritenuta > Decimal("0.00"):
+            ritenuta = (imponibile_ritenuta * aliquota_ritenuta / Decimal("100")).quantize(Decimal("0.01"))
+        else:
+            ritenuta = ritenuta or Decimal("0.00")
+        if ritenuta < Decimal("0.00"):
+            self.add_error("ritenuta_acconto", "La ritenuta d'acconto non puo essere negativa.")
+
+        cleaned["imponibile_ritenuta_acconto"] = imponibile_ritenuta.quantize(Decimal("0.01"))
+        cleaned["aliquota_ritenuta_acconto"] = aliquota_ritenuta.quantize(Decimal("0.01"))
+        cleaned["ritenuta_acconto"] = ritenuta.quantize(Decimal("0.01"))
+
+        totale = totale or Decimal("0.00")
+        if totale > Decimal("0.00") and cleaned["ritenuta_acconto"] > totale:
+            self.add_error("ritenuta_acconto", "La ritenuta non puo superare il totale fattura.")
         return cleaned
 
 

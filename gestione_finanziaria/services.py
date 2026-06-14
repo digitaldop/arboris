@@ -2440,7 +2440,7 @@ def aggiorna_stato_documento_da_scadenze(documento):
         return documento
 
     pagato = scadenze.aggregate(totale=Sum("importo_pagato"))["totale"] or Decimal("0.00")
-    totale = documento.totale or Decimal("0.00")
+    totale = documento.totale_da_pagare
     if totale > Decimal("0.00") and pagato >= totale - _TOLLERANZA_IMPORTO_ESATTO:
         nuovo_stato = StatoDocumentoFornitore.PAGATO
     elif pagato > Decimal("0.00"):

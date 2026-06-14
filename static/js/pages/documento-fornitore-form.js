@@ -4,6 +4,9 @@ window.ArborisDocumentoFornitoreForm = (function () {
         aliquotaIva: "id_aliquota_iva",
         iva: "id_iva",
         totale: "id_totale",
+        imponibileRitenuta: "id_imponibile_ritenuta_acconto",
+        aliquotaRitenuta: "id_aliquota_ritenuta_acconto",
+        ritenuta: "id_ritenuta_acconto",
     };
 
     function parseNumber(value) {
@@ -43,11 +46,50 @@ window.ArborisDocumentoFornitoreForm = (function () {
         field.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
+    function computeNetPayable() {
+        const totale = document.getElementById(MONEY_FIELDS.totale);
+        const ritenuta = document.getElementById(MONEY_FIELDS.ritenuta);
+        const gross = parseNumber(totale?.value) || 0;
+        const withholding = parseNumber(ritenuta?.value) || 0;
+        return Math.max(gross - withholding, 0);
+    }
+
+    function updateNetPayablePreview() {
+        document.querySelectorAll("[data-supplier-net-payable-preview]").forEach(function (node) {
+            node.textContent = `EUR ${formatMoney(computeNetPayable())}`;
+        });
+    }
+
+    function syncFirstDeadlineWithNetPayable() {
+        const field = document.querySelector("#scadenze-fornitore-table tbody .inline-form-row [name$='-importo_previsto']");
+        if (!field || field.dataset.userEdited === "1") {
+            return;
+        }
+        const currentValue = (field.value || "").trim();
+        if (currentValue && field.dataset.autoNetPayable !== "1") {
+            return;
+        }
+        const netPayable = computeNetPayable();
+        if (netPayable <= 0) {
+            return;
+        }
+        field.dataset.autoNetPayable = "1";
+        setValue(field, netPayable);
+    }
+
+    function refreshNetPayable() {
+        updateNetPayablePreview();
+        syncFirstDeadlineWithNetPayable();
+    }
+
     function initDocumentTotals() {
         const imponibile = document.getElementById(MONEY_FIELDS.imponibile);
         const aliquotaIva = document.getElementById(MONEY_FIELDS.aliquotaIva);
         const iva = document.getElementById(MONEY_FIELDS.iva);
         const totale = document.getElementById(MONEY_FIELDS.totale);
+        const imponibileRitenuta = document.getElementById(MONEY_FIELDS.imponibileRitenuta);
+        const aliquotaRitenuta = document.getElementById(MONEY_FIELDS.aliquotaRitenuta);
+        const ritenuta = document.getElementById(MONEY_FIELDS.ritenuta);
 
         if (!imponibile || !aliquotaIva || !iva || !totale) {
             return;
@@ -65,6 +107,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
             const tax = net * getAliquota() / 100;
             setValue(iva, tax);
             setValue(totale, net + tax);
+            refreshNetPayable();
         }
 
         function calculateFromGross() {
@@ -77,6 +120,22 @@ window.ArborisDocumentoFornitoreForm = (function () {
             const tax = gross - net;
             setValue(imponibile, net);
             setValue(iva, tax);
+            refreshNetPayable();
+        }
+
+        function calculateWithholding() {
+            if (!imponibileRitenuta || !aliquotaRitenuta || !ritenuta) {
+                refreshNetPayable();
+                return;
+            }
+            const withholdingBase = parseNumber(imponibileRitenuta.value);
+            if (withholdingBase === null) {
+                refreshNetPayable();
+                return;
+            }
+            const withholdingRate = parseNumber(aliquotaRitenuta.value) || 0;
+            setValue(ritenuta, withholdingBase * withholdingRate / 100);
+            refreshNetPayable();
         }
 
         imponibile.addEventListener("input", calculateFromNet);
@@ -88,6 +147,17 @@ window.ArborisDocumentoFornitoreForm = (function () {
             }
         });
         totale.addEventListener("input", calculateFromGross);
+        totale.addEventListener("change", refreshNetPayable);
+        if (imponibileRitenuta) {
+            imponibileRitenuta.addEventListener("input", calculateWithholding);
+        }
+        if (aliquotaRitenuta) {
+            aliquotaRitenuta.addEventListener("input", calculateWithholding);
+        }
+        if (ritenuta) {
+            ritenuta.addEventListener("input", refreshNetPayable);
+        }
+        refreshNetPayable();
     }
 
     function isoToday() {
@@ -149,6 +219,13 @@ window.ArborisDocumentoFornitoreForm = (function () {
             field.addEventListener("input", applyAutoStatus);
             field.addEventListener("change", applyAutoStatus);
         });
+
+        const importoPrevisto = row.querySelector('[name$="-importo_previsto"]');
+        if (importoPrevisto) {
+            importoPrevisto.addEventListener("input", function () {
+                importoPrevisto.dataset.userEdited = "1";
+            });
+        }
     }
 
     function rowBundleFromButton(button) {
@@ -206,6 +283,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
         }
         (root || document).querySelectorAll("#scadenze-fornitore-table tbody .inline-form-row").forEach(bindDeadlineStatus);
         bindRemoveButtons(root || document);
+        syncFirstDeadlineWithNetPayable();
     }
 
     function initRelatedPopups() {

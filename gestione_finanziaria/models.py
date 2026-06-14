@@ -311,6 +311,9 @@ class DocumentoFornitore(models.Model):
     aliquota_iva = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("22.00"))
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     totale = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    imponibile_ritenuta_acconto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    aliquota_ritenuta_acconto = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("20.00"))
+    ritenuta_acconto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     stato = models.CharField(
         max_length=30,
         choices=StatoDocumentoFornitore.choices,
@@ -398,6 +401,16 @@ class DocumentoFornitore(models.Model):
             raise ValidationError({"mese_competenza": "Il mese di competenza deve essere compreso tra 1 e 12."})
         if self.categoria_spesa_id and self.categoria_spesa.tipo != TipoCategoriaFinanziaria.SPESA:
             raise ValidationError({"categoria_spesa": "Seleziona una categoria di tipo spesa."})
+        if (self.imponibile_ritenuta_acconto or Decimal("0.00")) < Decimal("0.00"):
+            raise ValidationError({"imponibile_ritenuta_acconto": "L'imponibile ritenuta non puo essere negativo."})
+        if (self.aliquota_ritenuta_acconto or Decimal("0.00")) < Decimal("0.00"):
+            raise ValidationError({"aliquota_ritenuta_acconto": "L'aliquota ritenuta non puo essere negativa."})
+        if (self.ritenuta_acconto or Decimal("0.00")) < Decimal("0.00"):
+            raise ValidationError({"ritenuta_acconto": "La ritenuta d'acconto non puo essere negativa."})
+        if (self.totale or Decimal("0.00")) > Decimal("0.00") and (
+            self.ritenuta_acconto or Decimal("0.00")
+        ) > (self.totale or Decimal("0.00")):
+            raise ValidationError({"ritenuta_acconto": "La ritenuta non puo superare il totale fattura."})
 
     def save(self, *args, **kwargs):
         if not self.categoria_spesa_id and self.fornitore_id:
@@ -414,8 +427,13 @@ class DocumentoFornitore(models.Model):
         return totale or Decimal("0.00")
 
     @property
+    def totale_da_pagare(self):
+        totale = (self.totale or Decimal("0.00")) - (self.ritenuta_acconto or Decimal("0.00"))
+        return max(totale, Decimal("0.00"))
+
+    @property
     def residuo_da_pagare(self):
-        residuo = (self.totale or Decimal("0.00")) - self.importo_pagato
+        residuo = self.totale_da_pagare - self.importo_pagato
         return max(residuo, Decimal("0.00"))
 
 
