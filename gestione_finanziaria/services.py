@@ -151,6 +151,31 @@ def _serializable_financial_series(series, period_label):
     }
 
 
+def movimenti_economici_filter():
+    """
+    Movimenti da includere nei ragionamenti economici.
+
+    Le ricariche/entrate su carte prepagate sono liquidita' gia' propria
+    spostata su uno strumento operativo, quindi non sono introiti. Le uscite
+    dalla prepagata restano invece spese reali.
+    """
+
+    from .models import TipoCategoriaFinanziaria, TipoContoFinanziario
+
+    return (
+        ~Q(categoria__tipo=TipoCategoriaFinanziaria.TRASFERIMENTO)
+        & (
+            Q(importo__lte=0)
+            | Q(conto__isnull=True)
+            | ~Q(conto__tipo_conto=TipoContoFinanziario.CARTA_PREPAGATA)
+        )
+    )
+
+
+def movimenti_introito_effettivo_filter():
+    return Q(importo__gt=0) & movimenti_economici_filter()
+
+
 def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
     from .models import MovimentoFinanziario
 
@@ -158,7 +183,7 @@ def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
     movimenti = MovimentoFinanziario.objects.filter(
         data_contabile__gte=start_date,
         data_contabile__lte=end_date,
-    ).values("data_contabile", "importo")
+    ).filter(movimenti_economici_filter()).values("data_contabile", "importo")
 
     for movimento in movimenti:
         importo = movimento["importo"] or Decimal("0.00")
@@ -600,7 +625,7 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         data_contabile__gte=period["start"],
         data_contabile__lte=period["end"],
         importo__lt=0,
-    )
+    ).filter(movimenti_economici_filter())
     for movimento in movimenti_uscita:
         amount = abs(movimento.importo or Decimal("0.00"))
         _add_budget_amount(months_by_key, "uscite_effettive", movimento.data_contabile, amount)

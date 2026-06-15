@@ -96,6 +96,7 @@ from .services import (
     importo_rata_residuo,
     applica_anteprima_riconciliazione_fornitori,
     applica_proposta_riconciliazione,
+    build_home_financial_dashboard_data,
     build_budgeting_dashboard_data,
     calcola_hash_deduplica_movimento,
     crea_proposta_riconciliazione,
@@ -2076,6 +2077,54 @@ class BudgetingGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Flusso di cassa")
         self.assertContains(response, "Bilancio mese per mese")
         self.assertContains(response, "Affitto")
+
+    def test_home_dashboard_esclude_ricariche_prepagate_e_trasferimenti(self):
+        conto_corrente = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+        )
+        prepagata = ContoBancario.objects.create(
+            nome_conto="Carta web",
+            tipo_conto=TipoContoFinanziario.CARTA_PREPAGATA,
+        )
+        trasferimenti = CategoriaFinanziaria.objects.create(
+            nome="Giroconti",
+            tipo=TipoCategoriaFinanziaria.TRASFERIMENTO,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto_corrente,
+            data_contabile=self.today,
+            importo=Decimal("100.00"),
+            descrizione="Incasso reale",
+        )
+        MovimentoFinanziario.objects.create(
+            conto=prepagata,
+            data_contabile=self.today,
+            importo=Decimal("300.00"),
+            descrizione="Ricarica carta",
+            canale=CanaleMovimento.PREPAGATA,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=prepagata,
+            data_contabile=self.today,
+            importo=Decimal("-45.00"),
+            descrizione="Spesa web",
+            canale=CanaleMovimento.PREPAGATA,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto_corrente,
+            data_contabile=self.today,
+            importo=Decimal("-300.00"),
+            descrizione="Giroconto verso carta",
+            categoria=trasferimenti,
+        )
+
+        data = build_home_financial_dashboard_data(today=self.today)
+
+        self.assertEqual(data["monthly"]["totale_entrate"], Decimal("100.00"))
+        self.assertEqual(data["monthly"]["totale_uscite"], Decimal("45.00"))
+        self.assertEqual(data["monthly"]["saldo"], Decimal("55.00"))
+        self.assertEqual(data["monthly"]["movimenti"], 2)
 
     def test_crea_voce_budget(self):
         response = self.client.post(
@@ -5352,6 +5401,54 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
 
+    def test_spese_mensili_dashboard_esclude_ricariche_prepagate_dagli_introiti(self):
+        conto_corrente = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+        )
+        prepagata = ContoBancario.objects.create(
+            nome_conto="Carta web",
+            tipo_conto=TipoContoFinanziario.CARTA_PREPAGATA,
+        )
+        incasso = MovimentoFinanziario.objects.create(
+            conto=conto_corrente,
+            data_contabile=date(2026, 1, 10),
+            importo=Decimal("1000.00"),
+            descrizione="Incasso rette gennaio",
+            origine=OrigineMovimento.BANCA,
+            incide_su_saldo_banca=True,
+        )
+        ricarica = MovimentoFinanziario.objects.create(
+            conto=prepagata,
+            data_contabile=date(2026, 1, 12),
+            importo=Decimal("300.00"),
+            descrizione="Ricarica carta prepagata",
+            origine=OrigineMovimento.BANCA,
+            canale=CanaleMovimento.PREPAGATA,
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=prepagata,
+            data_contabile=date(2026, 1, 13),
+            importo=Decimal("-45.00"),
+            descrizione="Amazon marketplace",
+            origine=OrigineMovimento.BANCA,
+            canale=CanaleMovimento.PREPAGATA,
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-01"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["period_summary"]["totale_entrate"], Decimal("1000.00"))
+        self.assertEqual(response.context["selected_introiti_total"], Decimal("1000.00"))
+        self.assertEqual(response.context["selected_introiti"], [incasso])
+        self.assertContains(response, "Incasso rette gennaio")
+        self.assertNotContains(response, ricarica.descrizione)
+
     def test_spese_mensili_dashboard_riepilogo_periodo_mostra_perdita(self):
         categoria = crea_categoria_spesa_test("Utenze")
         SpesaOperativa.objects.create(
@@ -6884,6 +6981,65 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Sintesi")
         self.assertContains(response, "EUR 150,00")
         self.assertContains(response, "report-category-entrata")
+
+    def test_report_categorie_esclude_ricariche_prepagate_e_trasferimenti(self):
+        conto_corrente = ContoBancario.objects.create(
+            nome_conto="Conto operativo",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+        )
+        prepagata = ContoBancario.objects.create(
+            nome_conto="Carta web",
+            tipo_conto=TipoContoFinanziario.CARTA_PREPAGATA,
+        )
+        entrate = CategoriaFinanziaria.objects.create(
+            nome="Rette",
+            tipo=TipoCategoriaFinanziaria.ENTRATA,
+        )
+        trasferimenti = CategoriaFinanziaria.objects.create(
+            nome="Giroconti",
+            tipo=TipoCategoriaFinanziaria.TRASFERIMENTO,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto_corrente,
+            data_contabile=date(2026, 1, 10),
+            importo=Decimal("150.00"),
+            descrizione="Incasso retta",
+            categoria=entrate,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=prepagata,
+            data_contabile=date(2026, 1, 11),
+            importo=Decimal("300.00"),
+            descrizione="Ricarica carta",
+            categoria=entrate,
+            canale=CanaleMovimento.PREPAGATA,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto_corrente,
+            data_contabile=date(2026, 1, 11),
+            importo=Decimal("-300.00"),
+            descrizione="Giroconto verso carta",
+            categoria=trasferimenti,
+        )
+
+        response = self.client.get(
+            reverse("report_categorie_annuale"),
+            {"periodo": "solare", "anno": "2026"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["totale_entrate"], Decimal("150.00"))
+        self.assertEqual(response.context["totale_uscite"], Decimal("0"))
+        self.assertEqual(response.context["saldo_netto"], Decimal("150.00"))
+
+        response = self.client.get(
+            reverse("report_categorie_mensile"),
+            {"periodo": "solare", "anno": "2026"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["totale_entrate"], Decimal("150.00"))
+        self.assertEqual(response.context["totale_generale"], Decimal("150.00"))
 
     def test_report_categorie_annuale_mostra_categorie_figlie(self):
         categoria_padre = CategoriaFinanziaria.objects.create(

@@ -159,6 +159,8 @@ from .services import (
     importo_movimento_disponibile_fornitori,
     importo_rata_residuo,
     importo_scadenza_fornitore_residuo,
+    movimenti_economici_filter,
+    movimenti_introito_effettivo_filter,
     proposte_riconciliazione_da_movimento,
     proposte_riconciliazione_da_scadenza_fornitore,
     ricalcola_saldo_corrente_conto,
@@ -1507,7 +1509,8 @@ def _spese_mensili_rows(request, start, end):
 def _introiti_mensili(start, end):
     return list(
         MovimentoFinanziario.objects.select_related("conto", "categoria")
-        .filter(data_contabile__gte=start, data_contabile__lte=end, importo__gt=0)
+        .filter(data_contabile__gte=start, data_contabile__lte=end)
+        .filter(movimenti_introito_effettivo_filter())
         .filter(Q(origine__in=[OrigineMovimento.BANCA, OrigineMovimento.IMPORT_FILE]) | Q(incide_su_saldo_banca=True))
         .order_by("data_contabile", "id")
     )
@@ -6326,9 +6329,7 @@ def report_categorie_mensile(request):
     queryset = MovimentoFinanziario.objects.filter(
         data_contabile__gte=periodo_context["data_inizio"],
         data_contabile__lte=periodo_context["data_fine"],
-    ).exclude(
-        categoria__isnull=True
-    )
+    ).filter(movimenti_economici_filter()).exclude(categoria__isnull=True)
     queryset, conto_id = _filtra_movimenti_report(request, queryset)
 
     aggregato = (
@@ -6407,9 +6408,7 @@ def report_categorie_annuale(request):
     queryset = MovimentoFinanziario.objects.filter(
         data_contabile__gte=periodo_context["data_inizio"],
         data_contabile__lte=periodo_context["data_fine"],
-    ).exclude(
-        categoria__isnull=True
-    )
+    ).filter(movimenti_economici_filter()).exclude(categoria__isnull=True)
     queryset, conto_id = _filtra_movimenti_report(request, queryset)
 
     aggregato = (
