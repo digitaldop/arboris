@@ -940,6 +940,86 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, "data-account-name")
         self.assertNotContains(response, "finance-account-edit-link")
 
+    def test_lista_movimenti_mostra_pulsante_pulizia_duplicati(self):
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pulisci duplicati")
+        self.assertContains(response, reverse("pulizia_duplicati_movimenti_finanziari"))
+
+    def test_pulizia_duplicati_movimenti_mostra_gruppi_preselezionati(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto duplicati")
+        movimento_keep = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-42.00"),
+            descrizione="Pagamento POS",
+            controparte="Cartoleria",
+        )
+        movimento_duplicato = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-42.00"),
+            descrizione="Pagamento POS",
+            controparte="Cartoleria",
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 11),
+            importo=Decimal("-42.00"),
+            descrizione="Pagamento POS",
+            controparte="Cartoleria",
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Gruppo duplicati #1")
+        self.assertContains(response, "Conservato")
+        self.assertContains(response, "Duplicato")
+        self.assertContains(response, "stessa data, importo, descrizione, controparte e IBAN")
+        content = response.content.decode()
+        self.assertNotIn(f'name="selected_ids" value="{movimento_keep.pk}"', content)
+        self.assertIn(f'name="selected_ids" value="{movimento_duplicato.pk}"', content)
+
+    def test_pulizia_duplicati_movimenti_elimina_solo_i_selezionati(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto da pulire")
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+        )
+        duplicato_da_eliminare = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+        )
+        duplicato_deselezionato = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.post(
+            reverse("pulizia_duplicati_movimenti_finanziari"),
+            {"selected_ids": [str(duplicato_da_eliminare.pk)]},
+        )
+
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"))
+        self.assertFalse(MovimentoFinanziario.objects.filter(pk=duplicato_da_eliminare.pk).exists())
+        self.assertTrue(MovimentoFinanziario.objects.filter(pk=duplicato_deselezionato.pk).exists())
+        conto.refresh_from_db()
+        self.assertEqual(conto.saldo_corrente, Decimal("-200.00"))
+
     def test_lista_movimenti_prepara_dropdown_categorie_gerarchico(self):
         padre = CategoriaFinanziaria.objects.create(
             nome="Spese di Gestione",
@@ -4928,7 +5008,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Spesa supermercato")
         self.assertContains(response, "F24 contributi maggio")
         self.assertContains(response, "Incasso rette maggio")
-        self.assertContains(response, "Introiti 850,00")
+        self.assertContains(response, "Totale introiti del mese")
+        self.assertContains(response, "Totale spese mensili")
+        self.assertContains(response, "Residuo da pagare")
+        self.assertContains(response, "3 spese - 2 insolute")
+        self.assertContains(response, "monthly-expense-month-value-income")
         self.assertContains(response, "Parziale")
         documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
         self.assertContains(response, f'data-row-href="{documento_url}"')

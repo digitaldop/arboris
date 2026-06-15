@@ -92,11 +92,26 @@
             <a href="{{ mese.url }}" class="monthly-expense-month {% if mese.is_selected %}is-selected{% endif %}">
                 <span class="monthly-expense-month-name">{{ mese.label }}</span>
                 <span class="monthly-expense-month-main">
-                    <strong>{{ mese.totale_spese|euro }} &euro;</strong>
-                    <em>{{ mese.residuo|euro }} &euro;</em>
+                    <span class="monthly-expense-month-value monthly-expense-month-value-income">
+                        <span class="monthly-expense-month-value-icon" data-floating-text="Totale introiti del mese" aria-label="Totale introiti del mese">
+                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                        </span>
+                        <span>{{ mese.introiti|euro }} &euro;</span>
+                    </span>
+                    <strong class="monthly-expense-month-value monthly-expense-month-value-expenses">
+                        <span class="monthly-expense-month-value-icon" data-floating-text="Totale spese mensili" aria-label="Totale spese mensili">
+                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
+                        </span>
+                        <span>{{ mese.totale_spese|euro }} &euro;</span>
+                    </strong>
+                    <em class="monthly-expense-month-value monthly-expense-month-value-residual">
+                        <span class="monthly-expense-month-value-icon" data-floating-text="Residuo da pagare" aria-label="Residuo da pagare">
+                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
+                        </span>
+                        <span>{{ mese.residuo|euro }} &euro;</span>
+                    </em>
                 </span>
-                <span class="monthly-expense-month-meta">{{ mese.spese_count }} spese - {{ mese.insolute_count }} aperte</span>
-                <span class="monthly-expense-month-income">Introiti {{ mese.introiti|euro }} &euro;</span>
+                <span class="monthly-expense-month-meta">{{ mese.spese_count }} spese - {{ mese.insolute_count }} insolute</span>
             </a>
         {% endfor %}
     </section>

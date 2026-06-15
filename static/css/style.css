@@ -18225,6 +18225,11 @@ a.header-school-compact:hover {
     color: #a30f2d;
 }
 
+.family-status-pill.is-warning {
+    background: #fff4d9;
+    color: #8a5b00;
+}
+
 .family-status-dot {
     width: 7px;
     height: 7px;
@@ -28637,9 +28642,10 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .monthly-expense-month {
     display: grid;
-    gap: 6px;
-    flex: 0 0 172px;
-    min-height: 122px;
+    align-content: start;
+    gap: 8px;
+    flex: 0 0 198px;
+    min-height: 150px;
     padding: 12px;
     border: 1px solid #dce5f0;
     border-radius: 8px;
@@ -28670,7 +28676,6 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .monthly-expense-month-name,
 .module-gestione_finanziaria .monthly-expense-month-meta,
-.module-gestione_finanziaria .monthly-expense-month-income,
 .module-gestione_finanziaria .monthly-expense-period-label {
     color: #60738d;
     font-size: 11px;
@@ -28678,23 +28683,51 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 }
 
 .module-gestione_finanziaria .monthly-expense-month-name {
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-main {
     display: grid;
-    gap: 2px;
+    gap: 4px;
 }
 
-.module-gestione_finanziaria .monthly-expense-month-main strong {
-    color: #a30f2d;
-    font-size: 18px;
-    font-weight: 850;
+.module-gestione_finanziaria .monthly-expense-month-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
     line-height: 1.12;
 }
 
-.module-gestione_finanziaria .monthly-expense-month-main em {
+.module-gestione_finanziaria .monthly-expense-month-value-icon {
+    display: inline-grid;
+    flex: 0 0 15px;
+    width: 15px;
+    height: 15px;
+    place-items: center;
+    color: #9aa8b8;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-income {
     color: #1f8048;
+    font-size: 14px;
+    font-weight: 850;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-expenses {
+    color: #a30f2d;
+    font-size: 19px;
+    font-weight: 850;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-residual {
+    color: #a87511;
     font-size: 14px;
     font-style: normal;
     font-weight: 850;
@@ -29131,6 +29164,83 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .finance-bulk-table tr.finance-bulk-selected-row > td {
     background: #f1f8fb;
+}
+
+.module-gestione_finanziaria .finance-duplicate-clean-form {
+    display: grid;
+    gap: 14px;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group {
+    border: 1px solid #dce5f0;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
+    overflow: hidden;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e7edf3;
+    background: #f8fbfd;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group-title {
+    margin: 0 0 4px;
+    color: #223846;
+    font-size: 15px;
+    font-weight: 850;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group-head p {
+    margin: 0;
+    color: #52637c;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group-count,
+.module-gestione_finanziaria .finance-duplicate-role {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 850;
+    white-space: nowrap;
+}
+
+.module-gestione_finanziaria .finance-duplicate-group-count {
+    background: #eef4f8;
+    color: #42566e;
+}
+
+.module-gestione_finanziaria .finance-duplicate-role.is-keep {
+    background: #e8f7ec;
+    color: #226b3a;
+}
+
+.module-gestione_finanziaria .finance-duplicate-role.is-delete {
+    background: #fff1f4;
+    color: #a30f2d;
+}
+
+.module-gestione_finanziaria .finance-duplicate-table-shell {
+    overflow-x: auto;
+}
+
+.module-gestione_finanziaria .finance-duplicate-table {
+    min-width: 1080px;
+}
+
+.module-gestione_finanziaria .finance-duplicate-keep-row > td {
+    background: #fbfdf8;
 }
 
 .module-gestione_finanziaria .finance-guide-panel,

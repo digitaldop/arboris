@@ -1221,6 +1221,20 @@ def fatture_scadenze_fornitori(request):
 
 
 MESI_BREVI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
+MESI_ESTESI = [
+    "Gennaio",
+    "Febbraio",
+    "Marzo",
+    "Aprile",
+    "Maggio",
+    "Giugno",
+    "Luglio",
+    "Agosto",
+    "Settembre",
+    "Ottobre",
+    "Novembre",
+    "Dicembre",
+]
 
 
 def _first_day(value):
@@ -1505,7 +1519,7 @@ def spese_mensili_dashboard(request):
         _month_key(mese): {
             "date": mese,
             "key": _month_key(mese),
-            "label": f"{MESI_BREVI[mese.month - 1]} {mese.year}",
+            "label": f"{MESI_ESTESI[mese.month - 1]} {mese.year}",
             "totale_spese": Decimal("0.00"),
             "residuo": Decimal("0.00"),
             "spese_count": 0,
@@ -2815,6 +2829,10 @@ def _assorbi_collegamenti_movimento_duplicato(movimento_sorgente, movimento_dest
     NotificaFinanziaria.objects.filter(movimento_finanziario=movimento_sorgente).update(
         movimento_finanziario=movimento_destinazione
     )
+    BustaPagaDipendente.objects.filter(movimento_pagamento=movimento_sorgente).update(
+        movimento_pagamento=movimento_destinazione,
+        data_aggiornamento=now,
+    )
 
     for pagamento in PagamentoFornitore.objects.filter(movimento_finanziario=movimento_sorgente):
         exists = PagamentoFornitore.objects.filter(
@@ -3686,6 +3704,246 @@ def _statistiche_pulizia_movimenti(queryset):
         "collegati_scadenze": ScadenzaPagamentoFornitore.objects.filter(movimento_finanziario__in=queryset).count(),
         "collegati_buste": BustaPagaDipendente.objects.filter(movimento_pagamento__in=queryset).count(),
     }
+
+
+def _link_count_movimento(movimento):
+    return (
+        (1 if movimento.rata_iscrizione_id else 0)
+        + (getattr(movimento, "riconciliazioni_rate_count", 0) or 0)
+        + (getattr(movimento, "pagamenti_fornitori_count", 0) or 0)
+        + (getattr(movimento, "scadenze_fornitori_count", 0) or 0)
+        + (getattr(movimento, "spese_operative_count", 0) or 0)
+        + (getattr(movimento, "buste_paga_count", 0) or 0)
+    )
+
+
+def _links_label_movimento(movimento):
+    labels = []
+    if movimento.rata_iscrizione_id or (getattr(movimento, "riconciliazioni_rate_count", 0) or 0):
+        labels.append("rate")
+    if getattr(movimento, "pagamenti_fornitori_count", 0) or getattr(movimento, "scadenze_fornitori_count", 0):
+        labels.append("fornitori")
+    if getattr(movimento, "spese_operative_count", 0):
+        labels.append("spese operative")
+    if getattr(movimento, "buste_paga_count", 0):
+        labels.append("buste paga")
+    return ", ".join(labels) if labels else "nessun collegamento"
+
+
+def _canonical_duplicate_movimento_key(movimento):
+    return (
+        -_link_count_movimento(movimento),
+        0 if movimento.provider_transaction_id else 1,
+        0 if movimento.hash_deduplica else 1,
+        0 if movimento.categoria_id else 1,
+        movimento.pk,
+    )
+
+
+def _movimenti_finanziari_duplicate_groups():
+    movimenti = list(
+        MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
+        .annotate(
+            riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
+            scadenze_fornitori_count=Count("scadenze_fornitori", distinct=True),
+            spese_operative_count=Count("spese_operative", distinct=True),
+            buste_paga_count=Count("buste_paga_dipendenti", distinct=True),
+        )
+        .order_by("data_contabile", "id")
+    )
+    if not movimenti:
+        return []
+
+    movimenti_by_id = {movimento.pk: movimento for movimento in movimenti}
+    parent = {movimento.pk: movimento.pk for movimento in movimenti}
+    key_to_ids = {}
+    key_to_reason = {}
+
+    def find(item_id):
+        while parent[item_id] != item_id:
+            parent[item_id] = parent[parent[item_id]]
+            item_id = parent[item_id]
+        return item_id
+
+    def union(first_id, second_id):
+        first_root = find(first_id)
+        second_root = find(second_id)
+        if first_root != second_root:
+            parent[second_root] = first_root
+
+    def add_key(key, movimento, reason):
+        key_to_ids.setdefault(key, []).append(movimento.pk)
+        key_to_reason.setdefault(key, reason)
+
+    for movimento in movimenti:
+        provider_tx_id = (movimento.provider_transaction_id or "").strip()
+        if provider_tx_id:
+            add_key(
+                ("provider", movimento.conto_id or 0, provider_tx_id),
+                movimento,
+                "stesso identificativo provider",
+            )
+
+        hash_deduplica = (movimento.hash_deduplica or "").strip()
+        if hash_deduplica:
+            add_key(
+                ("hash", movimento.conto_id or 0, hash_deduplica),
+                movimento,
+                "stessa impronta salvata",
+            )
+
+        generated_hash = calcola_hash_deduplica_movimento(
+            conto_id=movimento.conto_id,
+            data_contabile=movimento.data_contabile,
+            importo=movimento.importo,
+            descrizione=movimento.descrizione,
+            controparte=movimento.controparte,
+            iban_controparte=movimento.iban_controparte,
+        )
+        if generated_hash:
+            add_key(
+                ("fingerprint", generated_hash),
+                movimento,
+                "stessa data, importo, descrizione, controparte e IBAN",
+            )
+
+    for ids in key_to_ids.values():
+        if len(ids) <= 1:
+            continue
+        first_id = ids[0]
+        for item_id in ids[1:]:
+            union(first_id, item_id)
+
+    component_ids = {}
+    component_reasons = {}
+    for key, ids in key_to_ids.items():
+        if len(ids) <= 1:
+            continue
+        root = find(ids[0])
+        component_ids.setdefault(root, set()).update(ids)
+        component_reasons.setdefault(root, set()).add(key_to_reason[key])
+
+    groups = []
+    for root, ids in component_ids.items():
+        component_movimenti = [movimenti_by_id[item_id] for item_id in ids if item_id in movimenti_by_id]
+        if len(component_movimenti) <= 1:
+            continue
+
+        for movimento in component_movimenti:
+            movimento.dedup_link_count = _link_count_movimento(movimento)
+            movimento.dedup_links_label = _links_label_movimento(movimento)
+
+        keep = sorted(component_movimenti, key=_canonical_duplicate_movimento_key)[0]
+        duplicati = sorted(
+            [movimento for movimento in component_movimenti if movimento.pk != keep.pk],
+            key=lambda movimento: (movimento.data_contabile, movimento.pk),
+        )
+        reasons = sorted(component_reasons.get(root, []))
+        groups.append(
+            {
+                "key": root,
+                "keep": keep,
+                "duplicati": duplicati,
+                "movimenti": [keep, *duplicati],
+                "motivi": reasons,
+                "motivo_label": "; ".join(reasons),
+                "totale_count": len(component_movimenti),
+                "duplicati_count": len(duplicati),
+            }
+        )
+
+    return sorted(
+        groups,
+        key=lambda group: (group["keep"].data_contabile, group["keep"].pk),
+        reverse=True,
+    )
+
+
+def _selected_duplicate_pairs(duplicate_groups, selected_ids):
+    selected_ids = set(selected_ids)
+    pairs = []
+    for group in duplicate_groups:
+        keep_id = group["keep"].pk
+        for movimento in group["duplicati"]:
+            if movimento.pk in selected_ids:
+                pairs.append((movimento.pk, keep_id))
+    return pairs
+
+
+def _esegui_pulizia_duplicati_movimenti(duplicate_pairs):
+    if not duplicate_pairs:
+        return 0
+
+    duplicati_ids = [duplicato_id for duplicato_id, _keep_id in duplicate_pairs]
+    keep_ids = [keep_id for _duplicato_id, keep_id in duplicate_pairs]
+    conti_da_ricalcolare_ids = set()
+    eliminati_ids = []
+
+    with transaction.atomic():
+        movimenti = {
+            movimento.pk: movimento
+            for movimento in MovimentoFinanziario.objects.select_for_update()
+            .filter(pk__in=set(duplicati_ids + keep_ids))
+        }
+        now = timezone.now()
+        for duplicato_id, keep_id in duplicate_pairs:
+            movimento_duplicato = movimenti.get(duplicato_id)
+            movimento_keep = movimenti.get(keep_id)
+            if not movimento_duplicato or not movimento_keep or movimento_duplicato.pk == movimento_keep.pk:
+                continue
+            if movimento_duplicato.conto_id and movimento_duplicato.incide_su_saldo_banca:
+                conti_da_ricalcolare_ids.add(movimento_duplicato.conto_id)
+            _assorbi_collegamenti_movimento_duplicato(
+                movimento_duplicato,
+                movimento_keep,
+                now=now,
+            )
+            eliminati_ids.append(movimento_duplicato.pk)
+
+        if eliminati_ids:
+            MovimentoFinanziario.objects.filter(pk__in=eliminati_ids).delete()
+
+    for conto in ContoBancario.objects.filter(pk__in=conti_da_ricalcolare_ids):
+        ricalcola_saldo_corrente_conto(conto)
+
+    return len(eliminati_ids)
+
+
+def pulizia_duplicati_movimenti_finanziari(request):
+    duplicate_groups = _movimenti_finanziari_duplicate_groups()
+    duplicati_count = sum(group["duplicati_count"] for group in duplicate_groups)
+
+    if request.method == "POST":
+        selected_ids = _ids_selezionati_da_post(request)
+        duplicate_pairs = _selected_duplicate_pairs(duplicate_groups, selected_ids)
+
+        if not duplicate_groups:
+            messages.info(request, "Non ci sono duplicati da pulire.")
+            return redirect("lista_movimenti_finanziari")
+        if not duplicate_pairs:
+            messages.info(request, "Nessun duplicato selezionato per l'eliminazione.")
+            return redirect("pulizia_duplicati_movimenti_finanziari")
+
+        eliminati = _esegui_pulizia_duplicati_movimenti(duplicate_pairs)
+        if eliminati:
+            messages.success(
+                request,
+                f"Pulizia duplicati completata: eliminati {eliminati} movimenti duplicati.",
+            )
+        else:
+            messages.info(request, "Nessun movimento duplicato e' stato eliminato.")
+        return redirect("lista_movimenti_finanziari")
+
+    return render(
+        request,
+        "gestione_finanziaria/movimenti_duplicati.html",
+        {
+            "duplicate_groups": duplicate_groups,
+            "gruppi_count": len(duplicate_groups),
+            "duplicati_count": duplicati_count,
+        },
+    )
 
 
 def pulizia_movimenti_finanziari(request):

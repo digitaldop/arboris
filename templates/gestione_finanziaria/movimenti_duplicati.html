@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Pulisci duplicati movimenti - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'lista_movimenti_finanziari' %}">Movimenti</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Duplicati</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Pulisci duplicati movimenti</h1>
+                <span class="family-status-pill {% if duplicate_groups %}is-warning{% else %}is-success{% endif %}">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {% if duplicate_groups %}Revisione richiesta{% else %}Nessun duplicato{% endif %}
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                {{ gruppi_count }} gruppi trovati, {{ duplicati_count }} movimenti candidati all'eliminazione
+            </div>
+        </div>
+        <div class="page-head-actions">
+            <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span class="btn-label">Indietro</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="{% if duplicate_groups %}finance-danger-panel{% else %}finance-success-panel finance-guide-panel{% endif %}">
+        <div class="finance-guide-icon" aria-hidden="true">
+            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if duplicate_groups %}alert{% else %}check{% endif %}"></use></svg>
+        </div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">
+                {% if duplicate_groups %}Controllo manuale prima della cancellazione{% else %}Archivio movimenti pulito{% endif %}
+            </div>
+            {% if duplicate_groups %}
+                <p>
+                    I movimenti candidati all'eliminazione sono gia' selezionati. Deseleziona quelli che non vuoi
+                    trattare come duplicati; il movimento indicato come conservato restera' in archivio.
+                </p>
+                <p class="help-text">
+                    Prima della cancellazione i collegamenti a rate, fornitori, spese operative e buste paga vengono
+                    trasferiti al movimento conservato. I saldi dei conti interessati vengono poi ricalcolati.
+                </p>
+            {% else %}
+                <p>Non risultano gruppi di movimenti con stessa impronta di deduplica o stesso identificativo provider.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if duplicate_groups %}
+        <form method="post" class="finance-bulk-form finance-duplicate-clean-form" data-bulk-form>
+            {% csrf_token %}
+            <div class="finance-bulk-toolbar" data-bulk-toolbar>
+                <div class="finance-bulk-summary">
+                    <strong><span data-bulk-count>{{ duplicati_count }}</span></strong>
+                    <span>duplicati selezionati per l'eliminazione</span>
+                </div>
+                <label class="finance-bulk-select-all">
+                    <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all checked aria-label="Seleziona tutti i duplicati candidati">
+                    <span>Tutti i duplicati</span>
+                </label>
+            </div>
+
+            {% for gruppo in duplicate_groups %}
+                <section class="finance-duplicate-group">
+                    <div class="finance-duplicate-group-head">
+                        <div>
+                            <h2 class="finance-duplicate-group-title">Gruppo duplicati #{{ forloop.counter }}</h2>
+                            <p>{{ gruppo.motivo_label }}</p>
+                        </div>
+                        <span class="finance-duplicate-group-count">{{ gruppo.totale_count }} movimenti</span>
+                    </div>
+                    <div class="finance-duplicate-table-shell">
+                        <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table finance-duplicate-table">
+                            <thead>
+                                <tr>
+                                    <th class="finance-bulk-select-col">Elimina</th>
+                                    <th>Ruolo</th>
+                                    <th>Data</th>
+                                    <th>Conto</th>
+                                    <th>Descrizione</th>
+                                    <th>Controparte</th>
+                                    <th class="column-right">Importo</th>
+                                    <th>Origine</th>
+                                    <th>Collegamenti</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="finance-duplicate-keep-row">
+                                    <td class="finance-bulk-select-col">-</td>
+                                    <td><span class="finance-duplicate-role is-keep">Conservato</span></td>
+                                    <td>{{ gruppo.keep.data_contabile|date:"d/m/Y" }}</td>
+                                    <td>{{ gruppo.keep.conto|default:"-" }}</td>
+                                    <td>{{ gruppo.keep.descrizione|truncatechars:90|default:"-" }}</td>
+                                    <td>{{ gruppo.keep.controparte|default:"-" }}</td>
+                                    <td class="column-right">{{ gruppo.keep.importo|euro }} &euro;</td>
+                                    <td>{{ gruppo.keep.get_origine_display }}</td>
+                                    <td>{{ gruppo.keep.dedup_links_label }}</td>
+                                    <td>
+                                        <a href="{% url 'modifica_movimento_finanziario' gruppo.keep.pk %}" class="table-link">Apri</a>
+                                    </td>
+                                </tr>
+                                {% for movimento in gruppo.duplicati %}
+                                    <tr>
+                                        <td class="finance-bulk-select-col">
+                                            <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ movimento.pk }}" data-bulk-checkbox checked aria-label="Elimina movimento duplicato del {{ movimento.data_contabile|date:'d/m/Y' }}">
+                                        </td>
+                                        <td><span class="finance-duplicate-role is-delete">Duplicato</span></td>
+                                        <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
+                                        <td>{{ movimento.conto|default:"-" }}</td>
+                                        <td>{{ movimento.descrizione|truncatechars:90|default:"-" }}</td>
+                                        <td>{{ movimento.controparte|default:"-" }}</td>
+                                        <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
+                                        <td>{{ movimento.get_origine_display }}</td>
+                                        <td>{{ movimento.dedup_links_label }}</td>
+                                        <td>
+                                            <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}" class="table-link">Apri</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% endfor %}
+
+            <div class="form-actions finance-confirm-actions">
+                <button type="submit" class="btn btn-danger btn-icon-text" data-bulk-submit>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina duplicati selezionati</span>
+                </button>
+                <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            </div>
+        </form>
+    {% else %}
+        <div class="empty-state">
+            Non ci sono duplicati da revisionare.
+        </div>
+    {% endif %}
+
+    <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisBulkActions) {
+                ArborisBulkActions.init(document);
+            }
+        });
+    </script>
+{% endblock %}

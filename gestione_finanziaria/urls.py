@@ -330,6 +330,11 @@ urlpatterns = [
         name="pulizia_movimenti_finanziari",
     ),
     path(
+        "gestione-finanziaria/movimenti/duplicati/",
+        gf_manage(views.pulizia_duplicati_movimenti_finanziari),
+        name="pulizia_duplicati_movimenti_finanziari",
+    ),
+    path(
         "gestione-finanziaria/movimenti/elimina-selezionati/",
         gf_manage(views.elimina_movimenti_finanziari_multipla),
         name="elimina_movimenti_finanziari_multipla",
