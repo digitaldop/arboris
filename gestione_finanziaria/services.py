@@ -933,6 +933,192 @@ def calcola_hash_deduplica_movimento(
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
+def normalizza_testo_deduplica_movimento(value: str) -> str:
+    text = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def descrizione_deduplica_debole(value: str) -> bool:
+    text = normalizza_testo_deduplica_movimento(value)
+    if not text:
+        return True
+
+    if text in {
+        "notprovided",
+        "nonfornito",
+        "n d",
+        "nd",
+        "bonifico",
+        "bonifico ricevuto",
+        "bonif vs favore",
+        "bon da",
+        "addebito diretto sdd",
+    }:
+        return True
+
+    tokens = text.split()
+    generic_prefix_limits = (
+        ("bonif vs favore", 4),
+        ("bonifico", 3),
+        ("bon da", 3),
+        ("addebito diretto sdd", 4),
+    )
+    return any(
+        (text == prefix or text.startswith(f"{prefix} ")) and len(tokens) <= max_tokens
+        for prefix, max_tokens in generic_prefix_limits
+    )
+
+
+def punteggio_descrizione_deduplica(value: str) -> int:
+    if descrizione_deduplica_debole(value):
+        return 0
+    return len(normalizza_testo_deduplica_movimento(value))
+
+
+def firma_deduplica_movimento(
+    *,
+    conto_id,
+    data_contabile,
+    importo,
+    descrizione: str,
+    controparte: str,
+    iban_controparte: str,
+) -> tuple:
+    return (
+        conto_id or None,
+        data_contabile,
+        Decimal(importo or 0).quantize(Decimal("0.01")),
+        normalizza_testo_deduplica_movimento(descrizione),
+        normalizza_testo_deduplica_movimento(controparte),
+        (iban_controparte or "").replace(" ", "").upper(),
+    )
+
+
+def firma_deduplica_da_movimento(movimento) -> tuple:
+    return firma_deduplica_movimento(
+        conto_id=movimento.conto_id,
+        data_contabile=movimento.data_contabile,
+        importo=movimento.importo,
+        descrizione=movimento.descrizione,
+        controparte=movimento.controparte,
+        iban_controparte=movimento.iban_controparte,
+    )
+
+
+def firma_deduplica_da_transazione(conto, transazione) -> tuple:
+    return firma_deduplica_movimento(
+        conto_id=conto.pk if conto else None,
+        data_contabile=transazione.data_contabile,
+        importo=transazione.importo,
+        descrizione=transazione.descrizione,
+        controparte=transazione.controparte,
+        iban_controparte=transazione.iban_controparte,
+    )
+
+
+def chiavi_deduplica_movimento(conto, transazione) -> dict:
+    return {
+        "hash": calcola_hash_deduplica_movimento(
+            conto_id=conto.pk if conto else None,
+            data_contabile=transazione.data_contabile,
+            importo=transazione.importo,
+            descrizione=transazione.descrizione,
+            controparte=transazione.controparte,
+            iban_controparte=transazione.iban_controparte,
+        ),
+        "signature": firma_deduplica_da_transazione(conto, transazione),
+        "provider_transaction_id": (getattr(transazione, "provider_transaction_id", "") or "").strip(),
+    }
+
+
+def chiavi_deduplica_esistenti(conto, transazioni) -> dict:
+    from .models import MovimentoFinanziario, OrigineMovimento
+
+    transazioni = list(transazioni)
+    hashes = set()
+    provider_tx_ids = set()
+    date_values = set()
+    amount_values = set()
+    signature_values = set()
+
+    for transazione in transazioni:
+        keys = chiavi_deduplica_movimento(conto, transazione)
+        if keys["hash"]:
+            hashes.add(keys["hash"])
+        if keys["provider_transaction_id"]:
+            provider_tx_ids.add(keys["provider_transaction_id"])
+        signature_values.add(keys["signature"])
+        if transazione.data_contabile:
+            date_values.add(transazione.data_contabile)
+        if transazione.importo is not None:
+            amount_values.add(Decimal(transazione.importo).quantize(Decimal("0.01")))
+
+    existing_hashes = set()
+    if hashes:
+        existing_hashes = set(
+            MovimentoFinanziario.objects.filter(
+                conto=conto,
+                hash_deduplica__in=hashes,
+            ).values_list("hash_deduplica", flat=True)
+        )
+
+    existing_tx_ids = set()
+    if provider_tx_ids:
+        existing_tx_ids = set(
+            MovimentoFinanziario.objects.filter(
+                conto=conto,
+                provider_transaction_id__in=provider_tx_ids,
+            ).values_list("provider_transaction_id", flat=True)
+        )
+
+    existing_signatures = set()
+    if date_values and amount_values and signature_values:
+        candidates = MovimentoFinanziario.objects.filter(
+            conto=conto,
+            data_contabile__in=date_values,
+            importo__in=amount_values,
+        ).filter(
+            Q(incide_su_saldo_banca=True)
+            | Q(origine__in=[OrigineMovimento.IMPORT_FILE, OrigineMovimento.BANCA])
+        )
+        existing_signatures = {
+            firma_deduplica_da_movimento(movimento)
+            for movimento in candidates.only(
+                "conto_id",
+                "data_contabile",
+                "importo",
+                "descrizione",
+                "controparte",
+                "iban_controparte",
+                "incide_su_saldo_banca",
+                "origine",
+            )
+        }
+        existing_signatures &= signature_values
+
+    return {
+        "hashes": existing_hashes,
+        "provider_transaction_ids": existing_tx_ids,
+        "signatures": existing_signatures,
+    }
+
+
+def transazione_gia_importata(keys, existing_keys, imported_keys=None) -> bool:
+    imported_keys = imported_keys or {}
+    provider_tx_id = keys.get("provider_transaction_id") or ""
+    hash_dedup = keys.get("hash") or ""
+    signature = keys.get("signature")
+    return (
+        (hash_dedup and hash_dedup in existing_keys.get("hashes", set()))
+        or (hash_dedup and hash_dedup in imported_keys.get("hashes", set()))
+        or (provider_tx_id and provider_tx_id in existing_keys.get("provider_transaction_ids", set()))
+        or (provider_tx_id and provider_tx_id in imported_keys.get("provider_transaction_ids", set()))
+        or (signature and signature in existing_keys.get("signatures", set()))
+        or (signature and signature in imported_keys.get("signatures", set()))
+    )
+
+
 # =========================================================================
 #  Saldo corrente del conto
 # =========================================================================
@@ -1143,27 +1329,15 @@ def sincronizza_conto_psd2(
                 data_inizio=data_inizio,
                 data_fine=oggi,
             )
+            existing_keys = chiavi_deduplica_esistenti(conto, transazioni)
+            imported_keys = {
+                "hashes": set(),
+                "provider_transaction_ids": set(),
+                "signatures": set(),
+            }
             for tx in transazioni:
-                esiste = False
-                if tx.provider_transaction_id:
-                    esiste = MovimentoFinanziario.objects.filter(
-                        conto=conto,
-                        provider_transaction_id=tx.provider_transaction_id,
-                    ).exists()
-                hash_dedup = calcola_hash_deduplica_movimento(
-                    conto_id=conto.id,
-                    data_contabile=tx.data_contabile,
-                    importo=tx.importo,
-                    descrizione=tx.descrizione,
-                    controparte=tx.controparte,
-                    iban_controparte=tx.iban_controparte,
-                )
-                if not esiste:
-                    esiste = MovimentoFinanziario.objects.filter(
-                        conto=conto,
-                        hash_deduplica=hash_dedup,
-                    ).exists()
-                if esiste:
+                keys = chiavi_deduplica_movimento(conto, tx)
+                if transazione_gia_importata(keys, existing_keys, imported_keys):
                     continue
 
                 movimento = MovimentoFinanziario(
@@ -1177,7 +1351,7 @@ def sincronizza_conto_psd2(
                     controparte=tx.controparte,
                     iban_controparte=tx.iban_controparte,
                     provider_transaction_id=tx.provider_transaction_id,
-                    hash_deduplica=hash_dedup,
+                    hash_deduplica=keys["hash"],
                     incide_su_saldo_banca=True,
                     stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
                 )
@@ -1185,6 +1359,10 @@ def sincronizza_conto_psd2(
                 movimento.save()
                 crea_notifica_movimento_bancario(movimento, origine_label="PSD2")
                 inseriti += 1
+                imported_keys["hashes"].add(keys["hash"])
+                imported_keys["signatures"].add(keys["signature"])
+                if keys["provider_transaction_id"]:
+                    imported_keys["provider_transaction_ids"].add(keys["provider_transaction_id"])
             messaggi.append(
                 f"Movimenti scaricati: {len(transazioni)}, inseriti: {inseriti}"
             )

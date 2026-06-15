@@ -9,8 +9,8 @@ Riceve in input:
 
 Si occupa di:
 - scorrere i :class:`ParsedMovimento` prodotti dal parser;
-- calcolare l'``hash_deduplica`` ed evitare i duplicati (stesso hash o
-  stesso ``provider_transaction_id`` per il conto);
+- calcolare le chiavi di deduplica ed evitare i duplicati (stesso hash,
+  stesso ``provider_transaction_id`` o stessa firma normalizzata per il conto);
 - persistere i nuovi :class:`MovimentoFinanziario` con
   ``origine = import_file`` e ``incide_su_saldo_banca = True``;
 - applicare le regole di categorizzazione automatica;
@@ -39,10 +39,12 @@ from ..models import (
     TipoOperazioneSincronizzazione,
 )
 from ..services import (
-    calcola_hash_deduplica_movimento,
+    chiavi_deduplica_esistenti,
+    chiavi_deduplica_movimento,
     crea_notifica_movimento_bancario,
     ricalcola_saldo_corrente_conto,
     riconcilia_movimento_automaticamente,
+    transazione_gia_importata,
     _regola_matcha_movimento,
 )
 from .base import BaseParser, ParsedMovimento, RisultatoImport
@@ -77,36 +79,25 @@ def importa_movimenti_da_file(
 
     movimenti_parsed = list(parsed_iter)
     risultato.totale_letti = len(movimenti_parsed)
-    parsed_con_hash = [
-        (
-            parsed,
-            calcola_hash_deduplica_movimento(
-                conto_id=conto.id,
-                data_contabile=parsed.data_contabile,
-                importo=parsed.importo,
-                descrizione=parsed.descrizione,
-                controparte=parsed.controparte,
-                iban_controparte=parsed.iban_controparte,
-            ),
-        )
+    parsed_con_keys = [
+        (parsed, chiavi_deduplica_movimento(conto, parsed))
         for parsed in movimenti_parsed
     ]
-    existing_hashes, existing_tx_ids = _duplicati_esistenti(conto, parsed_con_hash)
-    imported_hashes = set()
-    imported_tx_ids = set()
+    existing_keys = chiavi_deduplica_esistenti(conto, movimenti_parsed)
+    imported_keys = {
+        "hashes": set(),
+        "provider_transaction_ids": set(),
+        "signatures": set(),
+    }
     regole_categorizzazione = list(
         RegolaCategorizzazione.objects.filter(attiva=True).order_by("priorita", "id")
     )
     regole_applicate = {}
 
-    for parsed, hash_dedup in parsed_con_hash:
-        provider_tx_id = parsed.provider_transaction_id or ""
-        if (
-            hash_dedup in existing_hashes
-            or hash_dedup in imported_hashes
-            or (provider_tx_id and provider_tx_id in existing_tx_ids)
-            or (provider_tx_id and provider_tx_id in imported_tx_ids)
-        ):
+    for parsed, keys in parsed_con_keys:
+        provider_tx_id = keys["provider_transaction_id"]
+        hash_dedup = keys["hash"]
+        if transazione_gia_importata(keys, existing_keys, imported_keys):
             risultato.duplicati += 1
             continue
 
@@ -141,9 +132,10 @@ def importa_movimenti_da_file(
 
         risultato.inseriti += 1
         risultato.movimenti_ids.append(movimento.id)
-        imported_hashes.add(hash_dedup)
+        imported_keys["hashes"].add(hash_dedup)
+        imported_keys["signatures"].add(keys["signature"])
         if provider_tx_id:
-            imported_tx_ids.add(provider_tx_id)
+            imported_keys["provider_transaction_ids"].add(provider_tx_id)
 
     ricalcola_saldo_corrente_conto(conto)
     _aggiorna_statistiche_regole(regole_applicate)
@@ -205,37 +197,6 @@ def _aggiorna_statistiche_regole(regole_applicate: dict[int, int]) -> None:
             volte_applicata=F("volte_applicata") + count,
             ultima_applicazione_at=now,
         )
-
-
-def _duplicati_esistenti(
-    conto: ContoBancario, parsed_con_hash: list[tuple[ParsedMovimento, str]]
-) -> tuple[set[str], set[str]]:
-    hashes = {hash_dedup for _parsed, hash_dedup in parsed_con_hash if hash_dedup}
-    provider_tx_ids = {
-        parsed.provider_transaction_id
-        for parsed, _hash_dedup in parsed_con_hash
-        if parsed.provider_transaction_id
-    }
-
-    existing_hashes = set()
-    if hashes:
-        existing_hashes = set(
-            MovimentoFinanziario.objects.filter(
-                conto=conto,
-                hash_deduplica__in=hashes,
-            ).values_list("hash_deduplica", flat=True)
-        )
-
-    existing_tx_ids = set()
-    if provider_tx_ids:
-        existing_tx_ids = set(
-            MovimentoFinanziario.objects.filter(
-                conto=conto,
-                provider_transaction_id__in=provider_tx_ids,
-            ).values_list("provider_transaction_id", flat=True)
-        )
-
-    return existing_hashes, existing_tx_ids
 
 
 def _crea_log_import(

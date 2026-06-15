@@ -29591,6 +29591,28 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: 0 8px 22px rgba(32, 54, 69, 0.05);
 }
 
+.module-gestione_finanziaria .finance-cleanup-summary-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.module-gestione_finanziaria .finance-cleanup-panel .panel-body {
+    padding: 16px 18px 18px;
+}
+
+.module-gestione_finanziaria .finance-cleanup-form {
+    display: grid;
+    gap: 16px;
+    margin: 0;
+}
+
+.module-gestione_finanziaria .finance-cleanup-field-grid {
+    grid-template-columns: minmax(260px, 0.9fr) minmax(260px, 1.1fr);
+}
+
+.module-gestione_finanziaria .finance-cleanup-actions {
+    margin-top: 0;
+}
+
 .module-gestione_finanziaria .finance-reconciliation-summary {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }

@@ -39,7 +39,14 @@ from .services import (
     riconcilia_movimento_con_scadenza_fornitore,
     trova_movimenti_candidati_per_scadenza_fornitore,
 )
-from .fatture_in_cloud_xml import content_kind, download_bytes, extension_from_name, supplier_from_attachment_payload
+from .fatture_in_cloud_xml import (
+    content_kind,
+    document_data_from_e_invoice_xml,
+    download_bytes,
+    extension_from_name,
+    supplier_from_e_invoice_xml,
+    xml_text_from_bytes,
+)
 
 
 FIC_SOURCE = "fatture_in_cloud"
@@ -729,6 +736,146 @@ def _document_total(document_data):
     )
 
 
+def _iter_direct_withholding_nodes(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    amounts = _as_dict(document_data.get("amounts"))
+    node = _first_present(
+        document_data.get("withholding_tax"),
+        document_data.get("withholdingTax"),
+        document_data.get("tax_withholding"),
+        document_data.get("taxWithholding"),
+        document_data.get("ritenuta"),
+        document_data.get("ritenuta_acconto"),
+        amounts.get("withholding_tax"),
+        amounts.get("withholdingTax"),
+        amounts.get("ritenuta"),
+        amounts.get("ritenuta_acconto"),
+        e_invoice.get("withholding_tax"),
+        e_invoice.get("withholdingTax"),
+        e_invoice.get("ritenuta"),
+        e_invoice.get("ritenuta_acconto"),
+    )
+    if node:
+        yield node
+
+
+def _iter_e_invoice_withholding_nodes(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    general_sources = [_document_general_data(e_invoice)]
+    for body in _e_invoice_bodies(e_invoice):
+        general_sources.extend(
+            [
+                _nested_dict(body, "dati_generali", "dati_generali_documento"),
+                _nested_dict(body, "DatiGenerali", "DatiGeneraliDocumento"),
+            ]
+        )
+    seen_sources = set()
+    for source in general_sources:
+        source_marker = id(source)
+        if not source or source_marker in seen_sources:
+            continue
+        seen_sources.add(source_marker)
+        for node in _as_list(_dict_value(source, "dati_ritenuta", "DatiRitenuta", "datiRitenuta")):
+            if node:
+                yield node
+
+
+def _withholding_node_amount(node):
+    if not isinstance(node, dict):
+        return _as_decimal(node)
+    return _as_decimal(
+        _first_present(
+            node.get("amount"),
+            node.get("value"),
+            node.get("total"),
+            node.get("importo"),
+            node.get("importo_ritenuta"),
+            node.get("ImportoRitenuta"),
+            node.get("withholding_amount"),
+            node.get("withholdingAmount"),
+            node.get("withholding_tax_amount"),
+            node.get("withholdingTaxAmount"),
+            node.get("ritenuta_acconto"),
+            node.get("ritenutaAcconto"),
+        )
+    )
+
+
+def _withholding_node_rate(node):
+    if not isinstance(node, dict):
+        return Decimal("0.00")
+    return _as_decimal(
+        _first_present(
+            node.get("rate"),
+            node.get("percentage"),
+            node.get("aliquota"),
+            node.get("aliquota_ritenuta"),
+            node.get("AliquotaRitenuta"),
+            node.get("withholding_rate"),
+            node.get("withholdingRate"),
+            node.get("withholding_tax_rate"),
+            node.get("withholdingTaxRate"),
+        )
+    )
+
+
+def _withholding_node_taxable(node):
+    if not isinstance(node, dict):
+        return Decimal("0.00")
+    return _as_decimal(
+        _first_present(
+            node.get("taxable"),
+            node.get("taxable_amount"),
+            node.get("taxableAmount"),
+            node.get("imponibile"),
+            node.get("imponibile_ritenuta"),
+            node.get("imponibile_ritenuta_acconto"),
+            node.get("withholding_taxable"),
+            node.get("withholdingTaxable"),
+            node.get("withholding_taxable_amount"),
+            node.get("withholdingTaxableAmount"),
+        )
+    )
+
+
+def _document_withholding(document_data):
+    direct = _summarize_withholding_nodes(_iter_direct_withholding_nodes(document_data))
+    if direct["ritenuta"] > Decimal("0.00") or direct["imponibile"] > Decimal("0.00"):
+        return direct
+    return _summarize_withholding_nodes(_iter_e_invoice_withholding_nodes(document_data))
+
+
+def _summarize_withholding_nodes(nodes):
+    total_amount = Decimal("0.00")
+    taxable_total = Decimal("0.00")
+    first_rate = Decimal("0.00")
+    for node in nodes:
+        amount = _withholding_node_amount(node)
+        taxable = _withholding_node_taxable(node)
+        rate = _withholding_node_rate(node)
+        if amount <= Decimal("0.00") and taxable <= Decimal("0.00"):
+            continue
+        total_amount += amount
+        taxable_total += taxable
+        if first_rate <= Decimal("0.00") and rate > Decimal("0.00"):
+            first_rate = rate
+
+    if taxable_total <= Decimal("0.00") and total_amount > Decimal("0.00") and first_rate > Decimal("0.00"):
+        taxable_total = (total_amount * Decimal("100") / first_rate).quantize(Decimal("0.01"))
+
+    return {
+        "imponibile": taxable_total.quantize(Decimal("0.01")),
+        "aliquota": first_rate.quantize(Decimal("0.01")) if first_rate > Decimal("0.00") else Decimal("20.00"),
+        "ritenuta": total_amount.quantize(Decimal("0.01")),
+    }
+
+
+def _document_total_to_pay(document_data):
+    total = _document_total(document_data)
+    withholding = _document_withholding(document_data)["ritenuta"]
+    return max(total - withholding, Decimal("0.00"))
+
+
 def _iter_invoice_line_items(document_data):
     e_invoice = _as_dict(document_data.get("e_invoice"))
     containers = [document_data, e_invoice, *_e_invoice_bodies(e_invoice)]
@@ -906,6 +1053,17 @@ def _merge_non_empty(base, extra):
     return merged
 
 
+def _merge_missing_nested(base, extra):
+    merged = dict(base or {})
+    for key, value in _as_dict(extra).items():
+        current = merged.get(key)
+        if isinstance(current, dict) and isinstance(value, dict):
+            merged[key] = _merge_missing_nested(current, value)
+        elif current in (None, "", [], {}) and value not in (None, "", [], {}):
+            merged[key] = value
+    return merged
+
+
 def _supplier_has_import_details(entity):
     normalized = _normalize_entity(entity)
     return any(
@@ -954,6 +1112,28 @@ def _document_with_supplier_detail(client, document_data, supplier_context):
     return enriched
 
 
+def _attachment_xml_details(document_data, supplier_context):
+    if not isinstance(document_data, dict):
+        return {}
+    if not document_data.get("attachment_url"):
+        return {}
+
+    cache = supplier_context.setdefault("attachment_xml_cache", {}) if supplier_context is not None else {}
+    cache_key = str(document_data.get("attachment_url") or document_data.get("id") or "")
+    if cache_key not in cache:
+        data, _download_info = download_bytes(
+            document_data.get("attachment_url"),
+            timeout=_api_timeout(),
+            max_bytes=_attachment_max_bytes(),
+        )
+        xml_text, _xml_source = xml_text_from_bytes(data or b"")
+        cache[cache_key] = {
+            "supplier": supplier_from_e_invoice_xml(xml_text) if xml_text else {},
+            "document": document_data_from_e_invoice_xml(xml_text) if xml_text else {},
+        }
+    return cache.get(cache_key) or {}
+
+
 def _document_with_attachment_supplier_detail(document_data, supplier_context):
     if not isinstance(document_data, dict):
         return document_data
@@ -962,12 +1142,7 @@ def _document_with_attachment_supplier_detail(document_data, supplier_context):
     if _supplier_has_import_details(_entity_from_document(document_data)):
         return document_data
 
-    cache = supplier_context.setdefault("attachment_cache", {}) if supplier_context is not None else {}
-    cache_key = str(document_data.get("attachment_url") or document_data.get("id") or "")
-    if cache_key not in cache:
-        cache[cache_key] = supplier_from_attachment_payload(document_data, timeout=_api_timeout())
-
-    supplier_detail = cache.get(cache_key)
+    supplier_detail = _attachment_xml_details(document_data, supplier_context).get("supplier")
     if not supplier_detail:
         return document_data
 
@@ -984,9 +1159,28 @@ def _document_with_attachment_supplier_detail(document_data, supplier_context):
     return enriched
 
 
+def _document_with_attachment_invoice_detail(document_data, supplier_context):
+    if not isinstance(document_data, dict):
+        return document_data
+    if not document_data.get("attachment_url"):
+        return document_data
+
+    attachment_document = _attachment_xml_details(document_data, supplier_context).get("document")
+    if not attachment_document:
+        return document_data
+
+    enriched = dict(document_data)
+    enriched["e_invoice"] = _merge_missing_nested(
+        _as_dict(document_data.get("e_invoice")),
+        _as_dict(attachment_document.get("e_invoice")),
+    )
+    return enriched
+
+
 def _document_with_external_supplier_details(client, document_data, supplier_context, *, include_attachment=False):
     enriched = _document_with_supplier_detail(client, document_data, supplier_context)
     if include_attachment:
+        enriched = _document_with_attachment_invoice_detail(enriched, supplier_context)
         enriched = _document_with_attachment_supplier_detail(enriched, supplier_context)
     return enriched
 
@@ -1192,7 +1386,7 @@ def _payment_deadlines(document_data, source_doc_type=None):
         return []
 
     payments = _payment_items(document_data)
-    total = _document_total(document_data)
+    total = _document_total_to_pay(document_data)
     deadlines = []
     for payment in payments:
         due_date = _as_date(
@@ -1378,6 +1572,7 @@ def _update_document_fields(documento, document_data, fornitore, pending, *, sou
     e_invoice = _as_dict(document_data.get("e_invoice"))
     amounts = _as_dict(document_data.get("amounts"))
     doc_date = _document_date(document_data)
+    withholding = _document_withholding(document_data)
     amount_net = _as_decimal(
         document_data.get("amount_net")
         or amounts.get("net")
@@ -1407,10 +1602,18 @@ def _update_document_fields(documento, document_data, fornitore, pending, *, sou
     documento.imponibile = amount_net
     documento.iva = amount_vat
     documento.totale = amount_gross
+    documento.imponibile_ritenuta_acconto = withholding["imponibile"]
+    documento.aliquota_ritenuta_acconto = withholding["aliquota"]
+    documento.ritenuta_acconto = withholding["ritenuta"]
     documento.aliquota_iva = Decimal("0.00")
     if amount_net:
         documento.aliquota_iva = (amount_vat * Decimal("100") / amount_net).quantize(Decimal("0.01"))
-    documento.stato = _state_from_document(amount_gross, _payment_items(document_data), document_data, source_doc_type)
+    documento.stato = _state_from_document(
+        max(amount_gross - withholding["ritenuta"], Decimal("0.00")),
+        _payment_items(document_data),
+        document_data,
+        source_doc_type,
+    )
     documento.origine = OrigineDocumentoFornitore.FATTURE_IN_CLOUD
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")

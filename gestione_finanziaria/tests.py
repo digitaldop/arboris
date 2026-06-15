@@ -463,6 +463,47 @@ class Psd2SchedulerTests(TestCase):
         self.assertIn("Nuovo movimento bancario", notifica.titolo)
         self.assertIn("Pagamento cancelleria", notifica.messaggio)
 
+    @patch("gestione_finanziaria.providers.adapter_for_provider")
+    def test_psd2_account_sync_salta_movimento_esistente_senza_hash_normalizzato(self, mock_adapter_for_provider):
+        from gestione_finanziaria.services import sincronizza_conto_psd2
+
+        provider = ProviderBancario.objects.create(
+            nome="Provider PSD2 dedup",
+            tipo=TipoProviderBancario.PSD2,
+            configurazione={"adapter": "test"},
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto PSD2 dedup",
+            provider=provider,
+            external_account_id="account-dedup",
+            attivo=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 6, 3),
+            importo=Decimal("-18.90"),
+            descrizione="COMM.SU BONIFICI AREA SEPA",
+            controparte="Banca Test",
+            incide_su_saldo_banca=True,
+        )
+        adapter = Mock()
+        adapter.saldo_conto.return_value = []
+        adapter.movimenti_conto.return_value = [
+            ProviderTransaction(
+                data_contabile=date(2026, 6, 3),
+                importo=Decimal("-18.90"),
+                descrizione="Comm su bonifici   area sepa",
+                controparte="Banca Test",
+            )
+        ]
+        mock_adapter_for_provider.return_value = adapter
+
+        log = sincronizza_conto_psd2(conto)
+
+        self.assertEqual(log.movimenti_inseriti, 0)
+        self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 1)
+
 
 class MovimentoNotificationTests(TestCase):
     def test_importa_movimenti_da_file_crea_notifica_per_nuovo_movimento(self):
@@ -504,6 +545,86 @@ class MovimentoNotificationTests(TestCase):
         self.assertIn("import estratto conto", notifica.titolo)
         self.assertIn("Commissioni bancarie", notifica.messaggio)
 
+    def test_importa_movimenti_da_file_salta_movimento_esistente_senza_hash_normalizzato(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import dedup storico",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto dedup storico",
+            provider=provider,
+            attivo=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 6, 3),
+            importo=Decimal("-18.90"),
+            descrizione="COMM.SU BONIFICI AREA SEPA",
+            controparte="Banca Test",
+            incide_su_saldo_banca=True,
+        )
+        raw_csv = (
+            "Data;Importo;Descrizione;Controparte\n"
+            "03/06/2026;-18,90;Comm su bonifici   area sepa;Banca Test\n"
+        ).encode("utf-8")
+        config = CsvImporterConfig(
+            delimiter=";",
+            ha_intestazione=True,
+            colonna_data_contabile="Data",
+            colonna_importo="Importo",
+            colonna_descrizione="Descrizione",
+            colonna_controparte="Controparte",
+        )
+
+        risultato = importa_movimenti_da_file(
+            parser=CsvImporter(config),
+            raw_bytes=raw_csv,
+            conto=conto,
+            provider=provider,
+            nome_file="dedup.csv",
+        )
+
+        self.assertEqual(risultato.inseriti, 0)
+        self.assertEqual(risultato.duplicati, 1)
+        self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 1)
+
+    def test_importa_movimenti_da_file_salta_duplicati_equivalenti_nello_stesso_file(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import dedup interno",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto dedup interno",
+            provider=provider,
+            attivo=True,
+        )
+        raw_csv = (
+            "Data;Importo;Descrizione;Controparte\n"
+            "03/06/2026;-18,90;COMM.SU BONIFICI AREA SEPA;Banca Test\n"
+            "03/06/2026;-18,90;Comm su bonifici   area sepa;Banca Test\n"
+        ).encode("utf-8")
+        config = CsvImporterConfig(
+            delimiter=";",
+            ha_intestazione=True,
+            colonna_data_contabile="Data",
+            colonna_importo="Importo",
+            colonna_descrizione="Descrizione",
+            colonna_controparte="Controparte",
+        )
+
+        risultato = importa_movimenti_da_file(
+            parser=CsvImporter(config),
+            raw_bytes=raw_csv,
+            conto=conto,
+            provider=provider,
+            nome_file="dedup-interno.csv",
+        )
+
+        self.assertEqual(risultato.inseriti, 1)
+        self.assertEqual(risultato.duplicati, 1)
+        self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 1)
+
 
 class DocumentoFornitoreFormsetTests(TestCase):
     def test_popup_scadenze_movimento_field_keeps_all_bank_movements_available(self):
@@ -538,6 +659,43 @@ class Psd2ConnectionImportTests(TestCase):
         request.session = self.client.session
         request._messages = FallbackStorage(request)
         return request
+
+    def test_gocardless_movimenti_conto_ignora_transazioni_pending(self):
+        from .providers.gocardless import GoCardlessBadAdapter, GoCardlessCredentials
+
+        adapter = GoCardlessBadAdapter(GoCardlessCredentials(secret_id="id", secret_key="key"))
+        adapter._get = Mock(
+            return_value={
+                "transactions": {
+                    "booked": [
+                        {
+                            "transactionAmount": {"amount": "700.00", "currency": "EUR"},
+                            "bookingDate": "2026-06-13",
+                            "valueDate": "2026-06-13",
+                            "remittanceInformationUnstructured": (
+                                "BONIF. VS. FAVORE - BON.DA LABRIOLA FRANCESCO Caparra"
+                            ),
+                            "debtorName": "LABRIOLA FRANCESCO",
+                            "transactionId": "booked-700",
+                        }
+                    ],
+                    "pending": [
+                        {
+                            "transactionAmount": {"amount": "700.00", "currency": "EUR"},
+                            "bookingDate": "2026-06-12",
+                            "remittanceInformationUnstructured": "BONIF. VS. FAVORE",
+                            "transactionId": "pending-700",
+                        }
+                    ],
+                }
+            }
+        )
+
+        movimenti = adapter.movimenti_conto("account-bpm")
+
+        self.assertEqual(len(movimenti), 1)
+        self.assertEqual(movimenti[0].provider_transaction_id, "booked-700")
+        self.assertEqual(movimenti[0].descrizione, "BONIF. VS. FAVORE - BON.DA LABRIOLA FRANCESCO Caparra")
 
     def test_lista_connessioni_renderizza_layout_moderno_e_pulsante_rinnovo(self):
         from .views import lista_connessioni_bancarie
@@ -981,6 +1139,65 @@ class MovimentoCategoriaInlineTests(TestCase):
         content = response.content.decode()
         self.assertNotIn(f'name="selected_ids" value="{movimento_keep.pk}"', content)
         self.assertIn(f'name="selected_ids" value="{movimento_duplicato.pk}"', content)
+
+    def test_pulizia_duplicati_movimenti_propone_causale_generica_con_data_vicina(self):
+        conto = ContoBancario.objects.create(nome_conto="Banco BPM")
+        movimento_generico = MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 12),
+            importo=Decimal("700.00"),
+            descrizione="BONIF. VS. FAVORE",
+            incide_su_saldo_banca=True,
+        )
+        movimento_dettagliato = MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 13),
+            importo=Decimal("700.00"),
+            descrizione="BONIF. VS. FAVORE - BON.DA LABRIOLA FRANCESCO Caparra iscrizione A.S. 2026/27",
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "causale assente o generica")
+        content = response.content.decode()
+        self.assertIn(f'name="selected_ids" value="{movimento_generico.pk}"', content)
+        self.assertNotIn(f'name="selected_ids" value="{movimento_dettagliato.pk}"', content)
+
+    def test_pulizia_duplicati_movimenti_non_propone_causale_generica_ambigua(self):
+        conto = ContoBancario.objects.create(nome_conto="Banco BPM")
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 12),
+            importo=Decimal("700.00"),
+            descrizione="BONIF. VS. FAVORE",
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 13),
+            importo=Decimal("700.00"),
+            descrizione="BONIF. VS. FAVORE - BON.DA LABRIOLA FRANCESCO Caparra iscrizione A.S. 2026/27",
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 14),
+            importo=Decimal("700.00"),
+            descrizione="BONIF. VS. FAVORE - BON.DA ROSSI MARIO Retta giugno",
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "causale assente o generica")
 
     def test_pulizia_duplicati_movimenti_elimina_solo_i_selezionati(self):
         conto = ContoBancario.objects.create(nome_conto="Conto da pulire")
@@ -3570,6 +3787,70 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.data_scadenza, date(2026, 6, 15))
         self.assertEqual(scadenza.importo_previsto, Decimal("122.00"))
 
+    def test_importa_documento_fatture_in_cloud_riconosce_ritenuta_da_e_invoice(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload = {
+            "id": 9981,
+            "type": "expense",
+            "description": "Consulenza con ritenuta",
+            "date": "2026-05-10",
+            "amount_net": "1500.00",
+            "amount_vat": "330.00",
+            "amount_gross": "1830.00",
+            "e_invoice": {
+                "FatturaElettronicaHeader": {
+                    "CedentePrestatore": {
+                        "DatiAnagrafici": {
+                            "IdFiscaleIVA": {"IdPaese": "IT", "IdCodice": "12345678966"},
+                            "Anagrafica": {"Denominazione": "Consulente Ritenuta"},
+                        },
+                    },
+                },
+                "FatturaElettronicaBody": {
+                    "DatiGenerali": {
+                        "DatiGeneraliDocumento": {
+                            "Numero": "RA-1",
+                            "ImportoTotaleDocumento": "1830.00",
+                            "DatiRitenuta": {
+                                "TipoRitenuta": "RT01",
+                                "ImportoRitenuta": "300.00",
+                                "AliquotaRitenuta": "20.00",
+                                "CausalePagamento": "A",
+                            },
+                        }
+                    },
+                    "DatiPagamento": [
+                        {
+                            "DettaglioPagamento": [
+                                {
+                                    "DataScadenzaPagamento": "2026-06-10",
+                                    "ImportoPagamento": "1530.00",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            },
+        }
+
+        importa_documento_fatture_in_cloud(connessione, payload, pending=True, utente=self.user)
+
+        documento = DocumentoFornitore.objects.get(external_id="9981")
+        self.assertEqual(documento.ritenuta_acconto, Decimal("300.00"))
+        self.assertEqual(documento.aliquota_ritenuta_acconto, Decimal("20.00"))
+        self.assertEqual(documento.imponibile_ritenuta_acconto, Decimal("1500.00"))
+        self.assertEqual(documento.totale_da_pagare, Decimal("1530.00"))
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.importo_previsto, Decimal("1530.00"))
+
+        response = self.client.get(reverse("fatture_scadenze_fornitori"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "supplier-withholding-badge")
+        self.assertContains(response, "R.A.")
+
     def test_importa_documento_fatture_in_cloud_usa_descrizione_dalle_righe_xml(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
@@ -4195,7 +4476,6 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             "amount_net": "100.00",
             "amount_vat": "22.00",
             "amount_gross": "122.00",
-            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
         }
         mock_client_class.return_value = client
         xml = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -4211,6 +4491,28 @@ class FornitoriGestioneFinanziariaTests(TestCase):
       <Contatti><Email>fornitore.xml@example.com</Email></Contatti>
     </CedentePrestatore>
   </FatturaElettronicaHeader>
+  <FatturaElettronicaBody>
+    <DatiGenerali>
+      <DatiGeneraliDocumento>
+        <TipoDocumento>TD01</TipoDocumento>
+        <Data>2026-05-04</Data>
+        <Numero>42</Numero>
+        <DatiRitenuta>
+          <TipoRitenuta>RT01</TipoRitenuta>
+          <ImportoRitenuta>20.00</ImportoRitenuta>
+          <AliquotaRitenuta>20.00</AliquotaRitenuta>
+          <CausalePagamento>A</CausalePagamento>
+        </DatiRitenuta>
+        <ImportoTotaleDocumento>122.00</ImportoTotaleDocumento>
+      </DatiGeneraliDocumento>
+    </DatiGenerali>
+    <DatiPagamento>
+      <DettaglioPagamento>
+        <DataScadenzaPagamento>2026-06-04</DataScadenzaPagamento>
+        <ImportoPagamento>102.00</ImportoPagamento>
+      </DettaglioPagamento>
+    </DatiPagamento>
+  </FatturaElettronicaBody>
 </FatturaElettronica>"""
         attachment_response = Mock(status_code=200, headers={"Content-Type": "text/xml"})
         attachment_response.iter_content.return_value = [xml]
@@ -4228,8 +4530,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(fornitore.email, "fornitore.xml@example.com")
         documento = DocumentoFornitore.objects.get(external_id="998")
         self.assertEqual(documento.fornitore, fornitore)
+        self.assertEqual(documento.ritenuta_acconto, Decimal("20.00"))
+        self.assertEqual(documento.totale_da_pagare, Decimal("102.00"))
         self.assertTrue(documento.allegato.name.startswith("fatture_fornitori/"))
-        self.assertEqual(documento.scadenze.get().data_scadenza, date(2026, 6, 4))
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 6, 4))
+        self.assertEqual(scadenza.importo_previsto, Decimal("102.00"))
         self.assertEqual(mock_requests_get.call_count, 2)
 
     @patch("gestione_finanziaria.management.commands.debug_fatture_in_cloud_payload.FattureInCloudClient")
@@ -5577,6 +5883,48 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(MovimentoFinanziario.objects.filter(conto=conto).count(), 2)
         movimento = MovimentoFinanziario.objects.get(importo=Decimal("300.00"))
         self.assertIn("Gheduzzi Sofia", movimento.descrizione)
+
+    def test_import_estratto_conto_preview_stima_duplicato_storico_senza_hash(self):
+        provider = ProviderBancario.objects.create(
+            nome="Import preview dedup",
+            tipo=TipoProviderBancario.IMPORT_FILE,
+        )
+        conto = ContoBancario.objects.create(
+            nome_conto="Conto preview dedup",
+            provider=provider,
+            attivo=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 6, 3),
+            importo=Decimal("-18.90"),
+            descrizione="COMM.SU BONIFICI AREA SEPA",
+            controparte="Banca Test",
+            incide_su_saldo_banca=True,
+        )
+        uploaded = SimpleUploadedFile(
+            "movimenti_dedup.csv",
+            (
+                "Data;Importo;Descrizione;Controparte\n"
+                "03/06/2026;-18,90;Comm su bonifici   area sepa;Banca Test\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("import_estratto_conto"),
+            {
+                "import_action": "preview",
+                "formato": "auto",
+                "conto": str(conto.pk),
+                "file": uploaded,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["preview"]["duplicati_stimati"], 1)
+        self.assertEqual(response.context["preview"]["nuovi_stimati"], 0)
 
     def test_excel_autodetect_parses_movements(self):
         from openpyxl import Workbook

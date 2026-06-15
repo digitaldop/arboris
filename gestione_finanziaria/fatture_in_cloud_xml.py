@@ -86,6 +86,12 @@ def _find_first(element, name):
     return None
 
 
+def _find_all(element, name):
+    if element is None:
+        return []
+    return [node for node in element.iter() if _local_name(node.tag) == name]
+
+
 def _text_for(element, *path):
     current = element
     for name in path:
@@ -122,6 +128,60 @@ def supplier_from_e_invoice_xml(xml_text):
         "email": _text_for(contatti, "Email"),
         "phone": _text_for(contatti, "Telefono"),
     }
+
+
+def document_data_from_e_invoice_xml(xml_text):
+    xml_text = re.sub(r"^\s*<\?xml[^>]*\?>", "", xml_text or "", count=1)
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError:
+        return {}
+
+    body = _find_first(root, "FatturaElettronicaBody")
+    if body is None:
+        return {}
+
+    e_invoice_body = {}
+    general_document = _find_first(_find_first(body, "DatiGenerali"), "DatiGeneraliDocumento")
+    if general_document is not None:
+        general_data = {}
+        for field_name in ("TipoDocumento", "Data", "Numero", "ImportoTotaleDocumento"):
+            value = _text_for(general_document, field_name)
+            if value:
+                general_data[field_name] = value
+
+        withholding_nodes = []
+        for withholding in _find_all(general_document, "DatiRitenuta"):
+            node_data = {}
+            for field_name in ("TipoRitenuta", "ImportoRitenuta", "AliquotaRitenuta", "CausalePagamento"):
+                value = _text_for(withholding, field_name)
+                if value:
+                    node_data[field_name] = value
+            if node_data:
+                withholding_nodes.append(node_data)
+        if withholding_nodes:
+            general_data["DatiRitenuta"] = withholding_nodes[0] if len(withholding_nodes) == 1 else withholding_nodes
+
+        if general_data:
+            e_invoice_body["DatiGenerali"] = {"DatiGeneraliDocumento": general_data}
+
+    payment_groups = []
+    for payment_group in _find_all(body, "DatiPagamento"):
+        payment_details = []
+        for payment_detail in _find_all(payment_group, "DettaglioPagamento"):
+            detail_data = {}
+            for field_name in ("DataScadenzaPagamento", "ImportoPagamento", "DataPagamento"):
+                value = _text_for(payment_detail, field_name)
+                if value:
+                    detail_data[field_name] = value
+            if detail_data:
+                payment_details.append(detail_data)
+        if payment_details:
+            payment_groups.append({"DettaglioPagamento": payment_details})
+    if payment_groups:
+        e_invoice_body["DatiPagamento"] = payment_groups
+
+    return {"e_invoice": {"FatturaElettronicaBody": e_invoice_body}} if e_invoice_body else {}
 
 
 def decode_xml_bytes(data):

@@ -264,9 +264,8 @@ class GoCardlessBadAdapter(BasePsd2Adapter):
         transactions_node = (data or {}).get("transactions") or {}
         raw_list: List[Dict[str, Any]] = []
         raw_list.extend(transactions_node.get("booked", []) or [])
-        # Includiamo anche le pending per dare all'utente piena visibilita';
-        # queste verranno deduplicate se/quando diventano "booked" grazie all'hash.
-        raw_list.extend(transactions_node.get("pending", []) or [])
+        # Le pending sono transitorie: possono cambiare data/causale o sparire.
+        # Le importiamo solo quando diventano booked, cioe' movimenti contabilizzati.
 
         risultato: List[ProviderTransaction] = []
         for raw in raw_list:

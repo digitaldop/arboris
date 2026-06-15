@@ -6,7 +6,7 @@ import re
 import secrets
 import unicodedata
 from calendar import monthrange
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
@@ -150,7 +150,11 @@ from .services import (
     build_budgeting_dashboard_data,
     calcola_saldo_conto_alla_data,
     calcola_hash_deduplica_movimento,
+    chiavi_deduplica_esistenti,
+    chiavi_deduplica_movimento,
     crea_proposta_riconciliazione,
+    descrizione_deduplica_debole,
+    firma_deduplica_da_movimento,
     importo_movimento_disponibile,
     importo_movimento_disponibile_fornitori,
     importo_rata_residuo,
@@ -163,6 +167,8 @@ from .services import (
     registra_pagamento_fornitore,
     sincronizza_conto_psd2,
     stato_riconciliazione_movimento_display,
+    transazione_gia_importata,
+    punteggio_descrizione_deduplica,
 )
 
 logger = logging.getLogger(__name__)
@@ -3733,11 +3739,67 @@ def _links_label_movimento(movimento):
 def _canonical_duplicate_movimento_key(movimento):
     return (
         -_link_count_movimento(movimento),
+        1 if descrizione_deduplica_debole(movimento.descrizione) else 0,
+        -punteggio_descrizione_deduplica(movimento.descrizione),
         0 if movimento.provider_transaction_id else 1,
         0 if movimento.hash_deduplica else 1,
         0 if movimento.categoria_id else 1,
         movimento.pk,
     )
+
+
+def _movimento_bancario_deduplica_automatica(movimento):
+    return (
+        movimento.conto_id
+        and movimento.data_contabile
+        and movimento.importo is not None
+        and (
+            movimento.incide_su_saldo_banca
+            or movimento.origine in {OrigineMovimento.IMPORT_FILE, OrigineMovimento.BANCA}
+        )
+    )
+
+
+def _aggiungi_chiavi_duplicati_descrizione_debole(movimenti, add_key):
+    """
+    Segnala casi sospetti da revisione manuale: stesso conto/importo entro pochi giorni,
+    dove una riga ha solo una causale generica e l'altra una causale informativa.
+    """
+
+    finestra = timedelta(days=3)
+    dettagliati_by_conto_importo = {}
+    deboli = []
+
+    for movimento in movimenti:
+        if not _movimento_bancario_deduplica_automatica(movimento):
+            continue
+
+        amount_key = Decimal(movimento.importo).quantize(Decimal("0.01"))
+        group_key = (movimento.conto_id, amount_key)
+        if descrizione_deduplica_debole(movimento.descrizione):
+            deboli.append((movimento, group_key))
+        else:
+            dettagliati_by_conto_importo.setdefault(group_key, []).append(movimento)
+
+    reason = "causale assente o generica, stesso conto e importo entro 3 giorni"
+    for movimento_debole, group_key in deboli:
+        candidati = [
+            movimento
+            for movimento in dettagliati_by_conto_importo.get(group_key, [])
+            if movimento.pk != movimento_debole.pk
+            and abs(movimento.data_contabile - movimento_debole.data_contabile) <= finestra
+        ]
+        if len(candidati) != 1:
+            continue
+
+        candidato = candidati[0]
+        key = (
+            "weak-description",
+            min(movimento_debole.pk, candidato.pk),
+            max(movimento_debole.pk, candidato.pk),
+        )
+        add_key(key, movimento_debole, reason)
+        add_key(key, candidato, reason)
 
 
 def _movimenti_finanziari_duplicate_groups():
@@ -3793,20 +3855,15 @@ def _movimenti_finanziari_duplicate_groups():
                 "stessa impronta salvata",
             )
 
-        generated_hash = calcola_hash_deduplica_movimento(
-            conto_id=movimento.conto_id,
-            data_contabile=movimento.data_contabile,
-            importo=movimento.importo,
-            descrizione=movimento.descrizione,
-            controparte=movimento.controparte,
-            iban_controparte=movimento.iban_controparte,
-        )
-        if generated_hash:
+        signature = firma_deduplica_da_movimento(movimento)
+        if signature:
             add_key(
-                ("fingerprint", generated_hash),
+                ("signature", signature),
                 movimento,
                 "stessa data, importo, descrizione, controparte e IBAN",
             )
+
+    _aggiungi_chiavi_duplicati_descrizione_debole(movimenti, add_key)
 
     for ids in key_to_ids.values():
         if len(ids) <= 1:
@@ -4733,46 +4790,24 @@ def _build_import_preview(parser, raw_bytes, conto):
     duplicati = 0
     esempi = []
     date = []
-    preview_hashes = []
-    existing_hashes = set()
-    existing_tx_ids = set()
+    preview_keys = []
+    existing_keys = {
+        "hashes": set(),
+        "provider_transaction_ids": set(),
+        "signatures": set(),
+    }
 
     if conto and parsed:
-        hash_set = set()
-        tx_set = set()
-        for movimento in parsed:
-            hash_dedup = calcola_hash_deduplica_movimento(
-                conto_id=conto.id,
-                data_contabile=movimento.data_contabile,
-                importo=movimento.importo,
-                descrizione=movimento.descrizione,
-                controparte=movimento.controparte,
-                iban_controparte=movimento.iban_controparte,
-            )
-            preview_hashes.append(hash_dedup)
-            hash_set.add(hash_dedup)
-            if movimento.provider_transaction_id:
-                tx_set.add(movimento.provider_transaction_id)
-
-        if hash_set:
-            existing_hashes = set(
-                MovimentoFinanziario.objects.filter(
-                    conto=conto,
-                    hash_deduplica__in=hash_set,
-                ).values_list("hash_deduplica", flat=True)
-            )
-        if tx_set:
-            existing_tx_ids = set(
-                MovimentoFinanziario.objects.filter(
-                    conto=conto,
-                    provider_transaction_id__in=tx_set,
-                ).values_list("provider_transaction_id", flat=True)
-            )
+        preview_keys = [chiavi_deduplica_movimento(conto, movimento) for movimento in parsed]
+        existing_keys = chiavi_deduplica_esistenti(conto, parsed)
     else:
-        preview_hashes = [""] * len(parsed)
+        preview_keys = [{} for _movimento in parsed]
 
-    seen_hashes = set()
-    seen_tx_ids = set()
+    seen_keys = {
+        "hashes": set(),
+        "provider_transaction_ids": set(),
+        "signatures": set(),
+    }
 
     for index, movimento in enumerate(parsed):
         date.append(movimento.data_contabile)
@@ -4783,19 +4818,16 @@ def _build_import_preview(parser, raw_bytes, conto):
 
         is_duplicate = False
         if conto:
-            hash_dedup = preview_hashes[index]
-            provider_tx_id = movimento.provider_transaction_id or ""
-            is_duplicate = (
-                hash_dedup in existing_hashes
-                or hash_dedup in seen_hashes
-                or (provider_tx_id and provider_tx_id in existing_tx_ids)
-                or (provider_tx_id and provider_tx_id in seen_tx_ids)
-            )
+            keys = preview_keys[index]
+            is_duplicate = transazione_gia_importata(keys, existing_keys, seen_keys)
             if is_duplicate:
                 duplicati += 1
-            seen_hashes.add(hash_dedup)
-            if provider_tx_id:
-                seen_tx_ids.add(provider_tx_id)
+            if keys.get("hash"):
+                seen_keys["hashes"].add(keys["hash"])
+            if keys.get("signature"):
+                seen_keys["signatures"].add(keys["signature"])
+            if keys.get("provider_transaction_id"):
+                seen_keys["provider_transaction_ids"].add(keys["provider_transaction_id"])
 
         if len(esempi) < 8:
             esempi.append(
