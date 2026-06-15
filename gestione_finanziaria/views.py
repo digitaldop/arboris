@@ -4070,13 +4070,30 @@ def _movimenti_finanziari_duplicate_groups():
     )
 
 
-def _selected_duplicate_pairs(duplicate_groups, selected_ids):
+def _duplicate_keep_choices_from_post(duplicate_groups, post_data):
+    choices = {}
+    for group in duplicate_groups:
+        raw_keep_id = post_data.get(f"keep_{group['key']}")
+        if raw_keep_id and str(raw_keep_id).isdigit():
+            choices[group["key"]] = int(raw_keep_id)
+    return choices
+
+
+def _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices=None):
     selected_ids = set(selected_ids)
+    keep_choices = keep_choices or {}
     pairs = []
     for group in duplicate_groups:
-        keep_id = group["keep"].pk
-        for movimento in group["duplicati"]:
-            if movimento.pk in selected_ids:
+        default_keep_id = group["keep"].pk
+        movement_ids = {movimento.pk for movimento in group["movimenti"]}
+        requested_keep_id = keep_choices.get(group["key"])
+        keep_id = requested_keep_id if requested_keep_id in movement_ids else default_keep_id
+        keep_changed = keep_id != default_keep_id
+
+        for movimento in group["movimenti"]:
+            if movimento.pk == keep_id:
+                continue
+            if keep_changed or movimento.pk in selected_ids:
                 pairs.append((movimento.pk, keep_id))
     return pairs
 
@@ -4126,7 +4143,8 @@ def pulizia_duplicati_movimenti_finanziari(request):
 
     if request.method == "POST":
         selected_ids = _ids_selezionati_da_post(request)
-        duplicate_pairs = _selected_duplicate_pairs(duplicate_groups, selected_ids)
+        keep_choices = _duplicate_keep_choices_from_post(duplicate_groups, request.POST)
+        duplicate_pairs = _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices)
 
         if not duplicate_groups:
             messages.info(request, "Non ci sono duplicati da pulire.")

@@ -1138,8 +1138,8 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, "Duplicato")
         self.assertContains(response, "stessa data, importo, descrizione, controparte e IBAN")
         content = response.content.decode()
-        self.assertNotIn(f'name="selected_ids" value="{movimento_keep.pk}"', content)
-        self.assertIn(f'name="selected_ids" value="{movimento_duplicato.pk}"', content)
+        self.assertIn(f'value="{movimento_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
+        self.assertIn(f'value="{movimento_duplicato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
 
     def test_pulizia_duplicati_movimenti_propone_causale_generica_con_data_vicina(self):
         conto = ContoBancario.objects.create(nome_conto="Banco BPM")
@@ -1165,8 +1165,8 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "causale assente o generica")
         content = response.content.decode()
-        self.assertIn(f'name="selected_ids" value="{movimento_generico.pk}"', content)
-        self.assertNotIn(f'name="selected_ids" value="{movimento_dettagliato.pk}"', content)
+        self.assertIn(f'value="{movimento_generico.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
+        self.assertIn(f'value="{movimento_dettagliato.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
 
     def test_pulizia_duplicati_movimenti_propone_import_file_e_banca_simili(self):
         conto = ContoBancario.objects.create(nome_conto="Banco BPM")
@@ -1196,8 +1196,8 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, "Import estratto conto")
         self.assertContains(response, "Movimento bancario")
         content = response.content.decode()
-        self.assertIn(f'name="selected_ids" value="{movimento_importato.pk}"', content)
-        self.assertNotIn(f'name="selected_ids" value="{movimento_bancario.pk}"', content)
+        self.assertIn(f'value="{movimento_importato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
+        self.assertIn(f'value="{movimento_bancario.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
 
     def test_pulizia_duplicati_movimenti_non_propone_import_banca_ambigui(self):
         conto = ContoBancario.objects.create(nome_conto="Banco BPM")
@@ -1300,6 +1300,75 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertTrue(MovimentoFinanziario.objects.filter(pk=duplicato_deselezionato.pk).exists())
         conto.refresh_from_db()
         self.assertEqual(conto.saldo_corrente, Decimal("-200.00"))
+
+    def test_pulizia_duplicati_movimenti_forza_conservato_e_trasferisce_collegamenti(self):
+        conto = ContoBancario.objects.create(nome_conto="Conto riconciliato")
+        movimento_riconciliato = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+            stato_riconciliazione=StatoRiconciliazione.RICONCILIATO,
+        )
+        movimento_da_mantenere = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 6, 10),
+            importo=Decimal("-100.00"),
+            descrizione="Bonifico fornitore",
+            controparte="Fornitore SRL",
+            incide_su_saldo_banca=True,
+        )
+        fornitore = Fornitore.objects.create(denominazione="Fornitore SRL")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FOR-001",
+            data_documento=date(2026, 6, 1),
+            totale=Decimal("100.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 6, 10),
+            importo_previsto=Decimal("100.00"),
+            importo_pagato=Decimal("100.00"),
+            data_pagamento=date(2026, 6, 10),
+            conto_bancario=conto,
+            movimento_finanziario=movimento_riconciliato,
+        )
+        pagamento = PagamentoFornitore.objects.create(
+            scadenza=scadenza,
+            movimento_finanziario=movimento_riconciliato,
+            data_pagamento=date(2026, 6, 10),
+            importo=Decimal("100.00"),
+            metodo=MetodoPagamentoFornitore.BANCA,
+            conto_bancario=conto,
+            creato_da=self.user,
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+        self.assertEqual(response.status_code, 200)
+        gruppo = response.context["duplicate_groups"][0]
+        self.assertEqual(gruppo["keep"].pk, movimento_riconciliato.pk)
+        self.assertContains(response, "forzare il movimento conservato")
+
+        response = self.client.post(
+            reverse("pulizia_duplicati_movimenti_finanziari"),
+            {
+                f"keep_{gruppo['key']}": str(movimento_da_mantenere.pk),
+                "selected_ids": [str(movimento_da_mantenere.pk)],
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"))
+        self.assertFalse(MovimentoFinanziario.objects.filter(pk=movimento_riconciliato.pk).exists())
+        self.assertTrue(MovimentoFinanziario.objects.filter(pk=movimento_da_mantenere.pk).exists())
+        movimento_da_mantenere.refresh_from_db()
+        scadenza.refresh_from_db()
+        pagamento.refresh_from_db()
+        self.assertEqual(movimento_da_mantenere.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        self.assertEqual(scadenza.movimento_finanziario, movimento_da_mantenere)
+        self.assertEqual(pagamento.movimento_finanziario, movimento_da_mantenere)
 
     def test_lista_movimenti_prepara_dropdown_categorie_gerarchico(self):
         padre = CategoriaFinanziaria.objects.create(

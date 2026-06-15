@@ -48,8 +48,9 @@
             </div>
             {% if duplicate_groups %}
                 <p>
-                    I movimenti candidati all'eliminazione sono gia' selezionati. Deseleziona quelli che non vuoi
-                    trattare come duplicati; il movimento indicato come conservato restera' in archivio.
+                    I movimenti candidati all'eliminazione sono gia' selezionati. Puoi scegliere quale movimento
+                    mantenere per ogni gruppo; i collegamenti dei duplicati eliminati verranno trasferiti al
+                    movimento conservato.
                 </p>
                 <p class="help-text">
                     Prima della cancellazione i collegamenti a rate, fornitori, spese operative e buste paga vengono
@@ -69,14 +70,11 @@
                     <strong><span data-bulk-count>{{ duplicati_count }}</span></strong>
                     <span>duplicati selezionati per l'eliminazione</span>
                 </div>
-                <label class="finance-bulk-select-all">
-                    <input type="checkbox" class="finance-bulk-checkbox" data-bulk-select-all checked aria-label="Seleziona tutti i duplicati candidati">
-                    <span>Tutti i duplicati</span>
-                </label>
+                <div class="finance-bulk-hint">Scegli "Mantieni" per forzare il movimento conservato.</div>
             </div>
 
             {% for gruppo in duplicate_groups %}
-                <section class="finance-duplicate-group">
+                <section class="finance-duplicate-group" data-duplicate-group>
                     <div class="finance-duplicate-group-head">
                         <div>
                             <h2 class="finance-duplicate-group-title">Gruppo duplicati #{{ forloop.counter }}</h2>
@@ -88,6 +86,7 @@
                         <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table finance-duplicate-table">
                             <thead>
                                 <tr>
+                                    <th class="finance-bulk-select-col">Mantieni</th>
                                     <th class="finance-bulk-select-col">Elimina</th>
                                     <th>Ruolo</th>
                                     <th>Data</th>
@@ -101,26 +100,19 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="finance-duplicate-keep-row">
-                                    <td class="finance-bulk-select-col">-</td>
-                                    <td><span class="finance-duplicate-role is-keep">Conservato</span></td>
-                                    <td>{{ gruppo.keep.data_contabile|date:"d/m/Y" }}</td>
-                                    <td>{{ gruppo.keep.conto|default:"-" }}</td>
-                                    <td>{{ gruppo.keep.descrizione|truncatechars:90|default:"-" }}</td>
-                                    <td>{{ gruppo.keep.controparte|default:"-" }}</td>
-                                    <td class="column-right">{{ gruppo.keep.importo|euro }} &euro;</td>
-                                    <td>{{ gruppo.keep.get_origine_display }}</td>
-                                    <td>{{ gruppo.keep.dedup_links_label }}</td>
-                                    <td>
-                                        <a href="{% url 'modifica_movimento_finanziario' gruppo.keep.pk %}" class="table-link">Apri</a>
-                                    </td>
-                                </tr>
-                                {% for movimento in gruppo.duplicati %}
-                                    <tr>
+                                {% for movimento in gruppo.movimenti %}
+                                    <tr class="{% if movimento.pk == gruppo.keep.pk %}finance-duplicate-keep-row{% endif %}" data-duplicate-row data-movement-id="{{ movimento.pk }}">
                                         <td class="finance-bulk-select-col">
-                                            <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ movimento.pk }}" data-bulk-checkbox checked aria-label="Elimina movimento duplicato del {{ movimento.data_contabile|date:'d/m/Y' }}">
+                                            <input type="radio" class="finance-duplicate-keep-choice" name="keep_{{ gruppo.key }}" value="{{ movimento.pk }}" data-duplicate-keep {% if movimento.pk == gruppo.keep.pk %}checked{% endif %} aria-label="Mantieni movimento del {{ movimento.data_contabile|date:'d/m/Y' }}">
                                         </td>
-                                        <td><span class="finance-duplicate-role is-delete">Duplicato</span></td>
+                                        <td class="finance-bulk-select-col">
+                                            <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ movimento.pk }}" data-bulk-checkbox data-duplicate-delete {% if movimento.pk != gruppo.keep.pk %}checked{% else %}disabled{% endif %} aria-label="Elimina movimento duplicato del {{ movimento.data_contabile|date:'d/m/Y' }}">
+                                        </td>
+                                        <td>
+                                            <span class="finance-duplicate-role {% if movimento.pk == gruppo.keep.pk %}is-keep{% else %}is-delete{% endif %}" data-duplicate-role data-movement-id="{{ movimento.pk }}">
+                                                {% if movimento.pk == gruppo.keep.pk %}Conservato{% else %}Duplicato{% endif %}
+                                            </span>
+                                        </td>
                                         <td>{{ movimento.data_contabile|date:"d/m/Y" }}</td>
                                         <td>{{ movimento.conto|default:"-" }}</td>
                                         <td>{{ movimento.descrizione|truncatechars:90|default:"-" }}</td>
@@ -162,6 +154,38 @@
             if (window.ArborisBulkActions) {
                 ArborisBulkActions.init(document);
             }
+
+            document.querySelectorAll("[data-duplicate-keep]").forEach(function (radio) {
+                radio.addEventListener("change", function () {
+                    if (!radio.checked) {
+                        return;
+                    }
+
+                    var group = radio.closest("[data-duplicate-group]");
+                    if (!group) {
+                        return;
+                    }
+
+                    var keepId = radio.value;
+                    group.querySelectorAll("[data-duplicate-delete]").forEach(function (checkbox) {
+                        var isKeep = checkbox.value === keepId;
+                        checkbox.disabled = isKeep;
+                        checkbox.checked = !isKeep;
+                        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+                    });
+
+                    group.querySelectorAll("[data-duplicate-role]").forEach(function (role) {
+                        var isKeep = role.dataset.movementId === keepId;
+                        role.textContent = isKeep ? "Conservato" : "Duplicato";
+                        role.classList.toggle("is-keep", isKeep);
+                        role.classList.toggle("is-delete", !isKeep);
+                    });
+
+                    group.querySelectorAll("[data-duplicate-row]").forEach(function (row) {
+                        row.classList.toggle("finance-duplicate-keep-row", row.dataset.movementId === keepId);
+                    });
+                });
+            });
         });
     </script>
 {% endblock %}
