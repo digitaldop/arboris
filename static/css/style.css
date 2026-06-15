@@ -28706,12 +28706,17 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .monthly-expense-month-value-label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
 }
 
-.module-gestione_finanziaria .monthly-expense-month-value-label > span:last-child {
+.module-gestione_finanziaria .monthly-expense-month-value-caption {
+    min-width: 0;
     overflow-wrap: anywhere;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value-amount {
