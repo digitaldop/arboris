@@ -125,7 +125,6 @@
                             <span class="monthly-expense-month-value-icon" data-floating-text="Totale spese e fatture mensili" aria-label="Totale spese e fatture mensili">
                                 <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg>
                             </span>
-                            <span>Spese e fatture mensili</span>
                         </span>
                         <span class="monthly-expense-month-value-amount">{{ mese.totale_spese|euro }} &euro;</span>
                     </strong>
@@ -134,7 +133,6 @@
                             <span class="monthly-expense-month-value-icon" data-floating-text="Residuo da pagare" aria-label="Residuo da pagare">
                                 <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
                             </span>
-                            <span>Residuo da pagare</span>
                         </span>
                         <span class="monthly-expense-month-value-amount">{{ mese.residuo|euro }} &euro;</span>
                     </em>

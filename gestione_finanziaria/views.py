@@ -1614,7 +1614,7 @@ def spese_mensili_dashboard(request):
             stats["bilancio_tone"] = "neutral"
 
     totale_entrate_periodo = sum((stats["introiti"] for stats in month_stats.values()), Decimal("0.00"))
-    totale_uscite_periodo = sum((stats["totale_spese"] for stats in month_stats.values()), Decimal("0.00"))
+    totale_uscite_periodo = sum((stats["uscite_movimenti"] for stats in month_stats.values()), Decimal("0.00"))
     differenza_periodo = totale_entrate_periodo - totale_uscite_periodo
     if periodo_data["periodo"] == "scolastico" and periodo_data["anno_scolastico"]:
         periodo_label = f"Anno scolastico {periodo_data['anno_scolastico']}"
