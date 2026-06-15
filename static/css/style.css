@@ -5168,6 +5168,7 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 }
 
 .finance-movement-filters select,
+.finance-movement-filters input,
 .finance-report-filters select {
     min-width: 0;
 }
@@ -5178,6 +5179,14 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 
 .finance-filter-field-categoria select {
     width: 240px;
+}
+
+.finance-filter-field-tipo select {
+    width: 135px;
+}
+
+.finance-filter-field-data input {
+    width: 145px;
 }
 
 .finance-filter-field-origine select {
@@ -5557,6 +5566,7 @@ body.finance-category-editing .anagrafica-list-table tbody tr:hover td {
     }
 
     .finance-movement-filters select,
+    .finance-movement-filters input,
     .finance-report-filters select,
     .finance-movement-filters .btn,
     .finance-report-filters .btn {

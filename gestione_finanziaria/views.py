@@ -3719,8 +3719,13 @@ def lista_movimenti_finanziari(request):
 
     conti_filter = request.GET.get("conto")
     categoria_filter = request.GET.get("categoria")
+    tipo_movimento_filter = request.GET.get("tipo")
+    data_da_filter = (request.GET.get("data_da") or "").strip()
+    data_a_filter = (request.GET.get("data_a") or "").strip()
     origine_filter = request.GET.get("origine")
     canale_filter = request.GET.get("canale")
+    data_da = parse_date(data_da_filter) if data_da_filter else None
+    data_a = parse_date(data_a_filter) if data_a_filter else None
 
     if conti_filter:
         movimenti = movimenti.filter(conto_id=conti_filter)
@@ -3728,6 +3733,14 @@ def lista_movimenti_finanziari(request):
         movimenti = movimenti.filter(categoria__isnull=True)
     elif categoria_filter:
         movimenti = movimenti.filter(categoria_id=categoria_filter)
+    if tipo_movimento_filter == "entrate":
+        movimenti = movimenti.filter(importo__gt=0)
+    elif tipo_movimento_filter == "uscite":
+        movimenti = movimenti.filter(importo__lt=0)
+    if data_da:
+        movimenti = movimenti.filter(data_contabile__gte=data_da)
+    if data_a:
+        movimenti = movimenti.filter(data_contabile__lte=data_a)
     if origine_filter:
         movimenti = movimenti.filter(origine=origine_filter)
     if canale_filter:
@@ -3755,6 +3768,9 @@ def lista_movimenti_finanziari(request):
             "canali_disponibili": CanaleMovimento.choices,
             "conto_selezionato": conti_filter or "",
             "categoria_selezionata": categoria_filter or "",
+            "tipo_movimento_selezionato": tipo_movimento_filter or "",
+            "data_da_selezionata": data_da_filter,
+            "data_a_selezionata": data_a_filter,
             "origine_selezionata": origine_filter or "",
             "canale_selezionato": canale_filter or "",
         },

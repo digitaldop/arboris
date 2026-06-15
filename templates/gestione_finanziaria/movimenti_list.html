@@ -46,6 +46,22 @@
                     {% endfor %}
                 </select>
             </label>
+            <label class="finance-filter-field finance-filter-field-tipo">
+                Tipo:
+                <select name="tipo">
+                    <option value="">Tutti</option>
+                    <option value="entrate" {% if tipo_movimento_selezionato == "entrate" %}selected{% endif %}>Solo entrate</option>
+                    <option value="uscite" {% if tipo_movimento_selezionato == "uscite" %}selected{% endif %}>Solo uscite</option>
+                </select>
+            </label>
+            <label class="finance-filter-field finance-filter-field-data">
+                Da:
+                <input type="date" name="data_da" value="{{ data_da_selezionata }}">
+            </label>
+            <label class="finance-filter-field finance-filter-field-data">
+                A:
+                <input type="date" name="data_a" value="{{ data_a_selezionata }}">
+            </label>
             <label class="finance-filter-field finance-filter-field-origine">
                 Origine:
                 <select name="origine">

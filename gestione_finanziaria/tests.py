@@ -5375,7 +5375,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Bilancio del mese")
         self.assertContains(response, "Totale spese e fatture mensili")
         self.assertContains(response, "Residuo da pagare")
-        self.assertContains(response, "3 spese - 2 insolute")
+        self.assertContains(response, "3 fatture - 2 insolute")
         self.assertContains(response, "monthly-expense-month-value-income")
         self.assertContains(response, "Parziale")
         documento_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
@@ -6522,6 +6522,46 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "finance-movement-row-incoming")
         self.assertContains(response, "finance-movement-row-outgoing")
+
+    def test_lista_movimenti_filtra_per_tipo_e_intervallo_date(self):
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 10),
+            importo=Decimal("120.00"),
+            descrizione="Incasso filtro aprile",
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 4, 12),
+            importo=Decimal("-35.00"),
+            descrizione="Pagamento filtro aprile",
+        )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 5),
+            importo=Decimal("-20.00"),
+            descrizione="Pagamento filtro maggio",
+        )
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"), {"tipo": "entrate"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Solo entrate")
+        self.assertContains(response, "Incasso filtro aprile")
+        self.assertNotContains(response, "Pagamento filtro aprile")
+
+        response = self.client.get(
+            reverse("lista_movimenti_finanziari"),
+            {
+                "tipo": "uscite",
+                "data_da": "2026-04-01",
+                "data_a": "2026-04-30",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="data_da" value="2026-04-01"', html=False)
+        self.assertContains(response, 'name="data_a" value="2026-04-30"', html=False)
+        self.assertContains(response, "Pagamento filtro aprile")
+        self.assertNotContains(response, "Incasso filtro aprile")
+        self.assertNotContains(response, "Pagamento filtro maggio")
 
     def test_lista_movimenti_mostra_stato_riconciliazione_effettivo(self):
         scadenza_completa, movimento_completo = self._crea_scadenza_pagamento_test(importo=Decimal("100.00"))
