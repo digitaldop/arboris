@@ -9,9 +9,9 @@
  * rimanda il reload (doppio rAF + setTimeout(0)) così il browser può ridisegnare.
  */
 (function () {
-    const NAV_DELAY_MS = 180;
-    const FORM_DELAY_MS = 180;
-    const FETCH_DELAY_MS = 700;
+    const NAV_DELAY_MS = 1200;
+    const FORM_DELAY_MS = 1200;
+    const FETCH_DELAY_MS = 1400;
     const MIN_VISIBLE_MS = 320;
     const BOOT_RELEASE_DELAY_MS = 120;
     const NEXT_PAGE_WAIT_TTL_MS = 8000;
@@ -39,6 +39,23 @@
             window.sessionStorage.setItem(NEXT_PAGE_WAIT_KEY, String(nowMs() + NEXT_PAGE_WAIT_TTL_MS));
         } catch (e) {
             /* ignore */
+        }
+    }
+
+    function rememberNextPageLoadingIfVisualActive() {
+        const root = document.documentElement;
+        const visualIsActive = Boolean(
+            bootArmed ||
+            formArmed ||
+            navArmed ||
+            fetchArmed ||
+            (root && root.classList && root.classList.contains(CLASS_NAME))
+        );
+
+        if (visualIsActive) {
+            rememberNextPageLoading();
+        } else {
+            clearNextPageLoading();
         }
     }
 
@@ -163,12 +180,12 @@
         }
         navArmed = false;
         navClickPending = true;
-        rememberNextPageLoading();
         updateVisual();
         navTimer = setTimeout(function () {
             navTimer = null;
             if (navClickPending) {
                 navArmed = true;
+                rememberNextPageLoading();
                 updateVisual();
             }
         }, NAV_DELAY_MS);
@@ -396,6 +413,15 @@
         return anchor.dataset.longWaitSkip === "1" || anchor.dataset.noLongWait === "1";
     }
 
+    function opensOutsideCurrentTab(event, anchor) {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return true;
+        }
+
+        const target = (anchor.getAttribute("target") || "").trim().toLowerCase();
+        return Boolean(target && target !== "_self");
+    }
+
     function isCurrentWindowLocation(loc) {
         try {
             return loc === window.location || (typeof document !== "undefined" && loc === document.location);
@@ -455,9 +481,9 @@
                 clearTimeout(formTimer);
             }
             formArmed = false;
-            rememberNextPageLoading();
             if (shouldShowFormWaitImmediately(event.target)) {
                 formArmed = true;
+                rememberNextPageLoading();
                 updateVisual();
             } else {
                 updateVisual();
@@ -465,6 +491,7 @@
             formTimer = setTimeout(function () {
                 formTimer = null;
                 formArmed = true;
+                rememberNextPageLoading();
                 updateVisual();
             }, FORM_DELAY_MS);
 
@@ -491,7 +518,7 @@
             if (e.defaultPrevented || e.button !== 0) {
                 return;
             }
-            if (a.target === "_blank" || shouldSkipLongWaitForLink(a)) {
+            if (opensOutsideCurrentTab(e, a) || shouldSkipLongWaitForLink(a)) {
                 return;
             }
             if (isPopupOrModalLink(a)) {
@@ -523,7 +550,7 @@
         false
     );
 
-    window.addEventListener("beforeunload", rememberNextPageLoading);
+    window.addEventListener("beforeunload", rememberNextPageLoadingIfVisualActive);
     window.addEventListener("pagehide", resetAll);
     window.addEventListener("pageshow", resetAll);
 

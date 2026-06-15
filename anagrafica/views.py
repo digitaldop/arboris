@@ -4337,6 +4337,9 @@ def elimina_tipo_documento(request, pk):
 
 def lista_studenti(request):
     q = request.GET.get("q", "").strip()
+    anno_scolastico_filter = (request.GET.get("anno_scolastico") or "").strip()
+    classe_filter = (request.GET.get("classe") or "").strip()
+    gruppo_classe_filter = (request.GET.get("gruppo_classe") or "").strip()
 
     studenti = (
         annotate_studenti_current_iscrizione_status(Studente.objects.all())
@@ -4370,10 +4373,21 @@ def lista_studenti(request):
             Q(relazioni_familiari__attivo=True, relazioni_familiari__familiare__persona__telefono__icontains=q)
         ).distinct()
 
+    iscrizione_filter = Q()
+    if anno_scolastico_filter.isdigit():
+        iscrizione_filter &= Q(iscrizioni__anno_scolastico_id=int(anno_scolastico_filter))
+    if classe_filter.isdigit():
+        iscrizione_filter &= Q(iscrizioni__classe_id=int(classe_filter))
+    if gruppo_classe_filter.isdigit():
+        iscrizione_filter &= Q(iscrizioni__gruppo_classe_id=int(gruppo_classe_filter))
+    if iscrizione_filter:
+        studenti = studenti.filter(iscrizione_filter & Q(iscrizioni__attiva=True)).distinct()
+
     studenti = list(studenti)
     decorate_studenti_current_enrollment_labels(studenti)
     decorate_studenti_direct_relation_labels(studenti)
     evidenzia_id = request.GET.get("highlight")
+    filtri_attivi = bool(q or anno_scolastico_filter or classe_filter or gruppo_classe_filter)
 
     return render(
         request,
@@ -4381,6 +4395,17 @@ def lista_studenti(request):
         {
             "studenti": studenti,
             "q": q,
+            "anni_scolastici_disponibili": AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id"),
+            "classi_disponibili": Classe.objects.filter(attiva=True).order_by("ordine_classe", "nome_classe", "sezione_classe"),
+            "gruppi_classe_disponibili": (
+                GruppoClasse.objects.filter(attivo=True)
+                .select_related("anno_scolastico")
+                .order_by("-anno_scolastico__data_inizio", "nome_gruppo_classe", "id")
+            ),
+            "anno_scolastico_selezionato": anno_scolastico_filter,
+            "classe_selezionata": classe_filter,
+            "gruppo_classe_selezionato": gruppo_classe_filter,
+            "filtri_attivi": filtri_attivi,
             "evidenzia_id": evidenzia_id,
         },
     )

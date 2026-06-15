@@ -1623,6 +1623,100 @@ class StudenteListEnrollmentBadgeLayoutTests(TestCase):
         self.assertContains(response, "ISCRITTO 2025/2026")
         self.assertContains(response, "PREISCRITTO 2026/2027")
 
+    def test_studenti_list_filtra_per_classe_pluriclasse_e_anno_scolastico(self):
+        anno_2025 = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            attivo=True,
+        )
+        anno_2026 = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=date(2026, 9, 1),
+            data_fine=date(2027, 8, 31),
+            attivo=True,
+        )
+        classe_materna = Classe.objects.create(nome_classe="Materna", ordine_classe=1, attiva=True)
+        classe_primaria = Classe.objects.create(nome_classe="Primaria", ordine_classe=2, attiva=True)
+        gruppo_materna = GruppoClasse.objects.create(
+            nome_gruppo_classe="Materna mista",
+            anno_scolastico=anno_2025,
+            attivo=True,
+        )
+        gruppo_materna.classi.add(classe_materna)
+        stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        condizione_2025 = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_2025,
+            nome_condizione_iscrizione="Retta standard 2025",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        condizione_2026 = CondizioneIscrizione.objects.create(
+            anno_scolastico=anno_2026,
+            nome_condizione_iscrizione="Retta standard 2026",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        studente_materna = Studente.objects.create(nome="Lia", cognome="Bianchi", attivo=True)
+        studente_primaria = Studente.objects.create(nome="Marco", cognome="Rossi", attivo=True)
+        studente_anno_futuro = Studente.objects.create(nome="Anna", cognome="Verdi", attivo=True)
+        Iscrizione.objects.create(
+            studente=studente_materna,
+            anno_scolastico=anno_2025,
+            classe=classe_materna,
+            gruppo_classe=gruppo_materna,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_2025,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_primaria,
+            anno_scolastico=anno_2025,
+            classe=classe_primaria,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_2025,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=studente_anno_futuro,
+            anno_scolastico=anno_2026,
+            classe=classe_materna,
+            stato_iscrizione=stato_iscrizione,
+            condizione_iscrizione=condizione_2026,
+            attiva=True,
+        )
+
+        response = self.client.get(
+            reverse("lista_studenti"),
+            {
+                "anno_scolastico": str(anno_2025.pk),
+                "classe": str(classe_materna.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Anno scolastico")
+        self.assertContains(response, "Pluriclasse")
+        self.assertContains(response, "Bianchi Lia")
+        self.assertNotContains(response, "Rossi Marco")
+        self.assertNotContains(response, "Verdi Anna")
+        self.assertEqual(list(response.context["studenti"]), [studente_materna])
+
+        response = self.client.get(
+            reverse("lista_studenti"),
+            {
+                "anno_scolastico": str(anno_2025.pk),
+                "gruppo_classe": str(gruppo_materna.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Materna mista - 2025/2026")
+        self.assertContains(response, "Bianchi Lia")
+        self.assertNotContains(response, "Rossi Marco")
+        self.assertNotContains(response, "Verdi Anna")
+        self.assertEqual(list(response.context["studenti"]), [studente_materna])
+
 
 class IscrizioneInlineDefaultsTests(TestCase):
     def test_iscrizione_inline_defaults_to_first_condition_for_default_year(self):

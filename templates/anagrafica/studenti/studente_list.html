@@ -47,11 +47,38 @@
                     data-live-list-input
                 >
             </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Anno scolastico</span>
+                <select name="anno_scolastico" data-live-list-filter>
+                    <option value="">Tutti gli anni</option>
+                    {% for anno in anni_scolastici_disponibili %}
+                        <option value="{{ anno.pk }}" {% if anno_scolastico_selezionato == anno.pk|stringformat:"s" %}selected{% endif %}>{{ anno.nome_anno_scolastico }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Classe</span>
+                <select name="classe" data-live-list-filter>
+                    <option value="">Tutte le classi</option>
+                    {% for classe in classi_disponibili %}
+                        <option value="{{ classe.pk }}" {% if classe_selezionata == classe.pk|stringformat:"s" %}selected{% endif %}>{{ classe }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="anagrafica-filter-field">
+                <span class="anagrafica-filter-label">Pluriclasse</span>
+                <select name="gruppo_classe" data-live-list-filter>
+                    <option value="">Tutte le pluriclassi</option>
+                    {% for gruppo in gruppi_classe_disponibili %}
+                        <option value="{{ gruppo.pk }}" {% if gruppo_classe_selezionato == gruppo.pk|stringformat:"s" %}selected{% endif %}>{{ gruppo.nome_gruppo_classe }} - {{ gruppo.anno_scolastico }}</option>
+                    {% endfor %}
+                </select>
+            </label>
             <button type="submit" class="btn btn-secondary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                 <span class="btn-label">Cerca</span>
             </button>
-            <a href="{% url 'lista_studenti' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear{% if not q %} hidden{% endif %}>
+            <a href="{% url 'lista_studenti' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear{% if not filtri_attivi %} hidden{% endif %}>
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                 <span class="btn-label">Pulisci</span>
             </a>
@@ -154,7 +181,7 @@
                 </table>
             {% else %}
                 <div class="empty-state">
-                    Nessuno studente inserito.
+                    Nessuno studente trovato con i filtri correnti.
                 </div>
             {% endif %}
         </div>
