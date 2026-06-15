@@ -28644,8 +28644,8 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     display: grid;
     align-content: start;
     gap: 8px;
-    flex: 0 0 248px;
-    min-height: 216px;
+    flex: 0 0 198px;
+    min-height: 156px;
     padding: 12px;
     border: 1px solid #dce5f0;
     border-radius: 8px;
@@ -28758,7 +28758,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 .module-gestione_finanziaria .monthly-expense-month-separator {
     display: block;
     border-top: 1px solid #dce5f0;
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value-expenses {
