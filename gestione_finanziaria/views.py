@@ -1572,6 +1572,7 @@ def spese_mensili_dashboard(request):
             "spese_count": 0,
             "insolute_count": 0,
             "introiti": Decimal("0.00"),
+            "uscite_movimenti": Decimal("0.00"),
             "url": f"{reverse('spese_mensili_dashboard')}?{urlencode(_base_period_params(periodo_data, mese, vista))}",
             "is_selected": _month_key(mese) == _month_key(periodo_data["selected_month"]),
         }
@@ -1592,6 +1593,25 @@ def spese_mensili_dashboard(request):
         stats = month_stats.get(_month_key(movimento.data_contabile))
         if stats:
             stats["introiti"] += movimento.importo or Decimal("0.00")
+
+    for movimento in uscite_movimenti:
+        stats = month_stats.get(_month_key(movimento.data_contabile))
+        if stats:
+            stats["uscite_movimenti"] += abs(movimento.importo or Decimal("0.00"))
+
+    for stats in month_stats.values():
+        bilancio = stats["introiti"] - stats["uscite_movimenti"]
+        stats["bilancio"] = bilancio
+        stats["bilancio_abs"] = abs(bilancio)
+        if bilancio > Decimal("0.00"):
+            stats["bilancio_segno"] = "+"
+            stats["bilancio_tone"] = "positive"
+        elif bilancio < Decimal("0.00"):
+            stats["bilancio_segno"] = "-"
+            stats["bilancio_tone"] = "negative"
+        else:
+            stats["bilancio_segno"] = ""
+            stats["bilancio_tone"] = "neutral"
 
     totale_entrate_periodo = sum((stats["introiti"] for stats in month_stats.values()), Decimal("0.00"))
     totale_uscite_periodo = sum((stats["totale_spese"] for stats in month_stats.values()), Decimal("0.00"))

@@ -5349,6 +5349,13 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             controparte="Famiglie",
             origine=OrigineMovimento.BANCA,
         )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 21),
+            importo=Decimal("-210.50"),
+            descrizione="Pagamento utenze maggio",
+            controparte="Fornitore Utenze",
+            origine=OrigineMovimento.BANCA,
+        )
 
         response = self.client.get(
             reverse("spese_mensili_dashboard"),
@@ -5364,7 +5371,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertContains(response, "Incasso rette maggio")
         self.assertContains(response, "Totale introiti del mese")
-        self.assertContains(response, "Totale spese mensili")
+        self.assertContains(response, "Totale movimenti in uscita del mese")
+        self.assertContains(response, "Bilancio del mese")
+        self.assertContains(response, "Spese e fatture mensili")
         self.assertContains(response, "Residuo da pagare")
         self.assertContains(response, "3 spese - 2 insolute")
         self.assertContains(response, "monthly-expense-month-value-income")
@@ -5376,6 +5385,10 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-05")
         self.assertEqual(selected_month["totale_spese"], Decimal("470.50"))
         self.assertEqual(selected_month["residuo"], Decimal("302.00"))
+        self.assertEqual(selected_month["uscite_movimenti"], Decimal("210.50"))
+        self.assertEqual(selected_month["bilancio"], Decimal("639.50"))
+        self.assertEqual(selected_month["bilancio_segno"], "+")
+        self.assertEqual(selected_month["bilancio_tone"], "positive")
         self.assertEqual(selected_month["spese_count"], 3)
         self.assertEqual(selected_month["insolute_count"], 2)
         self.assertEqual(len(response.context["selected_category_summary"]), 1)
@@ -5479,6 +5492,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             descrizione="Rimborso",
             origine=OrigineMovimento.BANCA,
         )
+        MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 6, 21),
+            importo=Decimal("-80.00"),
+            descrizione="Pagamento materiali",
+            origine=OrigineMovimento.BANCA,
+        )
 
         response = self.client.get(
             reverse("spese_mensili_dashboard"),
@@ -5486,6 +5505,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-06")
+        self.assertEqual(selected_month["uscite_movimenti"], Decimal("80.00"))
+        self.assertEqual(selected_month["bilancio"], Decimal("-30.00"))
+        self.assertEqual(selected_month["bilancio_segno"], "-")
+        self.assertEqual(selected_month["bilancio_tone"], "negative")
         self.assertEqual(response.context["period_summary"]["totale_entrate"], Decimal("50.00"))
         self.assertEqual(response.context["period_summary"]["totale_uscite"], Decimal("180.00"))
         self.assertEqual(response.context["period_summary"]["differenza"], Decimal("-130.00"))
@@ -5493,6 +5517,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.context["period_summary"]["differenza_tone"], "negative")
         self.assertContains(response, "-130,00")
         self.assertContains(response, "monthly-expense-period-delta is-negative")
+        self.assertContains(response, "monthly-expense-month-value-balance is-negative")
+        self.assertContains(response, "-30,00")
 
     def test_spese_mensili_dashboard_prepara_click_destro_categoria(self):
         padre = CategoriaFinanziaria.objects.create(

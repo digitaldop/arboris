@@ -28644,8 +28644,8 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     display: grid;
     align-content: start;
     gap: 8px;
-    flex: 0 0 198px;
-    min-height: 150px;
+    flex: 0 0 248px;
+    min-height: 216px;
     padding: 12px;
     border: 1px solid #dce5f0;
     border-radius: 8px;
@@ -28692,11 +28692,32 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    line-height: 1.12;
+    font-size: 13px;
+    font-weight: 850;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     min-width: 0;
-    line-height: 1.12;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-label > span:last-child {
+    overflow-wrap: anywhere;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-amount {
+    flex: 0 0 auto;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value-icon {
@@ -28716,14 +28737,32 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .module-gestione_finanziaria .monthly-expense-month-value-income {
     color: #1f8048;
-    font-size: 14px;
-    font-weight: 850;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-outflows {
+    color: #b91c1c;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-balance.is-positive {
+    color: #1f8048;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-balance.is-negative {
+    color: #b91c1c;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-value-balance.is-neutral {
+    color: #60738d;
+}
+
+.module-gestione_finanziaria .monthly-expense-month-separator {
+    display: block;
+    border-top: 1px solid #dce5f0;
+    margin: 4px 0;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value-expenses {
-    color: #a30f2d;
-    font-size: 19px;
-    font-weight: 850;
+    color: #243145;
 }
 
 .module-gestione_finanziaria .monthly-expense-month-value-residual {
