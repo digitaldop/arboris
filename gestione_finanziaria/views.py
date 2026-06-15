@@ -1516,6 +1516,43 @@ def _introiti_mensili(start, end):
     )
 
 
+def _uscite_movimenti_mensili(start, end):
+    return list(
+        MovimentoFinanziario.objects.select_related("conto", "categoria")
+        .filter(data_contabile__gte=start, data_contabile__lte=end, importo__lt=0)
+        .filter(Q(origine__in=[OrigineMovimento.BANCA, OrigineMovimento.IMPORT_FILE]) | Q(incide_su_saldo_banca=True))
+        .order_by("data_contabile", "id")
+    )
+
+
+def _riepilogo_spese_per_categoria(rows):
+    by_category = {}
+    for row in rows:
+        categoria_id = row.get("categoria_id") or ""
+        categoria_label = str(row.get("categoria") or "").strip()
+        if not categoria_id:
+            categoria_label = "Senza categoria"
+        bucket = by_category.setdefault(
+            categoria_id,
+            {
+                "categoria": categoria_label,
+                "count": 0,
+                "totale_previsto": Decimal("0.00"),
+                "totale_pagato": Decimal("0.00"),
+                "totale_residuo": Decimal("0.00"),
+            },
+        )
+        bucket["count"] += 1
+        bucket["totale_previsto"] += row.get("importo_previsto") or Decimal("0.00")
+        bucket["totale_pagato"] += row.get("importo_pagato") or Decimal("0.00")
+        bucket["totale_residuo"] += row.get("residuo") or Decimal("0.00")
+
+    return sorted(
+        by_category.values(),
+        key=lambda item: (item["totale_previsto"] * Decimal("-1"), item["categoria"].casefold()),
+    )
+
+
 def spese_mensili_dashboard(request):
     periodo_data = _periodo_spese_mensili(request)
     vista = request.GET.get("vista") or "tutte"
@@ -1524,6 +1561,7 @@ def spese_mensili_dashboard(request):
 
     rows = _spese_mensili_rows(request, periodo_data["start"], periodo_data["end"])
     introiti = _introiti_mensili(periodo_data["start"], periodo_data["end"])
+    uscite_movimenti = _uscite_movimenti_mensili(periodo_data["start"], periodo_data["end"])
     month_stats = {
         _month_key(mese): {
             "date": mese,
@@ -1579,7 +1617,11 @@ def spese_mensili_dashboard(request):
         if vista == "insolute"
         else selected_rows_all
     )
+    selected_category_summary = _riepilogo_spese_per_categoria(selected_rows_all)
     selected_introiti = [movimento for movimento in introiti if _month_key(movimento.data_contabile) == selected_key]
+    selected_uscite_movimenti = [
+        movimento for movimento in uscite_movimenti if _month_key(movimento.data_contabile) == selected_key
+    ]
 
     switch_params = _base_period_params(periodo_data, periodo_data["selected_month"])
     vista_tutte_url = f"{reverse('spese_mensili_dashboard')}?{urlencode({**switch_params, 'vista': 'tutte'})}"
@@ -1604,8 +1646,14 @@ def spese_mensili_dashboard(request):
             "selected_month_label": f"{MESI_BREVI[periodo_data['selected_month'].month - 1]} {periodo_data['selected_month'].year}",
             "selected_rows": selected_rows,
             "selected_rows_all_count": len(selected_rows_all),
+            "selected_category_summary": selected_category_summary,
             "selected_introiti": selected_introiti,
             "selected_introiti_total": sum((movimento.importo or Decimal("0.00") for movimento in selected_introiti), Decimal("0.00")),
+            "selected_uscite_movimenti": selected_uscite_movimenti,
+            "selected_uscite_movimenti_total": sum(
+                (abs(movimento.importo or Decimal("0.00")) for movimento in selected_uscite_movimenti),
+                Decimal("0.00"),
+            ),
             "categorie_disponibili": _categorie_finanziarie_attive_per_select(),
             "categorie_spesa_disponibili": _categorie_finanziarie_attive_per_select(TipoCategoriaFinanziaria.SPESA),
             "vista": vista,

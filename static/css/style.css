@@ -28814,6 +28814,10 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     min-width: 940px;
 }
 
+.module-gestione_finanziaria .monthly-category-summary-table {
+    min-width: 760px;
+}
+
 @media (max-width: 820px) {
     .module-gestione_finanziaria .monthly-expense-period-summary-grid {
         grid-template-columns: 1fr;

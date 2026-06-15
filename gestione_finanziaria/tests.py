@@ -5378,6 +5378,13 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(selected_month["residuo"], Decimal("302.00"))
         self.assertEqual(selected_month["spese_count"], 3)
         self.assertEqual(selected_month["insolute_count"], 2)
+        self.assertEqual(len(response.context["selected_category_summary"]), 1)
+        categoria_summary = response.context["selected_category_summary"][0]
+        self.assertEqual(categoria_summary["categoria"], "Servizi generali")
+        self.assertEqual(categoria_summary["count"], 3)
+        self.assertEqual(categoria_summary["totale_previsto"], Decimal("470.50"))
+        self.assertEqual(categoria_summary["totale_pagato"], Decimal("168.50"))
+        self.assertEqual(categoria_summary["totale_residuo"], Decimal("302.00"))
         self.assertEqual(response.context["period_summary"]["totale_entrate"], Decimal("850.00"))
         self.assertEqual(response.context["period_summary"]["totale_uscite"], Decimal("470.50"))
         self.assertEqual(response.context["period_summary"]["differenza"], Decimal("379.50"))
@@ -5387,6 +5394,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Riepilogo totale anno solare 2026")
         self.assertContains(response, "+379,50")
         self.assertContains(response, "monthly-expense-period-delta is-positive")
+        self.assertContains(response, "Riepilogo spese per categoria")
+        self.assertContains(response, "Spese di Mag 2026 raggruppate per categoria.")
         self.assertContains(response, "supplier-invoice-row-unpaid", count=1)
         self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertContains(response, "supplier-invoice-row-paid", count=1)
@@ -5427,7 +5436,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             canale=CanaleMovimento.PREPAGATA,
             incide_su_saldo_banca=True,
         )
-        MovimentoFinanziario.objects.create(
+        uscita_prepagata = MovimentoFinanziario.objects.create(
             conto=prepagata,
             data_contabile=date(2026, 1, 13),
             importo=Decimal("-45.00"),
@@ -5448,6 +5457,11 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.context["selected_introiti"], [incasso])
         self.assertContains(response, "Incasso rette gennaio")
         self.assertNotContains(response, ricarica.descrizione)
+        self.assertEqual(response.context["selected_uscite_movimenti"], [uscita_prepagata])
+        self.assertEqual(response.context["selected_uscite_movimenti_total"], Decimal("45.00"))
+        self.assertContains(response, "Movimenti in uscita di Gen 2026")
+        self.assertContains(response, "Totale movimenti in uscita registrati")
+        self.assertContains(response, "Amazon marketplace")
 
     def test_spese_mensili_dashboard_riepilogo_periodo_mostra_perdita(self):
         categoria = crea_categoria_spesa_test("Utenze")
