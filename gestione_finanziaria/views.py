@@ -3828,11 +3828,20 @@ def _canonical_duplicate_movimento_key(movimento):
         -_link_count_movimento(movimento),
         1 if descrizione_deduplica_debole(movimento.descrizione) else 0,
         -punteggio_descrizione_deduplica(movimento.descrizione),
+        _origine_deduplica_priority(movimento),
         0 if movimento.provider_transaction_id else 1,
         0 if movimento.hash_deduplica else 1,
         0 if movimento.categoria_id else 1,
         movimento.pk,
     )
+
+
+def _origine_deduplica_priority(movimento):
+    if movimento.origine == OrigineMovimento.BANCA:
+        return 0
+    if movimento.origine == OrigineMovimento.IMPORT_FILE:
+        return 1
+    return 2
 
 
 def _movimento_bancario_deduplica_automatica(movimento):
@@ -3887,6 +3896,62 @@ def _aggiungi_chiavi_duplicati_descrizione_debole(movimenti, add_key):
         )
         add_key(key, movimento_debole, reason)
         add_key(key, candidato, reason)
+
+
+def _aggiungi_chiavi_duplicati_origine_diversa(movimenti, add_key):
+    """
+    Segnala coppie import file / sincronizzazione bancaria compatibili.
+
+    La proposta resta volutamente prudente: stesso conto, stesso importo, data
+    vicina e abbinamento univoco per entrambi i movimenti.
+    """
+
+    finestra = timedelta(days=3)
+    origini_compatibili = {OrigineMovimento.IMPORT_FILE, OrigineMovimento.BANCA}
+    movimenti_by_conto_importo = {}
+
+    for movimento in movimenti:
+        if not _movimento_bancario_deduplica_automatica(movimento):
+            continue
+        if movimento.origine not in origini_compatibili:
+            continue
+
+        amount_key = Decimal(movimento.importo).quantize(Decimal("0.01"))
+        group_key = (movimento.conto_id, amount_key)
+        movimenti_by_conto_importo.setdefault(group_key, []).append(movimento)
+
+    reason = "origine diversa: import file / banca, stesso conto e importo entro 3 giorni"
+    for group_movimenti in movimenti_by_conto_importo.values():
+        importati = [movimento for movimento in group_movimenti if movimento.origine == OrigineMovimento.IMPORT_FILE]
+        bancari = [movimento for movimento in group_movimenti if movimento.origine == OrigineMovimento.BANCA]
+        if not importati or not bancari:
+            continue
+
+        coppie_candidate = []
+        for movimento_importato in importati:
+            for movimento_bancario in bancari:
+                if abs(movimento_importato.data_contabile - movimento_bancario.data_contabile) <= finestra:
+                    coppie_candidate.append((movimento_importato, movimento_bancario))
+
+        if not coppie_candidate:
+            continue
+
+        candidate_count_by_id = {}
+        for movimento_importato, movimento_bancario in coppie_candidate:
+            candidate_count_by_id[movimento_importato.pk] = candidate_count_by_id.get(movimento_importato.pk, 0) + 1
+            candidate_count_by_id[movimento_bancario.pk] = candidate_count_by_id.get(movimento_bancario.pk, 0) + 1
+
+        for movimento_importato, movimento_bancario in coppie_candidate:
+            if candidate_count_by_id[movimento_importato.pk] != 1 or candidate_count_by_id[movimento_bancario.pk] != 1:
+                continue
+
+            key = (
+                "cross-origin-bank-import",
+                min(movimento_importato.pk, movimento_bancario.pk),
+                max(movimento_importato.pk, movimento_bancario.pk),
+            )
+            add_key(key, movimento_importato, reason)
+            add_key(key, movimento_bancario, reason)
 
 
 def _movimenti_finanziari_duplicate_groups():
@@ -3951,6 +4016,7 @@ def _movimenti_finanziari_duplicate_groups():
             )
 
     _aggiungi_chiavi_duplicati_descrizione_debole(movimenti, add_key)
+    _aggiungi_chiavi_duplicati_origine_diversa(movimenti, add_key)
 
     for ids in key_to_ids.values():
         if len(ids) <= 1:

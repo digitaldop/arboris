@@ -1168,6 +1168,69 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertIn(f'name="selected_ids" value="{movimento_generico.pk}"', content)
         self.assertNotIn(f'name="selected_ids" value="{movimento_dettagliato.pk}"', content)
 
+    def test_pulizia_duplicati_movimenti_propone_import_file_e_banca_simili(self):
+        conto = ContoBancario.objects.create(nome_conto="Banco BPM")
+        movimento_importato = MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 6, 12),
+            importo=Decimal("-42.00"),
+            descrizione="Pagamento POS 1234",
+            hash_deduplica="hash-import-pos-1234",
+            incide_su_saldo_banca=True,
+        )
+        movimento_bancario = MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 13),
+            importo=Decimal("-42.00"),
+            descrizione="Transazione carta 1234",
+            provider_transaction_id="bank-pos-1234",
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "origine diversa: import file / banca")
+        self.assertContains(response, "Import estratto conto")
+        self.assertContains(response, "Movimento bancario")
+        content = response.content.decode()
+        self.assertIn(f'name="selected_ids" value="{movimento_importato.pk}"', content)
+        self.assertNotIn(f'name="selected_ids" value="{movimento_bancario.pk}"', content)
+
+    def test_pulizia_duplicati_movimenti_non_propone_import_banca_ambigui(self):
+        conto = ContoBancario.objects.create(nome_conto="Banco BPM")
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.IMPORT_FILE,
+            data_contabile=date(2026, 6, 12),
+            importo=Decimal("-42.00"),
+            descrizione="Pagamento POS 1234",
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 13),
+            importo=Decimal("-42.00"),
+            descrizione="Transazione carta 1234",
+            incide_su_saldo_banca=True,
+        )
+        MovimentoFinanziario.objects.create(
+            conto=conto,
+            origine=OrigineMovimento.BANCA,
+            data_contabile=date(2026, 6, 14),
+            importo=Decimal("-42.00"),
+            descrizione="Transazione carta 5678",
+            incide_su_saldo_banca=True,
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "origine diversa: import file / banca")
+
     def test_pulizia_duplicati_movimenti_non_propone_causale_generica_ambigua(self):
         conto = ContoBancario.objects.create(nome_conto="Banco BPM")
         MovimentoFinanziario.objects.create(
