@@ -1,0 +1,115 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
+
+{% block title %}Annulla riconciliazione rata - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    {% if not popup %}
+        <div class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'lista_rate_iscrizione' %}">Rate iscrizione</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <a href="{% url 'modifica_rata_iscrizione' rata.pk %}">{{ rata.display_label }}</a>
+            <span class="breadcrumb-sep">&gt;</span>
+            <span>Annulla riconciliazione</span>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    <section class="page-head anagrafica-page-head">
+        <div>
+            <div class="anagrafica-eyebrow">
+                <span class="anagrafica-eyebrow-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+                </span>
+                <span>Rata iscrizione</span>
+            </div>
+            <h1 class="page-title">Annulla riconciliazione</h1>
+            <p class="page-subtitle">{{ rata.display_label }} - {{ rata.iscrizione.studente }} - {{ rata.display_period_label }}</p>
+        </div>
+        <div class="page-head-actions">
+            <a href="{{ next_url }}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span>Indietro</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="content-card">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">{{ rata.importo_finale|euro }} &euro;</div>
+                <div class="summary-label">Importo finale</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ rata.importo_pagato|euro }} &euro;</div>
+                <div class="summary-label">Pagato attuale</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value">{{ totale_riconciliato_rata|euro }} &euro;</div>
+                <div class="summary-label">Importo riconciliato</div>
+            </div>
+        </div>
+        <p class="help-text">L'annullamento rimuove il collegamento tra questa rata e i movimenti bancari indicati. La rata verra aggiornata riducendo il pagato degli importi riconciliati.</p>
+    </section>
+
+    <section class="content-card">
+        <h2 class="section-title">Collegamenti da annullare</h2>
+        {% if ha_riconciliazioni_rata %}
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Movimento</th>
+                        <th>Importo movimento</th>
+                        <th>Importo collegato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for link in riconciliazioni_rata %}
+                        <tr>
+                            <td>Riconciliazione rata</td>
+                            <td>
+                                {{ link.movimento.data_contabile|date:"d/m/Y"|default:"-" }}
+                                - {{ link.movimento.descrizione|default:"Movimento senza descrizione" }}
+                                {% if link.movimento.controparte %}<br><span class="table-muted">{{ link.movimento.controparte }}</span>{% endif %}
+                            </td>
+                            <td>{{ link.movimento.importo|euro }} &euro;</td>
+                            <td>{{ link.importo|euro }} &euro;</td>
+                        </tr>
+                    {% endfor %}
+                    {% for movimento in movimenti_diretti_rata %}
+                        <tr>
+                            <td>Collegamento diretto</td>
+                            <td>
+                                {{ movimento.data_contabile|date:"d/m/Y"|default:"-" }}
+                                - {{ movimento.descrizione|default:"Movimento senza descrizione" }}
+                                {% if movimento.controparte %}<br><span class="table-muted">{{ movimento.controparte }}</span>{% endif %}
+                            </td>
+                            <td>{{ movimento.importo|euro }} &euro;</td>
+                            <td><span class="table-muted">Non disponibile</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <form method="post" class="form-actions">
+                {% csrf_token %}
+                {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+                <button type="submit" class="btn btn-danger btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span>Annulla riconciliazione</span>
+                </button>
+                <a href="{{ next_url }}" class="btn btn-secondary">Mantieni collegamento</a>
+            </form>
+        {% else %}
+            <div class="empty-state">Questa rata non ha riconciliazioni da annullare.</div>
+            <div class="form-actions">
+                <a href="{{ next_url }}" class="btn btn-secondary">Torna alla rata</a>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

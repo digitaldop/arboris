@@ -2627,6 +2627,72 @@ def annulla_riconciliazione(movimento):
     return movimento
 
 
+@transaction.atomic
+def annulla_riconciliazione_rata(rata):
+    if rata is None or not getattr(rata, "pk", None):
+        raise ValidationError("Rata non valida.")
+
+    from .models import RiconciliazioneRataMovimento
+
+    rata = rata.__class__.objects.select_for_update().get(pk=rata.pk)
+    links = list(
+        RiconciliazioneRataMovimento.objects.select_for_update()
+        .select_related("movimento")
+        .filter(rata=rata)
+    )
+    movimenti_da_aggiornare = {link.movimento_id: link.movimento for link in links}
+    movimenti_con_link_ids = set(movimenti_da_aggiornare)
+    movimenti_diretti = list(
+        rata.movimenti_finanziari.select_for_update()
+        .exclude(pk__in=movimenti_con_link_ids)
+    )
+    for movimento in movimenti_diretti:
+        movimenti_da_aggiornare[movimento.pk] = movimento
+
+    if not links and not movimenti_diretti:
+        return {
+            "links_annullati": 0,
+            "movimenti_aggiornati": 0,
+            "importo_annullato": Decimal("0.00"),
+            "movimenti_diretti": 0,
+        }
+
+    importo_annullato = sum((link.importo for link in links), Decimal("0.00"))
+    if importo_annullato > 0:
+        rata.importo_pagato = max((rata.importo_pagato or Decimal("0.00")) - importo_annullato, Decimal("0.00"))
+        importo_finale = rata.importo_finale or Decimal("0.00")
+        rata.pagata = importo_finale <= 0 or rata.importo_pagato >= importo_finale - _TOLLERANZA_IMPORTO_ESATTO
+        if rata.importo_pagato <= 0:
+            rata.data_pagamento = None
+        rata.save(update_fields=["importo_pagato", "pagata", "data_pagamento", "importo_finale"])
+
+    if links:
+        RiconciliazioneRataMovimento.objects.filter(pk__in=[link.pk for link in links]).delete()
+
+    for movimento in movimenti_da_aggiornare.values():
+        movimento = movimento.__class__.objects.select_for_update().get(pk=movimento.pk)
+        _clear_importo_movimento_disponibile_cache(movimento)
+        links_rimasti = list(movimento.riconciliazioni_rate.select_related("rata"))
+        residuo = importo_movimento_disponibile(movimento)
+        nuova_rata_diretta = (
+            links_rimasti[0].rata
+            if len(links_rimasti) == 1 and residuo <= _TOLLERANZA_IMPORTO_ESATTO
+            else None
+        )
+        nuova_rata_diretta_id = nuova_rata_diretta.pk if nuova_rata_diretta else None
+        if movimento.rata_iscrizione_id == rata.pk or movimento.rata_iscrizione_id != nuova_rata_diretta_id:
+            movimento.rata_iscrizione = nuova_rata_diretta
+            movimento.save(update_fields=["rata_iscrizione", "data_aggiornamento"])
+        aggiorna_stato_riconciliazione_movimento(movimento)
+
+    return {
+        "links_annullati": len(links),
+        "movimenti_aggiornati": len(movimenti_da_aggiornare),
+        "importo_annullato": importo_annullato,
+        "movimenti_diretti": len(movimenti_diretti),
+    }
+
+
 # =========================================================================
 #  Documenti e pagamenti fornitori
 # =========================================================================

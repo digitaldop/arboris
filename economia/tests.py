@@ -53,6 +53,7 @@ from economia.services import (
     rimodula_rate_future,
 )
 from gestione_finanziaria.models import MovimentoFinanziario, StatoRiconciliazione
+from gestione_finanziaria.services import riconcilia_movimento_con_rate
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import (
     ComunicazioneFamigliaLog,
@@ -1165,6 +1166,28 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertContains(response, "Collega un pagamento")
         self.assertContains(response, f'href="{reconciliation_url}"')
         self.assertContains(response, f'data-popup-url="{reconciliation_url}"')
+        self.assertNotContains(response, "Annulla riconciliazione")
+
+    def test_rate_detail_has_cancel_reconciliation_button_when_linked(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta Luca Bianchi",
+            controparte="Bianchi Luca",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        riconcilia_movimento_con_rate(movimento, [(rata, rata.importo_finale)])
+        cancel_url = reverse("annulla_riconciliazione_rata_iscrizione", kwargs={"pk": rata.pk})
+
+        response = self.client.get(reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Annulla riconciliazione")
+        self.assertContains(response, cancel_url)
 
     def test_rate_detail_preserves_back_url_after_save(self):
         User.objects.create_superuser(username="admin", password="admin")
@@ -1195,6 +1218,63 @@ class RateCustomizationAndRemodulationTests(TestCase):
         )
 
         self.assertRedirects(response, source_url, fetch_redirect_response=False)
+
+    def test_cancel_rate_reconciliation_detaches_only_selected_rate(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        sorella = Studente.objects.create(nome="Marta", cognome="Bianchi")
+        iscrizione_sorella = Iscrizione.objects.create(
+            studente=sorella,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+        )
+        self.iscrizione.sync_rate_schedule()
+        iscrizione_sorella.sync_rate_schedule()
+        rata_luca = self.iscrizione.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+        )
+        rata_marta = iscrizione_sorella.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            mese_riferimento=9,
+            anno_riferimento=2025,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 9, 10),
+            importo=rata_luca.importo_finale + rata_marta.importo_finale,
+            descrizione="Bonifico rette Luca Bianchi e Marta Bianchi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        riconcilia_movimento_con_rate(
+            movimento,
+            [
+                (rata_luca, rata_luca.importo_finale),
+                (rata_marta, rata_marta.importo_finale),
+            ],
+        )
+        detail_url = reverse("modifica_rata_iscrizione", kwargs={"pk": rata_luca.pk})
+
+        response = self.client.post(
+            reverse("annulla_riconciliazione_rata_iscrizione", kwargs={"pk": rata_luca.pk}),
+            {"next": detail_url},
+        )
+
+        self.assertRedirects(response, detail_url, fetch_redirect_response=False)
+        rata_luca.refresh_from_db()
+        rata_marta.refresh_from_db()
+        movimento.refresh_from_db()
+        self.assertEqual(rata_luca.importo_pagato, Decimal("0.00"))
+        self.assertFalse(rata_luca.pagata)
+        self.assertFalse(rata_luca.riconciliazioni_movimenti.exists())
+        self.assertEqual(rata_marta.importo_pagato, rata_marta.importo_finale)
+        self.assertTrue(rata_marta.pagata)
+        self.assertEqual(rata_marta.riconciliazioni_movimenti.count(), 1)
+        self.assertEqual(movimento.riconciliazioni_rate.count(), 1)
+        self.assertEqual(movimento.riconciliazioni_rate.get().rata_id, rata_marta.pk)
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
 
 @skip("Legacy test basato sulla tabella anagrafica.Famiglia rimossa.")
 class EconomiaBatchRateTests(TestCase):

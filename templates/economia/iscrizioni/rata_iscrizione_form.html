@@ -52,6 +52,15 @@
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
                     <span class="btn-label">Collega un pagamento</span>
                 </a>
+                {% if ha_riconciliazioni_rata %}
+                    <a
+                        href="{% url 'annulla_riconciliazione_rata_iscrizione' rata.pk %}?next={{ request.get_full_path|urlencode }}{% if popup %}&popup=1{% endif %}"
+                        class="btn btn-danger btn-icon-text"
+                    >
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                        <span class="btn-label">Annulla riconciliazione</span>
+                    </a>
+                {% endif %}
                 <button type="button" class="btn btn-primary btn-icon-text" id="enable-edit-rata-btn">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
                     <span class="btn-label">Modifica</span>

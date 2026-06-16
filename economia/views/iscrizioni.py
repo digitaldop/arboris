@@ -46,6 +46,7 @@ from scuola.utils import resolve_default_anno_scolastico
 from arboris.form_widgets import italian_decimal_to_python
 from gestione_finanziaria.models import MovimentoFinanziario
 from gestione_finanziaria.services import (
+    annulla_riconciliazione_rata,
     applica_proposta_riconciliazione,
     crea_proposta_riconciliazione,
     importo_movimento_disponibile,
@@ -84,6 +85,25 @@ def _cap_allocazione_rata_singola_a_disponibile_movimento(movimento, allocazioni
     if importo_riconciliabile <= Decimal("0.00"):
         return allocazioni
     return [(movimento, rata, target_tipo, importo_riconciliabile)]
+
+
+def _rata_riconciliazione_context(rata):
+    riconciliazioni = list(
+        rata.riconciliazioni_movimenti.select_related("movimento", "movimento__conto")
+        .order_by("-data_creazione", "-id")
+    )
+    movimenti_con_link_ids = [link.movimento_id for link in riconciliazioni]
+    movimenti_diretti = list(
+        rata.movimenti_finanziari.select_related("conto")
+        .exclude(pk__in=movimenti_con_link_ids)
+        .order_by("-data_contabile", "-id")
+    )
+    return {
+        "riconciliazioni_rata": riconciliazioni,
+        "movimenti_diretti_rata": movimenti_diretti,
+        "ha_riconciliazioni_rata": bool(riconciliazioni or movimenti_diretti),
+        "totale_riconciliato_rata": sum((link.importo for link in riconciliazioni), Decimal("0.00")),
+    }
 
 
 def get_stato_ritirato():
@@ -1023,6 +1043,7 @@ def modifica_rata_iscrizione(request, pk):
         form = RataIscrizionePagamentoForm(instance=rata)
 
     rata_residuo = max((rata.importo_finale or Decimal("0.00")) - (rata.importo_pagato or Decimal("0.00")), Decimal("0.00"))
+    riconciliazione_context = _rata_riconciliazione_context(rata)
 
     return render(
         request,
@@ -1034,6 +1055,57 @@ def modifica_rata_iscrizione(request, pk):
             "back_url": back_url,
             "popup": popup,
             "rata_residuo": rata_residuo,
+            **riconciliazione_context,
+        },
+    )
+
+
+def annulla_riconciliazione_rata_iscrizione(request, pk):
+    rata = get_object_or_404(
+        RataIscrizione.objects.select_related(
+            "iscrizione",
+            "iscrizione__studente",
+            "iscrizione__anno_scolastico",
+        ),
+        pk=pk,
+    )
+    popup = is_popup_request(request)
+    fallback_url = reverse("modifica_rata_iscrizione", kwargs={"pk": rata.pk})
+    if popup:
+        fallback_url = f"{fallback_url}?popup=1"
+    next_url = get_safe_next_url(request, fallback_url)
+    riconciliazione_context = _rata_riconciliazione_context(rata)
+
+    if request.method == "POST":
+        if not riconciliazione_context["ha_riconciliazioni_rata"]:
+            messages.info(request, "La rata non ha riconciliazioni da annullare.")
+            return redirect(next_url)
+
+        try:
+            risultato = annulla_riconciliazione_rata(rata)
+        except ValidationError as exc:
+            messaggio = " ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
+            messages.error(request, messaggio)
+            return redirect(next_url)
+
+        dettagli = []
+        if risultato["links_annullati"]:
+            dettagli.append(f"{risultato['links_annullati']} collegamento/i analitico/i")
+        if risultato["movimenti_diretti"]:
+            dettagli.append(f"{risultato['movimenti_diretti']} collegamento/i diretto/i")
+        if not dettagli:
+            dettagli.append(f"{risultato['movimenti_aggiornati']} movimento/i aggiornato/i")
+        messages.success(request, "Riconciliazione rata annullata: " + ", ".join(dettagli) + ".")
+        return redirect(next_url)
+
+    return render(
+        request,
+        "economia/iscrizioni/rata_iscrizione_annulla_riconciliazione.html",
+        {
+            "rata": rata,
+            "popup": popup,
+            "next_url": next_url,
+            **riconciliazione_context,
         },
     )
 
