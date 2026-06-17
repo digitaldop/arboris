@@ -1112,6 +1112,10 @@ def _documento_importo_key(documento):
     return (documento.totale or Decimal("0.00")).quantize(Decimal("0.01"))
 
 
+def _money_key(value):
+    return (value or Decimal("0.00")).quantize(Decimal("0.01"))
+
+
 def _documento_data_ricezione_key(documento):
     return documento.data_ricezione_effettiva
 
@@ -1328,6 +1332,180 @@ def _documenti_fornitori_duplicate_groups():
     )
 
 
+def _scadenza_fornitore_link_count(scadenza):
+    return (
+        (getattr(scadenza, "dedup_pagamenti_count", 0) or 0)
+        + (1 if scadenza.movimento_finanziario_id else 0)
+        + (1 if scadenza.conto_bancario_id else 0)
+    )
+
+
+def _scadenza_fornitore_links_label(scadenza):
+    labels = []
+    pagamenti_count = getattr(scadenza, "dedup_pagamenti_count", 0) or 0
+    if pagamenti_count:
+        labels.append(f"{pagamenti_count} pagamento/i")
+    if scadenza.movimento_finanziario_id:
+        labels.append("movimento")
+    if scadenza.conto_bancario_id:
+        labels.append("conto")
+    return ", ".join(labels) if labels else "nessun collegamento"
+
+
+def _canonical_duplicate_scadenza_key(scadenza):
+    return (
+        -_scadenza_fornitore_link_count(scadenza),
+        0 if (scadenza.importo_pagato or Decimal("0.00")) > Decimal("0.00") else 1,
+        0 if scadenza.stato == StatoScadenzaFornitore.PAGATA else 1,
+        scadenza.pk,
+    )
+
+
+def _scadenze_fornitori_duplicate_groups():
+    scadenze = list(
+        ScadenzaPagamentoFornitore.objects.select_related(
+            "documento",
+            "documento__fornitore",
+            "documento__categoria_spesa",
+            "documento__fornitore__categoria_spesa",
+            "conto_bancario",
+            "movimento_finanziario",
+        )
+        .annotate(dedup_pagamenti_count=Count("pagamenti", distinct=True))
+        .order_by("data_scadenza", "id")
+    )
+    if not scadenze:
+        return []
+
+    scadenze_by_id = {scadenza.pk: scadenza for scadenza in scadenze}
+    parent = {scadenza.pk: scadenza.pk for scadenza in scadenze}
+    key_to_ids = {}
+    key_to_reason = {}
+
+    def find(item_id):
+        while parent[item_id] != item_id:
+            parent[item_id] = parent[parent[item_id]]
+            item_id = parent[item_id]
+        return item_id
+
+    def union(first_id, second_id):
+        first_root = find(first_id)
+        second_root = find(second_id)
+        if first_root != second_root:
+            parent[second_root] = first_root
+
+    def add_key(key, scadenza, reason):
+        key_to_ids.setdefault(key, []).append(scadenza.pk)
+        key_to_reason.setdefault(key, reason)
+
+    for scadenza in scadenze:
+        documento = scadenza.documento
+        numero_norm = _normalizza_numero_documento_deduplica(documento.numero_documento)
+        if not numero_norm:
+            continue
+
+        importo_previsto_key = _money_key(scadenza.importo_previsto)
+        importo_pagato_key = _money_key(scadenza.importo_pagato)
+        descrizione_norm = _normalizza_testo_documento_deduplica(documento.descrizione)
+        data_ricezione_key = documento.data_ricezione_effettiva
+
+        add_key(
+            ("same-document-due-amount", scadenza.documento_id, scadenza.data_scadenza, importo_previsto_key),
+            scadenza,
+            "stessa fattura, scadenza e importo",
+        )
+        add_key(
+            (
+                "document-number-due-amount",
+                documento.fornitore_id,
+                numero_norm,
+                scadenza.data_scadenza,
+                importo_previsto_key,
+            ),
+            scadenza,
+            "stesso fornitore, numero fattura, scadenza e importo",
+        )
+        add_key(
+            (
+                "due-core-number",
+                documento.fornitore_id,
+                documento.data_documento,
+                data_ricezione_key,
+                scadenza.data_scadenza,
+                importo_previsto_key,
+                importo_pagato_key,
+                numero_norm,
+            ),
+            scadenza,
+            "stessi dati fattura, ricezione, scadenza, importi e numero",
+        )
+        if descrizione_norm:
+            add_key(
+                (
+                    "due-core-description",
+                    documento.fornitore_id,
+                    documento.data_documento,
+                    data_ricezione_key,
+                    scadenza.data_scadenza,
+                    importo_previsto_key,
+                    importo_pagato_key,
+                    descrizione_norm,
+                ),
+                scadenza,
+                "stessi dati fattura, ricezione, scadenza, importi e descrizione",
+            )
+
+    for ids in key_to_ids.values():
+        if len(ids) <= 1:
+            continue
+        first_id = ids[0]
+        for item_id in ids[1:]:
+            union(first_id, item_id)
+
+    component_ids = {}
+    component_reasons = {}
+    for key, ids in key_to_ids.items():
+        if len(ids) <= 1:
+            continue
+        root = find(ids[0])
+        component_ids.setdefault(root, set()).update(ids)
+        component_reasons.setdefault(root, set()).add(key_to_reason[key])
+
+    groups = []
+    for root, ids in component_ids.items():
+        component_scadenze = [scadenze_by_id[item_id] for item_id in ids if item_id in scadenze_by_id]
+        if len(component_scadenze) <= 1:
+            continue
+
+        for scadenza in component_scadenze:
+            scadenza.dedup_links_label = _scadenza_fornitore_links_label(scadenza)
+
+        keep = sorted(component_scadenze, key=_canonical_duplicate_scadenza_key)[0]
+        duplicati = sorted(
+            [scadenza for scadenza in component_scadenze if scadenza.pk != keep.pk],
+            key=lambda scadenza: (scadenza.data_scadenza, scadenza.pk),
+        )
+        reasons = sorted(component_reasons.get(root, []))
+        groups.append(
+            {
+                "key": root,
+                "keep": keep,
+                "duplicati": duplicati,
+                "scadenze": [keep, *duplicati],
+                "motivi": reasons,
+                "motivo_label": "; ".join(reasons),
+                "totale_count": len(component_scadenze),
+                "duplicati_count": len(duplicati),
+            }
+        )
+
+    return sorted(
+        groups,
+        key=lambda group: (group["keep"].data_scadenza, group["keep"].pk),
+        reverse=True,
+    )
+
+
 def _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs):
     if not duplicate_pairs:
         return 0
@@ -1354,30 +1532,72 @@ def _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs):
     return len(eliminati_ids)
 
 
+def _esegui_pulizia_duplicati_scadenze_fornitori(duplicate_pairs):
+    if not duplicate_pairs:
+        return 0
+
+    duplicati_ids = [duplicato_id for duplicato_id, _keep_id in duplicate_pairs]
+    keep_ids = [keep_id for _duplicato_id, keep_id in duplicate_pairs]
+    eliminati_ids = []
+    documenti_da_aggiornare_ids = set()
+
+    with transaction.atomic():
+        scadenze = {
+            scadenza.pk: scadenza
+            for scadenza in ScadenzaPagamentoFornitore.objects.select_for_update().filter(
+                pk__in=set(duplicati_ids + keep_ids)
+            )
+        }
+        for duplicato_id, keep_id in duplicate_pairs:
+            scadenza_duplicata = scadenze.get(duplicato_id)
+            scadenza_keep = scadenze.get(keep_id)
+            if not scadenza_duplicata or not scadenza_keep or scadenza_duplicata.pk == scadenza_keep.pk:
+                continue
+            eliminati_ids.append(scadenza_duplicata.pk)
+            documenti_da_aggiornare_ids.add(scadenza_duplicata.documento_id)
+            documenti_da_aggiornare_ids.add(scadenza_keep.documento_id)
+
+        if eliminati_ids:
+            ScadenzaPagamentoFornitore.objects.filter(pk__in=eliminati_ids).delete()
+
+    for documento in DocumentoFornitore.objects.filter(pk__in=documenti_da_aggiornare_ids):
+        service_aggiorna_stato_documento_da_scadenze(documento)
+
+    return len(eliminati_ids)
+
+
 def pulizia_duplicati_documenti_fornitori(request):
     duplicate_groups = _documenti_fornitori_duplicate_groups()
+    scadenza_duplicate_groups = _scadenze_fornitori_duplicate_groups()
     duplicati_count = sum(group["duplicati_count"] for group in duplicate_groups)
+    scadenze_duplicati_count = sum(group["duplicati_count"] for group in scadenza_duplicate_groups)
 
     if request.method == "POST":
         selected_ids = _ids_selezionati_da_post(request)
-        keep_choices = _duplicate_keep_choices_from_post(duplicate_groups, request.POST)
-        duplicate_pairs = _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices)
+        pulizia_tipo = request.POST.get("tipo") or "documenti"
+        active_groups = scadenza_duplicate_groups if pulizia_tipo == "scadenze" else duplicate_groups
+        keep_choices = _duplicate_keep_choices_from_post(active_groups, request.POST)
+        duplicate_pairs = _selected_duplicate_pairs(active_groups, selected_ids, keep_choices)
 
-        if not duplicate_groups:
+        if not duplicate_groups and not scadenza_duplicate_groups:
             messages.info(request, "Non ci sono duplicati da pulire.")
             return redirect("fatture_scadenze_fornitori")
         if not duplicate_pairs:
             messages.info(request, "Nessun duplicato selezionato per l'eliminazione.")
             return redirect("pulizia_duplicati_documenti_fornitori")
 
-        eliminati = _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs)
+        if pulizia_tipo == "scadenze":
+            eliminati = _esegui_pulizia_duplicati_scadenze_fornitori(duplicate_pairs)
+        else:
+            eliminati = _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs)
         if eliminati:
+            oggetto = "scadenze fornitore" if pulizia_tipo == "scadenze" else "fatture fornitore"
             messages.success(
                 request,
-                f"Pulizia duplicati completata: eliminate {eliminati} fatture fornitore duplicate.",
+                f"Pulizia duplicati completata: eliminate {eliminati} {oggetto} duplicate.",
             )
         else:
-            messages.info(request, "Nessuna fattura duplicata e' stata eliminata.")
+            messages.info(request, "Nessun duplicato e' stato eliminato.")
         return redirect("fatture_scadenze_fornitori")
 
     return render(
@@ -1385,8 +1605,11 @@ def pulizia_duplicati_documenti_fornitori(request):
         "gestione_finanziaria/documenti_fornitori_duplicati.html",
         {
             "duplicate_groups": duplicate_groups,
+            "scadenza_duplicate_groups": scadenza_duplicate_groups,
             "gruppi_count": len(duplicate_groups),
+            "scadenze_gruppi_count": len(scadenza_duplicate_groups),
             "duplicati_count": duplicati_count,
+            "scadenze_duplicati_count": scadenze_duplicati_count,
         },
     )
 
@@ -4380,7 +4603,7 @@ def _duplicate_keep_choices_from_post(duplicate_groups, post_data):
 
 
 def _duplicate_group_items(group):
-    return group.get("movimenti") or group.get("documenti") or []
+    return group.get("movimenti") or group.get("documenti") or group.get("scadenze") or []
 
 
 def _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices=None):

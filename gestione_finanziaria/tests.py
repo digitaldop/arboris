@@ -2588,6 +2588,69 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertIn(f'value="{documento_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
         self.assertIn(f'value="{documento_duplicato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
 
+    def test_pulizia_duplicati_documenti_fornitori_riconosce_scadenze_duplicate_stessa_fattura(self):
+        fornitore = Fornitore.objects.create(denominazione="Duferco Energia Spa")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="00126FT02140128",
+            data_documento=date(2026, 6, 24),
+            data_ricezione=date(2026, 6, 24),
+            descrizione="Fattura energia",
+            totale=Decimal("213.47"),
+        )
+        scadenza_keep = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 7, 9),
+            importo_previsto=Decimal("213.47"),
+        )
+        scadenza_duplicata = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 7, 9),
+            importo_previsto=Decimal("213.47"),
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_documenti_fornitori"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Gruppo scadenze duplicate #1")
+        self.assertContains(response, "stessa fattura, scadenza e importo")
+        content = response.content.decode()
+        self.assertIn(f'value="{scadenza_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
+        self.assertIn(f'value="{scadenza_duplicata.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
+
+    def test_pulizia_duplicati_documenti_fornitori_elimina_scadenza_duplicata_senza_cancellare_fattura(self):
+        fornitore = Fornitore.objects.create(denominazione="Duferco Energia Spa")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="00126FT02140128",
+            data_documento=date(2026, 6, 24),
+            data_ricezione=date(2026, 6, 24),
+            totale=Decimal("213.47"),
+        )
+        scadenza_keep = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 7, 9),
+            importo_previsto=Decimal("213.47"),
+        )
+        scadenza_duplicata = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 7, 9),
+            importo_previsto=Decimal("213.47"),
+        )
+
+        response = self.client.post(
+            reverse("pulizia_duplicati_documenti_fornitori"),
+            {
+                "tipo": "scadenze",
+                "selected_ids": [str(scadenza_duplicata.pk)],
+            },
+        )
+
+        self.assertRedirects(response, reverse("fatture_scadenze_fornitori"))
+        self.assertTrue(DocumentoFornitore.objects.filter(pk=documento.pk).exists())
+        self.assertTrue(ScadenzaPagamentoFornitore.objects.filter(pk=scadenza_keep.pk).exists())
+        self.assertFalse(ScadenzaPagamentoFornitore.objects.filter(pk=scadenza_duplicata.pk).exists())
+
     def test_pulizia_duplicati_documenti_fornitori_elimina_solo_selezionati(self):
         fornitore = Fornitore.objects.create(denominazione="CAMST")
         documento_keep = DocumentoFornitore.objects.create(
