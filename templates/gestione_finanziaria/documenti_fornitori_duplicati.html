@@ -91,7 +91,9 @@
                                     <th>Ruolo</th>
                                     <th>Fattura</th>
                                     <th>Fornitore</th>
-                                    <th>Data</th>
+                                    <th>Data fattura</th>
+                                    <th>Ricezione</th>
+                                    <th>Scadenza</th>
                                     <th class="column-right">Totale</th>
                                     <th>Origine</th>
                                     <th>Stato</th>
@@ -119,6 +121,8 @@
                                         </td>
                                         <td>{{ documento.fornitore.denominazione }}</td>
                                         <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                                        <td>{{ documento.data_ricezione_effettiva|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>{{ documento.dedup_data_scadenza_prima|date:"d/m/Y"|default:"-" }}</td>
                                         <td class="column-right">{{ documento.totale|euro }} &euro;</td>
                                         <td>
                                             {{ documento.get_origine_display }}

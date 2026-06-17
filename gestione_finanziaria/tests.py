@@ -2524,6 +2524,70 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertIn(f'value="{documento_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
         self.assertIn(f'value="{documento_duplicato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
 
+    def test_pulizia_duplicati_documenti_fornitori_usa_numero_fattura_come_segnale_forte(self):
+        fornitore = Fornitore.objects.create(denominazione="CAMST")
+        documento_keep = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="42/A",
+            data_documento=date(2026, 1, 31),
+            data_ricezione=date(2026, 2, 1),
+            descrizione="Servizio mensa gennaio",
+            totale=Decimal("122.00"),
+        )
+        documento_duplicato = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="42 A",
+            data_documento=date(2026, 2, 3),
+            data_ricezione=date(2026, 2, 4),
+            descrizione="Mensa CAMST",
+            totale=Decimal("130.00"),
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_documenti_fornitori"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "stesso fornitore e numero fattura normalizzato")
+        content = response.content.decode()
+        self.assertIn(f'value="{documento_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
+        self.assertIn(f'value="{documento_duplicato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
+
+    def test_pulizia_duplicati_documenti_fornitori_confronta_date_scadenza_importo_e_descrizione(self):
+        fornitore = Fornitore.objects.create(denominazione="CAMST")
+        documento_keep = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FT-100",
+            data_documento=date(2026, 1, 31),
+            data_ricezione=date(2026, 2, 1),
+            descrizione="Servizio mensa gennaio",
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_keep,
+            data_scadenza=date(2026, 2, 28),
+            importo_previsto=Decimal("122.00"),
+        )
+        documento_duplicato = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="FT-101",
+            data_documento=date(2026, 1, 31),
+            data_ricezione=date(2026, 2, 1),
+            descrizione="Servizio mensa gennaio",
+            totale=Decimal("122.00"),
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_duplicato,
+            data_scadenza=date(2026, 2, 28),
+            importo_previsto=Decimal("122.00"),
+        )
+
+        response = self.client.get(reverse("pulizia_duplicati_documenti_fornitori"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "stessi dati fattura, ricezione, scadenza, importo e descrizione")
+        content = response.content.decode()
+        self.assertIn(f'value="{documento_keep.pk}" data-bulk-checkbox data-duplicate-delete disabled', content)
+        self.assertIn(f'value="{documento_duplicato.pk}" data-bulk-checkbox data-duplicate-delete checked', content)
+
     def test_pulizia_duplicati_documenti_fornitori_elimina_solo_selezionati(self):
         fornitore = Fornitore.objects.create(denominazione="CAMST")
         documento_keep = DocumentoFornitore.objects.create(

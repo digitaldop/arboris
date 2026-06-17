@@ -1112,6 +1112,14 @@ def _documento_importo_key(documento):
     return (documento.totale or Decimal("0.00")).quantize(Decimal("0.01"))
 
 
+def _documento_data_ricezione_key(documento):
+    return documento.data_ricezione_effettiva
+
+
+def _documento_scadenza_key(documento):
+    return getattr(documento, "dedup_data_scadenza_prima", None)
+
+
 def _documento_fornitore_origin_priority(documento):
     if documento.origine == OrigineDocumentoFornitore.FATTURE_IN_CLOUD:
         return 0
@@ -1150,6 +1158,7 @@ def _documenti_fornitori_duplicate_groups():
         .annotate(
             dedup_scadenze_count=Count("scadenze", distinct=True),
             dedup_pagamenti_count=Count("scadenze__pagamenti", distinct=True),
+            dedup_data_scadenza_prima=Min("scadenze__data_scadenza"),
         )
         .order_by("data_documento", "id")
     )
@@ -1184,18 +1193,40 @@ def _documenti_fornitori_duplicate_groups():
             continue
 
         importo_key = _documento_importo_key(documento)
-        base_key = (documento.fornitore_id, documento.tipo_documento, numero_norm)
+        data_ricezione_key = _documento_data_ricezione_key(documento)
+        scadenza_key = _documento_scadenza_key(documento)
+        descrizione_norm = _normalizza_testo_documento_deduplica(documento.descrizione)
+        base_number_key = (documento.fornitore_id, numero_norm)
+        base_typed_key = (documento.fornitore_id, documento.tipo_documento, numero_norm)
         add_key(
-            ("document-number-date", *base_key, documento.data_documento),
+            ("document-number", *base_number_key),
+            documento,
+            "stesso fornitore e numero fattura normalizzato",
+        )
+        add_key(
+            ("document-number-date", *base_typed_key, documento.data_documento),
             documento,
             "stesso fornitore, tipo, numero normalizzato e data documento",
         )
         add_key(
-            ("document-number-year-total", *base_key, documento.data_documento.year, importo_key),
+            ("document-number-year-total", *base_typed_key, documento.data_documento.year, importo_key),
             documento,
             "stesso fornitore, tipo, numero normalizzato, anno e totale",
         )
-        close_date_candidates.setdefault((*base_key, importo_key), []).append(documento)
+        add_key(
+            (
+                "document-core-number",
+                documento.fornitore_id,
+                documento.data_documento,
+                data_ricezione_key,
+                scadenza_key,
+                importo_key,
+                numero_norm,
+            ),
+            documento,
+            "stessi dati fattura, ricezione, scadenza, importo e numero",
+        )
+        close_date_candidates.setdefault((*base_typed_key, importo_key), []).append(documento)
 
         external_source = (documento.external_source or "").strip()
         external_id = (documento.external_id or "").strip()
@@ -1206,7 +1237,6 @@ def _documenti_fornitori_duplicate_groups():
                 "stesso identificativo esterno",
             )
 
-        descrizione_norm = _normalizza_testo_documento_deduplica(documento.descrizione)
         if descrizione_norm and importo_key != Decimal("0.00"):
             add_key(
                 (
@@ -1219,6 +1249,19 @@ def _documenti_fornitori_duplicate_groups():
                 ),
                 documento,
                 "stesso fornitore, descrizione, data e totale",
+            )
+            add_key(
+                (
+                    "document-core-description",
+                    documento.fornitore_id,
+                    documento.data_documento,
+                    data_ricezione_key,
+                    scadenza_key,
+                    importo_key,
+                    descrizione_norm,
+                ),
+                documento,
+                "stessi dati fattura, ricezione, scadenza, importo e descrizione",
             )
 
     close_reason = "stesso fornitore, tipo, numero normalizzato e totale entro 7 giorni"
