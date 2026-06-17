@@ -25,6 +25,37 @@
         </div>
     </div>
 
+    <section class="finance-movements-balance-card" aria-label="Riepilogo saldi conti">
+        <div class="finance-movements-balance-total">
+            <span class="finance-movements-balance-icon" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
+            </span>
+            <div class="finance-movements-balance-copy">
+                <div class="finance-movements-balance-label">Saldo totale conti attivi</div>
+                <div class="finance-movements-balance-value">{{ saldo_totale_conti|euro }} &euro;</div>
+                <div class="finance-movements-balance-note">{{ conti_disponibili|length }} conti monitorati</div>
+            </div>
+        </div>
+        <div class="finance-movements-balance-accounts" aria-label="Saldi per conto">
+            {% for conto in conti_disponibili %}
+                <a href="{% url 'modifica_conto_bancario' conto.pk %}" class="finance-movements-balance-account">
+                    <span class="finance-movements-balance-account-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                    </span>
+                    <span class="finance-movements-balance-account-copy">
+                        <span class="finance-movements-balance-account-name">{{ conto.nome_conto }}</span>
+                        <span class="finance-movements-balance-account-meta">
+                            {{ conto.get_tipo_conto_display }}{% if conto.banca %} - {{ conto.banca }}{% endif %}
+                        </span>
+                    </span>
+                    <strong class="finance-movements-balance-account-value">{{ conto.saldo_calcolato|euro }} &euro;</strong>
+                </a>
+            {% empty %}
+                <div class="finance-movements-balance-empty">Nessun conto attivo configurato.</div>
+            {% endfor %}
+        </div>
+    </section>
+
     <div class="content-card">
         <form method="get" class="filter-bar finance-movement-filters">
             <label class="finance-filter-field finance-filter-field-conto">

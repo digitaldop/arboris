@@ -4280,12 +4280,19 @@ def lista_movimenti_finanziari(request):
             movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
         movimento.stato_riconciliazione_display_effettivo = stato_display
 
+    conti_disponibili = list(ContoBancario.objects.filter(attivo=True).order_by("nome_conto"))
+    saldo_totale_conti = Decimal("0")
+    for conto in conti_disponibili:
+        conto.saldo_calcolato = calcola_saldo_conto_alla_data(conto)
+        saldo_totale_conti += conto.saldo_calcolato
+
     return render(
         request,
         "gestione_finanziaria/movimenti_list.html",
         {
             "movimenti": movimenti,
-            "conti_disponibili": ContoBancario.objects.filter(attivo=True).order_by("nome_conto"),
+            "conti_disponibili": conti_disponibili,
+            "saldo_totale_conti": saldo_totale_conti,
             "categorie_disponibili": _categorie_finanziarie_attive_per_select(),
             "origini_disponibili": OrigineMovimento.choices,
             "canali_disponibili": CanaleMovimento.choices,
@@ -5096,10 +5103,21 @@ def lista_regole_categorizzazione(request):
         RegolaCategorizzazione.objects.select_related("categoria_da_assegnare")
         .order_by("priorita", "nome")
     )
+    totale_regole = regole.count()
+    regole_attive = regole.filter(attiva=True).count()
+    totale_applicazioni = regole.aggregate(totale=Sum("volte_applicata"))["totale"] or 0
+    movimenti_non_categorizzati = MovimentoFinanziario.objects.filter(categoria__isnull=True).count()
+
     return render(
         request,
         "gestione_finanziaria/regole_list.html",
-        {"regole": regole},
+        {
+            "regole": regole,
+            "totale_regole": totale_regole,
+            "regole_attive": regole_attive,
+            "totale_applicazioni": totale_applicazioni,
+            "movimenti_non_categorizzati": movimenti_non_categorizzati,
+        },
     )
 
 
@@ -5196,6 +5214,18 @@ def lista_categorie_finanziarie(request):
     categorie = list(
         CategoriaFinanziaria.objects.select_related("parent").order_by("ordine", "nome", "id")
     )
+    totale_categorie = len(categorie)
+    categorie_attive = sum(1 for categoria in categorie if categoria.attiva)
+    categorie_padre = sum(1 for categoria in categorie if categoria.parent_id is None)
+    categorie_spesa = sum(
+        1 for categoria in categorie if categoria.tipo == TipoCategoriaFinanziaria.SPESA
+    )
+    categorie_entrata = sum(
+        1 for categoria in categorie if categoria.tipo == TipoCategoriaFinanziaria.ENTRATA
+    )
+    categorie_trasferimento = sum(
+        1 for categoria in categorie if categoria.tipo == TipoCategoriaFinanziaria.TRASFERIMENTO
+    )
     icon_symbol_by_value = {
         icon["value"]: icon["symbol"]
         for icon in CategoriaFinanziariaForm.ICON_CHOICES
@@ -5238,6 +5268,12 @@ def lista_categorie_finanziarie(request):
             "categorie": categorie,
             "categorie_tree": categorie_tree,
             "tipo_choices": TipoCategoriaFinanziaria.choices,
+            "totale_categorie": totale_categorie,
+            "categorie_attive": categorie_attive,
+            "categorie_padre": categorie_padre,
+            "categorie_spesa": categorie_spesa,
+            "categorie_entrata": categorie_entrata,
+            "categorie_trasferimento": categorie_trasferimento,
         },
     )
 
@@ -7066,6 +7102,9 @@ def report_categorie_mensile(request):
             totali_mensili[key] += riga["valori_mese_map"][key]
         totale_generale += riga["totale"]
 
+    def count_report_rows(righe):
+        return sum(1 + count_report_rows(riga.get("figli", [])) for riga in righe)
+
     conti = ContoBancario.objects.filter(attivo=True).order_by("nome_conto")
     report_querystring = _build_report_query(periodo_context, conto_id)
 
@@ -7086,6 +7125,7 @@ def report_categorie_mensile(request):
             "totale_uscite": totale_uscite,
             "saldo_netto": totale_entrate + totale_uscite,
             "mesi": [m["label"] for m in mesi_periodo],
+            "categorie_report_count": count_report_rows(righe_report),
             "conti": conti,
             "conto_selezionato": conto_id,
             "report_querystring": report_querystring,

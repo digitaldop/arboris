@@ -15,74 +15,198 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-head">
-        <h1 class="page-title">Regole di categorizzazione</h1>
-        <div class="page-head-actions">
-            <form method="post" action="{% url 'applica_regole_massiva' %}" style="display:inline;">
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Regole di categorizzazione</h1>
+                <span class="family-status-pill is-muted">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {{ totale_regole }} regole
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg></span>
+                Automatismi per assegnare categorie ai movimenti bancari e importati
+            </div>
+        </div>
+        <div class="page-head-actions family-page-actions">
+            <a href="{% url 'dashboard_gestione_finanziaria' %}" class="btn btn-secondary btn-icon-text btn-intent-return-list">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
+                <span class="btn-label">Dashboard</span>
+            </a>
+            <form method="post" action="{% url 'applica_regole_massiva' %}" class="page-head-inline-form finance-rule-apply-form">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-secondary">Applica regole ai movimenti non categorizzati</button>
+                <button type="submit" class="btn btn-secondary btn-icon-text" title="Applica regole ai movimenti non categorizzati">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                    <span class="btn-label">Applica regole</span>
+                </button>
             </form>
-            <a href="{% url 'crea_regola_categorizzazione' %}" class="btn btn-primary">Nuova regola</a>
+            <a href="{% url 'crea_regola_categorizzazione' %}" class="btn btn-primary btn-icon-text btn-add-action">
+                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                <span class="btn-label">Nuova regola</span>
+            </a>
         </div>
     </div>
 
-    <div class="content-card">
-        <p>
-            Le regole vengono valutate nell'ordine di <strong>priorita'</strong> numerica (dalla piu' bassa
-            alla piu' alta). La prima regola che trova match sul movimento assegna la categoria.
-            I movimenti confermati manualmente dall'utente non vengono mai sovrascritti.
-        </p>
+    <div class="finance-rule-summary-grid" aria-label="Riepilogo regole di categorizzazione">
+        <div class="finance-rule-summary-card">
+            <span class="finance-rule-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
+            <span class="finance-rule-summary-copy">
+                <span>Regole totali</span>
+                <strong>{{ totale_regole }}</strong>
+            </span>
+        </div>
+        <div class="finance-rule-summary-card is-success">
+            <span class="finance-rule-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
+            <span class="finance-rule-summary-copy">
+                <span>Attive</span>
+                <strong>{{ regole_attive }}</strong>
+            </span>
+        </div>
+        <div class="finance-rule-summary-card is-amber">
+            <span class="finance-rule-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+            <span class="finance-rule-summary-copy">
+                <span>Applicazioni</span>
+                <strong>{{ totale_applicazioni }}</strong>
+            </span>
+        </div>
+        <div class="finance-rule-summary-card is-muted">
+            <span class="finance-rule-summary-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg></span>
+            <span class="finance-rule-summary-copy">
+                <span>Da categorizzare</span>
+                <strong>{{ movimenti_non_categorizzati }}</strong>
+            </span>
+        </div>
+    </div>
 
-        <table class="list-table">
-            <thead>
-                <tr>
-                    <th>Priorita'</th>
-                    <th>Nome</th>
-                    <th>Condizione</th>
-                    <th>Valore</th>
-                    <th>Categoria assegnata</th>
-                    <th>Applicata</th>
-                    <th>Attiva</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in regole %}
-                    <tr class="list-row-link" data-row-href="{% url 'modifica_regola_categorizzazione' r.pk %}">
-                        <td>{{ r.priorita }}</td>
-                        <td>{{ r.nome }}</td>
-                        <td>{{ r.get_condizione_tipo_display }}</td>
-                        <td>
-                            {% if r.condizione_tipo == "importo_range" %}
-                                {% if r.importo_min is not None %}da {{ r.importo_min|euro }}{% endif %}
-                                {% if r.importo_max is not None %} a {{ r.importo_max|euro }}{% endif %}
-                            {% else %}
-                                {{ r.pattern|default:"-" }}
-                            {% endif %}
-                            {% if r.segno_filtro %}<br><small class="table-muted">solo {{ r.get_segno_filtro_display }}</small>{% endif %}
-                        </td>
-                        <td>{{ r.categoria_da_assegnare }}</td>
-                        <td>{{ r.volte_applicata }} volte</td>
-                        <td>{% active_toggle r %}</td>
-                        <td class="actions-cell">
-                            <a href="{% url 'modifica_regola_categorizzazione' r.pk %}" class="table-link">Modifica</a>
-                            <span class="table-muted">|</span>
-                            <a href="{% url 'elimina_regola_categorizzazione' r.pk %}" class="table-link table-link-danger">Elimina</a>
-                        </td>
-                    </tr>
-                {% empty %}
+    <div class="finance-guide-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">Ordine di applicazione</div>
+            <p>
+                Le regole vengono valutate dalla priorita' piu' bassa alla piu' alta. La prima corrispondenza assegna la categoria;
+                i movimenti confermati manualmente non vengono sovrascritti.
+            </p>
+        </div>
+    </div>
+
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+        <div class="finance-section-head">
+            <div>
+                <h2 class="section-title">Regole operative</h2>
+                <p class="finance-section-subtitle">Condizioni, categoria assegnata e stato di attivazione.</p>
+            </div>
+        </div>
+        <div class="panel-body">
+            <table class="list-table anagrafica-list-table finance-modern-table finance-rule-table">
+                <colgroup>
+                    <col class="finance-rule-col-name">
+                    <col class="finance-rule-col-priority">
+                    <col class="finance-rule-col-condition">
+                    <col class="finance-rule-col-value">
+                    <col class="finance-rule-col-category">
+                    <col class="finance-rule-col-applied">
+                    <col class="finance-rule-col-status">
+                    <col class="finance-rule-col-actions">
+                </colgroup>
+                <thead>
                     <tr>
-                        <td colspan="8">
-                            <div class="empty-state">
-                                Nessuna regola configurata. Le regole permettono di assegnare
-                                automaticamente la categoria ai nuovi movimenti in base a descrizione,
-                                controparte, IBAN o importo.
-                            </div>
-                        </td>
+                        <th>Regola</th>
+                        <th>Priorita'</th>
+                        <th>Condizione</th>
+                        <th>Valore</th>
+                        <th>Categoria</th>
+                        <th>Applicata</th>
+                        <th>Stato</th>
+                        <th>Azioni</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for r in regole %}
+                        <tr class="list-row-link {% if not r.attiva %}finance-rule-row-inactive{% endif %}" data-row-href="{% url 'modifica_regola_categorizzazione' r.pk %}">
+                            <td class="anagrafica-record-cell">
+                                <a href="{% url 'modifica_regola_categorizzazione' r.pk %}" class="anagrafica-record-link anagrafica-record-link-compact">
+                                    <span class="finance-record-icon finance-record-icon-rule" aria-hidden="true">
+                                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
+                                    </span>
+                                    <span class="anagrafica-record-main">
+                                        <span class="table-main-text">{{ r.nome }}</span>
+                                        <span class="table-subtext">
+                                            {% if r.note %}
+                                                {{ r.note|truncatechars:76 }}
+                                            {% else %}
+                                                Prima corrispondenza valida
+                                            {% endif %}
+                                        </span>
+                                    </span>
+                                </a>
+                            </td>
+                            <td><span class="finance-rule-priority">{{ r.priorita }}</span></td>
+                            <td>
+                                <span class="anagrafica-status-chip is-muted">{{ r.get_condizione_tipo_display }}</span>
+                            </td>
+                            <td>
+                                <div class="finance-rule-value">
+                                    {% if r.condizione_tipo == "importo_range" %}
+                                        <span class="finance-rule-value-main">
+                                            {% if r.importo_min is not None %}da {{ r.importo_min|euro }}{% endif %}
+                                            {% if r.importo_max is not None %} a {{ r.importo_max|euro }}{% endif %}
+                                        </span>
+                                    {% elif r.pattern %}
+                                        <span class="finance-rule-value-main">{{ r.pattern|linebreaksbr }}</span>
+                                    {% elif r.segno_filtro %}
+                                        <span class="finance-rule-value-main">Solo {{ r.get_segno_filtro_display|lower }}</span>
+                                    {% else %}
+                                        <span class="table-muted">-</span>
+                                    {% endif %}
+                                    {% if r.segno_filtro and r.condizione_tipo != "segno" %}
+                                        <span class="finance-rule-segno-chip">solo {{ r.get_segno_filtro_display|lower }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <strong class="finance-rule-category">{{ r.categoria_da_assegnare }}</strong>
+                            </td>
+                            <td>
+                                <strong class="finance-rule-applied-count">{{ r.volte_applicata }}</strong>
+                                <span class="table-muted">volte</span>
+                                {% if r.ultima_applicazione_at %}
+                                    <br><small class="table-muted">{{ r.ultima_applicazione_at|date:"d/m/Y H:i" }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="finance-rule-toggle-cell">
+                                {% active_toggle r compact=True %}
+                            </td>
+                            <td class="actions-cell">
+                                <div class="table-icon-actions anagrafica-row-actions">
+                                    <a
+                                        class="table-icon-link anagrafica-action-btn anagrafica-action-open"
+                                        href="{% url 'modifica_regola_categorizzazione' r.pk %}"
+                                        title="Modifica regola"
+                                        aria-label="Modifica regola {{ r.nome }}"
+                                    ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></a>
+                                    <a
+                                        class="table-icon-link table-icon-link-danger anagrafica-action-btn anagrafica-action-delete"
+                                        href="{% url 'elimina_regola_categorizzazione' r.pk %}"
+                                        title="Elimina regola"
+                                        aria-label="Elimina regola {{ r.nome }}"
+                                    ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8">
+                                <div class="empty-state">
+                                    Nessuna regola configurata. Le regole permettono di assegnare automaticamente la categoria ai nuovi
+                                    movimenti in base a descrizione, controparte, IBAN o importo.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>

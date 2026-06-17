@@ -15,7 +15,9 @@
                     <span class="report-category-toggle-spacer"></span>
                 {% endif %}
                 <span class="{% if not parent_id %}report-category-root-label{% endif %}">{{ riga.categoria.nome }}</span>
-                <span class="table-muted">({{ riga.categoria.get_tipo_display }})</span>
+                <span class="anagrafica-status-chip finance-report-category-type-chip is-{{ riga.categoria.tipo }}">
+                    {{ riga.categoria.get_tipo_display }}
+                </span>
             </div>
         </td>
         {% for valore in riga.valori_mese %}
@@ -23,11 +25,11 @@
                 {% if valore == 0 %}
                     <span class="table-muted">-</span>
                 {% else %}
-                    {{ valore|euro }}
+                    <span class="finance-report-value {% if valore > 0 %}is-positive{% elif valore < 0 %}is-negative{% endif %}">{{ valore|euro }}</span>
                 {% endif %}
             </td>
         {% endfor %}
-        <td class="column-right"><strong>{{ riga.totale|euro }}</strong></td>
+        <td class="column-right"><strong class="finance-report-value {% if riga.totale > 0 %}is-positive{% elif riga.totale < 0 %}is-negative{% endif %}">{{ riga.totale|euro }}</strong></td>
     </tr>
     {% if riga.figli %}
         {% include "gestione_finanziaria/includes/report_categoria_mensile_rows.html" with righe=riga.figli parent_id=riga.row_id only %}
