@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load static currency %}
+
+{% block title %}Pulisci duplicati fatture fornitori - Arboris School Management{% endblock %}
+
+{% block breadcrumb %}
+    <div class="breadcrumb">
+        <a href="{% url 'home' %}">Home</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'dashboard_gestione_finanziaria' %}">Gestione finanziaria</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <a href="{% url 'fatture_scadenze_fornitori' %}">Fatture e scadenze</a>
+        <span class="breadcrumb-sep">&gt;</span>
+        <span>Duplicati</span>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="page-head family-page-head anagrafica-list-head finance-page-head">
+        <div class="family-page-title-block">
+            <div class="family-page-title-line">
+                <h1 class="page-title">Pulisci duplicati fatture fornitori</h1>
+                <span class="family-status-pill {% if duplicate_groups %}is-warning{% else %}is-success{% endif %}">
+                    <span class="family-status-dot" aria-hidden="true"></span>
+                    {% if duplicate_groups %}Revisione richiesta{% else %}Nessun duplicato{% endif %}
+                </span>
+            </div>
+            <div class="family-page-address">
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                {{ gruppi_count }} gruppi trovati, {{ duplicati_count }} fatture candidate all'eliminazione
+            </div>
+        </div>
+        <div class="page-head-actions">
+            <a href="{% url 'fatture_scadenze_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                <span class="btn-label">Indietro</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="{% if duplicate_groups %}finance-danger-panel{% else %}finance-success-panel finance-guide-panel{% endif %}">
+        <div class="finance-guide-icon" aria-hidden="true">
+            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{% if duplicate_groups %}alert{% else %}check{% endif %}"></use></svg>
+        </div>
+        <div class="finance-guide-copy">
+            <div class="finance-guide-title">
+                {% if duplicate_groups %}Controllo manuale prima della cancellazione{% else %}Archivio fatture pulito{% endif %}
+            </div>
+            {% if duplicate_groups %}
+                <p>
+                    Le fatture candidate all'eliminazione sono gia' selezionate. Puoi scegliere quale fattura
+                    mantenere per ogni gruppo; il sistema propone come conservata quella con piu collegamenti,
+                    dati esterni o allegati.
+                </p>
+                <p class="help-text">
+                    La cancellazione elimina anche scadenze, pagamenti e notifiche collegate alla fattura selezionata.
+                    Verifica sempre la colonna Collegamenti prima di confermare.
+                </p>
+            {% else %}
+                <p>Non risultano gruppi di fatture fornitore compatibili per numero normalizzato, date, importi o identificativi esterni.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if duplicate_groups %}
+        <form method="post" class="finance-bulk-form finance-duplicate-clean-form" data-bulk-form>
+            {% csrf_token %}
+            <div class="finance-bulk-toolbar" data-bulk-toolbar>
+                <div class="finance-bulk-summary">
+                    <strong><span data-bulk-count>{{ duplicati_count }}</span></strong>
+                    <span>duplicati selezionati per l'eliminazione</span>
+                </div>
+                <div class="finance-bulk-hint">Scegli "Mantieni" per forzare la fattura conservata.</div>
+            </div>
+
+            {% for gruppo in duplicate_groups %}
+                <section class="finance-duplicate-group" data-duplicate-group>
+                    <div class="finance-duplicate-group-head">
+                        <div>
+                            <h2 class="finance-duplicate-group-title">Gruppo duplicati #{{ forloop.counter }}</h2>
+                            <p>{{ gruppo.motivo_label }}</p>
+                        </div>
+                        <span class="finance-duplicate-group-count">{{ gruppo.totale_count }} fatture</span>
+                    </div>
+                    <div class="finance-duplicate-table-shell">
+                        <table class="list-table anagrafica-list-table finance-modern-table finance-bulk-table finance-duplicate-table">
+                            <thead>
+                                <tr>
+                                    <th class="finance-bulk-select-col">Mantieni</th>
+                                    <th class="finance-bulk-select-col">Elimina</th>
+                                    <th>Ruolo</th>
+                                    <th>Fattura</th>
+                                    <th>Fornitore</th>
+                                    <th>Data</th>
+                                    <th class="column-right">Totale</th>
+                                    <th>Origine</th>
+                                    <th>Stato</th>
+                                    <th>Collegamenti</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for documento in gruppo.documenti %}
+                                    <tr class="{% if documento.pk == gruppo.keep.pk %}finance-duplicate-keep-row{% endif %}" data-duplicate-row data-document-id="{{ documento.pk }}">
+                                        <td class="finance-bulk-select-col">
+                                            <input type="radio" class="finance-duplicate-keep-choice" name="keep_{{ gruppo.key }}" value="{{ documento.pk }}" data-duplicate-keep {% if documento.pk == gruppo.keep.pk %}checked{% endif %} aria-label="Mantieni fattura {{ documento.numero_documento }}">
+                                        </td>
+                                        <td class="finance-bulk-select-col">
+                                            <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ documento.pk }}" data-bulk-checkbox data-duplicate-delete {% if documento.pk != gruppo.keep.pk %}checked{% else %}disabled{% endif %} aria-label="Elimina fattura duplicata {{ documento.numero_documento }}">
+                                        </td>
+                                        <td>
+                                            <span class="finance-duplicate-role {% if documento.pk == gruppo.keep.pk %}is-keep{% else %}is-delete{% endif %}" data-duplicate-role data-document-id="{{ documento.pk }}">
+                                                {% if documento.pk == gruppo.keep.pk %}Conservata{% else %}Duplicata{% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ documento.get_tipo_documento_display }} {{ documento.numero_documento }}</strong>
+                                            {% if documento.descrizione %}<br><span class="table-muted">{{ documento.descrizione|truncatechars:80 }}</span>{% endif %}
+                                        </td>
+                                        <td>{{ documento.fornitore.denominazione }}</td>
+                                        <td>{{ documento.data_documento|date:"d/m/Y" }}</td>
+                                        <td class="column-right">{{ documento.totale|euro }} &euro;</td>
+                                        <td>
+                                            {{ documento.get_origine_display }}
+                                            {% if documento.external_source and documento.external_id %}
+                                                <br><span class="table-muted">{{ documento.external_source }} #{{ documento.external_id }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ documento.get_stato_display }}</td>
+                                        <td>{{ documento.dedup_links_label }}</td>
+                                        <td>
+                                            <a href="{% url 'modifica_documento_fornitore' documento.pk %}" class="table-link">Apri</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% endfor %}
+
+            <div class="form-actions finance-confirm-actions">
+                <button type="submit" class="btn btn-danger btn-icon-text" data-bulk-submit>
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                    <span class="btn-label">Elimina duplicati selezionati</span>
+                </button>
+                <a href="{% url 'fatture_scadenze_fornitori' %}" class="btn btn-secondary btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
+                    <span class="btn-label">Annulla</span>
+                </a>
+            </div>
+        </form>
+    {% else %}
+        <div class="empty-state">
+            Non ci sono duplicati da revisionare.
+        </div>
+    {% endif %}
+
+    <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisBulkActions) {
+                ArborisBulkActions.init(document);
+            }
+
+            document.querySelectorAll("[data-duplicate-keep]").forEach(function (radio) {
+                radio.addEventListener("change", function () {
+                    if (!radio.checked) {
+                        return;
+                    }
+
+                    var group = radio.closest("[data-duplicate-group]");
+                    if (!group) {
+                        return;
+                    }
+
+                    var keepId = radio.value;
+                    group.querySelectorAll("[data-duplicate-delete]").forEach(function (checkbox) {
+                        var isKeep = checkbox.value === keepId;
+                        checkbox.disabled = isKeep;
+                        checkbox.checked = !isKeep;
+                        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+                    });
+
+                    group.querySelectorAll("[data-duplicate-role]").forEach(function (role) {
+                        var isKeep = role.dataset.documentId === keepId;
+                        role.textContent = isKeep ? "Conservata" : "Duplicata";
+                        role.classList.toggle("is-keep", isKeep);
+                        role.classList.toggle("is-delete", !isKeep);
+                    });
+
+                    group.querySelectorAll("[data-duplicate-row]").forEach(function (row) {
+                        row.classList.toggle("finance-duplicate-keep-row", row.dataset.documentId === keepId);
+                    });
+                });
+            });
+        });
+    </script>
+{% endblock %}

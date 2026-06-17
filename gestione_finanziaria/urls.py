@@ -134,6 +134,11 @@ urlpatterns = [
         name="elimina_documenti_fornitori_multipla",
     ),
     path(
+        "gestione-finanziaria/documenti-fornitori/duplicati/",
+        gf_manage(views.pulizia_duplicati_documenti_fornitori),
+        name="pulizia_duplicati_documenti_fornitori",
+    ),
+    path(
         "gestione-finanziaria/documenti-fornitori/<int:pk>/modifica/",
         gf_edit(views.modifica_documento_fornitore),
         name="modifica_documento_fornitore",

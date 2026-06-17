@@ -95,6 +95,7 @@ from .models import (
     NotificaFinanziariaLettura,
     PagamentoFornitore,
     PianoRatealeSpesa,
+    OrigineDocumentoFornitore,
     OrigineMovimento,
     ProviderBancario,
     RiconciliazioneRataMovimento,
@@ -1087,6 +1088,262 @@ def elimina_documenti_fornitori_multipla(request):
             "totale_documenti": totale_documenti,
             "scadenze_count": scadenze_count,
             "pagamenti_count": pagamenti_count,
+        },
+    )
+
+
+def _normalizza_numero_documento_deduplica(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+    if text.isdigit():
+        return text.lstrip("0") or "0"
+    return text
+
+
+def _normalizza_testo_documento_deduplica(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = re.sub(r"[^A-Za-z0-9]+", " ", text).upper()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _documento_importo_key(documento):
+    return (documento.totale or Decimal("0.00")).quantize(Decimal("0.01"))
+
+
+def _documento_fornitore_origin_priority(documento):
+    if documento.origine == OrigineDocumentoFornitore.FATTURE_IN_CLOUD:
+        return 0
+    return 1
+
+
+def _documento_fornitore_link_count(documento):
+    return (getattr(documento, "dedup_pagamenti_count", 0) or 0) + (getattr(documento, "dedup_scadenze_count", 0) or 0)
+
+
+def _documento_fornitore_links_label(documento):
+    labels = []
+    scadenze_count = getattr(documento, "dedup_scadenze_count", 0) or 0
+    pagamenti_count = getattr(documento, "dedup_pagamenti_count", 0) or 0
+    if scadenze_count:
+        labels.append(f"{scadenze_count} scadenza/e")
+    if pagamenti_count:
+        labels.append(f"{pagamenti_count} pagamento/i")
+    return ", ".join(labels) if labels else "nessun collegamento"
+
+
+def _canonical_duplicate_documento_key(documento):
+    return (
+        -_documento_fornitore_link_count(documento),
+        0 if documento.stato != StatoDocumentoFornitore.ANNULLATO else 1,
+        _documento_fornitore_origin_priority(documento),
+        0 if (documento.external_source and documento.external_id) else 1,
+        0 if documento.allegato else 1,
+        documento.pk,
+    )
+
+
+def _documenti_fornitori_duplicate_groups():
+    documenti = list(
+        DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa")
+        .annotate(
+            dedup_scadenze_count=Count("scadenze", distinct=True),
+            dedup_pagamenti_count=Count("scadenze__pagamenti", distinct=True),
+        )
+        .order_by("data_documento", "id")
+    )
+    if not documenti:
+        return []
+
+    documenti_by_id = {documento.pk: documento for documento in documenti}
+    parent = {documento.pk: documento.pk for documento in documenti}
+    key_to_ids = {}
+    key_to_reason = {}
+
+    def find(item_id):
+        while parent[item_id] != item_id:
+            parent[item_id] = parent[parent[item_id]]
+            item_id = parent[item_id]
+        return item_id
+
+    def union(first_id, second_id):
+        first_root = find(first_id)
+        second_root = find(second_id)
+        if first_root != second_root:
+            parent[second_root] = first_root
+
+    def add_key(key, documento, reason):
+        key_to_ids.setdefault(key, []).append(documento.pk)
+        key_to_reason.setdefault(key, reason)
+
+    close_date_candidates = {}
+    for documento in documenti:
+        numero_norm = _normalizza_numero_documento_deduplica(documento.numero_documento)
+        if not numero_norm:
+            continue
+
+        importo_key = _documento_importo_key(documento)
+        base_key = (documento.fornitore_id, documento.tipo_documento, numero_norm)
+        add_key(
+            ("document-number-date", *base_key, documento.data_documento),
+            documento,
+            "stesso fornitore, tipo, numero normalizzato e data documento",
+        )
+        add_key(
+            ("document-number-year-total", *base_key, documento.data_documento.year, importo_key),
+            documento,
+            "stesso fornitore, tipo, numero normalizzato, anno e totale",
+        )
+        close_date_candidates.setdefault((*base_key, importo_key), []).append(documento)
+
+        external_source = (documento.external_source or "").strip()
+        external_id = (documento.external_id or "").strip()
+        if external_source and external_id:
+            add_key(
+                ("external", external_source, external_id),
+                documento,
+                "stesso identificativo esterno",
+            )
+
+        descrizione_norm = _normalizza_testo_documento_deduplica(documento.descrizione)
+        if descrizione_norm and importo_key != Decimal("0.00"):
+            add_key(
+                (
+                    "description-date-total",
+                    documento.fornitore_id,
+                    documento.tipo_documento,
+                    documento.data_documento,
+                    importo_key,
+                    descrizione_norm,
+                ),
+                documento,
+                "stesso fornitore, descrizione, data e totale",
+            )
+
+    close_reason = "stesso fornitore, tipo, numero normalizzato e totale entro 7 giorni"
+    for candidati in close_date_candidates.values():
+        if len(candidati) <= 1:
+            continue
+        ordinati = sorted(candidati, key=lambda documento: (documento.data_documento, documento.pk))
+        for index, documento in enumerate(ordinati):
+            for candidato in ordinati[index + 1 :]:
+                if abs(candidato.data_documento - documento.data_documento) > timedelta(days=7):
+                    break
+                key = ("document-number-close-date", min(documento.pk, candidato.pk), max(documento.pk, candidato.pk))
+                add_key(key, documento, close_reason)
+                add_key(key, candidato, close_reason)
+
+    for ids in key_to_ids.values():
+        if len(ids) <= 1:
+            continue
+        first_id = ids[0]
+        for item_id in ids[1:]:
+            union(first_id, item_id)
+
+    component_ids = {}
+    component_reasons = {}
+    for key, ids in key_to_ids.items():
+        if len(ids) <= 1:
+            continue
+        root = find(ids[0])
+        component_ids.setdefault(root, set()).update(ids)
+        component_reasons.setdefault(root, set()).add(key_to_reason[key])
+
+    groups = []
+    for root, ids in component_ids.items():
+        component_documenti = [documenti_by_id[item_id] for item_id in ids if item_id in documenti_by_id]
+        if len(component_documenti) <= 1:
+            continue
+
+        for documento in component_documenti:
+            documento.dedup_links_label = _documento_fornitore_links_label(documento)
+
+        keep = sorted(component_documenti, key=_canonical_duplicate_documento_key)[0]
+        duplicati = sorted(
+            [documento for documento in component_documenti if documento.pk != keep.pk],
+            key=lambda documento: (documento.data_documento, documento.pk),
+        )
+        reasons = sorted(component_reasons.get(root, []))
+        groups.append(
+            {
+                "key": root,
+                "keep": keep,
+                "duplicati": duplicati,
+                "documenti": [keep, *duplicati],
+                "motivi": reasons,
+                "motivo_label": "; ".join(reasons),
+                "totale_count": len(component_documenti),
+                "duplicati_count": len(duplicati),
+            }
+        )
+
+    return sorted(
+        groups,
+        key=lambda group: (group["keep"].data_documento, group["keep"].pk),
+        reverse=True,
+    )
+
+
+def _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs):
+    if not duplicate_pairs:
+        return 0
+
+    duplicati_ids = [duplicato_id for duplicato_id, _keep_id in duplicate_pairs]
+    keep_ids = [keep_id for _duplicato_id, keep_id in duplicate_pairs]
+    eliminati_ids = []
+
+    with transaction.atomic():
+        documenti = {
+            documento.pk: documento
+            for documento in DocumentoFornitore.objects.select_for_update().filter(pk__in=set(duplicati_ids + keep_ids))
+        }
+        for duplicato_id, keep_id in duplicate_pairs:
+            documento_duplicato = documenti.get(duplicato_id)
+            documento_keep = documenti.get(keep_id)
+            if not documento_duplicato or not documento_keep or documento_duplicato.pk == documento_keep.pk:
+                continue
+            eliminati_ids.append(documento_duplicato.pk)
+
+        if eliminati_ids:
+            DocumentoFornitore.objects.filter(pk__in=eliminati_ids).delete()
+
+    return len(eliminati_ids)
+
+
+def pulizia_duplicati_documenti_fornitori(request):
+    duplicate_groups = _documenti_fornitori_duplicate_groups()
+    duplicati_count = sum(group["duplicati_count"] for group in duplicate_groups)
+
+    if request.method == "POST":
+        selected_ids = _ids_selezionati_da_post(request)
+        keep_choices = _duplicate_keep_choices_from_post(duplicate_groups, request.POST)
+        duplicate_pairs = _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices)
+
+        if not duplicate_groups:
+            messages.info(request, "Non ci sono duplicati da pulire.")
+            return redirect("fatture_scadenze_fornitori")
+        if not duplicate_pairs:
+            messages.info(request, "Nessun duplicato selezionato per l'eliminazione.")
+            return redirect("pulizia_duplicati_documenti_fornitori")
+
+        eliminati = _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs)
+        if eliminati:
+            messages.success(
+                request,
+                f"Pulizia duplicati completata: eliminate {eliminati} fatture fornitore duplicate.",
+            )
+        else:
+            messages.info(request, "Nessuna fattura duplicata e' stata eliminata.")
+        return redirect("fatture_scadenze_fornitori")
+
+    return render(
+        request,
+        "gestione_finanziaria/documenti_fornitori_duplicati.html",
+        {
+            "duplicate_groups": duplicate_groups,
+            "gruppi_count": len(duplicate_groups),
+            "duplicati_count": duplicati_count,
         },
     )
 
@@ -4079,22 +4336,27 @@ def _duplicate_keep_choices_from_post(duplicate_groups, post_data):
     return choices
 
 
+def _duplicate_group_items(group):
+    return group.get("movimenti") or group.get("documenti") or []
+
+
 def _selected_duplicate_pairs(duplicate_groups, selected_ids, keep_choices=None):
     selected_ids = set(selected_ids)
     keep_choices = keep_choices or {}
     pairs = []
     for group in duplicate_groups:
         default_keep_id = group["keep"].pk
-        movement_ids = {movimento.pk for movimento in group["movimenti"]}
+        items = _duplicate_group_items(group)
+        movement_ids = {item.pk for item in items}
         requested_keep_id = keep_choices.get(group["key"])
         keep_id = requested_keep_id if requested_keep_id in movement_ids else default_keep_id
         keep_changed = keep_id != default_keep_id
 
-        for movimento in group["movimenti"]:
-            if movimento.pk == keep_id:
+        for item in items:
+            if item.pk == keep_id:
                 continue
-            if keep_changed or movimento.pk in selected_ids:
-                pairs.append((movimento.pk, keep_id))
+            if keep_changed or item.pk in selected_ids:
+                pairs.append((item.pk, keep_id))
     return pairs
 
 
