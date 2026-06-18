@@ -142,6 +142,14 @@ class Fornitore(models.Model):
         null=True,
         help_text="Categoria prevalente usata come default sui documenti del fornitore.",
     )
+    dipendente_collegato = models.ForeignKey(
+        "gestione_amministrativa.Dipendente",
+        on_delete=models.SET_NULL,
+        related_name="fornitori_collegati",
+        blank=True,
+        null=True,
+        help_text="Dipendente, educatore o collaboratore a cui attribuire le fatture di questo fornitore.",
+    )
     codice_fiscale = models.CharField(max_length=16, blank=True)
     partita_iva = models.CharField(max_length=11, blank=True)
     indirizzo = models.CharField(max_length=255, blank=True)

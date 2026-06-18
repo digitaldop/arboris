@@ -34,10 +34,27 @@ class CategoriaFinanziariaAdmin(admin.ModelAdmin):
 
 @admin.register(Fornitore)
 class FornitoreAdmin(admin.ModelAdmin):
-    list_display = ("denominazione", "tipo_soggetto", "categoria_spesa", "email", "telefono", "attivo")
+    list_display = (
+        "denominazione",
+        "tipo_soggetto",
+        "categoria_spesa",
+        "dipendente_collegato",
+        "email",
+        "telefono",
+        "attivo",
+    )
     list_filter = ("tipo_soggetto", "categoria_spesa", "attivo")
-    search_fields = ("denominazione", "codice_fiscale", "partita_iva", "email", "pec", "referente")
-    autocomplete_fields = ("categoria_spesa",)
+    search_fields = (
+        "denominazione",
+        "codice_fiscale",
+        "partita_iva",
+        "email",
+        "pec",
+        "referente",
+        "dipendente_collegato__persona_collegata__nome",
+        "dipendente_collegato__persona_collegata__cognome",
+    )
+    autocomplete_fields = ("categoria_spesa", "dipendente_collegato")
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "categoria_spesa":

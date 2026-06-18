@@ -497,8 +497,8 @@
                         <section class="ga-dipendente-side-card" aria-labelledby="ga-dipendente-buste-title">
                             <div class="ga-dipendente-side-card-head">
                                 <div>
-                                    <h2 id="ga-dipendente-buste-title">Buste paga recenti</h2>
-                                    <p>Ultimi cedolini registrati.</p>
+                                    <h2 id="ga-dipendente-buste-title">Buste paga e compensi recenti</h2>
+                                    <p>Cedolini e fatture dei fornitori collegati.</p>
                                 </div>
                                 {% if can_manage_gestione_amministrativa %}
                                     <a
@@ -515,23 +515,42 @@
                                 {% endif %}
                             </div>
                             <div class="ga-dipendente-mini-list">
-                                {% for busta in buste_paga %}
+                                {% for compenso in compensi_lavorativi %}
                                     <article class="ga-dipendente-mini-row">
-                                        <div>
-                                            <a
-                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
-                                                class="ga-dipendente-mini-title"
-                                                data-window-popup="1"
-                                                data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                data-popup-window-name="arboris-busta-paga-popup"
-                                                data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
-                                            >{{ busta.periodo_label }}</a>
-                                            <span>{{ busta.get_stato_display }}</span>
-                                        </div>
-                                        <strong>{{ busta.costo_azienda_effettivo|default:busta.costo_azienda_previsto|euro }} &euro;</strong>
+                                        {% if compenso.tipo == "busta" %}
+                                            {% with busta=compenso.oggetto %}
+                                                <div>
+                                                    <a
+                                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
+                                                        class="ga-dipendente-mini-title"
+                                                        data-window-popup="1"
+                                                        data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                        data-popup-window-name="arboris-busta-paga-popup"
+                                                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                                    >{{ compenso.titolo }}</a>
+                                                    <span>{{ compenso.stato }}</span>
+                                                </div>
+                                                <strong>{{ compenso.importo_secondario|default:compenso.importo|euro }} &euro;</strong>
+                                            {% endwith %}
+                                        {% else %}
+                                            {% with documento=compenso.oggetto %}
+                                                <div>
+                                                    <a
+                                                        href="{% url 'modifica_documento_fornitore' documento.pk %}"
+                                                        class="ga-dipendente-mini-title"
+                                                        data-window-popup="1"
+                                                        data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1"
+                                                        data-popup-window-name="arboris-documento-fornitore-popup"
+                                                        data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                    >{{ compenso.titolo }}</a>
+                                                    <span>{{ documento.fornitore }} - {{ compenso.stato }}</span>
+                                                </div>
+                                                <strong>{{ compenso.importo|euro }} &euro;</strong>
+                                            {% endwith %}
+                                        {% endif %}
                                     </article>
                                 {% empty %}
-                                    <div class="ga-dipendente-empty">Nessuna busta paga.</div>
+                                    <div class="ga-dipendente-empty">Nessuna busta paga o fattura collegata.</div>
                                 {% endfor %}
                             </div>
                         </section>

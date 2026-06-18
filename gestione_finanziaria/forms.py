@@ -9,6 +9,7 @@ from django.forms import inlineformset_factory
 from django.db.models import Q
 
 from arboris.form_widgets import apply_eur_currency_widget
+from gestione_amministrativa.models import Dipendente
 from .security import cifra_testo
 
 from .models import (
@@ -309,6 +310,7 @@ class FornitoreForm(forms.ModelForm):
             "denominazione",
             "tipo_soggetto",
             "categoria_spesa",
+            "dipendente_collegato",
             "codice_fiscale",
             "partita_iva",
             "indirizzo",
@@ -326,6 +328,7 @@ class FornitoreForm(forms.ModelForm):
             "denominazione": "Denominazione / ragione sociale",
             "tipo_soggetto": "Tipo soggetto",
             "categoria_spesa": "Categoria di spesa",
+            "dipendente_collegato": "Dipendente / educatore collegato",
             "codice_fiscale": "Codice fiscale",
             "partita_iva": "Partita IVA",
             "indirizzo": "Indirizzo",
@@ -348,6 +351,7 @@ class FornitoreForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         optional_fields = [
             "categoria_spesa",
+            "dipendente_collegato",
             "codice_fiscale",
             "partita_iva",
             "indirizzo",
@@ -364,6 +368,12 @@ class FornitoreForm(forms.ModelForm):
             self.fields[field_name].required = False
         self.fields["categoria_spesa"].queryset = categorie_spesa_queryset()
         self.fields["categoria_spesa"].empty_label = "--- nessuna ---"
+        self.fields["dipendente_collegato"].queryset = Dipendente.objects.order_by(
+            "persona_collegata__cognome",
+            "persona_collegata__nome",
+        )
+        self.fields["dipendente_collegato"].empty_label = "--- nessun collegamento ---"
+        make_searchable_select(self.fields["dipendente_collegato"], "Cerca un dipendente o educatore...")
 
 
 class DocumentoFornitoreForm(forms.ModelForm):

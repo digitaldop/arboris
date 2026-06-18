@@ -328,7 +328,7 @@
                                     <span class="family-stat-content">
                                         <span class="family-stat-value">1</span>
                                         <span class="family-stat-label">Profilo lavorativo</span>
-                                        <span class="family-stat-link">{{ profilo_contratti|length }} contratti, {{ profilo_buste_paga|length }} buste</span>
+                                        <span class="family-stat-link">{{ profilo_contratti|length }} contratti, {{ profilo_compensi_lavorativi|length }} compensi</span>
                                     </span>
                                 </a>
                             {% endif %}
@@ -432,12 +432,12 @@
                                         {% endif %}
                                     </div>
                                     <div class="family-card-inline-list">
-                                        {% if profilo_buste_paga %}
+                                        {% if profilo_compensi_lavorativi %}
                                             <h3>Buste paga recenti</h3>
-                                            {% for busta in profilo_buste_paga %}
+                                            {% for compenso in profilo_compensi_lavorativi|slice:":6" %}
                                                 <div class="family-card-inline-row">
-                                                    <span>{{ busta.periodo_label }}</span>
-                                                    <strong>{{ busta.importo_netto_riepilogo|euro }} {{ busta.valuta }}</strong>
+                                                    <span>{{ compenso.titolo }}</span>
+                                                    <strong>{{ compenso.importo|euro }} {{ compenso.valuta }}</strong>
                                                 </div>
                                             {% endfor %}
                                         {% endif %}
@@ -2111,7 +2111,7 @@
                     <div class="tab-nav" role="tablist" aria-label="Profilo lavorativo">
                         <button type="button" class="tab-btn is-active" data-work-tab-target="tab-lavoro-generali">Dati generali (1)</button>
                         <button type="button" class="tab-btn" data-work-tab-target="tab-lavoro-contratti">Contratto ({{ profilo_contratti|length }})</button>
-                        <button type="button" class="tab-btn" data-work-tab-target="tab-lavoro-buste">Buste paga ({{ profilo_buste_paga|length }})</button>
+                        <button type="button" class="tab-btn" data-work-tab-target="tab-lavoro-buste">Buste paga ({{ profilo_compensi_lavorativi|length }})</button>
                     </div>
                     <div class="relative-work-inline-actions">
                         <button type="button" class="btn btn-secondary btn-sm btn-icon-text" data-relative-main-action="edit">
@@ -2246,8 +2246,8 @@
                         <div class="relative-work-tab-panel" id="tab-lavoro-buste" data-relative-work-panel hidden>
                             <div class="relative-work-panel-head">
                                 <div>
-                                    <h3>Buste paga</h3>
-                                    <p>Cedolini, importi e allegati collegati al profilo lavorativo.</p>
+                                    <h3>Buste paga e compensi</h3>
+                                    <p>Cedolini, importi e fatture collegate al profilo lavorativo.</p>
                                 </div>
                                 {% if can_manage_gestione_amministrativa %}
                                     <a
@@ -2264,81 +2264,118 @@
                                 {% endif %}
                             </div>
                             <div class="relative-work-list">
-                                {% for busta in profilo_buste_paga %}
+                                {% for compenso in profilo_compensi_lavorativi %}
                                     <article class="relative-work-row">
-                                        <div>
-                                            <strong>{{ busta.periodo_label }}</strong>
-                                            <span>{{ busta.get_stato_display }}{% if busta.contratto_id %} - {{ busta.contratto.tipo_contratto|default:"Contratto" }}{% endif %}</span>
-                                            {% if busta.file_busta_paga %}
-                                                <a href="{% url 'apri_file_busta_paga_dipendente' busta.pk %}" target="_blank" rel="noopener">File busta paga</a>
-                                            {% endif %}
-                                            {% for documento in busta.documenti.all %}
-                                                <a href="{{ documento.file.url }}" target="_blank" rel="noopener">{{ documento.titolo }}</a>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="relative-work-row-value">
-                                            <strong>{{ busta.importo_netto_riepilogo|euro }} &euro;</strong>
-                                            {% if busta.ha_costo_azienda_riepilogo %}
-                                                <span>Costo azienda {{ busta.costo_azienda_riepilogo|euro }} &euro;</span>
-                                            {% elif busta.risulta_pagata %}
-                                                <span>{% if busta.data_pagamento_effettiva %}Pagata il {{ busta.data_pagamento_effettiva|date:"d/m/Y" }}{% else %}Pagamento collegato{% endif %}</span>
-                                            {% else %}
-                                                <span>Non pagata</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="relative-work-row-actions">
-                                            {% if can_manage_gestione_amministrativa and can_manage_gestione_finanziaria and not busta.risulta_pagata %}
-                                                <a
-                                                    href="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                    class="btn btn-save-soft btn-sm btn-icon-text"
-                                                    data-window-popup="1"
-                                                    data-popup-url="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                    data-popup-window-name="arboris-busta-paga-reconcile-popup"
-                                                    data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
-                                                >
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
-                                                    <span class="btn-label">Collega pagamento</span>
-                                                </a>
-                                                <a
-                                                    href="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                    class="btn btn-save-soft btn-sm btn-icon-text"
-                                                    data-window-popup="1"
-                                                    data-popup-url="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                    data-popup-window-name="arboris-busta-paga-payment-popup"
-                                                    data-popup-window-features="width=960,height=760,resizable=yes,scrollbars=yes"
-                                                >
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
-                                                    <span class="btn-label">Inserisci pagamento</span>
-                                                </a>
-                                            {% endif %}
-                                            <a
-                                                href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
-                                                class="btn btn-secondary btn-sm btn-icon-text"
-                                                data-window-popup="1"
-                                                data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                data-popup-window-name="arboris-busta-paga-popup"
-                                                data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
-                                            >
-                                                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                                <span class="btn-label">Modifica</span>
-                                            </a>
-                                            {% if can_manage_gestione_amministrativa %}
-                                                <a
-                                                    href="{% url 'elimina_busta_paga_dipendente' busta.pk %}"
-                                                    class="btn btn-danger btn-sm btn-icon-text"
-                                                    data-window-popup="1"
-                                                    data-popup-url="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
-                                                    data-popup-window-name="arboris-busta-paga-delete-popup"
-                                                    data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
-                                                >
-                                                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                                                    <span class="btn-label">Elimina</span>
-                                                </a>
-                                            {% endif %}
-                                        </div>
+                                        {% if compenso.tipo == "busta" %}
+                                            {% with busta=compenso.oggetto %}
+                                                <div>
+                                                    <strong>{{ busta.periodo_label }}</strong>
+                                                    <span>{{ busta.get_stato_display }}{% if busta.contratto_id %} - {{ busta.contratto.tipo_contratto|default:"Contratto" }}{% endif %}</span>
+                                                    {% if busta.file_busta_paga %}
+                                                        <a href="{% url 'apri_file_busta_paga_dipendente' busta.pk %}" target="_blank" rel="noopener">File busta paga</a>
+                                                    {% endif %}
+                                                    {% for documento in busta.documenti.all %}
+                                                        <a href="{{ documento.file.url }}" target="_blank" rel="noopener">{{ documento.titolo }}</a>
+                                                    {% endfor %}
+                                                </div>
+                                                <div class="relative-work-row-value">
+                                                    <strong>{{ busta.importo_netto_riepilogo|euro }} &euro;</strong>
+                                                    {% if busta.ha_costo_azienda_riepilogo %}
+                                                        <span>Costo azienda {{ busta.costo_azienda_riepilogo|euro }} &euro;</span>
+                                                    {% elif busta.risulta_pagata %}
+                                                        <span>{% if busta.data_pagamento_effettiva %}Pagata il {{ busta.data_pagamento_effettiva|date:"d/m/Y" }}{% else %}Pagamento collegato{% endif %}</span>
+                                                    {% else %}
+                                                        <span>Non pagata</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="relative-work-row-actions">
+                                                    {% if can_manage_gestione_amministrativa and can_manage_gestione_finanziaria and not busta.risulta_pagata %}
+                                                        <a
+                                                            href="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                            class="btn btn-save-soft btn-sm btn-icon-text"
+                                                            data-window-popup="1"
+                                                            data-popup-url="{% url 'riconcilia_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                            data-popup-window-name="arboris-busta-paga-reconcile-popup"
+                                                            data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                        >
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                                                            <span class="btn-label">Collega pagamento</span>
+                                                        </a>
+                                                        <a
+                                                            href="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                            class="btn btn-save-soft btn-sm btn-icon-text"
+                                                            data-window-popup="1"
+                                                            data-popup-url="{% url 'inserisci_pagamento_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                            data-popup-window-name="arboris-busta-paga-payment-popup"
+                                                            data-popup-window-features="width=960,height=760,resizable=yes,scrollbars=yes"
+                                                        >
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
+                                                            <span class="btn-label">Inserisci pagamento</span>
+                                                        </a>
+                                                    {% endif %}
+                                                    <a
+                                                        href="{% url 'modifica_busta_paga_dipendente' busta.pk %}"
+                                                        class="btn btn-secondary btn-sm btn-icon-text"
+                                                        data-window-popup="1"
+                                                        data-popup-url="{% url 'modifica_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                        data-popup-window-name="arboris-busta-paga-popup"
+                                                        data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
+                                                    >
+                                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                        <span class="btn-label">Modifica</span>
+                                                    </a>
+                                                    {% if can_manage_gestione_amministrativa %}
+                                                        <a
+                                                            href="{% url 'elimina_busta_paga_dipendente' busta.pk %}"
+                                                            class="btn btn-danger btn-sm btn-icon-text"
+                                                            data-window-popup="1"
+                                                            data-popup-url="{% url 'elimina_busta_paga_dipendente' busta.pk %}?popup=1"
+                                                            data-popup-window-name="arboris-busta-paga-delete-popup"
+                                                            data-popup-window-features="width=760,height=560,resizable=yes,scrollbars=yes"
+                                                        >
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                                                            <span class="btn-label">Elimina</span>
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            {% endwith %}
+                                        {% else %}
+                                            {% with documento=compenso.oggetto %}
+                                                <div>
+                                                    <strong>{{ compenso.titolo }}</strong>
+                                                    <span>{{ documento.fornitore }} - {{ compenso.stato }}{% if documento.data_documento %} - {{ documento.data_documento|date:"d/m/Y" }}{% endif %}</span>
+                                                    {% if documento.allegato %}
+                                                        <a href="{{ documento.allegato.url }}" target="_blank" rel="noopener">Allegato fattura</a>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="relative-work-row-value">
+                                                    <strong>{{ compenso.importo|euro }} &euro;</strong>
+                                                    {% if documento.ritenuta_acconto %}
+                                                        <span>Totale {{ documento.totale|euro }} &euro; - R.A. {{ documento.ritenuta_acconto|euro }} &euro;</span>
+                                                    {% else %}
+                                                        <span>{{ documento.get_tipo_documento_display }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="relative-work-row-actions">
+                                                    {% if can_manage_gestione_finanziaria %}
+                                                        <a
+                                                            href="{% url 'modifica_documento_fornitore' documento.pk %}"
+                                                            class="btn btn-secondary btn-sm btn-icon-text"
+                                                            data-window-popup="1"
+                                                            data-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1"
+                                                            data-popup-window-name="arboris-documento-fornitore-popup"
+                                                            data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
+                                                        >
+                                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                                            <span class="btn-label">Apri fattura</span>
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            {% endwith %}
+                                        {% endif %}
                                     </article>
                                 {% empty %}
-                                    <div class="empty-state compact-empty-state">Nessuna busta paga registrata.</div>
+                                    <div class="empty-state compact-empty-state">Nessuna busta paga o fattura collegata.</div>
                                 {% endfor %}
                             </div>
                         </div>

@@ -49,7 +49,7 @@ from .models import (
     StatoDipendente,
     TipoContrattoDipendente,
 )
-from .services import contratto_applicabile, crea_o_aggiorna_previsione_busta_paga
+from .services import compensi_lavorativi_dipendente, contratto_applicabile, crea_o_aggiorna_previsione_busta_paga
 
 
 ZERO = Decimal("0.00")
@@ -447,6 +447,7 @@ def _profili_lavoro_queryset(scope, *, q="", stato=""):
         .annotate(
             numero_contratti=Count("contratti", distinct=True),
             numero_buste=Count("buste_paga", distinct=True),
+            numero_fatture_collegate=Count("fornitori_collegati__documenti", distinct=True),
             numero_documenti=Count("documenti", distinct=True),
         )
         .filter(ruolo_aziendale__in=_ruoli_for_scope(scope))
@@ -599,6 +600,7 @@ def _crea_profilo_lavoro(request, scope):
             "dipendente": None,
             "contratti": [],
             "buste_paga": [],
+            "compensi_lavorativi": [],
             "simulazioni_costo": [],
             "documenti": [],
             "studenti_classe_principale": [],
@@ -634,6 +636,7 @@ def _modifica_profilo_lavoro(request, pk, scope=None):
 
     contratti = dipendente.contratti.all()
     buste_paga = dipendente.buste_paga.select_related("contratto").order_by("-anno", "-mese")[:12]
+    compensi_lavorativi = compensi_lavorativi_dipendente(dipendente, limite=12)
     documenti = dipendente.documenti.order_by("-data_documento", "-id")[:12]
     simulazioni_costo = (
         SimulazioneCostoDipendente.objects.select_related("contratto", "contratto__tipo_contratto")
@@ -649,6 +652,7 @@ def _modifica_profilo_lavoro(request, pk, scope=None):
             "dipendente": dipendente,
             "contratti": contratti,
             "buste_paga": buste_paga,
+            "compensi_lavorativi": compensi_lavorativi,
             "documenti": documenti,
             "simulazioni_costo": simulazioni_costo,
             "studenti_classe_principale": _studenti_classe_principale(dipendente),
@@ -672,6 +676,7 @@ def _elimina_profilo_lavoro(request, pk, scope):
     count_relazioni = (
         dipendente.contratti.count()
         + dipendente.buste_paga.count()
+        + dipendente.fornitori_collegati.count()
         + dipendente.documenti.count()
     )
     if request.method == "POST":
@@ -680,7 +685,7 @@ def _elimina_profilo_lavoro(request, pk, scope):
                 request,
                 (
                     f"Impossibile eliminare {labels['singular']} "
-                    "perche sono presenti contratti, buste paga o documenti collegati."
+                    "perche sono presenti contratti, buste paga, fornitori o documenti collegati."
                 ),
             )
             return redirect(labels["detail_url"], pk=dipendente.pk)

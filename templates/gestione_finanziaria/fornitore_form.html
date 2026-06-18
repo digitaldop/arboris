@@ -145,6 +145,15 @@
                                     {{ form.categoria_spesa.errors }}
                                 </div>
                             </div>
+                            <div class="supplier-document-field is-wide">
+                                <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                                <div class="supplier-document-field-body">
+                                    <label for="{{ form.dipendente_collegato.id_for_label }}">{{ form.dipendente_collegato.label }}</label>
+                                    <div class="mode-view-only readonly-display-plain">{% if fornitore and fornitore.dipendente_collegato %}{{ fornitore.dipendente_collegato }}{% else %}Nessun collegamento{% endif %}</div>
+                                    <div class="mode-edit-field">{{ form.dipendente_collegato }}</div>
+                                    {{ form.dipendente_collegato.errors }}
+                                </div>
+                            </div>
                             <div class="supplier-document-field">
                                 <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
                                 <div class="supplier-document-field-body">

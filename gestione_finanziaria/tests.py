@@ -5625,10 +5625,16 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
     def test_fornitori_pages_render(self):
         categoria = crea_categoria_spesa_test("Materiali")
+        dipendente = Dipendente.objects.create(
+            nome="Laura",
+            cognome="Bianchi",
+            codice_fiscale="BNCLRA80A01A944K",
+        )
         fornitore = Fornitore.objects.create(
             denominazione="Carta Srl",
             tipo_soggetto="azienda",
             categoria_spesa=categoria,
+            dipendente_collegato=dipendente,
         )
         documento = DocumentoFornitore.objects.create(
             fornitore=fornitore,
@@ -5670,6 +5676,12 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, 'title="Seleziona tutto"')
         self.assertNotContains(response, ">Seleziona Tutto<")
         self.assertContains(response, "live-list-search.js")
+
+        response = self.client.get(reverse("lista_fornitori"))
+        self.assertContains(response, "Bianchi Laura")
+        response = self.client.get(reverse("modifica_fornitore", kwargs={"pk": fornitore.pk}))
+        self.assertContains(response, "Dipendente / educatore collegato")
+        self.assertContains(response, "Bianchi Laura")
 
     def test_fatture_scadenze_fornitori_fonde_fatture_e_scadenziario(self):
         categoria = crea_categoria_spesa_test("Servizi")

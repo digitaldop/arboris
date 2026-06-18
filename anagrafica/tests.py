@@ -74,6 +74,7 @@ from gestione_amministrativa.models import (
     StatoDipendente,
     TipoContrattoDipendente,
 )
+from gestione_finanziaria.models import DocumentoFornitore, Fornitore, TipoDocumentoFornitore
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
@@ -1279,6 +1280,48 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
         self.assertContains(response, "Costo azienda")
         self.assertContains(response, reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+
+    def test_modifica_familiare_mostra_fatture_fornitore_collegato_nei_compensi(self):
+        fornitore_collegato = Fornitore.objects.create(
+            denominazione="Ada Rossi Consulenze",
+            tipo_soggetto="professionista",
+            dipendente_collegato=self.profilo,
+        )
+        documento_collegato = DocumentoFornitore.objects.create(
+            fornitore=fornitore_collegato,
+            tipo_documento=TipoDocumentoFornitore.RICEVUTA,
+            numero_documento="RO-1",
+            data_documento=date(2026, 6, 5),
+            descrizione="Laboratorio educativo",
+            imponibile=Decimal("500.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("500.00"),
+            imponibile_ritenuta_acconto=Decimal("500.00"),
+            ritenuta_acconto=Decimal("100.00"),
+        )
+        fornitore_non_collegato = Fornitore.objects.create(
+            denominazione="Altro Professionista",
+            tipo_soggetto="professionista",
+        )
+        DocumentoFornitore.objects.create(
+            fornitore=fornitore_non_collegato,
+            tipo_documento=TipoDocumentoFornitore.FATTURA,
+            numero_documento="NO-1",
+            data_documento=date(2026, 6, 6),
+            imponibile=Decimal("900.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("900.00"),
+        )
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["profilo_compensi_lavorativi"]), 2)
+        self.assertContains(response, "Ricevuta RO-1")
+        self.assertContains(response, "Ada Rossi Consulenze")
+        self.assertContains(response, "400,00 EUR")
+        self.assertContains(response, reverse("modifica_documento_fornitore", kwargs={"pk": documento_collegato.pk}))
+        self.assertNotContains(response, "NO-1")
 
     def test_crea_educatore_non_mostra_parentela_generale(self):
         response = self.client.get(f"{reverse('crea_familiare')}?profilo_lavorativo=educatore")

@@ -556,7 +556,7 @@ def lista_fornitori(request):
     stato = request.GET.get("stato") or ""
 
     fornitori = (
-        Fornitore.objects.select_related("categoria_spesa")
+        Fornitore.objects.select_related("categoria_spesa", "dipendente_collegato__persona_collegata")
         .annotate(numero_documenti=Count("documenti", distinct=True))
         .order_by("denominazione")
     )
@@ -568,6 +568,8 @@ def lista_fornitori(request):
             | Q(email__icontains=q)
             | Q(pec__icontains=q)
             | Q(referente__icontains=q)
+            | Q(dipendente_collegato__persona_collegata__nome__icontains=q)
+            | Q(dipendente_collegato__persona_collegata__cognome__icontains=q)
         )
     if categoria_id.isdigit():
         fornitori = fornitori.filter(categoria_spesa_id=int(categoria_id))
@@ -618,7 +620,10 @@ def crea_fornitore(request):
 
 def modifica_fornitore(request, pk):
     popup = is_popup_request(request)
-    fornitore = get_object_or_404(Fornitore.objects.select_related("categoria_spesa"), pk=pk)
+    fornitore = get_object_or_404(
+        Fornitore.objects.select_related("categoria_spesa", "dipendente_collegato__persona_collegata"),
+        pk=pk,
+    )
     edit_scope = "view"
     if request.method == "POST":
         form = FornitoreForm(request.POST, instance=fornitore)

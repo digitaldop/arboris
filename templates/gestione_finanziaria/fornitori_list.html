@@ -44,7 +44,7 @@
         <form method="get" class="search-form anagrafica-search-form">
             <label class="anagrafica-search-field">
                 <span class="anagrafica-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
-                <input type="search" name="q" value="{{ q }}" placeholder="Cerca per denominazione, CF/P.IVA, email, referente..." class="search-input">
+                <input type="search" name="q" value="{{ q }}" placeholder="Cerca per denominazione, collaboratore, CF/P.IVA, email..." class="search-input">
             </label>
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Categoria</span>
@@ -82,6 +82,7 @@
                         <tr>
                             <th>Denominazione</th>
                             <th>Categoria spesa</th>
+                            <th>Collaboratore</th>
                             <th>Referente</th>
                             <th>Email</th>
                             <th>Telefono</th>
@@ -105,6 +106,7 @@
                                     </a>
                                 </td>
                                 <td>{{ fornitore.categoria_spesa|default:"-" }}</td>
+                                <td>{{ fornitore.dipendente_collegato|default:"-" }}</td>
                                 <td>{{ fornitore.referente|default:"-" }}</td>
                                 <td>{{ fornitore.email|default:fornitore.pec|default:"-" }}</td>
                                 <td>{{ fornitore.telefono|default:"-" }}</td>

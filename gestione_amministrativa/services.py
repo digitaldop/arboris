@@ -35,6 +35,55 @@ def periodo_bounds(anno, mese):
     return date(int(anno), int(mese), 1), date(int(anno), int(mese), ultimo_giorno)
 
 
+def compensi_lavorativi_dipendente(dipendente, limite=24):
+    if not dipendente or not getattr(dipendente, "pk", None):
+        return []
+
+    from gestione_finanziaria.models import DocumentoFornitore
+
+    buste = (
+        dipendente.buste_paga.select_related("contratto", "contratto__tipo_contratto")
+        .prefetch_related("documenti")
+        .order_by("-anno", "-mese", "-id")[:limite]
+    )
+    documenti_fornitore = (
+        DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa", "fornitore__categoria_spesa")
+        .filter(fornitore__dipendente_collegato=dipendente)
+        .order_by("-data_documento", "-id")[:limite]
+    )
+
+    compensi = []
+    for busta in buste:
+        compensi.append(
+            {
+                "tipo": "busta",
+                "oggetto": busta,
+                "data": date(busta.anno, busta.mese, monthrange(busta.anno, busta.mese)[1]),
+                "titolo": busta.periodo_label,
+                "stato": busta.get_stato_display(),
+                "importo": busta.importo_netto_riepilogo,
+                "importo_secondario": busta.costo_azienda_riepilogo if busta.ha_costo_azienda_riepilogo else ZERO,
+                "valuta": busta.valuta,
+            }
+        )
+
+    for documento in documenti_fornitore:
+        compensi.append(
+            {
+                "tipo": "documento_fornitore",
+                "oggetto": documento,
+                "data": documento.data_documento,
+                "titolo": f"{documento.get_tipo_documento_display()} {documento.numero_documento}".strip(),
+                "stato": documento.get_stato_display(),
+                "importo": documento.totale_da_pagare,
+                "importo_secondario": documento.totale,
+                "valuta": "EUR",
+            }
+        )
+
+    return sorted(compensi, key=lambda item: (item["data"], item["titolo"]), reverse=True)[:limite]
+
+
 def contratto_applicabile(dipendente, anno, mese):
     inizio_periodo, fine_periodo = periodo_bounds(anno, mese)
     return (

@@ -57,6 +57,7 @@ from economia.models import Iscrizione, PrestazioneScambioRetta, RataIscrizione,
 from economia.scambio_retta_helpers import build_familiare_scambio_retta_inline_context
 from gestione_finanziaria.services import build_home_financial_dashboard_data
 from gestione_amministrativa.models import Dipendente, RuoloAnagraficoDipendente, StatoDipendente
+from gestione_amministrativa.services import compensi_lavorativi_dipendente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from scuola.utils import resolve_default_anno_scolastico
 from sistema.inline_context import famiglia_inline_head, studente_inline_head
@@ -3537,7 +3538,12 @@ def sync_familiare_profilo_lavorativo(familiare, cleaned_data):
         if not profilo:
             return None, False
 
-        has_relazioni = profilo.contratti.exists() or profilo.buste_paga.exists() or profilo.documenti.exists()
+        has_relazioni = (
+            profilo.contratti.exists()
+            or profilo.buste_paga.exists()
+            or profilo.documenti.exists()
+            or profilo.fornitori_collegati.exists()
+        )
         if has_relazioni:
             return profilo, True
 
@@ -3613,6 +3619,7 @@ def build_familiare_lavoro_context(familiare):
             "profilo_contratto_corrente": None,
             "profilo_contratti": [],
             "profilo_buste_paga": [],
+            "profilo_compensi_lavorativi": [],
             "profilo_documenti": [],
             "profilo_studenti_classe": [],
         }
@@ -3628,6 +3635,7 @@ def build_familiare_lavoro_context(familiare):
             .prefetch_related("documenti")
             .order_by("-anno", "-mese", "-id")[:8]
         ),
+        "profilo_compensi_lavorativi": compensi_lavorativi_dipendente(profilo),
         "profilo_documenti": profilo.documenti.order_by("-data_documento", "-id")[:6],
         "profilo_studenti_classe": studenti_classe_principale_educatore(profilo),
     }
