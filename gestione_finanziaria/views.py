@@ -5206,8 +5206,173 @@ def applica_regole_massiva(request):
 
 
 # =========================================================================
-#  Categorie finanziarie - CRUD (invariato rispetto all'iterazione precedente)
+#  Categorie finanziarie - CRUD e manutenzione
 # =========================================================================
+
+
+_CATEGORIA_REFERENCE_SPECS = (
+    {
+        "key": "movimenti",
+        "label": "Movimenti finanziari",
+        "model": MovimentoFinanziario,
+        "field": "categoria",
+        "delete_action": "scollegati dalla categoria",
+    },
+    {
+        "key": "fornitori",
+        "label": "Fornitori",
+        "model": Fornitore,
+        "field": "categoria_spesa",
+        "delete_action": "scollegati dalla categoria prevalente",
+    },
+    {
+        "key": "documenti",
+        "label": "Documenti fornitori",
+        "model": DocumentoFornitore,
+        "field": "categoria_spesa",
+        "delete_action": "scollegati dalla categoria spesa",
+    },
+    {
+        "key": "voci_budget",
+        "label": "Voci budget ricorrenti",
+        "model": VoceBudgetRicorrente,
+        "field": "categoria",
+        "delete_action": "scollegate dalla categoria",
+    },
+    {
+        "key": "piani_rateali",
+        "label": "Piani rateali di spesa",
+        "model": PianoRatealeSpesa,
+        "field": "categoria",
+        "delete_action": "scollegati dalla categoria",
+    },
+    {
+        "key": "spese_operative",
+        "label": "Spese operative",
+        "model": SpesaOperativa,
+        "field": "categoria",
+        "delete_action": "scollegate dalla categoria",
+    },
+    {
+        "key": "buste_paga",
+        "label": "Buste paga",
+        "model": BustaPagaDipendente,
+        "field": "categoria",
+        "delete_action": "scollegate dalla categoria",
+    },
+    {
+        "key": "regole",
+        "label": "Regole automatiche",
+        "model": RegolaCategorizzazione,
+        "field": "categoria_da_assegnare",
+        "delete_action": "eliminate perche' non possono restare senza categoria",
+    },
+    {
+        "key": "figlie",
+        "label": "Sottocategorie",
+        "model": CategoriaFinanziaria,
+        "field": "parent",
+        "delete_action": "promosse a categorie padre",
+    },
+)
+
+
+def _categoria_reference_counts(categoria):
+    counts = {}
+    for spec in _CATEGORIA_REFERENCE_SPECS:
+        counts[spec["key"]] = spec["model"].objects.filter(**{f"{spec['field']}_id": categoria.pk}).count()
+    return counts
+
+
+def _categoria_reference_items(categoria):
+    counts = _categoria_reference_counts(categoria)
+    items = [
+        {
+            "key": spec["key"],
+            "label": spec["label"],
+            "count": counts[spec["key"]],
+            "delete_action": spec["delete_action"],
+        }
+        for spec in _CATEGORIA_REFERENCE_SPECS
+    ]
+    return items, sum(counts.values()), counts
+
+
+def _categoria_descendant_ids(categoria):
+    descendant_ids = set()
+    pending = list(CategoriaFinanziaria.objects.filter(parent_id=categoria.pk).values_list("pk", flat=True))
+    while pending:
+        current_id = pending.pop()
+        if current_id in descendant_ids:
+            continue
+        descendant_ids.add(current_id)
+        pending.extend(
+            CategoriaFinanziaria.objects.filter(parent_id=current_id).values_list("pk", flat=True)
+        )
+    return descendant_ids
+
+
+def _categoria_transfer_destination_queryset(categoria):
+    excluded_ids = {categoria.pk} | _categoria_descendant_ids(categoria)
+    return (
+        CategoriaFinanziaria.objects.select_related("parent")
+        .filter(tipo=categoria.tipo)
+        .exclude(pk__in=excluded_ids)
+        .order_by("parent__nome", "ordine", "nome", "id")
+    )
+
+
+def _categoria_child_parent_conflicts(categoria, target_parent):
+    child_names = list(CategoriaFinanziaria.objects.filter(parent_id=categoria.pk).values_list("nome", flat=True))
+    if not child_names:
+        return []
+
+    queryset = CategoriaFinanziaria.objects.filter(nome__in=child_names)
+    if target_parent is None:
+        queryset = queryset.filter(parent__isnull=True).exclude(pk=categoria.pk)
+    else:
+        queryset = queryset.filter(parent=target_parent)
+    return list(queryset.order_by("nome").values_list("nome", flat=True))
+
+
+def _trasferisci_collegamenti_categoria(categoria, destinazione):
+    counts = _categoria_reference_counts(categoria)
+    with transaction.atomic():
+        MovimentoFinanziario.objects.filter(categoria_id=categoria.pk).update(categoria_id=destinazione.pk)
+        Fornitore.objects.filter(categoria_spesa_id=categoria.pk).update(categoria_spesa_id=destinazione.pk)
+        DocumentoFornitore.objects.filter(categoria_spesa_id=categoria.pk).update(categoria_spesa_id=destinazione.pk)
+        VoceBudgetRicorrente.objects.filter(categoria_id=categoria.pk).update(categoria_id=destinazione.pk)
+        PianoRatealeSpesa.objects.filter(categoria_id=categoria.pk).update(categoria_id=destinazione.pk)
+        SpesaOperativa.objects.filter(categoria_id=categoria.pk).update(categoria_id=destinazione.pk)
+        BustaPagaDipendente.objects.filter(categoria_id=categoria.pk).update(categoria_id=destinazione.pk)
+        RegolaCategorizzazione.objects.filter(categoria_da_assegnare_id=categoria.pk).update(
+            categoria_da_assegnare_id=destinazione.pk
+        )
+        CategoriaFinanziaria.objects.filter(parent_id=categoria.pk).update(parent_id=destinazione.pk)
+    return counts
+
+
+def _scollega_e_cancella_categoria(categoria):
+    counts = _categoria_reference_counts(categoria)
+    categoria_id = categoria.pk
+    with transaction.atomic():
+        MovimentoFinanziario.objects.filter(categoria_id=categoria_id).update(
+            categoria=None,
+            categorizzazione_automatica=False,
+            regola_categorizzazione=None,
+            categorizzato_da=None,
+            categorizzato_il=None,
+        )
+        Fornitore.objects.filter(categoria_spesa_id=categoria_id).update(categoria_spesa=None)
+        DocumentoFornitore.objects.filter(categoria_spesa_id=categoria_id).update(categoria_spesa=None)
+        VoceBudgetRicorrente.objects.filter(categoria_id=categoria_id).update(categoria=None)
+        PianoRatealeSpesa.objects.filter(categoria_id=categoria_id).update(categoria=None)
+        SpesaOperativa.objects.filter(categoria_id=categoria_id).update(categoria=None)
+        BustaPagaDipendente.objects.filter(categoria_id=categoria_id).update(categoria=None)
+        RegolaCategorizzazione.objects.filter(categoria_da_assegnare_id=categoria_id).delete()
+        CategoriaFinanziaria.objects.filter(parent_id=categoria_id).update(parent=None)
+        categoria.delete()
+    return counts
 
 
 def lista_categorie_finanziarie(request):
@@ -5342,43 +5507,134 @@ def modifica_categoria_finanziaria(request, pk):
     )
 
 
+def trasferisci_categoria_finanziaria(request, pk):
+    categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
+    reference_items, reference_total, _counts = _categoria_reference_items(categoria)
+    destinazioni = list(_categoria_transfer_destination_queryset(categoria))
+    destinazioni_by_id = {str(destinazione.pk): destinazione for destinazione in destinazioni}
+    selected_destination_id = ""
+    form_error = ""
+
+    if request.method == "POST":
+        selected_destination_id = (request.POST.get("categoria_destinazione") or "").strip()
+        conferma = request.POST.get("conferma_trasferimento") == "1"
+        destinazione = destinazioni_by_id.get(selected_destination_id)
+
+        if not destinazione:
+            form_error = "Seleziona una categoria di destinazione valida."
+        elif not conferma:
+            form_error = "Conferma il trasferimento prima di procedere."
+        else:
+            child_conflicts = _categoria_child_parent_conflicts(categoria, destinazione)
+            if child_conflicts:
+                form_error = (
+                    "Non posso trasferire le sottocategorie perche' la destinazione contiene gia': "
+                    + ", ".join(child_conflicts)
+                    + ". Rinomina o sposta quelle sottocategorie prima di procedere."
+                )
+            else:
+                counts = _trasferisci_collegamenti_categoria(categoria, destinazione)
+                totale_trasferito = sum(counts.values())
+                messages.success(
+                    request,
+                    (
+                        f"Trasferimento completato: {totale_trasferito} collegamenti spostati "
+                        f"da {categoria.nome} a {destinazione.percorso_label}."
+                    ),
+                )
+                return redirect("lista_categorie_finanziarie")
+
+        messages.error(request, form_error)
+
+    return render(
+        request,
+        "gestione_finanziaria/categoria_transfer.html",
+        {
+            "categoria": categoria,
+            "reference_items": reference_items,
+            "reference_total": reference_total,
+            "destinazioni": destinazioni,
+            "selected_destination_id": selected_destination_id,
+            "form_error": form_error,
+        },
+    )
+
+
 def elimina_categoria_finanziaria(request, pk):
     popup = is_popup_request(request)
     categoria = get_object_or_404(CategoriaFinanziaria, pk=pk)
 
-    count_movimenti = categoria.movimenti.count()
-    count_fornitori = categoria.fornitori.count()
-    count_documenti = categoria.documenti_fornitori.count()
-    count_figlie = categoria.figli.count()
-    count_regole = categoria.regole.count()
-    count_voci_budget = categoria.voci_budget.count()
-    ha_vincoli = bool(count_movimenti or count_fornitori or count_documenti or count_figlie or count_regole or count_voci_budget)
+    reference_items, reference_total, _counts = _categoria_reference_items(categoria)
+    ha_vincoli = bool(reference_total)
+    confirmation_text = f"ELIMINA {categoria.nome}"
 
     if request.method == "POST":
-        if ha_vincoli:
-            if popup:
+        if popup and ha_vincoli:
+            return render(
+                request,
+                "gestione_finanziaria/entity_popup_delete.html",
+                _generic_popup_delete_context(
+                    request,
+                    f"Elimina categoria {categoria.nome}",
+                    str(categoria),
+                    True,
+                    "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
+                ),
+            )
+
+        if not popup:
+            posted_confirmation = (request.POST.get("conferma_eliminazione") or "").strip()
+            if posted_confirmation != confirmation_text:
+                messages.error(
+                    request,
+                    f"Conferma non valida. Digita esattamente: {confirmation_text}",
+                )
                 return render(
                     request,
-                    "gestione_finanziaria/entity_popup_delete.html",
-                    _generic_popup_delete_context(
-                        request,
-                        f"Elimina categoria {categoria.nome}",
-                        str(categoria),
-                        True,
-                        "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
+                    "gestione_finanziaria/categoria_confirm_delete.html",
+                    {
+                        "categoria": categoria,
+                        "reference_items": reference_items,
+                        "reference_total": reference_total,
+                        "confirmation_text": confirmation_text,
+                        "form_error": "La frase di conferma non corrisponde.",
+                    },
+                )
+
+            child_conflicts = _categoria_child_parent_conflicts(categoria, None)
+            if child_conflicts:
+                messages.error(
+                    request,
+                    (
+                        "Non posso promuovere le sottocategorie a categorie padre perche' esistono gia': "
+                        + ", ".join(child_conflicts)
+                        + ". Trasferisci prima la categoria verso un'altra destinazione oppure rinomina le sottocategorie."
                     ),
                 )
-            messages.error(
-                request,
-                "Impossibile eliminare la categoria: ha elementi collegati. Puoi disattivarla invece di eliminarla.",
-            )
-            return redirect("lista_categorie_finanziarie")
+                return render(
+                    request,
+                    "gestione_finanziaria/categoria_confirm_delete.html",
+                    {
+                        "categoria": categoria,
+                        "reference_items": reference_items,
+                        "reference_total": reference_total,
+                        "confirmation_text": confirmation_text,
+                        "form_error": "Conflitto fra sottocategorie e categorie padre esistenti.",
+                    },
+                )
 
         object_id = categoria.pk
-        categoria.delete()
+        delete_counts = _scollega_e_cancella_categoria(categoria)
         if popup:
             return popup_delete_response(request, "categoria_finanziaria", object_id)
-        messages.success(request, "Categoria finanziaria eliminata correttamente.")
+        totale_scollegato = sum(delete_counts.values())
+        messages.success(
+            request,
+            (
+                f"Categoria finanziaria eliminata. "
+                f"{totale_scollegato} collegamenti sono stati scollegati o rimossi."
+            ),
+        )
         return redirect("lista_categorie_finanziarie")
 
     if popup:
@@ -5399,13 +5655,10 @@ def elimina_categoria_finanziaria(request, pk):
         "gestione_finanziaria/categoria_confirm_delete.html",
         {
             "categoria": categoria,
-            "count_movimenti": count_movimenti,
-            "count_fornitori": count_fornitori,
-            "count_documenti": count_documenti,
-            "count_figlie": count_figlie,
-            "count_regole": count_regole,
-            "count_voci_budget": count_voci_budget,
-            "ha_vincoli": ha_vincoli,
+            "reference_items": reference_items,
+            "reference_total": reference_total,
+            "confirmation_text": confirmation_text,
+            "form_error": "",
         },
     )
 

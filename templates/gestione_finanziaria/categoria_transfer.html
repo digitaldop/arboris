@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Elimina categoria {{ categoria.nome }} - Arboris School Management{% endblock %}
+{% block title %}Trasferisci categoria {{ categoria.nome }} - Arboris School Management{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -11,7 +11,7 @@
         <span class="breadcrumb-sep">&gt;</span>
         <a href="{% url 'lista_categorie_finanziarie' %}">Categorie</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <span>Elimina</span>
+        <span>Trasferisci</span>
     </div>
 {% endblock %}
 
@@ -19,15 +19,15 @@
     <div class="page-head family-page-head anagrafica-list-head finance-page-head">
         <div class="family-page-title-block">
             <div class="family-page-title-line">
-                <h1 class="page-title">Elimina categoria</h1>
-                <span class="family-status-pill is-danger">
+                <h1 class="page-title">Trasferisci assegnazioni</h1>
+                <span class="family-status-pill is-muted">
                     <span class="family-status-dot" aria-hidden="true"></span>
-                    Conferma forte
+                    {{ reference_total }} collegamenti
                 </span>
             </div>
             <div class="family-page-address">
-                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
-                {{ categoria.percorso_label }} sara' rimossa dall'archivio categorie.
+                <span class="family-meta-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#move-horizontal"></use></svg></span>
+                Da <strong>{{ categoria.percorso_label }}</strong> verso una categoria dello stesso tipo.
             </div>
         </div>
         <div class="page-head-actions family-page-actions">
@@ -38,17 +38,13 @@
         </div>
     </div>
 
-    <div class="finance-danger-panel">
-        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></div>
+    <div class="finance-guide-panel">
+        <div class="finance-guide-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></div>
         <div class="finance-guide-copy">
-            <div class="finance-guide-title">Eliminazione con scollegamento dati</div>
+            <div class="finance-guide-title">Unione categorie duplicate</div>
             <p>
-                La categoria verra' eliminata definitivamente. I dati categorizzati non verranno eliminati:
-                perderanno solo il collegamento a questa categoria. Le regole automatiche collegate verranno eliminate.
-            </p>
-            <p class="help-text">
-                Se vuoi unire categorie duplicate senza perdere il riferimento, trasferisci prima i collegamenti
-                verso la categoria corretta.
+                Questa operazione sposta movimenti, documenti, budget, regole automatiche e sottocategorie
+                dalla categoria sorgente alla destinazione. La categoria sorgente resta disponibile finche' non la elimini.
             </p>
         </div>
     </div>
@@ -56,8 +52,8 @@
     <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-category-maintenance-panel">
         <div class="finance-section-head">
             <div>
-                <h2 class="section-title">Collegamenti interessati</h2>
-                <p class="finance-section-subtitle">{{ reference_total }} collegamenti verranno scollegati, spostati o rimossi.</p>
+                <h2 class="section-title">Impatto del trasferimento</h2>
+                <p class="finance-section-subtitle">Elementi che oggi puntano a {{ categoria.nome }}.</p>
             </div>
         </div>
         <div class="panel-body">
@@ -66,7 +62,6 @@
                     <div class="finance-category-reference-card {% if item.count %}has-items{% endif %}">
                         <span>{{ item.label }}</span>
                         <strong>{{ item.count }}</strong>
-                        <small>{{ item.delete_action }}</small>
                     </div>
                 {% endfor %}
             </div>
@@ -76,36 +71,43 @@
     <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-category-maintenance-panel">
         <div class="finance-section-head">
             <div>
-                <h2 class="section-title">Conferma eliminazione</h2>
-                <p class="finance-section-subtitle">Digita la frase richiesta per abilitare l'operazione.</p>
+                <h2 class="section-title">Destinazione</h2>
+                <p class="finance-section-subtitle">Seleziona la categoria corretta che deve assorbire i collegamenti.</p>
             </div>
         </div>
         <div class="panel-body">
             {% if form_error %}
                 <div class="message message-error">{{ form_error }}</div>
             {% endif %}
-
             <form method="post" class="detail-form finance-category-maintenance-form">
                 {% csrf_token %}
                 <label class="finance-form-field">
-                    <span class="finance-form-label">Frase di conferma</span>
-                    <input type="text" name="conferma_eliminazione" autocomplete="off" required placeholder="{{ confirmation_text }}">
-                    <span class="help-text">Scrivi esattamente: <strong>{{ confirmation_text }}</strong></span>
+                    <span class="finance-form-label">Categoria destinazione</span>
+                    <select name="categoria_destinazione" id="id_categoria_destinazione" required data-searchable-select="1" data-searchable-placeholder="Cerca categoria destinazione...">
+                        <option value="">---------</option>
+                        {% for destinazione in destinazioni %}
+                            <option value="{{ destinazione.pk }}" {% if selected_destination_id == destinazione.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ destinazione.percorso_label }}{% if not destinazione.attiva %} (non attiva){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    {% if not destinazioni %}
+                        <span class="help-text">Non esistono altre categorie dello stesso tipo disponibili come destinazione.</span>
+                    {% endif %}
+                </label>
+
+                <label class="finance-toggle-field">
+                    <input type="checkbox" name="conferma_trasferimento" value="1" required>
+                    <span>Confermo di voler trasferire tutti i collegamenti alla categoria selezionata.</span>
+                    <span></span>
+                    <span class="help-text">L'operazione aggiorna anche le regole automatiche e le sottocategorie.</span>
                 </label>
 
                 <div class="form-actions finance-confirm-actions">
-                    <button
-                        type="submit"
-                        class="btn btn-danger btn-icon-text"
-                        onclick="return confirm('Confermi eliminazione categoria e scollegamento dei dati collegati?');"
-                    >
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                        <span class="btn-label">Elimina categoria</span>
-                    </button>
-                    <a href="{% url 'trasferisci_categoria_finanziaria' categoria.pk %}" class="btn btn-secondary btn-icon-text">
+                    <button type="submit" class="btn btn-primary btn-icon-text" {% if not destinazioni %}disabled{% endif %}>
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#move-horizontal"></use></svg></span>
-                        <span class="btn-label">Trasferisci prima</span>
-                    </a>
+                        <span class="btn-label">Trasferisci collegamenti</span>
+                    </button>
                     <a href="{% url 'lista_categorie_finanziarie' %}" class="btn btn-secondary btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
                         <span class="btn-label">Annulla</span>

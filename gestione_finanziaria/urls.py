@@ -502,6 +502,11 @@ urlpatterns = [
         name="modifica_categoria_finanziaria",
     ),
     path(
+        "gestione-finanziaria/categorie/<int:pk>/trasferisci/",
+        gf_manage(views.trasferisci_categoria_finanziaria),
+        name="trasferisci_categoria_finanziaria",
+    ),
+    path(
         "gestione-finanziaria/categorie/<int:pk>/elimina/",
         gf_manage(views.elimina_categoria_finanziaria),
         name="elimina_categoria_finanziaria",

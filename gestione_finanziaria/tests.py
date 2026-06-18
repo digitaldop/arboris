@@ -1401,6 +1401,155 @@ class MovimentoCategoriaInlineTests(TestCase):
         self.assertContains(response, 'data-category-icon="bolt"', html=False)
 
 
+class CategoriaFinanziariaMaintenanceTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="finanza-categorie@example.com",
+            email="finanza-categorie@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(self.user)
+
+    def _crea_categoria_con_collegamenti(self):
+        sorgente = CategoriaFinanziaria.objects.create(
+            nome="Utenze duplicate",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        destinazione = CategoriaFinanziaria.objects.create(
+            nome="Utenze",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+        )
+        figlia = CategoriaFinanziaria.objects.create(
+            nome="Energia elettrica",
+            tipo=TipoCategoriaFinanziaria.SPESA,
+            parent=sorgente,
+        )
+        regola = RegolaCategorizzazione.objects.create(
+            nome="Regola utenze",
+            condizione_tipo=CondizioneRegolaCategorizzazione.DESCRIZIONE_CONTIENE,
+            pattern="bolletta",
+            categoria_da_assegnare=sorgente,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 5, 20),
+            importo=Decimal("-80.00"),
+            descrizione="Bolletta energia",
+            categoria=sorgente,
+            categorizzazione_automatica=True,
+            regola_categorizzazione=regola,
+        )
+        fornitore = Fornitore.objects.create(
+            denominazione="Fornitore energia",
+            categoria_spesa=sorgente,
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            categoria_spesa=sorgente,
+            numero_documento="FT-1",
+            data_documento=date(2026, 5, 21),
+        )
+        voce_budget = VoceBudgetRicorrente.objects.create(
+            nome="Budget utenze",
+            tipo=TipoVoceBudget.USCITA,
+            categoria=sorgente,
+            importo=Decimal("100.00"),
+            data_inizio=date(2026, 1, 1),
+        )
+        piano = PianoRatealeSpesa.objects.create(
+            descrizione="Piano utenze",
+            categoria=sorgente,
+            importo_totale=Decimal("300.00"),
+            data_prima_scadenza=date(2026, 6, 1),
+        )
+        spesa = SpesaOperativa.objects.create(
+            descrizione="Rata utenze",
+            categoria=sorgente,
+            data_scadenza=date(2026, 6, 1),
+            importo_previsto=Decimal("100.00"),
+        )
+        return {
+            "sorgente": sorgente,
+            "destinazione": destinazione,
+            "figlia": figlia,
+            "regola": regola,
+            "movimento": movimento,
+            "fornitore": fornitore,
+            "documento": documento,
+            "voce_budget": voce_budget,
+            "piano": piano,
+            "spesa": spesa,
+        }
+
+    def test_trasferimento_categoria_sposta_collegamenti(self):
+        dati = self._crea_categoria_con_collegamenti()
+
+        get_response = self.client.get(reverse("trasferisci_categoria_finanziaria", args=[dati["sorgente"].pk]))
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, 'id="id_categoria_destinazione"', html=False)
+        self.assertContains(get_response, dati["destinazione"].percorso_label)
+
+        response = self.client.post(
+            reverse("trasferisci_categoria_finanziaria", args=[dati["sorgente"].pk]),
+            {
+                "categoria_destinazione": str(dati["destinazione"].pk),
+                "conferma_trasferimento": "1",
+            },
+        )
+
+        self.assertRedirects(response, reverse("lista_categorie_finanziarie"))
+        self.assertTrue(CategoriaFinanziaria.objects.filter(pk=dati["sorgente"].pk).exists())
+        for key in ["figlia", "regola", "movimento", "fornitore", "documento", "voce_budget", "piano", "spesa"]:
+            dati[key].refresh_from_db()
+        self.assertEqual(dati["figlia"].parent, dati["destinazione"])
+        self.assertEqual(dati["regola"].categoria_da_assegnare, dati["destinazione"])
+        self.assertEqual(dati["movimento"].categoria, dati["destinazione"])
+        self.assertEqual(dati["fornitore"].categoria_spesa, dati["destinazione"])
+        self.assertEqual(dati["documento"].categoria_spesa, dati["destinazione"])
+        self.assertEqual(dati["voce_budget"].categoria, dati["destinazione"])
+        self.assertEqual(dati["piano"].categoria, dati["destinazione"])
+        self.assertEqual(dati["spesa"].categoria, dati["destinazione"])
+
+    def test_eliminazione_categoria_richiede_conferma_forte(self):
+        dati = self._crea_categoria_con_collegamenti()
+
+        response = self.client.post(
+            reverse("elimina_categoria_finanziaria", args=[dati["sorgente"].pk]),
+            {"conferma_eliminazione": "ELIMINA altra categoria"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(CategoriaFinanziaria.objects.filter(pk=dati["sorgente"].pk).exists())
+        dati["movimento"].refresh_from_db()
+        self.assertEqual(dati["movimento"].categoria, dati["sorgente"])
+
+    def test_eliminazione_categoria_scollega_dati_ed_elimina_regole(self):
+        dati = self._crea_categoria_con_collegamenti()
+
+        response = self.client.post(
+            reverse("elimina_categoria_finanziaria", args=[dati["sorgente"].pk]),
+            {"conferma_eliminazione": f"ELIMINA {dati['sorgente'].nome}"},
+        )
+
+        self.assertRedirects(response, reverse("lista_categorie_finanziarie"))
+        self.assertFalse(CategoriaFinanziaria.objects.filter(pk=dati["sorgente"].pk).exists())
+        self.assertFalse(RegolaCategorizzazione.objects.filter(pk=dati["regola"].pk).exists())
+        for key in ["figlia", "movimento", "fornitore", "documento", "voce_budget", "piano", "spesa"]:
+            dati[key].refresh_from_db()
+        self.assertIsNone(dati["figlia"].parent)
+        self.assertIsNone(dati["movimento"].categoria)
+        self.assertFalse(dati["movimento"].categorizzazione_automatica)
+        self.assertIsNone(dati["movimento"].regola_categorizzazione)
+        self.assertIsNone(dati["fornitore"].categoria_spesa)
+        self.assertIsNone(dati["documento"].categoria_spesa)
+        self.assertIsNone(dati["voce_budget"].categoria)
+        self.assertIsNone(dati["piano"].categoria)
+        self.assertIsNone(dati["spesa"].categoria)
+
+
 class FusioneContiBancariTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
