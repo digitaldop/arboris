@@ -446,6 +446,37 @@ class DocumentoFornitore(models.Model):
         return max(residuo, Decimal("0.00"))
 
 
+class DocumentoFornitoreImportAlias(models.Model):
+    external_source = models.CharField(max_length=60, db_index=True)
+    external_id = models.CharField(max_length=120, db_index=True)
+    documento = models.ForeignKey(
+        DocumentoFornitore,
+        on_delete=models.SET_NULL,
+        related_name="import_aliases",
+        blank=True,
+        null=True,
+    )
+    ignorato = models.BooleanField(default=False, db_index=True)
+    motivo = models.CharField(max_length=120, blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_finanziaria_documento_fornitore_import_alias"
+        ordering = ["external_source", "external_id"]
+        verbose_name = "Alias import documento fornitore"
+        verbose_name_plural = "Alias import documenti fornitori"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["external_source", "external_id"],
+                name="gf_doc_forn_import_alias_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.external_source} #{self.external_id}"
+
+
 class StatoScadenzaFornitore(models.TextChoices):
     PREVISTA = "prevista", "Prevista"
     SCADUTA = "scaduta", "Scaduta"

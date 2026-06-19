@@ -5,6 +5,7 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    DocumentoFornitoreImportAlias,
     FattureInCloudConnessione,
     FattureInCloudSyncLog,
     Fornitore,
@@ -98,6 +99,15 @@ class DocumentoFornitoreAdmin(admin.ModelAdmin):
         if db_field.name == "categoria_spesa":
             kwargs["queryset"] = CategoriaFinanziaria.objects.filter(tipo=TipoCategoriaFinanziaria.SPESA)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(DocumentoFornitoreImportAlias)
+class DocumentoFornitoreImportAliasAdmin(admin.ModelAdmin):
+    list_display = ("external_source", "external_id", "documento", "ignorato", "motivo", "data_aggiornamento")
+    list_filter = ("external_source", "ignorato", "motivo")
+    search_fields = ("external_id", "documento__numero_documento", "documento__fornitore__denominazione")
+    autocomplete_fields = ("documento",)
+    readonly_fields = ("data_creazione", "data_aggiornamento")
 
 
 @admin.register(ScadenzaPagamentoFornitore)

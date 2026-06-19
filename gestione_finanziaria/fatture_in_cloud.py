@@ -32,6 +32,7 @@ from .models import (
     TipoDocumentoFornitore,
     TipoSyncFattureInCloud,
     DocumentoFornitore,
+    DocumentoFornitoreImportAlias,
 )
 from .security import cifra_testo, decifra_testo_safe
 from .services import (
@@ -1675,6 +1676,118 @@ def _find_existing_document_by_import_signature(document_data, fornitore, entity
     return sorted(matches, key=_document_import_match_key)[0]
 
 
+def _clean_external_alias_value(value):
+    return str(value or "").strip()
+
+
+def _fic_import_alias_for_external_id(external_id):
+    external_id = _clean_external_alias_value(external_id)
+    if not external_id:
+        return None
+    alias = (
+        DocumentoFornitoreImportAlias.objects.select_for_update()
+        .filter(external_source=FIC_SOURCE, external_id=external_id)
+        .first()
+    )
+    if alias and alias.documento_id:
+        alias.documento = DocumentoFornitore.objects.select_for_update().filter(pk=alias.documento_id).first()
+    return alias
+
+
+def _upsert_document_import_alias(documento, external_source, external_id, *, motivo=""):
+    external_source = _clean_external_alias_value(external_source)
+    external_id = _clean_external_alias_value(external_id)
+    if not external_source or not external_id:
+        return None
+    alias, _created = DocumentoFornitoreImportAlias.objects.update_or_create(
+        external_source=external_source,
+        external_id=external_id,
+        defaults={
+            "documento": documento,
+            "ignorato": False,
+            "motivo": motivo,
+        },
+    )
+    return alias
+
+
+def _ignore_document_import_alias(external_source, external_id, *, motivo=""):
+    external_source = _clean_external_alias_value(external_source)
+    external_id = _clean_external_alias_value(external_id)
+    if not external_source or not external_id:
+        return None
+    alias, _created = DocumentoFornitoreImportAlias.objects.update_or_create(
+        external_source=external_source,
+        external_id=external_id,
+        defaults={
+            "documento": None,
+            "ignorato": True,
+            "motivo": motivo,
+        },
+    )
+    return alias
+
+
+def registra_alias_import_documento_fornitore(documento, *, motivo="import_fatture_in_cloud"):
+    return _upsert_document_import_alias(documento, documento.external_source, documento.external_id, motivo=motivo)
+
+
+def assorbi_alias_import_documento_fornitore(documento_duplicato, documento_keep, *, motivo="pulizia_duplicati"):
+    if not documento_duplicato or not documento_keep or documento_duplicato.pk == documento_keep.pk:
+        return 0
+
+    aggiornati = 0
+    if documento_duplicato.external_source and documento_duplicato.external_id:
+        _upsert_document_import_alias(
+            documento_keep,
+            documento_duplicato.external_source,
+            documento_duplicato.external_id,
+            motivo=motivo,
+        )
+        aggiornati += 1
+
+    aggiornati += DocumentoFornitoreImportAlias.objects.filter(documento=documento_duplicato).update(
+        documento=documento_keep,
+        ignorato=False,
+        motivo=motivo,
+        data_aggiornamento=timezone.now(),
+    )
+    return aggiornati
+
+
+def ignora_alias_import_documento_fornitore(documento, *, motivo="documento_eliminato"):
+    if not documento:
+        return 0
+
+    aggiornati = 0
+    if documento.external_source and documento.external_id:
+        _ignore_document_import_alias(documento.external_source, documento.external_id, motivo=motivo)
+        aggiornati += 1
+
+    aggiornati += DocumentoFornitoreImportAlias.objects.filter(documento=documento).update(
+        documento=None,
+        ignorato=True,
+        motivo=motivo,
+        data_aggiornamento=timezone.now(),
+    )
+    return aggiornati
+
+
+def _skipped_import_result(documento=None, *, reason=""):
+    return {
+        "documento": documento,
+        "created": False,
+        "updated": False,
+        "skipped": True,
+        "skip_reason": reason,
+        "fornitore_created": False,
+        "fornitore_updated": False,
+        "scadenze_create": 0,
+        "pagamenti_auto": 0,
+        "notifica_created": False,
+    }
+
+
 def _document_is_before_sync_start(document_data, data_inizio):
     if not data_inizio:
         return False
@@ -1848,14 +1961,33 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     if not document_data or not document_data.get("id"):
         raise ValidationError("Documento Fatture in Cloud privo di ID.")
 
+    external_id = _clean_external_alias_value(document_data.get("id"))
+    import_alias = _fic_import_alias_for_external_id(external_id)
+    if import_alias and import_alias.ignorato:
+        return _skipped_import_result(import_alias.documento, reason="alias_ignorato")
+    if import_alias and import_alias.documento is None:
+        import_alias.ignorato = True
+        import_alias.motivo = import_alias.motivo or "documento_eliminato"
+        import_alias.save(update_fields=["ignorato", "motivo", "data_aggiornamento"])
+        return _skipped_import_result(reason="alias_documento_eliminato")
+
+    documento = None
+    if import_alias:
+        documento = import_alias.documento
+        if not (
+            documento.external_source == FIC_SOURCE
+            and _clean_external_alias_value(documento.external_id) == external_id
+        ):
+            return _skipped_import_result(documento, reason="alias_assorbito")
+
     entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
     fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
-    external_id = str(document_data.get("id"))
-    documento = (
-        DocumentoFornitore.objects.select_for_update()
-        .filter(external_source=FIC_SOURCE, external_id=external_id)
-        .first()
-    )
+    if documento is None:
+        documento = (
+            DocumentoFornitore.objects.select_for_update()
+            .filter(external_source=FIC_SOURCE, external_id=external_id)
+            .first()
+        )
     created = False
     if documento is None:
         documento = DocumentoFornitore.objects.select_for_update().filter(
@@ -1870,8 +2002,20 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento = DocumentoFornitore()
         created = True
 
+    previous_external_source = documento.external_source if documento.pk else ""
+    previous_external_id = documento.external_id if documento.pk else ""
     _update_document_fields(documento, document_data, fornitore, pending, source_doc_type=source_doc_type)
     documento.save()
+    registra_alias_import_documento_fornitore(documento, motivo="import_fatture_in_cloud")
+    if previous_external_source and previous_external_id and (
+        previous_external_source != documento.external_source or previous_external_id != documento.external_id
+    ):
+        _upsert_document_import_alias(
+            documento,
+            previous_external_source,
+            previous_external_id,
+            motivo="alias_precedente_import",
+        )
 
     attachment_result = _salva_allegato_fatture_in_cloud(documento, document_data)
     if attachment_result.get("saved") or attachment_result.get("error"):
@@ -2141,13 +2285,14 @@ def _check_sync_budget(start, max_seconds):
 
 
 def _add_import_result_to_stats(stats, result):
-    stats["creati"] += 1 if result["created"] else 0
-    stats["aggiornati"] += 1 if result["updated"] else 0
-    stats["scadenze"] += result["scadenze_create"]
+    stats["creati"] += 1 if result.get("created") else 0
+    stats["aggiornati"] += 1 if result.get("updated") else 0
+    stats["ignorati"] += 1 if result.get("skipped") else 0
+    stats["scadenze"] += result.get("scadenze_create", 0)
     stats["pagamenti_auto"] += result.get("pagamenti_auto", 0)
-    stats["notifiche"] += 1 if result["notifica_created"] else 0
-    stats["fornitori_creati"] += 1 if result["fornitore_created"] else 0
-    stats["fornitori_aggiornati"] += 1 if result["fornitore_updated"] else 0
+    stats["notifiche"] += 1 if result.get("notifica_created") else 0
+    stats["fornitori_creati"] += 1 if result.get("fornitore_created") else 0
+    stats["fornitori_aggiornati"] += 1 if result.get("fornitore_updated") else 0
 
 
 def _sync_summary_label(doc_type, pending):
@@ -2162,6 +2307,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
     stats = {
         "creati": 0,
         "aggiornati": 0,
+        "ignorati": 0,
         "scadenze": 0,
         "notifiche": 0,
         "pagamenti_auto": 0,
@@ -2266,6 +2412,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
         if not stats["messaggi"]:
             stats["messaggi"].append(
                 f"Importati {stats['creati']} nuovi documenti, aggiornati {stats['aggiornati']} documenti. "
+                f"Ignorati {stats['ignorati']} documenti gia gestiti. "
                 f"Fornitori: {stats['fornitori_creati']} creati, "
                 f"{stats['fornitori_aggiornati']} aggiornati. "
                 f"Pagamenti riconosciuti: {stats['pagamenti_auto']}."

@@ -34,9 +34,11 @@ from .fatture_in_cloud import (
     FIC_SOURCE,
     FattureInCloudError,
     FattureInCloudClient,
+    assorbi_alias_import_documento_fornitore,
     authorization_url,
     configured_oauth_redirect_uri,
     has_oauth_credentials,
+    ignora_alias_import_documento_fornitore,
     importa_documento_da_webhook,
     oauth_env_configured,
     sincronizza_fatture_in_cloud,
@@ -988,7 +990,9 @@ def elimina_documento_fornitore(request, pk):
     documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
     popup = is_popup_request(request)
     if request.method == "POST":
-        documento.delete()
+        with transaction.atomic():
+            ignora_alias_import_documento_fornitore(documento, motivo="eliminazione_manuale")
+            documento.delete()
         message = "Fattura fornitore eliminata correttamente."
         if popup:
             return render(
@@ -1073,7 +1077,12 @@ def elimina_documenti_fornitori_multipla(request):
     if request.POST.get("conferma") == "1":
         count = len(documenti)
         with transaction.atomic():
-            DocumentoFornitore.objects.filter(pk__in=[documento.pk for documento in documenti]).delete()
+            locked_documenti = list(
+                DocumentoFornitore.objects.select_for_update().filter(pk__in=[documento.pk for documento in documenti])
+            )
+            for documento in locked_documenti:
+                ignora_alias_import_documento_fornitore(documento, motivo="eliminazione_multipla")
+            DocumentoFornitore.objects.filter(pk__in=[documento.pk for documento in locked_documenti]).delete()
         messages.success(request, f"Eliminate {count} fatture fornitori selezionate.")
         return redirect(next_url)
 
@@ -1530,6 +1539,11 @@ def _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs):
             documento_keep = documenti.get(keep_id)
             if not documento_duplicato or not documento_keep or documento_duplicato.pk == documento_keep.pk:
                 continue
+            assorbi_alias_import_documento_fornitore(
+                documento_duplicato,
+                documento_keep,
+                motivo="pulizia_duplicati",
+            )
             eliminati_ids.append(documento_duplicato.pk)
 
         if eliminati_ids:
@@ -2682,6 +2696,7 @@ def sincronizza_fatture_in_cloud_view(request, pk):
         message = (
             f"Sincronizzazione completata: {stats['creati']} documenti nuovi, "
             f"{stats['aggiornati']} documenti aggiornati. "
+            f"{stats.get('ignorati', 0)} documenti gia gestiti ignorati. "
             f"Fornitori: {stats.get('fornitori_creati', 0)} nuovi, "
             f"{stats.get('fornitori_aggiornati', 0)} aggiornati."
         )

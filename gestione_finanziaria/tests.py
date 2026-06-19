@@ -32,6 +32,7 @@ from .models import (
     ConnessioneBancaria,
     ContoBancario,
     DocumentoFornitore,
+    DocumentoFornitoreImportAlias,
     EsitoSincronizzazione,
     FattureInCloudConnessione,
     FattureInCloudSyncLog,
@@ -2830,6 +2831,67 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertFalse(DocumentoFornitore.objects.filter(pk=documento_duplicato.pk).exists())
         self.assertTrue(ScadenzaPagamentoFornitore.objects.filter(pk=scadenza.pk, documento=documento_keep).exists())
 
+    def test_pulizia_duplicati_documenti_fornitori_memorizza_alias_fic_eliminato(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        fornitore = Fornitore.objects.create(denominazione="Alias Supplier")
+        documento_keep = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="ALIAS-1",
+            data_documento=date(2026, 1, 31),
+            totale=Decimal("122.00"),
+            origine=OrigineDocumentoFornitore.FATTURE_IN_CLOUD,
+            external_source="fatture_in_cloud",
+            external_id="fic-keep",
+        )
+        documento_duplicato = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="ALIAS 1",
+            data_documento=date(2026, 1, 31),
+            totale=Decimal("122.00"),
+            origine=OrigineDocumentoFornitore.FATTURE_IN_CLOUD,
+            external_source="fatture_in_cloud",
+            external_id="fic-dup",
+        )
+
+        response = self.client.post(
+            reverse("pulizia_duplicati_documenti_fornitori"),
+            {"selected_ids": [str(documento_duplicato.pk)]},
+        )
+
+        self.assertRedirects(response, reverse("fatture_scadenze_fornitori"))
+        self.assertTrue(DocumentoFornitore.objects.filter(pk=documento_keep.pk).exists())
+        self.assertFalse(DocumentoFornitore.objects.filter(pk=documento_duplicato.pk).exists())
+        alias = DocumentoFornitoreImportAlias.objects.get(
+            external_source="fatture_in_cloud",
+            external_id="fic-dup",
+        )
+        self.assertEqual(alias.documento, documento_keep)
+        self.assertFalse(alias.ignorato)
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {
+                "id": "fic-dup",
+                "type": "expense",
+                "description": "Duplicato gia assorbito",
+                "invoice_number": "ALIAS 1",
+                "date": "2026-01-31",
+                "amount_net": "100.00",
+                "amount_vat": "22.00",
+                "amount_gross": "122.00",
+                "entity": {"name": "Alias Supplier"},
+                "payments_list": [{"due_date": "2026-02-28", "amount": "122.00"}],
+            },
+            pending=False,
+            utente=self.user,
+        )
+
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["skip_reason"], "alias_assorbito")
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        documento_keep.refresh_from_db()
+        self.assertEqual(documento_keep.external_id, "fic-keep")
+
     def test_pagamento_fornitore_popup_usa_layout_senza_shell_globale(self):
         scadenza, _movimento = self._crea_scadenza_pagamento_test()
 
@@ -3646,6 +3708,35 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, r"gestione\u002Dfinanziaria/fatture\u002Dscadenze\u002Dfornitori")
         self.assertFalse(DocumentoFornitore.objects.filter(pk=documento.pk).exists())
         self.assertFalse(ScadenzaPagamentoFornitore.objects.filter(documento_id=documento.pk).exists())
+        alias = DocumentoFornitoreImportAlias.objects.get(
+            external_source="fatture_in_cloud",
+            external_id="fic-del-1",
+        )
+        self.assertIsNone(alias.documento)
+        self.assertTrue(alias.ignorato)
+
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {
+                "id": "fic-del-1",
+                "type": "expense",
+                "description": "Fattura gia eliminata",
+                "invoice_number": "FIC-DEL-1",
+                "date": "2026-05-08",
+                "amount_net": "100.00",
+                "amount_vat": "22.00",
+                "amount_gross": "122.00",
+                "entity": {"name": "FIC Delete Supplier"},
+                "payments_list": [{"due_date": "2026-05-31", "amount": "122.00"}],
+            },
+            pending=False,
+            utente=self.user,
+        )
+
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["skip_reason"], "alias_ignorato")
+        self.assertFalse(DocumentoFornitore.objects.filter(external_id="fic-del-1").exists())
 
     def test_documento_fornitore_popup_salva_categoria_con_fornitore_inattivo(self):
         categoria = crea_categoria_spesa_test("Categoria aggiornata")
