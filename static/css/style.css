@@ -9545,6 +9545,65 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     align-items: center;
 }
 
+.supplier-document-compensation-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid #dbe8ef;
+    border-radius: 8px;
+    background: #f7fbfd;
+}
+
+.supplier-document-compensation-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: #4f6682;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.supplier-document-compensation-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: #e3f5ed;
+    color: #087b55;
+}
+
+.supplier-document-compensation-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.supplier-document-compensation-form {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+    margin: 0;
+}
+
+.supplier-document-compensation-form select {
+    width: min(100%, 520px);
+    min-width: 260px;
+}
+
+.supplier-document-compensation-form .btn {
+    flex: 0 0 auto;
+}
+
 .supplier-document-delete-inline-form {
     display: inline-flex;
     margin: 0;
@@ -10549,6 +10608,21 @@ html.app-modal-child .supplier-document-detail-shell.is-popup {
     }
 
     .supplier-profile-related-field .related-actions {
+        min-width: 0;
+    }
+
+    .supplier-document-compensation-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .supplier-document-compensation-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .supplier-document-compensation-form select {
+        width: 100%;
         min-width: 0;
     }
 
