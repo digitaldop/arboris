@@ -236,6 +236,16 @@
                                 {{ form.descrizione.errors }}
                             </div>
                         </div>
+
+                        <div class="supplier-document-field is-wide">
+                            <span class="supplier-document-field-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#document"></use></svg></span>
+                            <div class="supplier-document-field-body">
+                                <label for="{{ form.descrizione_righe_fattura.id_for_label }}">{{ form.descrizione_righe_fattura.label }}</label>
+                                <div class="mode-view-only readonly-display readonly-display-plain">{{ documento.descrizione_righe_fattura|default:"-"|linebreaksbr }}</div>
+                                <div class="mode-edit-field">{{ form.descrizione_righe_fattura }}</div>
+                                {{ form.descrizione_righe_fattura.errors }}
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -729,6 +739,7 @@
                         <tr><th>{{ form.anno_competenza.label_tag }}</th><td>{{ form.anno_competenza }} {{ form.anno_competenza.errors }}</td></tr>
                         <tr><th>{{ form.mese_competenza.label_tag }}</th><td>{{ form.mese_competenza }} {{ form.mese_competenza.errors }}</td></tr>
                         <tr><th>{{ form.descrizione.label_tag }}</th><td>{{ form.descrizione }} {{ form.descrizione.errors }}</td></tr>
+                        <tr><th>{{ form.descrizione_righe_fattura.label_tag }}</th><td>{{ form.descrizione_righe_fattura }} {{ form.descrizione_righe_fattura.errors }}</td></tr>
                     </table>
                 </div>
             </div>

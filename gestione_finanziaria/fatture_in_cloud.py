@@ -1023,7 +1023,7 @@ def _iter_invoice_line_items(document_data):
                         yield item
 
 
-def _document_line_descriptions(document_data):
+def _document_line_descriptions(document_data, *, limit=3):
     return _unique_text_values(
         (
             _first_present(
@@ -1035,8 +1035,24 @@ def _document_line_descriptions(document_data):
             )
             for item in _iter_invoice_line_items(document_data)
         ),
-        limit=3,
+        limit=limit,
     )
+
+
+def _document_invoice_line_descriptions(document_data):
+    return _unique_text_values(
+        [
+            *_document_line_descriptions(document_data, limit=20),
+            *_as_list(document_data.get("_arboris_line_descriptions")),
+            *_as_list(document_data.get("invoice_line_descriptions")),
+            *_as_list(document_data.get("line_descriptions")),
+        ],
+        limit=20,
+    )
+
+
+def _document_invoice_line_description_text(document_data):
+    return "\n".join(_document_invoice_line_descriptions(document_data))[:4000]
 
 
 def _document_causali(document_data):
@@ -1283,6 +1299,15 @@ def _document_with_attachment_invoice_detail(document_data, supplier_context):
         _as_dict(document_data.get("e_invoice")),
         _as_dict(attachment_document.get("e_invoice")),
     )
+    line_descriptions = _unique_text_values(
+        [
+            *_as_list(document_data.get("_arboris_line_descriptions")),
+            *_as_list(attachment_document.get("_arboris_line_descriptions")),
+        ],
+        limit=20,
+    )
+    if line_descriptions:
+        enriched["_arboris_line_descriptions"] = line_descriptions
     return enriched
 
 
@@ -1785,6 +1810,9 @@ def _update_document_fields(documento, document_data, fornitore, pending, *, sou
     documento.anno_competenza = doc_date.year
     documento.mese_competenza = doc_date.month
     documento.descrizione = _document_description(document_data)
+    descrizione_righe_fattura = _document_invoice_line_description_text(document_data)
+    if descrizione_righe_fattura or not documento.descrizione_righe_fattura:
+        documento.descrizione_righe_fattura = descrizione_righe_fattura
     documento.imponibile = amount_net
     documento.iva = amount_vat
     documento.totale = amount_gross

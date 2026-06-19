@@ -737,6 +737,7 @@ def lista_documenti_fornitori(request):
         documenti = documenti.filter(
             Q(numero_documento__icontains=q)
             | Q(descrizione__icontains=q)
+            | Q(descrizione_righe_fattura__icontains=q)
             | Q(fornitore__denominazione__icontains=q)
         )
     if fornitore_id.isdigit():
@@ -1688,6 +1689,7 @@ def fatture_scadenze_fornitori(request):
         scadenze = scadenze.filter(
             Q(documento__numero_documento__icontains=q)
             | Q(documento__descrizione__icontains=q)
+            | Q(documento__descrizione_righe_fattura__icontains=q)
             | Q(documento__fornitore__denominazione__icontains=q)
         )
     if fornitore_id.isdigit():

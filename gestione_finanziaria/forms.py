@@ -389,6 +389,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "anno_competenza",
             "mese_competenza",
             "descrizione",
+            "descrizione_righe_fattura",
             "imponibile",
             "aliquota_iva",
             "iva",
@@ -410,6 +411,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "anno_competenza": "Anno competenza",
             "mese_competenza": "Mese competenza",
             "descrizione": "Descrizione",
+            "descrizione_righe_fattura": "Descrizione righe fattura",
             "imponibile": "Imponibile",
             "aliquota_iva": "Aliquota IVA %",
             "iva": "IVA",
@@ -426,6 +428,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "data_ricezione": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "mese_competenza": forms.Select(choices=MESE_COMPETENZA_CHOICES),
             "descrizione": forms.TextInput(attrs={"placeholder": "Causale o descrizione sintetica"}),
+            "descrizione_righe_fattura": forms.Textarea(attrs={"rows": 3}),
             "note": forms.Textarea(attrs={"rows": 3}),
         }
 
@@ -437,6 +440,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "anno_competenza",
             "mese_competenza",
             "descrizione",
+            "descrizione_righe_fattura",
             "imponibile",
             "iva",
             "totale",

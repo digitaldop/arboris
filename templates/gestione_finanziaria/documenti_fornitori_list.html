@@ -168,6 +168,9 @@
                                                         {% endif %}
                                                     </span>
                                                     <span class="table-subtext">{{ documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}</span>
+                                                    {% if documento.descrizione_righe_fattura %}
+                                                        <span class="table-subtext">{{ documento.descrizione_righe_fattura|truncatechars:90 }}</span>
+                                                    {% endif %}
                                                 </span>
                                             </a>
                                         </td>

@@ -165,6 +165,13 @@ def document_data_from_e_invoice_xml(xml_text):
         if general_data:
             e_invoice_body["DatiGenerali"] = {"DatiGeneraliDocumento": general_data}
 
+    line_descriptions = []
+    for goods_services in _find_all(body, "DatiBeniServizi"):
+        for line in _find_all(goods_services, "DettaglioLinee"):
+            description = _text_for(line, "Descrizione")
+            if description:
+                line_descriptions.append(description)
+
     payment_groups = []
     for payment_group in _find_all(body, "DatiPagamento"):
         payment_details = []
@@ -181,7 +188,10 @@ def document_data_from_e_invoice_xml(xml_text):
     if payment_groups:
         e_invoice_body["DatiPagamento"] = payment_groups
 
-    return {"e_invoice": {"FatturaElettronicaBody": e_invoice_body}} if e_invoice_body else {}
+    result = {"e_invoice": {"FatturaElettronicaBody": e_invoice_body}} if e_invoice_body else {}
+    if line_descriptions:
+        result["_arboris_line_descriptions"] = line_descriptions
+    return result
 
 
 def decode_xml_bytes(data):

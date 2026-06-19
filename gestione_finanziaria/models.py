@@ -315,6 +315,7 @@ class DocumentoFornitore(models.Model):
     anno_competenza = models.PositiveIntegerField(blank=True, null=True)
     mese_competenza = models.PositiveSmallIntegerField(blank=True, null=True)
     descrizione = models.CharField(max_length=255, blank=True)
+    descrizione_righe_fattura = models.TextField(blank=True)
     imponibile = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     aliquota_iva = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("22.00"))
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))

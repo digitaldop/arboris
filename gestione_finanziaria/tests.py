@@ -4479,6 +4479,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         documento = DocumentoFornitore.objects.get(external_id="995")
         self.assertEqual(documento.descrizione, "Servizio mensa maggio; Materiale didattico")
+        self.assertEqual(documento.descrizione_righe_fattura, "Servizio mensa maggio\nMateriale didattico")
 
     def test_importa_documento_fatture_in_cloud_usa_causale_se_mancano_le_righe(self):
         connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
@@ -5089,6 +5090,13 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         <ImportoPagamento>102.00</ImportoPagamento>
       </DettaglioPagamento>
     </DatiPagamento>
+    <DatiBeniServizi>
+      <DettaglioLinee>
+        <NumeroLinea>1</NumeroLinea>
+        <Descrizione>Affitto locali aprile 2025</Descrizione>
+        <PrezzoTotale>102.00</PrezzoTotale>
+      </DettaglioLinee>
+    </DatiBeniServizi>
   </FatturaElettronicaBody>
 </FatturaElettronica>"""
         attachment_response = Mock(status_code=200, headers={"Content-Type": "text/xml"})
@@ -5107,6 +5115,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(fornitore.email, "fornitore.xml@example.com")
         documento = DocumentoFornitore.objects.get(external_id="998")
         self.assertEqual(documento.fornitore, fornitore)
+        self.assertEqual(documento.descrizione, "Documento pending con XML")
+        self.assertEqual(documento.descrizione_righe_fattura, "Affitto locali aprile 2025")
         self.assertEqual(documento.ritenuta_acconto, Decimal("20.00"))
         self.assertEqual(documento.totale_da_pagare, Decimal("102.00"))
         self.assertTrue(documento.allegato.name.startswith("fatture_fornitori/"))

@@ -160,6 +160,9 @@
                                                     <span class="supplier-withholding-badge" title="Ritenuta d'acconto" aria-label="Ritenuta d'acconto">R.A.</span>
                                                 {% endif %}
                                             </span>
+                                            {% if scadenza.documento.descrizione_righe_fattura %}
+                                                <span class="table-subtext">{{ scadenza.documento.descrizione_righe_fattura|truncatechars:90 }}</span>
+                                            {% endif %}
                                         </span>
                                     </span>
                                 </td>
