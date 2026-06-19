@@ -1935,12 +1935,13 @@ def _update_document_fields(documento, document_data, fornitore, pending, *, sou
     documento.aliquota_iva = Decimal("0.00")
     if amount_net:
         documento.aliquota_iva = (amount_vat * Decimal("100") / amount_net).quantize(Decimal("0.01"))
-    documento.stato = _state_from_document(
-        max(amount_gross - withholding["ritenuta"], Decimal("0.00")),
-        _payment_items(document_data),
-        document_data,
-        source_doc_type,
-    )
+    if documento.stato != StatoDocumentoFornitore.COMPENSATO:
+        documento.stato = _state_from_document(
+            max(amount_gross - withholding["ritenuta"], Decimal("0.00")),
+            _payment_items(document_data),
+            document_data,
+            source_doc_type,
+        )
     documento.origine = OrigineDocumentoFornitore.FATTURE_IN_CLOUD
     documento.external_source = FIC_SOURCE
     documento.external_id = str(document_data.get("id") or "")
@@ -2023,14 +2024,18 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento.save(update_fields=["allegato", "external_payload", "data_aggiornamento"])
 
     is_credit_note = documento.tipo_documento == TipoDocumentoFornitore.NOTA_CREDITO
-    scadenze_create = _sync_document_deadlines(
-        documento,
-        _payment_deadlines(document_data, source_doc_type),
-        clear_existing=is_credit_note,
-    )
-    pagamenti_auto = 0 if is_credit_note else _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
-
-    aggiorna_stato_documento_da_scadenze(documento)
+    is_compensated = documento.stato == StatoDocumentoFornitore.COMPENSATO
+    if is_compensated:
+        scadenze_create = 0
+        pagamenti_auto = 0
+    else:
+        scadenze_create = _sync_document_deadlines(
+            documento,
+            _payment_deadlines(document_data, source_doc_type),
+            clear_existing=is_credit_note,
+        )
+        pagamenti_auto = 0 if is_credit_note else _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
+        aggiorna_stato_documento_da_scadenze(documento)
     _notifica, notifica_created = crea_notifica_finanziaria(
         titolo="Nuova nota di credito ricevuta" if is_credit_note and created else (
             "Nota di credito aggiornata" if is_credit_note else (

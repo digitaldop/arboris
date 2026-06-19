@@ -5943,6 +5943,109 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertNotContains(response, "supplier-invoice-row-paid")
         self.assertNotContains(response, "Materiali")
 
+    def test_compensa_documento_fornitore_con_nota_credito_esclude_dai_conteggi(self):
+        categoria = crea_categoria_spesa_test("Storni fornitori")
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        fornitore = Fornitore.objects.create(
+            denominazione="Fornitore Compensato",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="COMP-1",
+            data_documento=date(2026, 5, 10),
+            descrizione="Servizio annullato",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+            external_source="fatture_in_cloud",
+            external_id="fic-comp-1",
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 31),
+            importo_previsto=Decimal("122.00"),
+        )
+        nota_credito = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO,
+            numero_documento="NC-COMP-1",
+            data_documento=date(2026, 5, 12),
+            descrizione="Storno servizio annullato",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.PAGATO,
+        )
+
+        response = self.client.get(f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
+        self.assertContains(response, "Compensa")
+        self.assertContains(response, "NC-COMP-1")
+
+        detail_url = f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1'
+        response = self.client.post(
+            reverse("compensa_documento_fornitore", kwargs={"pk": documento.pk}),
+            {
+                "popup": "1",
+                "next": detail_url,
+                "nota_credito": str(nota_credito.pk),
+            },
+        )
+
+        self.assertRedirects(response, detail_url)
+        documento.refresh_from_db()
+        scadenza.refresh_from_db()
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.COMPENSATO)
+        self.assertEqual(documento.nota_credito_compensazione, nota_credito)
+        self.assertIsNotNone(documento.compensata_at)
+        self.assertEqual(documento.totale_da_pagare, Decimal("0.00"))
+        self.assertEqual(documento.residuo_da_pagare, Decimal("0.00"))
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.ANNULLATA)
+        self.assertIn("NC-COMP-1", scadenza.note)
+
+        response = self.client.get(reverse("fatture_scadenze_fornitori"))
+        self.assertEqual(response.context["totale_previsto"], Decimal("0.00"))
+        self.assertEqual(response.context["totale_pagato"], Decimal("0.00"))
+        self.assertEqual(response.context["totale_residuo"], Decimal("0.00"))
+        self.assertNotContains(response, "COMP-1")
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-05"},
+        )
+        selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-05")
+        self.assertEqual(selected_month["totale_spese"], Decimal("0.00"))
+        self.assertEqual(selected_month["residuo"], Decimal("0.00"))
+        self.assertEqual(selected_month["spese_count"], 0)
+        self.assertNotContains(response, "Servizio annullato")
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {
+                "id": "fic-comp-1",
+                "type": "expense",
+                "description": "Servizio annullato aggiornato",
+                "invoice_number": "COMP-1",
+                "date": "2026-05-10",
+                "amount_net": "100.00",
+                "amount_vat": "22.00",
+                "amount_gross": "122.00",
+                "entity": {"name": "Fornitore Compensato"},
+                "payments_list": [{"due_date": "2026-06-30", "amount": "122.00"}],
+            },
+            pending=False,
+            utente=self.user,
+        )
+
+        documento.refresh_from_db()
+        scadenza.refresh_from_db()
+        self.assertFalse(result["created"])
+        self.assertEqual(result["scadenze_create"], 0)
+        self.assertEqual(documento.stato, StatoDocumentoFornitore.COMPENSATO)
+        self.assertEqual(scadenza.stato, StatoScadenzaFornitore.ANNULLATA)
+
     def test_spese_mensili_dashboard_unisce_fatture_spese_e_introiti(self):
         categoria = crea_categoria_spesa_test("Servizi generali")
         fornitore = Fornitore.objects.create(

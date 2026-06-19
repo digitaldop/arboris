@@ -48,6 +48,7 @@ from .forms import (
     CategoriaSpesaForm,
     CategoriaFinanziariaForm,
     ContoBancarioForm,
+    DocumentoFornitoreCompensazioneForm,
     DocumentoFornitoreForm,
     FattureInCloudConnessioneForm,
     FattureInCloudSyncForm,
@@ -113,6 +114,7 @@ from .models import (
     StatoRiconciliazione,
     TipoCategoriaFinanziaria,
     TipoContoFinanziario,
+    TipoDocumentoFornitore,
     TipoPianoRatealeSpesa,
     TipoSpesaOperativa,
     TipoProviderBancario,
@@ -155,6 +157,7 @@ from .services import (
     calcola_hash_deduplica_movimento,
     chiavi_deduplica_esistenti,
     chiavi_deduplica_movimento,
+    compensa_documento_fornitore_con_nota_credito,
     crea_proposta_riconciliazione,
     descrizione_deduplica_debole,
     firma_deduplica_da_movimento,
@@ -227,11 +230,15 @@ def dashboard_gestione_finanziaria(request):
     categorie_attive = CategoriaFinanziaria.objects.filter(attiva=True).count()
     regole_attive = RegolaCategorizzazione.objects.filter(attiva=True).count()
     fornitori_attivi = Fornitore.objects.filter(attivo=True).count()
-    scadenze_fornitori_aperte = ScadenzaPagamentoFornitore.objects.exclude(
-        stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+    scadenze_fornitori_aperte = _scadenze_fornitori_con_impatto_spese(
+        ScadenzaPagamentoFornitore.objects.exclude(
+            stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+        )
     ).count()
-    scadenze_fornitori_scadute = ScadenzaPagamentoFornitore.objects.exclude(
-        stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+    scadenze_fornitori_scadute = _scadenze_fornitori_con_impatto_spese(
+        ScadenzaPagamentoFornitore.objects.exclude(
+            stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
+        )
     ).filter(data_scadenza__lt=timezone.localdate()).count()
     fatture_in_cloud_attive = FattureInCloudConnessione.objects.filter(attiva=True).count()
 
@@ -363,6 +370,13 @@ def toggle_voce_budget(request, pk):
 
 def _aggiorna_stato_documento_da_scadenze(documento):
     return service_aggiorna_stato_documento_da_scadenze(documento)
+
+
+def _scadenze_fornitori_con_impatto_spese(queryset):
+    return (
+        queryset.exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
+    )
 
 
 def _popup_target_input_name(request):
@@ -651,12 +665,11 @@ def modifica_fornitore(request, pk):
         .prefetch_related("scadenze")
         .order_by("-data_documento", "-id")[:20]
     )
-    scadenze_aperte = (
+    scadenze_aperte = _scadenze_fornitori_con_impatto_spese(
         ScadenzaPagamentoFornitore.objects.select_related("documento")
         .filter(documento__fornitore=fornitore)
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
-        .order_by("data_scadenza", "id")[:20]
-    )
+    ).order_by("data_scadenza", "id")[:20]
 
     return render(
         request,
@@ -730,7 +743,12 @@ def lista_documenti_fornitori(request):
     stato = request.GET.get("stato") or ""
 
     documenti = (
-        DocumentoFornitore.objects.select_related("fornitore", "fornitore__categoria_spesa", "categoria_spesa")
+        DocumentoFornitore.objects.select_related(
+            "fornitore",
+            "fornitore__categoria_spesa",
+            "categoria_spesa",
+            "nota_credito_compensazione",
+        )
         .annotate(data_scadenza_prima=Min("scadenze__data_scadenza"))
         .prefetch_related("scadenze")
         .order_by("-data_documento", "-id")
@@ -801,12 +819,23 @@ def _scadenza_documento_da_collegare(documento):
 
 
 def _documento_form_context(form, formset, documento, popup=False):
+    compensazione_form = None
+    puo_compensare = False
+    if documento and documento.pk:
+        compensazione_form = DocumentoFornitoreCompensazioneForm(documento=documento)
+        puo_compensare = (
+            documento.tipo_documento != TipoDocumentoFornitore.NOTA_CREDITO
+            and documento.stato != StatoDocumentoFornitore.COMPENSATO
+            and compensazione_form.fields["nota_credito"].queryset.exists()
+        )
     return {
         "form": form,
         "formset": formset,
         "documento": documento,
         "popup": popup,
         "scadenza_collegamento_movimento": _scadenza_documento_da_collegare(documento),
+        "compensazione_form": compensazione_form,
+        "puo_compensare_documento": puo_compensare,
     }
 
 
@@ -829,6 +858,7 @@ def _documento_fornitore_detail_queryset():
         "fornitore",
         "fornitore__categoria_spesa",
         "categoria_spesa",
+        "nota_credito_compensazione",
     ).prefetch_related(
         Prefetch(
             "scadenze",
@@ -984,6 +1014,36 @@ def modifica_documento_fornitore(request, pk):
         "gestione_finanziaria/documento_fornitore_form.html",
         _documento_form_context(form, formset, documento, popup=popup),
     )
+
+
+@require_POST
+def compensa_documento_fornitore(request, pk):
+    documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
+    popup = is_popup_request(request)
+    fallback_url = reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})
+    if popup:
+        fallback_url = f"{fallback_url}?popup=1"
+    next_url = request.POST.get("next") or fallback_url
+    if not url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = fallback_url
+
+    form = DocumentoFornitoreCompensazioneForm(request.POST, documento=documento)
+    if form.is_valid():
+        try:
+            compensa_documento_fornitore_con_nota_credito(documento, form.cleaned_data["nota_credito"])
+            messages.success(request, "Fattura compensata con nota di credito.")
+        except ValidationError as exc:
+            for message in exc.messages:
+                messages.error(request, message)
+    else:
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+    return redirect(next_url)
 
 
 def elimina_documento_fornitore(request, pk):
@@ -1649,6 +1709,7 @@ def scadenziario_fornitori(request):
         )
         .order_by("data_scadenza", "id")
     )
+    scadenze = _scadenze_fornitori_con_impatto_spese(scadenze)
     if stato == "aperte":
         scadenze = scadenze.exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
     elif stato:
@@ -1699,6 +1760,7 @@ def fatture_scadenze_fornitori(request):
         .exclude(stato=StatoScadenzaFornitore.ANNULLATA)
         .order_by("data_scadenza", "id")
     )
+    scadenze = _scadenze_fornitori_con_impatto_spese(scadenze)
     if q:
         scadenze = scadenze.filter(
             Q(documento__numero_documento__icontains=q)
@@ -2021,6 +2083,7 @@ def _spese_mensili_rows(request, start, end):
         .filter(data_scadenza__gte=start, data_scadenza__lte=end)
         .order_by("data_scadenza", "id")
     )
+    scadenze = _scadenze_fornitori_con_impatto_spese(scadenze)
     for scadenza in scadenze:
         documento = scadenza.documento
         residuo = scadenza.importo_residuo

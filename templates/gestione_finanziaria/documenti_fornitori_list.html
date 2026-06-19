@@ -151,7 +151,7 @@
                             </thead>
                             <tbody>
                                 {% for documento in documenti %}
-                                    <tr class="list-row-link {% if documento.stato == 'pagato' %}supplier-invoice-row-paid{% elif documento.stato == 'da_pagare' or documento.stato == 'parzialmente_pagato' %}supplier-invoice-row-unpaid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
+                                    <tr class="list-row-link {% if documento.stato == 'pagato' or documento.stato == 'compensato' %}supplier-invoice-row-paid{% elif documento.stato == 'da_pagare' or documento.stato == 'parzialmente_pagato' %}supplier-invoice-row-unpaid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ documento.numero_documento }}">
                                         <td class="finance-bulk-select-col">
                                             <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ documento.pk }}" data-bulk-checkbox aria-label="Seleziona fattura {{ documento.numero_documento }}">
                                         </td>
@@ -183,9 +183,12 @@
                                         <td class="column-right finance-money-cell">{{ documento.totale|euro }} &euro;</td>
                                         <td class="column-right finance-money-cell">{{ documento.totale_da_pagare|euro }} &euro;</td>
                                         <td>
-                                            <span class="anagrafica-status-chip {% if documento.stato == 'pagato' %}is-success{% elif documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
+                                            <span class="anagrafica-status-chip {% if documento.stato == 'pagato' or documento.stato == 'compensato' %}is-success{% elif documento.stato == 'annullato' %}is-danger{% else %}is-muted{% endif %}">
                                                 {{ documento.get_stato_display }}
                                             </span>
+                                            {% if documento.nota_credito_compensazione %}
+                                                <span class="table-subtext">Nota credito {{ documento.nota_credito_compensazione.numero_documento }}</span>
+                                            {% endif %}
                                         </td>
                                         <td class="actions-cell">
                                             <div class="table-icon-actions anagrafica-row-actions">

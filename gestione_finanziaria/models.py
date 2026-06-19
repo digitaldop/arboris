@@ -277,6 +277,7 @@ class StatoDocumentoFornitore(models.TextChoices):
     DA_PAGARE = "da_pagare", "Da pagare"
     PARZIALMENTE_PAGATO = "parzialmente_pagato", "Parzialmente pagato"
     PAGATO = "pagato", "Pagato"
+    COMPENSATO = "compensato", "Compensato da nota di credito"
     ANNULLATO = "annullato", "Annullato"
 
 
@@ -328,6 +329,14 @@ class DocumentoFornitore(models.Model):
         choices=StatoDocumentoFornitore.choices,
         default=StatoDocumentoFornitore.DA_PAGARE,
     )
+    nota_credito_compensazione = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        related_name="fatture_compensate",
+        blank=True,
+        null=True,
+    )
+    compensata_at = models.DateTimeField(blank=True, null=True)
     allegato = models.FileField(
         upload_to=documento_fornitore_upload_to,
         blank=True,
@@ -406,6 +415,13 @@ class DocumentoFornitore(models.Model):
 
     def clean(self):
         super().clean()
+        if self.nota_credito_compensazione_id and self.nota_credito_compensazione_id == self.pk:
+            raise ValidationError({"nota_credito_compensazione": "La nota di credito non puo coincidere con la fattura."})
+        if (
+            self.nota_credito_compensazione_id
+            and self.nota_credito_compensazione.tipo_documento != TipoDocumentoFornitore.NOTA_CREDITO
+        ):
+            raise ValidationError({"nota_credito_compensazione": "Seleziona una nota di credito fornitore."})
         if self.mese_competenza is not None and not 1 <= self.mese_competenza <= 12:
             raise ValidationError({"mese_competenza": "Il mese di competenza deve essere compreso tra 1 e 12."})
         if self.categoria_spesa_id and self.categoria_spesa.tipo != TipoCategoriaFinanziaria.SPESA:
@@ -437,6 +453,8 @@ class DocumentoFornitore(models.Model):
 
     @property
     def totale_da_pagare(self):
+        if self.stato == StatoDocumentoFornitore.COMPENSATO:
+            return Decimal("0.00")
         totale = (self.totale or Decimal("0.00")) - (self.ritenuta_acconto or Decimal("0.00"))
         return max(totale, Decimal("0.00"))
 
@@ -533,6 +551,10 @@ class ScadenzaPagamentoFornitore(models.Model):
 
     @property
     def importo_residuo(self):
+        if self.stato == StatoScadenzaFornitore.ANNULLATA:
+            return Decimal("0.00")
+        if getattr(self.documento, "stato", "") == StatoDocumentoFornitore.COMPENSATO:
+            return Decimal("0.00")
         residuo = (self.importo_previsto or Decimal("0.00")) - (self.importo_pagato or Decimal("0.00"))
         return max(residuo, Decimal("0.00"))
 

@@ -205,11 +205,13 @@ def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
 
 
 def build_current_month_supplier_due_data(monthly_start, monthly_end):
-    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+    from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     scadenze = (
         ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore")
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .filter(data_scadenza__lte=monthly_end)
         .order_by("data_scadenza", "documento__fornitore__denominazione", "id")
     )
@@ -516,7 +518,9 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
     from .models import (
         MovimentoFinanziario,
         ScadenzaPagamentoFornitore,
+        StatoDocumentoFornitore,
         StatoScadenzaFornitore,
+        TipoDocumentoFornitore,
         TipoVoceBudget,
         VoceBudgetRicorrente,
     )
@@ -653,6 +657,8 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
         .exclude(
             stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
         )
+        .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"])
     )
     for scadenza in scadenze_fornitori:
@@ -2701,7 +2707,7 @@ def annulla_riconciliazione_rata(rata):
 def aggiorna_stato_documento_da_scadenze(documento):
     from .models import StatoDocumentoFornitore, StatoScadenzaFornitore
 
-    if documento.stato == StatoDocumentoFornitore.ANNULLATO:
+    if documento.stato in {StatoDocumentoFornitore.ANNULLATO, StatoDocumentoFornitore.COMPENSATO}:
         return documento
 
     scadenze = documento.scadenze.exclude(stato=StatoScadenzaFornitore.ANNULLATA)
@@ -2720,6 +2726,57 @@ def aggiorna_stato_documento_da_scadenze(documento):
     if documento.stato != nuovo_stato:
         documento.stato = nuovo_stato
         documento.save(update_fields=["stato", "data_aggiornamento"])
+    return documento
+
+
+def compensa_documento_fornitore_con_nota_credito(documento, nota_credito):
+    from .models import DocumentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
+
+    if not documento or not getattr(documento, "pk", None):
+        raise ValidationError("Fattura fornitore non valida.")
+    if not nota_credito or not getattr(nota_credito, "pk", None):
+        raise ValidationError("Seleziona una nota di credito valida.")
+    if documento.pk == nota_credito.pk:
+        raise ValidationError("La nota di credito non puo coincidere con la fattura.")
+    if documento.tipo_documento == TipoDocumentoFornitore.NOTA_CREDITO:
+        raise ValidationError("Una nota di credito non puo essere compensata da un'altra nota di credito.")
+    if nota_credito.tipo_documento != TipoDocumentoFornitore.NOTA_CREDITO:
+        raise ValidationError("Il documento selezionato non e una nota di credito.")
+    if documento.fornitore_id != nota_credito.fornitore_id:
+        raise ValidationError("La nota di credito deve appartenere allo stesso fornitore della fattura.")
+    if nota_credito.fatture_compensate.exclude(pk=documento.pk).exists():
+        raise ValidationError("La nota di credito selezionata e gia collegata a un'altra fattura compensata.")
+
+    with transaction.atomic():
+        documento = DocumentoFornitore.objects.select_for_update().get(pk=documento.pk)
+        nota_credito = DocumentoFornitore.objects.select_for_update().get(pk=nota_credito.pk)
+        if nota_credito.fatture_compensate.exclude(pk=documento.pk).exists():
+            raise ValidationError("La nota di credito selezionata e gia collegata a un'altra fattura compensata.")
+        documento.stato = StatoDocumentoFornitore.COMPENSATO
+        documento.nota_credito_compensazione = nota_credito
+        documento.compensata_at = timezone.now()
+        documento.save(
+            update_fields=[
+                "stato",
+                "nota_credito_compensazione",
+                "compensata_at",
+                "data_aggiornamento",
+            ]
+        )
+
+        for scadenza in documento.scadenze.exclude(stato=StatoScadenzaFornitore.ANNULLATA):
+            note = (scadenza.note or "").strip()
+            appendice = f"Compensata da nota di credito {nota_credito.numero_documento}."
+            if appendice not in note:
+                scadenza.note = f"{note}\n{appendice}".strip() if note else appendice
+            scadenza.stato = StatoScadenzaFornitore.ANNULLATA
+            scadenza._preserve_manual_stato = True
+            scadenza.save(update_fields=["stato", "note", "data_aggiornamento"])
+
+        if nota_credito.stato != StatoDocumentoFornitore.PAGATO:
+            nota_credito.stato = StatoDocumentoFornitore.PAGATO
+            nota_credito.save(update_fields=["stato", "data_aggiornamento"])
+
     return documento
 
 
@@ -3010,7 +3067,7 @@ def _supplier_match_score(fornitore, testo_movimento):
 
 
 def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
-    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+    from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     if movimento is None or movimento.importo is None or movimento.importo >= 0:
         return []
@@ -3030,6 +3087,8 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
             "documento__categoria_spesa",
         )
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .order_by("data_scadenza", "id")[:300]
     )
     candidati = []
@@ -3178,7 +3237,7 @@ def _trova_sottoinsieme_scadenze_fornitori_per_importo(scadenze, importo_target,
 
 
 def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5):
-    from .models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
+    from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     if movimento is None or movimento.importo is None or movimento.importo >= 0:
         return []
@@ -3197,6 +3256,8 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
             "documento__categoria_spesa",
         )
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
+        .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .order_by("documento__fornitore_id", "data_scadenza", "id")[:600]
     )
 

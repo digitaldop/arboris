@@ -91,8 +91,15 @@ class DocumentoFornitoreAdmin(admin.ModelAdmin):
     list_filter = ("tipo_documento", "stato", "categoria_spesa", "origine")
     search_fields = ("numero_documento", "descrizione", "fornitore__denominazione", "external_id")
     date_hierarchy = "data_documento"
-    autocomplete_fields = ("fornitore", "categoria_spesa")
-    readonly_fields = ("external_payload", "external_source", "external_id", "importato_at", "external_updated_at")
+    autocomplete_fields = ("fornitore", "categoria_spesa", "nota_credito_compensazione")
+    readonly_fields = (
+        "external_payload",
+        "external_source",
+        "external_id",
+        "importato_at",
+        "external_updated_at",
+        "compensata_at",
+    )
     inlines = [ScadenzaPagamentoFornitoreInline]
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

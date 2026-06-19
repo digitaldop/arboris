@@ -29,8 +29,10 @@ from .models import (
     SaldoConto,
     ScadenzaPagamentoFornitore,
     SpesaOperativa,
+    StatoDocumentoFornitore,
     StatoScadenzaFornitore,
     TipoCategoriaFinanziaria,
+    TipoDocumentoFornitore,
     TipoPianoRatealeSpesa,
     TipoSpesaOperativa,
     VoceBudgetRicorrente,
@@ -473,6 +475,20 @@ class DocumentoFornitoreForm(forms.ModelForm):
             apply_eur_currency_widget(self.fields[field_name], compact=False)
         if not self.is_bound and not getattr(self.instance, "pk", None):
             self.initial.setdefault("aliquota_ritenuta_acconto", Decimal("20.00"))
+        stato_choices = list(self.fields["stato"].choices)
+        if self.instance and self.instance.stato == StatoDocumentoFornitore.COMPENSATO:
+            stato_choices = [
+                choice
+                for choice in stato_choices
+                if choice[0] == StatoDocumentoFornitore.COMPENSATO
+            ]
+        else:
+            stato_choices = [
+                choice
+                for choice in stato_choices
+                if choice[0] != StatoDocumentoFornitore.COMPENSATO
+            ]
+        self.fields["stato"].choices = stato_choices
 
     def clean(self):
         cleaned = super().clean()
@@ -534,6 +550,44 @@ class DocumentoFornitoreForm(forms.ModelForm):
         if totale > Decimal("0.00") and cleaned["ritenuta_acconto"] > totale:
             self.add_error("ritenuta_acconto", "La ritenuta non puo superare il totale fattura.")
         return cleaned
+
+
+class DocumentoFornitoreCompensazioneForm(forms.Form):
+    nota_credito = forms.ModelChoiceField(
+        queryset=DocumentoFornitore.objects.none(),
+        label="Nota di credito",
+        empty_label="Seleziona nota di credito",
+    )
+
+    def __init__(self, *args, documento=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.documento = documento
+        queryset = DocumentoFornitore.objects.none()
+        if documento and documento.pk and documento.fornitore_id:
+            queryset = (
+                DocumentoFornitore.objects.filter(
+                    fornitore_id=documento.fornitore_id,
+                    tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO,
+                )
+                .exclude(pk=documento.pk)
+                .filter(Q(fatture_compensate__isnull=True) | Q(fatture_compensate=documento))
+                .order_by("-data_documento", "-id")
+                .distinct()
+            )
+        self.fields["nota_credito"].queryset = queryset
+
+    def clean_nota_credito(self):
+        nota_credito = self.cleaned_data["nota_credito"]
+        documento = self.documento
+        if not documento or not documento.pk:
+            raise forms.ValidationError("Fattura fornitore non valida.")
+        if documento.tipo_documento == TipoDocumentoFornitore.NOTA_CREDITO:
+            raise forms.ValidationError("Una nota di credito non puo essere compensata da un'altra nota di credito.")
+        if nota_credito.fornitore_id != documento.fornitore_id:
+            raise forms.ValidationError("Seleziona una nota di credito dello stesso fornitore.")
+        if nota_credito.tipo_documento != TipoDocumentoFornitore.NOTA_CREDITO:
+            raise forms.ValidationError("Il documento selezionato non e una nota di credito.")
+        return nota_credito
 
 
 class ScadenzaPagamentoFornitoreForm(forms.ModelForm):
