@@ -5983,6 +5983,10 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         response = self.client.get(f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1')
         self.assertContains(response, "Compensa")
         self.assertContains(response, "NC-COMP-1")
+        self.assertContains(
+            response,
+            f'name="reload_url" value="{reverse("fatture_scadenze_fornitori")}?vista=insolute"',
+        )
 
         detail_url = f'{reverse("modifica_documento_fornitore", kwargs={"pk": documento.pk})}?popup=1'
         response = self.client.post(
@@ -5994,7 +5998,10 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "popup/popup_close.html")
+        self.assertContains(response, "Fattura compensata con nota di credito.")
+        self.assertContains(response, r"vista\u003Dinsolute")
         documento.refresh_from_db()
         scadenza.refresh_from_db()
         self.assertEqual(documento.stato, StatoDocumentoFornitore.COMPENSATO)

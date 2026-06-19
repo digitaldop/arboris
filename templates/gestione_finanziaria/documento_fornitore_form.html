@@ -79,6 +79,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="popup" value="1">
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="reload_url" value="{% url 'fatture_scadenze_fornitori' %}?vista=insolute">
                     {{ compensazione_form.nota_credito }}
                     <button type="submit" class="btn btn-secondary btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>

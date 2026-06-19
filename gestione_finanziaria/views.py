@@ -1035,10 +1035,26 @@ def compensa_documento_fornitore(request, pk):
     if form.is_valid():
         try:
             compensa_documento_fornitore_con_nota_credito(documento, form.cleaned_data["nota_credito"])
-            messages.success(request, "Fattura compensata con nota di credito.")
         except ValidationError as exc:
             for message in exc.messages:
                 messages.error(request, message)
+        else:
+            message = "Fattura compensata con nota di credito."
+            if popup:
+                default_reload_url = f"{reverse('fatture_scadenze_fornitori')}?{urlencode({'vista': 'insolute'})}"
+                reload_url = request.POST.get("reload_url") or default_reload_url
+                if not url_has_allowed_host_and_scheme(
+                    reload_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    reload_url = default_reload_url
+                return render(
+                    request,
+                    "popup/popup_close.html",
+                    {"message": message, "reload_url": reload_url},
+                )
+            messages.success(request, message)
     else:
         for errors in form.errors.values():
             for error in errors:
