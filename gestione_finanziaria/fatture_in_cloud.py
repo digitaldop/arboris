@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import re
+import unicodedata
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from json import JSONDecodeError
@@ -96,6 +97,20 @@ PAYMENT_PARTIAL_STATUSES = {
     "parzialmente_pagato",
     "pagata_parzialmente",
     "pagato_parzialmente",
+}
+SUPPLIER_LEGAL_SUFFIXES = {
+    "SRL",
+    "SPA",
+    "SAPA",
+    "SAS",
+    "SNC",
+    "SS",
+    "COOP",
+    "COOPERATIVA",
+    "SCARL",
+    "IMPRESA",
+    "INDIVIDUALE",
+    "DITTA",
 }
 
 
@@ -204,6 +219,51 @@ def _as_datetime(value):
 
 def _clean_identifier(value):
     return "".join(ch for ch in (value or "").upper().strip() if ch.isalnum())
+
+
+def _clean_vat_identifier(value):
+    identifier = _clean_identifier(value)
+    if identifier.startswith("IT") and len(identifier) > 11:
+        identifier = identifier[2:]
+    return identifier
+
+
+def _normalizza_testo_match(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = re.sub(r"[^A-Za-z0-9]+", " ", text).upper()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalizza_nome_fornitore_match(value):
+    text = _normalizza_testo_match(value)
+    if not text:
+        return ""
+    legal_forms = (
+        (r"\bS R L\b", "SRL"),
+        (r"\bS P A\b", "SPA"),
+        (r"\bS A P A\b", "SAPA"),
+        (r"\bS A S\b", "SAS"),
+        (r"\bS N C\b", "SNC"),
+        (r"\bS C A R L\b", "SCARL"),
+    )
+    for pattern, replacement in legal_forms:
+        text = re.sub(pattern, replacement, text)
+    tokens = [token for token in text.split() if token not in SUPPLIER_LEGAL_SUFFIXES]
+    return " ".join(tokens) or text
+
+
+def _normalizza_numero_documento_match(value):
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = re.sub(r"[^A-Za-z0-9]+", "", text).upper()
+    if text.isdigit():
+        return text.lstrip("0") or "0"
+    return text
+
+
+def _same_money(first, second):
+    return _as_decimal(first) == _as_decimal(second)
 
 
 def _as_dict(value):
@@ -617,12 +677,59 @@ def _supplier_address(entity):
     return " ".join(part for part in parts if part)[:255]
 
 
+def _supplier_identity_from_values(vat_number="", tax_code=""):
+    return {
+        "vat": _clean_vat_identifier(vat_number),
+        "tax": _clean_identifier(tax_code),
+    }
+
+
+def _supplier_identity_from_entity(entity):
+    return _supplier_identity_from_values(entity.get("vat_number"), entity.get("tax_code"))
+
+
+def _supplier_identity_from_fornitore(fornitore):
+    return _supplier_identity_from_values(fornitore.partita_iva, fornitore.codice_fiscale)
+
+
+def _supplier_identity_conflicts(fornitore, identity):
+    existing = _supplier_identity_from_fornitore(fornitore)
+    return bool(
+        (identity.get("vat") and existing.get("vat") and identity["vat"] != existing["vat"])
+        or (identity.get("tax") and existing.get("tax") and identity["tax"] != existing["tax"])
+    )
+
+
+def _supplier_identity_matches(fornitore, identity):
+    existing = _supplier_identity_from_fornitore(fornitore)
+    return bool(
+        (identity.get("vat") and existing.get("vat") == identity["vat"])
+        or (identity.get("tax") and existing.get("tax") == identity["tax"])
+    )
+
+
+def _find_supplier_by_normalized_name(qs, name, identity):
+    name_key = _normalizza_nome_fornitore_match(name)
+    if not name_key:
+        return None
+
+    matches = []
+    for candidate in qs.only("id", "denominazione", "partita_iva", "codice_fiscale"):
+        if _normalizza_nome_fornitore_match(candidate.denominazione) != name_key:
+            continue
+        if _supplier_identity_conflicts(candidate, identity):
+            continue
+        matches.append(candidate)
+        if len(matches) > 1:
+            return None
+    return matches[0] if matches else None
+
+
 def _find_or_create_supplier(entity, document_data):
     name = _supplier_name(entity, document_data)
-    vat_number = _clean_identifier(entity.get("vat_number"))
-    if vat_number.startswith("IT") and len(vat_number) > 11:
-        vat_number = vat_number[2:]
+    vat_number = _clean_vat_identifier(entity.get("vat_number"))
     tax_code = _clean_identifier(entity.get("tax_code"))
+    identity = _supplier_identity_from_values(vat_number, tax_code)
 
     qs = Fornitore.objects.all()
     fornitore = None
@@ -632,6 +739,8 @@ def _find_or_create_supplier(entity, document_data):
         fornitore = qs.filter(codice_fiscale__iexact=tax_code).first()
     if fornitore is None:
         fornitore = qs.filter(denominazione__iexact=name).first()
+    if fornitore is None:
+        fornitore = _find_supplier_by_normalized_name(qs, name, identity)
 
     defaults = {
         "tipo_soggetto": "azienda" if (entity.get("type") or "") != "person" else "professionista",
@@ -1464,6 +1573,83 @@ def _document_date_for_sync_filter(document_data):
     )
 
 
+def _document_total_for_import_match(document_data):
+    amounts = _as_dict(document_data.get("amounts"))
+    amount_net = _as_decimal(
+        document_data.get("amount_net")
+        or amounts.get("net")
+        or amounts.get("amount_net")
+    )
+    amount_vat = _as_decimal(
+        document_data.get("amount_vat")
+        or amounts.get("vat")
+        or amounts.get("amount_vat")
+    )
+    amount_gross = _document_total(document_data)
+    if amount_gross == Decimal("0.00") and amount_net:
+        amount_gross = amount_net + amount_vat
+    return amount_gross.quantize(Decimal("0.01"))
+
+
+def _supplier_matches_imported_document(fornitore, identity, supplier_name_key):
+    if _supplier_identity_matches(fornitore, identity):
+        return True
+    if _supplier_identity_conflicts(fornitore, identity):
+        return False
+    return bool(
+        supplier_name_key
+        and _normalizza_nome_fornitore_match(fornitore.denominazione) == supplier_name_key
+    )
+
+
+def _document_import_match_key(documento):
+    return (
+        0 if documento.origine == OrigineDocumentoFornitore.FATTURE_IN_CLOUD else 1,
+        0 if documento.external_source == FIC_SOURCE and documento.external_id else 1,
+        documento.pk,
+    )
+
+
+def _find_existing_document_by_import_signature(document_data, fornitore, entity, source_doc_type=None):
+    doc_date = _document_date_for_sync_filter(document_data)
+    invoice_number = _invoice_number(document_data)
+    numero_norm = _normalizza_numero_documento_match(invoice_number)
+    if not doc_date or not numero_norm:
+        return None
+
+    doc_type = _document_type(document_data, source_doc_type)
+    total = _document_total_for_import_match(document_data)
+    identity = _supplier_identity_from_entity(entity)
+    supplier_name_key = _normalizza_nome_fornitore_match(_supplier_name(entity, document_data))
+    candidates_qs = (
+        DocumentoFornitore.objects.select_for_update()
+        .select_related("fornitore")
+        .filter(tipo_documento=doc_type, data_documento__year=doc_date.year)
+    )
+    matches = []
+
+    for documento in candidates_qs.filter(fornitore=fornitore):
+        if _normalizza_numero_documento_match(documento.numero_documento) != numero_norm:
+            continue
+        if documento.data_documento == doc_date or _same_money(documento.totale, total):
+            matches.append(documento)
+
+    if not matches and total > Decimal("0.00"):
+        for documento in candidates_qs.filter(data_documento=doc_date):
+            if documento.fornitore_id == fornitore.pk:
+                continue
+            if _normalizza_numero_documento_match(documento.numero_documento) != numero_norm:
+                continue
+            if not _same_money(documento.totale, total):
+                continue
+            if _supplier_matches_imported_document(documento.fornitore, identity, supplier_name_key):
+                matches.append(documento)
+
+    if not matches:
+        return None
+    return sorted(matches, key=_document_import_match_key)[0]
+
+
 def _document_is_before_sync_start(document_data, data_inizio):
     if not data_inizio:
         return False
@@ -1637,15 +1823,21 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
     fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
     external_id = str(document_data.get("id"))
-    documento = DocumentoFornitore.objects.filter(external_source=FIC_SOURCE, external_id=external_id).first()
+    documento = (
+        DocumentoFornitore.objects.select_for_update()
+        .filter(external_source=FIC_SOURCE, external_id=external_id)
+        .first()
+    )
     created = False
     if documento is None:
-        documento = DocumentoFornitore.objects.filter(
+        documento = DocumentoFornitore.objects.select_for_update().filter(
             fornitore=fornitore,
             tipo_documento=_document_type(document_data, source_doc_type),
             numero_documento=_invoice_number(document_data),
             data_documento=_document_date(document_data),
         ).first()
+    if documento is None:
+        documento = _find_existing_document_by_import_signature(document_data, fornitore, entity, source_doc_type)
     if documento is None:
         documento = DocumentoFornitore()
         created = True

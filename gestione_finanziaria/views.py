@@ -1849,7 +1849,7 @@ def _periodo_spese_mensili(request):
     }
 
 
-def _base_period_params(periodo_data, selected_month=None, vista=None):
+def _base_period_params(periodo_data, selected_month=None, vista=None, sort_key=None, sort_direction=None):
     params = {"periodo": periodo_data["periodo"]}
     if periodo_data["periodo"] == "scolastico" and periodo_data["anno_scolastico"]:
         params["anno_scolastico"] = periodo_data["anno_scolastico"].pk
@@ -1859,7 +1859,66 @@ def _base_period_params(periodo_data, selected_month=None, vista=None):
         params["mese"] = _month_key(selected_month)
     if vista:
         params["vista"] = vista
+    if sort_key:
+        params["ordina"] = sort_key
+    if sort_direction:
+        params["direzione"] = sort_direction
     return params
+
+
+SPESE_MENSILI_DEFAULT_SORT = "scadenza"
+SPESE_MENSILI_DEFAULT_SORT_DIRECTION = "asc"
+SPESE_MENSILI_SORT_FIELDS = {
+    "scadenza": {
+        "label": "Scadenza",
+        "key": lambda row: (row["data_scadenza"], str(row["descrizione"]).casefold()),
+    },
+    "previsto": {
+        "label": "Importo previsto",
+        "key": lambda row: (row["importo_previsto"], row["data_scadenza"], str(row["descrizione"]).casefold()),
+    },
+    "pagato": {
+        "label": "Importo pagato",
+        "key": lambda row: (row["importo_pagato"], row["data_scadenza"], str(row["descrizione"]).casefold()),
+    },
+    "residuo": {
+        "label": "Importo residuo",
+        "key": lambda row: (row["residuo"], row["data_scadenza"], str(row["descrizione"]).casefold()),
+    },
+}
+
+
+def _spese_mensili_sort_state(request):
+    sort_key = request.GET.get("ordina") or SPESE_MENSILI_DEFAULT_SORT
+    if sort_key not in SPESE_MENSILI_SORT_FIELDS:
+        sort_key = SPESE_MENSILI_DEFAULT_SORT
+    sort_direction = request.GET.get("direzione") or SPESE_MENSILI_DEFAULT_SORT_DIRECTION
+    if sort_direction not in {"asc", "desc"}:
+        sort_direction = SPESE_MENSILI_DEFAULT_SORT_DIRECTION
+    return sort_key, sort_direction
+
+
+def _ordina_spese_mensili_rows(rows, sort_key, sort_direction):
+    sort_config = SPESE_MENSILI_SORT_FIELDS.get(sort_key, SPESE_MENSILI_SORT_FIELDS[SPESE_MENSILI_DEFAULT_SORT])
+    return sorted(rows, key=sort_config["key"], reverse=sort_direction == "desc")
+
+
+def _spese_mensili_sort_links(periodo_data, selected_month, vista, sort_key, sort_direction):
+    links = {}
+    for field_key, sort_config in SPESE_MENSILI_SORT_FIELDS.items():
+        active = field_key == sort_key
+        next_direction = "desc" if active and sort_direction == "asc" else "asc"
+        params = _base_period_params(periodo_data, selected_month, vista, field_key, next_direction)
+        links[field_key] = {
+            "label": sort_config["label"],
+            "url": f"{reverse('spese_mensili_dashboard')}?{urlencode(params)}",
+            "active": active,
+            "direction": sort_direction if active else "",
+            "direction_label": "crescente" if sort_direction == "asc" else "decrescente",
+            "next_direction_label": "decrescente" if next_direction == "desc" else "crescente",
+            "aria_sort": "ascending" if active and sort_direction == "asc" else "descending" if active else "none",
+        }
+    return links
 
 
 def _spesa_row(
@@ -2086,6 +2145,7 @@ def spese_mensili_dashboard(request):
     vista = request.GET.get("vista") or "tutte"
     if vista not in {"tutte", "insolute"}:
         vista = "tutte"
+    spese_sort_key, spese_sort_direction = _spese_mensili_sort_state(request)
 
     rows = _spese_mensili_rows(request, periodo_data["start"], periodo_data["end"])
     introiti = _introiti_mensili(periodo_data["start"], periodo_data["end"])
@@ -2101,7 +2161,10 @@ def spese_mensili_dashboard(request):
             "insolute_count": 0,
             "introiti": Decimal("0.00"),
             "uscite_movimenti": Decimal("0.00"),
-            "url": f"{reverse('spese_mensili_dashboard')}?{urlencode(_base_period_params(periodo_data, mese, vista))}",
+            "url": (
+                f"{reverse('spese_mensili_dashboard')}?"
+                f"{urlencode(_base_period_params(periodo_data, mese, vista, spese_sort_key, spese_sort_direction))}"
+            ),
             "is_selected": _month_key(mese) == _month_key(periodo_data["selected_month"]),
         }
         for mese in periodo_data["mesi"]
@@ -2165,15 +2228,28 @@ def spese_mensili_dashboard(request):
         if vista == "insolute"
         else selected_rows_all
     )
+    selected_rows = _ordina_spese_mensili_rows(selected_rows, spese_sort_key, spese_sort_direction)
     selected_category_summary = _riepilogo_spese_per_categoria(selected_rows_all)
     selected_introiti = [movimento for movimento in introiti if _month_key(movimento.data_contabile) == selected_key]
     selected_uscite_movimenti = [
         movimento for movimento in uscite_movimenti if _month_key(movimento.data_contabile) == selected_key
     ]
 
-    switch_params = _base_period_params(periodo_data, periodo_data["selected_month"])
+    switch_params = _base_period_params(
+        periodo_data,
+        periodo_data["selected_month"],
+        sort_key=spese_sort_key,
+        sort_direction=spese_sort_direction,
+    )
     vista_tutte_url = f"{reverse('spese_mensili_dashboard')}?{urlencode({**switch_params, 'vista': 'tutte'})}"
     vista_insolute_url = f"{reverse('spese_mensili_dashboard')}?{urlencode({**switch_params, 'vista': 'insolute'})}"
+    spese_sort_links = _spese_mensili_sort_links(
+        periodo_data,
+        periodo_data["selected_month"],
+        vista,
+        spese_sort_key,
+        spese_sort_direction,
+    )
 
     return render(
         request,
@@ -2207,6 +2283,9 @@ def spese_mensili_dashboard(request):
             "vista": vista,
             "vista_tutte_url": vista_tutte_url,
             "vista_insolute_url": vista_insolute_url,
+            "spese_sort_key": spese_sort_key,
+            "spese_sort_direction": spese_sort_direction,
+            "spese_sort_links": spese_sort_links,
         },
     )
 

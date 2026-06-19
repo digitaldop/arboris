@@ -4054,6 +4054,58 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(DocumentoFornitore.objects.filter(external_id="987").count(), 1)
         self.assertEqual(NotificaFinanziaria.objects.filter(documento=documento).count(), 1)
 
+    def test_importa_documento_fatture_in_cloud_aggancia_duplicato_con_id_e_numero_varianti(self):
+        connessione = FattureInCloudConnessione.objects.create(
+            nome="FIC",
+            company_id=123,
+        )
+        payload_pending = {
+            "id": "pending-42",
+            "type": "agyo",
+            "document_type": "invoice",
+            "subject": "Fattura da registrare",
+            "supplier_name": "Studio Rossi",
+            "invoice_number": "42/PA",
+            "emission_date": "2026-05-04",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
+        }
+        payload_registrato = {
+            "id": "registered-42",
+            "type": "expense",
+            "description": "Fattura registrata",
+            "invoice_number": "42 PA",
+            "date": "2026-05-04",
+            "amount_net": "100.00",
+            "amount_vat": "22.00",
+            "amount_gross": "122.00",
+            "entity": {
+                "name": "Studio Rossi S.r.l.",
+                "vat_number": "IT12345678901",
+            },
+            "payments_list": [{"due_date": "2026-06-04", "amount": "122.00"}],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload_pending, pending=True, utente=self.user)
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="pending-42")
+        documento_id = documento.pk
+
+        result = importa_documento_fatture_in_cloud(connessione, payload_registrato, pending=False, utente=self.user)
+
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        self.assertEqual(Fornitore.objects.count(), 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.pk, documento_id)
+        self.assertEqual(documento.external_id, "registered-42")
+        self.assertEqual(documento.numero_documento, "42 PA")
+        self.assertEqual(documento.external_type, "expense")
+        self.assertEqual(documento.scadenze.count(), 1)
+        self.assertEqual(documento.fornitore.partita_iva, "12345678901")
+
     def test_importa_documento_fatture_in_cloud_nota_credito_non_crea_scadenze(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",
@@ -5910,6 +5962,101 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Materiale didattico")
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
+
+    def test_spese_mensili_dashboard_ordina_spese_e_fatture(self):
+        categoria = crea_categoria_spesa_test("Ordinamento")
+        fornitore = Fornitore.objects.create(
+            denominazione="Consulenze Blu",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria,
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="ORD-1",
+            data_documento=date(2026, 5, 5),
+            descrizione="Fattura consulenza",
+            imponibile=Decimal("200.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("200.00"),
+            stato=StatoDocumentoFornitore.PARZIALMENTE_PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=date(2026, 5, 25),
+            importo_previsto=Decimal("200.00"),
+            importo_pagato=Decimal("20.00"),
+        )
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Spesa importo alto",
+            categoria=categoria,
+            data_scadenza=date(2026, 5, 20),
+            importo_previsto=Decimal("300.00"),
+            importo_pagato=Decimal("10.00"),
+        )
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Spesa pagamento alto",
+            categoria=categoria,
+            data_scadenza=date(2026, 5, 10),
+            importo_previsto=Decimal("100.00"),
+            importo_pagato=Decimal("80.00"),
+        )
+        SpesaOperativa.objects.create(
+            tipo=TipoSpesaOperativa.MANUALE,
+            descrizione="Spesa saldata",
+            categoria=categoria,
+            data_scadenza=date(2026, 5, 15),
+            importo_previsto=Decimal("50.00"),
+            importo_pagato=Decimal("50.00"),
+        )
+
+        def get_descriptions(**params):
+            response = self.client.get(
+                reverse("spese_mensili_dashboard"),
+                {"periodo": "solare", "anno": "2026", "mese": "2026-05", **params},
+            )
+            self.assertEqual(response.status_code, 200)
+            return [row["descrizione"] for row in response.context["selected_rows"]], response
+
+        descriptions, response = get_descriptions(ordina="previsto", direzione="desc")
+        self.assertEqual(
+            descriptions,
+            ["Spesa importo alto", "Fattura consulenza", "Spesa pagamento alto", "Spesa saldata"],
+        )
+        self.assertEqual(response.context["spese_sort_key"], "previsto")
+        self.assertEqual(response.context["spese_sort_direction"], "desc")
+        self.assertTrue(response.context["spese_sort_links"]["previsto"]["active"])
+        self.assertIn("ordina=previsto", response.context["vista_insolute_url"])
+        self.assertIn("direzione=desc", response.context["vista_insolute_url"])
+        self.assertContains(response, "Importo previsto")
+        self.assertContains(response, "DESC")
+
+        descriptions, _ = get_descriptions(ordina="pagato", direzione="asc")
+        self.assertEqual(
+            descriptions,
+            ["Spesa importo alto", "Fattura consulenza", "Spesa saldata", "Spesa pagamento alto"],
+        )
+
+        descriptions, _ = get_descriptions(ordina="residuo", direzione="desc")
+        self.assertEqual(
+            descriptions,
+            ["Spesa importo alto", "Fattura consulenza", "Spesa pagamento alto", "Spesa saldata"],
+        )
+
+        descriptions, _ = get_descriptions(ordina="scadenza", direzione="desc")
+        self.assertEqual(
+            descriptions,
+            ["Fattura consulenza", "Spesa importo alto", "Spesa saldata", "Spesa pagamento alto"],
+        )
+
+        descriptions, response = get_descriptions(ordina="campo-non-valido", direzione="lato")
+        self.assertEqual(
+            descriptions,
+            ["Spesa pagamento alto", "Spesa saldata", "Spesa importo alto", "Fattura consulenza"],
+        )
+        self.assertEqual(response.context["spese_sort_key"], "scadenza")
+        self.assertEqual(response.context["spese_sort_direction"], "asc")
 
     def test_spese_mensili_dashboard_esclude_ricariche_prepagate_dagli_introiti(self):
         conto_corrente = ContoBancario.objects.create(
