@@ -2282,6 +2282,8 @@
                                                     <strong>{{ busta.importo_netto_riepilogo|euro }} &euro;</strong>
                                                     {% if busta.ha_costo_azienda_riepilogo %}
                                                         <span>Costo azienda {{ busta.costo_azienda_riepilogo|euro }} &euro;</span>
+                                                    {% elif busta.pagamento_parziale %}
+                                                        <span>Parziale: pagati {{ busta.importo_pagato_riconciliato|euro }} &euro;, residuo {{ busta.importo_residuo_pagamento|euro }} &euro;</span>
                                                     {% elif busta.risulta_pagata %}
                                                         <span>{% if busta.data_pagamento_effettiva %}Pagata il {{ busta.data_pagamento_effettiva|date:"d/m/Y" }}{% else %}Pagamento collegato{% endif %}</span>
                                                     {% else %}

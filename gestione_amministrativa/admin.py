@@ -6,6 +6,7 @@ from .models import (
     DatoPayrollUfficiale,
     Dipendente,
     DocumentoDipendente,
+    PagamentoBustaPagaDipendente,
     ParametroCalcoloStipendio,
     SimulazioneCostoDipendente,
     TipoContrattoDipendente,
@@ -167,6 +168,13 @@ class VoceBustaPagaInline(admin.TabularInline):
     fields = ("scenario", "tipo_voce", "codice", "descrizione", "importo", "ordine")
 
 
+class PagamentoBustaPagaInline(admin.TabularInline):
+    model = PagamentoBustaPagaDipendente
+    extra = 0
+    autocomplete_fields = ("movimento",)
+    fields = ("data_pagamento", "importo", "movimento", "note")
+
+
 @admin.register(BustaPagaDipendente)
 class BustaPagaDipendenteAdmin(admin.ModelAdmin):
     list_display = (
@@ -186,7 +194,20 @@ class BustaPagaDipendenteAdmin(admin.ModelAdmin):
         "dipendente__persona_collegata__codice_fiscale",
     )
     autocomplete_fields = ("dipendente", "contratto", "movimento_pagamento")
-    inlines = [VoceBustaPagaInline]
+    inlines = [PagamentoBustaPagaInline, VoceBustaPagaInline]
+
+
+@admin.register(PagamentoBustaPagaDipendente)
+class PagamentoBustaPagaDipendenteAdmin(admin.ModelAdmin):
+    list_display = ("busta_paga", "data_pagamento", "importo", "movimento")
+    list_filter = ("data_pagamento",)
+    search_fields = (
+        "busta_paga__dipendente__persona_collegata__nome",
+        "busta_paga__dipendente__persona_collegata__cognome",
+        "movimento__descrizione",
+        "movimento__controparte",
+    )
+    autocomplete_fields = ("busta_paga", "movimento")
 
 
 @admin.register(VoceBustaPaga)

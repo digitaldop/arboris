@@ -2815,8 +2815,8 @@ def _importo_movimento_buste_paga_riconciliato(movimento):
     if movimento is None or not getattr(movimento, "pk", None):
         return Decimal("0.00")
 
-    totale = Decimal("0.00")
-    for busta in movimento.buste_paga_dipendenti.only("netto_effettivo", "netto_previsto"):
+    totale = movimento.pagamenti_buste_paga.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
+    for busta in movimento.buste_paga_dipendenti.filter(pagamenti__isnull=True).only("netto_effettivo", "netto_previsto").distinct():
         importo = busta.netto_effettivo or busta.netto_previsto or Decimal("0.00")
         totale += abs(importo)
     return totale
@@ -2835,7 +2835,7 @@ def aggiorna_stato_riconciliazione_movimento(movimento):
     _clear_importo_movimento_disponibile_cache(movimento)
     ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or movimento.riconciliazioni_rate.exists()
     ha_collegamenti_fornitori = movimento.pagamenti_fornitori.exists()
-    ha_collegamenti_buste = movimento.buste_paga_dipendenti.exists()
+    ha_collegamenti_buste = movimento.buste_paga_dipendenti.exists() or movimento.pagamenti_buste_paga.exists()
     ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
 
     if movimento.importo is not None and movimento.importo < 0:
@@ -2870,7 +2870,11 @@ def stato_riconciliazione_movimento_display(movimento):
     ha_collegamenti_fornitori = (
         fornitori_count if fornitori_count is not None else movimento.pagamenti_fornitori.exists()
     )
-    ha_collegamenti_buste = buste_count if buste_count is not None else movimento.buste_paga_dipendenti.exists()
+    ha_collegamenti_buste = (
+        buste_count
+        if buste_count is not None
+        else movimento.buste_paga_dipendenti.exists() or movimento.pagamenti_buste_paga.exists()
+    )
     ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
 
     if not ha_collegamenti:

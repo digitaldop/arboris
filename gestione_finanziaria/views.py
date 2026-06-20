@@ -71,7 +71,7 @@ from .forms import (
     SpesaOperativaForm,
     VoceBudgetRicorrenteForm,
 )
-from gestione_amministrativa.models import BustaPagaDipendente
+from gestione_amministrativa.models import BustaPagaDipendente, PagamentoBustaPagaDipendente
 from .importers import (
     Camt053Parser,
     CsvImporter,
@@ -2168,7 +2168,7 @@ def _spese_mensili_rows(request, start, end):
         )
         if importo_previsto <= Decimal("0.00"):
             continue
-        importo_pagato = importo_previsto if busta.data_pagamento_effettiva or busta.movimento_pagamento_id else Decimal("0.00")
+        importo_pagato = min(busta.importo_pagato_riconciliato, importo_previsto)
         rows.append(
             _spesa_row(
                 data_scadenza=data_scadenza,
@@ -3613,6 +3613,10 @@ def _assorbi_collegamenti_movimento_duplicato(movimento_sorgente, movimento_dest
         movimento_pagamento=movimento_destinazione,
         data_aggiornamento=now,
     )
+    PagamentoBustaPagaDipendente.objects.filter(movimento=movimento_sorgente).update(
+        movimento=movimento_destinazione,
+        data_aggiornamento=now,
+    )
 
     for pagamento in PagamentoFornitore.objects.filter(movimento_finanziario=movimento_sorgente):
         exists = PagamentoFornitore.objects.filter(
@@ -4415,7 +4419,7 @@ def lista_movimenti_finanziari(request):
         .annotate(
             riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
-            buste_paga_count=Count("buste_paga_dipendenti", distinct=True),
+            buste_paga_count=Count("pagamenti_buste_paga", distinct=True) + Count("buste_paga_dipendenti", distinct=True),
         )
         .order_by("-data_contabile", "-id")
     )
@@ -4505,7 +4509,9 @@ def _statistiche_pulizia_movimenti(queryset):
         "manuali": queryset.filter(origine=OrigineMovimento.MANUALE).count(),
         "riconciliati_rate": queryset.filter(rata_iscrizione__isnull=False).count(),
         "collegati_scadenze": ScadenzaPagamentoFornitore.objects.filter(movimento_finanziario__in=queryset).count(),
-        "collegati_buste": BustaPagaDipendente.objects.filter(movimento_pagamento__in=queryset).count(),
+        "collegati_buste": BustaPagaDipendente.objects.filter(
+            Q(movimento_pagamento__in=queryset) | Q(pagamenti__movimento__in=queryset)
+        ).distinct().count(),
     }
 
 
@@ -4672,7 +4678,7 @@ def _movimenti_finanziari_duplicate_groups():
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
             scadenze_fornitori_count=Count("scadenze_fornitori", distinct=True),
             spese_operative_count=Count("spese_operative", distinct=True),
-            buste_paga_count=Count("buste_paga_dipendenti", distinct=True),
+            buste_paga_count=Count("pagamenti_buste_paga", distinct=True) + Count("buste_paga_dipendenti", distinct=True),
         )
         .order_by("data_contabile", "id")
     )
@@ -4982,10 +4988,26 @@ def _collega_movimento_a_busta_paga(movimento, busta_id):
     busta = BustaPagaDipendente.objects.filter(pk=busta_id).first()
     if not busta:
         return
+    importo = min(abs(movimento.importo or Decimal("0.00")), busta.importo_residuo_pagamento)
+    if importo <= Decimal("0.00"):
+        return
     movimento_precedente_id = busta.movimento_pagamento_id
+    pagamento = PagamentoBustaPagaDipendente.objects.filter(busta_paga=busta, movimento=movimento).first()
+    if pagamento:
+        pagamento.importo += importo
+        pagamento.data_pagamento = movimento.data_contabile
+        pagamento.save(update_fields=["importo", "data_pagamento", "data_aggiornamento"])
+    else:
+        PagamentoBustaPagaDipendente.objects.create(
+            busta_paga=busta,
+            movimento=movimento,
+            importo=importo,
+            data_pagamento=movimento.data_contabile,
+            note="Pagamento busta paga inserito manualmente",
+        )
     busta.movimento_pagamento = movimento
     update_fields = ["movimento_pagamento", "data_aggiornamento"]
-    if not busta.data_pagamento_effettiva:
+    if busta.importo_residuo_pagamento <= Decimal("0.00") and not busta.data_pagamento_effettiva:
         busta.data_pagamento_effettiva = movimento.data_contabile
         update_fields.append("data_pagamento_effettiva")
     busta.save(update_fields=update_fields)
@@ -5208,7 +5230,9 @@ def elimina_movimenti_finanziari_multipla(request):
         movimento_finanziario__in=movimenti
     ).count()
     pagamenti_collegati_count = PagamentoFornitore.objects.filter(movimento_finanziario__in=movimenti).count()
-    buste_collegate_count = BustaPagaDipendente.objects.filter(movimento_pagamento__in=movimenti).count()
+    buste_collegate_count = BustaPagaDipendente.objects.filter(
+        Q(movimento_pagamento__in=movimenti) | Q(pagamenti__movimento__in=movimenti)
+    ).distinct().count()
 
     return render(
         request,

@@ -30,8 +30,8 @@
             <section class="family-overview-card rate-reconcile-hero">
                 <span class="family-stat-icon family-stat-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
                 <div>
-                    <h2>Netto da riconciliare EUR {{ importo_busta|euro }}</h2>
-                    <p>Arboris usa l'importo della singola busta paga e scala solo questa quota dal movimento selezionato.</p>
+                    <h2>Residuo da riconciliare EUR {{ importo_busta|euro }}</h2>
+                    <p>Arboris collega alla busta solo la quota disponibile del movimento selezionato, anche se copre un pagamento parziale.</p>
                 </div>
             </section>
 
@@ -42,7 +42,7 @@
                         <button
                             type="button"
                             class="rate-reconcile-help-trigger"
-                            data-floating-text="Il collegamento usa il netto effettivo della busta; se non presente usa il netto previsto. Un movimento piu grande puo coprire piu buste, una alla volta."
+                            data-floating-text="Il collegamento usa il residuo del netto busta. Un movimento piu piccolo viene registrato come pagamento parziale."
                             aria-label="Aiuto importo busta paga"
                         >?</button>
                     </div>
@@ -51,10 +51,10 @@
                             <div>
                                 <strong>{{ busta.dipendente }}</strong>
                                 <span>{{ busta.periodo_label }} - {{ busta.get_stato_display }}</span>
-                                <small>Netto busta EUR {{ importo_busta|euro }}</small>
+                                <small>Netto busta EUR {{ importo_netto_busta|euro }}{% if importo_pagato_busta %} - gia collegato EUR {{ importo_pagato_busta|euro }}{% endif %}</small>
                             </div>
                             <label>
-                                <span>Importo collegato</span>
+                                <span>Residuo da collegare</span>
                                 <div class="currency-input-group currency-input-group-suffix currency-input-group-compact">
                                     <input
                                         type="text"
@@ -66,12 +66,14 @@
                                 </div>
                             </label>
                         </article>
-                        {% if busta.movimento_pagamento %}
+                        {% if pagamenti_busta %}
                             <article class="rate-reconcile-rate">
                                 <div>
-                                    <strong>Pagamento collegato</strong>
-                                    <span>{{ busta.movimento_pagamento.data_contabile|date:"d/m/Y" }} - {{ busta.movimento_pagamento.importo|euro }} &euro;</span>
-                                    <small>{{ busta.movimento_pagamento.descrizione|default:"Nessuna descrizione" }}</small>
+                                    <strong>Pagamenti collegati</strong>
+                                    {% for pagamento in pagamenti_busta %}
+                                        <span>{{ pagamento.data_pagamento|date:"d/m/Y" }} - {{ pagamento.importo|euro }} &euro;</span>
+                                        <small>{{ pagamento.movimento.descrizione|default:"Nessuna descrizione" }}</small>
+                                    {% endfor %}
                                 </div>
                                 <button
                                     type="submit"
@@ -94,7 +96,7 @@
                         <button
                             type="button"
                             class="rate-reconcile-help-trigger"
-                            data-floating-text="Sono mostrati movimenti bancari in uscita con disponibilita sufficiente per coprire il netto della singola busta paga."
+                            data-floating-text="Sono mostrati movimenti bancari in uscita con disponibilita residua, anche quando coprono solo una parte della busta."
                             aria-label="Aiuto movimenti candidati"
                         >?</button>
                     </div>
@@ -107,6 +109,7 @@
                                         <strong>Disponibile EUR {{ candidato.importo_disponibile|euro }}</strong>
                                         <span>{{ candidato.score_percentuale }}%</span>
                                     </span>
+                                    <span>Collegabile a questa busta EUR {{ candidato.importo_collegabile|euro }}</span>
                                     <span>
                                         {{ candidato.movimento.data_contabile|date:"d/m/Y" }} -
                                         {% if candidato.movimento.controparte %}
@@ -126,7 +129,7 @@
                                 </span>
                             </label>
                         {% empty %}
-                            <div class="empty-state compact-empty-state">Nessun movimento bancario disponibile trovato. Verifica che i movimenti siano importati e che il netto della busta sia valorizzato.</div>
+                            <div class="empty-state compact-empty-state">Nessun movimento bancario disponibile trovato. Verifica che i movimenti siano importati e che ci sia un residuo da collegare.</div>
                         {% endfor %}
                     </div>
                 </section>

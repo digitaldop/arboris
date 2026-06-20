@@ -12015,6 +12015,11 @@ textarea.is-conditional-disabled,
     background: #ffffff;
 }
 
+#tab-lavoro-buste .relative-work-row {
+    grid-template-columns: minmax(0, 1.4fr) minmax(150px, auto) auto;
+    column-gap: 22px;
+}
+
 .relative-work-row > div {
     display: grid;
     gap: 3px;
@@ -12030,6 +12035,18 @@ textarea.is-conditional-disabled,
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 6px;
+}
+
+#tab-lavoro-buste .relative-work-row-actions {
+    column-gap: 8px;
+}
+
+#tab-lavoro-buste .relative-work-row-actions .btn-save-soft,
+#tab-lavoro-buste .relative-work-row-actions .btn-save-soft:hover,
+#tab-lavoro-buste .relative-work-row-actions .btn-save-soft:focus-visible,
+#tab-lavoro-buste .relative-work-row-actions .btn-save-soft .btn-icon,
+#tab-lavoro-buste .relative-work-row-actions .btn-save-soft .btn-label {
+    color: #ffffff !important;
 }
 
 @media (max-width: 900px) {

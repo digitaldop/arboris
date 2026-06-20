@@ -7776,6 +7776,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(busta.movimento_pagamento, movimento)
         self.assertEqual(busta.data_pagamento_effettiva, date(2025, 10, 31))
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        pagamento = busta.pagamenti.get(movimento=movimento)
+        self.assertEqual(pagamento.importo, Decimal("1302.00"))
 
     def test_dashboard_mostra_saldi_per_tipo_conto(self):
         conto = ContoBancario.objects.create(

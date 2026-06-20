@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import Max, Q
+from django.db.models import Max, Q, Sum
 from django.utils import timezone
 
 
@@ -967,8 +967,30 @@ class BustaPagaDipendente(models.Model):
         return bool(self.costo_azienda_effettivo or self.costo_azienda_previsto)
 
     @property
+    def importo_pagato_riconciliato(self):
+        totale = ZERO
+        if self.pk:
+            totale = self.pagamenti.aggregate(totale=Sum("importo"))["totale"] or ZERO
+        if totale > ZERO:
+            return min(totale, self.importo_netto_riepilogo or ZERO)
+        if self.movimento_pagamento_id or self.data_pagamento_effettiva:
+            return self.importo_netto_riepilogo or ZERO
+        return ZERO
+
+    @property
+    def importo_residuo_pagamento(self):
+        return max((self.importo_netto_riepilogo or ZERO) - self.importo_pagato_riconciliato, ZERO)
+
+    @property
+    def pagamento_parziale(self):
+        return self.importo_pagato_riconciliato > ZERO and self.importo_residuo_pagamento > ZERO
+
+    @property
     def risulta_pagata(self):
-        return bool(self.data_pagamento_effettiva or self.movimento_pagamento_id)
+        importo_netto = self.importo_netto_riepilogo or ZERO
+        if importo_netto <= ZERO:
+            return bool(self.data_pagamento_effettiva or self.movimento_pagamento_id)
+        return self.importo_pagato_riconciliato >= importo_netto
 
     @property
     def data_pagamento_suggerita(self):
@@ -1005,6 +1027,50 @@ class BustaPagaDipendente(models.Model):
     @property
     def scostamento_netto(self):
         return (self.netto_effettivo or ZERO) - (self.netto_previsto or ZERO)
+
+
+class PagamentoBustaPagaDipendente(models.Model):
+    busta_paga = models.ForeignKey(
+        BustaPagaDipendente,
+        on_delete=models.CASCADE,
+        related_name="pagamenti",
+    )
+    movimento = models.ForeignKey(
+        "gestione_finanziaria.MovimentoFinanziario",
+        on_delete=models.SET_NULL,
+        related_name="pagamenti_buste_paga",
+        blank=True,
+        null=True,
+    )
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    data_pagamento = models.DateField()
+    note = models.TextField(blank=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "gestione_amministrativa_pagamento_busta_paga"
+        ordering = ["-data_pagamento", "-id"]
+        verbose_name = "Pagamento busta paga"
+        verbose_name_plural = "Pagamenti buste paga"
+        indexes = [
+            models.Index(fields=["busta_paga", "data_pagamento"], name="ga_pag_busta_data_idx"),
+            models.Index(fields=["movimento"], name="ga_pag_busta_mov_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["busta_paga", "movimento"],
+                condition=Q(movimento__isnull=False),
+                name="ga_pag_busta_unique_movimento",
+            ),
+            models.CheckConstraint(
+                check=Q(importo__gt=ZERO),
+                name="ga_pag_busta_importo_pos",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.busta_paga} - EUR {self.importo}"
 
 
 class VoceBustaPaga(models.Model):

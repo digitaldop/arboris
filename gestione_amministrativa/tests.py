@@ -22,6 +22,7 @@ from .models import (
     ContrattoDipendente,
     DatoPayrollUfficiale,
     Dipendente,
+    PagamentoBustaPagaDipendente,
     ParametroCalcoloStipendio,
     RuoloAnagraficoDipendente,
     ScenarioValorePayroll,
@@ -666,10 +667,11 @@ class SimulazioneCostoDipendenteTests(TestCase):
         response = self.client.get(reverse("riconcilia_busta_paga_dipendente", args=[self.busta.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Netto da riconciliare EUR 1.302,00")
+        self.assertContains(response, "Residuo da riconciliare EUR 1.302,00")
         self.assertContains(response, movimento_cumulativo.descrizione)
         self.assertContains(response, "Disponibile EUR 1.302,00")
-        self.assertNotContains(response, movimento_piccolo.descrizione)
+        self.assertContains(response, movimento_piccolo.descrizione)
+        self.assertContains(response, "Movimento utilizzabile come pagamento parziale")
 
     def test_riconciliazione_busta_paga_collega_movimento_su_quota_singola(self):
         self.client.force_login(self.user)
@@ -709,8 +711,10 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(self.busta.movimento_pagamento, movimento)
         self.assertEqual(self.busta.data_pagamento_effettiva, date(2025, 10, 31))
         self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        pagamento = PagamentoBustaPagaDipendente.objects.get(busta_paga=self.busta, movimento=movimento)
+        self.assertEqual(pagamento.importo, Decimal("1302.00"))
 
-    def test_riconciliazione_busta_paga_blocca_movimento_non_capiente(self):
+    def test_riconciliazione_busta_paga_accetta_movimento_non_capiente_come_parziale(self):
         self.client.force_login(self.user)
         movimento = MovimentoFinanziario.objects.create(
             data_contabile=date(2025, 10, 31),
@@ -728,12 +732,18 @@ class SimulazioneCostoDipendenteTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.busta.refresh_from_db()
         movimento.refresh_from_db()
-        self.assertIsNone(self.busta.movimento_pagamento)
-        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.NON_RICONCILIATO)
-        self.assertContains(response, "non ha disponibilita sufficiente")
+        self.assertEqual(self.busta.movimento_pagamento, movimento)
+        self.assertIsNone(self.busta.data_pagamento_effettiva)
+        self.assertFalse(self.busta.risulta_pagata)
+        self.assertTrue(self.busta.pagamento_parziale)
+        self.assertEqual(self.busta.importo_pagato_riconciliato, Decimal("1000.00"))
+        self.assertEqual(self.busta.importo_residuo_pagamento, Decimal("302.00"))
+        self.assertEqual(movimento.stato_riconciliazione, StatoRiconciliazione.RICONCILIATO)
+        pagamento = PagamentoBustaPagaDipendente.objects.get(busta_paga=self.busta, movimento=movimento)
+        self.assertEqual(pagamento.importo, Decimal("1000.00"))
 
     def test_modalita_semplice_busta_paga_nasconde_previsione_dettagliata(self):
         self.client.force_login(self.user)
