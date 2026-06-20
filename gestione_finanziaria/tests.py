@@ -4197,6 +4197,99 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(documento.scadenze.count(), 1)
         self.assertEqual(documento.fornitore.partita_iva, "12345678901")
 
+    def test_importa_documento_fatture_in_cloud_aggancia_duplicato_storico_stessi_dati(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        fornitore = Fornitore.objects.create(
+            denominazione="IL RAMO D'ORO S.R.L.",
+            partita_iva="99999999999",
+        )
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="19",
+            data_documento=date(2026, 5, 12),
+            descrizione="affitto locali aprile 2025",
+            imponibile=Decimal("4000.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("4000.00"),
+            origine=OrigineDocumentoFornitore.FATTURE_IN_CLOUD,
+            external_source="fatture_in_cloud",
+            external_id="fic-storico-old",
+        )
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {
+                "id": "fic-storico-new",
+                "type": "expense",
+                "description": "affitto locali aprile 2025",
+                "invoice_number": "19",
+                "date": "2026-05-12",
+                "amount_net": "4000.00",
+                "amount_vat": "0.00",
+                "amount_gross": "4000.00",
+                "entity": {
+                    "name": "IL RAMO D ORO SRL",
+                    "vat_number": "IT03400731208",
+                },
+                "payments_list": [{"due_date": "2026-05-12", "amount": "4000.00"}],
+            },
+            pending=False,
+            utente=self.user,
+        )
+
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.external_id, "fic-storico-new")
+        self.assertTrue(
+            DocumentoFornitoreImportAlias.objects.filter(
+                external_source="fatture_in_cloud",
+                external_id__startswith="signature:",
+                documento=documento,
+                ignorato=False,
+            ).exists()
+        )
+
+    def test_importa_documento_fatture_in_cloud_blocca_duplicato_con_id_diverso_stessa_impronta(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": "fic-ramo-1",
+            "type": "expense",
+            "description": "affitto locali aprile 2025",
+            "invoice_number": "19",
+            "date": "2026-05-12",
+            "amount_net": "4000.00",
+            "amount_vat": "0.00",
+            "amount_gross": "4000.00",
+            "entity": {
+                "name": "IL RAMO D'ORO S.R.L.",
+                "vat_number": "IT03400731208",
+            },
+            "payments_list": [{"due_date": "2026-05-12", "amount": "4000.00"}],
+        }
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="fic-ramo-1")
+
+        duplicate_payload = {
+            **payload,
+            "id": "fic-ramo-2",
+            "entity": {
+                "name": "IL RAMO D ORO SRL",
+                "vat_number": "IT99999999999",
+            },
+        }
+        result = importa_documento_fatture_in_cloud(connessione, duplicate_payload, pending=False, utente=self.user)
+
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        self.assertEqual(Fornitore.objects.count(), 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.external_id, "fic-ramo-2")
+        self.assertEqual(documento.numero_documento, "19")
+        self.assertEqual(documento.totale, Decimal("4000.00"))
+        self.assertEqual(documento.scadenze.count(), 1)
+
     def test_importa_documento_fatture_in_cloud_nota_credito_non_crea_scadenze(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",

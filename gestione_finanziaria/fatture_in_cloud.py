@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 import re
 import unicodedata
@@ -726,6 +727,35 @@ def _find_supplier_by_normalized_name(qs, name, identity):
     return matches[0] if matches else None
 
 
+def _supplier_defaults_from_entity(entity):
+    vat_number = _clean_vat_identifier(entity.get("vat_number"))
+    tax_code = _clean_identifier(entity.get("tax_code"))
+    return {
+        "tipo_soggetto": "azienda" if (entity.get("type") or "") != "person" else "professionista",
+        "partita_iva": vat_number[:11],
+        "codice_fiscale": tax_code[:16],
+        "indirizzo": _supplier_address(entity),
+        "email": (entity.get("email") or "")[:254],
+        "pec": (entity.get("certified_email") or "")[:254],
+        "telefono": (entity.get("phone") or "")[:40],
+        "codice_sdi": _clean_identifier(entity.get("ei_code"))[:7],
+        "iban": _clean_identifier(entity.get("bank_iban"))[:34],
+        "banca": (entity.get("bank_name") or "")[:160],
+    }
+
+
+def _update_supplier_missing_fields(fornitore, entity):
+    changed = []
+    for field_name, value in _supplier_defaults_from_entity(entity).items():
+        if value and not getattr(fornitore, field_name):
+            setattr(fornitore, field_name, value)
+            changed.append(field_name)
+    if changed:
+        changed.append("data_aggiornamento")
+        fornitore.save(update_fields=changed)
+    return bool(changed)
+
+
 def _find_or_create_supplier(entity, document_data):
     name = _supplier_name(entity, document_data)
     vat_number = _clean_vat_identifier(entity.get("vat_number"))
@@ -743,30 +773,11 @@ def _find_or_create_supplier(entity, document_data):
     if fornitore is None:
         fornitore = _find_supplier_by_normalized_name(qs, name, identity)
 
-    defaults = {
-        "tipo_soggetto": "azienda" if (entity.get("type") or "") != "person" else "professionista",
-        "partita_iva": vat_number[:11],
-        "codice_fiscale": tax_code[:16],
-        "indirizzo": _supplier_address(entity),
-        "email": (entity.get("email") or "")[:254],
-        "pec": (entity.get("certified_email") or "")[:254],
-        "telefono": (entity.get("phone") or "")[:40],
-        "codice_sdi": _clean_identifier(entity.get("ei_code"))[:7],
-        "iban": _clean_identifier(entity.get("bank_iban"))[:34],
-        "banca": (entity.get("bank_name") or "")[:160],
-    }
+    defaults = _supplier_defaults_from_entity(entity)
     if fornitore is None:
         return Fornitore.objects.create(denominazione=name, attivo=True, **defaults), True, False
 
-    changed = []
-    for field_name, value in defaults.items():
-        if value and not getattr(fornitore, field_name):
-            setattr(fornitore, field_name, value)
-            changed.append(field_name)
-    if changed:
-        changed.append("data_aggiornamento")
-        fornitore.save(update_fields=changed)
-    return fornitore, False, bool(changed)
+    return fornitore, False, _update_supplier_missing_fields(fornitore, entity)
 
 
 def _raw_document_type_values(document_data, source_doc_type=None):
@@ -1617,6 +1628,43 @@ def _document_total_for_import_match(document_data):
     return amount_gross.quantize(Decimal("0.01"))
 
 
+def _document_import_signature_alias_id(document_data, entity, source_doc_type=None):
+    doc_date = _document_date_for_sync_filter(document_data)
+    numero_norm = _normalizza_numero_documento_match(_invoice_number(document_data))
+    supplier_name_key = _normalizza_nome_fornitore_match(_supplier_name(entity, document_data))
+    total = _document_total_for_import_match(document_data)
+    if not (doc_date and numero_norm and supplier_name_key and total > Decimal("0.00")):
+        return ""
+
+    parts = [
+        "signature",
+        str(_document_type(document_data, source_doc_type)),
+        supplier_name_key,
+        numero_norm,
+        doc_date.isoformat(),
+        f"{total:.2f}",
+    ]
+    digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+    return f"signature:{digest}"
+
+
+def _document_description_matches_import(documento, description_key, line_description_key):
+    if not description_key and not line_description_key:
+        return True
+
+    existing_keys = {
+        _normalizza_testo_match(documento.descrizione),
+        _normalizza_testo_match(documento.descrizione_righe_fattura),
+    }
+    existing_keys.discard("")
+    if not existing_keys:
+        return True
+    return bool(
+        (description_key and description_key in existing_keys)
+        or (line_description_key and line_description_key in existing_keys)
+    )
+
+
 def _supplier_matches_imported_document(fornitore, identity, supplier_name_key):
     if _supplier_identity_matches(fornitore, identity):
         return True
@@ -1647,6 +1695,8 @@ def _find_existing_document_by_import_signature(document_data, fornitore, entity
     total = _document_total_for_import_match(document_data)
     identity = _supplier_identity_from_entity(entity)
     supplier_name_key = _normalizza_nome_fornitore_match(_supplier_name(entity, document_data))
+    description_key = _normalizza_testo_match(_document_description(document_data))
+    line_description_key = _normalizza_testo_match(_document_invoice_line_description_text(document_data))
     candidates_qs = (
         DocumentoFornitore.objects.select_for_update()
         .select_related("fornitore")
@@ -1669,6 +1719,13 @@ def _find_existing_document_by_import_signature(document_data, fornitore, entity
             if not _same_money(documento.totale, total):
                 continue
             if _supplier_matches_imported_document(documento.fornitore, identity, supplier_name_key):
+                matches.append(documento)
+                continue
+            if (
+                supplier_name_key
+                and _normalizza_nome_fornitore_match(documento.fornitore.denominazione) == supplier_name_key
+                and _document_description_matches_import(documento, description_key, line_description_key)
+            ):
                 matches.append(documento)
 
     if not matches:
@@ -1963,7 +2020,10 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         raise ValidationError("Documento Fatture in Cloud privo di ID.")
 
     external_id = _clean_external_alias_value(document_data.get("id"))
+    entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
+    signature_alias_id = _document_import_signature_alias_id(document_data, entity, source_doc_type)
     import_alias = _fic_import_alias_for_external_id(external_id)
+    signature_alias = _fic_import_alias_for_external_id(signature_alias_id) if signature_alias_id else None
     if import_alias and import_alias.ignorato:
         return _skipped_import_result(import_alias.documento, reason="alias_ignorato")
     if import_alias and import_alias.documento is None:
@@ -1971,8 +2031,16 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         import_alias.motivo = import_alias.motivo or "documento_eliminato"
         import_alias.save(update_fields=["ignorato", "motivo", "data_aggiornamento"])
         return _skipped_import_result(reason="alias_documento_eliminato")
+    if signature_alias and signature_alias.ignorato:
+        return _skipped_import_result(signature_alias.documento, reason="firma_import_ignorata")
+    if signature_alias and signature_alias.documento is None:
+        signature_alias.ignorato = True
+        signature_alias.motivo = signature_alias.motivo or "documento_eliminato"
+        signature_alias.save(update_fields=["ignorato", "motivo", "data_aggiornamento"])
+        return _skipped_import_result(reason="firma_import_documento_eliminato")
 
     documento = None
+    documento_da_firma_import = False
     if import_alias:
         documento = import_alias.documento
         if not (
@@ -1980,9 +2048,16 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
             and _clean_external_alias_value(documento.external_id) == external_id
         ):
             return _skipped_import_result(documento, reason="alias_assorbito")
+    elif signature_alias:
+        documento = signature_alias.documento
+        documento_da_firma_import = documento is not None
 
-    entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
-    fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
+    if documento_da_firma_import:
+        fornitore = documento.fornitore
+        fornitore_created = False
+        fornitore_updated = _update_supplier_missing_fields(fornitore, entity)
+    else:
+        fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
     if documento is None:
         documento = (
             DocumentoFornitore.objects.select_for_update()
@@ -2008,6 +2083,8 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     _update_document_fields(documento, document_data, fornitore, pending, source_doc_type=source_doc_type)
     documento.save()
     registra_alias_import_documento_fornitore(documento, motivo="import_fatture_in_cloud")
+    if signature_alias_id:
+        _upsert_document_import_alias(documento, FIC_SOURCE, signature_alias_id, motivo="firma_import_fatture_in_cloud")
     if previous_external_source and previous_external_id and (
         previous_external_source != documento.external_source or previous_external_id != documento.external_id
     ):
