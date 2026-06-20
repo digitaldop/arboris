@@ -423,8 +423,9 @@ class SimulazioneCostoDipendenteTests(TestCase):
         response = self.client.get(f"{reverse('modifica_contratto_dipendente', args=[self.contratto.pk])}?popup=1")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Previsione economica")
-        self.assertContains(response, "Costo aziendale ipotizzato")
+        self.assertContains(response, "Tipo contratto")
+        self.assertNotContains(response, "Previsione economica")
+        self.assertNotContains(response, "Costo aziendale ipotizzato")
         self.assertNotContains(response, 'id="popup-add-parametro-calcolo-btn"')
         self.assertNotContains(response, "CCNL")
         self.assertNotContains(response, "Simulazioni costo collegate")
@@ -433,6 +434,12 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.client.force_login(self.user)
         self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
         self.impostazioni.save()
+        self.tipo_contratto.mensilita_annue = Decimal("13.00")
+        self.tipo_contratto.costo_azienda_ipotizzato = Decimal("2300.00")
+        self.tipo_contratto.lordo_ipotizzato = Decimal("1600.00")
+        self.tipo_contratto.netto_ipotizzato = Decimal("1250.00")
+        self.tipo_contratto.contributi_mensili_ipotizzati = Decimal("700.00")
+        self.tipo_contratto.save()
 
         response = self.client.post(
             f"{reverse('modifica_contratto_dipendente', args=[self.contratto.pk])}?popup=1",
@@ -443,12 +450,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "data_inizio": "2025-09-01",
                 "data_fine": "",
                 "mansione": "Maestro",
-                "costo_azienda_ipotizzato": "2300.00",
-                "lordo_ipotizzato": "1600.00",
-                "netto_ipotizzato": "1250.00",
-                "contributi_mensili_ipotizzati": "700.00",
-                "mensilita_annue": "13.00",
-                "valuta": "EUR",
                 "attivo": "on",
                 "note": "",
             },
@@ -473,17 +474,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "target_input_name": "tipo_contratto",
                 "nome": "Educatore 30 ore",
                 "parametro_calcolo": str(self.parametro.pk),
-                "ccnl": "Cooperative sociali",
-                "livello": "D2",
-                "qualifica": "Educatore",
-                "mansione": "Educatore musicale",
-                "regime_orario": "tempo_parziale",
-                "ore_settimanali": "30.00",
-                "percentuale_part_time": "75.00",
-                "retribuzione_lorda_mensile": "1450.00",
-                "tariffa_oraria": "0.00",
-                "superminimo_mensile": "50.00",
-                "indennita_fisse_mensili": "25.00",
                 "mensilita_annue": "13.00",
                 "costo_azienda_ipotizzato": "2300.00",
                 "lordo_ipotizzato": "1500.00",
@@ -499,7 +489,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         tipo = TipoContrattoDipendente.objects.get(nome="Educatore 30 ore")
         self.assertEqual(tipo.parametro_calcolo, self.parametro)
-        self.assertEqual(tipo.ore_settimanali, Decimal("30.00"))
+        self.assertEqual(tipo.mensilita_annue, Decimal("13.00"))
         self.assertEqual(tipo.lordo_ipotizzato, Decimal("1500.00"))
         self.assertEqual(tipo.costo_azienda_ipotizzato, Decimal("2300.00"))
 
@@ -507,7 +497,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.client.force_login(self.user)
         self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
         self.impostazioni.save()
-        self.tipo_contratto.mansione = "Educatore"
         self.tipo_contratto.mensilita_annue = Decimal("14.00")
         self.tipo_contratto.costo_azienda_ipotizzato = Decimal("2450.00")
         self.tipo_contratto.lordo_ipotizzato = Decimal("1700.00")
@@ -523,7 +512,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "tipo_contratto": str(self.tipo_contratto.pk),
                 "data_inizio": "2025-09-01",
                 "data_fine": "",
-                "mansione": "",
+                "mansione": "Educatore di classe",
                 "attivo": "on",
                 "note": "",
             },
@@ -532,7 +521,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.contratto.refresh_from_db()
         simulazione = self.contratto.simulazioni_costo.filter(attiva=True).order_by("-id").first()
-        self.assertEqual(self.contratto.mansione, "Educatore")
+        self.assertEqual(self.contratto.mansione, "Educatore di classe")
         self.assertEqual(self.contratto.mensilita_annue, Decimal("14.00"))
         self.assertEqual(self.contratto.retribuzione_lorda_mensile, Decimal("1700.00"))
         self.assertEqual(simulazione.costo_azienda_mensile, Decimal("2450.00"))
@@ -543,8 +532,6 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.client.force_login(self.user)
         tipo = TipoContrattoDipendente.objects.create(
             nome="Educatore full time",
-            mansione="Educatore",
-            retribuzione_lorda_mensile=Decimal("1800.00"),
             mensilita_annue=Decimal("13.00"),
             costo_azienda_ipotizzato=Decimal("2600.00"),
             lordo_ipotizzato=Decimal("1800.00"),
@@ -560,6 +547,13 @@ class SimulazioneCostoDipendenteTests(TestCase):
                 "tipo_contratto": str(tipo.pk),
                 "data_inizio": "2026-01-01",
                 "data_fine": "",
+                "mansione": "Educatore",
+                "regime_orario": "tempo_pieno",
+                "ore_settimanali": "0.00",
+                "percentuale_part_time": "100.00",
+                "tariffa_oraria": "0.00",
+                "superminimo_mensile": "0.00",
+                "indennita_fisse_mensili": "0.00",
                 "attivo": "on",
                 "note": "",
             },

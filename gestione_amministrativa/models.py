@@ -97,34 +97,6 @@ class TipoContrattoDipendente(models.Model):
         blank=True,
         null=True,
     )
-    ccnl = models.CharField(max_length=120, blank=True)
-    livello = models.CharField(max_length=60, blank=True)
-    qualifica = models.CharField(max_length=120, blank=True)
-    mansione = models.CharField(max_length=160, blank=True)
-    regime_orario = models.CharField(
-        max_length=30,
-        choices=RegimeOrarioDipendente.choices,
-        default=RegimeOrarioDipendente.TEMPO_PIENO,
-        blank=True,
-    )
-    ore_settimanali = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        blank=True,
-        validators=[MinValueValidator(Decimal("0.00"))],
-    )
-    percentuale_part_time = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=ONE_HUNDRED,
-        blank=True,
-        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(ONE_HUNDRED)],
-    )
-    retribuzione_lorda_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
-    tariffa_oraria = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
-    superminimo_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
-    indennita_fisse_mensili = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
     mensilita_annue = models.DecimalField(
         max_digits=4,
         decimal_places=2,
@@ -157,28 +129,16 @@ class TipoContrattoDipendente(models.Model):
 
     def contratto_default_values(self):
         defaults = {
-            "regime_orario": self.regime_orario or RegimeOrarioDipendente.TEMPO_PIENO,
-            "ore_settimanali": self.ore_settimanali or ZERO,
-            "percentuale_part_time": self.percentuale_part_time or ONE_HUNDRED,
-            "tariffa_oraria": self.tariffa_oraria or ZERO,
-            "superminimo_mensile": self.superminimo_mensile or ZERO,
-            "indennita_fisse_mensili": self.indennita_fisse_mensili or ZERO,
             "mensilita_annue": self.mensilita_annue or Decimal("13.00"),
             "valuta": self.valuta or "EUR",
+            "retribuzione_lorda_mensile": self.lordo_ipotizzato or ZERO,
         }
-        defaults["retribuzione_lorda_mensile"] = (
-            self.retribuzione_lorda_mensile or self.lordo_ipotizzato or ZERO
-        )
         if self.parametro_calcolo_id:
             defaults["parametro_calcolo"] = self.parametro_calcolo
-        for field_name in ["ccnl", "livello", "qualifica", "mansione"]:
-            value = getattr(self, field_name, "")
-            if value:
-                defaults[field_name] = value
         return defaults
 
     def previsione_default_values(self):
-        lordo = self.lordo_ipotizzato or self.retribuzione_lorda_mensile or ZERO
+        lordo = self.lordo_ipotizzato or ZERO
         costo = self.costo_azienda_ipotizzato or ZERO
         netto = self.netto_ipotizzato or ZERO
         contributi = self.contributi_mensili_ipotizzati or ZERO

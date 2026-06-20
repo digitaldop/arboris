@@ -1,17 +1,7 @@
 window.ArborisContrattoPopupForm = (function () {
     const tipoContrattoFieldMap = {
         "parametro_calcolo": "parametroCalcolo",
-        "ccnl": "ccnl",
-        "livello": "livello",
-        "qualifica": "qualifica",
-        "mansione": "mansione",
-        "regime_orario": "regimeOrario",
-        "ore_settimanali": "oreSettimanali",
-        "percentuale_part_time": "percentualePartTime",
         "retribuzione_lorda_mensile": "retribuzioneLordaMensile",
-        "tariffa_oraria": "tariffaOraria",
-        "superminimo_mensile": "superminimoMensile",
-        "indennita_fisse_mensili": "indennitaFisseMensili",
         "mensilita_annue": "mensilitaAnnue",
         "costo_azienda_ipotizzato": "costoAziendaIpotizzato",
         "lordo_ipotizzato": "lordoIpotizzato",

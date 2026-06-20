@@ -36,40 +36,10 @@
                 </section>
 
                 <section class="ga-tipo-contratto-section">
-                    <h2>Inquadramento</h2>
-                    <div class="ga-tipo-contratto-grid">
-                        {% for field in form %}
-                            {% if field.name == "ccnl" or field.name == "livello" or field.name == "qualifica" or field.name == "mansione" %}
-                                <div class="form-field{% if field.name == 'mansione' %} is-wide{% endif %}">
-                                    {{ field.label_tag }}
-                                    {{ field }}
-                                    {{ field.errors }}
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </section>
-
-                <section class="ga-tipo-contratto-section">
-                    <h2>Orario e compenso</h2>
-                    <div class="ga-tipo-contratto-grid">
-                        {% for field in form %}
-                            {% if field.name == "regime_orario" or field.name == "ore_settimanali" or field.name == "percentuale_part_time" or field.name == "retribuzione_lorda_mensile" or field.name == "tariffa_oraria" or field.name == "superminimo_mensile" or field.name == "indennita_fisse_mensili" or field.name == "mensilita_annue" or field.name == "valuta" %}
-                                <div class="form-field">
-                                    {{ field.label_tag }}
-                                    {{ field }}
-                                    {{ field.errors }}
-                                </div>
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                </section>
-
-                <section class="ga-tipo-contratto-section">
                     <h2>Previsione economica</h2>
                     <div class="ga-tipo-contratto-grid">
                         {% for field in form %}
-                            {% if field.name == "costo_azienda_ipotizzato" or field.name == "lordo_ipotizzato" or field.name == "netto_ipotizzato" or field.name == "contributi_mensili_ipotizzati" %}
+                            {% if field.name == "mensilita_annue" or field.name == "costo_azienda_ipotizzato" or field.name == "lordo_ipotizzato" or field.name == "netto_ipotizzato" or field.name == "contributi_mensili_ipotizzati" or field.name == "valuta" %}
                                 <div class="form-field">
                                     {{ field.label_tag }}
                                     {{ field }}

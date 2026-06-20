@@ -247,19 +247,19 @@
                 </div>
             </section>
 
+            {% if gestione_dipendenti_dettagliata_attiva %}
             <section class="scambio-retta-card" aria-labelledby="ga-contract-economics-title">
                 <div class="scambio-retta-card-head">
                     <span class="scambio-retta-card-icon is-green" aria-hidden="true">
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
                     </span>
                     <div>
-                        <h2 id="ga-contract-economics-title">{% if gestione_dipendenti_dettagliata_attiva %}Orario e importi{% else %}Previsione economica{% endif %}</h2>
-                        <p>{% if gestione_dipendenti_dettagliata_attiva %}Regime orario, ore settimanali, retribuzione e mensilita.{% else %}Valori sintetici usati per budgeting, previsione costi e confronto con le buste paga reali.{% endif %}</p>
+                        <h2 id="ga-contract-economics-title">Orario e importi</h2>
+                        <p>Regime orario, ore settimanali, retribuzione e mensilita.</p>
                     </div>
                 </div>
 
                 <div class="scambio-retta-grid ga-contract-form-grid">
-                    {% if gestione_dipendenti_dettagliata_attiva %}
                         <div class="scambio-retta-field">
                             <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
                                 <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg>
@@ -336,52 +336,6 @@
                                 {{ form.indennita_fisse_mensili.errors }}
                             </div>
                         </div>
-                    {% else %}
-                        <div class="scambio-retta-field">
-                            <span class="scambio-retta-field-icon is-blue" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#finance"></use></svg>
-                            </span>
-                            <div>
-                                <label for="{{ form.costo_azienda_ipotizzato.id_for_label }}">{{ form.costo_azienda_ipotizzato.label }}</label>
-                                {{ form.costo_azienda_ipotizzato }}
-                                {{ form.costo_azienda_ipotizzato.errors }}
-                            </div>
-                        </div>
-
-                        <div class="scambio-retta-field">
-                            <span class="scambio-retta-field-icon is-green" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
-                            </span>
-                            <div>
-                                <label for="{{ form.lordo_ipotizzato.id_for_label }}">{{ form.lordo_ipotizzato.label }}</label>
-                                {{ form.lordo_ipotizzato }}
-                                {{ form.lordo_ipotizzato.errors }}
-                            </div>
-                        </div>
-
-                        <div class="scambio-retta-field">
-                            <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
-                            </span>
-                            <div>
-                                <label for="{{ form.netto_ipotizzato.id_for_label }}">{{ form.netto_ipotizzato.label }}</label>
-                                {{ form.netto_ipotizzato }}
-                                {{ form.netto_ipotizzato.errors }}
-                            </div>
-                        </div>
-
-                        <div class="scambio-retta-field">
-                            <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
-                            </span>
-                            <div>
-                                <label for="{{ form.contributi_mensili_ipotizzati.id_for_label }}">{{ form.contributi_mensili_ipotizzati.label }}</label>
-                                {{ form.contributi_mensili_ipotizzati }}
-                                {{ form.contributi_mensili_ipotizzati.errors }}
-                                {% if form.contributi_mensili_ipotizzati.help_text %}<small>{{ form.contributi_mensili_ipotizzati.help_text }}</small>{% endif %}
-                            </div>
-                        </div>
-                    {% endif %}
 
                     <div class="scambio-retta-field">
                         <span class="scambio-retta-field-icon is-cyan" aria-hidden="true">
@@ -406,6 +360,7 @@
                     </div>
                 </div>
             </section>
+            {% endif %}
 
             <details class="ga-dipendente-notes-field ga-contract-notes-field" {% if form.note.errors or form.note.value %}open{% endif %}>
                 <summary title="Clicca per espandere">
