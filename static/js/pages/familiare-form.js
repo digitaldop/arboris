@@ -26,6 +26,95 @@ window.ArborisFamiliareForm = (function () {
             return `arboris-familiare-form-active-tab-${config.familiareId || "new"}`;
         }
 
+        function getRelativeWorkTabStorageKey() {
+            return `arboris-familiare-form-work-tab-${config.familiareId || "new"}`;
+        }
+
+        function persistRelativeWorkTab(tabId) {
+            if (!tabId || !window.sessionStorage) {
+                return;
+            }
+            try {
+                window.sessionStorage.setItem(getRelativeWorkTabStorageKey(), tabId);
+            } catch (error) {
+                // Storage may be unavailable in restricted browser modes.
+            }
+        }
+
+        function readPersistedRelativeWorkTab() {
+            if (!window.sessionStorage) {
+                return "";
+            }
+            try {
+                return window.sessionStorage.getItem(getRelativeWorkTabStorageKey()) || "";
+            } catch (error) {
+                return "";
+            }
+        }
+
+        function activateRelativeWorkTab(root, targetId, options) {
+            if (!root || !targetId) {
+                return false;
+            }
+            const targetPanel = Array.from(root.querySelectorAll("[data-relative-work-panel]")).find(function (panel) {
+                return panel.id === targetId;
+            });
+            const targetButton = Array.from(root.querySelectorAll("[data-work-tab-target]")).find(function (button) {
+                return button.dataset.workTabTarget === targetId;
+            });
+            if (!targetPanel || !targetButton) {
+                return false;
+            }
+            root.querySelectorAll("[data-work-tab-target]").forEach(function (item) {
+                item.classList.toggle("is-active", item === targetButton);
+            });
+            root.querySelectorAll("[data-relative-work-panel]").forEach(function (panel) {
+                const active = panel === targetPanel;
+                panel.hidden = !active;
+                panel.classList.toggle("is-active", active);
+            });
+            if (!options || options.persist !== false) {
+                persistRelativeWorkTab(targetId);
+            }
+            return true;
+        }
+
+        function restoreRelativeWorkTabs() {
+            const targetId = readPersistedRelativeWorkTab();
+            if (!targetId) {
+                return;
+            }
+            document.querySelectorAll("[data-relative-work-inline]").forEach(function (root) {
+                activateRelativeWorkTab(root, targetId, { persist: false });
+            });
+        }
+
+        function rememberBusteTabOnPopupClose() {
+            const baseDismissRelatedPopup = window.dismissRelatedPopup;
+            if (typeof baseDismissRelatedPopup === "function" && baseDismissRelatedPopup.__familiareWorkTabWrapped !== true) {
+                const wrappedDismissRelatedPopup = function (fieldName, objectId, objectLabel, targetInputName) {
+                    if (fieldName === "busta_paga") {
+                        persistRelativeWorkTab("tab-lavoro-buste");
+                    }
+                    return baseDismissRelatedPopup.call(this, fieldName, objectId, objectLabel, targetInputName);
+                };
+                wrappedDismissRelatedPopup.__familiareWorkTabWrapped = true;
+                window.dismissRelatedPopup = wrappedDismissRelatedPopup;
+            }
+
+            const baseDismissDeletedRelatedPopup = window.dismissDeletedRelatedPopup;
+            if (typeof baseDismissDeletedRelatedPopup === "function" && baseDismissDeletedRelatedPopup.__familiareWorkTabWrapped !== true) {
+                const wrappedDismissDeletedRelatedPopup = function (fieldName, objectId, targetInputName) {
+                    if (fieldName === "busta_paga") {
+                        persistRelativeWorkTab("tab-lavoro-buste");
+                    }
+                    return baseDismissDeletedRelatedPopup.call(this, fieldName, objectId, targetInputName);
+                };
+                wrappedDismissDeletedRelatedPopup.__familiareWorkTabWrapped = true;
+                window.dismissDeletedRelatedPopup = wrappedDismissDeletedRelatedPopup;
+            }
+        }
+
         function setInlineTarget(prefixOrTabId) {
             inlineTabs.setInlineTargetValue(targetInputId, prefixOrTabId);
         }
@@ -2725,14 +2814,7 @@ window.ArborisFamiliareForm = (function () {
                 root.querySelectorAll("[data-work-tab-target]").forEach(function (button) {
                     button.addEventListener("click", function () {
                         const targetId = button.dataset.workTabTarget || "";
-                        root.querySelectorAll("[data-work-tab-target]").forEach(function (item) {
-                            item.classList.toggle("is-active", item === button);
-                        });
-                        root.querySelectorAll("[data-relative-work-panel]").forEach(function (panel) {
-                            const active = panel.id === targetId;
-                            panel.hidden = !active;
-                            panel.classList.toggle("is-active", active);
-                        });
+                        activateRelativeWorkTab(root, targetId);
                     });
                 });
             });
@@ -2759,6 +2841,7 @@ window.ArborisFamiliareForm = (function () {
         refreshIndirizzoButtons = indirizzoCrud.refresh;
         bindFamiliareAddressSuggestion();
         applyFamiliareAddressSuggestions(document);
+        rememberBusteTabOnPopupClose();
         if (relazioneSelect) {
             relazioneSelect.addEventListener("change", function () {
                 updateMainButtons();
@@ -2823,6 +2906,7 @@ window.ArborisFamiliareForm = (function () {
         syncEducatorClassField(document);
         initRelativeNoteDialog();
         bindRelativeWorkInlineTabs();
+        restoreRelativeWorkTabs();
         wireRelativeMainCardActions(document);
         bindRelativePageActionLock();
         bindRelativeCardStickyActions();
