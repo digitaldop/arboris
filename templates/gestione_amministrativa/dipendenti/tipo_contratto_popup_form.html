@@ -9,24 +9,82 @@
 <body style="padding: 20px;">
     <h1 class="section-title">{{ titolo }}</h1>
 
-    <div class="panel">
+    <div class="panel ga-tipo-contratto-popup">
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="popup" value="1">
             <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
+            {% if form.non_field_errors %}
+                <div class="message message-error">{{ form.non_field_errors }}</div>
+            {% endif %}
+
             <div class="panel-body">
-                <table class="form-table">
-                    {% for field in form %}
-                        <tr>
-                            <th>{{ field.label_tag }}</th>
-                            <td>
-                                {{ field }}
-                                {{ field.errors }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </table>
+                <section class="ga-tipo-contratto-section">
+                    <h2>Dati base</h2>
+                    <div class="ga-tipo-contratto-grid">
+                        {% for field in form %}
+                            {% if field.name == "nome" or field.name == "parametro_calcolo" or field.name == "ordine" or field.name == "attivo" %}
+                                <div class="form-field{% if field.name == 'nome' or field.name == 'parametro_calcolo' %} is-wide{% endif %}">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="ga-tipo-contratto-section">
+                    <h2>Inquadramento</h2>
+                    <div class="ga-tipo-contratto-grid">
+                        {% for field in form %}
+                            {% if field.name == "ccnl" or field.name == "livello" or field.name == "qualifica" or field.name == "mansione" %}
+                                <div class="form-field{% if field.name == 'mansione' %} is-wide{% endif %}">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="ga-tipo-contratto-section">
+                    <h2>Orario e compenso</h2>
+                    <div class="ga-tipo-contratto-grid">
+                        {% for field in form %}
+                            {% if field.name == "regime_orario" or field.name == "ore_settimanali" or field.name == "percentuale_part_time" or field.name == "retribuzione_lorda_mensile" or field.name == "tariffa_oraria" or field.name == "superminimo_mensile" or field.name == "indennita_fisse_mensili" or field.name == "mensilita_annue" or field.name == "valuta" %}
+                                <div class="form-field">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="ga-tipo-contratto-section">
+                    <h2>Previsione economica</h2>
+                    <div class="ga-tipo-contratto-grid">
+                        {% for field in form %}
+                            {% if field.name == "costo_azienda_ipotizzato" or field.name == "lordo_ipotizzato" or field.name == "netto_ipotizzato" or field.name == "contributi_mensili_ipotizzati" %}
+                                <div class="form-field">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <details class="ga-tipo-contratto-notes" {% if form.note.errors or form.note.value %}open{% endif %}>
+                    <summary>{{ form.note.label }}</summary>
+                    {{ form.note }}
+                    {{ form.note.errors }}
+                </details>
             </div>
 
             <div class="form-actions">

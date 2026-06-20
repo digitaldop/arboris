@@ -74,8 +74,8 @@ class DipendenteAdmin(admin.ModelAdmin):
 
 @admin.register(TipoContrattoDipendente)
 class TipoContrattoDipendenteAdmin(admin.ModelAdmin):
-    list_display = ("nome", "ordine", "attivo")
-    list_filter = ("attivo",)
+    list_display = ("nome", "mensilita_annue", "lordo_ipotizzato", "costo_azienda_ipotizzato", "ordine", "attivo")
+    list_filter = ("attivo", "regime_orario")
     search_fields = ("nome",)
 
 

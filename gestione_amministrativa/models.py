@@ -90,6 +90,53 @@ class TipoDocumentoDipendente(models.TextChoices):
 
 class TipoContrattoDipendente(models.Model):
     nome = models.CharField(max_length=100, unique=True)
+    parametro_calcolo = models.ForeignKey(
+        "ParametroCalcoloStipendio",
+        on_delete=models.SET_NULL,
+        related_name="tipi_contratto",
+        blank=True,
+        null=True,
+    )
+    ccnl = models.CharField(max_length=120, blank=True)
+    livello = models.CharField(max_length=60, blank=True)
+    qualifica = models.CharField(max_length=120, blank=True)
+    mansione = models.CharField(max_length=160, blank=True)
+    regime_orario = models.CharField(
+        max_length=30,
+        choices=RegimeOrarioDipendente.choices,
+        default=RegimeOrarioDipendente.TEMPO_PIENO,
+        blank=True,
+    )
+    ore_settimanali = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    percentuale_part_time = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=ONE_HUNDRED,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(ONE_HUNDRED)],
+    )
+    retribuzione_lorda_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    tariffa_oraria = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    superminimo_mensile = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    indennita_fisse_mensili = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    mensilita_annue = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("13.00"),
+        blank=True,
+        validators=[MinValueValidator(Decimal("1.00"))],
+    )
+    costo_azienda_ipotizzato = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    lordo_ipotizzato = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    netto_ipotizzato = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    contributi_mensili_ipotizzati = models.DecimalField(max_digits=12, decimal_places=2, default=ZERO, blank=True)
+    valuta = models.CharField(max_length=3, default="EUR", blank=True)
     ordine = models.IntegerField(blank=True, null=True)
     attivo = models.BooleanField(default=True)
     note = models.TextField(blank=True)
@@ -107,6 +154,45 @@ class TipoContrattoDipendente(models.Model):
         if self.ordine is None:
             self.ordine = next_order_value(TipoContrattoDipendente)
         super().save(*args, **kwargs)
+
+    def contratto_default_values(self):
+        defaults = {
+            "regime_orario": self.regime_orario or RegimeOrarioDipendente.TEMPO_PIENO,
+            "ore_settimanali": self.ore_settimanali or ZERO,
+            "percentuale_part_time": self.percentuale_part_time or ONE_HUNDRED,
+            "tariffa_oraria": self.tariffa_oraria or ZERO,
+            "superminimo_mensile": self.superminimo_mensile or ZERO,
+            "indennita_fisse_mensili": self.indennita_fisse_mensili or ZERO,
+            "mensilita_annue": self.mensilita_annue or Decimal("13.00"),
+            "valuta": self.valuta or "EUR",
+        }
+        defaults["retribuzione_lorda_mensile"] = (
+            self.retribuzione_lorda_mensile or self.lordo_ipotizzato or ZERO
+        )
+        if self.parametro_calcolo_id:
+            defaults["parametro_calcolo"] = self.parametro_calcolo
+        for field_name in ["ccnl", "livello", "qualifica", "mansione"]:
+            value = getattr(self, field_name, "")
+            if value:
+                defaults[field_name] = value
+        return defaults
+
+    def previsione_default_values(self):
+        lordo = self.lordo_ipotizzato or self.retribuzione_lorda_mensile or ZERO
+        costo = self.costo_azienda_ipotizzato or ZERO
+        netto = self.netto_ipotizzato or ZERO
+        contributi = self.contributi_mensili_ipotizzati or ZERO
+        if not contributi and costo and lordo:
+            contributi = max(costo - lordo, ZERO)
+        return {
+            "costo_azienda_ipotizzato": costo,
+            "lordo_ipotizzato": lordo,
+            "netto_ipotizzato": netto,
+            "contributi_mensili_ipotizzati": contributi,
+        }
+
+    def has_previsione_economica(self):
+        return any((value or ZERO) > ZERO for value in self.previsione_default_values().values())
 
 
 class DipendenteQuerySet(models.QuerySet):

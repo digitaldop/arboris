@@ -81,6 +81,37 @@ class PersonaCollegataSelect(forms.Select):
         return option
 
 
+class TipoContrattoDipendenteSelect(forms.Select):
+    DATA_FIELDS = [
+        "ccnl",
+        "livello",
+        "qualifica",
+        "mansione",
+        "regime_orario",
+        "ore_settimanali",
+        "percentuale_part_time",
+        "retribuzione_lorda_mensile",
+        "tariffa_oraria",
+        "superminimo_mensile",
+        "indennita_fisse_mensili",
+        "mensilita_annue",
+        "costo_azienda_ipotizzato",
+        "lordo_ipotizzato",
+        "netto_ipotizzato",
+        "contributi_mensili_ipotizzati",
+        "valuta",
+    ]
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        if value and hasattr(value, "instance"):
+            tipo = value.instance
+            option["attrs"]["data-parametro-calcolo"] = tipo.parametro_calcolo_id or ""
+            for field_name in self.DATA_FIELDS:
+                option["attrs"][f"data-{field_name.replace('_', '-')}"] = getattr(tipo, field_name, "") or ""
+        return option
+
+
 def default_italia_nazionalita_label():
     italia = (
         Nazione.objects.filter(nome__iexact="Italia", attiva=True)
@@ -464,6 +495,29 @@ class DipendenteForm(forms.ModelForm):
 
 
 class ContrattoDipendenteForm(forms.ModelForm):
+    CONTRACT_TEMPLATE_FIELDS = [
+        "parametro_calcolo",
+        "ccnl",
+        "livello",
+        "qualifica",
+        "mansione",
+        "regime_orario",
+        "ore_settimanali",
+        "percentuale_part_time",
+        "retribuzione_lorda_mensile",
+        "tariffa_oraria",
+        "superminimo_mensile",
+        "indennita_fisse_mensili",
+        "mensilita_annue",
+        "valuta",
+    ]
+    SIMPLE_TEMPLATE_FIELDS = [
+        "costo_azienda_ipotizzato",
+        "lordo_ipotizzato",
+        "netto_ipotizzato",
+        "contributi_mensili_ipotizzati",
+    ]
+
     costo_azienda_ipotizzato = forms.DecimalField(
         label="Costo aziendale ipotizzato",
         max_digits=12,
@@ -545,6 +599,7 @@ class ContrattoDipendenteForm(forms.ModelForm):
             "note": "Note",
         }
         widgets = {
+            "tipo_contratto": TipoContrattoDipendenteSelect(),
             "data_inizio": html5_date_input(),
             "data_fine": html5_date_input(),
             "note": forms.Textarea(attrs={"rows": 3}),
@@ -595,6 +650,11 @@ class ContrattoDipendenteForm(forms.ModelForm):
         ]
         for field_name in optional_fields:
             self.fields[field_name].required = False
+        for field_name in self.CONTRACT_TEMPLATE_FIELDS + self.SIMPLE_TEMPLATE_FIELDS:
+            if field_name in self.fields:
+                self.fields[field_name].required = False
+        if not self.is_bound:
+            self._apply_initial_tipo_contratto_defaults()
         if self.simple_mode:
             self._setup_simple_mode()
         else:
@@ -605,6 +665,71 @@ class ContrattoDipendenteForm(forms.ModelForm):
                 "contributi_mensili_ipotizzati",
             ]:
                 self.fields[field_name].required = False
+
+    def _initial_tipo_contratto(self):
+        tipo_id = self.initial.get("tipo_contratto") or getattr(self.instance, "tipo_contratto_id", None)
+        if not tipo_id:
+            return None
+        try:
+            return TipoContrattoDipendente.objects.get(pk=tipo_id)
+        except (TipoContrattoDipendente.DoesNotExist, TypeError, ValueError):
+            return None
+
+    def _apply_initial_tipo_contratto_defaults(self):
+        if getattr(self.instance, "pk", None):
+            return
+        tipo = self._initial_tipo_contratto()
+        if not tipo:
+            return
+        for field_name, value in tipo.contratto_default_values().items():
+            if field_name in self.fields and field_name not in self.initial:
+                self.initial[field_name] = getattr(value, "pk", value)
+        for field_name, value in tipo.previsione_default_values().items():
+            if field_name in self.fields and field_name not in self.initial and value:
+                self.initial[field_name] = value
+
+    @staticmethod
+    def _is_empty_value(value):
+        return value is None or value == ""
+
+    def _apply_tipo_defaults_to_cleaned_data(self, cleaned_data):
+        tipo = cleaned_data.get("tipo_contratto")
+        if not tipo:
+            return
+        defaults = tipo.contratto_default_values()
+        if self.simple_mode:
+            defaults.update(tipo.previsione_default_values())
+        for field_name, value in defaults.items():
+            if field_name not in self.fields:
+                continue
+            if self._is_empty_value(cleaned_data.get(field_name)):
+                cleaned_data[field_name] = value
+
+    def _apply_contract_fallbacks_to_cleaned_data(self, cleaned_data):
+        fallbacks = {
+            "regime_orario": RegimeOrarioDipendente.TEMPO_PIENO,
+            "ore_settimanali": Decimal("0.00"),
+            "percentuale_part_time": Decimal("100.00"),
+            "retribuzione_lorda_mensile": Decimal("0.00"),
+            "tariffa_oraria": Decimal("0.00"),
+            "superminimo_mensile": Decimal("0.00"),
+            "indennita_fisse_mensili": Decimal("0.00"),
+            "mensilita_annue": Decimal("13.00"),
+            "valuta": "EUR",
+        }
+        for field_name, value in fallbacks.items():
+            if field_name in self.fields and self._is_empty_value(cleaned_data.get(field_name)):
+                cleaned_data[field_name] = value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        self._apply_tipo_defaults_to_cleaned_data(cleaned_data)
+        self._apply_contract_fallbacks_to_cleaned_data(cleaned_data)
+        if self.simple_mode:
+            for field_name in ["costo_azienda_ipotizzato", "lordo_ipotizzato", "netto_ipotizzato"]:
+                if self._is_empty_value(cleaned_data.get(field_name)):
+                    self.add_error(field_name, "Questo campo e obbligatorio se la tipologia non lo precompila.")
+        return cleaned_data
 
     def _setup_simple_mode(self):
         technical_fields = [
@@ -675,6 +800,8 @@ class ContrattoDipendenteForm(forms.ModelForm):
             self.save_m2m()
             if self.simple_mode:
                 self._save_simple_simulation(contratto)
+            else:
+                self._save_tipo_contratto_simulation(contratto)
 
         return contratto
 
@@ -715,25 +842,155 @@ class ContrattoDipendenteForm(forms.ModelForm):
         )
         simulazione.save()
 
+    def _save_tipo_contratto_simulation(self, contratto):
+        tipo = contratto.tipo_contratto
+        if not tipo or not tipo.has_previsione_economica():
+            return
+
+        auto_title = "Profilo previsionale da tipologia contratto"
+        simulazione = (
+            contratto.simulazioni_costo.filter(titolo=auto_title)
+            .order_by("-valido_dal", "-id")
+            .first()
+        )
+        if simulazione is None and contratto.simulazioni_costo.filter(attiva=True).exists():
+            return
+        if simulazione is None:
+            simulazione = SimulazioneCostoDipendente(contratto=contratto)
+
+        previsione = tipo.previsione_default_values()
+        costo = previsione["costo_azienda_ipotizzato"] or Decimal("0.00")
+        lordo = previsione["lordo_ipotizzato"] or Decimal("0.00")
+        netto = previsione["netto_ipotizzato"] or Decimal("0.00")
+        contributi = previsione["contributi_mensili_ipotizzati"] or max(costo - lordo, Decimal("0.00"))
+
+        simulazione.titolo = auto_title
+        simulazione.valido_dal = contratto.data_inizio
+        simulazione.valido_al = contratto.data_fine
+        simulazione.netto_mensile = netto
+        simulazione.lordo_mensile = lordo
+        simulazione.costo_azienda_mensile = costo
+        simulazione.contributi_previdenziali_azienda = contributi
+        simulazione.contributi_assicurativi_azienda = Decimal("0.00")
+        simulazione.contributi_previdenza_complementare_azienda = Decimal("0.00")
+        simulazione.mensilita_annue = contratto.mensilita_annue
+        simulazione.percentuale_part_time = contratto.percentuale_part_time
+        simulazione.livello = contratto.livello or ""
+        simulazione.qualifica = contratto.qualifica or contratto.mansione or ""
+        simulazione.valuta = contratto.valuta
+        simulazione.attiva = True
+        simulazione.note = "Simulazione generata automaticamente dalla tipologia di contratto."
+        simulazione.save()
+
 
 class TipoContrattoDipendenteForm(forms.ModelForm):
     class Meta:
         model = TipoContrattoDipendente
-        fields = ["nome", "ordine", "attivo", "note"]
+        fields = [
+            "nome",
+            "parametro_calcolo",
+            "ccnl",
+            "livello",
+            "qualifica",
+            "mansione",
+            "regime_orario",
+            "ore_settimanali",
+            "percentuale_part_time",
+            "retribuzione_lorda_mensile",
+            "tariffa_oraria",
+            "superminimo_mensile",
+            "indennita_fisse_mensili",
+            "mensilita_annue",
+            "costo_azienda_ipotizzato",
+            "lordo_ipotizzato",
+            "netto_ipotizzato",
+            "contributi_mensili_ipotizzati",
+            "valuta",
+            "ordine",
+            "attivo",
+            "note",
+        ]
         labels = {
             "nome": "Tipo di contratto",
+            "parametro_calcolo": "Parametro di calcolo",
+            "ccnl": "CCNL",
+            "livello": "Livello",
+            "qualifica": "Qualifica",
+            "mansione": "Mansione",
+            "regime_orario": "Regime orario",
+            "ore_settimanali": "Ore settimanali",
+            "percentuale_part_time": "Percentuale part-time",
+            "retribuzione_lorda_mensile": "Compenso lordo mensile",
+            "tariffa_oraria": "Tariffa oraria",
+            "superminimo_mensile": "Superminimo mensile",
+            "indennita_fisse_mensili": "Indennita fisse mensili",
+            "mensilita_annue": "Mensilita annue",
+            "costo_azienda_ipotizzato": "Costo aziendale ipotizzato",
+            "lordo_ipotizzato": "Lordo ipotizzato",
+            "netto_ipotizzato": "Netto ipotizzato",
+            "contributi_mensili_ipotizzati": "Contributi mensili ipotizzati",
+            "valuta": "Valuta",
             "ordine": "Ordine",
             "attivo": "Attivo",
             "note": "Note",
         }
         widgets = {
+            "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
             "note": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["ordine"].required = False
-        self.fields["note"].required = False
+        for field_name in [
+            "costo_azienda_ipotizzato",
+            "lordo_ipotizzato",
+            "netto_ipotizzato",
+            "contributi_mensili_ipotizzati",
+            "retribuzione_lorda_mensile",
+            "tariffa_oraria",
+            "superminimo_mensile",
+            "indennita_fisse_mensili",
+        ]:
+            apply_eur_currency_widget(self.fields[field_name])
+        selected_parametro_id = (
+            self.data.get(self.add_prefix("parametro_calcolo"))
+            if self.is_bound
+            else self.initial.get(
+                "parametro_calcolo",
+                getattr(self.instance, "parametro_calcolo_id", None),
+            )
+        )
+        self.fields["parametro_calcolo"].queryset = parametro_calcolo_queryset(selected_parametro_id)
+        self.fields["parametro_calcolo"].empty_label = "--- nessun parametro dedicato ---"
+        make_searchable_select(self.fields["parametro_calcolo"], "Cerca un parametro di calcolo...")
+        for field_name in self.fields:
+            if field_name != "nome":
+                self.fields[field_name].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        for field_name in [
+            "ore_settimanali",
+            "retribuzione_lorda_mensile",
+            "tariffa_oraria",
+            "superminimo_mensile",
+            "indennita_fisse_mensili",
+            "costo_azienda_ipotizzato",
+            "lordo_ipotizzato",
+            "netto_ipotizzato",
+            "contributi_mensili_ipotizzati",
+        ]:
+            if cleaned_data.get(field_name) is None:
+                cleaned_data[field_name] = Decimal("0.00")
+        if cleaned_data.get("percentuale_part_time") is None:
+            cleaned_data["percentuale_part_time"] = Decimal("100.00")
+        if cleaned_data.get("mensilita_annue") is None:
+            cleaned_data["mensilita_annue"] = Decimal("13.00")
+        if not cleaned_data.get("regime_orario"):
+            cleaned_data["regime_orario"] = RegimeOrarioDipendente.TEMPO_PIENO
+        if not cleaned_data.get("valuta"):
+            cleaned_data["valuta"] = "EUR"
+        return cleaned_data
 
 
 class ParametroCalcoloStipendioForm(forms.ModelForm):

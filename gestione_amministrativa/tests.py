@@ -463,6 +463,116 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertEqual(simulazione.netto_mensile, Decimal("1250.00"))
         self.assertEqual(simulazione.contributi_previdenziali_azienda, Decimal("700.00"))
 
+    def test_tipo_contratto_popup_salva_template_con_valori_economici(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            f"{reverse('crea_tipo_contratto_dipendente')}?popup=1&target_input_name=tipo_contratto",
+            {
+                "popup": "1",
+                "target_input_name": "tipo_contratto",
+                "nome": "Educatore 30 ore",
+                "parametro_calcolo": str(self.parametro.pk),
+                "ccnl": "Cooperative sociali",
+                "livello": "D2",
+                "qualifica": "Educatore",
+                "mansione": "Educatore musicale",
+                "regime_orario": "tempo_parziale",
+                "ore_settimanali": "30.00",
+                "percentuale_part_time": "75.00",
+                "retribuzione_lorda_mensile": "1450.00",
+                "tariffa_oraria": "0.00",
+                "superminimo_mensile": "50.00",
+                "indennita_fisse_mensili": "25.00",
+                "mensilita_annue": "13.00",
+                "costo_azienda_ipotizzato": "2300.00",
+                "lordo_ipotizzato": "1500.00",
+                "netto_ipotizzato": "1220.00",
+                "contributi_mensili_ipotizzati": "800.00",
+                "valuta": "EUR",
+                "ordine": "",
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        tipo = TipoContrattoDipendente.objects.get(nome="Educatore 30 ore")
+        self.assertEqual(tipo.parametro_calcolo, self.parametro)
+        self.assertEqual(tipo.ore_settimanali, Decimal("30.00"))
+        self.assertEqual(tipo.lordo_ipotizzato, Decimal("1500.00"))
+        self.assertEqual(tipo.costo_azienda_ipotizzato, Decimal("2300.00"))
+
+    def test_modalita_semplice_contratto_eredita_previsione_da_tipologia(self):
+        self.client.force_login(self.user)
+        self.impostazioni.gestione_dipendenti_dettagliata_attiva = False
+        self.impostazioni.save()
+        self.tipo_contratto.mansione = "Educatore"
+        self.tipo_contratto.mensilita_annue = Decimal("14.00")
+        self.tipo_contratto.costo_azienda_ipotizzato = Decimal("2450.00")
+        self.tipo_contratto.lordo_ipotizzato = Decimal("1700.00")
+        self.tipo_contratto.netto_ipotizzato = Decimal("1320.00")
+        self.tipo_contratto.contributi_mensili_ipotizzati = Decimal("750.00")
+        self.tipo_contratto.save()
+
+        response = self.client.post(
+            f"{reverse('modifica_contratto_dipendente', args=[self.contratto.pk])}?popup=1",
+            {
+                "popup": "1",
+                "descrizione": "Contratto da template",
+                "tipo_contratto": str(self.tipo_contratto.pk),
+                "data_inizio": "2025-09-01",
+                "data_fine": "",
+                "mansione": "",
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.contratto.refresh_from_db()
+        simulazione = self.contratto.simulazioni_costo.filter(attiva=True).order_by("-id").first()
+        self.assertEqual(self.contratto.mansione, "Educatore")
+        self.assertEqual(self.contratto.mensilita_annue, Decimal("14.00"))
+        self.assertEqual(self.contratto.retribuzione_lorda_mensile, Decimal("1700.00"))
+        self.assertEqual(simulazione.costo_azienda_mensile, Decimal("2450.00"))
+        self.assertEqual(simulazione.netto_mensile, Decimal("1320.00"))
+        self.assertEqual(simulazione.contributi_previdenziali_azienda, Decimal("750.00"))
+
+    def test_contratto_dettagliato_crea_simulazione_da_tipologia_se_non_presente(self):
+        self.client.force_login(self.user)
+        tipo = TipoContrattoDipendente.objects.create(
+            nome="Educatore full time",
+            mansione="Educatore",
+            retribuzione_lorda_mensile=Decimal("1800.00"),
+            mensilita_annue=Decimal("13.00"),
+            costo_azienda_ipotizzato=Decimal("2600.00"),
+            lordo_ipotizzato=Decimal("1800.00"),
+            netto_ipotizzato=Decimal("1400.00"),
+            contributi_mensili_ipotizzati=Decimal("800.00"),
+        )
+
+        response = self.client.post(
+            f"{reverse('crea_contratto_dipendente_generico')}?popup=1",
+            {
+                "popup": "1",
+                "descrizione": "Contratto dettagliato da template",
+                "tipo_contratto": str(tipo.pk),
+                "data_inizio": "2026-01-01",
+                "data_fine": "",
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        contratto = ContrattoDipendente.objects.get(descrizione="Contratto dettagliato da template")
+        simulazione = contratto.simulazioni_costo.get(titolo="Profilo previsionale da tipologia contratto")
+        self.assertEqual(contratto.mansione, "Educatore")
+        self.assertEqual(contratto.retribuzione_lorda_mensile, Decimal("1800.00"))
+        self.assertEqual(simulazione.costo_azienda_mensile, Decimal("2600.00"))
+        self.assertEqual(simulazione.netto_mensile, Decimal("1400.00"))
+
     def test_contratto_delete_popup_renderizza_nuovo_layout(self):
         self.client.force_login(self.user)
 

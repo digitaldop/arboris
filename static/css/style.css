@@ -34028,6 +34028,69 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: none;
 }
 
+.ga-tipo-contratto-popup .panel-body {
+    display: grid;
+    gap: 18px;
+}
+
+.ga-tipo-contratto-section {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #dce7f1;
+    border-radius: 8px;
+    background: #fbfdff;
+}
+
+.ga-tipo-contratto-section h2 {
+    margin: 0;
+    color: #10233d;
+    font-size: 16px;
+    line-height: 1.25;
+}
+
+.ga-tipo-contratto-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.ga-tipo-contratto-grid .form-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ga-tipo-contratto-grid .form-field.is-wide {
+    grid-column: 1 / -1;
+}
+
+.ga-tipo-contratto-grid label,
+.ga-tipo-contratto-notes summary {
+    color: #516984;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.ga-tipo-contratto-grid input,
+.ga-tipo-contratto-grid select,
+.ga-tipo-contratto-notes textarea {
+    width: 100%;
+}
+
+.ga-tipo-contratto-notes {
+    padding: 14px 16px;
+    border: 1px solid #dce7f1;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.ga-tipo-contratto-notes textarea {
+    min-height: 92px;
+    margin-top: 10px;
+}
+
 .scambio-retta-card-icon.is-rose,
 .scambio-retta-field-icon.is-rose {
     background: #fdecef;
@@ -34041,6 +34104,10 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
     .ga-contract-currency-field {
         max-width: none;
+    }
+
+    .ga-tipo-contratto-grid {
+        grid-template-columns: 1fr;
     }
 }
 
