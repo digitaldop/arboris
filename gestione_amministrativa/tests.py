@@ -415,6 +415,22 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, 'type="date"', count=2)
         self.assertContains(response, 'value="2025-09-01"')
 
+    def test_tipo_contratto_popup_renderizza_layout_arboris_e_controlli_parametro(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            f"{reverse('modifica_tipo_contratto_dipendente', args=[self.tipo_contratto.pk])}?popup=1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ga-tipo-contratto-form-shell")
+        self.assertContains(response, "scambio-retta-form-head")
+        self.assertContains(response, 'name="popup" value="1"')
+        self.assertContains(response, 'id="popup-add-parametro-calcolo-btn"')
+        self.assertContains(response, 'id="popup-edit-parametro-calcolo-btn"')
+        self.assertContains(response, 'id="popup-delete-parametro-calcolo-btn"')
+        self.assertContains(response, "tipo-contratto-popup-form.js")
+
     def test_modalita_semplice_contratto_mostra_previsione_e_nasconde_campi_tecnici(self):
         self.client.force_login(self.user)
         self.impostazioni.gestione_dipendenti_dettagliata_attiva = False

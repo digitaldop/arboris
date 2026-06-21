@@ -34028,67 +34028,44 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: none;
 }
 
-.ga-tipo-contratto-popup .panel-body {
-    display: grid;
-    gap: 18px;
+.ga-tipo-contratto-form-shell {
+    max-width: 980px;
 }
 
-.ga-tipo-contratto-section {
-    display: grid;
-    gap: 12px;
-    padding: 16px;
-    border: 1px solid #dce7f1;
-    border-radius: 8px;
-    background: #fbfdff;
+.ga-tipo-contratto-form-shell.is-popup {
+    padding: 8px;
 }
 
-.ga-tipo-contratto-section h2 {
-    margin: 0;
-    color: #10233d;
-    font-size: 16px;
-    line-height: 1.25;
+.ga-tipo-contratto-form-shell.is-popup .scambio-retta-form-head {
+    padding-right: 72px;
 }
 
-.ga-tipo-contratto-grid {
-    display: grid;
+.ga-tipo-contratto-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
 }
 
-.ga-tipo-contratto-grid .form-field {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-}
-
-.ga-tipo-contratto-grid .form-field.is-wide {
-    grid-column: 1 / -1;
-}
-
-.ga-tipo-contratto-grid label,
-.ga-tipo-contratto-notes summary {
-    color: #516984;
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.ga-tipo-contratto-grid input,
-.ga-tipo-contratto-grid select,
-.ga-tipo-contratto-notes textarea {
+.ga-tipo-contratto-related-field {
     width: 100%;
 }
 
-.ga-tipo-contratto-notes {
-    padding: 14px 16px;
-    border: 1px solid #dce7f1;
-    border-radius: 8px;
-    background: #ffffff;
+.ga-tipo-contratto-related-field .related-actions {
+    align-self: stretch;
 }
 
-.ga-tipo-contratto-notes textarea {
-    min-height: 92px;
-    margin-top: 10px;
+.ga-tipo-contratto-switch-card {
+    align-self: stretch;
+}
+
+.ga-tipo-contratto-currency-field .currency-input-group {
+    max-width: 260px;
+}
+
+.ga-tipo-contratto-currency-code-field {
+    max-width: 360px;
+}
+
+.ga-tipo-contratto-notes-field {
+    margin: 0 20px 20px;
 }
 
 .scambio-retta-card-icon.is-rose,
@@ -34106,8 +34083,13 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
         max-width: none;
     }
 
-    .ga-tipo-contratto-grid {
+    .ga-tipo-contratto-form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .ga-tipo-contratto-currency-field .currency-input-group,
+    .ga-tipo-contratto-currency-code-field {
+        max-width: none;
     }
 }
 
@@ -34116,7 +34098,15 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
         flex-wrap: wrap;
     }
 
+    .ga-tipo-contratto-related-field {
+        flex-wrap: wrap;
+    }
+
     .ga-contract-form-shell.is-popup .scambio-retta-form-head {
+        padding-right: 48px;
+    }
+
+    .ga-tipo-contratto-form-shell.is-popup .scambio-retta-form-head {
         padding-right: 48px;
     }
 }
