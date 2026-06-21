@@ -528,7 +528,11 @@
                                                         data-popup-window-name="arboris-busta-paga-popup"
                                                         data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes"
                                                     >{{ compenso.titolo }}</a>
-                                                    <span>{{ compenso.stato }}</span>
+                                                    {% if gestione_dipendenti_dettagliata_attiva %}
+                                                        <span>{{ compenso.stato }}</span>
+                                                    {% elif busta.contratto_id %}
+                                                        <span>{{ busta.contratto.tipo_contratto|default:"Contratto" }}</span>
+                                                    {% endif %}
                                                 </div>
                                                 <strong>{{ compenso.importo_secondario|default:compenso.importo|euro }} &euro;</strong>
                                             {% endwith %}

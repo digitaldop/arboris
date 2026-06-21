@@ -191,7 +191,9 @@
                         <tr>
                             <th>Periodo</th>
                             <th>Dipendente</th>
-                            <th>Stato</th>
+                            {% if gestione_dipendenti_dettagliata_attiva %}
+                                <th>Stato</th>
+                            {% endif %}
                             <th class="column-right">Costo previsto</th>
                             <th class="column-right">Costo effettivo</th>
                             <th class="column-right">Scostamento</th>
@@ -223,15 +225,17 @@
                                     </a>
                                 </td>
                                 <td><strong>{{ busta.dipendente }}</strong></td>
-                                <td>
-                                    {% if busta.stato == "effettiva" or busta.stato == "verificata" %}
-                                        <span class="scambio-list-status-chip is-success">{{ busta.get_stato_display }}</span>
-                                    {% elif busta.stato == "prevista" %}
-                                        <span class="scambio-list-status-chip is-blue">{{ busta.get_stato_display }}</span>
-                                    {% else %}
-                                        <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
-                                    {% endif %}
-                                </td>
+                                {% if gestione_dipendenti_dettagliata_attiva %}
+                                    <td>
+                                        {% if busta.stato == "effettiva" or busta.stato == "verificata" %}
+                                            <span class="scambio-list-status-chip is-success">{{ busta.get_stato_display }}</span>
+                                        {% elif busta.stato == "prevista" %}
+                                            <span class="scambio-list-status-chip is-blue">{{ busta.get_stato_display }}</span>
+                                        {% else %}
+                                            <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                                 <td class="column-right"><strong>{{ busta.costo_azienda_previsto|euro }} &euro;</strong></td>
                                 <td class="column-right"><strong>{{ busta.costo_azienda_effettivo|euro }} &euro;</strong></td>
                                 <td class="column-right"><strong>{{ busta.scostamento_costo_azienda|euro }} &euro;</strong></td>

@@ -149,7 +149,9 @@
                     <colgroup>
                         <col class="ga-buste-col-period">
                         <col class="ga-buste-col-person">
-                        <col class="ga-buste-col-status">
+                        {% if gestione_dipendenti_dettagliata_attiva %}
+                            <col class="ga-buste-col-status">
+                        {% endif %}
                         <col class="ga-buste-col-money">
                         <col class="ga-buste-col-money">
                         <col class="ga-buste-col-money">
@@ -160,7 +162,9 @@
                         <tr>
                             <th>Periodo</th>
                             <th>Dipendente</th>
-                            <th>Stato</th>
+                            {% if gestione_dipendenti_dettagliata_attiva %}
+                                <th>Stato</th>
+                            {% endif %}
                             <th class="column-right">Netto previsto</th>
                             <th class="column-right">Netto effettivo</th>
                             <th class="column-right">Costo previsto</th>
@@ -204,9 +208,11 @@
                                         onclick="event.stopPropagation();"
                                     >{{ busta.dipendente }}</a>
                                 </td>
-                                <td>
-                                    <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
-                                </td>
+                                {% if gestione_dipendenti_dettagliata_attiva %}
+                                    <td>
+                                        <span class="scambio-list-status-chip is-muted">{{ busta.get_stato_display }}</span>
+                                    </td>
+                                {% endif %}
                                 <td class="column-right">{{ busta.netto_previsto|euro }} &euro;</td>
                                 <td class="column-right">{{ busta.netto_effettivo|euro }} &euro;</td>
                                 <td class="column-right">{{ busta.costo_azienda_previsto|euro }} &euro;</td>

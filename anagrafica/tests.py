@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pandas as pd
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -79,6 +80,7 @@ from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
     AzioneOperazioneCronologia,
+    SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
@@ -1280,6 +1282,20 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
         self.assertContains(response, "Costo azienda")
         self.assertContains(response, reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+
+    def test_modifica_familiare_modalita_semplice_non_mostra_stato_busta(self):
+        SistemaImpostazioniGenerali.objects.create(gestione_dipendenti_dettagliata_attiva=False)
+        cache.delete("sistema:general_settings")
+        self.busta.stato = StatoBustaPaga.BOZZA
+        self.busta.save(update_fields=["stato"])
+
+        response = self.client.get(reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        payroll_tab = response.content.decode().split('id="tab-lavoro-buste"', 1)[1]
+        self.assertIn("05/2026", payroll_tab)
+        self.assertIn("Tempo indeterminato", payroll_tab)
+        self.assertNotIn("Bozza", payroll_tab)
 
     def test_modifica_familiare_mostra_fatture_fornitore_collegato_nei_compensi(self):
         fornitore_collegato = Fornitore.objects.create(
