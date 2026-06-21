@@ -34044,14 +34044,6 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.ga-tipo-contratto-related-field {
-    width: 100%;
-}
-
-.ga-tipo-contratto-related-field .related-actions {
-    align-self: stretch;
-}
-
 .ga-tipo-contratto-switch-card {
     align-self: stretch;
 }
@@ -34095,10 +34087,6 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 @media (max-width: 680px) {
     .ga-contract-related-field {
-        flex-wrap: wrap;
-    }
-
-    .ga-tipo-contratto-related-field {
         flex-wrap: wrap;
     }
 

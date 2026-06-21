@@ -415,7 +415,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, 'type="date"', count=2)
         self.assertContains(response, 'value="2025-09-01"')
 
-    def test_tipo_contratto_popup_renderizza_layout_arboris_e_controlli_parametro(self):
+    def test_tipo_contratto_popup_renderizza_layout_arboris_senza_parametro_visibile(self):
         self.client.force_login(self.user)
 
         response = self.client.get(
@@ -426,10 +426,10 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, "ga-tipo-contratto-form-shell")
         self.assertContains(response, "scambio-retta-form-head")
         self.assertContains(response, 'name="popup" value="1"')
-        self.assertContains(response, 'id="popup-add-parametro-calcolo-btn"')
-        self.assertContains(response, 'id="popup-edit-parametro-calcolo-btn"')
-        self.assertContains(response, 'id="popup-delete-parametro-calcolo-btn"')
-        self.assertContains(response, "tipo-contratto-popup-form.js")
+        self.assertContains(response, 'type="hidden" name="parametro_calcolo"')
+        self.assertNotContains(response, "Parametro di calcolo")
+        self.assertNotContains(response, 'id="popup-add-parametro-calcolo-btn"')
+        self.assertNotContains(response, "tipo-contratto-popup-form.js")
 
     def test_modalita_semplice_contratto_mostra_previsione_e_nasconde_campi_tecnici(self):
         self.client.force_login(self.user)

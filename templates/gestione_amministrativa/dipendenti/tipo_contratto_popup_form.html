@@ -61,6 +61,7 @@
             {% csrf_token %}
             {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
             {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
+            <input type="hidden" name="{{ form.parametro_calcolo.html_name }}" value="{{ form.parametro_calcolo.value|default:'' }}">
 
             {% if form.non_field_errors %}
                 <div class="message message-error">{{ form.non_field_errors }}</div>
@@ -90,32 +91,6 @@
                     </div>
 
                     <div class="scambio-retta-field is-wide">
-                        <span class="scambio-retta-field-icon is-purple" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#settings"></use></svg>
-                        </span>
-                        <div>
-                            <label for="{{ form.parametro_calcolo.id_for_label }}">{{ form.parametro_calcolo.label }}</label>
-                            <div class="popup-related-field ga-tipo-contratto-related-field">
-                                <div class="related-field-stack">
-                                    {{ form.parametro_calcolo }}
-                                </div>
-                                <span class="related-actions inline-related-actions" aria-label="Azioni parametro di calcolo">
-                                    <button type="button" class="related-btn related-btn-add" id="popup-add-parametro-calcolo-btn" aria-label="Nuovo parametro" title="Nuovo parametro">
-                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg></span>
-                                    </button>
-                                    <button type="button" class="related-btn related-btn-edit" id="popup-edit-parametro-calcolo-btn" aria-label="Modifica parametro" title="Modifica parametro">
-                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                    </button>
-                                    <button type="button" class="related-btn related-btn-delete" id="popup-delete-parametro-calcolo-btn" aria-label="Elimina parametro" title="Elimina parametro">
-                                        <span class="related-btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg></span>
-                                    </button>
-                                </span>
-                            </div>
-                            {{ form.parametro_calcolo.errors }}
-                        </div>
-                    </div>
-
-                    <div class="scambio-retta-field scambio-retta-field-compact">
                         <span class="scambio-retta-field-icon is-amber" aria-hidden="true">
                             <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
                         </span>
@@ -259,13 +234,4 @@
             </div>
         </form>
     </div>
-
-    <script src="{% static 'js/pages/tipo-contratto-popup-form.js' %}?v=1"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            if (window.ArborisTipoContrattoPopupForm) {
-                ArborisTipoContrattoPopupForm.init();
-            }
-        });
-    </script>
 {% endblock %}
