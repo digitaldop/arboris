@@ -4290,6 +4290,100 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(documento.totale, Decimal("4000.00"))
         self.assertEqual(documento.scadenze.count(), 1)
 
+    def test_importa_documento_fatture_in_cloud_aggancia_pending_senza_fornitore_con_scadenza_e_righe(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload_pending = {
+            "id": "pending-shkelzen-1",
+            "type": "agyo",
+            "document_type": "expense",
+            "subject": "Fattura da registrare",
+            "invoice_number": "9",
+            "amount_net": "1920.00",
+            "amount_vat": "422.40",
+            "amount_gross": "2342.40",
+            "_arboris_line_descriptions": ["SFALCIO ERBA"],
+            "payments_list": [{"due_date": "2026-06-09", "amount": "2342.40"}],
+        }
+        payload_registrato = {
+            "id": "registered-shkelzen-1",
+            "type": "expense",
+            "description": "Fattura registrata",
+            "invoice_number": "9",
+            "date": "2026-06-09",
+            "amount_net": "1920.00",
+            "amount_vat": "422.40",
+            "amount_gross": "2342.40",
+            "entity": {"name": "SHKELZEN GJATA"},
+            "_arboris_line_descriptions": ["SFALCIO ERBA"],
+            "payments_list": [{"due_date": "2026-06-09", "amount": "2342.40"}],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload_pending, pending=True, utente=self.user)
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="pending-shkelzen-1")
+        documento_id = documento.pk
+
+        result = importa_documento_fatture_in_cloud(connessione, payload_registrato, pending=False, utente=self.user)
+
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.pk, documento_id)
+        self.assertEqual(documento.external_id, "registered-shkelzen-1")
+        self.assertEqual(documento.fornitore.denominazione, "SHKELZEN GJATA")
+        self.assertEqual(documento.data_documento, date(2026, 6, 9))
+        self.assertEqual(documento.scadenze.count(), 1)
+        self.assertTrue(
+            DocumentoFornitoreImportAlias.objects.filter(
+                external_source="fatture_in_cloud",
+                external_id="pending-shkelzen-1",
+                documento=documento,
+                ignorato=False,
+            ).exists()
+        )
+
+    def test_importa_documento_fatture_in_cloud_blocca_duplicato_antonio_morano_con_id_diverso(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": "fic-morano-1",
+            "type": "expense",
+            "description": "Prestazione di Manodopera per smontaggio Wc",
+            "invoice_number": "35",
+            "date": "2026-06-19",
+            "amount_net": "800.00",
+            "amount_vat": "176.00",
+            "amount_gross": "976.00",
+            "entity": {"name": "Antonio Morano"},
+            "payments_list": [{"due_date": "2026-06-19", "amount": "976.00"}],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+        self.assertTrue(result["created"])
+        documento = DocumentoFornitore.objects.get(external_id="fic-morano-1")
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {**payload, "id": "fic-morano-2"},
+            pending=False,
+            utente=self.user,
+        )
+
+        self.assertFalse(result["created"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.external_id, "fic-morano-2")
+        self.assertEqual(documento.numero_documento, "35")
+        self.assertEqual(documento.fornitore.denominazione, "Antonio Morano")
+        self.assertEqual(documento.totale, Decimal("976.00"))
+        self.assertTrue(
+            DocumentoFornitoreImportAlias.objects.filter(
+                external_source="fatture_in_cloud",
+                external_id="fic-morano-1",
+                documento=documento,
+                ignorato=False,
+            ).exists()
+        )
+
     def test_importa_documento_fatture_in_cloud_nota_credito_non_crea_scadenze(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",

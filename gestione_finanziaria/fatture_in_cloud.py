@@ -114,6 +114,11 @@ SUPPLIER_LEGAL_SUFFIXES = {
     "INDIVIDUALE",
     "DITTA",
 }
+SUPPLIER_PLACEHOLDER_NAME_KEYS = {
+    "FORNITORE NON IDENTIFICATO",
+    "FATTURA DA REGISTRARE",
+    "DOCUMENTO DA REGISTRARE",
+}
 
 
 class FattureInCloudError(Exception):
@@ -657,12 +662,19 @@ def _entity_from_document(document_data):
     return _normalize_entity(entity)
 
 
-def _supplier_name(entity, document_data):
+def _explicit_supplier_name(entity, document_data):
     return (
         entity.get("name")
         or " ".join(part for part in [entity.get("first_name"), entity.get("last_name")] if part)
         or document_data.get("supplier_name")
         or document_data.get("supplierName")
+        or ""
+    )[:220]
+
+
+def _supplier_name(entity, document_data):
+    return (
+        _explicit_supplier_name(entity, document_data)
         or document_data.get("description")
         or document_data.get("subject")
         or "Fornitore non identificato"
@@ -708,6 +720,28 @@ def _supplier_identity_matches(fornitore, identity):
         (identity.get("vat") and existing.get("vat") == identity["vat"])
         or (identity.get("tax") and existing.get("tax") == identity["tax"])
     )
+
+
+def _supplier_name_is_placeholder(value):
+    key = _normalizza_nome_fornitore_match(value)
+    return bool(
+        key in SUPPLIER_PLACEHOLDER_NAME_KEYS
+        or key.startswith("FATTURA DA ")
+        or key.startswith("DOCUMENTO DA ")
+    )
+
+
+def _should_replace_supplier_after_signature_match(fornitore, entity, document_data):
+    new_name = _explicit_supplier_name(entity, document_data)
+    new_name_key = _normalizza_nome_fornitore_match(new_name)
+    existing_name_key = _normalizza_nome_fornitore_match(fornitore.denominazione)
+    if not new_name_key or new_name_key == existing_name_key:
+        return False
+    if _supplier_name_is_placeholder(new_name):
+        return False
+    if _supplier_identity_conflicts(fornitore, _supplier_identity_from_entity(entity)):
+        return False
+    return _supplier_name_is_placeholder(fornitore.denominazione)
 
 
 def _find_supplier_by_normalized_name(qs, name, identity):
@@ -1527,6 +1561,20 @@ def _state_from_document(total, payments, document_data=None, source_doc_type=No
     return StatoDocumentoFornitore.DA_PAGARE
 
 
+def _payment_due_date(payment):
+    return _as_date(
+        payment.get("due_date")
+        or payment.get("dueDate")
+        or payment.get("date")
+        or payment.get("expiration_date")
+        or payment.get("expirationDate")
+        or payment.get("payment_due_date")
+        or payment.get("paymentDueDate")
+        or payment.get("data_scadenza_pagamento")
+        or payment.get("DataScadenzaPagamento")
+    )
+
+
 def _payment_deadlines(document_data, source_doc_type=None):
     if _is_credit_note_document(document_data, source_doc_type):
         return []
@@ -1535,17 +1583,7 @@ def _payment_deadlines(document_data, source_doc_type=None):
     total = _document_total_to_pay(document_data)
     deadlines = []
     for payment in payments:
-        due_date = _as_date(
-            payment.get("due_date")
-            or payment.get("dueDate")
-            or payment.get("date")
-            or payment.get("expiration_date")
-            or payment.get("expirationDate")
-            or payment.get("payment_due_date")
-            or payment.get("paymentDueDate")
-            or payment.get("data_scadenza_pagamento")
-            or payment.get("DataScadenzaPagamento")
-        )
+        due_date = _payment_due_date(payment)
         amount = _payment_amount(payment)
         if amount <= Decimal("0.00") and len(payments) == 1:
             amount = total
@@ -1587,27 +1625,77 @@ def _payment_deadlines(document_data, source_doc_type=None):
     return []
 
 
-def _document_date(document_data):
-    return (
-        _as_date(
-            document_data.get("date")
-            or document_data.get("emission_date")
-            or document_data.get("emssion_date")
-            or document_data.get("document_date")
-            or document_data.get("documentDate")
+def _document_explicit_date(document_data):
+    e_invoice = _as_dict(document_data.get("e_invoice"))
+    dati_generali_documento = _document_general_data(e_invoice)
+    return _as_date(
+        _first_present(
+            document_data.get("date"),
+            document_data.get("emission_date"),
+            document_data.get("emssion_date"),
+            document_data.get("document_date"),
+            document_data.get("documentDate"),
+            e_invoice.get("date"),
+            e_invoice.get("emission_date"),
+            e_invoice.get("emssion_date"),
+            e_invoice.get("document_date"),
+            e_invoice.get("documentDate"),
+            e_invoice.get("data"),
+            e_invoice.get("Data"),
+            dati_generali_documento.get("data"),
+            dati_generali_documento.get("Data"),
+            dati_generali_documento.get("data_documento"),
+            dati_generali_documento.get("DataDocumento"),
         )
-        or timezone.localdate()
     )
+
+
+def _document_date(document_data):
+    return _document_explicit_date(document_data) or timezone.localdate()
 
 
 def _document_date_for_sync_filter(document_data):
-    return _as_date(
-        document_data.get("date")
-        or document_data.get("emission_date")
-        or document_data.get("emssion_date")
-        or document_data.get("document_date")
-        or document_data.get("documentDate")
-    )
+    return _document_explicit_date(document_data)
+
+
+def _document_due_date_candidates(document_data):
+    values = [
+        document_data.get("next_due_date"),
+        document_data.get("nextDueDate"),
+        document_data.get("due_date"),
+        document_data.get("dueDate"),
+        document_data.get("expiration_date"),
+        document_data.get("expirationDate"),
+        document_data.get("payment_due_date"),
+        document_data.get("paymentDueDate"),
+    ]
+    dates = []
+    for value in values:
+        due_date = _as_date(value)
+        if due_date:
+            dates.append(due_date)
+    for payment in _payment_items(document_data):
+        due_date = _payment_due_date(payment)
+        if due_date:
+            dates.append(due_date)
+    return dates
+
+
+def _document_import_date_candidates(document_data):
+    dates = []
+    explicit_date = _document_date_for_sync_filter(document_data)
+    if explicit_date:
+        dates.append(explicit_date)
+    dates.extend(_document_due_date_candidates(document_data))
+
+    seen = set()
+    unique_dates = []
+    for item in dates:
+        if item in seen:
+            continue
+        seen.add(item)
+        unique_dates.append(item)
+    return unique_dates
 
 
 def _document_total_for_import_match(document_data):
@@ -1628,24 +1716,77 @@ def _document_total_for_import_match(document_data):
     return amount_gross.quantize(Decimal("0.01"))
 
 
-def _document_import_signature_alias_id(document_data, entity, source_doc_type=None):
-    doc_date = _document_date_for_sync_filter(document_data)
+def _signature_alias_id(parts):
+    digest = hashlib.sha256("|".join(str(part) for part in parts).encode("utf-8")).hexdigest()
+    return f"signature:{digest}"
+
+
+def _document_import_signature_alias_ids(document_data, entity, source_doc_type=None):
+    date_candidates = _document_import_date_candidates(document_data)
     numero_norm = _normalizza_numero_documento_match(_invoice_number(document_data))
     supplier_name_key = _normalizza_nome_fornitore_match(_supplier_name(entity, document_data))
+    identity = _supplier_identity_from_entity(entity)
+    description_key = _normalizza_testo_match(_document_description(document_data))
+    line_description_key = _normalizza_testo_match(_document_invoice_line_description_text(document_data))
     total = _document_total_for_import_match(document_data)
-    if not (doc_date and numero_norm and supplier_name_key and total > Decimal("0.00")):
-        return ""
+    if not (date_candidates and numero_norm and total > Decimal("0.00")):
+        return []
 
-    parts = [
-        "signature",
-        str(_document_type(document_data, source_doc_type)),
-        supplier_name_key,
-        numero_norm,
-        doc_date.isoformat(),
-        f"{total:.2f}",
+    doc_type = str(_document_type(document_data, source_doc_type))
+    aliases = []
+
+    # Legacy signature kept so old aliases created before this strengthening remain effective.
+    explicit_date = _document_date_for_sync_filter(document_data)
+    if explicit_date and supplier_name_key:
+        aliases.append(
+            _signature_alias_id(
+                [
+                    "signature",
+                    doc_type,
+                    supplier_name_key,
+                    numero_norm,
+                    explicit_date.isoformat(),
+                    f"{total:.2f}",
+                ]
+            )
+        )
+
+    discriminators = [
+        ("supplier", supplier_name_key),
+        ("description", description_key),
+        ("lines", line_description_key),
     ]
-    digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
-    return f"signature:{digest}"
+    if identity.get("vat"):
+        discriminators.append(("vat", identity["vat"]))
+    if identity.get("tax"):
+        discriminators.append(("tax", identity["tax"]))
+
+    for kind, discriminator in discriminators:
+        if not discriminator:
+            continue
+        for item_date in date_candidates:
+            aliases.append(
+                _signature_alias_id(
+                    [
+                        "signature-v2",
+                        kind,
+                        doc_type,
+                        discriminator,
+                        numero_norm,
+                        item_date.isoformat(),
+                        f"{total:.2f}",
+                    ]
+                )
+            )
+
+    seen = set()
+    unique_aliases = []
+    for alias_id in aliases:
+        if alias_id in seen:
+            continue
+        seen.add(alias_id)
+        unique_aliases.append(alias_id)
+    return unique_aliases
 
 
 def _document_description_matches_import(documento, description_key, line_description_key):
@@ -1685,10 +1826,11 @@ def _document_import_match_key(documento):
 
 
 def _find_existing_document_by_import_signature(document_data, fornitore, entity, source_doc_type=None):
-    doc_date = _document_date_for_sync_filter(document_data)
+    date_candidates = _document_import_date_candidates(document_data)
+    date_candidate_set = set(date_candidates)
     invoice_number = _invoice_number(document_data)
     numero_norm = _normalizza_numero_documento_match(invoice_number)
-    if not doc_date or not numero_norm:
+    if not numero_norm:
         return None
 
     doc_type = _document_type(document_data, source_doc_type)
@@ -1697,21 +1839,34 @@ def _find_existing_document_by_import_signature(document_data, fornitore, entity
     supplier_name_key = _normalizza_nome_fornitore_match(_supplier_name(entity, document_data))
     description_key = _normalizza_testo_match(_document_description(document_data))
     line_description_key = _normalizza_testo_match(_document_invoice_line_description_text(document_data))
-    candidates_qs = (
-        DocumentoFornitore.objects.select_for_update()
-        .select_related("fornitore")
-        .filter(tipo_documento=doc_type, data_documento__year=doc_date.year)
+    has_description_signal = bool(description_key or line_description_key)
+    candidates_qs = DocumentoFornitore.objects.select_for_update().select_related("fornitore").filter(
+        tipo_documento=doc_type,
     )
+    candidate_years = sorted({item.year for item in date_candidates})
+    if candidate_years:
+        candidates_qs = candidates_qs.filter(data_documento__year__in=candidate_years)
     matches = []
 
     for documento in candidates_qs.filter(fornitore=fornitore):
         if _normalizza_numero_documento_match(documento.numero_documento) != numero_norm:
             continue
-        if documento.data_documento == doc_date or _same_money(documento.totale, total):
+        same_candidate_date = bool(date_candidate_set and documento.data_documento in date_candidate_set)
+        same_total = total > Decimal("0.00") and _same_money(documento.totale, total)
+        if same_candidate_date or (
+            same_total
+            and has_description_signal
+            and _document_description_matches_import(documento, description_key, line_description_key)
+        ):
             matches.append(documento)
 
     if not matches and total > Decimal("0.00"):
-        for documento in candidates_qs.filter(data_documento=doc_date):
+        if not date_candidate_set and not has_description_signal:
+            return None
+        cross_supplier_qs = candidates_qs
+        if date_candidate_set:
+            cross_supplier_qs = cross_supplier_qs.filter(data_documento__in=date_candidate_set)
+        for documento in cross_supplier_qs:
             if documento.fornitore_id == fornitore.pk:
                 continue
             if _normalizza_numero_documento_match(documento.numero_documento) != numero_norm:
@@ -1749,6 +1904,33 @@ def _fic_import_alias_for_external_id(external_id):
     if alias and alias.documento_id:
         alias.documento = DocumentoFornitore.objects.select_for_update().filter(pk=alias.documento_id).first()
     return alias
+
+
+def _reserve_fic_import_alias(external_id, *, motivo="import_fatture_in_cloud"):
+    external_id = _clean_external_alias_value(external_id)
+    if not external_id:
+        return None
+    alias, _created = DocumentoFornitoreImportAlias.objects.select_for_update().get_or_create(
+        external_source=FIC_SOURCE,
+        external_id=external_id,
+        defaults={
+            "documento": None,
+            "ignorato": False,
+            "motivo": motivo,
+        },
+    )
+    if alias.documento_id:
+        alias.documento = DocumentoFornitore.objects.select_for_update().filter(pk=alias.documento_id).first()
+    return alias
+
+
+def _reserve_fic_import_aliases(external_ids, *, motivo="import_fatture_in_cloud"):
+    aliases = []
+    for external_id in external_ids:
+        alias = _reserve_fic_import_alias(external_id, motivo=motivo)
+        if alias is not None:
+            aliases.append(alias)
+    return aliases
 
 
 def _upsert_document_import_alias(documento, external_source, external_id, *, motivo=""):
@@ -2021,27 +2203,25 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
 
     external_id = _clean_external_alias_value(document_data.get("id"))
     entity = _enrich_supplier_entity_from_document(_entity_from_document(document_data), document_data)
-    signature_alias_id = _document_import_signature_alias_id(document_data, entity, source_doc_type)
-    import_alias = _fic_import_alias_for_external_id(external_id)
-    signature_alias = _fic_import_alias_for_external_id(signature_alias_id) if signature_alias_id else None
+    signature_alias_ids = _document_import_signature_alias_ids(document_data, entity, source_doc_type)
+    import_alias = _reserve_fic_import_alias(external_id, motivo="import_fatture_in_cloud")
+    signature_aliases = _reserve_fic_import_aliases(
+        signature_alias_ids,
+        motivo="firma_import_fatture_in_cloud",
+    )
+    signature_alias = next(
+        (alias for alias in signature_aliases if not alias.ignorato and alias.documento is not None),
+        None,
+    )
+    ignored_signature_alias = next((alias for alias in signature_aliases if alias.ignorato), None)
     if import_alias and import_alias.ignorato:
         return _skipped_import_result(import_alias.documento, reason="alias_ignorato")
-    if import_alias and import_alias.documento is None:
-        import_alias.ignorato = True
-        import_alias.motivo = import_alias.motivo or "documento_eliminato"
-        import_alias.save(update_fields=["ignorato", "motivo", "data_aggiornamento"])
-        return _skipped_import_result(reason="alias_documento_eliminato")
-    if signature_alias and signature_alias.ignorato:
-        return _skipped_import_result(signature_alias.documento, reason="firma_import_ignorata")
-    if signature_alias and signature_alias.documento is None:
-        signature_alias.ignorato = True
-        signature_alias.motivo = signature_alias.motivo or "documento_eliminato"
-        signature_alias.save(update_fields=["ignorato", "motivo", "data_aggiornamento"])
-        return _skipped_import_result(reason="firma_import_documento_eliminato")
+    if ignored_signature_alias and signature_alias is None:
+        return _skipped_import_result(ignored_signature_alias.documento, reason="firma_import_ignorata")
 
     documento = None
     documento_da_firma_import = False
-    if import_alias:
+    if import_alias and import_alias.documento is not None:
         documento = import_alias.documento
         if not (
             documento.external_source == FIC_SOURCE
@@ -2053,9 +2233,12 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento_da_firma_import = documento is not None
 
     if documento_da_firma_import:
-        fornitore = documento.fornitore
-        fornitore_created = False
-        fornitore_updated = _update_supplier_missing_fields(fornitore, entity)
+        if _should_replace_supplier_after_signature_match(documento.fornitore, entity, document_data):
+            fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
+        else:
+            fornitore = documento.fornitore
+            fornitore_created = False
+            fornitore_updated = _update_supplier_missing_fields(fornitore, entity)
     else:
         fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
     if documento is None:
@@ -2083,7 +2266,7 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
     _update_document_fields(documento, document_data, fornitore, pending, source_doc_type=source_doc_type)
     documento.save()
     registra_alias_import_documento_fornitore(documento, motivo="import_fatture_in_cloud")
-    if signature_alias_id:
+    for signature_alias_id in signature_alias_ids:
         _upsert_document_import_alias(documento, FIC_SOURCE, signature_alias_id, motivo="firma_import_fatture_in_cloud")
     if previous_external_source and previous_external_id and (
         previous_external_source != documento.external_source or previous_external_id != documento.external_id
