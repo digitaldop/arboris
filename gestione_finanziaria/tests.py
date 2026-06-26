@@ -4384,6 +4384,85 @@ class FornitoriGestioneFinanziariaTests(TestCase):
             ).exists()
         )
 
+    def test_importa_documento_fatture_in_cloud_deduplica_scadenze_duplicate_nel_payload(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        payload = {
+            "id": "fic-duferco-dup-payments",
+            "type": "expense",
+            "description": "Spesa per la tariffa per l'uso della rete del gas naturale",
+            "invoice_number": "00126FG00836575",
+            "date": "2026-07-20",
+            "amount_net": "8.36",
+            "amount_vat": "1.84",
+            "amount_gross": "10.20",
+            "entity": {"name": "Duferco Energia Spa"},
+            "payments_list": [
+                {"due_date": "2026-07-20", "amount": "10.20"},
+                {"due_date": "2026-07-20", "amount": "10.20"},
+            ],
+        }
+
+        result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
+
+        self.assertTrue(result["created"])
+        self.assertEqual(result["scadenze_create"], 1)
+        documento = DocumentoFornitore.objects.get(external_id="fic-duferco-dup-payments")
+        self.assertEqual(documento.totale, Decimal("10.20"))
+        self.assertEqual(documento.scadenze.count(), 1)
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 7, 20))
+        self.assertEqual(scadenza.importo_previsto, Decimal("10.20"))
+
+    def test_importa_documento_fatture_in_cloud_collassa_scadenze_duplicate_gia_create(self):
+        connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
+        fornitore = Fornitore.objects.create(denominazione="Duferco Energia Spa")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="00126FG00839345",
+            data_documento=date(2026, 7, 20),
+            imponibile=Decimal("61.75"),
+            iva=Decimal("13.59"),
+            totale=Decimal("75.34"),
+            origine=OrigineDocumentoFornitore.FATTURE_IN_CLOUD,
+            external_source="fatture_in_cloud",
+            external_id="fic-duferco-existing",
+        )
+        for _index in range(2):
+            ScadenzaPagamentoFornitore.objects.create(
+                documento=documento,
+                data_scadenza=date(2026, 7, 20),
+                importo_previsto=Decimal("75.34"),
+            )
+
+        result = importa_documento_fatture_in_cloud(
+            connessione,
+            {
+                "id": "fic-duferco-existing",
+                "type": "expense",
+                "description": "Spesa per la vendita di gas naturale",
+                "invoice_number": "00126FG00839345",
+                "date": "2026-07-20",
+                "amount_net": "61.75",
+                "amount_vat": "13.59",
+                "amount_gross": "75.34",
+                "entity": {"name": "Duferco Energia Spa"},
+                "payments_list": [
+                    {"due_date": "2026-07-20", "amount": "75.34"},
+                    {"due_date": "2026-07-20", "amount": "75.34"},
+                ],
+            },
+            pending=False,
+            utente=self.user,
+        )
+
+        self.assertFalse(result["created"])
+        self.assertEqual(result["scadenze_create"], 1)
+        documento.refresh_from_db()
+        self.assertEqual(documento.scadenze.count(), 1)
+        scadenza = documento.scadenze.get()
+        self.assertEqual(scadenza.data_scadenza, date(2026, 7, 20))
+        self.assertEqual(scadenza.importo_previsto, Decimal("75.34"))
+
     def test_importa_documento_fatture_in_cloud_nota_credito_non_crea_scadenze(self):
         connessione = FattureInCloudConnessione.objects.create(
             nome="FIC",

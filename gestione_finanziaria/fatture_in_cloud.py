@@ -1540,6 +1540,44 @@ def _apply_document_payment_state_to_deadlines(document_data, deadlines):
     return deadlines
 
 
+def _deadlines_total(deadlines):
+    return sum((_as_decimal(deadline.get("importo_previsto")) for deadline in deadlines), Decimal("0.00"))
+
+
+def _deduplicate_payment_deadlines(deadlines, *, expected_total=None):
+    normalized = [
+        {
+            "data_scadenza": deadline["data_scadenza"],
+            "importo_previsto": _as_decimal(deadline["importo_previsto"]),
+            "importo_pagato": _as_decimal(deadline.get("importo_pagato")),
+            "data_pagamento": deadline.get("data_pagamento"),
+        }
+        for deadline in deadlines or []
+    ]
+    if len(normalized) <= 1:
+        return normalized
+
+    expected_total = _as_decimal(expected_total)
+    if expected_total > Decimal("0.00") and _deadlines_total(normalized) <= expected_total + Decimal("0.01"):
+        return normalized
+
+    deduplicated = []
+    by_key = {}
+    for deadline in normalized:
+        key = (deadline["data_scadenza"], deadline["importo_previsto"])
+        existing = by_key.get(key)
+        if existing is None:
+            by_key[key] = deadline
+            deduplicated.append(deadline)
+            continue
+
+        if deadline["importo_pagato"] > existing["importo_pagato"]:
+            existing["importo_pagato"] = deadline["importo_pagato"]
+        if deadline["data_pagamento"] and not existing["data_pagamento"]:
+            existing["data_pagamento"] = deadline["data_pagamento"]
+    return deduplicated
+
+
 def _paid_amount_from_payments(payments):
     paid = Decimal("0.00")
     for payment in payments or []:
@@ -1598,6 +1636,7 @@ def _payment_deadlines(document_data, source_doc_type=None):
             )
 
     if deadlines:
+        deadlines = _deduplicate_payment_deadlines(deadlines, expected_total=total)
         return _apply_document_payment_state_to_deadlines(document_data, deadlines)
 
     due_date = _as_date(
@@ -1614,14 +1653,18 @@ def _payment_deadlines(document_data, source_doc_type=None):
         or document_data.get("date")
     ) or timezone.localdate()
     if total > Decimal("0.00"):
-        return _apply_document_payment_state_to_deadlines(document_data, [
-            {
-                "data_scadenza": due_date,
-                "importo_previsto": total,
-                "importo_pagato": Decimal("0.00"),
-                "data_pagamento": None,
-            }
-        ])
+        deadlines = _deduplicate_payment_deadlines(
+            [
+                {
+                    "data_scadenza": due_date,
+                    "importo_previsto": total,
+                    "importo_pagato": Decimal("0.00"),
+                    "data_pagamento": None,
+                }
+            ],
+            expected_total=total,
+        )
+        return _apply_document_payment_state_to_deadlines(document_data, deadlines)
     return []
 
 
@@ -2069,6 +2112,7 @@ def _sync_document_deadlines(documento, deadlines, *, clear_existing=False):
                     scadenza.save(update_fields=["stato", "data_aggiornamento"])
         return 0
 
+    deadlines = _deduplicate_payment_deadlines(deadlines, expected_total=documento.totale_da_pagare)
     if not deadlines:
         return 0
 
