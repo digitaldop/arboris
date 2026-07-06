@@ -49,8 +49,34 @@
                     <tr class="classe-separator">
                         <td class="sticky-col classe-separator-cell">
                             Classe: <strong>{{ gruppo.classe_label }}</strong>
+                            <div class="classe-summary-label">Totali classe</div>
                         </td>
-                        <td colspan="{{ num_colonne|add:"-1" }}" class="classe-separator-fill" aria-hidden="true"></td>
+                        {% for totale in gruppo.totali_colonne %}
+                            <td class="verifica-rette-total-cell verifica-rette-class-total-cell">
+                                <div class="cell-amount">
+                                    <span class="label">Dovuto</span>
+                                    <span class="value">&euro; {{ totale.dovuto|euro }}</span>
+                                </div>
+                                <div class="cell-amount">
+                                    <span class="label">Incassato</span>
+                                    <span class="value">&euro; {{ totale.pagato|euro }}</span>
+                                </div>
+                                <div class="cell-amount">
+                                    <span class="label">Rimanente</span>
+                                    <span class="value">&euro; {{ totale.rimanente|euro }}</span>
+                                </div>
+                            </td>
+                        {% endfor %}
+                        <td class="verifica-rette-total-cell verifica-rette-row-summary-total verifica-rette-class-year-total-cell">
+                            <div class="cell-amount">
+                                <span class="label">Totale anno</span>
+                                <span class="value">&euro; {{ gruppo.totale_annuale_dovuto|euro }}</span>
+                            </div>
+                            <div class="cell-amount">
+                                <span class="label">Residuo</span>
+                                <span class="value">&euro; {{ gruppo.totale_annuale_rimanente|euro }}</span>
+                            </div>
+                        </td>
                     </tr>
                     {% for riga in gruppo.righe %}
                         {% include "economia/iscrizioni/includes/verifica_situazione_rette_matrix_row.html" with riga=riga matrix_return_url=matrix_return_url only %}

@@ -298,8 +298,47 @@
             font-weight: 800;
             box-shadow: 9px 0 18px rgba(19, 42, 63, 0.12), 0 2px 0 #c9d7e1;
         }
-        .verifica-rette-table .classe-separator .classe-separator-fill {
+        .verifica-rette-table .classe-summary-label {
+            margin-top: 0.12rem;
+            color: #60738d;
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .verifica-rette-table .classe-separator .verifica-rette-class-total-cell,
+        .verifica-rette-table .classe-separator .verifica-rette-class-year-total-cell {
             min-width: 112px;
+            max-width: 138px;
+            padding: 0.34rem 0.46rem;
+            background: #eef8fb;
+            color: #223846;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.2;
+            text-transform: none;
+        }
+        .verifica-rette-table .classe-separator .verifica-rette-class-year-total-cell {
+            min-width: 142px;
+            max-width: 168px;
+            background: #eaf6fb;
+            box-shadow: inset 3px 0 0 #9cc9da, 0 2px 0 #c9d7e1;
+        }
+        .verifica-rette-table .classe-separator .verifica-rette-class-total-cell .cell-amount,
+        .verifica-rette-table .classe-separator .verifica-rette-class-year-total-cell .cell-amount {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.35rem;
+        }
+        .verifica-rette-table .classe-separator .verifica-rette-class-total-cell .label,
+        .verifica-rette-table .classe-separator .verifica-rette-class-year-total-cell .label {
+            color: #5f7280;
+            font-size: 0.66rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .verifica-rette-table .classe-separator .verifica-rette-class-total-cell .value,
+        .verifica-rette-table .classe-separator .verifica-rette-class-year-total-cell .value {
+            font-weight: 800;
         }
 
         .verifica-rette-cell {

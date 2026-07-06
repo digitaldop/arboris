@@ -1018,7 +1018,8 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertContains(response, reverse("modifica_studente", args=[self.studente.pk]))
         self.assertContains(response, "?next=/economia/verifica-situazione-rette/%3Fanno_scolastico%3D")
         self.assertContains(response, "classe-separator-cell")
-        self.assertContains(response, "classe-separator-fill")
+        self.assertContains(response, "verifica-rette-class-total-cell")
+        self.assertContains(response, "verifica-rette-class-year-total-cell")
         self.assertContains(response, "top: 34px")
         self.assertContains(response, "is-row-highlighted")
         self.assertContains(response, "aria-selected=\"false\"")
@@ -1126,6 +1127,87 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertEqual(celle_dodici_rate[(2026, 8)]["importo_dovuto"], Decimal("100.00"))
         self.assertEqual(riga_dodici_rate["totale_annuale_dovuto"], Decimal("1200.00"))
         self.assertEqual(riga_dodici_rate["totale_annuale_rimanente"], Decimal("1200.00"))
+
+    def test_verifica_situazione_rette_class_view_exposes_class_totals(self):
+        User.objects.create_superuser(username="admin", password="admin")
+        self.client.login(username="admin", password="admin")
+        classe_prima = Classe.objects.create(nome_classe="Prima", ordine_classe=1)
+        classe_seconda = Classe.objects.create(nome_classe="Seconda", ordine_classe=2)
+        self.iscrizione.classe = classe_prima
+        self.iscrizione.save(update_fields=["classe"])
+        self.iscrizione.sync_rate_schedule()
+
+        compagna = Studente.objects.create(nome="Anna", cognome="Verdi")
+        iscrizione_compagna = Iscrizione.objects.create(
+            studente=compagna,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+            classe=classe_prima,
+        )
+        iscrizione_compagna.sync_rate_schedule()
+
+        studente_seconda = Studente.objects.create(nome="Marco", cognome="Rossi")
+        iscrizione_seconda = Iscrizione.objects.create(
+            studente=studente_seconda,
+            anno_scolastico=self.anno,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione,
+            data_iscrizione=date(2025, 9, 1),
+            classe=classe_seconda,
+        )
+        iscrizione_seconda.sync_rate_schedule()
+
+        settembre_luca = self.iscrizione.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            anno_riferimento=2025,
+            mese_riferimento=9,
+        )
+        settembre_luca.importo_pagato = Decimal("120.00")
+        settembre_luca.save(update_fields=["importo_pagato"])
+        settembre_anna = iscrizione_compagna.rate.get(
+            tipo_rata=RataIscrizione.TIPO_MENSILE,
+            anno_riferimento=2025,
+            mese_riferimento=9,
+        )
+        settembre_anna.importo_pagato = Decimal("60.00")
+        settembre_anna.save(update_fields=["importo_pagato"])
+
+        response = self.client.get(
+            reverse("verifica_situazione_rette"),
+            {"anno_scolastico": self.anno.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Totali classe", count=2)
+        self.assertContains(response, "verifica-rette-class-total-cell")
+        self.assertContains(response, "verifica-rette-class-year-total-cell")
+
+        gruppo_prima = next(
+            gruppo
+            for gruppo in response.context["righe_per_classe"]
+            if gruppo["classe"].pk == classe_prima.pk
+        )
+        totale_settembre_prima = next(
+            totale
+            for totale in gruppo_prima["totali_colonne"]
+            if totale["colonna"]["key"] == (2025, 9)
+        )
+        self.assertEqual(totale_settembre_prima["dovuto"], Decimal("240.00"))
+        self.assertEqual(totale_settembre_prima["pagato"], Decimal("180.00"))
+        self.assertEqual(totale_settembre_prima["rimanente"], Decimal("60.00"))
+        self.assertEqual(gruppo_prima["totale_annuale_dovuto"], Decimal("2400.00"))
+        self.assertEqual(gruppo_prima["totale_annuale_pagato"], Decimal("180.00"))
+        self.assertEqual(gruppo_prima["totale_annuale_rimanente"], Decimal("2220.00"))
+
+        gruppo_seconda = next(
+            gruppo
+            for gruppo in response.context["righe_per_classe"]
+            if gruppo["classe"].pk == classe_seconda.pk
+        )
+        self.assertEqual(gruppo_seconda["totale_annuale_dovuto"], Decimal("1200.00"))
+        self.assertEqual(gruppo_seconda["totale_annuale_rimanente"], Decimal("1200.00"))
 
     def test_rate_detail_form_allows_empty_credit_and_discount_fields(self):
         self.iscrizione.sync_rate_schedule()

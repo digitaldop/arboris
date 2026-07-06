@@ -1590,6 +1590,12 @@ def verifica_situazione_rette(request):
 
         for classe_key, gruppo in gruppi.items():
             righe = []
+            totali_gruppo_per_chiave = {
+                colonna["key"]: _empty_verifica_rette_totale()
+                for colonna in colonne
+            }
+            totale_gruppo_annuale_dovuto = Decimal("0.00")
+            totale_gruppo_annuale_pagato = Decimal("0.00")
             for iscrizione in gruppo["iscrizioni"]:
                 # Indicizziamo le rate dell'iscrizione per chiave colonna.
                 rate_per_chiave = {}
@@ -1618,9 +1624,14 @@ def verifica_situazione_rette(request):
                         if not rata.is_preiscrizione:
                             totale_riga_annuale_dovuto += importo_dovuto
                             totale_riga_annuale_pagato += importo_pagato
+                            totale_gruppo_annuale_dovuto += importo_dovuto
+                            totale_gruppo_annuale_pagato += importo_pagato
                         totale_colonna = totali_per_chiave[colonna["key"]]
                         totale_colonna["dovuto"] += importo_dovuto
                         totale_colonna["pagato"] += importo_pagato
+                        totale_gruppo_colonna = totali_gruppo_per_chiave[colonna["key"]]
+                        totale_gruppo_colonna["dovuto"] += importo_dovuto
+                        totale_gruppo_colonna["pagato"] += importo_pagato
                         riepilogo_totali["totale_anno_con_preiscrizioni"] += importo_dovuto
                         if not rata.is_preiscrizione:
                             riepilogo_totali["totale_anno_senza_preiscrizioni"] += importo_dovuto
@@ -1639,8 +1650,11 @@ def verifica_situazione_rette(request):
                         importo_pagato = Decimal("0.00")
                         stato = "non-dovuta" if importo_dovuto <= 0 else "non-pagata"
                         totale_riga_annuale_dovuto += importo_dovuto
+                        totale_gruppo_annuale_dovuto += importo_dovuto
                         totale_colonna = totali_per_chiave[colonna["key"]]
                         totale_colonna["dovuto"] += importo_dovuto
+                        totale_gruppo_colonna = totali_gruppo_per_chiave[colonna["key"]]
+                        totale_gruppo_colonna["dovuto"] += importo_dovuto
                         riepilogo_totali["totale_anno_con_preiscrizioni"] += importo_dovuto
                         riepilogo_totali["totale_anno_senza_preiscrizioni"] += importo_dovuto
                         data_scadenza_prevista = rata_prevista.get("data_scadenza")
@@ -1686,6 +1700,24 @@ def verifica_situazione_rette(request):
                     "classe": gruppo["classe"],
                     "classe_label": gruppo["classe_label"],
                     "righe": righe,
+                    "totali_colonne": [
+                        {
+                            "colonna": colonna,
+                            "dovuto": totali_gruppo_per_chiave[colonna["key"]]["dovuto"],
+                            "pagato": totali_gruppo_per_chiave[colonna["key"]]["pagato"],
+                            "rimanente": (
+                                totali_gruppo_per_chiave[colonna["key"]]["dovuto"]
+                                - totali_gruppo_per_chiave[colonna["key"]]["pagato"]
+                            ),
+                        }
+                        for colonna in colonne
+                    ],
+                    "totale_annuale_dovuto": totale_gruppo_annuale_dovuto,
+                    "totale_annuale_pagato": totale_gruppo_annuale_pagato,
+                    "totale_annuale_rimanente": max(
+                        totale_gruppo_annuale_dovuto - totale_gruppo_annuale_pagato,
+                        Decimal("0.00"),
+                    ),
                 }
             )
 
