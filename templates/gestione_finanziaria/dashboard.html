@@ -334,6 +334,172 @@
             min-width: 900px;
         }
 
+        .finance-dashboard-payroll-section {
+            scroll-margin-top: 18px;
+        }
+
+        .finance-dashboard-payroll-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .finance-dashboard-payroll-switch {
+            display: inline-flex;
+            overflow: hidden;
+            border: 1px solid var(--finance-dashboard-border);
+            border-radius: 8px;
+            background: #f8fbfd;
+        }
+
+        .finance-dashboard-payroll-switch a {
+            display: inline-flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            padding: 0 14px;
+            color: #526983;
+            font-size: 12px;
+            font-weight: 850;
+            text-decoration: none;
+            text-transform: uppercase;
+            border-right: 1px solid var(--finance-dashboard-border);
+        }
+
+        .finance-dashboard-payroll-switch a:last-child {
+            border-right: 0;
+        }
+
+        .finance-dashboard-payroll-switch a.is-active {
+            color: #ffffff;
+            background: var(--finance-dashboard-primary-dark);
+        }
+
+        .finance-dashboard-payroll-form {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .finance-dashboard-payroll-form .anagrafica-filter-field {
+            min-width: 170px;
+        }
+
+        .finance-dashboard-payroll-summary {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(150px, 1fr));
+            gap: 12px;
+            padding: 16px 16px 0;
+        }
+
+        .finance-dashboard-payroll-total {
+            min-height: 92px;
+            padding: 16px;
+            border: 1px solid var(--finance-dashboard-border);
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ffffff, #f8fbfd);
+        }
+
+        .finance-dashboard-payroll-total.is-payable {
+            border-color: #cfe0ec;
+            background: linear-gradient(135deg, #ffffff, #eef7fb);
+        }
+
+        .finance-dashboard-payroll-total.is-paid {
+            border-color: #cfe9da;
+            background: linear-gradient(135deg, #ffffff, #eff9f3);
+        }
+
+        .finance-dashboard-payroll-total.is-open {
+            border-color: #f0dfad;
+            background: linear-gradient(135deg, #ffffff, #fff8e6);
+        }
+
+        .finance-dashboard-payroll-total.is-gross {
+            border-color: #d8d1ef;
+            background: linear-gradient(135deg, #ffffff, #f4f0ff);
+        }
+
+        .finance-dashboard-payroll-total-label {
+            color: #526983;
+            font-size: 11px;
+            font-weight: 850;
+            line-height: 1.25;
+            text-transform: uppercase;
+        }
+
+        .finance-dashboard-payroll-total-value {
+            margin-top: 8px;
+            color: var(--finance-dashboard-title);
+            font-size: 24px;
+            font-weight: 850;
+            line-height: 1;
+        }
+
+        .finance-dashboard-payroll-total-note {
+            margin-top: 7px;
+            color: var(--finance-dashboard-muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .finance-dashboard-payroll-table {
+            min-width: 980px;
+        }
+
+        .finance-dashboard-payroll-month {
+            display: grid;
+            gap: 3px;
+        }
+
+        .finance-dashboard-payroll-month strong {
+            color: #172131;
+            font-size: 13px;
+        }
+
+        .finance-dashboard-payroll-current {
+            display: inline-flex;
+            width: max-content;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            color: #275b75;
+            background: #e8f3f8;
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .finance-dashboard-payroll-number {
+            font-weight: 850;
+        }
+
+        .finance-dashboard-payroll-number.is-paid {
+            color: #158347;
+        }
+
+        .finance-dashboard-payroll-number.is-negative {
+            color: #cf3f54;
+        }
+
+        .finance-dashboard-payroll-number.is-neutral {
+            color: #526983;
+        }
+
+        .finance-dashboard-payroll-number.is-positive {
+            color: #275b75;
+        }
+
+        .finance-dashboard-payroll-table tfoot th,
+        .finance-dashboard-payroll-table tfoot td {
+            border-top: 1px solid var(--finance-dashboard-line);
+            color: #172131;
+            font-weight: 850;
+            background: #f8fbfd;
+        }
+
         .finance-dashboard-account-name,
         .finance-dashboard-movement-text {
             color: #172131;
@@ -401,6 +567,10 @@
             .finance-dashboard-mini-grid {
                 grid-template-columns: repeat(2, minmax(170px, 1fr));
             }
+
+            .finance-dashboard-payroll-summary {
+                grid-template-columns: repeat(2, minmax(170px, 1fr));
+            }
         }
 
         @media (max-width: 860px) {
@@ -413,7 +583,8 @@
             }
 
             .finance-dashboard-kpi-grid,
-            .finance-dashboard-mini-grid {
+            .finance-dashboard-mini-grid,
+            .finance-dashboard-payroll-summary {
                 grid-template-columns: 1fr;
             }
 
@@ -427,6 +598,21 @@
             .finance-dashboard-nav .btn {
                 width: 100%;
                 justify-content: center;
+            }
+
+            .finance-dashboard-payroll-actions,
+            .finance-dashboard-payroll-form {
+                justify-content: stretch;
+            }
+
+            .finance-dashboard-payroll-switch,
+            .finance-dashboard-payroll-form .btn,
+            .finance-dashboard-payroll-form .anagrafica-filter-field {
+                width: 100%;
+            }
+
+            .finance-dashboard-payroll-switch a {
+                flex: 1;
             }
         }
     </style>
@@ -485,6 +671,10 @@
             <a href="{% url 'lista_movimenti_finanziari' %}" class="btn btn-secondary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg></span>
                 <span>Movimenti</span>
+            </a>
+            <a href="#stipendi-personale" class="btn btn-secondary btn-icon-text">
+                <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg></span>
+                <span>Stipendi</span>
             </a>
             <a href="{% url 'lista_categorie_spesa' %}" class="btn btn-secondary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#briefcase"></use></svg></span>
@@ -558,6 +748,122 @@
                     <div class="finance-dashboard-mini-value">{{ fatture_in_cloud_attive }}</div>
                 </div>
             </article>
+        </section>
+
+        <section class="finance-dashboard-section finance-dashboard-payroll-section" id="stipendi-personale">
+            <div class="finance-dashboard-section-head">
+                <div>
+                    <h2 class="finance-dashboard-section-title">Stipendi personale</h2>
+                    <p class="finance-dashboard-section-subtitle">{{ stipendi_dashboard.period_label }} - da {{ stipendi_dashboard.start|date:"d/m/Y" }} a {{ stipendi_dashboard.end|date:"d/m/Y" }}</p>
+                </div>
+                <div class="finance-dashboard-payroll-actions">
+                    <div class="finance-dashboard-payroll-switch" aria-label="Periodo stipendi">
+                        {% for option in stipendi_dashboard.period_options %}
+                            <a href="{{ option.url }}" class="{% if option.value == stipendi_dashboard.periodo %}is-active{% endif %}" {% if option.value == stipendi_dashboard.periodo %}aria-current="page"{% endif %}>{{ option.label }}</a>
+                        {% endfor %}
+                    </div>
+                    <form method="get" action="{% url 'dashboard_gestione_finanziaria' %}#stipendi-personale" class="finance-dashboard-payroll-form">
+                        <input type="hidden" name="stipendi_periodo" value="{{ stipendi_dashboard.periodo }}">
+                        <label class="anagrafica-filter-field">
+                            <span class="anagrafica-filter-label">Anno solare</span>
+                            <select name="stipendi_anno">
+                                {% for anno_opzione in stipendi_dashboard.anni_solari %}
+                                    <option value="{{ anno_opzione }}" {% if anno_opzione == stipendi_dashboard.anno %}selected{% endif %}>{{ anno_opzione }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="anagrafica-filter-field">
+                            <span class="anagrafica-filter-label">Anno scolastico</span>
+                            <select name="stipendi_anno_scolastico">
+                                {% for anno_s in stipendi_dashboard.anni_scolastici %}
+                                    <option value="{{ anno_s.pk }}" {% if stipendi_dashboard.anno_scolastico and anno_s.pk == stipendi_dashboard.anno_scolastico.pk %}selected{% endif %}>{{ anno_s }}</option>
+                                {% empty %}
+                                    <option value="">Nessun anno scolastico</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <button type="submit" class="btn btn-secondary btn-icon-text">
+                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+                            <span>Aggiorna</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="finance-dashboard-payroll-summary" aria-label="Totale annuale stipendi">
+                <div class="finance-dashboard-payroll-total is-payable">
+                    <div class="finance-dashboard-payroll-total-label">Totale da pagare</div>
+                    <div class="finance-dashboard-payroll-total-value">{{ stipendi_dashboard.totals.totale_da_pagare|euro }} &euro;</div>
+                    <div class="finance-dashboard-payroll-total-note">{{ stipendi_dashboard.totals.buste_count }} buste nel periodo.</div>
+                </div>
+                <div class="finance-dashboard-payroll-total is-paid">
+                    <div class="finance-dashboard-payroll-total-label">Totale pagato</div>
+                    <div class="finance-dashboard-payroll-total-value">{{ stipendi_dashboard.totals.totale_pagato|euro }} &euro;</div>
+                    <div class="finance-dashboard-payroll-total-note">Pagamenti riconciliati alle buste.</div>
+                </div>
+                <div class="finance-dashboard-payroll-total is-open">
+                    <div class="finance-dashboard-payroll-total-label">Residuo da pagare</div>
+                    <div class="finance-dashboard-payroll-total-value">{{ stipendi_dashboard.totals.residuo_da_pagare|euro }} &euro;</div>
+                    <div class="finance-dashboard-payroll-total-note">Differenza tra netto e pagato.</div>
+                </div>
+                <div class="finance-dashboard-payroll-total is-gross">
+                    <div class="finance-dashboard-payroll-total-label">Totale lordo buste</div>
+                    <div class="finance-dashboard-payroll-total-value">{{ stipendi_dashboard.totals.totale_lordo|euro }} &euro;</div>
+                    <div class="finance-dashboard-payroll-total-note">Importi lordi effettivi o previsti.</div>
+                </div>
+                <div class="finance-dashboard-payroll-total">
+                    <div class="finance-dashboard-payroll-total-label">Differenza lordo/netto</div>
+                    <div class="finance-dashboard-payroll-total-value">{{ stipendi_dashboard.totals.differenza_lordo_netto|euro }} &euro;</div>
+                    <div class="finance-dashboard-payroll-total-note">Scarto tra lordo buste e stipendi da pagare.</div>
+                </div>
+            </div>
+            <div class="finance-dashboard-table-wrap">
+                <table class="list-table anagrafica-list-table finance-modern-table finance-dashboard-table finance-dashboard-payroll-table">
+                    <thead>
+                        <tr>
+                            <th>Mese</th>
+                            <th class="column-right">Buste</th>
+                            <th class="column-right">Da pagare</th>
+                            <th class="column-right">Pagato</th>
+                            <th class="column-right">Residuo</th>
+                            <th class="column-right">Lordo buste</th>
+                            <th class="column-right">Diff. lordo/netto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mese in stipendi_dashboard.months %}
+                            <tr>
+                                <td>
+                                    <span class="finance-dashboard-payroll-month">
+                                        <strong>{{ mese.label }}</strong>
+                                        {% if mese.is_current %}
+                                            <span class="finance-dashboard-payroll-current">Mese corrente</span>
+                                        {% else %}
+                                            <span class="finance-dashboard-muted">{{ mese.short_label }}</span>
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td class="column-right">{{ mese.buste_count }}</td>
+                                <td class="column-right"><span class="finance-dashboard-payroll-number">{{ mese.totale_da_pagare|euro }} &euro;</span></td>
+                                <td class="column-right"><span class="finance-dashboard-payroll-number is-paid">{{ mese.totale_pagato|euro }} &euro;</span></td>
+                                <td class="column-right"><span class="finance-dashboard-payroll-number is-{{ mese.residuo_tone }}">{{ mese.residuo_da_pagare|euro }} &euro;</span></td>
+                                <td class="column-right"><span class="finance-dashboard-payroll-number">{{ mese.totale_lordo|euro }} &euro;</span></td>
+                                <td class="column-right"><span class="finance-dashboard-payroll-number is-{{ mese.lordo_tone }}">{{ mese.differenza_lordo_netto|euro }} &euro;</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th>Totale {{ stipendi_dashboard.period_label }}</th>
+                            <td class="column-right">{{ stipendi_dashboard.totals.buste_count }}</td>
+                            <td class="column-right">{{ stipendi_dashboard.totals.totale_da_pagare|euro }} &euro;</td>
+                            <td class="column-right">{{ stipendi_dashboard.totals.totale_pagato|euro }} &euro;</td>
+                            <td class="column-right">{{ stipendi_dashboard.totals.residuo_da_pagare|euro }} &euro;</td>
+                            <td class="column-right">{{ stipendi_dashboard.totals.totale_lordo|euro }} &euro;</td>
+                            <td class="column-right">{{ stipendi_dashboard.totals.differenza_lordo_netto|euro }} &euro;</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </section>
 
         {% if saldo_per_tipo %}

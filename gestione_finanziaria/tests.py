@@ -25,6 +25,7 @@ from gestione_amministrativa.models import (
     BUSTA_PAGA_MESE_TREDICESIMA,
     BustaPagaDipendente,
     Dipendente,
+    PagamentoBustaPagaDipendente,
 )
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
@@ -8026,6 +8027,90 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Saldi per tipo")
         self.assertContains(response, "Cassa contanti")
         self.assertContains(response, "250,00")
+
+    def test_dashboard_mostra_tab_stipendi_per_anno_solare_e_scolastico(self):
+        anno_scolastico = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2025/2026",
+            data_inizio=date(2025, 9, 1),
+            data_fine=date(2026, 8, 31),
+            attivo=True,
+        )
+        dipendente = Dipendente.objects.create(
+            nome="Mario",
+            cognome="Rossi",
+            codice_fiscale="RSSMRA80A01H501U",
+        )
+        educatore = Dipendente.objects.create(
+            nome="Laura",
+            cognome="Bianchi",
+            codice_fiscale="BNCLRA82A41H501V",
+            ruolo_aziendale="educatore",
+        )
+        busta_gennaio = BustaPagaDipendente.objects.create(
+            dipendente=dipendente,
+            anno=2026,
+            mese=1,
+            stato="effettiva",
+            netto_effettivo=Decimal("1000.00"),
+            lordo_effettivo=Decimal("1400.00"),
+        )
+        BustaPagaDipendente.objects.create(
+            dipendente=educatore,
+            anno=2025,
+            mese=9,
+            stato="effettiva",
+            netto_effettivo=Decimal("900.00"),
+            lordo_effettivo=Decimal("1300.00"),
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 1, 31),
+            importo=Decimal("-800.00"),
+            descrizione="Acconto stipendio Mario Rossi",
+            controparte="Mario Rossi",
+        )
+        PagamentoBustaPagaDipendente.objects.create(
+            busta_paga=busta_gennaio,
+            movimento=movimento,
+            importo=Decimal("800.00"),
+            data_pagamento=date(2026, 1, 31),
+        )
+
+        response = self.client.get(
+            reverse("dashboard_gestione_finanziaria"),
+            {"stipendi_periodo": "solare", "stipendi_anno": "2026"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Stipendi personale")
+        self.assertContains(response, "Totale Anno solare 2026")
+        self.assertContains(response, "Gennaio 2026")
+        stipendi = response.context["stipendi_dashboard"]
+        gennaio = next(row for row in stipendi["months"] if row["key"] == "2026-01")
+        self.assertEqual(gennaio["totale_da_pagare"], Decimal("1000.00"))
+        self.assertEqual(gennaio["totale_pagato"], Decimal("800.00"))
+        self.assertEqual(gennaio["residuo_da_pagare"], Decimal("200.00"))
+        self.assertEqual(gennaio["totale_lordo"], Decimal("1400.00"))
+        self.assertEqual(gennaio["differenza_lordo_netto"], Decimal("400.00"))
+        self.assertEqual(stipendi["totals"]["totale_da_pagare"], Decimal("1000.00"))
+
+        response = self.client.get(
+            reverse("dashboard_gestione_finanziaria"),
+            {
+                "stipendi_periodo": "scolastico",
+                "stipendi_anno_scolastico": str(anno_scolastico.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Anno scolastico 2025/2026")
+        stipendi = response.context["stipendi_dashboard"]
+        settembre = next(row for row in stipendi["months"] if row["key"] == "2025-09")
+        self.assertEqual(settembre["totale_da_pagare"], Decimal("900.00"))
+        self.assertEqual(stipendi["totals"]["totale_da_pagare"], Decimal("1900.00"))
+        self.assertEqual(stipendi["totals"]["totale_pagato"], Decimal("800.00"))
+        self.assertEqual(stipendi["totals"]["residuo_da_pagare"], Decimal("1100.00"))
+        self.assertEqual(stipendi["totals"]["totale_lordo"], Decimal("2700.00"))
+        self.assertEqual(stipendi["totals"]["differenza_lordo_netto"], Decimal("800.00"))
 
     def test_template_import_saldi_conti_csv(self):
         response = self.client.get(reverse("scarica_template_saldi_conti_csv"))

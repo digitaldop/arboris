@@ -187,6 +187,153 @@ logger = logging.getLogger(__name__)
 RICONCILIAZIONE_FORNITORI_PREVIEW_SESSION_KEY = "gestione_finanziaria_riconciliazione_fornitori_preview"
 
 
+def _dashboard_stipendi_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _dashboard_stipendi_url(**params):
+    return f"{reverse('dashboard_gestione_finanziaria')}?{urlencode(params)}#stipendi-personale"
+
+
+def _dashboard_stipendi_importo_pagato(busta):
+    netto = busta.importo_netto_riepilogo or Decimal("0.00")
+    totale_pagamenti = getattr(busta, "totale_pagamenti_riconciliati", None) or Decimal("0.00")
+    if totale_pagamenti > Decimal("0.00"):
+        return min(totale_pagamenti, netto)
+    if busta.movimento_pagamento_id or busta.data_pagamento_effettiva:
+        return netto
+    return Decimal("0.00")
+
+
+def _dashboard_stipendi_context(request):
+    today = timezone.localdate()
+    periodo = request.GET.get("stipendi_periodo") or "solare"
+    if periodo not in {"solare", "scolastico"}:
+        periodo = "solare"
+
+    busta_years = list(BustaPagaDipendente.objects.values_list("anno", flat=True).distinct())
+    anno = _dashboard_stipendi_int(request.GET.get("stipendi_anno"), today.year)
+    anni_solari = set(range(today.year - 3, today.year + 4))
+    anni_solari.update(year for year in busta_years if year)
+    anni_solari.add(anno)
+    anni_solari = sorted(anni_solari)
+
+    anni_scolastici = list(AnnoScolastico.objects.order_by("-data_inizio", "-id"))
+    anno_scolastico = None
+    anno_scolastico_id = request.GET.get("stipendi_anno_scolastico") or ""
+    if anno_scolastico_id.isdigit():
+        anno_scolastico = next((item for item in anni_scolastici if item.pk == int(anno_scolastico_id)), None)
+    if anno_scolastico is None:
+        anno_scolastico = next((item for item in anni_scolastici if item.is_corrente), None)
+    if anno_scolastico is None:
+        anno_scolastico = next((item for item in anni_scolastici if item.attivo), None)
+    if anno_scolastico is None and anni_scolastici:
+        anno_scolastico = anni_scolastici[0]
+
+    if periodo == "scolastico" and anno_scolastico:
+        start = _first_day(anno_scolastico.data_inizio)
+        period_label = f"Anno scolastico {anno_scolastico.nome_anno_scolastico}"
+    else:
+        periodo = "solare"
+        start = date(anno, 1, 1)
+        period_label = f"Anno solare {anno}"
+
+    months = [_add_months(start, offset, day=1) for offset in range(12)]
+    end = _last_day(months[-1])
+    rows = []
+    rows_by_key = {}
+    for month_start in months:
+        month_end = _last_day(month_start)
+        row = {
+            "key": _month_key(month_start),
+            "date": month_start,
+            "label": f"{MESI_ESTESI[month_start.month - 1]} {month_start.year}",
+            "short_label": f"{MESI_BREVI[month_start.month - 1]} {month_start.year}",
+            "is_current": month_start <= today <= month_end,
+            "buste_count": 0,
+            "totale_da_pagare": Decimal("0.00"),
+            "totale_pagato": Decimal("0.00"),
+            "totale_lordo": Decimal("0.00"),
+            "residuo_da_pagare": Decimal("0.00"),
+            "differenza_lordo_netto": Decimal("0.00"),
+        }
+        rows.append(row)
+        rows_by_key[row["key"]] = row
+
+    buste = (
+        BustaPagaDipendente.objects.select_related("dipendente")
+        .filter(anno__gte=start.year, anno__lte=end.year)
+        .annotate(totale_pagamenti_riconciliati=Sum("pagamenti__importo"))
+        .order_by("anno", "mese", "dipendente__persona_collegata__cognome", "dipendente__persona_collegata__nome", "id")
+    )
+    for busta in buste:
+        data_riferimento = busta_paga_data_riferimento(busta.anno, busta.mese)
+        if data_riferimento < start or data_riferimento > end:
+            continue
+
+        row = rows_by_key.get(_month_key(data_riferimento))
+        if row is None:
+            continue
+
+        netto = busta.importo_netto_riepilogo or Decimal("0.00")
+        lordo = busta.lordo_effettivo or busta.lordo_previsto or Decimal("0.00")
+        row["buste_count"] += 1
+        row["totale_da_pagare"] += netto
+        row["totale_pagato"] += _dashboard_stipendi_importo_pagato(busta)
+        row["totale_lordo"] += lordo
+
+    totals = {
+        "buste_count": 0,
+        "totale_da_pagare": Decimal("0.00"),
+        "totale_pagato": Decimal("0.00"),
+        "residuo_da_pagare": Decimal("0.00"),
+        "totale_lordo": Decimal("0.00"),
+        "differenza_lordo_netto": Decimal("0.00"),
+    }
+    for row in rows:
+        row["residuo_da_pagare"] = max(row["totale_da_pagare"] - row["totale_pagato"], Decimal("0.00"))
+        row["differenza_lordo_netto"] = row["totale_lordo"] - row["totale_da_pagare"]
+        row["residuo_tone"] = "negative" if row["residuo_da_pagare"] > Decimal("0.00") else "neutral"
+        row["lordo_tone"] = "positive" if row["differenza_lordo_netto"] >= Decimal("0.00") else "negative"
+        totals["buste_count"] += row["buste_count"]
+        totals["totale_da_pagare"] += row["totale_da_pagare"]
+        totals["totale_pagato"] += row["totale_pagato"]
+        totals["residuo_da_pagare"] += row["residuo_da_pagare"]
+        totals["totale_lordo"] += row["totale_lordo"]
+        totals["differenza_lordo_netto"] += row["differenza_lordo_netto"]
+
+    return {
+        "periodo": periodo,
+        "period_label": period_label,
+        "start": start,
+        "end": end,
+        "anno": anno,
+        "anni_solari": anni_solari,
+        "anno_scolastico": anno_scolastico,
+        "anni_scolastici": anni_scolastici,
+        "period_options": [
+            {
+                "value": "solare",
+                "label": "Anno solare",
+                "url": _dashboard_stipendi_url(stipendi_periodo="solare", stipendi_anno=anno),
+            },
+            {
+                "value": "scolastico",
+                "label": "Anno scolastico",
+                "url": _dashboard_stipendi_url(
+                    stipendi_periodo="scolastico",
+                    stipendi_anno_scolastico=anno_scolastico.pk if anno_scolastico else "",
+                ),
+            },
+        ],
+        "months": rows,
+        "totals": totals,
+    }
+
+
 def _oauth_redirect_uri(request, provider):
     """
     Ritorna il ``redirect_uri`` da usare nelle chiamate OAuth2 al provider.
@@ -245,6 +392,7 @@ def dashboard_gestione_finanziaria(request):
         )
     ).filter(data_scadenza__lt=timezone.localdate()).count()
     fatture_in_cloud_attive = FattureInCloudConnessione.objects.filter(attiva=True).count()
+    stipendi_dashboard = _dashboard_stipendi_context(request)
 
     return render(
         request,
@@ -261,6 +409,7 @@ def dashboard_gestione_finanziaria(request):
             "scadenze_fornitori_aperte": scadenze_fornitori_aperte,
             "scadenze_fornitori_scadute": scadenze_fornitori_scadute,
             "fatture_in_cloud_attive": fatture_in_cloud_attive,
+            "stipendi_dashboard": stipendi_dashboard,
         },
     )
 
