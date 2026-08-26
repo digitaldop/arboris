@@ -1909,16 +1909,7 @@ def scadenziario_fornitori(request):
     )
 
 
-def fatture_scadenze_fornitori(request):
-    q = (request.GET.get("q") or "").strip()
-    stato = request.GET.get("stato") or ""
-    vista = (request.GET.get("vista") or "tutte").strip()
-    if vista not in {"tutte", "insolute"}:
-        vista = "tutte"
-    categoria_id = request.GET.get("categoria") or ""
-    fornitore_id = request.GET.get("fornitore") or ""
-    oggi = timezone.localdate()
-
+def _fatture_scadenze_fornitori_queryset(q="", categoria_id="", fornitore_id=""):
     scadenze = (
         ScadenzaPagamentoFornitore.objects.select_related(
             "documento",
@@ -1945,6 +1936,270 @@ def fatture_scadenze_fornitori(request):
             Q(documento__categoria_spesa_id=categoria_pk)
             | Q(documento__categoria_spesa__isnull=True, documento__fornitore__categoria_spesa_id=categoria_pk)
         )
+    return scadenze
+
+
+def _fatture_scadenze_fornitori_filtered_params(request):
+    return {
+        "q": (request.GET.get("q") or "").strip(),
+        "categoria_id": request.GET.get("categoria") or "",
+        "fornitore_id": request.GET.get("fornitore") or "",
+    }
+
+
+def _fatture_scadenze_fornitori_switch_params(q="", categoria_id="", fornitore_id=""):
+    params = {}
+    if q:
+        params["q"] = q
+    if fornitore_id:
+        params["fornitore"] = fornitore_id
+    if categoria_id:
+        params["categoria"] = categoria_id
+    return params
+
+
+def _scadenza_fornitore_export_stato(scadenza):
+    if getattr(scadenza, "mostra_badge_scaduta", False):
+        return "Scaduta"
+    if scadenza.pagamento_parziale:
+        return "Parzialmente pagata"
+    if scadenza.importo_residuo > Decimal("0.00"):
+        return "Da pagare"
+    return "Pagata"
+
+
+def _scadenze_fornitori_insolute_per_export(request):
+    params = _fatture_scadenze_fornitori_filtered_params(request)
+    oggi = timezone.localdate()
+    scadenze = _fatture_scadenze_fornitori_queryset(**params).exclude(stato=StatoScadenzaFornitore.PAGATA)
+    scadenze = [scadenza for scadenza in scadenze if scadenza.importo_residuo > Decimal("0.00")]
+    for scadenza in scadenze:
+        scadenza.mostra_badge_scaduta = (
+            scadenza.importo_residuo > Decimal("0.00")
+            and scadenza.data_scadenza
+            and scadenza.data_scadenza < oggi
+        )
+    return scadenze
+
+
+def _excel_money(value):
+    return float(value or Decimal("0.00"))
+
+
+def _excel_text(value):
+    return str(value or "").strip()
+
+
+def _format_fatture_insolute_sheet(worksheet, widths, *, money_columns=(), date_columns=()):
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    header_fill = PatternFill("solid", fgColor="D9EAF2")
+    header_font = Font(bold=True, color="172131")
+    border = Border(bottom=Side(style="thin", color="D7E3EC"))
+
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    for column_letter, width in widths.items():
+        worksheet.column_dimensions[column_letter].width = width
+
+    for column_letter in money_columns:
+        for cell in worksheet[column_letter][1:]:
+            cell.number_format = '#,##0.00 "€"'
+            cell.alignment = Alignment(horizontal="right")
+
+    for column_letter in date_columns:
+        for cell in worksheet[column_letter][1:]:
+            cell.number_format = "dd/mm/yyyy"
+
+    for row in worksheet.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+    worksheet.freeze_panes = "A2"
+    worksheet.auto_filter.ref = worksheet.dimensions
+
+
+def scarica_fatture_insolute_fornitori_excel(request):
+    from openpyxl import Workbook
+
+    oggi = timezone.localdate()
+    scadenze = _scadenze_fornitori_insolute_per_export(request)
+
+    workbook = Workbook()
+    workbook.properties.creator = "Arboris"
+    workbook.properties.title = "Fatture fornitori insolute"
+    dettaglio = workbook.active
+    dettaglio.title = "Fatture insolute"
+    dettaglio.append(
+        [
+            "Scadenza",
+            "Giorni scaduta",
+            "Fornitore",
+            "Numero documento",
+            "Tipo documento",
+            "Data documento",
+            "Categoria",
+            "Descrizione",
+            "Dettaglio righe",
+            "Previsto",
+            "Pagato",
+            "Residuo",
+            "Stato",
+        ]
+    )
+
+    fornitori = {}
+    categorie = {}
+    for scadenza in scadenze:
+        documento = scadenza.documento
+        categoria = documento.categoria_spesa_effettiva
+        categoria_label = str(categoria) if categoria else "Senza categoria"
+        fornitore_label = documento.fornitore.denominazione
+        giorni_scaduta = max((oggi - scadenza.data_scadenza).days, 0) if scadenza.data_scadenza else 0
+
+        dettaglio.append(
+            [
+                scadenza.data_scadenza,
+                giorni_scaduta,
+                fornitore_label,
+                documento.numero_documento,
+                documento.get_tipo_documento_display(),
+                documento.data_documento,
+                categoria_label,
+                documento.descrizione,
+                documento.descrizione_righe_fattura,
+                _excel_money(scadenza.importo_previsto),
+                _excel_money(scadenza.importo_pagato),
+                _excel_money(scadenza.importo_residuo),
+                _scadenza_fornitore_export_stato(scadenza),
+            ]
+        )
+
+        fornitore_group = fornitori.setdefault(
+            fornitore_label,
+            {
+                "documenti": set(),
+                "scadenze_count": 0,
+                "totale_previsto": Decimal("0.00"),
+                "totale_pagato": Decimal("0.00"),
+                "totale_residuo": Decimal("0.00"),
+                "scadute_count": 0,
+                "prima_scadenza": scadenza.data_scadenza,
+            },
+        )
+        categoria_group = categorie.setdefault(
+            categoria_label,
+            {
+                "documenti": set(),
+                "scadenze_count": 0,
+                "totale_previsto": Decimal("0.00"),
+                "totale_pagato": Decimal("0.00"),
+                "totale_residuo": Decimal("0.00"),
+                "scadute_count": 0,
+                "prima_scadenza": scadenza.data_scadenza,
+            },
+        )
+
+        for group in (fornitore_group, categoria_group):
+            group["documenti"].add(documento.pk)
+            group["scadenze_count"] += 1
+            group["totale_previsto"] += scadenza.importo_previsto or Decimal("0.00")
+            group["totale_pagato"] += scadenza.importo_pagato or Decimal("0.00")
+            group["totale_residuo"] += scadenza.importo_residuo
+            if scadenza.mostra_badge_scaduta:
+                group["scadute_count"] += 1
+            if scadenza.data_scadenza and (
+                group["prima_scadenza"] is None or scadenza.data_scadenza < group["prima_scadenza"]
+            ):
+                group["prima_scadenza"] = scadenza.data_scadenza
+
+    _format_fatture_insolute_sheet(
+        dettaglio,
+        {
+            "A": 13,
+            "B": 14,
+            "C": 30,
+            "D": 18,
+            "E": 18,
+            "F": 14,
+            "G": 24,
+            "H": 36,
+            "I": 42,
+            "J": 14,
+            "K": 14,
+            "L": 14,
+            "M": 20,
+        },
+        money_columns=("J", "K", "L"),
+        date_columns=("A", "F"),
+    )
+
+    def append_summary_sheet(title, group_label, groups):
+        sheet = workbook.create_sheet(title)
+        sheet.append(
+            [
+                group_label,
+                "Fatture",
+                "Scadenze",
+                "Previsto",
+                "Pagato",
+                "Residuo",
+                "Scadute",
+                "Prima scadenza",
+            ]
+        )
+        for label, group in sorted(
+            groups.items(),
+            key=lambda item: (-item[1]["totale_residuo"], _excel_text(item[0]).casefold()),
+        ):
+            sheet.append(
+                [
+                    label,
+                    len(group["documenti"]),
+                    group["scadenze_count"],
+                    _excel_money(group["totale_previsto"]),
+                    _excel_money(group["totale_pagato"]),
+                    _excel_money(group["totale_residuo"]),
+                    group["scadute_count"],
+                    group["prima_scadenza"],
+                ]
+            )
+        _format_fatture_insolute_sheet(
+            sheet,
+            {"A": 34, "B": 11, "C": 11, "D": 14, "E": 14, "F": 14, "G": 11, "H": 15},
+            money_columns=("D", "E", "F"),
+            date_columns=("H",),
+        )
+
+    append_summary_sheet("Riepilogo fornitori", "Fornitore", fornitori)
+    append_summary_sheet("Riepilogo categorie", "Categoria", categorie)
+
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    filename = f"fatture_fornitori_insolute_{oggi:%Y%m%d}.xlsx"
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def fatture_scadenze_fornitori(request):
+    q = (request.GET.get("q") or "").strip()
+    stato = request.GET.get("stato") or ""
+    vista = (request.GET.get("vista") or "tutte").strip()
+    if vista not in {"tutte", "insolute"}:
+        vista = "tutte"
+    categoria_id = request.GET.get("categoria") or ""
+    fornitore_id = request.GET.get("fornitore") or ""
+    oggi = timezone.localdate()
+
+    scadenze = _fatture_scadenze_fornitori_queryset(q=q, categoria_id=categoria_id, fornitore_id=fornitore_id)
     if stato == "pagata":
         scadenze = scadenze.filter(stato=StatoScadenzaFornitore.PAGATA)
     elif stato == "da_pagare":
@@ -1969,17 +2224,19 @@ def fatture_scadenze_fornitori(request):
     if vista == "insolute":
         scadenze = [scadenza for scadenza in scadenze if scadenza.importo_residuo > Decimal("0.00")]
 
-    switch_params = {}
-    if q:
-        switch_params["q"] = q
-    if fornitore_id:
-        switch_params["fornitore"] = fornitore_id
-    if categoria_id:
-        switch_params["categoria"] = categoria_id
+    switch_params = _fatture_scadenze_fornitori_switch_params(
+        q=q,
+        categoria_id=categoria_id,
+        fornitore_id=fornitore_id,
+    )
 
     def switch_url(vista_value):
         params = {**switch_params, "vista": vista_value}
         return f"{reverse('fatture_scadenze_fornitori')}?{urlencode(params)}"
+
+    export_insolute_excel_url = reverse("scarica_fatture_insolute_fornitori_excel")
+    if switch_params:
+        export_insolute_excel_url = f"{export_insolute_excel_url}?{urlencode(switch_params)}"
 
     return render(
         request,
@@ -1995,6 +2252,7 @@ def fatture_scadenze_fornitori(request):
             "vista": vista,
             "vista_tutte_url": switch_url("tutte"),
             "vista_insolute_url": switch_url("insolute"),
+            "export_insolute_excel_url": export_insolute_excel_url,
             "categorie": _categorie_spesa_queryset(attive_solo=True),
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
             "categoria_selezionata": categoria_id,

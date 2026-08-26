@@ -6172,6 +6172,8 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Tutte le fatture")
         self.assertContains(response, "Solo fatture insolute")
         self.assertContains(response, f'{reverse("fatture_scadenze_fornitori")}?vista=insolute')
+        self.assertContains(response, "Scarica insolute Excel")
+        self.assertContains(response, reverse("scarica_fatture_insolute_fornitori_excel"))
         self.assertContains(response, "Totale previsto")
         self.assertContains(response, "Totale pagato")
         self.assertContains(response, "Totale residuo")
@@ -6213,6 +6215,131 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "supplier-invoice-row-partial", count=1)
         self.assertNotContains(response, "supplier-invoice-row-paid")
         self.assertNotContains(response, "Materiali")
+
+    def test_export_fatture_insolute_fornitori_excel_rispetta_filtri(self):
+        from openpyxl import load_workbook
+
+        categoria_servizi = crea_categoria_spesa_test("Servizi export")
+        categoria_materiali = crea_categoria_spesa_test("Materiali export")
+        fornitore_servizi = Fornitore.objects.create(
+            denominazione="Alpha Servizi",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria_servizi,
+        )
+        fornitore_materiali = Fornitore.objects.create(
+            denominazione="Beta Materiali",
+            tipo_soggetto="azienda",
+            categoria_spesa=categoria_materiali,
+        )
+        scadenza_future = timezone.localdate() + timedelta(days=30)
+        documento_insoluto = DocumentoFornitore.objects.create(
+            fornitore=fornitore_servizi,
+            numero_documento="ALPHA-001",
+            data_documento=timezone.localdate(),
+            descrizione="Canone sede",
+            imponibile=Decimal("100.00"),
+            iva=Decimal("22.00"),
+            totale=Decimal("122.00"),
+            stato=StatoDocumentoFornitore.PARZIALMENTE_PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_insoluto,
+            data_scadenza=scadenza_future,
+            importo_previsto=Decimal("122.00"),
+            importo_pagato=Decimal("20.00"),
+        )
+        documento_pagato = DocumentoFornitore.objects.create(
+            fornitore=fornitore_servizi,
+            numero_documento="ALPHA-002",
+            data_documento=timezone.localdate(),
+            descrizione="Canone pagato",
+            imponibile=Decimal("50.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("50.00"),
+            stato=StatoDocumentoFornitore.PAGATO,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_pagato,
+            data_scadenza=scadenza_future,
+            importo_previsto=Decimal("50.00"),
+            importo_pagato=Decimal("50.00"),
+        )
+        documento_altro_filtro = DocumentoFornitore.objects.create(
+            fornitore=fornitore_materiali,
+            numero_documento="BETA-001",
+            data_documento=timezone.localdate(),
+            descrizione="Canone materiale",
+            imponibile=Decimal("80.00"),
+            iva=Decimal("0.00"),
+            totale=Decimal("80.00"),
+            stato=StatoDocumentoFornitore.DA_PAGARE,
+        )
+        ScadenzaPagamentoFornitore.objects.create(
+            documento=documento_altro_filtro,
+            data_scadenza=scadenza_future,
+            importo_previsto=Decimal("80.00"),
+            importo_pagato=Decimal("0.00"),
+        )
+
+        page_response = self.client.get(
+            reverse("fatture_scadenze_fornitori"),
+            {
+                "vista": "insolute",
+                "q": "Canone",
+                "fornitore": str(fornitore_servizi.pk),
+                "categoria": str(categoria_servizi.pk),
+            },
+        )
+
+        self.assertEqual(page_response.status_code, 200)
+        self.assertContains(page_response, "Scarica insolute Excel")
+        self.assertEqual(
+            page_response.context["export_insolute_excel_url"],
+            (
+                f"{reverse('scarica_fatture_insolute_fornitori_excel')}"
+                f"?q=Canone&fornitore={fornitore_servizi.pk}&categoria={categoria_servizi.pk}"
+            ),
+        )
+
+        response = self.client.get(
+            reverse("scarica_fatture_insolute_fornitori_excel"),
+            {
+                "q": "Canone",
+                "fornitore": str(fornitore_servizi.pk),
+                "categoria": str(categoria_servizi.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertIn('attachment; filename="fatture_fornitori_insolute_', response["Content-Disposition"])
+
+        workbook = load_workbook(BytesIO(response.content), data_only=True)
+        self.assertEqual(workbook.sheetnames, ["Fatture insolute", "Riepilogo fornitori", "Riepilogo categorie"])
+
+        dettaglio = workbook["Fatture insolute"]
+        self.assertEqual(dettaglio["A1"].value, "Scadenza")
+        rows = list(dettaglio.iter_rows(min_row=2, values_only=True))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][2], "Alpha Servizi")
+        self.assertEqual(rows[0][3], "ALPHA-001")
+        self.assertEqual(rows[0][6], "Servizi export")
+        self.assertEqual(rows[0][9], 122)
+        self.assertEqual(rows[0][10], 20)
+        self.assertEqual(rows[0][11], 102)
+        self.assertEqual(rows[0][12], "Parzialmente pagata")
+
+        riepilogo_fornitori = workbook["Riepilogo fornitori"]
+        self.assertEqual(riepilogo_fornitori["A2"].value, "Alpha Servizi")
+        self.assertEqual(riepilogo_fornitori["B2"].value, 1)
+        self.assertEqual(riepilogo_fornitori["F2"].value, 102)
+
+        riepilogo_categorie = workbook["Riepilogo categorie"]
+        self.assertEqual(riepilogo_categorie["A2"].value, "Servizi export")
+        self.assertEqual(riepilogo_categorie["F2"].value, 102)
 
     def test_compensa_documento_fornitore_con_nota_credito_esclude_dai_conteggi(self):
         categoria = crea_categoria_spesa_test("Storni fornitori")

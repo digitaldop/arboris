@@ -164,6 +164,11 @@ urlpatterns = [
         name="fatture_scadenze_fornitori",
     ),
     path(
+        "gestione-finanziaria/fatture-scadenze-fornitori/insolute/excel/",
+        gf_view(views.scarica_fatture_insolute_fornitori_excel),
+        name="scarica_fatture_insolute_fornitori_excel",
+    ),
+    path(
         "gestione-finanziaria/fatture-in-cloud/",
         gf_view(views.lista_fatture_in_cloud),
         name="lista_fatture_in_cloud",
