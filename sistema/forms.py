@@ -19,6 +19,12 @@ from .models import (
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
 )
+from .sidebar_menu import (
+    SIDEBAR_MENU_ITEM_CHOICES,
+    SIDEBAR_MENU_ITEM_KEYS,
+    build_sidebar_menu_form_sections,
+    normalize_sidebar_menu_disabled_keys,
+)
 
 
 class ArborisAuthenticationForm(AuthenticationForm):
@@ -416,6 +422,14 @@ class FeedbackSegnalazioneForm(forms.ModelForm):
 
 
 class SistemaRuoloPermessiForm(forms.ModelForm):
+    voci_menu_attive = forms.MultipleChoiceField(
+        label="Voci menu attive",
+        choices=SIDEBAR_MENU_ITEM_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Disattiva le voci che non devono comparire nella sidebar per gli utenti collegati a questo ruolo.",
+    )
+
     class Meta:
         model = SistemaRuoloPermessi
         fields = [
@@ -460,6 +474,43 @@ class SistemaRuoloPermessiForm(forms.ModelForm):
             "colore_principale": "Il colore personalizza header, label delle tabelle e tinte della sidebar per gli utenti con questo ruolo.",
             "controllo_completo": "Concede pieno accesso applicativo senza rendere l'utente superuser Django.",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        disabled_keys = normalize_sidebar_menu_disabled_keys(
+            getattr(self.instance, "voci_menu_disabilitate", [])
+        )
+        active_keys = [
+            key for key in SIDEBAR_MENU_ITEM_KEYS if key not in set(disabled_keys)
+        ]
+        self.fields["voci_menu_attive"].initial = active_keys
+
+    def clean_voci_menu_attive(self):
+        active_keys = self.cleaned_data.get("voci_menu_attive") or []
+        if (
+            self.is_bound
+            and "sidebar_menu_form_present" not in self.data
+            and "voci_menu_attive" not in self.data
+        ):
+            return list(SIDEBAR_MENU_ITEM_KEYS)
+        return active_keys
+
+    def save(self, commit=True):
+        role = super().save(commit=False)
+        active_keys = set(self.cleaned_data.get("voci_menu_attive") or [])
+        role.voci_menu_disabilitate = [
+            key for key in SIDEBAR_MENU_ITEM_KEYS if key not in active_keys
+        ]
+        if commit:
+            role.save()
+            self.save_m2m()
+        return role
+
+    def get_sidebar_menu_sections(self):
+        active_keys = self["voci_menu_attive"].value()
+        if active_keys is None:
+            active_keys = self.fields["voci_menu_attive"].initial
+        return build_sidebar_menu_form_sections(active_keys)
 
 
 class SistemaUtenteForm(forms.ModelForm):

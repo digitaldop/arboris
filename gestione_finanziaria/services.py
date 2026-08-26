@@ -204,7 +204,7 @@ def _build_movimenti_series(start_date, end_date, labels, bucket_for_date):
     return series
 
 
-def build_current_month_supplier_due_data(monthly_start, monthly_end):
+def build_current_month_supplier_due_data(monthly_start, monthly_end, *, include_payment_urls=True):
     from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     scadenze = (
@@ -224,6 +224,23 @@ def build_current_month_supplier_due_data(monthly_start, monthly_end):
     totale_pagato = aggregates["totale_pagato"] or Decimal("0.00")
     totale_residuo = max(totale_previsto - totale_pagato, Decimal("0.00"))
 
+    items = []
+    for scadenza in scadenze[:5]:
+        item = {
+            "fornitore": scadenza.documento.fornitore.denominazione,
+            "documento": scadenza.documento.numero_documento or str(scadenza.documento),
+            "data_scadenza": scadenza.data_scadenza,
+            "importo_residuo": scadenza.importo_residuo,
+            "stato_label": scadenza.get_stato_display(),
+            "is_overdue": scadenza.data_scadenza < monthly_start,
+            "url": f"{reverse('modifica_documento_fornitore', kwargs={'pk': scadenza.documento_id})}?popup=1",
+        }
+        if include_payment_urls:
+            item["pagamento_url"] = (
+                f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+            )
+        items.append(item)
+
     return {
         "count_fatture": aggregates["count_fatture"] or 0,
         "count_scadenze": scadenze.count(),
@@ -231,23 +248,11 @@ def build_current_month_supplier_due_data(monthly_start, monthly_end):
         "totale_previsto": totale_previsto,
         "totale_pagato": totale_pagato,
         "totale_residuo": totale_residuo,
-        "items": [
-            {
-                "fornitore": scadenza.documento.fornitore.denominazione,
-                "documento": scadenza.documento.numero_documento or str(scadenza.documento),
-                "data_scadenza": scadenza.data_scadenza,
-                "importo_residuo": scadenza.importo_residuo,
-                "stato_label": scadenza.get_stato_display(),
-                "is_overdue": scadenza.data_scadenza < monthly_start,
-                "url": f"{reverse('modifica_documento_fornitore', kwargs={'pk': scadenza.documento_id})}?popup=1",
-                "pagamento_url": f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1",
-            }
-            for scadenza in scadenze[:5]
-        ],
+        "items": items,
     }
 
 
-def build_home_financial_dashboard_data(today=None):
+def build_home_financial_dashboard_data(today=None, *, include_payment_urls=True):
     """
     Riepilogo sintetico per la dashboard generale.
 
@@ -287,7 +292,11 @@ def build_home_financial_dashboard_data(today=None):
     ).count()
     current_month_label = f"{MONTH_FULL_LABELS[today.month]} {today.year}"
     current_year_label = str(today.year)
-    fatture_in_scadenza_mese = build_current_month_supplier_due_data(monthly_start, monthly_end)
+    fatture_in_scadenza_mese = build_current_month_supplier_due_data(
+        monthly_start,
+        monthly_end,
+        include_payment_urls=include_payment_urls,
+    )
     fatture_in_scadenza_mese["period_label"] = f"Entro {current_month_label}, incluse scadute"
     budgeting_dashboard = build_budgeting_dashboard_data(today=today)
     budgeting_month = budgeting_dashboard.get("current_month") or {}

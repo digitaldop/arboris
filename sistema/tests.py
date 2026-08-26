@@ -48,6 +48,7 @@ from .models import (
 )
 from .popup_manifest import build_popup_manifest
 from .restore_job_runner import run_restore_job
+from .sidebar_menu import SIDEBAR_MENU_ITEM_KEYS
 from anagrafica.models import (
     Citta,
     Documento,
@@ -282,7 +283,11 @@ class ProfessionalInterfaceSettingsTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ui-professional-interface module-anagrafica")
-        self.assertContains(response, f'href="{reverse("lista_studenti")}" class="active"', html=False)
+        self.assertContains(
+            response,
+            f'href="{reverse("lista_studenti")}" data-sidebar-menu-key="anagrafica_studenti" class="active"',
+            html=False,
+        )
 
     def test_professional_interface_maps_integrated_apps_to_parent_sidebar_modules(self):
         SistemaImpostazioniGenerali.objects.create(interfaccia_professionale_attiva=True)
@@ -781,7 +786,7 @@ class SidebarEconomiaTests(TestCase):
         self.assertNotContains(response, 'data-sidebar-section-key="gestione-amministrativa"', html=False)
         content = response.content.decode("utf-8")
         start = content.index('data-sidebar-section-key="parcheggio"')
-        end = content.index('class="sidebar-reorder-footer"', start)
+        end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", start)
         parcheggio_section = content[start:end]
 
         labels_in_order = [
@@ -825,7 +830,7 @@ class SidebarEconomiaTests(TestCase):
         anagrafica_end = content.index('data-sidebar-section-key="parcheggio"', anagrafica_start)
         anagrafica_section = content[anagrafica_start:anagrafica_end]
         parcheggio_start = content.index('data-sidebar-section-key="parcheggio"')
-        parcheggio_end = content.index('class="sidebar-reorder-footer"', parcheggio_start)
+        parcheggio_end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", parcheggio_start)
         parcheggio_section = content[parcheggio_start:parcheggio_end]
 
         self.assertNotIn(f'href="{reverse("lista_educatori")}"', anagrafica_section)
@@ -979,6 +984,43 @@ class SidebarGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "Previsione mese corrente")
         self.assertContains(response, "Apri budgeting")
 
+    def test_home_financial_dashboard_hides_supplier_payment_actions_for_viewers(self):
+        viewer = User.objects.create_user(
+            username="financial-dashboard-viewer@example.com",
+            email="financial-dashboard-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=viewer,
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        today = timezone.localdate()
+        fornitore = Fornitore.objects.create(denominazione="Fornitore viewer dashboard")
+        documento = DocumentoFornitore.objects.create(
+            fornitore=fornitore,
+            numero_documento="VIEW-001",
+            data_documento=today,
+            totale=Decimal("180.00"),
+        )
+        scadenza = ScadenzaPagamentoFornitore.objects.create(
+            documento=documento,
+            data_scadenza=today,
+            importo_previsto=Decimal("180.00"),
+        )
+        pagamento_url = f"{reverse('registra_pagamento_scadenza_fornitore', kwargs={'pk': scadenza.pk})}?popup=1"
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fatture fornitori in scadenza")
+        self.assertContains(response, "Fornitore viewer dashboard")
+        self.assertContains(response, reverse("scadenziario_fornitori"))
+        self.assertNotContains(response, "Conferma pagamento")
+        self.assertNotContains(response, pagamento_url)
+        item = response.context["gestione_finanziaria_dashboard"]["fatture_in_scadenza_mese"]["items"][0]
+        self.assertNotIn("pagamento_url", item)
+
 
 class SidebarSistemaTests(TestCase):
     def setUp(self):
@@ -1046,32 +1088,22 @@ class SidebarSistemaTests(TestCase):
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
 
-    def test_home_keeps_sidebar_reorder_toggle_available(self):
-        self.client.force_login(self.user)
-
-        response = self.client.get(reverse("home"))
-        css = (settings.BASE_DIR / "static" / "css" / "style.css").read_text(encoding="utf-8")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="sidebar-reorder-toggle"')
-        self.assertContains(response, "Modalita drag and drop")
-        self.assertNotRegex(
-            css,
-            r"\.sidebar-reorder-footer\s*,\s*\.sidebar-reorder-list[^{]*\{\s*display:\s*none",
-        )
-
-    def test_home_exposes_sidebar_personalization_controls(self):
+    def test_home_uses_canonical_sidebar_without_local_customization_controls(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="sidebar-customize-toggle"')
-        self.assertContains(response, reverse("sidebar_personalizzazione_sistema"))
-        self.assertContains(response, 'id="sidebar-personalizzazione-config"')
-        self.assertContains(response, "sidebar-customization.js")
+        self.assertContains(response, 'id="sidebar-reorder-list"')
+        self.assertNotContains(response, 'id="sidebar-reorder-toggle"')
+        self.assertNotContains(response, "Modalita drag and drop")
+        self.assertNotContains(response, 'id="sidebar-customize-toggle"')
+        self.assertNotContains(response, reverse("sidebar_personalizzazione_sistema"))
+        self.assertNotContains(response, 'id="sidebar-personalizzazione-config"')
+        self.assertNotContains(response, "sidebar-customization.js")
+        self.assertNotContains(response, "sidebar-reorder.js")
 
-    def test_limited_user_inherits_admin_sidebar_config_filtered_by_permissions(self):
+    def test_saved_sidebar_personalizations_do_not_affect_canonical_menu(self):
         admin = User.objects.create_superuser(
             username="sidebar-admin@example.com",
             email="sidebar-admin@example.com",
@@ -1129,16 +1161,56 @@ class SidebarSistemaTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        config = response.context["sidebar_personalizzazione_config"]
-        self.assertEqual(config["hidden"], ["section:gestione-economica"])
-        self.assertEqual(config["order"]["root"], ["section:sistema", "section:anagrafica"])
-        self.assertEqual(len(config["custom_sections"]), 1)
-        self.assertEqual(
-            [link["id"] for link in config["custom_sections"][0]["links"]],
-            ["studenti"],
-        )
+        self.assertEqual(response.context["sidebar_personalizzazione_config"], {})
         self.assertContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
+        self.assertContains(response, 'data-sidebar-menu-key="anagrafica_studenti"', html=False)
         self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
+        self.assertNotContains(response, "Preferiti")
+
+    def test_role_menu_configuration_hides_disabled_sidebar_item(self):
+        role = SistemaRuoloPermessi.objects.create(
+            nome="Anagrafica senza bambini",
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+            voci_menu_disabilitate=["anagrafica_studenti"],
+        )
+        viewer = User.objects.create_user(
+            username="menu-role-viewer@example.com",
+            email="menu-role-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(user=viewer, ruolo_permessi=role)
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
+        self.assertNotContains(response, 'data-sidebar-menu-key="anagrafica_studenti"', html=False)
+        self.assertContains(response, 'data-sidebar-menu-key="anagrafica_familiari"', html=False)
+
+    def test_role_menu_configuration_hides_empty_sidebar_section(self):
+        role = SistemaRuoloPermessi.objects.create(
+            nome="Anagrafica menu spento",
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+            voci_menu_disabilitate=[
+                "anagrafica_studenti",
+                "anagrafica_familiari",
+                "anagrafica_famiglie",
+                "anagrafica_ricerche",
+            ],
+        )
+        viewer = User.objects.create_user(
+            username="menu-empty-viewer@example.com",
+            email="menu-empty-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(user=viewer, ruolo_permessi=role)
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
 
     def test_sidebar_personalization_endpoint_saves_user_config(self):
         self.client.force_login(self.user)
@@ -1521,6 +1593,50 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(response, "Amministratore operativo")
         self.assertContains(response, "--primary: #f2c94c")
         self.assertContains(response, reverse("crea_ruolo_utente"))
+
+    def test_role_form_renders_sidebar_menu_items(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("modifica_ruolo_utente", args=[self.admin_role.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Voci menu")
+        self.assertContains(response, 'name="voci_menu_attive"', html=False)
+        self.assertContains(response, 'value="anagrafica_studenti"', html=False)
+        self.assertContains(response, 'value="gestione_finanziaria_dashboard"', html=False)
+
+    def test_role_form_saves_disabled_sidebar_menu_items(self):
+        self.client.force_login(self.user)
+        active_menu_keys = [
+            key for key in SIDEBAR_MENU_ITEM_KEYS if key != "gestione_finanziaria_dashboard"
+        ]
+
+        response = self.client.post(
+            reverse("modifica_ruolo_utente", args=[self.admin_role.pk]),
+            {
+                "nome": self.admin_role.nome,
+                "descrizione": self.admin_role.descrizione,
+                "colore_principale": self.admin_role.colore_principale,
+                "attivo": "on",
+                "amministratore_operativo": "on",
+                "accesso_backup_database": "on",
+                "controllo_completo": "on",
+                "permesso_anagrafica": LivelloPermesso.GESTIONE,
+                "permesso_famiglie_interessate": LivelloPermesso.GESTIONE,
+                "permesso_economia": LivelloPermesso.GESTIONE,
+                "permesso_sistema": LivelloPermesso.GESTIONE,
+                "permesso_calendario": LivelloPermesso.GESTIONE,
+                "permesso_gestione_finanziaria": LivelloPermesso.GESTIONE,
+                "permesso_gestione_amministrativa": LivelloPermesso.GESTIONE,
+                "permesso_servizi_extra": LivelloPermesso.GESTIONE,
+                "sidebar_menu_form_present": "1",
+                "voci_menu_attive": active_menu_keys,
+            },
+        )
+
+        self.assertRedirects(response, reverse("modifica_ruolo_utente", args=[self.admin_role.pk]))
+        self.admin_role.refresh_from_db()
+        self.assertEqual(self.admin_role.voci_menu_disabilitate, ["gestione_finanziaria_dashboard"])
 
     def test_user_form_uses_role_instead_of_user_level_permissions(self):
         self.client.force_login(self.user)

@@ -1221,6 +1221,7 @@ class SistemaRuoloPermessi(models.Model):
         choices=LivelloPermesso.choices,
         default=LivelloPermesso.NESSUNO,
     )
+    voci_menu_disabilitate = models.JSONField(default=list, blank=True)
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 

@@ -1,0 +1,21 @@
+{% for node in nodes %}
+    {% if node.is_group %}
+        <div class="system-role-menu-group is-depth-{{ depth }}" data-menu-group="{{ node.key }}">
+            <div class="system-role-menu-group-title">{{ node.label }}</div>
+            <div class="system-role-menu-group-children">
+                {% include "sistema/partials/sidebar_menu_form_nodes.html" with nodes=node.children depth=depth|add:"1" field_name=field_name only %}
+            </div>
+        </div>
+    {% else %}
+        <label class="system-role-menu-item is-depth-{{ depth }}" for="id_voci_menu_attive_{{ node.key }}" data-menu-key="{{ node.key }}">
+            <input
+                type="checkbox"
+                name="{{ field_name }}"
+                value="{{ node.key }}"
+                id="id_voci_menu_attive_{{ node.key }}"
+                {% if node.checked %}checked{% endif %}
+            >
+            <span>{{ node.label }}</span>
+        </label>
+    {% endif %}
+{% endfor %}

@@ -2330,13 +2330,20 @@ def home(request):
         "gestione_finanziaria",
         LivelloPermesso.VISUALIZZAZIONE,
     )
+    can_manage_gestione_finanziaria = user_has_module_permission(
+        request.user,
+        "gestione_finanziaria",
+        LivelloPermesso.GESTIONE,
+    )
 
     dashboard_corrente = build_dashboard_school_year_statistics(anno_corrente)
     economia_dashboard = build_economia_dashboard_data(anno_corrente)
     calendar_reference_date = resolve_dashboard_calendar_reference_date(anno_corrente, today)
     calendario_dashboard = build_dashboard_calendar_data(today=calendar_reference_date, user=request.user)
     gestione_finanziaria_dashboard = (
-        build_home_financial_dashboard_data()
+        build_home_financial_dashboard_data(
+            include_payment_urls=can_manage_gestione_finanziaria,
+        )
         if can_view_gestione_finanziaria
         else None
     )

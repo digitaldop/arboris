@@ -140,6 +140,28 @@
                 </div>
             </section>
 
+            <section class="system-role-card" aria-labelledby="role-menu-title">
+                <div class="system-role-card-head">
+                    <span class="system-role-card-icon is-blue" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg>
+                    </span>
+                    <div>
+                        <h2 id="role-menu-title">Voci menu</h2>
+                        <p>Attiva o disattiva le voci della sidebar per gli utenti collegati a questo ruolo.</p>
+                    </div>
+                </div>
+                <div class="system-role-menu-tree">
+                    <input type="hidden" name="sidebar_menu_form_present" value="1">
+                    {% include "sistema/partials/sidebar_menu_form_nodes.html" with nodes=sidebar_menu_form_sections depth=0 field_name=form.voci_menu_attive.html_name only %}
+                </div>
+                <div class="system-role-menu-errors">
+                    {{ form.voci_menu_attive.errors }}
+                    {% if form.voci_menu_attive.help_text %}
+                        <span class="system-role-help">{{ form.voci_menu_attive.help_text }}</span>
+                    {% endif %}
+                </div>
+            </section>
+
             <section class="system-role-card" aria-labelledby="role-special-title">
                 <div class="system-role-card-head">
                     <span class="system-role-card-icon is-amber" aria-hidden="true">

@@ -19,6 +19,7 @@ from .permissions import (
     user_has_module_permission,
     user_is_operational_admin,
 )
+from .sidebar_menu import build_sidebar_menu_state, get_role_sidebar_menu_disabled_keys
 from .terminology import get_educator_terminology, get_family_member_terminology, get_student_terminology
 
 
@@ -363,15 +364,51 @@ def sistema_permissions_context(request):
 
     can_view_system_tables = user_is_operational_admin(user)
     role_theme = profilo.role_theme_variables if profilo else None
+    can_access_database_backups = user_can_access_database_backups(user)
+    gestione_dipendenti_dettagliata_attiva = False
+    try:
+        general_settings = cache.get("sistema:general_settings")
+        if general_settings is None:
+            general_settings = SistemaImpostazioniGenerali.objects.first()
+        gestione_dipendenti_dettagliata_attiva = bool(
+            getattr(general_settings, "gestione_dipendenti_dettagliata_attiva", False)
+        )
+    except (OperationalError, ProgrammingError):
+        gestione_dipendenti_dettagliata_attiva = False
+
+    sidebar_menu_disabled_keys = []
+    ruolo_permessi = getattr(profilo, "ruolo_permessi", None) if profilo else None
+    if ruolo_permessi and ruolo_permessi.attivo:
+        sidebar_menu_disabled_keys = get_role_sidebar_menu_disabled_keys(ruolo_permessi)
+
+    sidebar_menu_state = build_sidebar_menu_state(
+        sidebar_menu_disabled_keys,
+        {
+            "can_view_anagrafica": can_view_anagrafica,
+            "can_manage_anagrafica": can_manage_anagrafica,
+            "can_view_famiglie_interessate": can_view_famiglie_interessate,
+            "can_manage_famiglie_interessate": can_manage_famiglie_interessate,
+            "can_view_economia": can_view_economia,
+            "can_manage_economia": can_manage_economia,
+            "can_view_sistema": can_view_sistema,
+            "can_manage_sistema": can_manage_sistema,
+            "can_view_calendario": can_view_calendario,
+            "can_manage_calendario": can_manage_calendario,
+            "can_view_servizi_extra": can_view_servizi_extra,
+            "can_manage_servizi_extra": can_manage_servizi_extra,
+            "can_view_gestione_finanziaria": can_view_gestione_finanziaria,
+            "can_manage_gestione_finanziaria": can_manage_gestione_finanziaria,
+            "can_view_gestione_amministrativa": can_view_gestione_amministrativa,
+            "can_manage_gestione_amministrativa": can_manage_gestione_amministrativa,
+            "can_view_operation_history": can_view_system_tables,
+            "can_view_system_tables": can_view_system_tables,
+            "can_access_database_backups": can_access_database_backups,
+            "gestione_dipendenti_dettagliata_attiva": gestione_dipendenti_dettagliata_attiva,
+        },
+    )
     notifiche_finanziarie_non_lette = 0
     notifiche_finanziarie_recenti = []
     sidebar_personalizzazione_config = {}
-
-    if getattr(user, "is_authenticated", False):
-        try:
-            sidebar_personalizzazione_config = get_effective_sidebar_personalizzazione_config(user)
-        except (OperationalError, ProgrammingError):
-            sidebar_personalizzazione_config = {}
 
     if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
         try:
@@ -412,10 +449,13 @@ def sistema_permissions_context(request):
         "current_servizio_extra_id": current_servizio_extra_id,
         "can_view_operation_history": can_view_system_tables,
         "can_view_system_tables": can_view_system_tables,
-        "can_access_database_backups": user_can_access_database_backups(user),
+        "can_access_database_backups": can_access_database_backups,
         "notifiche_finanziarie_non_lette": notifiche_finanziarie_non_lette,
         "notifiche_finanziarie_recenti": notifiche_finanziarie_recenti,
         "sidebar_personalizzazione_config": sidebar_personalizzazione_config,
+        "sidebar_menu_items": sidebar_menu_state["items"],
+        "sidebar_menu_groups": sidebar_menu_state["groups"],
+        "sidebar_menu_disabled_keys": sidebar_menu_disabled_keys,
     }
 
 

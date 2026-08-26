@@ -1572,6 +1572,7 @@ def sistema_ruolo_form_context(request, form, ruolo_obj=None, is_new=False):
         "popup": sistema_is_popup_request(request),
         "module_permission_fields": module_permission_fields,
         "special_permission_fields": special_permission_fields,
+        "sidebar_menu_form_sections": form.get_sidebar_menu_sections(),
     }
     if ruolo_obj:
         context["count_utenti"] = ruolo_obj.utenti.count()

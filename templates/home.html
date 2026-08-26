@@ -478,15 +478,17 @@
                                                         EUR {{ item.importo_residuo|euro }}
                                                     </span>
                                                 </a>
-                                                <a
-                                                    href="{{ item.pagamento_url }}"
-                                                    class="btn btn-primary btn-sm dashboard-supplier-invoice-pay"
-                                                    data-window-popup="1"
-                                                    data-popup-url="{{ item.pagamento_url }}"
-                                                    data-popup-window-features="width=1040,height=760,resizable=yes,scrollbars=yes"
-                                                >
-                                                    Conferma pagamento
-                                                </a>
+                                                {% if item.pagamento_url %}
+                                                    <a
+                                                        href="{{ item.pagamento_url }}"
+                                                        class="btn btn-primary btn-sm dashboard-supplier-invoice-pay"
+                                                        data-window-popup="1"
+                                                        data-popup-url="{{ item.pagamento_url }}"
+                                                        data-popup-window-features="width=1040,height=760,resizable=yes,scrollbars=yes"
+                                                    >
+                                                        Conferma pagamento
+                                                    </a>
+                                                {% endif %}
                                             </div>
                                         {% endfor %}
                                     </div>
