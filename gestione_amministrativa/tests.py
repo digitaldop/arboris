@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from tempfile import TemporaryDirectory
 from unittest import skip
@@ -855,6 +855,34 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, "Disponibile EUR 1.302,00")
         self.assertContains(response, movimento_piccolo.descrizione)
         self.assertContains(response, "Movimento utilizzabile come pagamento parziale")
+
+    def test_riconciliazione_busta_paga_cerca_movimenti_vecchi_con_nome_invertito(self):
+        self.client.force_login(self.user)
+        MovimentoFinanziario.objects.bulk_create(
+            [
+                MovimentoFinanziario(
+                    data_contabile=date(2025, 3, 1) + timedelta(days=index % 220),
+                    importo=Decimal("-15.00"),
+                    valuta="EUR",
+                    descrizione=f"Movimento bancario recente {index}",
+                    origine=OrigineMovimento.BANCA,
+                )
+                for index in range(350)
+            ]
+        )
+        movimento_vecchio = MovimentoFinanziario.objects.create(
+            data_contabile=date(2025, 2, 28),
+            importo=Decimal("-1302.00"),
+            valuta="EUR",
+            descrizione="BONIFICO STIPENDIO ROSSI MARIO",
+            origine=OrigineMovimento.BANCA,
+        )
+
+        response = self.client.get(reverse("riconcilia_busta_paga_dipendente", args=[self.busta.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, movimento_vecchio.descrizione)
+        self.assertContains(response, "Cognome e nome del dipendente presenti nella causale")
 
     def test_riconciliazione_busta_paga_collega_movimento_su_quota_singola(self):
         self.client.force_login(self.user)

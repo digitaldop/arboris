@@ -1,4 +1,7 @@
 import mimetypes
+import re
+import unicodedata
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode
@@ -56,6 +59,10 @@ from .services import compensi_lavorativi_dipendente, contratto_applicabile, cre
 
 
 ZERO = Decimal("0.00")
+BUSTA_PAGA_CANDIDATE_LOOKBACK_DAYS = 730
+BUSTA_PAGA_CANDIDATE_FORWARD_DAYS = 180
+BUSTA_PAGA_CANDIDATE_SCAN_LIMIT = 2000
+BUSTA_PAGA_CANDIDATE_NAME_SCAN_LIMIT = 1200
 
 
 def gestione_dipendenti_dettagliata_attiva():
@@ -105,6 +112,71 @@ def _movimento_disponibile_per_busta(movimento):
     return importo_movimento_disponibile_fornitori(movimento)
 
 
+def _normalizza_testo_match_busta_paga(value):
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", normalized.lower()).strip()
+
+
+def _testo_contiene_parola(testo, parola):
+    return bool(parola and f" {parola} " in f" {testo or ''} ")
+
+
+def _testo_contiene_frase(testo, frase):
+    return bool(frase and f" {frase} " in f" {testo or ''} ")
+
+
+def _testo_movimento_busta_paga(movimento):
+    return _normalizza_testo_match_busta_paga(
+        " ".join(
+            [
+                movimento.descrizione or "",
+                movimento.controparte or "",
+                movimento.sostenitore or "",
+            ]
+        )
+    )
+
+
+def _match_dipendente_in_movimento(movimento, dipendente):
+    testo_movimento = _testo_movimento_busta_paga(movimento)
+    nome = _normalizza_testo_match_busta_paga(getattr(dipendente, "nome", ""))
+    cognome = _normalizza_testo_match_busta_paga(getattr(dipendente, "cognome", ""))
+    if nome and cognome:
+        nome_cognome = f"{nome} {cognome}"
+        cognome_nome = f"{cognome} {nome}"
+        if _testo_contiene_frase(testo_movimento, nome_cognome):
+            return "nome_cognome"
+        if _testo_contiene_frase(testo_movimento, cognome_nome):
+            return "cognome_nome"
+        if _testo_contiene_parola(testo_movimento, nome) and _testo_contiene_parola(testo_movimento, cognome):
+            return "nome_e_cognome"
+    if cognome and len(cognome) >= 4 and _testo_contiene_parola(testo_movimento, cognome):
+        return "cognome"
+    return ""
+
+
+def _movimento_dipendente_query(dipendente):
+    nome = (getattr(dipendente, "nome", "") or "").strip()
+    cognome = (getattr(dipendente, "cognome", "") or "").strip()
+    campi_testo = ("descrizione", "controparte", "sostenitore")
+    query = Q()
+    if nome and cognome:
+        for frase in (f"{nome} {cognome}", f"{cognome} {nome}"):
+            for campo in campi_testo:
+                query |= Q(**{f"{campo}__icontains": frase})
+        nome_query = Q()
+        cognome_query = Q()
+        for campo in campi_testo:
+            nome_query |= Q(**{f"{campo}__icontains": nome})
+            cognome_query |= Q(**{f"{campo}__icontains": cognome})
+        query |= nome_query & cognome_query
+    if cognome and len(cognome) >= 4:
+        for campo in campi_testo:
+            query |= Q(**{f"{campo}__icontains": cognome})
+    return query
+
+
 def _score_movimento_busta(movimento, busta, residuo_busta, disponibile, movimento_ids_collegati=None):
     score = 0
     motivazioni = []
@@ -133,20 +205,18 @@ def _score_movimento_busta(movimento, busta, residuo_busta, disponibile, movimen
             score += 10
             motivazioni.append(f"Data entro 30 giorni dal pagamento previsto ({delta_giorni} gg)")
 
-    testo_movimento = " ".join(
-        [
-            movimento.descrizione or "",
-            movimento.controparte or "",
-            movimento.sostenitore or "",
-        ]
-    ).lower()
     dipendente = busta.dipendente
-    nome = (getattr(dipendente, "nome", "") or "").strip().lower()
-    cognome = (getattr(dipendente, "cognome", "") or "").strip().lower()
-    if nome and cognome and nome in testo_movimento and cognome in testo_movimento:
+    match_dipendente = _match_dipendente_in_movimento(movimento, dipendente)
+    if match_dipendente == "nome_cognome":
+        score += 35
+        motivazioni.append("Nome e cognome del dipendente presenti nella causale")
+    elif match_dipendente == "cognome_nome":
+        score += 35
+        motivazioni.append("Cognome e nome del dipendente presenti nella causale")
+    elif match_dipendente == "nome_e_cognome":
         score += 30
         motivazioni.append("Nome e cognome del dipendente presenti nella causale")
-    elif cognome and cognome in testo_movimento:
+    elif match_dipendente == "cognome":
         score += 15
         motivazioni.append("Cognome del dipendente presente nella causale")
 
@@ -163,7 +233,7 @@ def _movimenti_candidati_busta_paga(busta, *, limite=20):
         return []
     movimento_ids_collegati = _pagamenti_busta_movimento_ids(busta)
 
-    queryset = (
+    base_queryset = (
         MovimentoFinanziario.objects.select_related("conto", "categoria")
         .filter(importo__lt=0)
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
@@ -176,8 +246,39 @@ def _movimenti_candidati_busta_paga(busta, *, limite=20):
         .order_by("-data_contabile", "-id")
     )
 
+    movimenti_da_valutare = []
+    movimenti_visti = set()
+
+    def aggiungi_movimenti(queryset):
+        for movimento in queryset:
+            if movimento.pk in movimenti_visti:
+                continue
+            movimenti_visti.add(movimento.pk)
+            movimenti_da_valutare.append(movimento)
+
+    movimenti_collegati_filter = Q()
+    if busta.movimento_pagamento_id:
+        movimenti_collegati_filter |= Q(pk=busta.movimento_pagamento_id)
+    if movimento_ids_collegati:
+        movimenti_collegati_filter |= Q(pk__in=movimento_ids_collegati)
+    if movimenti_collegati_filter:
+        aggiungi_movimenti(base_queryset.filter(movimenti_collegati_filter))
+
+    dipendente_query = _movimento_dipendente_query(busta.dipendente)
+    if dipendente_query:
+        aggiungi_movimenti(base_queryset.filter(dipendente_query)[:BUSTA_PAGA_CANDIDATE_NAME_SCAN_LIMIT])
+
+    data_suggerita = busta.data_pagamento_suggerita
+    if data_suggerita:
+        data_minima = data_suggerita - timedelta(days=BUSTA_PAGA_CANDIDATE_LOOKBACK_DAYS)
+        data_massima = data_suggerita + timedelta(days=BUSTA_PAGA_CANDIDATE_FORWARD_DAYS)
+        scansione_queryset = base_queryset.filter(data_contabile__gte=data_minima, data_contabile__lte=data_massima)
+    else:
+        scansione_queryset = base_queryset
+    aggiungi_movimenti(scansione_queryset[:BUSTA_PAGA_CANDIDATE_SCAN_LIMIT])
+
     candidati = []
-    for movimento in queryset[:300]:
+    for movimento in movimenti_da_valutare:
         disponibile = _movimento_disponibile_per_busta(movimento)
         is_current = movimento.pk == busta.movimento_pagamento_id or movimento.pk in movimento_ids_collegati
         if not is_current and disponibile <= ZERO:
@@ -200,9 +301,19 @@ def _movimenti_candidati_busta_paga(busta, *, limite=20):
             }
         )
 
+    def sort_key(item):
+        data_contabile = item["movimento"].data_contabile
+        data_ordinal = data_contabile.toordinal() if data_contabile else 0
+        return (
+            0 if item["is_current"] else 1,
+            -item["score_percentuale"],
+            -data_ordinal,
+            -item["movimento"].pk,
+        )
+
     return sorted(
         candidati,
-        key=lambda item: (0 if item["is_current"] else 1, -item["score_percentuale"], -item["movimento"].data_contabile.toordinal(), -item["movimento"].pk),
+        key=sort_key,
     )[:limite]
 
 
