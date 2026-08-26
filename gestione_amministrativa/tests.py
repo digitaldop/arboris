@@ -17,6 +17,7 @@ from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, Sistema
 
 from .forms import BustaPagaDipendenteForm
 from .models import (
+    BUSTA_PAGA_MESE_TREDICESIMA,
     BustaPagaDipendente,
     CategoriaDatoPayrollUfficiale,
     ContrattoDipendente,
@@ -31,7 +32,7 @@ from .models import (
     TipoContrattoDipendente,
     VoceBustaPaga,
 )
-from .services import crea_o_aggiorna_previsione_busta_paga
+from .services import crea_o_aggiorna_previsione_busta_paga, periodo_bounds
 
 
 class DipendentePersonaProxySaveTests(TestCase):
@@ -618,12 +619,74 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, "Previsione")
         self.assertContains(response, '<select name="mese"', html=False)
         self.assertContains(response, '<option value="10" selected>Ottobre</option>', html=True)
+        self.assertContains(response, '<option value="13">Tredicesima</option>', html=True)
         self.assertContains(response, 'data-popup-note-collapse="false"', html=False)
         self.assertContains(response, 'data-long-wait-immediate="1"', html=False)
         self.assertContains(response, "long-wait-cursor.js", html=False)
         self.assertContains(response, 'id="add-busta-movimento-btn"', html=False)
         self.assertContains(response, 'data-related-type="movimento_finanziario"', html=False)
         self.assertNotContains(response, "Note previsione")
+
+    def test_busta_paga_accetta_tredicesima_come_mensilita_extra(self):
+        BustaPagaDipendente.objects.create(
+            dipendente=self.dipendente,
+            contratto=self.contratto,
+            anno=2025,
+            mese=12,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_effettivo=Decimal("1302.00"),
+        )
+        form = BustaPagaDipendenteForm(
+            data={
+                "dipendente": str(self.dipendente.pk),
+                "contratto": str(self.contratto.pk),
+                "anno": "2025",
+                "mese": str(BUSTA_PAGA_MESE_TREDICESIMA),
+                "stato": StatoBustaPaga.EFFETTIVA,
+                "valuta": "EUR",
+                "lordo_effettivo": "1500,00",
+                "netto_effettivo": "1302,00",
+                "note_previsione": "",
+                "note_effettivo": "",
+            },
+            detailed_mode=True,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        busta = form.save()
+
+        self.assertEqual(busta.mese, BUSTA_PAGA_MESE_TREDICESIMA)
+        self.assertEqual(busta.periodo_label, "Tredicesima 2025")
+        self.assertEqual(busta.data_pagamento_suggerita, date(2025, 12, 31))
+        self.assertEqual(
+            periodo_bounds(2025, BUSTA_PAGA_MESE_TREDICESIMA),
+            (date(2025, 12, 1), date(2025, 12, 31)),
+        )
+
+    def test_lista_buste_paga_filtra_tredicesima(self):
+        self.client.force_login(self.user)
+        busta_tredicesima = BustaPagaDipendente.objects.create(
+            dipendente=self.dipendente,
+            contratto=self.contratto,
+            anno=2025,
+            mese=BUSTA_PAGA_MESE_TREDICESIMA,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_effettivo=Decimal("1302.00"),
+        )
+
+        response = self.client.get(
+            reverse("lista_buste_paga_dipendenti"),
+            {"mese": str(BUSTA_PAGA_MESE_TREDICESIMA)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="13" selected>Tredicesima</option>', html=True)
+        self.assertContains(response, "Tredicesima 2025")
+        self.assertContains(
+            response,
+            f"{reverse('modifica_busta_paga_dipendente', args=[busta_tredicesima.pk])}?popup=1",
+        )
+        self.assertNotContains(response, "10/2025")
 
     def test_busta_paga_form_mostra_indietro_con_navigazione_globale(self):
         self.client.force_login(self.user)

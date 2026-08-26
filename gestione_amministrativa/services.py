@@ -1,5 +1,3 @@
-from calendar import monthrange
-from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import Q
@@ -14,6 +12,7 @@ from .models import (
     StatoBustaPaga,
     TipoVocePayroll,
     VoceBustaPaga,
+    busta_paga_data_riferimento,
 )
 
 
@@ -31,8 +30,8 @@ def percentuale(importo, aliquota):
 
 
 def periodo_bounds(anno, mese):
-    ultimo_giorno = monthrange(int(anno), int(mese))[1]
-    return date(int(anno), int(mese), 1), date(int(anno), int(mese), ultimo_giorno)
+    data_riferimento = busta_paga_data_riferimento(anno, mese)
+    return data_riferimento.replace(day=1), data_riferimento
 
 
 def compensi_lavorativi_dipendente(dipendente, limite=24):
@@ -58,7 +57,7 @@ def compensi_lavorativi_dipendente(dipendente, limite=24):
             {
                 "tipo": "busta",
                 "oggetto": busta,
-                "data": date(busta.anno, busta.mese, monthrange(busta.anno, busta.mese)[1]),
+                "data": busta_paga_data_riferimento(busta.anno, busta.mese),
                 "titolo": busta.periodo_label,
                 "stato": busta.get_stato_display(),
                 "importo": busta.importo_netto_riepilogo,

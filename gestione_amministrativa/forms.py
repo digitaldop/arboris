@@ -17,6 +17,7 @@ from anagrafica.models import Citta, Familiare, Indirizzo, Nazione, Persona
 from anagrafica.utils import validate_and_normalize_phone_number
 
 from .models import (
+    BUSTA_PAGA_MONTH_CHOICES,
     BustaPagaDipendente,
     ContrattoDipendente,
     Dipendente,
@@ -31,20 +32,7 @@ from .models import (
 )
 
 
-MONTH_CHOICES = (
-    (1, "Gennaio"),
-    (2, "Febbraio"),
-    (3, "Marzo"),
-    (4, "Aprile"),
-    (5, "Maggio"),
-    (6, "Giugno"),
-    (7, "Luglio"),
-    (8, "Agosto"),
-    (9, "Settembre"),
-    (10, "Ottobre"),
-    (11, "Novembre"),
-    (12, "Dicembre"),
-)
+MONTH_CHOICES = BUSTA_PAGA_MONTH_CHOICES
 
 
 class CittaCodiceCatastaleSelect(forms.Select):

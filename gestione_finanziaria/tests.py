@@ -21,7 +21,11 @@ from django.utils import timezone
 
 from anagrafica.models import Familiare, RelazioneFamiliare, Studente, StudenteFamiliare
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione, TariffaCondizioneIscrizione
-from gestione_amministrativa.models import BustaPagaDipendente, Dipendente
+from gestione_amministrativa.models import (
+    BUSTA_PAGA_MESE_TREDICESIMA,
+    BustaPagaDipendente,
+    Dipendente,
+)
 from scuola.models import AnnoScolastico, Classe
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
@@ -6440,6 +6444,36 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "F24 contributi maggio")
         self.assertNotContains(response, "Spesa supermercato")
 
+    def test_spese_mensili_dashboard_include_tredicesima_busta_paga_a_dicembre(self):
+        categoria = crea_categoria_spesa_test("Personale")
+        dipendente = Dipendente.objects.create(
+            nome="Mario",
+            cognome="Rossi",
+            codice_fiscale="RSSMRA80A01H501U",
+        )
+        busta = BustaPagaDipendente.objects.create(
+            dipendente=dipendente,
+            anno=2026,
+            mese=BUSTA_PAGA_MESE_TREDICESIMA,
+            stato="effettiva",
+            costo_azienda_effettivo=Decimal("2400.00"),
+            netto_effettivo=Decimal("1300.00"),
+            categoria=categoria,
+        )
+
+        response = self.client.get(
+            reverse("spese_mensili_dashboard"),
+            {"periodo": "solare", "anno": "2026", "mese": "2026-12", "vista": "tutte"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Busta paga Tredicesima 2026")
+        self.assertContains(response, "Rossi Mario")
+        self.assertContains(response, reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta.pk}))
+        selected_month = next(month for month in response.context["month_stats"] if month["key"] == "2026-12")
+        self.assertEqual(selected_month["totale_spese"], Decimal("2400.00"))
+        self.assertEqual(selected_month["spese_count"], 1)
+
     def test_spese_mensili_dashboard_ordina_spese_e_fatture(self):
         categoria = crea_categoria_spesa_test("Ordinamento")
         fornitore = Fornitore.objects.create(
@@ -7837,6 +7871,15 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Inserisci saldo manuale")
         self.assertContains(response, f"{reverse('crea_saldo_conto')}?conto={conto.pk}")
+        self.assertContains(response, "finance-page-head")
+        self.assertContains(response, "finance-account-summary-grid")
+        self.assertContains(response, "finance-guide-panel")
+        self.assertContains(response, "finance-modern-panel")
+        self.assertContains(response, "finance-account-table")
+        self.assertContains(response, "finance-record-icon-bank")
+        self.assertContains(response, "table-icon-actions")
+        self.assertContains(response, "data-floating-text=\"Ricalcola saldo\"", html=False)
+        self.assertNotContains(response, "<span class=\"table-muted\">|</span>", html=False)
 
         response = self.client.get(f"{reverse('crea_saldo_conto')}?conto={conto.pk}")
 
@@ -7885,6 +7928,18 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         response = self.client.get(reverse("crea_movimento_manuale"))
         self.assertContains(response, "movimento-finanziario-form.js")
+        self.assertContains(response, "finance-movement-page-head")
+        self.assertContains(response, "finance-movement-form-panel")
+        self.assertContains(response, "finance-movement-toggle-list")
+        self.assertContains(response, "Salva movimento")
+        self.assertNotContains(response, "form-table")
+
+        response = self.client.get(reverse("modifica_movimento_finanziario", args=[movimento.pk]))
+        self.assertContains(response, "Modifica movimento")
+        self.assertContains(response, f"ID {movimento.pk}")
+        self.assertContains(response, "finance-movement-page-head")
+        self.assertContains(response, "finance-movement-form-panel")
+        self.assertNotContains(response, "form-table")
 
     def test_movimento_popup_accetta_prefill_da_busta_paga(self):
         response = self.client.get(

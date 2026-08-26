@@ -38,6 +38,7 @@ from .forms import (
     TipoContrattoDipendenteForm,
 )
 from .models import (
+    BUSTA_PAGA_MONTH_CHOICES,
     BustaPagaDipendente,
     CategoriaDatoPayrollUfficiale,
     ContrattoDipendente,
@@ -1171,6 +1172,7 @@ def lista_buste_paga_dipendenti(request):
             "mese": mese,
             "dipendente_id": dipendente_id,
             "dipendenti": Dipendente.objects.order_by("persona_collegata__cognome", "persona_collegata__nome"),
+            "mesi_busta_paga": BUSTA_PAGA_MONTH_CHOICES,
         },
     )
 

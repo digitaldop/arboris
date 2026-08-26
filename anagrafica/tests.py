@@ -67,6 +67,7 @@ from economia.models import (
     TariffaCondizioneIscrizione,
 )
 from gestione_amministrativa.models import (
+    BUSTA_PAGA_MESE_TREDICESIMA,
     BustaPagaDipendente,
     ContrattoDipendente,
     Dipendente,
@@ -1317,6 +1318,14 @@ class FamiliareCurrentDetailViewTests(TestCase):
         )
 
     def test_modifica_familiare_renders_work_profile_inline_with_tabs(self):
+        busta_tredicesima = BustaPagaDipendente.objects.create(
+            dipendente=self.profilo,
+            contratto=self.contratto,
+            anno=2026,
+            mese=BUSTA_PAGA_MESE_TREDICESIMA,
+            stato=StatoBustaPaga.EFFETTIVA,
+            netto_previsto=Decimal("1300.00"),
+        )
         with TemporaryDirectory() as tmpdir:
             with override_settings(MEDIA_ROOT=tmpdir):
                 self.busta.file_busta_paga = SimpleUploadedFile(
@@ -1352,13 +1361,22 @@ class FamiliareCurrentDetailViewTests(TestCase):
         self.assertContains(response, reverse("modifica_contratto_dipendente", kwargs={"pk": self.contratto.pk}))
         self.assertContains(response, reverse("elimina_contratto_dipendente", kwargs={"pk": self.contratto.pk}))
         self.assertContains(response, "05/2026")
-        sidebar_buste = response.content.decode().split("<h3>Buste paga recenti</h3>", 1)[1].split("<h3>Documenti</h3>", 1)[0]
+        sidebar_buste = (
+            response.content.decode()
+            .split("<h3>Buste paga recenti</h3>", 1)[1]
+            .split("<h3>Documenti</h3>", 1)[0]
+        )
         self.assertIn("1.300,00 EUR", sidebar_buste)
         self.assertNotIn("2.200,00 EUR", sidebar_buste)
         self.assertContains(response, "File busta paga")
         self.assertContains(response, "Allegato cedolino")
         self.assertContains(response, reverse("crea_busta_paga_dipendente"))
         self.assertContains(response, reverse("modifica_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
+        self.assertContains(response, "Tredicesima 2026")
+        self.assertContains(
+            response,
+            reverse("modifica_busta_paga_dipendente", kwargs={"pk": busta_tredicesima.pk}),
+        )
         self.assertContains(response, reverse("elimina_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))
         self.assertContains(response, "Costo azienda")
         self.assertContains(response, reverse("inserisci_pagamento_busta_paga_dipendente", kwargs={"pk": self.busta.pk}))

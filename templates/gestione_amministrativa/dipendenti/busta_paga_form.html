@@ -449,6 +449,9 @@
                 if (!year || !month) {
                     return "";
                 }
+                if (month === 13) {
+                    return year + "-12-31";
+                }
                 const lastDay = new Date(year, month, 0).getDate();
                 return year + "-" + pad(month) + "-" + pad(lastDay);
             }

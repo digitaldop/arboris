@@ -12,6 +12,36 @@ from django.utils import timezone
 
 ZERO = Decimal("0.00")
 ONE_HUNDRED = Decimal("100.00")
+BUSTA_PAGA_MESE_TREDICESIMA = 13
+BUSTA_PAGA_MONTH_CHOICES = (
+    (1, "Gennaio"),
+    (2, "Febbraio"),
+    (3, "Marzo"),
+    (4, "Aprile"),
+    (5, "Maggio"),
+    (6, "Giugno"),
+    (7, "Luglio"),
+    (8, "Agosto"),
+    (9, "Settembre"),
+    (10, "Ottobre"),
+    (11, "Novembre"),
+    (12, "Dicembre"),
+    (BUSTA_PAGA_MESE_TREDICESIMA, "Tredicesima"),
+)
+
+
+def busta_paga_periodo_label(anno, mese):
+    if int(mese) == BUSTA_PAGA_MESE_TREDICESIMA:
+        return f"Tredicesima {int(anno)}"
+    return f"{int(mese):02d}/{int(anno)}"
+
+
+def busta_paga_data_riferimento(anno, mese):
+    anno = int(anno)
+    mese = int(mese)
+    if mese == BUSTA_PAGA_MESE_TREDICESIMA:
+        return date(anno, 12, 31)
+    return date(anno, mese, monthrange(anno, mese)[1])
 
 
 def next_order_value(model_cls):
@@ -923,7 +953,10 @@ class BustaPagaDipendente(models.Model):
         null=True,
     )
     anno = models.PositiveSmallIntegerField()
-    mese = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
+    mese = models.PositiveSmallIntegerField(
+        choices=BUSTA_PAGA_MONTH_CHOICES,
+        validators=[MinValueValidator(1), MaxValueValidator(BUSTA_PAGA_MESE_TREDICESIMA)],
+    )
     stato = models.CharField(
         max_length=20,
         choices=StatoBustaPaga.choices,
@@ -998,7 +1031,7 @@ class BustaPagaDipendente(models.Model):
 
     @property
     def periodo_label(self):
-        return f"{self.mese:02d}/{self.anno}"
+        return busta_paga_periodo_label(self.anno, self.mese)
 
     @property
     def importo_netto_riepilogo(self):
@@ -1042,8 +1075,7 @@ class BustaPagaDipendente(models.Model):
     def data_pagamento_suggerita(self):
         if self.data_pagamento_effettiva:
             return self.data_pagamento_effettiva
-        last_day = monthrange(self.anno, self.mese)[1]
-        return date(self.anno, self.mese, last_day)
+        return busta_paga_data_riferimento(self.anno, self.mese)
 
     @property
     def ha_previsione(self):

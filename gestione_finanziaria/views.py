@@ -71,7 +71,11 @@ from .forms import (
     SpesaOperativaForm,
     VoceBudgetRicorrenteForm,
 )
-from gestione_amministrativa.models import BustaPagaDipendente, PagamentoBustaPagaDipendente
+from gestione_amministrativa.models import (
+    BustaPagaDipendente,
+    PagamentoBustaPagaDipendente,
+    busta_paga_data_riferimento,
+)
 from .importers import (
     Camt053Parser,
     CsvImporter,
@@ -2156,7 +2160,7 @@ def _spese_mensili_rows(request, start, end):
         anno__lte=end.year,
     )
     for busta in buste:
-        data_scadenza = date(busta.anno, busta.mese, monthrange(busta.anno, busta.mese)[1])
+        data_scadenza = busta_paga_data_riferimento(busta.anno, busta.mese)
         if data_scadenza < start or data_scadenza > end:
             continue
         importo_previsto = (
@@ -3750,6 +3754,12 @@ def lista_conti_bancari(request):
         conto.ultimo_saldo_registrato = ultimo_saldo
         conto.saldo_calcolato = calcola_saldo_conto_alla_data(conto)
         saldo_totale += conto.saldo_calcolato
+    conti_attivi = sum(1 for conto in conti if conto.attivo)
+    conti_psd2 = sum(
+        1
+        for conto in conti
+        if conto.provider_id or conto.connessione_id or conto.external_account_id
+    )
 
     return render(
         request,
@@ -3757,6 +3767,9 @@ def lista_conti_bancari(request):
         {
             "conti": conti,
             "saldo_totale": saldo_totale,
+            "conti_attivi": conti_attivi,
+            "conti_psd2": conti_psd2,
+            "conti_manuali": len(conti) - conti_psd2,
         },
     )
 

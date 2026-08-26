@@ -4,7 +4,7 @@
             return;
         }
         input.disabled = disabled;
-        input.closest("td")?.classList.toggle("is-disabled-field", disabled);
+        input.closest("td, .finance-toggle-field, .finance-form-field")?.classList.toggle("is-disabled-field", disabled);
     }
 
     function initMovementForm(form) {

@@ -112,7 +112,12 @@
                 </label>
                 <label class="scambio-list-filter-field ga-buste-filter-short">
                     <span>Mese</span>
-                    <input type="number" name="mese" value="{{ mese }}" min="1" max="12">
+                    <select name="mese">
+                        <option value="">Tutti</option>
+                        {% for month_value, month_label in mesi_busta_paga %}
+                            <option value="{{ month_value }}" {% if mese == month_value|stringformat:"s" %}selected{% endif %}>{{ month_label }}</option>
+                        {% endfor %}
+                    </select>
                 </label>
                 <label class="scambio-list-filter-field">
                     <span>Dipendente</span>
