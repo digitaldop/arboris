@@ -7670,6 +7670,52 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertContains(response, "finance-movement-row-incoming")
         self.assertContains(response, "finance-movement-row-outgoing")
 
+    def test_lista_movimenti_in_sola_visualizzazione_nasconde_azioni_e_edit_inline(self):
+        conto = ContoBancario.objects.create(
+            nome_conto="Banco BPM",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            attivo=True,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 8, 26),
+            importo=Decimal("-17.88"),
+            descrizione="Movimento sola lettura",
+            controparte="PayPal Europe",
+        )
+        viewer = User.objects.create_user(
+            username="viewer-finanza@example.com",
+            email="viewer-finanza@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=viewer,
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("lista_movimenti_finanziari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Movimento sola lettura")
+        self.assertContains(response, "Resoconto Spese per categoria")
+        self.assertContains(response, "finance-movements-table-readonly")
+        self.assertNotContains(response, "Nuovo movimento manuale")
+        self.assertNotContains(response, "Pulisci duplicati")
+        self.assertNotContains(response, "Ripulisci movimenti")
+        self.assertNotContains(response, "Elimina selezionati")
+        self.assertNotContains(response, "finance-movements-actions-head")
+        self.assertNotContains(response, "finance-bulk-select-col")
+        self.assertNotContains(response, "data-bulk-checkbox")
+        self.assertNotContains(response, "data-row-href")
+        self.assertNotContains(response, "data-movement-category-cell")
+        self.assertNotContains(response, "data-movement-account-cell")
+        self.assertNotContains(response, reverse("modifica_movimento_finanziario", args=[movimento.pk]))
+        self.assertNotContains(response, reverse("elimina_movimento_finanziario", args=[movimento.pk]))
+        self.assertNotContains(response, reverse("elimina_movimenti_finanziari_multipla"))
+        self.assertNotContains(response, "js/pages/movimenti-list.js")
+        self.assertNotContains(response, "js/core/bulk-actions.js")
+
     def test_lista_movimenti_filtra_per_tipo_e_intervallo_date(self):
         MovimentoFinanziario.objects.create(
             data_contabile=date(2026, 4, 10),

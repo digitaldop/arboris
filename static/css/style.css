@@ -5416,6 +5416,10 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     min-width: 1220px;
 }
 
+.module-gestione_finanziaria .finance-movements-table-readonly {
+    min-width: 1180px;
+}
+
 .module-gestione_finanziaria .finance-movements-col-select {
     width: 44px;
 }
@@ -5454,6 +5458,38 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
 
 .module-gestione_finanziaria .finance-movements-col-actions {
     width: 118px;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-date {
+    width: 116px;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-account {
+    width: 13%;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-origin {
+    width: 10%;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-channel {
+    width: 8%;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-description {
+    width: 29%;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-category {
+    width: 22%;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-amount {
+    width: 120px;
+}
+
+.module-gestione_finanziaria .finance-movements-table-readonly .finance-movements-col-status {
+    width: 13%;
 }
 
 .module-gestione_finanziaria .finance-movements-table th,
