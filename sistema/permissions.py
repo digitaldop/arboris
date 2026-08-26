@@ -17,6 +17,7 @@ from .models import (
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+EDIT_MODE_QUERY_VALUES = {"1", "true", "on", "yes", "si"}
 
 
 def redirect_unauthenticated_user(request):
@@ -67,7 +68,7 @@ def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZ
     if not profilo:
         return False
 
-    if profilo.controllo_completo:
+    if profilo.controllo_completo_effettivo:
         return True
 
     return profilo.has_module_permission(module_name, level=level)
@@ -145,9 +146,13 @@ def module_edit_permission_required(module_name):
     def decorator(view_func):
         @wraps(view_func)
         def wrapped(request, *args, **kwargs):
+            explicit_edit_mode = (
+                request.method in SAFE_METHODS
+                and str(request.GET.get("edit") or "").strip().lower() in EDIT_MODE_QUERY_VALUES
+            )
             required_level = (
                 LivelloPermesso.VISUALIZZAZIONE
-                if request.method in SAFE_METHODS
+                if request.method in SAFE_METHODS and not explicit_edit_mode
                 else LivelloPermesso.GESTIONE
             )
 

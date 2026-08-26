@@ -37,7 +37,7 @@
     {% endif %}
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
 </head>
-<body class="popup-page">
+<body class="popup-page{% if current_module_view_only %} module-view-only{% endif %}">
     {{ arboris_popup_manifest|json_script:"arboris-popup-manifest" }}
     <script>
         (function () {

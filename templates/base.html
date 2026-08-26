@@ -255,15 +255,17 @@
                                     {% endif %}
                                 </div>
                             {% endif %}
-                            <div class="header-settings-group">
-                                <div class="header-settings-heading">Impostazioni Scuola</div>
-                                {% if can_manage_sistema %}
-                                    <a href="{% url 'scuola_sistema' %}">Dati Generali Scuola</a>
-                                {% endif %}
-                                <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
-                                <a href="{% url 'lista_classi' %}">Classi</a>
-                                <a href="{% url 'lista_gruppi_classe' %}">Pluriclassi</a>
-                            </div>
+                            {% if can_view_sistema %}
+                                <div class="header-settings-group">
+                                    <div class="header-settings-heading">Impostazioni Scuola</div>
+                                    {% if can_manage_sistema %}
+                                        <a href="{% url 'scuola_sistema' %}">Dati Generali Scuola</a>
+                                    {% endif %}
+                                    <a href="{% url 'lista_anni_scolastici' %}">Anni scolastici</a>
+                                    <a href="{% url 'lista_classi' %}">Classi</a>
+                                    <a href="{% url 'lista_gruppi_classe' %}">Pluriclassi</a>
+                                </div>
+                            {% endif %}
                             <div class="header-settings-group">
                                 <a href="{% url 'logout' %}">Esci</a>
                             </div>
@@ -763,7 +765,7 @@
                         </div>
                     {% endif %}
 
-                    {% if request.user.is_authenticated %}
+                    {% if can_view_sistema or can_view_economia or can_view_gestione_finanziaria or can_access_database_backups or can_view_operation_history %}
                         <div class="sidebar-section" data-sidebar-section-key="sistema">
                             <button
                                 type="button"
@@ -914,39 +916,41 @@
                                     </div>
                                 {% endif %}
 
-                                <div class="sidebar-subsection">
-                                    <button
-                                        type="button"
-                                        class="sidebar-collapsible collapsible-title is-open"
-                                        data-target="sidebar-sistema-scuola-panel"
-                                        data-storage-key="arboris-sidebar-sistema-scuola"
-                                        data-default-open="true"
-                                    >
-                                        <span>Impostazioni Scuola</span>
-                                    </button>
-                                    <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-scuola-panel">
-                                        <nav class="sidebar-nav sidebar-subnav">
-                                            {% if can_manage_sistema %}
-                                                <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
-                                                    <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
-                                                    <span class="sidebar-link-text">Dati Generali Scuola</span>
+                                {% if can_view_sistema %}
+                                    <div class="sidebar-subsection">
+                                        <button
+                                            type="button"
+                                            class="sidebar-collapsible collapsible-title is-open"
+                                            data-target="sidebar-sistema-scuola-panel"
+                                            data-storage-key="arboris-sidebar-sistema-scuola"
+                                            data-default-open="true"
+                                        >
+                                            <span>Impostazioni Scuola</span>
+                                        </button>
+                                        <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-sistema-scuola-panel">
+                                            <nav class="sidebar-nav sidebar-subnav">
+                                                {% if can_manage_sistema %}
+                                                    <a href="{% url 'scuola_sistema' %}" class="{% if request.resolver_match.url_name == 'scuola_sistema' %}active{% endif %}">
+                                                        <span class="sidebar-link-icon sidebar-icon-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
+                                                        <span class="sidebar-link-text">Dati Generali Scuola</span>
+                                                    </a>
+                                                {% endif %}
+                                                <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' or request.resolver_match.url_name == 'crea_anno_scolastico' or request.resolver_match.url_name == 'modifica_anno_scolastico' or request.resolver_match.url_name == 'elimina_anno_scolastico' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                                    <span class="sidebar-link-text">Anni scolastici</span>
                                                 </a>
-                                            {% endif %}
-                                            <a href="{% url 'lista_anni_scolastici' %}" class="{% if request.resolver_match.url_name == 'lista_anni_scolastici' or request.resolver_match.url_name == 'crea_anno_scolastico' or request.resolver_match.url_name == 'modifica_anno_scolastico' or request.resolver_match.url_name == 'elimina_anno_scolastico' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                                <span class="sidebar-link-text">Anni scolastici</span>
-                                            </a>
-                                            <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' or request.resolver_match.url_name == 'crea_classe' or request.resolver_match.url_name == 'modifica_classe' or request.resolver_match.url_name == 'elimina_classe' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
-                                                <span class="sidebar-link-text">Classi</span>
-                                            </a>
-                                            <a href="{% url 'lista_gruppi_classe' %}" class="{% if request.resolver_match.url_name == 'lista_gruppi_classe' or request.resolver_match.url_name == 'crea_gruppo_classe' or request.resolver_match.url_name == 'modifica_gruppo_classe' or request.resolver_match.url_name == 'elimina_gruppo_classe' %}active{% endif %}">
-                                                <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
-                                                <span class="sidebar-link-text">Pluriclassi</span>
-                                            </a>
-                                        </nav>
+                                                <a href="{% url 'lista_classi' %}" class="{% if request.resolver_match.url_name == 'lista_classi' or request.resolver_match.url_name == 'crea_classe' or request.resolver_match.url_name == 'modifica_classe' or request.resolver_match.url_name == 'elimina_classe' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-sky" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                                                    <span class="sidebar-link-text">Classi</span>
+                                                </a>
+                                                <a href="{% url 'lista_gruppi_classe' %}" class="{% if request.resolver_match.url_name == 'lista_gruppi_classe' or request.resolver_match.url_name == 'crea_gruppo_classe' or request.resolver_match.url_name == 'modifica_gruppo_classe' or request.resolver_match.url_name == 'elimina_gruppo_classe' %}active{% endif %}">
+                                                    <span class="sidebar-link-icon sidebar-icon-teal" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#family"></use></svg></span>
+                                                    <span class="sidebar-link-text">Pluriclassi</span>
+                                                </a>
+                                            </nav>
+                                        </div>
                                     </div>
-                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     {% endif %}

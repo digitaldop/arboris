@@ -160,6 +160,8 @@ class AuthenticationInterfaceTests(TestCase):
         self.assertNotContains(response, f'href="{reverse("lista_famiglie")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
         self.assertNotContains(response, f'href="{reverse("lista_dipendenti")}"', html=False)
+        self.assertNotContains(response, f'href="{reverse("lista_anni_scolastici")}"', html=False)
+        self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
         self.assertNotContains(response, "GESTIONE FINANZIARIA")
 
 
@@ -779,7 +781,7 @@ class SidebarEconomiaTests(TestCase):
         self.assertNotContains(response, 'data-sidebar-section-key="gestione-amministrativa"', html=False)
         content = response.content.decode("utf-8")
         start = content.index('data-sidebar-section-key="parcheggio"')
-        end = content.index('data-sidebar-section-key="sistema"', start)
+        end = content.index('class="sidebar-reorder-footer"', start)
         parcheggio_section = content[start:end]
 
         labels_in_order = [
@@ -823,7 +825,7 @@ class SidebarEconomiaTests(TestCase):
         anagrafica_end = content.index('data-sidebar-section-key="parcheggio"', anagrafica_start)
         anagrafica_section = content[anagrafica_start:anagrafica_end]
         parcheggio_start = content.index('data-sidebar-section-key="parcheggio"')
-        parcheggio_end = content.index('data-sidebar-section-key="sistema"', parcheggio_start)
+        parcheggio_end = content.index('class="sidebar-reorder-footer"', parcheggio_start)
         parcheggio_section = content[parcheggio_start:parcheggio_end]
 
         self.assertNotIn(f'href="{reverse("lista_educatori")}"', anagrafica_section)
@@ -1437,6 +1439,35 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(roles_response, "Gestione finanziaria")
         self.assertContains(users_response, "Famiglie interessate")
         self.assertContains(roles_response, "Famiglie interessate")
+
+    def test_role_permissions_override_stale_user_level_full_control(self):
+        viewer_role = SistemaRuoloPermessi.objects.create(
+            nome="Sistema sola visualizzazione",
+            colore_principale="#64748b",
+            permesso_sistema=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        viewer = User.objects.create_user(
+            username="stale-viewer@example.com",
+            email="stale-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=viewer,
+            ruolo_permessi=viewer_role,
+            controllo_completo=True,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("lista_utenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_manage_sistema"])
+        self.assertContains(response, "module-view-only")
+
+        response = self.client.get(reverse("crea_utente"))
+
+        self.assertRedirects(response, reverse("home"))
 
     def test_header_settings_dropdown_renders_system_links(self):
         self.client.force_login(self.user)

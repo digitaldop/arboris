@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from sistema.models import LivelloPermesso, SistemaUtentePermessi
+
 from .forms import AnnoScolasticoForm, ClasseForm, GruppoClasseForm
 from .models import AnnoScolastico, Classe, GruppoClasse
 
@@ -133,6 +135,10 @@ class ListaAnniScolasticiTests(TestCase):
             email="scuola@example.com",
             password="Password123!",
         )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_sistema=LivelloPermesso.GESTIONE,
+        )
         self.client.force_login(self.user)
 
     def test_lista_anni_scolastici_separates_current_future_and_past_years(self):
@@ -193,3 +199,79 @@ class ListaAnniScolasticiTests(TestCase):
         self.assertContains(response, 'name="data_inizio" value="2099-09-01"')
         self.assertContains(response, 'name="data_fine" value="2100-08-31"')
         self.assertContains(response, "startInEditMode: true")
+
+
+class ScuolaPermissionTests(TestCase):
+    def setUp(self):
+        self.password = "Password123!"
+        self.anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2099/2100",
+            data_inizio=date(2099, 9, 1),
+            data_fine=date(2100, 8, 31),
+        )
+
+    def create_user_with_system_permission(self, username, level):
+        user = User.objects.create_user(
+            username=username,
+            email=username,
+            password=self.password,
+        )
+        SistemaUtentePermessi.objects.create(user=user, permesso_sistema=level)
+        return user
+
+    def test_user_without_system_permission_cannot_open_school_settings(self):
+        user = self.create_user_with_system_permission(
+            "no-sistema@example.com",
+            LivelloPermesso.NESSUNO,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("lista_anni_scolastici"))
+
+        self.assertRedirects(response, reverse("home"))
+
+    def test_system_viewer_can_read_school_settings_but_cannot_write(self):
+        user = self.create_user_with_system_permission(
+            "sistema-viewer@example.com",
+            LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("lista_anni_scolastici"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "module-view-only")
+
+        edit_response = self.client.get(
+            f"{reverse('modifica_anno_scolastico', args=[self.anno.pk])}?edit=1"
+        )
+        self.assertRedirects(edit_response, reverse("home"))
+
+        create_response = self.client.post(
+            reverse("crea_classe"),
+            {
+                "nome_classe": "Prima Elementare",
+                "sezione_classe": "",
+                "ordine_classe": "1",
+                "attiva": "on",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(create_response, reverse("home"))
+        self.assertFalse(Classe.objects.filter(nome_classe="Prima Elementare").exists())
+
+        update_response = self.client.post(
+            reverse("modifica_anno_scolastico", args=[self.anno.pk]),
+            {
+                "nome_anno_scolastico": "Anno modificato",
+                "data_inizio": "2099-09-01",
+                "data_fine": "2100-08-31",
+                "attivo": "on",
+                "note": "",
+            },
+        )
+
+        self.assertRedirects(update_response, reverse("home"))
+        self.anno.refresh_from_db()
+        self.assertEqual(self.anno.nome_anno_scolastico, "2099/2100")
