@@ -57,7 +57,7 @@
             } catch (error) {}
         })();
     </script>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=297">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=298">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/streamline-icons.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
@@ -293,6 +293,12 @@
                                 <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#home"></use></svg></span>
                                 <span class="sidebar-link-text">Dashboard</span>
                             </a>
+                            {% if sidebar_menu_items.calendario_agenda %}
+                            <a href="{% url 'calendario_agenda' %}" data-sidebar-menu-key="calendario_agenda" class="{% if request.resolver_match.url_name == 'calendario_agenda' or request.resolver_match.url_name == 'lista_eventi_calendario' or request.resolver_match.url_name == 'crea_evento_calendario' or request.resolver_match.url_name == 'modifica_evento_calendario' or request.resolver_match.url_name == 'elimina_evento_calendario' or request.resolver_match.url_name == 'lista_categorie_calendario' or request.resolver_match.url_name == 'crea_categoria_calendario' or request.resolver_match.url_name == 'modifica_categoria_calendario' or request.resolver_match.url_name == 'elimina_categoria_calendario' %}active{% endif %}">
+                                <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
+                                <span class="sidebar-link-text">Calendario</span>
+                            </a>
+                            {% endif %}
                         </nav>
                     </div>
                 </div>
@@ -302,44 +308,6 @@
                     id="sidebar-reorder-list"
                     {% if sidebar_can_reorder_menu %}data-sidebar-config-url="{% url 'sidebar_personalizzazione_sistema' %}"{% endif %}
                 >
-                    {% if sidebar_menu_groups.calendario %}
-                        <div class="sidebar-section" data-sidebar-section-key="calendario">
-                            <button
-                                type="button"
-                                class="sidebar-collapsible collapsible-title is-open"
-                                data-target="sidebar-calendario-panel"
-                                data-storage-key="arboris-sidebar-calendario"
-                                data-default-open="true"
-                            >
-                                <span class="sidebar-heading-content">
-                                    <span>Calendario</span>
-                                </span>
-                            </button>
-                            <div class="collapsible-panel is-open sidebar-module-panel" id="sidebar-calendario-panel">
-                                <nav class="sidebar-nav sidebar-subnav">
-                                    {% if sidebar_menu_items.calendario_agenda %}
-                                    <a href="{% url 'calendario_agenda' %}" data-sidebar-menu-key="calendario_agenda" class="{% if request.resolver_match.url_name == 'calendario_agenda' %}active{% endif %}">
-                                        <span class="sidebar-link-icon sidebar-icon-amber" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#calendar"></use></svg></span>
-                                        <span class="sidebar-link-text">Calendario</span>
-                                    </a>
-                                    {% endif %}
-                                    {% if sidebar_menu_items.calendario_eventi %}
-                                    <a href="{% url 'lista_eventi_calendario' %}" data-sidebar-menu-key="calendario_eventi" class="{% if request.resolver_match.url_name == 'lista_eventi_calendario' or request.resolver_match.url_name == 'crea_evento_calendario' or request.resolver_match.url_name == 'modifica_evento_calendario' or request.resolver_match.url_name == 'elimina_evento_calendario' %}active{% endif %}">
-                                        <span class="sidebar-link-icon sidebar-icon-blue" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#clock"></use></svg></span>
-                                        <span class="sidebar-link-text">Eventi</span>
-                                    </a>
-                                    {% endif %}
-                                    {% if sidebar_menu_items.calendario_categorie %}
-                                    <a href="{% url 'lista_categorie_calendario' %}" data-sidebar-menu-key="calendario_categorie" class="{% if request.resolver_match.url_name == 'lista_categorie_calendario' or request.resolver_match.url_name == 'crea_categoria_calendario' or request.resolver_match.url_name == 'modifica_categoria_calendario' or request.resolver_match.url_name == 'elimina_categoria_calendario' %}active{% endif %}">
-                                        <span class="sidebar-link-icon sidebar-icon-violet" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
-                                        <span class="sidebar-link-text">Categorie</span>
-                                    </a>
-                                    {% endif %}
-                                </nav>
-                            </div>
-                        </div>
-                    {% endif %}
-
                     {% if sidebar_menu_groups.anagrafica %}
                         <div class="sidebar-section" data-sidebar-section-key="anagrafica">
                             <button

@@ -4,8 +4,6 @@ SIDEBAR_MENU_SECTIONS = (
         "label": "Calendario",
         "children": (
             {"key": "calendario_agenda", "label": "Calendario", "requires": ("can_view_calendario",)},
-            {"key": "calendario_eventi", "label": "Eventi", "requires": ("can_view_calendario",)},
-            {"key": "calendario_categorie", "label": "Categorie", "requires": ("can_view_calendario",)},
         ),
     },
     {

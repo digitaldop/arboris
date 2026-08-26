@@ -1143,8 +1143,13 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
         dashboard_index = content.index('<span class="sidebar-link-text">Dashboard</span>')
+        calendario_index = content.index('data-sidebar-menu-key="calendario_agenda"')
+        reorder_list_index = content.index('id="sidebar-reorder-list"')
+        self.assertGreater(calendario_index, dashboard_index)
+        self.assertLess(calendario_index, reorder_list_index)
+        self.assertNotIn('data-sidebar-section-key="calendario"', content)
+
         section_keys = [
-            "calendario",
             "anagrafica",
             "gestione-economica",
             "servizi-extra",
@@ -1154,7 +1159,7 @@ class SidebarSistemaTests(TestCase):
             "sistema",
         ]
 
-        previous_index = dashboard_index
+        previous_index = calendario_index
         for section_key in section_keys:
             current_index = content.index(f'data-sidebar-section-key="{section_key}"')
             self.assertGreater(current_index, previous_index)
@@ -1329,6 +1334,25 @@ class SidebarSistemaTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
+
+    def test_role_menu_configuration_hides_direct_calendar_link(self):
+        role = SistemaRuoloPermessi.objects.create(
+            nome="Calendario spento",
+            permesso_calendario=LivelloPermesso.VISUALIZZAZIONE,
+            voci_menu_disabilitate=["calendario_agenda"],
+        )
+        viewer = User.objects.create_user(
+            username="menu-calendar-viewer@example.com",
+            email="menu-calendar-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(user=viewer, ruolo_permessi=role)
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-sidebar-menu-key="calendario_agenda"', html=False)
 
     def test_sidebar_personalization_endpoint_saves_admin_config(self):
         admin = self.force_login_sidebar_admin("sidebar-save-admin@example.com")
