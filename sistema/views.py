@@ -87,6 +87,7 @@ from .permissions import (
     get_user_permission_profile,
     operational_admin_required,
     user_has_module_permission,
+    user_is_operational_admin,
 )
 
 
@@ -309,6 +310,9 @@ def toggle_active_state(request):
 
 @authenticated_user_required
 def sidebar_personalizzazione_sistema(request):
+    if not user_is_operational_admin(request.user):
+        return JsonResponse({"ok": False, "message": "Permesso non consentito."}, status=403)
+
     if request.method == "GET":
         personalizzazione = SidebarPersonalizzazione.objects.filter(user=request.user).first()
         config = normalize_sidebar_config(personalizzazione.config if personalizzazione else {})

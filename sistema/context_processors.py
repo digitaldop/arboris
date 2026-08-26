@@ -285,6 +285,37 @@ def get_effective_sidebar_personalizzazione_config(user):
     return {}
 
 
+def sidebar_order_only_config(config):
+    order = config.get("order", {}) if isinstance(config, dict) else {}
+    return {
+        "version": 1,
+        "hidden": [],
+        "order": deepcopy(order) if isinstance(order, dict) else {},
+        "custom_sections": [],
+    }
+
+
+def get_effective_sidebar_order_config(user):
+    try:
+        if not user or not getattr(user, "is_authenticated", False):
+            return sidebar_order_only_config({})
+
+        personalizzazione = SidebarPersonalizzazione.objects.filter(user=user).first()
+        if sidebar_user_is_canonical_admin(user):
+            return sidebar_order_only_config(personalizzazione.config if personalizzazione else {})
+
+        for admin_personalizzazione in SidebarPersonalizzazione.objects.select_related(
+            "user",
+            "user__profilo_permessi",
+            "user__profilo_permessi__ruolo_permessi",
+        ).order_by("-user__is_superuser", "user_id"):
+            if sidebar_user_is_canonical_admin(admin_personalizzazione.user):
+                return sidebar_order_only_config(admin_personalizzazione.config)
+    except (OperationalError, ProgrammingError):
+        return sidebar_order_only_config({})
+    return sidebar_order_only_config({})
+
+
 def sistema_permissions_context(request):
     user = getattr(request, "user", None)
     profilo = get_user_permission_profile(user)
@@ -408,7 +439,8 @@ def sistema_permissions_context(request):
     )
     notifiche_finanziarie_non_lette = 0
     notifiche_finanziarie_recenti = []
-    sidebar_personalizzazione_config = {}
+    sidebar_can_reorder_menu = can_view_system_tables
+    sidebar_personalizzazione_config = get_effective_sidebar_order_config(user)
 
     if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
         try:
@@ -453,6 +485,7 @@ def sistema_permissions_context(request):
         "notifiche_finanziarie_non_lette": notifiche_finanziarie_non_lette,
         "notifiche_finanziarie_recenti": notifiche_finanziarie_recenti,
         "sidebar_personalizzazione_config": sidebar_personalizzazione_config,
+        "sidebar_can_reorder_menu": sidebar_can_reorder_menu,
         "sidebar_menu_items": sidebar_menu_state["items"],
         "sidebar_menu_groups": sidebar_menu_state["groups"],
         "sidebar_menu_disabled_keys": sidebar_menu_disabled_keys,

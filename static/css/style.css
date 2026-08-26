@@ -39065,6 +39065,7 @@ body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-s
 }
 
 body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="economia"],
+body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-economica"],
 body.ui-colorful-modules .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-finanziaria"] {
     --sidebar-section-accent: var(--module-payments);
     --sidebar-section-soft: var(--module-payments-soft);
@@ -39579,6 +39580,7 @@ body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-s
 }
 
 body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="economia"],
+body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-economica"],
 body.ui-streamline-icons .sidebar-reorder-list > .sidebar-section[data-sidebar-section-key="gestione-finanziaria"] {
     --streamline-section-color: var(--streamline-payments);
     --streamline-section-soft: var(--streamline-payments-soft);

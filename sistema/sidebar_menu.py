@@ -1,5 +1,14 @@
 SIDEBAR_MENU_SECTIONS = (
     {
+        "key": "calendario",
+        "label": "Calendario",
+        "children": (
+            {"key": "calendario_agenda", "label": "Calendario", "requires": ("can_view_calendario",)},
+            {"key": "calendario_eventi", "label": "Eventi", "requires": ("can_view_calendario",)},
+            {"key": "calendario_categorie", "label": "Categorie", "requires": ("can_view_calendario",)},
+        ),
+    },
+    {
         "key": "anagrafica",
         "label": "Anagrafiche",
         "children": (
@@ -22,24 +31,33 @@ SIDEBAR_MENU_SECTIONS = (
                 "label": "Comunicazioni alle famiglie",
                 "requires": ("can_manage_economia",),
             },
-        ),
-    },
-    {
-        "key": "famiglie_interessate",
-        "label": "Famiglie interessate",
-        "children": (
             {
-                "key": "famiglie_interessate_contatti",
-                "label": "Contatti e follow-up",
-                "requires": ("can_view_famiglie_interessate",),
+                "key": "anagrafica_rette_iscrizioni",
+                "label": "Rette e Iscrizioni",
+                "children": (
+                    {"key": "economia_iscrizioni", "label": "Iscrizioni", "requires": ("can_view_economia",)},
+                    {"key": "economia_stati_iscrizione", "label": "Stati iscrizione", "requires": ("can_view_economia",)},
+                    {"key": "economia_rate_iscrizione", "label": "Rate iscrizione", "requires": ("can_view_economia",)},
+                    {
+                        "key": "anagrafica_impostazioni_rette",
+                        "label": "Impostazioni Rette",
+                        "children": (
+                            {
+                                "key": "economia_condizioni",
+                                "label": "Condizioni economiche",
+                                "requires": ("can_view_economia",),
+                            },
+                            {"key": "economia_tariffe", "label": "Tariffe", "requires": ("can_view_economia",)},
+                            {
+                                "key": "economia_tariffe_scambio",
+                                "label": "Tariffe Scambio Retta",
+                                "requires": ("can_view_economia",),
+                            },
+                            {"key": "economia_agevolazioni", "label": "Agevolazioni", "requires": ("can_view_economia",)},
+                        ),
+                    },
+                ),
             },
-        ),
-    },
-    {
-        "key": "archivio_storico",
-        "label": "Archivio storico",
-        "children": (
-            {"key": "archivio_storico_anni", "label": "Anni archiviati", "requires": ("can_view_sistema",)},
         ),
     },
     {
@@ -53,25 +71,20 @@ SIDEBAR_MENU_SECTIONS = (
             },
             {"key": "economia_panoramica_rette", "label": "Panoramica Rette", "requires": ("can_view_economia",)},
             {
-                "key": "economia_fondi_accantonamento",
-                "label": "Fondi di Accantonamento",
-                "requires": ("can_view_economia",),
+                "key": "gestione_finanziaria_fatture_fornitori_dashboard",
+                "label": "Fatture e scadenze",
+                "requires": ("can_view_gestione_finanziaria",),
             },
-            {"key": "economia_scambi_retta", "label": "Scambi Retta", "requires": ("can_view_economia",)},
             {
                 "key": "gestione_finanziaria_spese_mensili",
                 "label": "Spese Mensili",
                 "requires": ("can_view_gestione_finanziaria",),
             },
+            {"key": "economia_scambi_retta", "label": "Scambi Retta", "requires": ("can_view_economia",)},
             {
-                "key": "gestione_finanziaria_fatture_fornitori_dashboard",
-                "label": "Fatture Fornitori",
-                "requires": ("can_view_gestione_finanziaria",),
-            },
-            {
-                "key": "gestione_finanziaria_budgeting",
-                "label": "Budgeting",
-                "requires": ("can_view_gestione_finanziaria",),
+                "key": "economia_fondi_accantonamento",
+                "label": "Fondi di Accantonamento",
+                "requires": ("can_view_economia",),
             },
             {
                 "key": "gestione_economica_conti",
@@ -140,45 +153,9 @@ SIDEBAR_MENU_SECTIONS = (
                     },
                 ),
             },
-        ),
-    },
-    {
-        "key": "servizi_extra",
-        "label": "Servizi extra",
-        "children": (
-            {"key": "servizi_extra_servizi", "label": "Servizi", "requires": ("can_view_servizi_extra",)},
             {
-                "key": "servizi_extra_dettaglio_servizi",
-                "label": "Schede servizi",
-                "requires": ("can_view_servizi_extra",),
-            },
-            {
-                "key": "servizi_extra_impostazioni",
-                "label": "Impostazioni Servizi Extra",
-                "children": (
-                    {"key": "servizi_extra_tariffe", "label": "Tariffe", "requires": ("can_view_servizi_extra",)},
-                    {"key": "servizi_extra_iscrizioni", "label": "Iscrizioni", "requires": ("can_view_servizi_extra",)},
-                    {"key": "servizi_extra_rate", "label": "Rate", "requires": ("can_view_servizi_extra",)},
-                ),
-            },
-        ),
-    },
-    {
-        "key": "calendario",
-        "label": "Calendario",
-        "children": (
-            {"key": "calendario_agenda", "label": "Calendario", "requires": ("can_view_calendario",)},
-            {"key": "calendario_eventi", "label": "Eventi", "requires": ("can_view_calendario",)},
-            {"key": "calendario_categorie", "label": "Categorie", "requires": ("can_view_calendario",)},
-        ),
-    },
-    {
-        "key": "parcheggio",
-        "label": "Parcheggio",
-        "children": (
-            {
-                "key": "parcheggio_gestione_amministrativa",
-                "label": "Dipendenti e collaboratori",
+                "key": "gestione_economica_dipendenti_collaboratori",
+                "label": "Dipendenti e Collaboratori",
                 "children": (
                     {
                         "key": "gestione_amministrativa_dashboard",
@@ -222,52 +199,81 @@ SIDEBAR_MENU_SECTIONS = (
                     },
                 ),
             },
+        ),
+    },
+    {
+        "key": "servizi_extra",
+        "label": "Servizi extra",
+        "children": (
+            {"key": "servizi_extra_servizi", "label": "Servizi", "requires": ("can_view_servizi_extra",)},
             {
-                "key": "parcheggio_iscrizioni",
-                "label": "Iscrizioni",
+                "key": "servizi_extra_dettaglio_servizi",
+                "label": "Schede servizi",
+                "requires": ("can_view_servizi_extra",),
+            },
+            {
+                "key": "servizi_extra_impostazioni",
+                "label": "Impostazioni Servizi Extra",
                 "children": (
-                    {
-                        "key": "economia_iscrizioni",
-                        "label": "Iscrizioni",
-                        "requires": ("can_view_system_tables", "can_view_economia"),
-                    },
-                    {
-                        "key": "economia_stati_iscrizione",
-                        "label": "Stati iscrizione",
-                        "requires": ("can_view_system_tables", "can_view_economia"),
-                    },
-                    {
-                        "key": "economia_rate_iscrizione",
-                        "label": "Rate iscrizione",
-                        "requires": ("can_view_system_tables", "can_view_economia"),
-                    },
+                    {"key": "servizi_extra_tariffe", "label": "Tariffe", "requires": ("can_view_servizi_extra",)},
+                    {"key": "servizi_extra_iscrizioni", "label": "Iscrizioni", "requires": ("can_view_servizi_extra",)},
+                    {"key": "servizi_extra_rate", "label": "Rate", "requires": ("can_view_servizi_extra",)},
                 ),
+            },
+        ),
+    },
+    {
+        "key": "famiglie_interessate",
+        "label": "Famiglie interessate",
+        "children": (
+            {
+                "key": "famiglie_interessate_contatti",
+                "label": "Contatti e follow-up",
+                "requires": ("can_view_famiglie_interessate",),
+            },
+        ),
+    },
+    {
+        "key": "archivio_storico",
+        "label": "Archivio storico",
+        "children": (
+            {"key": "archivio_storico_anni", "label": "Anni archiviati", "requires": ("can_view_sistema",)},
+        ),
+    },
+    {
+        "key": "parcheggio",
+        "label": "Parcheggio",
+        "children": (
+            {
+                "key": "gestione_finanziaria_budgeting",
+                "label": "Budgeting",
+                "requires": ("can_view_system_tables", "can_manage_gestione_finanziaria"),
             },
             {
                 "key": "gestione_finanziaria_documenti_fornitori",
                 "label": "Fatture fornitori",
-                "requires": ("can_view_system_tables", "can_view_gestione_finanziaria"),
+                "requires": ("can_view_system_tables", "can_manage_gestione_finanziaria"),
             },
             {
                 "key": "gestione_finanziaria_scadenziario_fornitori",
                 "label": "Scadenziario fornitori",
-                "requires": ("can_view_system_tables", "can_view_gestione_finanziaria"),
+                "requires": ("can_view_system_tables", "can_manage_gestione_finanziaria"),
             },
             {
                 "key": "gestione_finanziaria_pagamenti_fornitori",
                 "label": "Pagamenti fornitori",
-                "requires": ("can_view_system_tables", "can_view_gestione_finanziaria"),
+                "requires": ("can_view_system_tables", "can_manage_gestione_finanziaria"),
             },
             {
                 "key": "gestione_finanziaria_notifiche",
                 "label": "Notifiche",
-                "requires": ("can_view_system_tables", "can_view_gestione_finanziaria"),
+                "requires": ("can_view_system_tables", "can_manage_gestione_finanziaria"),
             },
         ),
     },
     {
         "key": "sistema",
-        "label": "Impostazioni",
+        "label": "Impostazioni generali",
         "children": (
             {"key": "sistema_impostazioni_generali", "label": "Impostazioni generali", "requires": ("can_view_sistema",)},
             {"key": "sistema_smtp", "label": "Server SMTP email", "requires": ("can_view_sistema", "can_manage_sistema")},
@@ -278,16 +284,6 @@ SIDEBAR_MENU_SECTIONS = (
                 "children": (
                     {"key": "sistema_utenti", "label": "Utenti", "requires": ("can_view_sistema",)},
                     {"key": "sistema_ruoli", "label": "Ruoli", "requires": ("can_view_sistema",)},
-                ),
-            },
-            {
-                "key": "sistema_impostazioni_rette",
-                "label": "Impostazioni Rette",
-                "children": (
-                    {"key": "economia_condizioni", "label": "Condizioni economiche", "requires": ("can_view_economia",)},
-                    {"key": "economia_tariffe", "label": "Tariffe", "requires": ("can_view_economia",)},
-                    {"key": "economia_tariffe_scambio", "label": "Tariffe Scambio Retta", "requires": ("can_view_economia",)},
-                    {"key": "economia_agevolazioni", "label": "Agevolazioni", "requires": ("can_view_economia",)},
                 ),
             },
             {

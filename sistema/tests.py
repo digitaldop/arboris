@@ -678,7 +678,7 @@ class SidebarEconomiaTests(TestCase):
             permesso_economia=LivelloPermesso.VISUALIZZAZIONE,
         )
 
-    def test_home_renders_economia_items_in_gestione_economica_and_settings(self):
+    def test_home_renders_economia_items_in_standard_sidebar_sections(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
@@ -687,26 +687,15 @@ class SidebarEconomiaTests(TestCase):
         content = response.content.decode("utf-8")
         self.assertNotIn('id="sidebar-economia-panel"', content)
 
-        start = content.index('id="sidebar-gestione-economica-panel"')
-        end = content.index('data-sidebar-section-key="sistema"', start)
-        gestione_economica_section = content[start:end]
+        anagrafica_start = content.index('id="sidebar-anagrafica-panel"')
+        anagrafica_end = content.index('data-sidebar-section-key="gestione-economica"', anagrafica_start)
+        anagrafica_section = content[anagrafica_start:anagrafica_end]
 
-        labels_in_order = [
-            "Panoramica Rette",
-            "Fondi di Accantonamento",
-            "Scambi Retta",
-        ]
-
-        previous_index = -1
-        for label in labels_in_order:
-            current_index = gestione_economica_section.index(label)
-            self.assertGreater(current_index, previous_index)
-            previous_index = current_index
-        self.assertNotIn("Tariffe Scambio Retta", gestione_economica_section)
-
-        sistema_start = content.index('id="sidebar-sistema-panel"')
-        sistema_section = content[sistema_start:]
-        settings_labels_in_order = [
+        anagrafica_labels_in_order = [
+            "<span>Rette e Iscrizioni</span>",
+            '<span class="sidebar-link-text">Iscrizioni</span>',
+            "Stati iscrizione",
+            "Rate iscrizione",
             "<span>Impostazioni Rette</span>",
             "Condizioni economiche",
             "Tariffe",
@@ -715,18 +704,34 @@ class SidebarEconomiaTests(TestCase):
         ]
 
         previous_index = -1
-        for label in settings_labels_in_order:
-            current_index = sistema_section.index(label)
+        for label in anagrafica_labels_in_order:
+            current_index = anagrafica_section.index(label)
+            self.assertGreater(current_index, previous_index)
+            previous_index = current_index
+
+        start = content.index('id="sidebar-gestione-economica-panel"')
+        end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", start)
+        gestione_economica_section = content[start:end]
+
+        labels_in_order = [
+            "Panoramica Rette",
+            "Scambi Retta",
+            "Fondi di Accantonamento",
+        ]
+
+        previous_index = -1
+        for label in labels_in_order:
+            current_index = gestione_economica_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
 
         self.assertNotIn("Fondo accantonamento", content)
         self.assertNotIn("Scambio retta", content)
         self.assertNotIn("Tariffe scambio retta", content)
-        self.assertNotIn('id="sidebar-economia-iscrizioni-panel"', content)
-        self.assertNotContains(response, f'href="{reverse("lista_iscrizioni")}"', html=False)
+        self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
+        self.assertNotContains(response, 'data-sidebar-section-key="parcheggio"', html=False)
 
-    def test_home_renders_parcheggio_only_for_operational_admin(self):
+    def test_home_hides_parcheggio_accounting_links_for_view_only_roles(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
@@ -751,23 +756,50 @@ class SidebarEconomiaTests(TestCase):
 
         self.assertEqual(admin_response.status_code, 200)
         content = admin_response.content.decode("utf-8")
+
+        self.assertIn('data-sidebar-menu-group="anagrafica_rette_iscrizioni"', content)
+        self.assertIn('data-sidebar-menu-key="economia_iscrizioni"', content)
+        self.assertNotIn('data-sidebar-section-key="parcheggio"', content)
+        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_budgeting"', content)
+        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_documenti_fornitori"', content)
+        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_scadenziario_fornitori"', content)
+        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_pagamenti_fornitori"', content)
+        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_notifiche"', content)
+
+    def test_home_renders_parcheggio_accounting_links_for_manage_roles(self):
+        admin_user = User.objects.create_user(
+            username="parcheggio-manager@example.com",
+            email="parcheggio-manager@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=admin_user,
+            ruolo=RuoloUtente.AMMINISTRATORE,
+            permesso_economia=LivelloPermesso.GESTIONE,
+            permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
         start = content.index('data-sidebar-section-key="parcheggio"')
         end = content.index('data-sidebar-section-key="sistema"', start)
         parcheggio_section = content[start:end]
 
         self.assertIn("Parcheggio", parcheggio_section)
-        self.assertIn('id="sidebar-parcheggio-iscrizioni-panel"', parcheggio_section)
-        self.assertIn(f'href="{reverse("lista_iscrizioni")}"', parcheggio_section)
-        self.assertIn(f'href="{reverse("lista_stati_iscrizione")}"', parcheggio_section)
-        self.assertIn(f'href="{reverse("lista_rate_iscrizione")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("budgeting_dashboard")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_documenti_fornitori")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("scadenziario_fornitori")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_movimenti_da_riconciliare_fornitori")}"', parcheggio_section)
         self.assertIn(f'href="{reverse("lista_notifiche_finanziarie")}"', parcheggio_section)
+        self.assertNotIn(f'href="{reverse("lista_iscrizioni")}"', parcheggio_section)
+        self.assertLess(parcheggio_section.index("Budgeting"), parcheggio_section.index("Fatture fornitori"))
         self.assertLess(parcheggio_section.index("Fatture fornitori"), parcheggio_section.index("Scadenziario fornitori"))
         self.assertLess(parcheggio_section.index("Scadenziario fornitori"), parcheggio_section.index("Pagamenti fornitori"))
 
-    def test_home_renders_gestione_amministrativa_inside_parcheggio(self):
+    def test_home_renders_gestione_amministrativa_inside_gestione_economica(self):
         SistemaImpostazioniGenerali.objects.create(gestione_dipendenti_dettagliata_attiva=True)
         user = User.objects.create_user(
             username="gestione-amministrativa@example.com",
@@ -785,12 +817,12 @@ class SidebarEconomiaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'data-sidebar-section-key="gestione-amministrativa"', html=False)
         content = response.content.decode("utf-8")
-        start = content.index('data-sidebar-section-key="parcheggio"')
+        start = content.index('data-sidebar-section-key="gestione-economica"')
         end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", start)
-        parcheggio_section = content[start:end]
+        gestione_economica_section = content[start:end]
 
         labels_in_order = [
-            "<span>Dipendenti e collaboratori</span>",
+            "<span>Dipendenti e Collaboratori</span>",
             '<span class="sidebar-link-text">Dashboard</span>',
             '<span class="sidebar-link-text">Educatori</span>',
             '<span class="sidebar-link-text">Dipendenti</span>',
@@ -803,13 +835,14 @@ class SidebarEconomiaTests(TestCase):
 
         previous_index = -1
         for label in labels_in_order:
-            current_index = parcheggio_section.index(label)
+            current_index = gestione_economica_section.index(label)
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
-        self.assertIn('id="sidebar-parcheggio-gestione-amministrativa-panel"', parcheggio_section)
-        self.assertIn(f'href="{reverse("lista_educatori")}"', parcheggio_section)
+        self.assertIn('id="sidebar-gestione-economica-dipendenti-collaboratori-panel"', gestione_economica_section)
+        self.assertIn(f'href="{reverse("lista_educatori")}"', gestione_economica_section)
+        self.assertNotContains(response, 'data-sidebar-section-key="parcheggio"', html=False)
 
-    def test_home_moves_educatori_from_anagrafiche_to_parcheggio(self):
+    def test_home_moves_educatori_from_anagrafiche_to_gestione_economica(self):
         user = User.objects.create_user(
             username="educatori-parcheggio@example.com",
             email="educatori-parcheggio@example.com",
@@ -827,14 +860,14 @@ class SidebarEconomiaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
         anagrafica_start = content.index('id="sidebar-anagrafica-panel"')
-        anagrafica_end = content.index('data-sidebar-section-key="parcheggio"', anagrafica_start)
+        anagrafica_end = content.index('data-sidebar-section-key="gestione-economica"', anagrafica_start)
         anagrafica_section = content[anagrafica_start:anagrafica_end]
-        parcheggio_start = content.index('data-sidebar-section-key="parcheggio"')
-        parcheggio_end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", parcheggio_start)
-        parcheggio_section = content[parcheggio_start:parcheggio_end]
+        gestione_economica_start = content.index('data-sidebar-section-key="gestione-economica"')
+        gestione_economica_end = content.index("<!-- FINE CODICE DELLA SIDEBAR -->", gestione_economica_start)
+        gestione_economica_section = content[gestione_economica_start:gestione_economica_end]
 
         self.assertNotIn(f'href="{reverse("lista_educatori")}"', anagrafica_section)
-        self.assertIn(f'href="{reverse("lista_educatori")}"', parcheggio_section)
+        self.assertIn(f'href="{reverse("lista_educatori")}"', gestione_economica_section)
 
 
 class SidebarGestioneFinanziariaTests(TestCase):
@@ -864,13 +897,12 @@ class SidebarGestioneFinanziariaTests(TestCase):
         gestione_economica_section = content[start:end]
 
         labels_in_order = [
-            "Dashboard",
+            '<span class="sidebar-link-text">Dashboard</span>',
             "Panoramica Rette",
-            "Fondi di Accantonamento",
-            "Scambi Retta",
+            "Fatture e scadenze",
             "Spese Mensili",
-            "Fatture Fornitori",
-            "Budgeting",
+            "Scambi Retta",
+            "Fondi di Accantonamento",
             "<span>Conti Correnti</span>",
             "Movimenti Bancari",
             "Categorie movimenti",
@@ -893,18 +925,24 @@ class SidebarGestioneFinanziariaTests(TestCase):
             previous_index = current_index
 
         self.assertNotIn('id="sidebar-gestione-finanziaria-panel"', content)
+        self.assertNotIn("Budgeting", gestione_economica_section)
+        self.assertNotIn("Fatture Fornitori", gestione_economica_section)
 
         sistema_start = content.index('id="sidebar-sistema-panel"')
         sistema_section = content[sistema_start:]
-        self.assertIn("<span>Impostazioni Rette</span>", sistema_section)
-        self.assertIn("Tariffe Scambio Retta", sistema_section)
+        anagrafica_start = content.index('id="sidebar-anagrafica-panel"')
+        anagrafica_end = content.index('data-sidebar-section-key="gestione-economica"', anagrafica_start)
+        anagrafica_section = content[anagrafica_start:anagrafica_end]
+        self.assertIn("<span>Rette e Iscrizioni</span>", anagrafica_section)
+        self.assertIn("<span>Impostazioni Rette</span>", anagrafica_section)
+        self.assertIn("Tariffe Scambio Retta", anagrafica_section)
+        self.assertNotIn("<span>Impostazioni Rette</span>", sistema_section)
         self.assertIn("<span>Impostazioni Fornitori</span>", sistema_section)
         self.assertIn("Fatture in Cloud", sistema_section)
         self.assertIn("Categorie di spesa", sistema_section)
         self.assertNotIn("Fondo accantonamento", content)
         self.assertNotIn("Scambio retta", content)
         self.assertNotIn("Tariffe scambio retta", content)
-        self.assertNotIn("Fatture e scadenze", content)
         self.assertNotIn("<span>Fornitori</span>", content)
         self.assertNotIn("Gestione finanziaria", content)
 
@@ -1039,6 +1077,15 @@ class SidebarSistemaTests(TestCase):
         cache.clear()
         super().tearDown()
 
+    def force_login_sidebar_admin(self, username="sidebar-admin@example.com"):
+        admin = User.objects.create_superuser(
+            username=username,
+            email=username,
+            password="Password123!",
+        )
+        self.client.force_login(admin)
+        return admin
+
     def impostazioni_generali_post_data(self, **overrides):
         data = {
             "terminologia_studente": "studente",
@@ -1088,7 +1135,36 @@ class SidebarSistemaTests(TestCase):
             self.assertGreater(current_index, previous_index)
             previous_index = current_index
 
-    def test_home_uses_canonical_sidebar_without_local_customization_controls(self):
+    def test_home_renders_standard_sidebar_top_level_order_for_admin(self):
+        self.force_login_sidebar_admin("standard-sidebar-admin@example.com")
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        dashboard_index = content.index('<span class="sidebar-link-text">Dashboard</span>')
+        section_keys = [
+            "calendario",
+            "anagrafica",
+            "gestione-economica",
+            "servizi-extra",
+            "famiglie-interessate",
+            "archivio-storico",
+            "parcheggio",
+            "sistema",
+        ]
+
+        previous_index = dashboard_index
+        for section_key in section_keys:
+            current_index = content.index(f'data-sidebar-section-key="{section_key}"')
+            self.assertGreater(current_index, previous_index)
+            previous_index = current_index
+
+        sistema_start = content.index('data-sidebar-section-key="sistema"')
+        sistema_section = content[sistema_start:]
+        self.assertIn("<span>Impostazioni generali</span>", sistema_section)
+
+    def test_home_hides_sidebar_reorder_controls_for_non_admin_roles(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
@@ -1096,12 +1172,46 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="sidebar-reorder-list"')
         self.assertNotContains(response, 'id="sidebar-reorder-toggle"')
-        self.assertNotContains(response, "Modalita drag and drop")
+        self.assertNotContains(response, "Riordina menu")
         self.assertNotContains(response, 'id="sidebar-customize-toggle"')
         self.assertNotContains(response, reverse("sidebar_personalizzazione_sistema"))
-        self.assertNotContains(response, 'id="sidebar-personalizzazione-config"')
-        self.assertNotContains(response, "sidebar-customization.js")
-        self.assertNotContains(response, "sidebar-reorder.js")
+
+    def test_home_renders_sidebar_reorder_controls_for_operational_admin(self):
+        self.force_login_sidebar_admin()
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="sidebar-reorder-list"')
+        self.assertContains(response, 'id="sidebar-reorder-toggle"')
+        self.assertContains(response, "Riordina menu")
+        self.assertContains(response, reverse("sidebar_personalizzazione_sistema"))
+        self.assertContains(response, 'id="sidebar-personalizzazione-config"')
+        self.assertContains(response, "sidebar-customization.js")
+        self.assertContains(response, "sidebar-reorder.js")
+        self.assertNotContains(response, 'id="sidebar-customize-toggle"')
+
+    def test_home_ignores_non_admin_sidebar_personalization_config(self):
+        SidebarPersonalizzazione.objects.create(
+            user=self.user,
+            config={
+                "version": 1,
+                "hidden": ["section:sistema"],
+                "order": {"root": ["section:famiglie-interessate"]},
+                "custom_sections": [],
+            },
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="sidebar-reorder-list"')
+        self.assertContains(response, 'id="sidebar-personalizzazione-config"')
+        self.assertEqual(
+            response.context["sidebar_personalizzazione_config"],
+            {"version": 1, "hidden": [], "order": {}, "custom_sections": []},
+        )
 
     def test_saved_sidebar_personalizations_do_not_affect_canonical_menu(self):
         admin = User.objects.create_superuser(
@@ -1161,7 +1271,15 @@ class SidebarSistemaTests(TestCase):
         response = self.client.get(reverse("home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["sidebar_personalizzazione_config"], {})
+        self.assertEqual(
+            response.context["sidebar_personalizzazione_config"],
+            {
+                "version": 1,
+                "hidden": [],
+                "order": {"root": ["section:sistema", "section:anagrafica"]},
+                "custom_sections": [],
+            },
+        )
         self.assertContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
         self.assertContains(response, 'data-sidebar-menu-key="anagrafica_studenti"', html=False)
         self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
@@ -1212,8 +1330,8 @@ class SidebarSistemaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
 
-    def test_sidebar_personalization_endpoint_saves_user_config(self):
-        self.client.force_login(self.user)
+    def test_sidebar_personalization_endpoint_saves_admin_config(self):
+        admin = self.force_login_sidebar_admin("sidebar-save-admin@example.com")
         payload = {
             "config": {
                 "hidden": ["section:gestione-finanziaria", "chiave non valida"],
@@ -1239,15 +1357,27 @@ class SidebarSistemaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        saved = SidebarPersonalizzazione.objects.get(user=self.user)
+        saved = SidebarPersonalizzazione.objects.get(user=admin)
         self.assertEqual(saved.config["hidden"], ["section:gestione-finanziaria"])
         self.assertEqual(saved.config["order"]["root"], ["section:sistema", "section:gestione-finanziaria"])
         self.assertEqual(saved.config["custom_sections"][0]["label"], "Preferiti")
         self.assertEqual(len(saved.config["custom_sections"][0]["links"]), 1)
         self.assertEqual(saved.config["custom_sections"][0]["links"][0]["url"], "/gestione-finanziaria/movimenti/")
 
-    def test_sidebar_personalization_endpoint_keeps_url_like_order_keys(self):
+    def test_sidebar_personalization_endpoint_rejects_non_admin_config(self):
         self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("sidebar_personalizzazione_sistema"),
+            data=json.dumps({"config": {"order": {"root": ["section:sistema"]}}}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(SidebarPersonalizzazione.objects.filter(user=self.user).exists())
+
+    def test_sidebar_personalization_endpoint_keeps_url_like_order_keys(self):
+        admin = self.force_login_sidebar_admin("sidebar-order-admin@example.com")
         parent_key = "nav:section:gestione-finanziaria:0"
         url_key = "link:/gestione-finanziaria/movimenti/?search=Rossi+Mario&filter=a;b,c(1)"
         long_key = "link:/gestione-finanziaria/report/categorie-mensile/?q=" + ("x" * 230) + "+ok"
@@ -1268,16 +1398,16 @@ class SidebarSistemaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        saved = SidebarPersonalizzazione.objects.get(user=self.user)
+        saved = SidebarPersonalizzazione.objects.get(user=admin)
         self.assertEqual(saved.config["hidden"], [url_key])
         self.assertEqual(saved.config["order"][parent_key], [long_key, url_key])
 
     def test_sidebar_personalization_endpoint_resets_user_config(self):
+        admin = self.force_login_sidebar_admin("sidebar-reset-admin@example.com")
         SidebarPersonalizzazione.objects.create(
-            user=self.user,
+            user=admin,
             config={"version": 1, "hidden": ["section:sistema"], "order": {}, "custom_sections": []},
         )
-        self.client.force_login(self.user)
 
         response = self.client.post(
             reverse("sidebar_personalizzazione_sistema"),
@@ -1286,7 +1416,7 @@ class SidebarSistemaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(SidebarPersonalizzazione.objects.filter(user=self.user).exists())
+        self.assertFalse(SidebarPersonalizzazione.objects.filter(user=admin).exists())
 
     def test_sidebar_collapse_toggle_lives_inside_sidebar(self):
         self.client.force_login(self.user)

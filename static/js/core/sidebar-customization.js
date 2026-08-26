@@ -1077,13 +1077,16 @@ window.ArborisSidebarCustomization = (function () {
     function init() {
         const trigger = document.getElementById("sidebar-customize-toggle");
         root = document.getElementById("sidebar-reorder-list");
-        if (!trigger || !root) {
+        const configScript = document.getElementById("sidebar-personalizzazione-config");
+        if (!root || (!trigger && !configScript)) {
             return;
         }
-        configUrl = trigger.dataset.sidebarConfigUrl || "";
+        configUrl = trigger?.dataset.sidebarConfigUrl || root.dataset.sidebarConfigUrl || "";
         config = { ...cloneConfig(EMPTY_CONFIG), ...readInitialConfig() };
         applyConfig();
-        trigger.addEventListener("click", openDialog);
+        if (trigger) {
+            trigger.addEventListener("click", openDialog);
+        }
     }
 
     return {
