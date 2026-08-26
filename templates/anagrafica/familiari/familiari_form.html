@@ -57,30 +57,34 @@
                 <span class="btn-label">Indietro</span>
             </button>
             {% if familiare %}
-                {% if studenti_formset %}
-                    <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-student-card-action="add">
+                {% if can_manage_anagrafica %}
+                    {% if studenti_formset %}
+                        <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-student-card-action="add">
+                            <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                            <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+                        </button>
+                    {% endif %}
+                    {% if parenti_formset %}
+                        <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-relative-card-action="add">
+                            <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                            <span class="btn-label">Familiare</span>
+                        </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
                         <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                        <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+                        <span class="btn-label">Documento</span>
                     </button>
                 {% endif %}
-                {% if parenti_formset %}
-                    <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-relative-card-action="add">
-                        <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                        <span class="btn-label">Familiare</span>
-                    </button>
-                {% endif %}
-                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-document-card-action="add">
-                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                    <span class="btn-label">Documento</span>
-                </button>
                 <a href="{% url 'lista_familiari' %}" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg></span>
                     <span class="btn-label">Elenco</span>
                 </a>
-                <a href="{% url 'elimina_familiare' familiare.pk %}" class="btn btn-danger btn-icon-text">
-                    <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                    <span class="btn-label">Elimina</span>
-                </a>
+                {% if can_manage_anagrafica %}
+                    <a href="{% url 'elimina_familiare' familiare.pk %}" class="btn btn-danger btn-icon-text">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
+                        <span class="btn-label">Elimina</span>
+                    </a>
+                {% endif %}
             {% else %}
                 <button type="submit" form="familiare-detail-form" name="_save" class="btn btn-save-soft btn-icon-text" data-auto-save-for="familiare-detail-form">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
@@ -122,10 +126,12 @@
                             <div class="family-overview-content relative-overview-content">
                                 <div class="family-overview-title-row relative-overview-title-row">
                                     <h2>{{ familiare.nome }} {{ familiare.cognome }}</h2>
-                                    <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" id="enable-edit-familiare-btn" data-relative-main-action="edit">
-                                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
-                                        <span class="btn-label">Modifica dati principali</span>
-                                    </button>
+                                    {% if can_manage_anagrafica %}
+                                        <button type="button" class="btn btn-secondary btn-sm btn-icon-text btn-intent-edit" id="enable-edit-familiare-btn" data-relative-main-action="edit">
+                                            <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg></span>
+                                            <span class="btn-label">Modifica dati principali</span>
+                                        </button>
+                                    {% endif %}
                                 </div>
                                 <div class="family-overview-status relative-overview-status">
                                     Relazione:

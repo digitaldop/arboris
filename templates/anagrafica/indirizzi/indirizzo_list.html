@@ -14,7 +14,9 @@
 {% block content %}
     <div class="page-head">
         <h1 class="page-title">Indirizzi</h1>
-        <a href="{% url 'crea_indirizzo' %}" class="btn btn-primary">Nuovo indirizzo</a>
+        {% if can_manage_anagrafica %}
+            <a href="{% url 'crea_indirizzo' %}" class="btn btn-primary">Nuovo indirizzo</a>
+        {% endif %}
     </div>
 
     <div class="panel">
@@ -52,12 +54,14 @@
                                 <td>{{ indirizzo.regione|default:"—" }}</td>
                                 <td class="actions-cell">
                                     <a class="table-link" href="{% url 'modifica_indirizzo' indirizzo.pk %}">
-                                        Modifica
+                                        Apri
                                     </a>
-                                    |
-                                    <a class="table-link table-link-danger" href="{% url 'elimina_indirizzo' indirizzo.pk %}">
-                                        Elimina
-                                    </a>
+                                    {% if can_manage_anagrafica %}
+                                        |
+                                        <a class="table-link table-link-danger" href="{% url 'elimina_indirizzo' indirizzo.pk %}">
+                                            Elimina
+                                        </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}

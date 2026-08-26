@@ -1,11 +1,16 @@
+from copy import deepcopy
+from urllib.parse import urlsplit
+
 from django.core.cache import cache
 from django.db.utils import OperationalError, ProgrammingError
+from django.urls import Resolver404, resolve
 
 from .models import (
     LivelloPermesso,
     Scuola,
     SidebarPersonalizzazione,
     SistemaImpostazioniGenerali,
+    SistemaUtentePermessi,
     get_site_font_settings,
 )
 from .permissions import (
@@ -17,12 +22,7 @@ from .permissions import (
 from .terminology import get_educator_terminology, get_family_member_terminology, get_student_terminology
 
 
-def get_current_permission_module(request):
-    resolver_match = getattr(request, "resolver_match", None)
-    if not resolver_match or not getattr(resolver_match, "func", None):
-        return ""
-
-    view_module = getattr(resolver_match.func, "__module__", "")
+def permission_module_from_view(view_module, path=""):
     if view_module.startswith("anagrafica."):
         return "anagrafica"
     if view_module.startswith("osservazioni."):
@@ -47,9 +47,21 @@ def get_current_permission_module(request):
         return "sistema"
     if view_module.startswith("sistema."):
         return "sistema"
-    if getattr(request, "path", "").startswith(("/scuola/calendario/", "/calendario/")):
+    if path.startswith(("/scuola/calendario/", "/calendario/")):
         return "calendario"
     return ""
+
+
+def get_current_permission_module(request):
+    resolver_match = getattr(request, "resolver_match", None)
+    if not resolver_match or not getattr(resolver_match, "func", None):
+        return ""
+
+    if getattr(resolver_match, "url_name", "") == "home":
+        return ""
+
+    view_module = getattr(resolver_match.func, "__module__", "")
+    return permission_module_from_view(view_module, getattr(request, "path", ""))
 
 
 def scuola_context(request):
@@ -187,6 +199,91 @@ def get_current_servizio_extra_id(request):
     return ServizioExtra.objects.filter(pk=pk).values_list("pk", flat=True).first() if pk else None
 
 
+def sidebar_user_is_canonical_admin(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        profilo = user.profilo_permessi
+    except (AttributeError, SistemaUtentePermessi.DoesNotExist):
+        return False
+    return bool(
+        profilo.controllo_completo_effettivo
+        or profilo.amministratore_operativo_effettivo
+    )
+
+
+def user_can_access_sidebar_url(user, url):
+    parsed = urlsplit(str(url or "").strip())
+    if parsed.scheme or parsed.netloc:
+        return True
+    if not parsed.path or not parsed.path.startswith("/"):
+        return True
+
+    try:
+        resolver_match = resolve(parsed.path)
+    except Resolver404:
+        return True
+
+    if getattr(resolver_match, "url_name", "") == "home":
+        return True
+
+    module_name = permission_module_from_view(
+        getattr(resolver_match.func, "__module__", ""),
+        parsed.path,
+    )
+    if not module_name:
+        return True
+    return user_has_module_permission(user, module_name, LivelloPermesso.VISUALIZZAZIONE)
+
+
+def filter_sidebar_config_for_user(config, user):
+    filtered_config = deepcopy(config) if isinstance(config, dict) else {}
+    custom_sections = []
+    for section in filtered_config.get("custom_sections", []) or []:
+        if not isinstance(section, dict):
+            continue
+        links = [
+            link
+            for link in section.get("links", []) or []
+            if isinstance(link, dict) and user_can_access_sidebar_url(user, link.get("url"))
+        ]
+        if links:
+            filtered_section = deepcopy(section)
+            filtered_section["links"] = links
+            custom_sections.append(filtered_section)
+    if custom_sections:
+        filtered_config["custom_sections"] = custom_sections
+    else:
+        filtered_config.pop("custom_sections", None)
+    return filtered_config
+
+
+def get_effective_sidebar_personalizzazione_config(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {}
+
+    personalizzazione = SidebarPersonalizzazione.objects.filter(user=user).first()
+    if sidebar_user_is_canonical_admin(user):
+        if personalizzazione:
+            return filter_sidebar_config_for_user(personalizzazione.config, user)
+        return {}
+
+    for admin_personalizzazione in SidebarPersonalizzazione.objects.select_related(
+        "user",
+        "user__profilo_permessi",
+        "user__profilo_permessi__ruolo_permessi",
+    ).order_by("-user__is_superuser", "user_id"):
+        if sidebar_user_is_canonical_admin(admin_personalizzazione.user):
+            return filter_sidebar_config_for_user(admin_personalizzazione.config, user)
+
+    if personalizzazione:
+        return filter_sidebar_config_for_user(personalizzazione.config, user)
+
+    return {}
+
+
 def sistema_permissions_context(request):
     user = getattr(request, "user", None)
     profilo = get_user_permission_profile(user)
@@ -272,8 +369,7 @@ def sistema_permissions_context(request):
 
     if getattr(user, "is_authenticated", False):
         try:
-            personalizzazione = SidebarPersonalizzazione.objects.filter(user=user).first()
-            sidebar_personalizzazione_config = personalizzazione.config if personalizzazione else {}
+            sidebar_personalizzazione_config = get_effective_sidebar_personalizzazione_config(user)
         except (OperationalError, ProgrammingError):
             sidebar_personalizzazione_config = {}
 
@@ -294,6 +390,7 @@ def sistema_permissions_context(request):
         "user_permission_profile": profilo,
         "role_theme": role_theme,
         "current_permission_module": current_module,
+        "can_manage_current_module": can_manage_current_module,
         "current_module_view_only": bool(current_module) and not can_manage_current_module,
         "can_view_anagrafica": can_view_anagrafica,
         "can_manage_anagrafica": can_manage_anagrafica,

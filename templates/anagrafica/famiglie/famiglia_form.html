@@ -37,14 +37,16 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Indietro</span>
             </button>
-            <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
-                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                <span class="btn-label">{{ student_terminology.selected_singular }}</span>
-            </button>
-            <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
-                <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
-                <span class="btn-label">Familiare</span>
-            </button>
+            {% if can_manage_anagrafica %}
+                <button type="button" class="btn btn-primary btn-icon-text btn-add-action" data-student-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">{{ student_terminology.selected_singular }}</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-icon-text btn-add-action" data-relative-card-action="add">
+                    <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
+                    <span class="btn-label">Familiare</span>
+                </button>
+            {% endif %}
             <button type="button" class="btn btn-secondary btn-icon-text" id="print-famiglia-btn" data-print-url="{% url 'stampa_famiglia_logica' famiglia.logical_key %}">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#printer"></use></svg></span>
                 <span class="btn-label">Stampa</span>

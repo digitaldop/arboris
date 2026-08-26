@@ -9,6 +9,7 @@ from unittest import skip
 from unittest.mock import patch
 
 import pandas as pd
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -80,6 +81,7 @@ from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
     AzioneOperazioneCronologia,
+    LivelloPermesso,
     SistemaImpostazioniGenerali,
     SistemaOperazioneCronologia,
     SistemaRuoloPermessi,
@@ -1135,6 +1137,84 @@ class LuogoNascitaAutocompletePerformanceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, logical_url)
         self.assertNotContains(response, reverse("modifica_famiglia", kwargs={"pk": famiglia.pk}))
+
+
+class AnagraficaReadOnlyInterfaceTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="anagrafica-viewer@example.com",
+            email="anagrafica-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=self.user,
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.studente = Studente.objects.create(nome="Luca", cognome="Rossi", attivo=True)
+        self.familiare = Familiare.objects.create(
+            nome="Giulia",
+            cognome="Rossi",
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.familiare,
+            relazione_familiare=self.relazione,
+            attivo=True,
+        )
+        self.indirizzo = Indirizzo.objects.create(via="Via Roma", numero_civico="1")
+        self.client.force_login(self.user)
+
+    def test_student_list_hides_create_and_delete_actions_for_view_only_user(self):
+        response = self.client.get(reverse("lista_studenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_manage_anagrafica"])
+        self.assertContains(response, "module-anagrafica module-view-only")
+        self.assertContains(response, "Apri scheda")
+        self.assertContains(response, reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+        self.assertNotContains(response, f'href="{reverse("crea_studente")}"')
+        self.assertNotContains(response, f'href="{reverse("elimina_studente", kwargs={"pk": self.studente.pk})}"')
+
+    def test_familiare_list_hides_create_and_delete_actions_for_view_only_user(self):
+        response = self.client.get(reverse("lista_familiari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_manage_anagrafica"])
+        self.assertContains(response, "Apri scheda")
+        self.assertContains(response, reverse("modifica_familiare", kwargs={"pk": self.familiare.pk}))
+        self.assertNotContains(response, f'href="{reverse("crea_familiare")}"')
+        self.assertNotContains(response, f'href="{reverse("elimina_familiare", kwargs={"pk": self.familiare.pk})}"')
+
+    def test_indirizzi_list_shows_open_without_create_or_delete_for_view_only_user(self):
+        response = self.client.get(reverse("lista_indirizzi"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Apri")
+        self.assertContains(response, reverse("modifica_indirizzo", kwargs={"pk": self.indirizzo.pk}))
+        self.assertNotContains(response, f'href="{reverse("crea_indirizzo")}"')
+        self.assertNotContains(response, f'href="{reverse("elimina_indirizzo", kwargs={"pk": self.indirizzo.pk})}"')
+
+    def test_student_detail_hides_primary_edit_entrypoints_for_view_only_user(self):
+        response = self.client.get(reverse("modifica_studente", kwargs={"pk": self.studente.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_manage_anagrafica"])
+        self.assertContains(response, "module-anagrafica module-view-only")
+        self.assertContains(response, "Osservazioni Pedagogiche")
+        self.assertContains(response, "Stampa")
+        self.assertNotContains(response, 'id="enable-edit-studente-btn"')
+        self.assertNotContains(response, f'href="{reverse("elimina_studente", kwargs={"pk": self.studente.pk})}"')
+
+    def test_view_only_css_hides_dynamic_anagrafica_edit_controls(self):
+        css = (settings.BASE_DIR / "static" / "css" / "style.css").read_text(encoding="utf-8")
+
+        self.assertIn(".module-view-only #enable-inline-edit-studente-btn", css)
+        self.assertIn(".module-view-only #student-note-edit-shortcut", css)
+        self.assertIn('.module-view-only [data-student-card-action="edit"]', css)
+        self.assertIn(".module-view-only .family-dashed-add", css)
 
 
 class FamiliareCurrentDetailViewTests(TestCase):

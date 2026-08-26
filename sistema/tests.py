@@ -1071,6 +1071,75 @@ class SidebarSistemaTests(TestCase):
         self.assertContains(response, 'id="sidebar-personalizzazione-config"')
         self.assertContains(response, "sidebar-customization.js")
 
+    def test_limited_user_inherits_admin_sidebar_config_filtered_by_permissions(self):
+        admin = User.objects.create_superuser(
+            username="sidebar-admin@example.com",
+            email="sidebar-admin@example.com",
+            password="Password123!",
+        )
+        SidebarPersonalizzazione.objects.create(
+            user=admin,
+            config={
+                "version": 1,
+                "hidden": ["section:gestione-economica"],
+                "order": {"root": ["section:sistema", "section:anagrafica"]},
+                "custom_sections": [
+                    {
+                        "id": "preferiti",
+                        "label": "Preferiti",
+                        "icon": "student",
+                        "links": [
+                            {
+                                "id": "studenti",
+                                "label": "Studenti",
+                                "url": reverse("lista_studenti"),
+                                "icon": "student",
+                            },
+                            {
+                                "id": "utenti",
+                                "label": "Utenti",
+                                "url": reverse("lista_utenti"),
+                                "icon": "user",
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+        viewer = User.objects.create_user(
+            username="sidebar-viewer@example.com",
+            email="sidebar-viewer@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=viewer,
+            permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        SidebarPersonalizzazione.objects.create(
+            user=viewer,
+            config={
+                "version": 1,
+                "hidden": ["section:anagrafica"],
+                "order": {"root": ["section:famiglie-interessate"]},
+                "custom_sections": [],
+            },
+        )
+        self.client.force_login(viewer)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        config = response.context["sidebar_personalizzazione_config"]
+        self.assertEqual(config["hidden"], ["section:gestione-economica"])
+        self.assertEqual(config["order"]["root"], ["section:sistema", "section:anagrafica"])
+        self.assertEqual(len(config["custom_sections"]), 1)
+        self.assertEqual(
+            [link["id"] for link in config["custom_sections"][0]["links"]],
+            ["studenti"],
+        )
+        self.assertContains(response, 'data-sidebar-section-key="anagrafica"', html=False)
+        self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
+
     def test_sidebar_personalization_endpoint_saves_user_config(self):
         self.client.force_login(self.user)
         payload = {
@@ -1281,6 +1350,83 @@ class SidebarSistemaTests(TestCase):
         response = self.client.get(reverse("calendario_agenda"))
 
         self.assertRedirects(response, reverse("home"))
+
+
+class GlobalReadOnlyModuleInterfaceTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def create_viewer(self, module_name):
+        user = User.objects.create_user(
+            username=f"{module_name}-viewer@example.com",
+            email=f"{module_name}-viewer@example.com",
+            password="Password123!",
+        )
+        permission_field = {
+            "anagrafica": "permesso_anagrafica",
+            "famiglie_interessate": "permesso_famiglie_interessate",
+            "economia": "permesso_economia",
+            "sistema": "permesso_sistema",
+            "calendario": "permesso_calendario",
+            "servizi_extra": "permesso_servizi_extra",
+            "gestione_finanziaria": "permesso_gestione_finanziaria",
+            "gestione_amministrativa": "permesso_gestione_amministrativa",
+        }[module_name]
+        SistemaUtentePermessi.objects.create(
+            user=user,
+            **{permission_field: LivelloPermesso.VISUALIZZAZIONE},
+        )
+        return user
+
+    def test_view_only_body_class_and_context_apply_to_all_main_modules(self):
+        routes = [
+            ("anagrafica", "lista_studenti", "module-anagrafica"),
+            ("famiglie_interessate", "lista_famiglie_interessate", "module-famiglie_interessate"),
+            ("economia", "lista_iscrizioni", "module-economia"),
+            ("sistema", "lista_classi", "module-sistema"),
+            ("calendario", "lista_eventi_calendario", "module-calendario"),
+            ("servizi_extra", "lista_servizi_extra", "module-servizi_extra"),
+            ("gestione_finanziaria", "lista_movimenti_finanziari", "module-gestione_finanziaria"),
+            ("gestione_amministrativa", "lista_dipendenti", "module-gestione_amministrativa"),
+        ]
+
+        for module_name, route_name, body_class in routes:
+            with self.subTest(module=module_name):
+                self.client.force_login(self.create_viewer(module_name))
+
+                response = self.client.get(reverse(route_name))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["current_permission_module"], module_name)
+                self.assertFalse(response.context["can_manage_current_module"])
+                self.assertTrue(response.context["current_module_view_only"])
+                self.assertContains(response, f"{body_class} module-view-only", html=False)
+
+    def test_global_view_only_css_covers_common_crud_controls(self):
+        css = (settings.BASE_DIR / "static" / "css" / "style.css").read_text(encoding="utf-8")
+
+        required_selectors = [
+            '.module-view-only a.btn-primary[href*="/nuovo"]',
+            '.module-view-only a.btn-primary[href*="/nuova"]',
+            '.module-view-only a.btn-secondary[href*="/nuovo"]',
+            '.module-view-only a.btn-secondary[href*="/nuova"]',
+            '.module-view-only .page-head-actions a.btn-secondary[href*="/duplicati"]',
+            '.module-view-only .page-head-actions a.btn-secondary[href*="/ripulisci"]',
+            '.module-view-only a[href*="/elimina/"]',
+            '.module-view-only form[action*="/elimina/"] button[type="submit"]',
+            ".module-view-only .table-icon-link-danger",
+            ".module-view-only .observation-icon-btn-danger",
+            ".module-view-only [id^=\"enable-edit-\"]",
+            ".module-view-only [data-bulk-toolbar]",
+            ".module-view-only [data-bulk-submit]",
+            ".module-view-only [data-bulk-checkbox]",
+            ".module-view-only .finance-bulk-select-col",
+            ".module-view-only .active-toggle-form",
+            ".module-view-only .actions-cell",
+        ]
+        for selector in required_selectors:
+            with self.subTest(selector=selector):
+                self.assertIn(selector, css)
 
 
 class ActiveToggleTests(TestCase):
