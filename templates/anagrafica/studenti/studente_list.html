@@ -51,8 +51,8 @@
             </label>
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Anno scolastico</span>
-                <select name="anno_scolastico" data-live-list-filter>
-                    <option value="">Tutti gli anni</option>
+                <select name="anno_scolastico" data-live-list-filter data-live-list-clear-value="{{ anno_scolastico_predefinito_id }}">
+                    <option value="{{ anno_scolastico_all_value }}" {% if anno_scolastico_selezionato == anno_scolastico_all_value %}selected{% endif %}>Tutti gli anni</option>
                     {% for anno in anni_scolastici_disponibili %}
                         <option value="{{ anno.pk }}" {% if anno_scolastico_selezionato == anno.pk|stringformat:"s" %}selected{% endif %}>{{ anno.nome_anno_scolastico }}</option>
                     {% endfor %}

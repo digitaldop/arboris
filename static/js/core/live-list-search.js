@@ -25,14 +25,27 @@
         return url;
     }
 
+    function fieldValue(field) {
+        if (field.type === "checkbox" || field.type === "radio") {
+            return field.checked ? String(field.value || "").trim() : "";
+        }
+        return String(field.value || "").trim();
+    }
+
+    function fieldClearValue(field) {
+        if (field.dataset.liveListClearValue !== undefined) {
+            return String(field.dataset.liveListClearValue || "").trim();
+        }
+        return "";
+    }
+
     function syncClearLink(form) {
         const clearLink = form.querySelector("[data-live-list-clear]");
         if (!clearLink) return;
         const hasValue = Array.from(form.elements).some((field) => {
             if (!field.name || field.disabled) return false;
             if (field.type === "submit" || field.type === "button" || field.type === "reset") return false;
-            if ((field.type === "checkbox" || field.type === "radio") && !field.checked) return false;
-            return String(field.value || "").trim();
+            return fieldValue(field) !== fieldClearValue(field);
         });
         clearLink.hidden = !hasValue;
     }
@@ -117,10 +130,11 @@
                 Array.from(form.elements).forEach((field) => {
                     if (!field.name || field.disabled) return;
                     if (field.type === "submit" || field.type === "button" || field.type === "reset") return;
+                    const clearValue = fieldClearValue(field);
                     if (field.type === "checkbox" || field.type === "radio") {
-                        field.checked = false;
+                        field.checked = Boolean(clearValue && String(field.value || "").trim() === clearValue);
                     } else {
-                        field.value = "";
+                        field.value = clearValue;
                     }
                 });
                 refreshResults();

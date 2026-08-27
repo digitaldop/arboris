@@ -41,11 +41,19 @@
                     data-live-list-input
                 >
             </label>
+            <label class="anagrafica-current-toggle-field">
+                <span class="anagrafica-filter-label">Vista</span>
+                <span class="active-toggle anagrafica-current-enrollment-toggle">
+                    <input type="checkbox" name="tutti" value="1" {% if mostra_tutti_anagrafiche %}checked{% endif %} data-live-list-filter>
+                    <span class="active-toggle-track" aria-hidden="true"></span>
+                    <span class="active-toggle-label">Mostra tutti</span>
+                </span>
+            </label>
             <button type="submit" class="btn btn-secondary btn-icon-text">
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                 <span class="btn-label">Cerca</span>
             </button>
-            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear{% if not q %} hidden{% endif %}>
+            <a href="{% url 'lista_famiglie' %}" class="btn btn-secondary btn-icon-text" data-live-list-clear{% if not filtri_attivi %} hidden{% endif %}>
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                 <span class="btn-label">Pulisci</span>
             </a>

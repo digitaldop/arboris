@@ -22088,6 +22088,19 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     box-shadow: 0 0 0 3px rgba(65, 118, 144, 0.12);
 }
 
+.anagrafica-current-toggle-field {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: 44px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+}
+
+.anagrafica-current-enrollment-toggle .active-toggle-label {
+    min-width: 82px;
+}
+
 .anagrafica-list-panel {
     border: 1px solid #dce5f0;
     border-radius: 8px;

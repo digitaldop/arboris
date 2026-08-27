@@ -105,6 +105,8 @@ ANAGRAFICA_DOCUMENT_QUERY_TARGETS = {
     "famiglie": "Famiglie",
 }
 
+ANAGRAFICA_ALL_YEARS_VALUE = "tutti"
+
 ANAGRAFICA_DOCUMENT_QUERY_PRESETS = [
     {
         "key": "familiari_senza_documento_identita",
@@ -176,6 +178,42 @@ def resolve_dashboard_school_year(request, *, today=None):
         "anno_scolastico_id": str(anno_selezionato.pk) if anno_selezionato else "",
         "has_year_switch": len(anni_scolastici) > 1,
     }
+
+
+def anagrafica_active_school_years_queryset():
+    return AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id")
+
+
+def resolve_studenti_list_school_year(anno_scolastico_filter):
+    anni_scolastici = anagrafica_active_school_years_queryset()
+    anno_predefinito = resolve_default_anno_scolastico(anni_scolastici)
+    selected_filter = (anno_scolastico_filter or "").strip()
+
+    if selected_filter == ANAGRAFICA_ALL_YEARS_VALUE:
+        return anni_scolastici, anno_predefinito, None, ANAGRAFICA_ALL_YEARS_VALUE
+
+    if selected_filter.isdigit():
+        anno_selezionato = anni_scolastici.filter(pk=int(selected_filter)).first()
+        if anno_selezionato:
+            return anni_scolastici, anno_predefinito, anno_selezionato, str(anno_selezionato.pk)
+
+    if anno_predefinito:
+        return anni_scolastici, anno_predefinito, anno_predefinito, str(anno_predefinito.pk)
+
+    return anni_scolastici, anno_predefinito, None, ANAGRAFICA_ALL_YEARS_VALUE
+
+
+def current_school_year_student_ids(anno_scolastico):
+    if not anno_scolastico:
+        return None
+    return set(
+        Iscrizione.objects.filter(
+            anno_scolastico=anno_scolastico,
+            attiva=True,
+        )
+        .values_list("studente_id", flat=True)
+        .distinct()
+    )
 
 
 def build_school_year_status(anno_scolastico):
@@ -3108,8 +3146,17 @@ def ricerche_anagrafica(request):
 #INIZIO VIEWS DELLE FAMIGLIE
 def lista_famiglie(request):
     q = request.GET.get("q", "").strip()
+    mostra_tutti = (request.GET.get("tutti") or "").strip() == "1"
+    anno_corrente = resolve_default_anno_scolastico(anagrafica_active_school_years_queryset())
+    studenti_correnti_ids = None if mostra_tutti else current_school_year_student_ids(anno_corrente)
 
     famiglie = list(iter_logical_family_snapshots())
+    if studenti_correnti_ids is not None:
+        famiglie = [
+            famiglia
+            for famiglia in famiglie
+            if famiglia.student_ids.intersection(studenti_correnti_ids)
+        ]
     if q:
         famiglie = [
             famiglia
@@ -3126,6 +3173,9 @@ def lista_famiglie(request):
             "famiglie": famiglie,
             "evidenzia_id": evidenzia_id,
             "q": q,
+            "anno_corrente_anagrafiche": anno_corrente,
+            "mostra_tutti_anagrafiche": mostra_tutti,
+            "filtri_attivi": bool(q or mostra_tutti),
         },
     )
 
@@ -3469,6 +3519,8 @@ def elimina_relazione_familiare(request, pk):
 #Views per i familiari veri e propri
 def lista_familiari(request):
     q = request.GET.get("q", "").strip()
+    mostra_tutti = (request.GET.get("tutti") or "").strip() == "1"
+    anno_corrente = resolve_default_anno_scolastico(anagrafica_active_school_years_queryset())
 
     familiari = (
         Familiare.objects
@@ -3484,6 +3536,13 @@ def lista_familiari(request):
         .prefetch_related(active_relative_student_prefetch())
         .order_by("cognome", "nome")
     )
+
+    if not mostra_tutti and anno_corrente:
+        familiari = familiari.filter(
+            relazioni_studenti__attivo=True,
+            relazioni_studenti__studente__iscrizioni__anno_scolastico=anno_corrente,
+            relazioni_studenti__studente__iscrizioni__attiva=True,
+        ).distinct()
 
     if q:
         familiari = familiari.filter(
@@ -3513,6 +3572,9 @@ def lista_familiari(request):
             "familiari": familiari,
             "q": q,
             "evidenzia_id": evidenzia_id,
+            "anno_corrente_anagrafiche": anno_corrente,
+            "mostra_tutti_anagrafiche": mostra_tutti,
+            "filtri_attivi": bool(q or mostra_tutti),
         },
     )
 
@@ -4355,6 +4417,17 @@ def lista_studenti(request):
     anno_scolastico_filter = (request.GET.get("anno_scolastico") or "").strip()
     classe_filter = (request.GET.get("classe") or "").strip()
     gruppo_classe_filter = (request.GET.get("gruppo_classe") or "").strip()
+    (
+        anni_scolastici_disponibili,
+        anno_scolastico_predefinito,
+        anno_scolastico_selezionato_obj,
+        anno_scolastico_selezionato,
+    ) = resolve_studenti_list_school_year(anno_scolastico_filter)
+    anno_scolastico_predefinito_id = (
+        str(anno_scolastico_predefinito.pk)
+        if anno_scolastico_predefinito
+        else ANAGRAFICA_ALL_YEARS_VALUE
+    )
 
     studenti = (
         annotate_studenti_current_iscrizione_status(Studente.objects.all())
@@ -4389,8 +4462,8 @@ def lista_studenti(request):
         ).distinct()
 
     iscrizione_filter = Q()
-    if anno_scolastico_filter.isdigit():
-        iscrizione_filter &= Q(iscrizioni__anno_scolastico_id=int(anno_scolastico_filter))
+    if anno_scolastico_selezionato_obj:
+        iscrizione_filter &= Q(iscrizioni__anno_scolastico=anno_scolastico_selezionato_obj)
     if classe_filter.isdigit():
         iscrizione_filter &= Q(iscrizioni__classe_id=int(classe_filter))
     if gruppo_classe_filter.isdigit():
@@ -4402,7 +4475,12 @@ def lista_studenti(request):
     decorate_studenti_current_enrollment_labels(studenti)
     decorate_studenti_direct_relation_labels(studenti)
     evidenzia_id = request.GET.get("highlight")
-    filtri_attivi = bool(q or anno_scolastico_filter or classe_filter or gruppo_classe_filter)
+    filtri_attivi = bool(
+        q
+        or classe_filter
+        or gruppo_classe_filter
+        or anno_scolastico_selezionato != anno_scolastico_predefinito_id
+    )
 
     return render(
         request,
@@ -4410,14 +4488,17 @@ def lista_studenti(request):
         {
             "studenti": studenti,
             "q": q,
-            "anni_scolastici_disponibili": AnnoScolastico.objects.filter(attivo=True).order_by("-data_inizio", "-id"),
+            "anni_scolastici_disponibili": anni_scolastici_disponibili,
             "classi_disponibili": Classe.objects.filter(attiva=True).order_by("ordine_classe", "nome_classe", "sezione_classe"),
             "gruppi_classe_disponibili": (
                 GruppoClasse.objects.filter(attivo=True)
                 .select_related("anno_scolastico")
                 .order_by("-anno_scolastico__data_inizio", "nome_gruppo_classe", "id")
             ),
-            "anno_scolastico_selezionato": anno_scolastico_filter,
+            "anno_scolastico_selezionato": anno_scolastico_selezionato,
+            "anno_scolastico_predefinito": anno_scolastico_predefinito,
+            "anno_scolastico_predefinito_id": anno_scolastico_predefinito_id,
+            "anno_scolastico_all_value": ANAGRAFICA_ALL_YEARS_VALUE,
             "classe_selezionata": classe_filter,
             "gruppo_classe_selezionato": gruppo_classe_filter,
             "filtri_attivi": filtri_attivi,

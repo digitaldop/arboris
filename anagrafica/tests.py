@@ -1875,6 +1875,175 @@ class StudenteListEnrollmentBadgeLayoutTests(TestCase):
         self.assertEqual(list(response.context["studenti"]), [studente_materna])
 
 
+class AnagraficaCurrentEnrollmentListFiltersTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="anagrafica-filtri-correnti@example.com",
+            email="anagrafica-filtri-correnti@example.com",
+            password="Password123!",
+        )
+        self.client.force_login(self.user)
+
+        today = timezone.localdate()
+        self.anno_corrente = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno corrente liste",
+            data_inizio=today - timedelta(days=30),
+            data_fine=today + timedelta(days=30),
+            attivo=True,
+        )
+        self.anno_passato = AnnoScolastico.objects.create(
+            nome_anno_scolastico="Anno passato liste",
+            data_inizio=today - timedelta(days=460),
+            data_fine=today - timedelta(days=360),
+            attivo=True,
+        )
+        self.stato_iscrizione = StatoIscrizione.objects.create(stato_iscrizione="Attiva", ordine=1, attiva=True)
+        self.condizione_corrente = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno_corrente,
+            nome_condizione_iscrizione="Retta corrente liste",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        self.condizione_passata = CondizioneIscrizione.objects.create(
+            anno_scolastico=self.anno_passato,
+            nome_condizione_iscrizione="Retta passata liste",
+            numero_mensilita_default=10,
+            attiva=True,
+        )
+        self.relazione = RelazioneFamiliare.objects.create(relazione="Madre", ordine=1)
+        self.studente_corrente = Studente.objects.create(nome="Luca", cognome="Correnti", attivo=True)
+        self.studente_passato = Studente.objects.create(nome="Marco", cognome="Storici", attivo=True)
+        self.studente_senza_iscrizione = Studente.objects.create(nome="Nina", cognome="Senzaiscrizioni", attivo=True)
+        Iscrizione.objects.create(
+            studente=self.studente_corrente,
+            anno_scolastico=self.anno_corrente,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione_corrente,
+            attiva=True,
+        )
+        Iscrizione.objects.create(
+            studente=self.studente_passato,
+            anno_scolastico=self.anno_passato,
+            stato_iscrizione=self.stato_iscrizione,
+            condizione_iscrizione=self.condizione_passata,
+            attiva=True,
+        )
+        self.familiare_corrente = Familiare.objects.create(
+            nome="Anna",
+            cognome="Correnti",
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+        )
+        self.familiare_passato = Familiare.objects.create(
+            nome="Paola",
+            cognome="Storici",
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+        )
+        self.familiare_senza_iscrizione = Familiare.objects.create(
+            nome="Sara",
+            cognome="Senzaiscrizioni",
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente_corrente,
+            familiare=self.familiare_corrente,
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente_passato,
+            familiare=self.familiare_passato,
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+            attivo=True,
+        )
+        StudenteFamiliare.objects.create(
+            studente=self.studente_senza_iscrizione,
+            familiare=self.familiare_senza_iscrizione,
+            relazione_familiare=self.relazione,
+            referente_principale=True,
+            attivo=True,
+        )
+
+    def test_lista_studenti_default_filtra_anno_scolastico_corrente(self):
+        response = self.client.get(reverse("lista_studenti"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["anno_scolastico_selezionato"], str(self.anno_corrente.pk))
+        self.assertEqual(response.context["anno_scolastico_predefinito_id"], str(self.anno_corrente.pk))
+        self.assertFalse(response.context["filtri_attivi"])
+        self.assertEqual(list(response.context["studenti"]), [self.studente_corrente])
+        self.assertContains(response, "Correnti Luca")
+        self.assertNotContains(response, "Storici Marco")
+        self.assertNotContains(response, "Senzaiscrizioni Nina")
+        self.assertContains(response, f'data-live-list-clear-value="{self.anno_corrente.pk}"')
+        self.assertContains(response, 'value="tutti"')
+
+    def test_lista_studenti_tutti_gli_anni_mostra_tutte_le_anagrafiche(self):
+        response = self.client.get(reverse("lista_studenti"), {"anno_scolastico": "tutti"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["anno_scolastico_selezionato"], "tutti")
+        self.assertTrue(response.context["filtri_attivi"])
+        self.assertEqual(
+            {studente.pk for studente in response.context["studenti"]},
+            {self.studente_corrente.pk, self.studente_passato.pk, self.studente_senza_iscrizione.pk},
+        )
+
+    def test_lista_familiari_default_filtra_figli_iscritti_correnti_con_toggle_tutti(self):
+        response = self.client.get(reverse("lista_familiari"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["mostra_tutti_anagrafiche"])
+        self.assertFalse(response.context["filtri_attivi"])
+        self.assertEqual(list(response.context["familiari"]), [self.familiare_corrente])
+        self.assertContains(response, "Mostra tutti")
+        self.assertContains(response, 'name="tutti" value="1"')
+        self.assertContains(response, "Correnti Anna")
+        self.assertNotContains(response, "Storici Paola")
+        self.assertNotContains(response, "Senzaiscrizioni Sara")
+
+        response = self.client.get(reverse("lista_familiari"), {"tutti": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["mostra_tutti_anagrafiche"])
+        self.assertTrue(response.context["filtri_attivi"])
+        self.assertEqual(
+            {familiare.pk for familiare in response.context["familiari"]},
+            {self.familiare_corrente.pk, self.familiare_passato.pk, self.familiare_senza_iscrizione.pk},
+        )
+
+    def test_lista_famiglie_default_filtra_figli_iscritti_correnti_con_toggle_tutti(self):
+        response = self.client.get(reverse("lista_famiglie"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["mostra_tutti_anagrafiche"])
+        self.assertFalse(response.context["filtri_attivi"])
+        self.assertEqual([famiglia.logical_key for famiglia in response.context["famiglie"]], [f"s-{self.studente_corrente.pk}"])
+        self.assertContains(response, "Mostra tutti")
+        self.assertContains(response, 'name="tutti" value="1"')
+        self.assertContains(response, "Correnti")
+        self.assertNotContains(response, "Storici")
+        self.assertNotContains(response, "Senzaiscrizioni")
+
+        response = self.client.get(reverse("lista_famiglie"), {"tutti": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["mostra_tutti_anagrafiche"])
+        self.assertTrue(response.context["filtri_attivi"])
+        self.assertEqual(
+            {famiglia.logical_key for famiglia in response.context["famiglie"]},
+            {
+                f"s-{self.studente_corrente.pk}",
+                f"s-{self.studente_passato.pk}",
+                f"s-{self.studente_senza_iscrizione.pk}",
+            },
+        )
+
+
 class IscrizioneInlineDefaultsTests(TestCase):
     def test_iscrizione_inline_defaults_to_first_condition_for_default_year(self):
         anno_corrente = AnnoScolastico.objects.create(
