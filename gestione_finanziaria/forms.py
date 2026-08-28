@@ -1188,7 +1188,7 @@ class MovimentoFinanziarioForm(forms.ModelForm):
             "data_valuta": "Data valuta",
             "importo": "Importo (negativo per uscite)",
             "valuta": "Valuta",
-            "descrizione": "Descrizione",
+            "descrizione": "Causale / descrizione",
             "controparte": "Controparte",
             "iban_controparte": "IBAN controparte",
             "categoria": "Categoria",
@@ -1201,7 +1201,7 @@ class MovimentoFinanziarioForm(forms.ModelForm):
         widgets = {
             "data_contabile": forms.DateInput(attrs={"placeholder": "gg/mm/aaaa"}),
             "data_valuta": forms.DateInput(attrs={"placeholder": "gg/mm/aaaa"}),
-            "descrizione": forms.Textarea(attrs={"rows": 2}),
+            "descrizione": forms.Textarea(attrs={"rows": 4}),
             "note": forms.Textarea(attrs={"rows": 2}),
             "valuta": forms.TextInput(attrs={"placeholder": "EUR"}),
         }
@@ -1226,6 +1226,14 @@ class MovimentoFinanziarioForm(forms.ModelForm):
         self.fields["categoria"].help_text = (
             "Se lasciata vuota, il sistema prova ad assegnarla automaticamente tramite le regole attive."
         )
+        descrizione = ""
+        if self.instance and getattr(self.instance, "pk", None):
+            descrizione = self.instance.descrizione or ""
+        else:
+            descrizione = self.initial.get("descrizione") or ""
+        if descrizione:
+            righe_testo = descrizione.count("\n") + (len(descrizione) // 90) + 1
+            self.fields["descrizione"].widget.attrs["rows"] = min(max(4, righe_testo), 12)
         self.fields["incide_su_saldo_banca"].help_text = (
             "Attiva per movimenti di cassa reali (es. cassa contanti tracciata in un conto interno). "
             "Lascia disattivo per voci puramente gestionali di previsione o controllo."

@@ -2377,7 +2377,12 @@ def home(request):
     dashboard_corrente = build_dashboard_school_year_statistics(anno_corrente)
     economia_dashboard = build_economia_dashboard_data(anno_corrente)
     calendar_reference_date = resolve_dashboard_calendar_reference_date(anno_corrente, today)
-    calendario_dashboard = build_dashboard_calendar_data(today=calendar_reference_date, user=request.user)
+    calendario_dashboard = build_dashboard_calendar_data(
+        today=calendar_reference_date,
+        user=request.user,
+        birthday_school_year=anno_corrente,
+        include_all_birthdays=request.GET.get("compleanni_tutti") == "1",
+    )
     gestione_finanziaria_dashboard = (
         build_home_financial_dashboard_data(
             include_payment_urls=can_manage_gestione_finanziaria,

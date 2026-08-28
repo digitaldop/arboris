@@ -1,0 +1,136 @@
+{% extends "popup_base.html" %}
+{% load static currency %}
+
+{% block title %}Dettaglio movimento - Arboris{% endblock %}
+
+{% block content %}
+<div class="content-card related-config-popup-card budget-voice-popup-card finance-movement-detail-popup">
+    <button type="button" class="budget-voice-popup-close" onclick="window.close()" aria-label="Chiudi popup">
+        <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#x"></use></svg>
+    </button>
+
+    <div class="finance-movement-detail-inner">
+        <div class="budget-voice-popup-hero">
+            <span class="budget-voice-icon-tile" aria-hidden="true">
+                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+            </span>
+            <div class="budget-voice-popup-title-block">
+                <div class="related-config-kicker">Movimenti finanziari</div>
+                <h1 class="page-title">Movimento del {{ movimento.data_contabile|date:"d/m/Y" }}</h1>
+                <p>{{ movimento.get_origine_display }}{% if movimento.conto %} - {{ movimento.conto.nome_conto }}{% endif %}</p>
+            </div>
+        </div>
+
+        <div class="finance-movement-detail-summary" aria-label="Riepilogo movimento">
+            <div class="finance-movement-detail-summary-card {% if movimento.importo > 0 %}is-income{% elif movimento.importo < 0 %}is-outgoing{% endif %}">
+                <span>Importo</span>
+                <strong>{{ movimento.importo|euro }} &euro;</strong>
+            </div>
+            <div class="finance-movement-detail-summary-card">
+                <span>Stato</span>
+                <strong>{{ movimento.stato_riconciliazione_display_effettivo|default:movimento.get_stato_riconciliazione_display }}</strong>
+            </div>
+            <div class="finance-movement-detail-summary-card">
+                <span>Canale</span>
+                <strong>{{ movimento.get_canale_display }}</strong>
+            </div>
+        </div>
+
+        <section class="finance-movement-detail-causale" aria-labelledby="movement-causale-title">
+            <div class="finance-movement-detail-section-head">
+                <h2 id="movement-causale-title">Causale completa</h2>
+            </div>
+            <div class="finance-movement-detail-causale-text">{{ movimento.descrizione|default:"-"|linebreaksbr }}</div>
+        </section>
+
+        <section class="finance-movement-detail-grid" aria-label="Dati movimento">
+            <div class="finance-movement-detail-item">
+                <span>Data contabile</span>
+                <strong>{{ movimento.data_contabile|date:"d/m/Y" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Data valuta</span>
+                <strong>{{ movimento.data_valuta|date:"d/m/Y"|default:"-" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Valuta</span>
+                <strong>{{ movimento.valuta|default:"EUR" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Conto</span>
+                <strong>{{ movimento.conto.nome_conto|default:"-" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Categoria</span>
+                <strong>{% if movimento.categoria %}{{ movimento.categoria }}{% else %}non categorizzato{% endif %}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Origine</span>
+                <strong>{{ movimento.get_origine_display }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Controparte</span>
+                <strong>{{ movimento.controparte|default:"-" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>IBAN controparte</span>
+                <strong>{{ movimento.iban_controparte|default:"-" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>ID transazione</span>
+                <strong>{{ movimento.provider_transaction_id|default:"-" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Incide sul saldo</span>
+                <strong>{{ movimento.incide_su_saldo_banca|yesno:"Si,No" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Sostenuta da terzi</span>
+                <strong>{{ movimento.sostenuta_da_terzi|yesno:"Si,No" }}</strong>
+            </div>
+            <div class="finance-movement-detail-item">
+                <span>Rimborsabile</span>
+                <strong>{{ movimento.rimborsabile|yesno:"Si,No" }}</strong>
+            </div>
+            {% if movimento.sostenitore %}
+                <div class="finance-movement-detail-item">
+                    <span>Sostenitore</span>
+                    <strong>{{ movimento.sostenitore }}</strong>
+                </div>
+            {% endif %}
+            {% if movimento.regola_categorizzazione %}
+                <div class="finance-movement-detail-item">
+                    <span>Regola categoria</span>
+                    <strong>{{ movimento.regola_categorizzazione }}</strong>
+                </div>
+            {% endif %}
+        </section>
+
+        {% if movimento.note %}
+            <section class="finance-movement-detail-causale finance-movement-detail-note" aria-labelledby="movement-note-title">
+                <div class="finance-movement-detail-section-head">
+                    <h2 id="movement-note-title">Note</h2>
+                </div>
+                <div class="finance-movement-detail-causale-text">{{ movimento.note|linebreaksbr }}</div>
+            </section>
+        {% endif %}
+
+        <div class="related-config-popup-actions finance-movement-detail-actions">
+            {% if can_manage_gestione_finanziaria %}
+                <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}?popup=1" class="btn btn-save-soft btn-icon-text">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
+                    </span>
+                    <span class="btn-label">Modifica</span>
+                </a>
+            {% endif %}
+            <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
+                <span class="btn-icon" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
+                </span>
+                <span class="btn-label">Chiudi</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

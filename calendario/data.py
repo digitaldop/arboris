@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from anagrafica.family_logic import logical_family_summary_for_person
 from anagrafica.models import Documento, Familiare, Studente
-from economia.models import RataIscrizione
+from economia.models import Iscrizione, RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 from sistema.models import LivelloPermesso
@@ -233,6 +233,21 @@ def can_include_birthday_records(user):
     return user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
 
 
+def dashboard_active_student_ids(anno_scolastico):
+    if not anno_scolastico:
+        return set()
+
+    return set(
+        Iscrizione.objects.filter(
+            anno_scolastico=anno_scolastico,
+            attiva=True,
+            studente__attivo=True,
+        )
+        .values_list("studente_id", flat=True)
+        .distinct()
+    )
+
+
 def build_dashboard_birthday_record(person, person_type, target_year_by_month):
     birth_date = person.data_nascita
     if not birth_date:
@@ -270,8 +285,9 @@ def build_dashboard_birthday_record(person, person_type, target_year_by_month):
     }
 
 
-def build_dashboard_birthdays_data(today=None, user=None):
+def build_dashboard_birthdays_data(today=None, user=None, anno_scolastico=None, include_all_anagrafica=False):
     today = today or timezone.localdate()
+    include_all_anagrafica = bool(include_all_anagrafica)
     current_month = date(today.year, today.month, 1)
     next_month = get_next_month_start(current_month)
     month_starts = [current_month, next_month]
@@ -288,30 +304,42 @@ def build_dashboard_birthdays_data(today=None, user=None):
         for month_start in month_starts
     ]
     group_map = {(group["year"], group["month"]): group for group in groups}
+    base_data = {
+        "period_label": " e ".join(group["label"] for group in groups),
+        "months": groups,
+        "records": [],
+        "count_records": 0,
+        "include_all_anagrafica": include_all_anagrafica,
+        "can_view_records": can_include_birthday_records(user),
+    }
 
-    if not can_include_birthday_records(user):
-        return {
-            "period_label": " e ".join(group["label"] for group in groups),
-            "months": groups,
-            "records": [],
-            "count_records": 0,
-        }
+    if not base_data["can_view_records"]:
+        return base_data
 
     records = []
-    studenti = (
-        Studente.objects.filter(attivo=True, data_nascita__month__in=target_months)
-        .order_by("data_nascita", "cognome", "nome", "pk")
-    )
+    if include_all_anagrafica:
+        studenti = Studente.objects.filter(data_nascita__month__in=target_months)
+        adulti = Familiare.objects.filter(data_nascita__month__in=target_months)
+    else:
+        active_student_ids = dashboard_active_student_ids(anno_scolastico)
+        studenti = Studente.objects.filter(
+            pk__in=active_student_ids,
+            attivo=True,
+            data_nascita__month__in=target_months,
+        )
+        adulti = Familiare.objects.filter(
+            relazioni_studenti__studente_id__in=active_student_ids,
+            relazioni_studenti__attivo=True,
+            data_nascita__month__in=target_months,
+        ).distinct()
+
+    studenti = studenti.order_by("data_nascita", "cognome", "nome", "pk")
     for studente in studenti:
         record = build_dashboard_birthday_record(studente, "student", target_year_by_month)
         if record:
             records.append(record)
 
-    adulti = (
-        Familiare.objects.filter(data_nascita__month__in=target_months)
-        .select_related("persona")
-        .order_by("data_nascita", "cognome", "nome", "pk")
-    )
+    adulti = adulti.select_related("persona").order_by("data_nascita", "cognome", "nome", "pk")
     for adulto in adulti:
         record = build_dashboard_birthday_record(adulto, "adult", target_year_by_month)
         if record:
@@ -330,12 +358,13 @@ def build_dashboard_birthdays_data(today=None, user=None):
         if group:
             group["records"].append(record)
 
-    return {
-        "period_label": " e ".join(group["label"] for group in groups),
-        "months": groups,
-        "records": records,
-        "count_records": len(records),
-    }
+    base_data.update(
+        {
+            "records": records,
+            "count_records": len(records),
+        }
+    )
+    return base_data
 
 
 def build_local_calendar_occurrence_record(evento, occurrence):
@@ -677,10 +706,21 @@ def build_calendar_list_bundle(categoria_filter="", query="", user=None):
     }
 
 
-def build_dashboard_calendar_data(today=None, user=None, week_page_size=3):
+def build_dashboard_calendar_data(
+    today=None,
+    user=None,
+    week_page_size=3,
+    birthday_school_year=None,
+    include_all_birthdays=False,
+):
     today = today or timezone.localdate()
     agenda_bundle = build_calendar_agenda_bundle(user=user)
-    birthdays_data = build_dashboard_birthdays_data(today=today, user=user)
+    birthdays_data = build_dashboard_birthdays_data(
+        today=today,
+        user=user,
+        anno_scolastico=birthday_school_year,
+        include_all_anagrafica=include_all_birthdays,
+    )
     visible_dashboard_category_ids = {
         categoria.pk
         for categoria in agenda_bundle["categories"]

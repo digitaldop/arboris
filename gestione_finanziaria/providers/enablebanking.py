@@ -563,7 +563,7 @@ class EnableBankingAdapter(BasePsd2Adapter):
             data_valuta=vdate,
             importo=importo,
             valuta=valuta,
-            descrizione=descrizione[:2000],
+            descrizione=descrizione,
             controparte=controparte[:500],
             iban_controparte=iban_ct,
             provider_transaction_id=txid[:200],

@@ -1011,6 +1011,25 @@ class Psd2ConnectionImportTests(TestCase):
         self.assertEqual(accounts[0].account_product, "Carta prepagata - Prepaid business")
         self.assertEqual(accounts[0].identification_hash, "hash-card")
 
+    def test_enablebanking_mantiene_causale_lunga_movimento(self):
+        causale_lunga = "BONIF. VS. FAVORE - CAUSALE COMPLETA " + ("0123456789ABCDEF" * 180)
+
+        movimento = EnableBankingAdapter._parse_transaction(
+            {
+                "transaction_amount": {"amount": "120.00", "currency": "EUR"},
+                "credit_debit_indicator": "CRDT",
+                "booking_date": "2026-08-26",
+                "value_date": "2026-08-27",
+                "debtor": {"name": "ROSSI MARIO"},
+                "debtor_account": {"iban": "IT60X0542811101000000123456"},
+                "remittance_information": [causale_lunga],
+                "entry_reference": "entry-long-description",
+            }
+        )
+
+        self.assertIsNotNone(movimento)
+        self.assertEqual(movimento.descrizione, causale_lunga)
+
 
 class MovimentoCategoriaInlineTests(TestCase):
     def setUp(self):
@@ -7834,7 +7853,9 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertNotContains(response, "finance-movements-actions-head")
         self.assertNotContains(response, "finance-bulk-select-col")
         self.assertNotContains(response, "data-bulk-checkbox")
-        self.assertNotContains(response, "data-row-href")
+        self.assertContains(response, "list-row-link")
+        self.assertContains(response, reverse("dettaglio_movimento_finanziario", args=[movimento.pk]))
+        self.assertContains(response, f'{reverse("dettaglio_movimento_finanziario", args=[movimento.pk])}?popup=1')
         self.assertNotContains(response, "data-movement-category-cell")
         self.assertNotContains(response, "data-movement-account-cell")
         self.assertNotContains(response, reverse("modifica_movimento_finanziario", args=[movimento.pk]))
@@ -7842,6 +7863,53 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertNotContains(response, reverse("elimina_movimenti_finanziari_multipla"))
         self.assertNotContains(response, "js/pages/movimenti-list.js")
         self.assertNotContains(response, "js/core/bulk-actions.js")
+        self.assertContains(response, "js/core/list-row-links.js")
+
+    def test_dettaglio_movimento_popup_mostra_causale_completa_anche_in_sola_visualizzazione(self):
+        causale_lunga = (
+            "BONIF. VS. FAVORE - BON.DA ROSSI MARIO "
+            "Retta e iscrizione scuola anno 2026 2027 con causale bancaria completa "
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        ) * 18
+        conto = ContoBancario.objects.create(
+            nome_conto="Banco BPM",
+            tipo_conto=TipoContoFinanziario.CONTO_CORRENTE,
+            attivo=True,
+        )
+        movimento = MovimentoFinanziario.objects.create(
+            conto=conto,
+            data_contabile=date(2026, 8, 26),
+            data_valuta=date(2026, 8, 27),
+            importo=Decimal("750.00"),
+            descrizione=causale_lunga,
+            controparte="ROSSI MARIO",
+            iban_controparte="IT60X0542811101000000123456",
+            origine=OrigineMovimento.BANCA,
+            canale=CanaleMovimento.BANCA,
+            incide_su_saldo_banca=True,
+        )
+        viewer = User.objects.create_user(
+            username="viewer-dettaglio-finanza@example.com",
+            email="viewer-dettaglio-finanza@example.com",
+            password="Password123!",
+        )
+        SistemaUtentePermessi.objects.create(
+            user=viewer,
+            permesso_gestione_finanziaria=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(viewer)
+
+        response = self.client.get(
+            reverse("dettaglio_movimento_finanziario", args=[movimento.pk]),
+            {"popup": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Causale completa")
+        self.assertContains(response, causale_lunga)
+        self.assertContains(response, "ROSSI MARIO")
+        self.assertContains(response, "finance-movement-detail-causale-text")
+        self.assertNotContains(response, "Modifica</span>")
 
     def test_lista_movimenti_filtra_per_tipo_e_intervallo_date(self):
         MovimentoFinanziario.objects.create(

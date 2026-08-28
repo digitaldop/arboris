@@ -888,9 +888,29 @@
                                             {% endif %}
                                         </div>
                                     </div>
-                                    <div class="dashboard-birthday-legend" aria-label="Legenda compleanni">
-                                        <span class="dashboard-birthday-type-chip is-student">Studente</span>
-                                        <span class="dashboard-birthday-type-chip is-adult">Adulto</span>
+                                    <div class="dashboard-birthday-tools">
+                                        {% if calendario_dashboard.birthdays.can_view_records %}
+                                            <form method="get" class="dashboard-birthday-toggle-form">
+                                                {% if dashboard_anno_scolastico_selezionato %}
+                                                    <input type="hidden" name="anno_scolastico" value="{{ dashboard_anno_scolastico_selezionato }}">
+                                                {% endif %}
+                                                <label class="dashboard-birthday-toggle">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="compleanni_tutti"
+                                                        value="1"
+                                                        {% if calendario_dashboard.birthdays.include_all_anagrafica %}checked{% endif %}
+                                                        onchange="this.form.submit()"
+                                                    >
+                                                    <span class="dashboard-birthday-toggle-track" aria-hidden="true"></span>
+                                                    <span class="dashboard-birthday-toggle-label">Intera anagrafica</span>
+                                                </label>
+                                            </form>
+                                        {% endif %}
+                                        <div class="dashboard-birthday-legend" aria-label="Legenda compleanni">
+                                            <span class="dashboard-birthday-type-chip is-student">Studente</span>
+                                            <span class="dashboard-birthday-type-chip is-adult">Adulto</span>
+                                        </div>
                                     </div>
                                 </div>
 

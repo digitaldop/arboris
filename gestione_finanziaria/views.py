@@ -4911,6 +4911,35 @@ def lista_movimenti_finanziari(request):
     )
 
 
+def dettaglio_movimento_finanziario(request, pk):
+    movimento = get_object_or_404(
+        MovimentoFinanziario.objects.select_related(
+            "conto",
+            "categoria",
+            "categoria__parent",
+            "regola_categorizzazione",
+            "rata_iscrizione",
+        ).annotate(
+            riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
+            scadenze_fornitori_count=Count("scadenze_fornitori", distinct=True),
+            spese_operative_count=Count("spese_operative", distinct=True),
+            buste_paga_count=Count("pagamenti_buste_paga", distinct=True) + Count("buste_paga_dipendenti", distinct=True),
+        ),
+        pk=pk,
+    )
+    movimento.stato_riconciliazione_display_effettivo = stato_riconciliazione_movimento_display(movimento)
+
+    return render(
+        request,
+        "gestione_finanziaria/movimento_popup_detail.html",
+        {
+            "movimento": movimento,
+            "popup": is_popup_request(request),
+        },
+    )
+
+
 def _movimenti_da_pulire_queryset(ambito):
     queryset = MovimentoFinanziario.objects.all()
     if ambito == PuliziaMovimentiFinanziariForm.AMBITO_AUTOMATICI:

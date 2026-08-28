@@ -198,7 +198,13 @@
                     </thead>
                     <tbody>
                         {% for movimento in movimenti %}
-                            <tr class="{% if can_manage_gestione_finanziaria %}list-row-link {% endif %}{% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}"{% if can_manage_gestione_finanziaria %} data-row-href="{% url 'modifica_movimento_finanziario' movimento.pk %}"{% endif %}>
+                            <tr
+                                class="list-row-link {% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}"
+                                data-row-href="{% url 'dettaglio_movimento_finanziario' movimento.pk %}"
+                                data-row-popup-url="{% url 'dettaglio_movimento_finanziario' movimento.pk %}?popup=1"
+                                data-popup-window-features="width=1080,height=780,resizable=yes,scrollbars=yes"
+                                data-popup-title="Movimento {{ movimento.data_contabile|date:'d/m/Y' }}"
+                            >
                                 {% if can_manage_gestione_finanziaria %}
                                     <td class="finance-bulk-select-col">
                                         <input type="checkbox" class="finance-bulk-checkbox" name="selected_ids" value="{{ movimento.pk }}" data-bulk-checkbox aria-label="Seleziona movimento del {{ movimento.data_contabile|date:'d/m/Y' }}">
@@ -228,7 +234,11 @@
                                         <br><small class="table-muted">{% if movimento.rimborsabile %}da rimborsare{% else %}senza rimborso{% endif %}</small>
                                     {% endif %}
                                 </td>
-                                <td>{{ movimento.descrizione|truncatechars:80|default:"-" }}</td>
+                                <td>
+                                    <span class="finance-movement-description-preview" title="{{ movimento.descrizione|default:'' }}">
+                                        {{ movimento.descrizione|truncatechars:80|default:"-" }}
+                                    </span>
+                                </td>
                                 <td class="finance-category-cell"
                                     {% if can_manage_gestione_finanziaria %}
                                         data-movement-category-cell
@@ -247,7 +257,15 @@
                                 {% if can_manage_gestione_finanziaria %}
                                     <td class="actions-cell finance-movements-actions-cell">
                                         <span class="table-icon-actions finance-movement-icon-actions">
-                                        <a href="{% url 'modifica_movimento_finanziario' movimento.pk %}" class="table-icon-link" aria-label="Modifica movimento" data-floating-text="Modifica">
+                                        <a
+                                            href="{% url 'modifica_movimento_finanziario' movimento.pk %}?popup=1"
+                                            class="table-icon-link"
+                                            aria-label="Modifica movimento"
+                                            data-floating-text="Modifica"
+                                            data-window-popup="1"
+                                            data-popup-url="{% url 'modifica_movimento_finanziario' movimento.pk %}?popup=1"
+                                            data-popup-window-features="width=1080,height=780,resizable=yes,scrollbars=yes"
+                                        >
                                             <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#edit"></use></svg>
                                         </a>
                                         <a href="{% url 'riconcilia_movimento' movimento.pk %}?next={{ request.get_full_path|urlencode }}" class="table-icon-link" aria-label="Collega pagamento al movimento" data-floating-text="Collega Pagamento">
@@ -305,22 +323,24 @@
         {% endif %}
     </div>
 
+    <script src="{% static 'js/core/list-row-links.js' %}?v=5"></script>
     {% if can_manage_gestione_finanziaria %}
-        <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
         <script src="{% static 'js/core/bulk-actions.js' %}?v=1"></script>
         <script src="{% static 'js/pages/movimenti-list.js' %}?v=6"></script>
-        <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                if (window.ArborisListRowLinks) {
-                    ArborisListRowLinks.init();
-                }
+    {% endif %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.ArborisListRowLinks) {
+                ArborisListRowLinks.init();
+            }
+            {% if can_manage_gestione_finanziaria %}
                 if (window.ArborisBulkActions) {
                     ArborisBulkActions.init(document);
                 }
                 if (window.ArborisMovimentiList) {
                     ArborisMovimentiList.init(document);
                 }
-            });
-        </script>
-    {% endif %}
+            {% endif %}
+        });
+    </script>
 {% endblock %}
