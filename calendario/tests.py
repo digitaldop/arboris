@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from anagrafica.models import Documento, Familiare, Studente, StudenteFamiliare, TipoDocumento
 from economia.models import CondizioneIscrizione, Iscrizione, RataIscrizione, StatoIscrizione
+from gestione_amministrativa.models import Dipendente, RuoloAziendaleDipendente, StatoDipendente
 from gestione_finanziaria.models import DocumentoFornitore, Fornitore, ScadenzaPagamentoFornitore
 from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso, SistemaImpostazioniGenerali, SistemaUtentePermessi
@@ -170,7 +171,8 @@ class CalendarioAgendaInterfaceTests(TestCase):
 
     def test_dashboard_birthdays_include_current_and_next_month(self):
         self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
-        self.permissions.save(update_fields=["permesso_anagrafica"])
+        self.permissions.permesso_gestione_amministrativa = LivelloPermesso.VISUALIZZAZIONE
+        self.permissions.save(update_fields=["permesso_anagrafica", "permesso_gestione_amministrativa"])
         anno = self.create_dashboard_school_year()
         luca = Studente.objects.create(
             nome="Luca",
@@ -222,6 +224,32 @@ class CalendarioAgendaInterfaceTests(TestCase):
             data_nascita=date(1986, 6, 10),
         )
         StudenteFamiliare.objects.create(studente=nina, familiare=ada)
+        Dipendente.objects.create(
+            nome="Elena",
+            cognome="Maestra",
+            data_nascita=date(1990, 5, 7),
+            ruolo_aziendale=RuoloAziendaleDipendente.EDUCATORE,
+            stato=StatoDipendente.ATTIVO,
+        )
+        Dipendente.objects.create(
+            nome="Gianni",
+            cognome="Conti",
+            data_nascita=date(1975, 6, 9),
+            ruolo_aziendale=RuoloAziendaleDipendente.DIPENDENTE,
+            stato=StatoDipendente.ATTIVO,
+        )
+        Dipendente.objects.create(
+            persona_collegata=ada.persona,
+            ruolo_aziendale=RuoloAziendaleDipendente.EDUCATORE,
+            stato=StatoDipendente.ATTIVO,
+        )
+        Dipendente.objects.create(
+            nome="Carla",
+            cognome="Cessata",
+            data_nascita=date(1970, 6, 20),
+            ruolo_aziendale=RuoloAziendaleDipendente.DIPENDENTE,
+            stato=StatoDipendente.CESSATO,
+        )
 
         dashboard_data = build_dashboard_calendar_data(
             today=date(2026, 5, 29),
@@ -231,22 +259,31 @@ class CalendarioAgendaInterfaceTests(TestCase):
 
         birthdays = dashboard_data["birthdays"]
         self.assertEqual(birthdays["period_label"], "Maggio 2026 e Giugno 2026")
-        self.assertEqual(birthdays["count_records"], 3)
+        self.assertEqual(birthdays["count_records"], 5)
         self.assertFalse(birthdays["include_all_anagrafica"])
         self.assertEqual([group["label"] for group in birthdays["months"]], ["Maggio 2026", "Giugno 2026"])
-        self.assertEqual([record["name"] for record in birthdays["months"][0]["records"]], ["Bianchi Luca"])
+        self.assertEqual([record["name"] for record in birthdays["months"][0]["records"]], ["Bianchi Luca", "Maestra Elena"])
         self.assertEqual(
             [record["name"] for record in birthdays["months"][1]["records"]],
-            ["Rossi Nina", "Verdi Ada"],
+            ["Rossi Nina", "Conti Gianni", "Verdi Ada"],
         )
         self.assertEqual(birthdays["months"][0]["records"][0]["age"], 10)
         self.assertEqual(birthdays["months"][0]["records"][0]["family_label"], "Famiglia Bianchi")
-        self.assertEqual(birthdays["months"][1]["records"][1]["person_type"], "adult")
-        self.assertEqual(birthdays["months"][1]["records"][1]["family_label"], "Famiglia Rossi")
+        self.assertEqual(birthdays["months"][0]["records"][1]["person_type"], "educator")
+        self.assertEqual(birthdays["months"][0]["records"][1]["type_label"], "Educatore")
+        self.assertEqual(birthdays["months"][1]["records"][1]["person_type"], "employee")
+        self.assertEqual(birthdays["months"][1]["records"][1]["type_label"], "Dipendente")
+        self.assertEqual(birthdays["months"][1]["records"][2]["person_type"], "adult")
+        self.assertEqual(birthdays["months"][1]["records"][2]["family_label"], "Famiglia Rossi")
+        self.assertEqual(
+            [type_label["label"] for type_label in birthdays["months"][1]["records"][2]["type_labels"]],
+            ["Adulto", "Educatore"],
+        )
         self.assertNotIn("Fuori Marco", [record["name"] for record in birthdays["records"]])
         self.assertNotIn("Nonattiva Irene", [record["name"] for record in birthdays["records"]])
         self.assertNotIn("Archivio Olga", [record["name"] for record in birthdays["records"]])
         self.assertNotIn("Archivio Marta", [record["name"] for record in birthdays["records"]])
+        self.assertNotIn("Cessata Carla", [record["name"] for record in birthdays["records"]])
 
         all_dashboard_data = build_dashboard_calendar_data(
             today=date(2026, 5, 29),
@@ -260,6 +297,7 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertIn("Archivio Olga", all_names)
         self.assertIn("Archivio Marta", all_names)
         self.assertIn("Nonattiva Irene", all_names)
+        self.assertIn("Cessata Carla", all_names)
 
     def test_dashboard_birthdays_respect_anagrafica_permission(self):
         Studente.objects.create(
@@ -278,7 +316,8 @@ class CalendarioAgendaInterfaceTests(TestCase):
 
     def test_home_dashboard_renders_birthday_section(self):
         self.permissions.permesso_anagrafica = LivelloPermesso.VISUALIZZAZIONE
-        self.permissions.save(update_fields=["permesso_anagrafica"])
+        self.permissions.permesso_gestione_amministrativa = LivelloPermesso.VISUALIZZAZIONE
+        self.permissions.save(update_fields=["permesso_anagrafica", "permesso_gestione_amministrativa"])
         today = timezone.localdate()
         birthday_day = min(today.day, 28)
         anno = self.create_dashboard_school_year(
@@ -305,6 +344,13 @@ class CalendarioAgendaInterfaceTests(TestCase):
             data_nascita=date(1980, 8, 1),
         )
         StudenteFamiliare.objects.create(studente=luca, familiare=padre)
+        Dipendente.objects.create(
+            nome="Elena",
+            cognome="Maestra",
+            data_nascita=date(today.year - 30, today.month, birthday_day),
+            ruolo_aziendale=RuoloAziendaleDipendente.EDUCATORE,
+            stato=StatoDipendente.ATTIVO,
+        )
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"), {"anno_scolastico": str(anno.pk)})
@@ -314,9 +360,12 @@ class CalendarioAgendaInterfaceTests(TestCase):
         self.assertContains(response, "dashboard-birthday-toggle")
         self.assertContains(response, 'name="compleanni_tutti"')
         self.assertContains(response, "Bianchi Luca")
+        self.assertContains(response, "Maestra Elena")
+        self.assertContains(response, "Educatore")
         self.assertContains(response, date(today.year, today.month, birthday_day).strftime("%d/%m/%Y"))
         self.assertContains(response, "10 anni")
         self.assertContains(response, "dashboard-birthday-row is-student")
+        self.assertContains(response, "dashboard-birthday-row is-educator")
         self.assertContains(response, "Famiglia Bianchi")
         self.assertNotContains(response, "Archivio Marco")
 

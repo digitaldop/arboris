@@ -908,8 +908,14 @@
                                             </form>
                                         {% endif %}
                                         <div class="dashboard-birthday-legend" aria-label="Legenda compleanni">
-                                            <span class="dashboard-birthday-type-chip is-student">Studente</span>
-                                            <span class="dashboard-birthday-type-chip is-adult">Adulto</span>
+                                            {% if calendario_dashboard.birthdays.can_view_anagrafica_records %}
+                                                <span class="dashboard-birthday-type-chip is-student">Studente</span>
+                                                <span class="dashboard-birthday-type-chip is-adult">Adulto</span>
+                                            {% endif %}
+                                            {% if calendario_dashboard.birthdays.can_view_staff_records %}
+                                                <span class="dashboard-birthday-type-chip is-educator">Educatore</span>
+                                                <span class="dashboard-birthday-type-chip is-employee">Dipendente</span>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </div>
@@ -942,7 +948,11 @@
                                                                                 {% else %}
                                                                                     {{ birthday.name }}
                                                                                 {% endif %}
-                                                                                <span class="dashboard-birthday-type-chip is-{{ birthday.person_type }}">{{ birthday.type_label }}</span>
+                                                                                {% for type_label in birthday.type_labels %}
+                                                                                    <span class="dashboard-birthday-type-chip is-{{ type_label.key }}">{{ type_label.label }}</span>
+                                                                                {% empty %}
+                                                                                    <span class="dashboard-birthday-type-chip is-{{ birthday.person_type }}">{{ birthday.type_label }}</span>
+                                                                                {% endfor %}
                                                                                 {% if birthday.family_label %}
                                                                                     {% if birthday.family_url %}
                                                                                         <a href="{{ birthday.family_url }}" class="dashboard-birthday-family-chip">{{ birthday.family_label }}</a>

@@ -7,6 +7,7 @@ from anagrafica.family_logic import logical_family_summary_for_person
 from anagrafica.models import Documento, Familiare, Studente
 from economia.models import Iscrizione, RataIscrizione
 from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivitaFamigliaInteressata
+from gestione_amministrativa.models import Dipendente, RuoloAziendaleDipendente, StatoDipendente
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 from sistema.models import LivelloPermesso
 from sistema.permissions import module_is_enabled, user_has_module_permission
@@ -45,6 +46,13 @@ ITALIAN_MONTH_NAMES = (
     "Novembre",
     "Dicembre",
 )
+
+BIRTHDAY_PERSON_TYPE_ORDER = {
+    "student": 0,
+    "adult": 1,
+    "educator": 2,
+    "employee": 3,
+}
 
 
 def format_time_value(value):
@@ -233,6 +241,14 @@ def can_include_birthday_records(user):
     return user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
 
 
+def can_include_staff_birthday_records(user):
+    if not module_is_enabled("gestione_amministrativa"):
+        return False
+    if user is None:
+        return True
+    return user_has_module_permission(user, "gestione_amministrativa", LivelloPermesso.VISUALIZZAZIONE)
+
+
 def dashboard_active_student_ids(anno_scolastico):
     if not anno_scolastico:
         return set()
@@ -246,6 +262,44 @@ def dashboard_active_student_ids(anno_scolastico):
         .values_list("studente_id", flat=True)
         .distinct()
     )
+
+
+def dashboard_birthday_identity_key(person, person_type):
+    if person_type == "student":
+        return f"student:{person.pk}"
+
+    persona_id = getattr(person, "persona_id", None) or getattr(person, "persona_collegata_id", None)
+    if persona_id:
+        return f"persona:{persona_id}"
+
+    return f"{person_type}:{person.pk}"
+
+
+def dashboard_birthday_type_label(person_type):
+    return {
+        "student": "Studente",
+        "adult": "Adulto",
+        "educator": "Educatore",
+        "employee": "Dipendente",
+    }.get(person_type, "Persona")
+
+
+def append_dashboard_birthday_type(record, person_type, label=None):
+    label = label or dashboard_birthday_type_label(person_type)
+    labels = record.setdefault("type_labels", [])
+    if not any(type_label["key"] == person_type for type_label in labels):
+        labels.append({"key": person_type, "label": label})
+
+
+def merge_dashboard_birthday_record(existing_record, new_record):
+    for type_label in new_record.get("type_labels", []):
+        append_dashboard_birthday_type(existing_record, type_label["key"], type_label["label"])
+
+
+def dipendente_birthday_person_type(dipendente):
+    if dipendente.ruolo_aziendale == RuoloAziendaleDipendente.EDUCATORE:
+        return "educator"
+    return "employee"
 
 
 def build_dashboard_birthday_record(person, person_type, target_year_by_month):
@@ -263,22 +317,34 @@ def build_dashboard_birthday_record(person, person_type, target_year_by_month):
         return None
 
     if person_type == "student":
-        type_label = "Studente"
+        type_label = dashboard_birthday_type_label(person_type)
         url = reverse("modifica_studente", kwargs={"pk": person.pk})
-    else:
-        type_label = "Adulto"
+    elif person_type == "adult":
+        type_label = dashboard_birthday_type_label(person_type)
         url = reverse("modifica_familiare", kwargs={"pk": person.pk})
+    elif person_type == "educator":
+        type_label = dashboard_birthday_type_label(person_type)
+        url = reverse("modifica_educatore", kwargs={"pk": person.pk})
+    else:
+        type_label = dashboard_birthday_type_label(person_type)
+        url = reverse("modifica_dipendente", kwargs={"pk": person.pk})
 
-    family_summary = logical_family_summary_for_person(person)
+    family_summary = (
+        logical_family_summary_for_person(person)
+        if person_type in {"student", "adult"}
+        else {"label": "", "url": ""}
+    )
 
     return {
         "id": f"{person_type}-{person.pk}",
+        "identity_key": dashboard_birthday_identity_key(person, person_type),
         "name": str(person),
         "birth_date": birth_date,
         "date": occurrence,
         "age": age,
         "person_type": person_type,
         "type_label": type_label,
+        "type_labels": [{"key": person_type, "label": type_label}],
         "url": url,
         "family_label": family_summary.get("label", ""),
         "family_url": family_summary.get("url", ""),
@@ -304,51 +370,84 @@ def build_dashboard_birthdays_data(today=None, user=None, anno_scolastico=None, 
         for month_start in month_starts
     ]
     group_map = {(group["year"], group["month"]): group for group in groups}
+    can_view_anagrafica_records = can_include_birthday_records(user)
+    can_view_staff_records = can_include_staff_birthday_records(user)
     base_data = {
         "period_label": " e ".join(group["label"] for group in groups),
         "months": groups,
         "records": [],
         "count_records": 0,
         "include_all_anagrafica": include_all_anagrafica,
-        "can_view_records": can_include_birthday_records(user),
+        "can_view_records": can_view_anagrafica_records or can_view_staff_records,
+        "can_view_anagrafica_records": can_view_anagrafica_records,
+        "can_view_staff_records": can_view_staff_records,
     }
 
     if not base_data["can_view_records"]:
         return base_data
 
     records = []
-    if include_all_anagrafica:
-        studenti = Studente.objects.filter(data_nascita__month__in=target_months)
-        adulti = Familiare.objects.filter(data_nascita__month__in=target_months)
-    else:
-        active_student_ids = dashboard_active_student_ids(anno_scolastico)
-        studenti = Studente.objects.filter(
-            pk__in=active_student_ids,
-            attivo=True,
-            data_nascita__month__in=target_months,
+    records_by_identity = {}
+    if can_view_anagrafica_records:
+        if include_all_anagrafica:
+            studenti = Studente.objects.filter(data_nascita__month__in=target_months)
+            adulti = Familiare.objects.filter(data_nascita__month__in=target_months)
+        else:
+            active_student_ids = dashboard_active_student_ids(anno_scolastico)
+            studenti = Studente.objects.filter(
+                pk__in=active_student_ids,
+                attivo=True,
+                data_nascita__month__in=target_months,
+            )
+            adulti = Familiare.objects.filter(
+                relazioni_studenti__studente_id__in=active_student_ids,
+                relazioni_studenti__attivo=True,
+                data_nascita__month__in=target_months,
+            ).distinct()
+
+        studenti = studenti.order_by("data_nascita", "cognome", "nome", "pk")
+        for studente in studenti:
+            record = build_dashboard_birthday_record(studente, "student", target_year_by_month)
+            if record:
+                records.append(record)
+                records_by_identity[record["identity_key"]] = record
+
+        adulti = adulti.select_related("persona").order_by("data_nascita", "cognome", "nome", "pk")
+        for adulto in adulti:
+            record = build_dashboard_birthday_record(adulto, "adult", target_year_by_month)
+            if record:
+                records.append(record)
+                records_by_identity[record["identity_key"]] = record
+
+    if can_view_staff_records:
+        dipendenti = Dipendente.objects.filter(
+            persona_collegata__data_nascita__month__in=target_months,
         )
-        adulti = Familiare.objects.filter(
-            relazioni_studenti__studente_id__in=active_student_ids,
-            relazioni_studenti__attivo=True,
-            data_nascita__month__in=target_months,
-        ).distinct()
+        if not include_all_anagrafica:
+            dipendenti = dipendenti.filter(stato=StatoDipendente.ATTIVO)
 
-    studenti = studenti.order_by("data_nascita", "cognome", "nome", "pk")
-    for studente in studenti:
-        record = build_dashboard_birthday_record(studente, "student", target_year_by_month)
-        if record:
+        dipendenti = dipendenti.select_related("persona_collegata").order_by(
+            "persona_collegata__data_nascita",
+            "persona_collegata__cognome",
+            "persona_collegata__nome",
+            "pk",
+        )
+        for dipendente in dipendenti:
+            person_type = dipendente_birthday_person_type(dipendente)
+            record = build_dashboard_birthday_record(dipendente, person_type, target_year_by_month)
+            if not record:
+                continue
+            existing_record = records_by_identity.get(record["identity_key"])
+            if existing_record:
+                merge_dashboard_birthday_record(existing_record, record)
+                continue
             records.append(record)
-
-    adulti = adulti.select_related("persona").order_by("data_nascita", "cognome", "nome", "pk")
-    for adulto in adulti:
-        record = build_dashboard_birthday_record(adulto, "adult", target_year_by_month)
-        if record:
-            records.append(record)
+            records_by_identity[record["identity_key"]] = record
 
     records.sort(
         key=lambda record: (
             record["date"],
-            0 if record["person_type"] == "student" else 1,
+            BIRTHDAY_PERSON_TYPE_ORDER.get(record["person_type"], 99),
             record["name"].lower(),
             record["id"],
         )

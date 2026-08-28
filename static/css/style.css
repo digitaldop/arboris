@@ -7378,6 +7378,18 @@ select:focus {
     color: #81580a;
 }
 
+.dashboard-birthday-type-chip.is-educator {
+    border-color: #afdccc;
+    background: #ecfbf6;
+    color: #17654f;
+}
+
+.dashboard-birthday-type-chip.is-employee {
+    border-color: #cfc6ee;
+    background: #f5f2ff;
+    color: #574293;
+}
+
 .dashboard-birthday-family-chip {
     display: inline-flex;
     align-items: center;
@@ -7455,12 +7467,28 @@ a.dashboard-birthday-family-chip:hover {
     background: #fff8ea;
 }
 
+.dashboard-birthday-row.is-educator > td {
+    background: #f0fbf7;
+}
+
+.dashboard-birthday-row.is-employee > td {
+    background: #f7f4ff;
+}
+
 .dashboard-birthday-row.is-student:hover > td {
     background: #e5f2ff;
 }
 
 .dashboard-birthday-row.is-adult:hover > td {
     background: #fff1d6;
+}
+
+.dashboard-birthday-row.is-educator:hover > td {
+    background: #e3f7ef;
+}
+
+.dashboard-birthday-row.is-employee:hover > td {
+    background: #eee8ff;
 }
 
 .dashboard-birthday-person a {
