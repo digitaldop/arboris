@@ -1483,6 +1483,7 @@ class FattureInCloudConnessione(models.Model):
     sincronizza_documenti_da_registrare = models.BooleanField(default=True)
     periodo_import = models.CharField(max_length=10, choices=IMPORT_PERIOD_CHOICES, default="tutte")
     data_inizio_import = models.DateField(blank=True, null=True)
+    data_fine_import = models.DateField(blank=True, null=True)
     sync_progress = models.JSONField(default=dict, blank=True, editable=False)
     sync_automatico = models.BooleanField(
         default=False,

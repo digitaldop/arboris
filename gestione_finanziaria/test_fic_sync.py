@@ -47,10 +47,25 @@ class FicImportPeriodTests(SimpleTestCase):
 
     @patch("gestione_finanziaria.fic_periods.timezone.localdate", return_value=date(2026, 9, 6))
     def test_preset_ignores_stale_manual_input(self, _today):
-        form = FattureInCloudSyncForm({"periodo": "3", "data_inizio": "invalid"})
+        form = FattureInCloudSyncForm({"periodo": "3", "data_inizio": "invalid", "data_fine": "invalid"})
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["data_inizio"], date(2026, 6, 6))
+        self.assertIsNone(form.cleaned_data["data_fine"])
         self.assertFalse(FattureInCloudSyncForm({"periodo": "2"}).is_valid())
+
+    def test_manual_range_accepts_same_day_and_optional_end(self):
+        for end in ("", "2026-01-01", "2026-03-31"):
+            with self.subTest(end=end):
+                form = FattureInCloudSyncForm({"periodo": "manuale", "data_inizio": "2026-01-01", "data_fine": end})
+                self.assertTrue(form.is_valid(), form.errors)
+                self.assertEqual(form.cleaned_data["data_fine"], date.fromisoformat(end) if end else None)
+
+    def test_manual_range_rejects_invalid_or_reversed_end(self):
+        for end in ("invalid", "2025-12-31"):
+            with self.subTest(end=end):
+                form = FattureInCloudSyncForm({"periodo": "manuale", "data_inizio": "2026-01-01", "data_fine": end})
+                self.assertFalse(form.is_valid())
+                self.assertIn("data_fine", form.errors)
 
 
 class FicPaginationTests(SimpleTestCase):
@@ -89,6 +104,13 @@ class FicPaginationTests(SimpleTestCase):
         self.assertEqual(request.call_args.kwargs["params"]["q"], "date >= '2026-01-01'")
         self.assertEqual(request.call_args.kwargs["params"]["page"], 2)
         self.assertNotIn("date_from", request.call_args.kwargs["params"])
+
+    def test_registered_api_filters_both_inclusive_dates(self):
+        client = FattureInCloudClient(FattureInCloudConnessione(company_id=123))
+        with patch.object(client, "request", return_value={}) as request:
+            client.list_received_documents("expense", page=3, data_inizio=date(2026, 1, 1), data_fine=date(2026, 3, 31))
+        self.assertEqual(request.call_args.kwargs["params"]["q"], "date >= '2026-01-01' and date <= '2026-03-31'")
+        self.assertEqual(request.call_args.kwargs["params"]["page"], 3)
 
 
 class FicSyncContinuationTests(TestCase):
@@ -135,6 +157,21 @@ class FicSyncContinuationTests(TestCase):
         self.assertTrue(DocumentoFornitore.objects.filter(external_id="3").exists())
         self.assertFalse(DocumentoFornitore.objects.filter(external_id="4").exists())
 
+    def test_range_includes_both_boundaries_across_pages(self):
+        stats = sincronizza_fatture_in_cloud(
+            self.connessione, max_seconds=0, data_inizio=date(2026, 6, 1), data_fine=date(2026, 7, 1),
+        )
+        self.assertEqual(stats["creati"], 2)
+        self.assertSetEqual(set(DocumentoFornitore.objects.values_list("external_id", flat=True)), {"2", "3"})
+        self.assertEqual(self.api.list_received_documents.call_args.kwargs["data_fine"], date(2026, 7, 1))
+
+    def test_single_day_import(self):
+        stats = sincronizza_fatture_in_cloud(
+            self.connessione, max_seconds=0, data_inizio=date(2026, 6, 1), data_fine=date(2026, 6, 1),
+        )
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(DocumentoFornitore.objects.get().external_id, "3")
+
     def interrupt_after_first_document(self, **kwargs):
         def budget(*args):
             if DocumentoFornitore.objects.count() == 1:
@@ -153,6 +190,52 @@ class FicSyncContinuationTests(TestCase):
         self.assertEqual(stats["creati"], 3)
         self.assertEqual(stats["aggiornati"], 0)
         self.assertEqual(DocumentoFornitore.objects.count(), 4)
+
+    def test_saved_range_is_preserved_when_resuming(self):
+        self.interrupt_after_first_document(
+            periodo_import="manuale", data_inizio=date(2026, 7, 1), data_fine=date(2026, 8, 1),
+        )
+        stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual(stats["aggiornati"], 0)
+        self.assertSetEqual(set(DocumentoFornitore.objects.values_list("external_id", flat=True)), {"1", "2"})
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.data_fine_import, date(2026, 8, 1))
+
+    def test_changing_only_end_date_restarts_import_with_new_range(self):
+        def budget(*args):
+            if DocumentoFornitore.objects.count() == 1:
+                raise FattureInCloudSyncBudgetExceeded("Tempo massimo")
+        with patch("gestione_finanziaria.fatture_in_cloud._check_sync_budget", side_effect=budget):
+            stats = sincronizza_fatture_in_cloud(
+                self.connessione, periodo_import="manuale", data_inizio=date(2026, 6, 1), data_fine=date(2026, 7, 1),
+            )
+        self.assertTrue(stats["interrotta_per_tempo"])
+        self.assertEqual(DocumentoFornitore.objects.get().external_id, "2")
+        stats = sincronizza_fatture_in_cloud(
+            self.connessione, max_seconds=0, periodo_import="manuale",
+            data_inizio=date(2026, 6, 1), data_fine=date(2026, 8, 1),
+        )
+        self.assertEqual(stats["creati"], 2)
+        self.assertEqual(stats["aggiornati"], 1)
+
+    def test_import_started_before_end_date_support_keeps_its_cursor(self):
+        self.interrupt_after_first_document()
+        self.connessione.sync_progress.pop("data_fine")
+        self.connessione.save(update_fields=["sync_progress"])
+        stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertEqual(stats["creati"], 3)
+        self.assertEqual(stats["aggiornati"], 0)
+
+    def test_switching_to_preset_clears_saved_manual_end(self):
+        self.connessione.periodo_import = "manuale"
+        self.connessione.data_inizio_import = date(2026, 1, 1)
+        self.connessione.data_fine_import = date(2026, 6, 1)
+        self.connessione.save()
+        stats = sincronizza_fatture_in_cloud(self.connessione, periodo_import="tutte", max_seconds=0)
+        self.assertEqual(stats["creati"], 4)
+        self.connessione.refresh_from_db()
+        self.assertIsNone(self.connessione.data_fine_import)
 
     def test_changed_period_restarts_and_preserves_existing_documents(self):
         self.interrupt_after_first_document()
@@ -203,6 +286,20 @@ class FicSyncContinuationTests(TestCase):
         stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
         self.assertEqual(stats["creati"], 4)
 
+    def test_pending_range_uses_invoice_date_in_details_instead_of_list_date(self):
+        self.connessione.sincronizza_documenti_registrati = False
+        self.connessione.sincronizza_documenti_da_registrare = True
+        self.connessione.save()
+        self.api.list_pending_received_documents.side_effect = lambda doc_type, **kwargs: self.fetch("expense" if doc_type == "agyo" else doc_type, **kwargs)
+        invoice_dates = {1: "2026-06-01", 2: "2026-08-01", 3: "2026-05-31", 4: "2026-07-01"}
+        with patch("gestione_finanziaria.fatture_in_cloud._document_detail_from_summary",
+                   side_effect=lambda client, summary, **kwargs: {**summary, "date": invoice_dates[summary["id"]]}):
+            stats = sincronizza_fatture_in_cloud(
+                self.connessione, max_seconds=0, data_inizio=date(2026, 6, 1), data_fine=date(2026, 7, 1),
+            )
+        self.assertEqual(stats["creati"], 2)
+        self.assertSetEqual(set(DocumentoFornitore.objects.values_list("external_id", flat=True)), {"1", "4"})
+
     def test_active_sync_is_not_overwritten(self):
         self.connessione.in_corso = True
         self.connessione.avviato_at = timezone.now()
@@ -230,7 +327,7 @@ class FicSyncContinuationTests(TestCase):
         self.assertEqual(self.connessione.periodo_import, "3")
         response = self.client.get(reverse("modifica_fatture_in_cloud", args=[self.connessione.pk]))
         self.assertEqual(response.context["sync_form"]["periodo"].value(), "3")
-        self.assertContains(response, "Data manuale")
+        self.assertContains(response, "Intervallo manuale")
 
     def test_invalid_ajax_date_does_not_start_sync(self):
         response = self.client.post(reverse("sincronizza_fatture_in_cloud", args=[self.connessione.pk]),
@@ -238,3 +335,31 @@ class FicSyncContinuationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Imposta la data", response.json()["error"])
         self.api.list_received_documents.assert_not_called()
+
+    def test_ajax_saves_and_displays_both_dates(self):
+        response = self.client.post(
+            reverse("sincronizza_fatture_in_cloud", args=[self.connessione.pk]),
+            {"periodo": "manuale", "data_inizio": "2026-06-01", "data_fine": "2026-07-01"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["creati"], 2)
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.data_inizio_import, date(2026, 6, 1))
+        self.assertEqual(self.connessione.data_fine_import, date(2026, 7, 1))
+        response = self.client.get(reverse("modifica_fatture_in_cloud", args=[self.connessione.pk]))
+        self.assertEqual(response.context["sync_form"]["data_fine"].value(), date(2026, 7, 1))
+        self.assertContains(response, 'name="data_fine" value="2026-07-01"')
+
+    def test_invalid_ajax_range_preserves_settings_and_does_not_start(self):
+        response = self.client.post(
+            reverse("sincronizza_fatture_in_cloud", args=[self.connessione.pk]),
+            {"periodo": "manuale", "data_inizio": "2026-07-01", "data_fine": "2026-06-01"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("La data finale non può precedere", response.json()["error"])
+        self.api.list_received_documents.assert_not_called()
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.periodo_import, "tutte")
+        self.assertEqual(self.connessione.sync_progress, {})

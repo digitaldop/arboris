@@ -3,7 +3,10 @@
     if (!form) return;
     const period = form.elements.periodo;
     const date = form.elements.data_inizio;
+    const endDate = form.elements.data_fine;
     const manual = document.getElementById("fic-manual-date");
+    const manualEnd = document.getElementById("fic-manual-end-date");
+    const rangeHelp = document.getElementById("fic-manual-range-help");
     const submit = document.getElementById("fic-sync-submit");
     const pause = document.getElementById("fic-sync-pause");
     const status = document.getElementById("fic-sync-status");
@@ -13,10 +16,15 @@
     const updatePeriod = () => {
         const custom = period.value === "manuale";
         manual.hidden = !custom;
+        manualEnd.hidden = !custom;
+        rangeHelp.hidden = !custom;
         date.disabled = !custom;
+        endDate.disabled = !custom;
         date.required = custom;
+        endDate.min = custom ? date.value : "";
     };
     period.addEventListener("change", updatePeriod);
+    date.addEventListener("input", updatePeriod);
     updatePeriod();
     pause.addEventListener("click", () => {
         pauseRequested = true;
@@ -35,6 +43,7 @@
         submit.disabled = true;
         period.disabled = true;
         date.disabled = true;
+        endDate.disabled = true;
         pause.hidden = false;
         pause.disabled = false;
         status.classList.remove("is-error");

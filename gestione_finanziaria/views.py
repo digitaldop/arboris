@@ -3082,6 +3082,7 @@ def modifica_fatture_in_cloud(request, pk):
             "sync_form": FattureInCloudSyncForm(initial={
                 "periodo": connessione.periodo_import,
                 "data_inizio": connessione.data_inizio_import,
+                "data_fine": connessione.data_fine_import,
             }),
             "logs": connessione.log_sincronizzazioni.order_by("-data_operazione", "-id")[:10],
         },
@@ -3192,6 +3193,7 @@ def sincronizza_fatture_in_cloud_view(request, pk):
         data_inizio = sync_form.cleaned_data.get("data_inizio")
         stats = sincronizza_fatture_in_cloud(
             connessione, utente=request.user, data_inizio=data_inizio,
+            data_fine=sync_form.cleaned_data.get("data_fine"),
             periodo_import=sync_form.cleaned_data["periodo"],
         )
         if ajax:

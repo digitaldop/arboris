@@ -37,7 +37,7 @@ from .models import (
     DocumentoFornitoreImportAlias,
 )
 from .security import cifra_testo, decifra_testo_safe
-from .fic_periods import import_start_date
+from .fic_periods import import_start_date, validate_import_date_range
 from .services import (
     aggiorna_stato_documento_da_scadenze,
     crea_notifica_finanziaria,
@@ -2084,6 +2084,13 @@ def _document_is_before_sync_start(document_data, data_inizio):
     return bool(document_date and document_date < data_inizio)
 
 
+def _document_is_after_sync_end(document_data, data_fine):
+    if not data_fine:
+        return False
+    document_date = _document_date_for_sync_filter(_as_dict(document_data))
+    return bool(document_date and document_date > data_fine)
+
+
 def _scadenza_modificabile_da_import(scadenza):
     return (
         scadenza.importo_pagato == Decimal("0.00")
@@ -2490,7 +2497,7 @@ class FattureInCloudClient:
             companies = data or []
         return [company for company in companies if isinstance(company, dict)]
 
-    def list_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None):
+    def list_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None, data_fine=None):
         params = {
             "type": doc_type,
             "page": page,
@@ -2498,8 +2505,13 @@ class FattureInCloudClient:
             "sort": "-date,-id",
             "fieldset": "detailed",
         }
+        filters = []
         if data_inizio:
-            params["q"] = f"date >= '{data_inizio.isoformat()}'"
+            filters.append(f"date >= '{data_inizio.isoformat()}'")
+        if data_fine:
+            filters.append(f"date <= '{data_fine.isoformat()}'")
+        if filters:
+            params["q"] = " and ".join(filters)
         return self.request("GET", f"/c/{self.connessione.company_id}/received_documents", params=params)
 
     def get_received_document(self, document_id):
@@ -2516,7 +2528,7 @@ class FattureInCloudClient:
             params={"fieldset": "detailed"},
         ).get("data", {})
 
-    def list_pending_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None):
+    def list_pending_received_documents(self, doc_type, *, page=1, per_page=50, data_inizio=None, data_fine=None):
         params = {
             "type": doc_type,
             "page": page,
@@ -2633,7 +2645,7 @@ def _sync_summary_label(doc_type, pending):
 
 def sincronizza_fatture_in_cloud(
     connessione, *, utente=None, max_seconds=None, data_inizio=USE_CONNECTION_IMPORT_PERIOD,
-    periodo_import=None, lock_acquired=False,
+    data_fine=None, periodo_import=None, lock_acquired=False,
 ):
     start = time.monotonic()
     if max_seconds is None:
@@ -2649,9 +2661,12 @@ def sincronizza_fatture_in_cloud(
             import_start_date(periodo_import, data_inizio if periodo_import == "manuale" else None)
             connessione.periodo_import = periodo_import
             connessione.data_inizio_import = data_inizio if periodo_import == "manuale" else None
+            connessione.data_fine_import = data_fine if periodo_import == "manuale" else None
         configured_period = periodo_import is not None or data_inizio is USE_CONNECTION_IMPORT_PERIOD
         if configured_period:
             data_inizio = import_start_date(connessione.periodo_import, connessione.data_inizio_import)
+            data_fine = connessione.data_fine_import if connessione.periodo_import == "manuale" else None
+        validate_import_date_range(data_inizio, data_fine)
         signature = {
             "company_id": connessione.company_id, "base_url": connessione.base_url,
             "registered": connessione.sincronizza_documenti_registrati,
@@ -2660,20 +2675,26 @@ def sincronizza_fatture_in_cloud(
             "date": (connessione.data_inizio_import.isoformat() if connessione.data_inizio_import else None)
             if configured_period else (data_inizio.isoformat() if data_inizio else None),
         }
+        # Keep existing imports without an end date compatible with their saved cursor.
+        if data_fine:
+            signature["end_date"] = data_fine.isoformat()
         progress = connessione.sync_progress or {}
         if progress.get("signature") != signature:
             progress = {
                 "signature": signature, "data_inizio": data_inizio.isoformat() if data_inizio else None,
+                "data_fine": data_fine.isoformat() if data_fine else None,
                 "stream": 0, "cursor": {}, "errors": [],
             }
         else:
             # Keep the cutoff fixed while a rolling-period import is resumed.
             data_inizio = parse_date(progress["data_inizio"]) if progress.get("data_inizio") else None
+            data_fine = parse_date(progress["data_fine"]) if progress.get("data_fine") else None
         connessione.sync_progress = progress
         connessione.in_corso = True
         connessione.avviato_at = now
         connessione.save(update_fields=[
-            "periodo_import", "data_inizio_import", "sync_progress", "in_corso", "avviato_at", "data_aggiornamento",
+            "periodo_import", "data_inizio_import", "data_fine_import", "sync_progress",
+            "in_corso", "avviato_at", "data_aggiornamento",
         ])
     stats = {
         "creati": 0,
@@ -2705,13 +2726,16 @@ def sincronizza_fatture_in_cloud(
         def checkpoint():
             FattureInCloudConnessione.objects.filter(pk=connessione.pk).update(sync_progress=progress)
 
+        date_filters = {"data_inizio": data_inizio}
+        if data_fine:
+            date_filters["data_fine"] = data_fine
         for stream_index in range(progress["stream"], len(streams)):
             pending, doc_type = streams[stream_index]
             label = _sync_summary_label(doc_type, pending)
             fetch = client.list_pending_received_documents if pending else client.list_received_documents
             try:
                 for summary in _iter_paginated(
-                    lambda page: fetch(doc_type, page=page, data_inizio=data_inizio),
+                    lambda page: fetch(doc_type, page=page, **date_filters),
                     progress=progress["cursor"],
                     before_fetch=lambda: _check_sync_budget(start, max_seconds),
                     checkpoint=checkpoint,
@@ -2721,12 +2745,15 @@ def sincronizza_fatture_in_cloud(
                     # without discarding the rest of the stream.
                     if not pending and _document_is_before_sync_start(summary, data_inizio):
                         break
+                    if not pending and _document_is_after_sync_end(summary, data_fine):
+                        continue
                     _check_sync_budget(start, max_seconds)
                     try:
                         document = _document_detail_from_summary(
                             client, summary, pending=pending, supplier_context=supplier_context,
                         )
-                        if _document_is_before_sync_start(document, data_inizio):
+                        if (_document_is_before_sync_start(document, data_inizio)
+                                or _document_is_after_sync_end(document, data_fine)):
                             continue
                         kwargs = {} if pending else {"source_doc_type": doc_type}
                         result = importa_documento_fatture_in_cloud(

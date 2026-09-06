@@ -11,7 +11,7 @@ IMPORT_PERIOD_CHOICES = (
     ("9", "9 mesi"),
     ("12", "Un anno"),
     ("tutte", "Tutte"),
-    ("manuale", "Data manuale"),
+    ("manuale", "Intervallo manuale"),
 )
 
 
@@ -30,3 +30,8 @@ def import_start_date(period, manual_date=None, *, today=None):
     year, month_index = divmod(today.year * 12 + today.month - 1 - int(period), 12)
     month = month_index + 1
     return today.replace(year=year, month=month, day=min(today.day, monthrange(year, month)[1]))
+
+
+def validate_import_date_range(start_date, end_date):
+    if start_date and end_date and end_date < start_date:
+        raise ValidationError("La data finale non può precedere la data iniziale.")

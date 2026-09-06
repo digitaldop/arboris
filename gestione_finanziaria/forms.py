@@ -11,7 +11,7 @@ from django.db.models import Q
 from arboris.form_widgets import apply_eur_currency_widget
 from gestione_amministrativa.models import Dipendente
 from .security import cifra_testo
-from .fic_periods import IMPORT_PERIOD_CHOICES, import_start_date
+from .fic_periods import IMPORT_PERIOD_CHOICES, import_start_date, validate_import_date_range
 
 from .models import (
     CategoriaFinanziaria,
@@ -969,6 +969,12 @@ class FattureInCloudSyncForm(forms.Form):
         input_formats=["%Y-%m-%d"],
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
     )
+    data_fine = forms.DateField(
+        label="Al (facoltativa)",
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
 
     def __init__(self, data=None, *args, **kwargs):
         if data is not None:
@@ -978,6 +984,7 @@ class FattureInCloudSyncForm(forms.Form):
                 data["periodo"] = "manuale" if data.get("data_inizio") else "tutte"
             if data.get("periodo") != "manuale":
                 data["data_inizio"] = ""
+                data["data_fine"] = ""
         super().__init__(data, *args, **kwargs)
 
     def clean(self):
@@ -988,6 +995,11 @@ class FattureInCloudSyncForm(forms.Form):
                 cleaned["data_inizio"] = import_start_date(period, cleaned.get("data_inizio"))
             except forms.ValidationError as exc:
                 self.add_error("data_inizio", exc)
+        if period == "manuale" and not self.errors:
+            try:
+                validate_import_date_range(cleaned.get("data_inizio"), cleaned.get("data_fine"))
+            except forms.ValidationError as exc:
+                self.add_error("data_fine", exc)
         return cleaned
 
 
