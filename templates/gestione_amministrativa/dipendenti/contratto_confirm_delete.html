@@ -42,34 +42,43 @@
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg>
                 </span>
                 <div>
-                    <h2 id="ga-contract-delete-title">Conferma eliminazione</h2>
+                    <h2 id="ga-contract-delete-title">{% if count_buste %}Eliminazione non disponibile{% else %}Conferma eliminazione{% endif %}</h2>
                     <p>Questa operazione rimuove il contratto dalla gestione amministrativa.</p>
                 </div>
             </div>
 
             <div class="ga-contract-delete-body">
-                {% if blocked or count_buste or count_simulazioni %}
+                {% if count_buste %}
                     <div class="message message-warning">
-                        Questo contratto ha
-                        {% if count_buste %}{{ count_buste }} buste paga collegate{% endif %}
-                        {% if count_buste and count_simulazioni %} e {% endif %}
-                        {% if count_simulazioni %}{{ count_simulazioni }} simulazioni costo collegate{% endif %}.
-                        Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
+                        Non puoi eliminare questo contratto perché ha
+                        {% if count_buste == 1 %}1 busta paga collegata{% else %}{{ count_buste }} buste paga collegate{% endif %}.
+                        Per conservarne lo storico, imposta una data di fine o disattiva il contratto.
+                    </div>
+                {% elif count_simulazioni %}
+                    <div class="message message-warning">
+                        {% if count_simulazioni == 1 %}
+                            È collegata 1 previsione di costo, che verrà eliminata insieme al contratto.
+                        {% else %}
+                            Sono collegate {{ count_simulazioni }} previsioni di costo, che verranno eliminate insieme al contratto.
+                        {% endif %}
+                        Il dipendente resterà in anagrafica.
                     </div>
                 {% endif %}
 
-                <p class="ga-contract-delete-copy">
-                    Vuoi eliminare il contratto
-                    <strong>{% if contratto.dipendente_id %}di {{ contratto.dipendente }}{% else %}non assegnato{% endif %}</strong>?
-                </p>
+                {% if not count_buste %}
+                    <p class="ga-contract-delete-copy">
+                        Vuoi eliminare il contratto
+                        <strong>{% if contratto.dipendente_id %}di {{ contratto.dipendente }}{% else %}non assegnato{% endif %}</strong>{% if count_simulazioni %} e le previsioni di costo collegate{% endif %}?
+                    </p>
+                {% endif %}
 
                 <form method="post" class="scambio-retta-actions ga-contract-delete-actions">
                     {% csrf_token %}
                     {% if popup %}<input type="hidden" name="popup" value="1">{% endif %}
                     {% if request.GET.target_input_name %}<input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name }}">{% endif %}
-                    <button type="submit" class="btn btn-danger btn-icon-text" {% if count_buste or count_simulazioni %}disabled{% endif %}>
+                    <button type="submit" class="btn btn-danger btn-icon-text" {% if count_buste %}disabled{% endif %}>
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
-                        <span class="btn-label">Elimina</span>
+                        <span class="btn-label">{% if count_simulazioni and not count_buste %}Elimina contratto e previsioni{% else %}Elimina{% endif %}</span>
                     </button>
                     {% if popup %}
                         <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">

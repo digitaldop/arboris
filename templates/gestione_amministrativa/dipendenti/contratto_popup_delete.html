@@ -11,17 +11,24 @@
 
     <div class="panel">
         <div class="panel-body" style="padding: 20px;">
-            {% if blocked or count_buste or count_simulazioni %}
+            {% if count_buste %}
                 <div class="message message-warning">
-                    Questo contratto ha
-                    {% if count_buste %}{{ count_buste }} buste paga collegate{% endif %}
-                    {% if count_buste and count_simulazioni %} e {% endif %}
-                    {% if count_simulazioni %}{{ count_simulazioni }} simulazioni costo collegate{% endif %}.
-                    Per mantenere la storia paghe, chiudilo con una data fine o disattivalo.
+                    Non puoi eliminare questo contratto perché ha
+                    {% if count_buste == 1 %}1 busta paga collegata{% else %}{{ count_buste }} buste paga collegate{% endif %}.
+                    Per conservarne lo storico, imposta una data di fine o disattiva il contratto.
+                </div>
+            {% elif count_simulazioni %}
+                <div class="message message-warning">
+                    {% if count_simulazioni == 1 %}
+                        È collegata 1 previsione di costo, che verrà eliminata insieme al contratto.
+                    {% else %}
+                        Sono collegate {{ count_simulazioni }} previsioni di costo, che verranno eliminate insieme al contratto.
+                    {% endif %}
+                    Il dipendente resterà in anagrafica.
                 </div>
             {% endif %}
 
-            <p>Sei sicuro di voler eliminare questo contratto?</p>
+            {% if not count_buste %}<p>Vuoi eliminare questo contratto{% if count_simulazioni %} e le previsioni di costo collegate{% endif %}?</p>{% endif %}
             <p><strong>{{ contratto.label_select }}</strong></p>
 
             <form method="post">
@@ -30,7 +37,7 @@
                 <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" {% if count_buste or count_simulazioni %}disabled{% endif %}>Si', elimina</button>
+                    <button type="submit" class="btn btn-primary" {% if count_buste %}disabled{% endif %}>{% if count_simulazioni and not count_buste %}Elimina contratto e previsioni{% else %}Elimina{% endif %}</button>
                     <button type="button" class="btn btn-secondary" onclick="window.close()">Annulla</button>
                 </div>
             </form>

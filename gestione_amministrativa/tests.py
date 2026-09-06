@@ -593,6 +593,102 @@ class SimulazioneCostoDipendenteTests(TestCase):
         self.assertContains(response, "ga-contract-delete-shell")
         self.assertContains(response, 'name="popup" value="1"')
 
+    def test_contratto_delete_con_sole_previsioni_chiede_conferma_e_abilita_elimina(self):
+        self.busta.delete()
+        self.client.force_login(self.user)
+        url = reverse("elimina_contratto_dipendente", args=[self.contratto.pk])
+
+        for popup in (False, True):
+            with self.subTest(popup=popup):
+                response = self.client.get(url, {"popup": "1"} if popup else {})
+
+                self.assertContains(response, "1 previsione di costo, che verrà eliminata insieme al contratto")
+                self.assertContains(response, "Elimina contratto e previsioni")
+                self.assertContains(response, "Il dipendente resterà in anagrafica.")
+                self.assertNotRegex(response.content.decode(), r'<button[^>]*type="submit"[^>]*disabled')
+                self.assertFalse(response.context["blocked"])
+                self.assertTrue(ContrattoDipendente.objects.filter(pk=self.contratto.pk).exists())
+                self.assertTrue(SimulazioneCostoDipendente.objects.filter(pk=self.simulazione.pk).exists())
+
+    def test_contratto_delete_elimina_solo_le_proprie_previsioni_attive_e_inattive(self):
+        self.busta.delete()
+        self.client.force_login(self.user)
+        inattiva = SimulazioneCostoDipendente.objects.create(
+            contratto=self.contratto, valido_dal=date(2025, 1, 1), attiva=False,
+        )
+        altro_contratto = ContrattoDipendente.objects.create(
+            dipendente=self.dipendente, data_inizio=date(2026, 1, 1),
+        )
+        altra_previsione = SimulazioneCostoDipendente.objects.create(
+            contratto=altro_contratto, valido_dal=date(2026, 1, 1),
+        )
+
+        response = self.client.post(reverse("elimina_contratto_dipendente", args=[self.contratto.pk]))
+
+        self.assertRedirects(
+            response, reverse("modifica_dipendente", args=[self.dipendente.pk]), fetch_redirect_response=False,
+        )
+        self.assertFalse(ContrattoDipendente.objects.filter(pk=self.contratto.pk).exists())
+        self.assertFalse(SimulazioneCostoDipendente.objects.filter(pk__in=[self.simulazione.pk, inattiva.pk]).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=self.dipendente.pk).exists())
+        self.assertTrue(ContrattoDipendente.objects.filter(pk=altro_contratto.pk).exists())
+        self.assertTrue(SimulazioneCostoDipendente.objects.filter(pk=altra_previsione.pk).exists())
+
+    def test_contratto_delete_popup_elimina_contratto_e_previsione(self):
+        self.busta.delete()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("elimina_contratto_dipendente", args=[self.contratto.pk]), {"popup": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["action"], "delete")
+        self.assertEqual(response.context["object_id"], self.contratto.pk)
+        self.assertFalse(ContrattoDipendente.objects.filter(pk=self.contratto.pk).exists())
+        self.assertFalse(SimulazioneCostoDipendente.objects.filter(pk=self.simulazione.pk).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=self.dipendente.pk).exists())
+
+    def test_contratto_delete_con_busta_paga_resta_bloccato_anche_su_post_diretto(self):
+        self.busta.stato = StatoBustaPaga.EFFETTIVA
+        self.busta.save(update_fields=["stato"])
+        self.client.force_login(self.user)
+        url = reverse("elimina_contratto_dipendente", args=[self.contratto.pk])
+
+        for popup in (False, True):
+            with self.subTest(popup=popup):
+                data = {"popup": "1"} if popup else {}
+                confirmation = self.client.get(url, data)
+                self.assertContains(confirmation, "1 busta paga collegata")
+                self.assertContains(confirmation, "Eliminazione non disponibile")
+                self.assertNotContains(confirmation, "Vuoi eliminare il contratto")
+                self.assertRegex(confirmation.content.decode(), r'<button[^>]*type="submit"[^>]*disabled')
+
+                response = self.client.post(url, data)
+
+                if popup:
+                    self.assertContains(response, "Eliminazione non disponibile")
+                    self.assertTrue(response.context["blocked"])
+                else:
+                    self.assertRedirects(response, reverse("modifica_contratto_dipendente", args=[self.contratto.pk]))
+                self.contratto.refresh_from_db()
+                self.simulazione.refresh_from_db()
+                self.busta.refresh_from_db()
+                self.assertEqual(self.busta.contratto_id, self.contratto.pk)
+
+    def test_contratto_delete_senza_previsioni_o_buste_paga(self):
+        self.busta.delete()
+        self.simulazione.delete()
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("elimina_contratto_dipendente", args=[self.contratto.pk]))
+
+        self.assertRedirects(
+            response, reverse("modifica_dipendente", args=[self.dipendente.pk]), fetch_redirect_response=False,
+        )
+        self.assertFalse(ContrattoDipendente.objects.filter(pk=self.contratto.pk).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=self.dipendente.pk).exists())
+
     def test_lista_buste_paga_renderizza_nuovo_layout_e_popup(self):
         self.client.force_login(self.user)
 

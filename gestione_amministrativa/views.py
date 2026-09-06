@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.utils import OperationalError, ProgrammingError
 from django.http import FileResponse, Http404
@@ -973,16 +974,20 @@ def modifica_contratto_dipendente(request, pk):
     )
 
 
+@transaction.atomic
 def elimina_contratto_dipendente(request, pk):
+    contratti = ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto", "parametro_calcolo")
+    if request.method == "POST":
+        contratti = contratti.select_for_update(of=("self",))
     contratto = get_object_or_404(
-        ContrattoDipendente.objects.select_related("dipendente", "tipo_contratto", "parametro_calcolo"),
+        contratti,
         pk=pk,
     )
     popup = is_popup_request(request)
     count_buste = contratto.buste_paga.count()
     count_simulazioni = contratto.simulazioni_costo.count()
     if request.method == "POST":
-        if count_buste or count_simulazioni:
+        if count_buste:
             if popup:
                 return render(
                     request,
@@ -997,7 +1002,7 @@ def elimina_contratto_dipendente(request, pk):
                 )
             messages.error(
                 request,
-                "Impossibile eliminare il contratto: ci sono buste paga o simulazioni costo collegate. Puoi disattivarlo o chiuderlo con una data fine.",
+                "Impossibile eliminare il contratto: ci sono buste paga collegate. Puoi disattivarlo o chiuderlo con una data fine.",
             )
             return redirect("modifica_contratto_dipendente", pk=contratto.pk)
 
@@ -1010,7 +1015,11 @@ def elimina_contratto_dipendente(request, pk):
                 field_name="contratto",
                 object_id=object_id,
             )
-        messages.success(request, "Contratto dipendente eliminato correttamente.")
+        messages.success(
+            request,
+            "Contratto e previsioni di costo collegate eliminati correttamente."
+            if count_simulazioni else "Contratto dipendente eliminato correttamente.",
+        )
         if dipendente_pk:
             return redirect("modifica_dipendente", pk=dipendente_pk)
         return redirect("lista_contratti_dipendenti")
@@ -1023,7 +1032,7 @@ def elimina_contratto_dipendente(request, pk):
             "count_buste": count_buste,
             "count_simulazioni": count_simulazioni,
             "popup": popup,
-            "blocked": False,
+            "blocked": bool(count_buste),
         },
     )
 
