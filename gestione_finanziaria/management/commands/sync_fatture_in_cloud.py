@@ -68,7 +68,8 @@ class Command(BaseCommand):
         errori = 0
         for connessione in connessioni:
             try:
-                stats = sincronizza_fatture_in_cloud(connessione, data_inizio=data_inizio)
+                kwargs = {"data_inizio": data_inizio} if options.get("data_inizio") else {}
+                stats = sincronizza_fatture_in_cloud(connessione, **kwargs)
                 totale += stats["creati"] + stats["aggiornati"]
                 self.stdout.write(
                     self.style.SUCCESS(

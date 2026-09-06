@@ -8,6 +8,8 @@ from django.db import models
 from django.db.models import Max, Sum
 from django.utils import timezone
 
+from .fic_periods import IMPORT_PERIOD_CHOICES
+
 
 def next_order_value(model_cls):
     max_value = model_cls.objects.aggregate(max_ordine=Max("ordine"))["max_ordine"]
@@ -1479,6 +1481,9 @@ class FattureInCloudConnessione(models.Model):
     attiva = models.BooleanField(default=True)
     sincronizza_documenti_registrati = models.BooleanField(default=True)
     sincronizza_documenti_da_registrare = models.BooleanField(default=True)
+    periodo_import = models.CharField(max_length=10, choices=IMPORT_PERIOD_CHOICES, default="tutte")
+    data_inizio_import = models.DateField(blank=True, null=True)
+    sync_progress = models.JSONField(default=dict, blank=True, editable=False)
     sync_automatico = models.BooleanField(
         default=False,
         help_text="Se attivo, Arboris prova a sincronizzare periodicamente questa connessione.",

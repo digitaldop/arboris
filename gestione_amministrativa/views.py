@@ -1292,7 +1292,8 @@ def crea_busta_paga_dipendente(request):
     popup = is_popup_request(request)
     detailed_mode = gestione_dipendenti_dettagliata_attiva()
     initial = {}
-    anno, mese = _current_period()
+    mese_precedente = timezone.localdate().replace(day=1) - timedelta(days=1)
+    anno, mese = mese_precedente.year, mese_precedente.month
     initial["anno"] = anno
     initial["mese"] = mese
     dipendente_id = (request.GET.get("dipendente") or "").strip()

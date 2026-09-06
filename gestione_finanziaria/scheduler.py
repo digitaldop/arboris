@@ -237,6 +237,8 @@ def is_fatture_in_cloud_sync_due(connessione: FattureInCloudConnessione, *, now=
     now = now or timezone.now()
     if connessione.ultimo_sync_at is None:
         return True
+    if connessione.sync_progress:
+        return connessione.ultimo_sync_at + timedelta(minutes=5) <= now
     return connessione.ultimo_sync_at + timedelta(hours=connessione.intervallo_sync_ore) <= now
 
 
@@ -244,6 +246,8 @@ def prossima_esecuzione_fatture_in_cloud(connessione: FattureInCloudConnessione)
     if not connessione.attiva or not connessione.sync_automatico or connessione.intervallo_sync_ore <= 0:
         return None
     base = connessione.ultimo_sync_at or timezone.now()
+    if connessione.sync_progress:
+        return base + timedelta(minutes=5)
     return base + timedelta(hours=connessione.intervallo_sync_ore)
 
 
@@ -296,6 +300,7 @@ def maybe_run_scheduled_fatture_in_cloud_sync(triggered_by=None):
                 "ultimo_sync_at",
                 "in_corso",
                 "avviato_at",
+                "sync_progress",
             ).filter(attiva=True, sync_automatico=True)
         )
     except (OperationalError, ProgrammingError):
@@ -316,7 +321,7 @@ def maybe_run_scheduled_fatture_in_cloud_sync(triggered_by=None):
         if connessione is None:
             continue
         try:
-            stats = sincronizza_fatture_in_cloud(connessione, utente=triggered_by)
+            stats = sincronizza_fatture_in_cloud(connessione, utente=triggered_by, lock_acquired=True)
             eseguite += 1
             documenti_gestiti += stats["creati"] + stats["aggiornati"]
         except FattureInCloudError:

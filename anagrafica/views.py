@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Case, Count, Exists, F, IntegerField, OuterRef, Prefetch, Q, Sum, Value, When
+from django.db.models.deletion import ProtectedError
 from django.forms import modelform_factory
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -2495,6 +2496,37 @@ def get_record_documents_impact(record):
         "totale_documenti": len(documenti),
     }
 
+
+def get_familiare_delete_impact(familiare, *, lock_profiles=False):
+    impact = get_record_documents_impact(familiare)
+    profiles = Dipendente.objects.filter(persona_collegata_id=familiare.persona_id).order_by("pk")
+    if lock_profiles:
+        profiles = profiles.select_for_update()
+    profiles = list(profiles)
+    blocking_relations = []
+    for relation, label in (
+        ("contratti", "Contratti"),
+        ("buste_paga", "Buste paga"),
+        ("fornitori_collegati", "Fornitori"),
+        ("documenti", "Documenti lavorativi"),
+        ("spese_operative", "Spese operative"),
+    ):
+        count = sum(getattr(profile, relation).count() for profile in profiles)
+        if count:
+            blocking_relations.append({"label": label, "count": count})
+    for relation, label in (
+        ("scambi_retta", "Scambi retta"),
+        ("prestazioni_scambio_retta", "Prestazioni scambio retta"),
+    ):
+        count = getattr(familiare, relation).count()
+        if count:
+            blocking_relations.append({"label": label, "count": count})
+    impact.update(
+        profili_lavorativi=profiles,
+        relazioni_bloccanti=blocking_relations,
+    )
+    return impact
+
 #INIZIO VIEWS DEGLI INDIRIZZI
 def lista_indirizzi(request):
     indirizzi = (
@@ -4278,20 +4310,38 @@ def modifica_familiare(request, pk):
     )
 
 
+@transaction.atomic
 def elimina_familiare(request, pk):
-    familiare = get_object_or_404(Familiare, pk=pk)
-    impact = get_record_documents_impact(familiare)
-    popup = is_popup_request(request)
-
+    familiari = Familiare.objects.select_related("persona")
     if request.method == "POST":
+        familiari = familiari.select_for_update()
+    familiare = get_object_or_404(familiari, pk=pk)
+    impact = get_familiare_delete_impact(familiare, lock_profiles=request.method == "POST")
+    popup = is_popup_request(request)
+    deletion_error = ""
+    if impact["profili_lavorativi"] and not user_has_module_permission(
+        request.user, "gestione_amministrativa", level=LivelloPermesso.GESTIONE,
+    ):
+        deletion_error = "Per eliminare questa anagrafica servono anche i permessi di gestione dei profili lavorativi."
+    elif impact["relazioni_bloccanti"]:
+        deletion_error = "Impossibile eliminare l'anagrafica: rimuovi prima i dati collegati elencati di seguito."
+
+    if request.method == "POST" and not deletion_error:
         object_id = familiare.pk
-        familiare.delete()
+        try:
+            with transaction.atomic():
+                # Deleting only Familiare leaves Persona and its work profiles alive;
+                # opening a surviving work profile would recreate the family record.
+                Dipendente.objects.filter(pk__in=[profile.pk for profile in impact["profili_lavorativi"]]).delete()
+                familiare.persona.delete()
+        except ProtectedError:
+            deletion_error = "Impossibile eliminare l'anagrafica: sono presenti dati collegati protetti. Nessun dato è stato eliminato."
+        else:
+            if popup:
+                return popup_delete_response(request, "familiare", object_id)
 
-        if popup:
-            return popup_delete_response(request, "familiare", object_id)
-
-        messages.success(request, "Familiare eliminato correttamente.")
-        return redirect("lista_familiari")
+            messages.success(request, "Anagrafica eliminata completamente.")
+            return redirect("lista_familiari")
 
     template_name = "anagrafica/familiari/familiare_popup_delete.html" if popup else "anagrafica/familiari/familiari_conferma_elimina.html"
 
@@ -4302,6 +4352,7 @@ def elimina_familiare(request, pk):
             "familiare": familiare,
             "impact": impact,
             "popup": popup,
+            "deletion_error": deletion_error,
         },
     )
 

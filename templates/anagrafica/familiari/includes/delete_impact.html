@@ -1,0 +1,30 @@
+{% if deletion_error %}
+    <div class="message message-error" role="alert">{{ deletion_error }}</div>
+{% else %}
+    <p>L'eliminazione definitiva rimuove i dati personali, i contatti e la scheda anagrafica.</p>
+    {% if impact.profili_lavorativi %}
+        <div class="message message-warning">
+            Verranno eliminati anche tutti i profili lavorativi di questa persona:
+            {% for profilo in impact.profili_lavorativi %}
+                {{ profilo.get_ruolo_aziendale_display }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}.
+        </div>
+    {% endif %}
+{% endif %}
+
+{% if impact.relazioni_bloccanti %}
+    <ul>
+        {% for relazione in impact.relazioni_bloccanti %}
+            <li>{{ relazione.label }}: {{ relazione.count }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+{% if impact.totale_documenti %}
+    <p><strong>Documenti anagrafici che verranno eliminati:</strong></p>
+    <ul>
+        {% for doc in impact.documenti %}
+            <li>{{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}</li>
+        {% endfor %}
+    </ul>
+{% endif %}

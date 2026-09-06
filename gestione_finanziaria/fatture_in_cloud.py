@@ -4,6 +4,7 @@ import hashlib
 import time
 import re
 import unicodedata
+from copy import deepcopy
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from json import JSONDecodeError
@@ -36,6 +37,7 @@ from .models import (
     DocumentoFornitoreImportAlias,
 )
 from .security import cifra_testo, decifra_testo_safe
+from .fic_periods import import_start_date
 from .services import (
     aggiorna_stato_documento_da_scadenze,
     crea_notifica_finanziaria,
@@ -71,6 +73,7 @@ DEFAULT_SCOPES = "received_documents:r entity.suppliers:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
 DEFAULT_SYNC_MAX_SECONDS = 18.0
+USE_CONNECTION_IMPORT_PERIOD = object()
 DEFAULT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 SUPPLIER_DETAILS_SCOPE_WARNING = (
     "Dati anagrafici completi dei fornitori non disponibili: "
@@ -126,6 +129,10 @@ class FattureInCloudError(Exception):
 
 
 class FattureInCloudSyncBudgetExceeded(FattureInCloudError):
+    pass
+
+
+class FattureInCloudSyncInProgress(FattureInCloudError):
     pass
 
 
@@ -2492,7 +2499,7 @@ class FattureInCloudClient:
             "fieldset": "detailed",
         }
         if data_inizio:
-            params["date_from"] = data_inizio.isoformat()
+            params["q"] = f"date >= '{data_inizio.isoformat()}'"
         return self.request("GET", f"/c/{self.connessione.company_id}/received_documents", params=params)
 
     def get_received_document(self, document_id):
@@ -2517,8 +2524,8 @@ class FattureInCloudClient:
             "sort": "-date,-id",
             "fieldset": "detailed",
         }
-        if data_inizio:
-            params["date_from"] = data_inizio.isoformat()
+        # Apply the invoice-date cutoff locally: pending lists can expose
+        # receipt dates instead of the date in the invoice XML.
         return self.request("GET", f"/c/{self.connessione.company_id}/received_documents/pending", params=params)
 
     def get_pending_received_document(self, document_id):
@@ -2543,19 +2550,34 @@ def authorization_url(connessione, redirect_uri, state, scopes=DEFAULT_SCOPES):
     return f"{AUTHORIZATION_URL}?{urlencode(params)}"
 
 
-def _iter_paginated(fetch_page):
-    page = 1
+def _iter_paginated(fetch_page, *, progress=None, before_fetch=None, checkpoint=None):
+    progress = progress if progress is not None else {}
+    page = int(progress.get("page") or 1)
     while True:
+        progress["page"] = page
+        if before_fetch:
+            before_fetch()
         payload = fetch_page(page)
         items = payload.get("data") or []
-        for item in items:
+        processed = set(progress.get("processed_ids") or [])
+        for index, item in enumerate(items):
+            item_key = str(item.get("id") or f"row:{index}")
+            if item_key in processed:
+                continue
             yield item
-        pagination = payload.get("pagination") or {}
-        current = pagination.get("current_page") or page
-        last_page = pagination.get("last_page") or current
-        if not items or current >= last_page:
+            processed.add(item_key)
+            progress["processed_ids"] = sorted(processed)
+            if checkpoint:
+                checkpoint()
+        # FIC returns pagination fields alongside data, not inside pagination.
+        # Accept the older nested shape too, for compatible API proxies.
+        pagination = payload.get("pagination") or payload
+        last_page = pagination.get("last_page")
+        has_next = page < int(last_page) if last_page is not None else bool(pagination.get("next_page_url"))
+        if not items or not has_next:
             break
         page += 1
+        progress.update(page=page, processed_ids=[])
 
 
 def _document_detail_from_summary(client, summary, *, pending, supplier_context=None):
@@ -2609,10 +2631,50 @@ def _sync_summary_label(doc_type, pending):
     return f"{prefix} {doc_type}"
 
 
-def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, data_inizio=None):
+def sincronizza_fatture_in_cloud(
+    connessione, *, utente=None, max_seconds=None, data_inizio=USE_CONNECTION_IMPORT_PERIOD,
+    periodo_import=None, lock_acquired=False,
+):
     start = time.monotonic()
     if max_seconds is None:
         max_seconds = _sync_max_seconds()
+    with transaction.atomic():
+        connessione = FattureInCloudConnessione.objects.select_for_update().get(pk=connessione.pk)
+        now = timezone.now()
+        if not lock_acquired and connessione.in_corso and (
+            not connessione.avviato_at or connessione.avviato_at >= now - timedelta(minutes=5)
+        ):
+            raise FattureInCloudSyncInProgress("Una sincronizzazione è già in corso. Attendi che termini e riprova.")
+        if periodo_import is not None:
+            import_start_date(periodo_import, data_inizio if periodo_import == "manuale" else None)
+            connessione.periodo_import = periodo_import
+            connessione.data_inizio_import = data_inizio if periodo_import == "manuale" else None
+        configured_period = periodo_import is not None or data_inizio is USE_CONNECTION_IMPORT_PERIOD
+        if configured_period:
+            data_inizio = import_start_date(connessione.periodo_import, connessione.data_inizio_import)
+        signature = {
+            "company_id": connessione.company_id, "base_url": connessione.base_url,
+            "registered": connessione.sincronizza_documenti_registrati,
+            "pending": connessione.sincronizza_documenti_da_registrare,
+            "period": connessione.periodo_import if configured_period else "explicit",
+            "date": (connessione.data_inizio_import.isoformat() if connessione.data_inizio_import else None)
+            if configured_period else (data_inizio.isoformat() if data_inizio else None),
+        }
+        progress = connessione.sync_progress or {}
+        if progress.get("signature") != signature:
+            progress = {
+                "signature": signature, "data_inizio": data_inizio.isoformat() if data_inizio else None,
+                "stream": 0, "cursor": {}, "errors": [],
+            }
+        else:
+            # Keep the cutoff fixed while a rolling-period import is resumed.
+            data_inizio = parse_date(progress["data_inizio"]) if progress.get("data_inizio") else None
+        connessione.sync_progress = progress
+        connessione.in_corso = True
+        connessione.avviato_at = now
+        connessione.save(update_fields=[
+            "periodo_import", "data_inizio_import", "sync_progress", "in_corso", "avviato_at", "data_aggiornamento",
+        ])
     stats = {
         "creati": 0,
         "aggiornati": 0,
@@ -2622,10 +2684,11 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
         "pagamenti_auto": 0,
         "fornitori_creati": 0,
         "fornitori_aggiornati": 0,
-        "messaggi": [],
+        "messaggi": list(progress.get("errors") or []),
         "interrotta_per_tempo": False,
     }
-    esito = EsitoSincronizzazione.OK
+    initial_progress = deepcopy(progress)
+    esito = EsitoSincronizzazione.PARZIALE if stats["messaggi"] else EsitoSincronizzazione.OK
     client = FattureInCloudClient(connessione)
     supplier_context = {"cache": {}, "warnings": set()}
 
@@ -2633,87 +2696,61 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
         if not connessione.company_id:
             raise FattureInCloudError("Company ID non configurato.")
 
+        streams = []
         if connessione.sincronizza_documenti_registrati:
-            for doc_type in RECEIVED_DOCUMENT_TYPES:
-                label = _sync_summary_label(doc_type, pending=False)
-                try:
-                    _check_sync_budget(start, max_seconds)
-                    for summary in _iter_paginated(
-                        lambda page: client.list_received_documents(doc_type, page=page, data_inizio=data_inizio)
-                    ):
-                        if _document_is_before_sync_start(summary, data_inizio):
-                            break
-                        _check_sync_budget(start, max_seconds)
-                        try:
-                            document = _document_detail_from_summary(
-                                client,
-                                summary,
-                                pending=False,
-                                supplier_context=supplier_context,
-                            )
-                            if _document_is_before_sync_start(document, data_inizio):
-                                continue
-                            result = importa_documento_fatture_in_cloud(
-                                connessione,
-                                document,
-                                pending=False,
-                                utente=utente,
-                                source_doc_type=doc_type,
-                            )
-                            _add_import_result_to_stats(stats, result)
-                        except FattureInCloudSyncBudgetExceeded:
-                            raise
-                        except (FattureInCloudError, ValidationError) as exc:
-                            esito = EsitoSincronizzazione.PARZIALE
-                            stats["messaggi"].append(f"{label}: documento {summary.get('id') or '-'}: {exc}")
-                except FattureInCloudSyncBudgetExceeded:
-                    raise
-                except FattureInCloudError as exc:
-                    esito = EsitoSincronizzazione.PARZIALE
-                    stats["messaggi"].append(f"{label}: {exc}")
-
+            streams.extend((False, doc_type) for doc_type in RECEIVED_DOCUMENT_TYPES)
         if connessione.sincronizza_documenti_da_registrare:
-            for doc_type in PENDING_DOCUMENT_TYPES:
-                label = _sync_summary_label(doc_type, pending=True)
-                try:
+            streams.extend((True, doc_type) for doc_type in PENDING_DOCUMENT_TYPES)
+
+        def checkpoint():
+            FattureInCloudConnessione.objects.filter(pk=connessione.pk).update(sync_progress=progress)
+
+        for stream_index in range(progress["stream"], len(streams)):
+            pending, doc_type = streams[stream_index]
+            label = _sync_summary_label(doc_type, pending)
+            fetch = client.list_pending_received_documents if pending else client.list_received_documents
+            try:
+                for summary in _iter_paginated(
+                    lambda page: fetch(doc_type, page=page, data_inizio=data_inizio),
+                    progress=progress["cursor"],
+                    before_fetch=lambda: _check_sync_budget(start, max_seconds),
+                    checkpoint=checkpoint,
+                ):
+                    # Registered documents are sorted by invoice date. Pending
+                    # documents may use a receipt date: skip older items there
+                    # without discarding the rest of the stream.
+                    if not pending and _document_is_before_sync_start(summary, data_inizio):
+                        break
                     _check_sync_budget(start, max_seconds)
-                    documents = _iter_paginated(
-                        lambda page: client.list_pending_received_documents(
-                            doc_type,
-                            page=page,
-                            data_inizio=data_inizio,
+                    try:
+                        document = _document_detail_from_summary(
+                            client, summary, pending=pending, supplier_context=supplier_context,
                         )
-                    )
-                    for summary in documents:
-                        if _document_is_before_sync_start(summary, data_inizio):
-                            break
-                        _check_sync_budget(start, max_seconds)
-                        try:
-                            document = _document_detail_from_summary(
-                                client,
-                                summary,
-                                pending=True,
-                                supplier_context=supplier_context,
-                            )
-                            if _document_is_before_sync_start(document, data_inizio):
-                                continue
-                            result = importa_documento_fatture_in_cloud(
-                                connessione,
-                                document,
-                                pending=True,
-                                utente=utente,
-                            )
-                            _add_import_result_to_stats(stats, result)
-                        except FattureInCloudSyncBudgetExceeded:
-                            raise
-                        except (FattureInCloudError, ValidationError) as exc:
-                            esito = EsitoSincronizzazione.PARZIALE
-                            stats["messaggi"].append(f"{label}: documento {summary.get('id') or '-'}: {exc}")
-                except FattureInCloudSyncBudgetExceeded:
-                    raise
-                except FattureInCloudError as exc:
-                    esito = EsitoSincronizzazione.PARZIALE
-                    stats["messaggi"].append(f"{label}: {exc}")
+                        if _document_is_before_sync_start(document, data_inizio):
+                            continue
+                        kwargs = {} if pending else {"source_doc_type": doc_type}
+                        result = importa_documento_fatture_in_cloud(
+                            connessione, document, pending=pending, utente=utente, **kwargs,
+                        )
+                        _add_import_result_to_stats(stats, result)
+                    except FattureInCloudSyncBudgetExceeded:
+                        raise
+                    except (FattureInCloudError, ValidationError) as exc:
+                        esito = EsitoSincronizzazione.PARZIALE
+                        message = f"{label}: documento {summary.get('id') or '-'}: {exc}"
+                        stats["messaggi"].append(message)
+                        progress["errors"] = stats["messaggi"][-20:]
+            except FattureInCloudSyncBudgetExceeded:
+                raise
+            except FattureInCloudError as exc:
+                esito = EsitoSincronizzazione.PARZIALE
+                stats["messaggi"].append(f"{label}: {exc}")
+                # Keep this page for a later retry when the API is available.
+                break
+            progress.update(stream=stream_index + 1, cursor={})
+            checkpoint()
+        else:
+            connessione.sync_progress = {}
 
         if supplier_context.get("warnings") and esito == EsitoSincronizzazione.OK:
             esito = EsitoSincronizzazione.PARZIALE
@@ -2762,6 +2799,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
                 "ultimo_esito",
                 "ultimo_messaggio",
                 "in_corso",
+                "sync_progress",
                 "stato",
                 "data_aggiornamento",
             ]
@@ -2778,6 +2816,7 @@ def sincronizza_fatture_in_cloud(connessione, *, utente=None, max_seconds=None, 
             messaggio=messaggio,
         )
     stats["esito"] = esito
+    stats["avanzato"] = progress != initial_progress
     if esito == EsitoSincronizzazione.ERRORE:
         raise FattureInCloudError(stats["messaggi"][-1])
     return stats

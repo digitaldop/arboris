@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
+from django.db.models.deletion import ProtectedError
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -48,7 +49,9 @@ from anagrafica.models import (
     Familiare,
     AnagraficaEmail,
     Indirizzo,
+    LabelEmail,
     Nazione,
+    Persona,
     Provincia,
     Regione,
     RelazioneFamiliare,
@@ -77,7 +80,7 @@ from gestione_amministrativa.models import (
     StatoDipendente,
     TipoContrattoDipendente,
 )
-from gestione_finanziaria.models import DocumentoFornitore, Fornitore, TipoDocumentoFornitore
+from gestione_finanziaria.models import DocumentoFornitore, Fornitore, SpesaOperativa, TipoDocumentoFornitore
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe, GruppoClasse
 from sistema.models import (
@@ -139,6 +142,192 @@ class FamiliarePersonaProxySaveTests(TestCase):
         familiare.persona.refresh_from_db()
         self.assertEqual(familiare.email, "contatti.lia@example.com")
         self.assertEqual(familiare.persona.email, "contatti.lia@example.com")
+
+
+class FamiliareDeletionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="delete-anagrafica")
+        self.client.force_login(self.user)
+        self.familiare = Familiare.objects.create(
+            nome="Dipendente", cognome="Prova", codice_fiscale="RSSMRA80A01H501U",
+        )
+        self.persona = self.familiare.persona
+        self.url = reverse("elimina_familiare", args=[self.familiare.pk])
+
+    def test_delete_removes_persona_and_frees_codice_fiscale(self):
+        response = self.client.post(self.url)
+
+        self.assertRedirects(response, reverse("lista_familiari"))
+        self.assertFalse(Familiare.objects.filter(pk=self.familiare.pk).exists())
+        self.assertFalse(Persona.objects.filter(pk=self.persona.pk).exists())
+        replacement = Familiare.objects.create(
+            nome="Nuovo", cognome="Test", codice_fiscale=self.persona.codice_fiscale,
+        )
+        self.assertNotEqual(replacement.persona_id, self.persona.pk)
+
+    def test_delete_removes_all_work_profiles_and_their_contacts(self):
+        profiles = [
+            Dipendente.objects.create(persona_collegata=self.persona, ruolo_aziendale=role)
+            for role in (RuoloAnagraficoDipendente.DIPENDENTE, RuoloAnagraficoDipendente.EDUCATORE)
+        ]
+        for owner in (self.persona, self.familiare, *profiles):
+            AnagraficaEmail.objects.create(
+                content_object=owner,
+                label=LabelEmail.objects.get_or_create(nome="Lavoro")[0],
+                email="test@example.com",
+            )
+        profile_ids = [profile.pk for profile in profiles]
+        contact_ids = list(AnagraficaEmail.objects.values_list("pk", flat=True))
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(response, reverse("lista_familiari"))
+        self.assertFalse(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertFalse(Dipendente.objects.filter(pk__in=profile_ids).exists())
+        self.assertFalse(AnagraficaEmail.objects.filter(pk__in=contact_ids).exists())
+        self.assertEqual(self.client.get(reverse("modifica_dipendente", args=[profile_ids[0]])).status_code, 404)
+        self.assertFalse(Familiare.objects.filter(persona_id=self.persona.pk).exists())
+
+    def test_popup_delete_removes_persona_and_work_profile(self):
+        profile = Dipendente.objects.create(persona_collegata=self.persona)
+
+        response = self.client.post(self.url, {"popup": "1"})
+
+        self.assertEqual(response.context["action"], "delete")
+        self.assertEqual(response.context["object_id"], self.familiare.pk)
+        self.assertFalse(Familiare.objects.filter(pk=self.familiare.pk).exists())
+        self.assertFalse(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertFalse(Dipendente.objects.filter(pk=profile.pk).exists())
+
+    def test_confirmation_explains_full_deletion_without_changing_records(self):
+        profile = Dipendente.objects.create(persona_collegata=self.persona)
+        for query in ({}, {"popup": "1"}):
+            with self.subTest(query=query):
+                response = self.client.get(self.url, query)
+                self.assertContains(response, "Elimina anagrafica")
+                self.assertContains(response, "Verranno eliminati anche tutti i profili lavorativi")
+                self.assertFalse(response.context["deletion_error"])
+        self.assertTrue(Familiare.objects.filter(pk=self.familiare.pk).exists())
+        self.assertTrue(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=profile.pk).exists())
+
+    def test_work_relations_block_get_and_post_without_partial_deletion(self):
+        empty_profile = Dipendente.objects.create(persona_collegata=self.persona)
+        profile = Dipendente.objects.create(persona_collegata=self.persona)
+        tipo_contratto = TipoContrattoDipendente.objects.create(nome="Test")
+        relations = [
+            ("Contratti", ContrattoDipendente.objects.create(
+                dipendente=profile, tipo_contratto=tipo_contratto, data_inizio=date(2026, 1, 1),
+            )),
+            ("Buste paga", BustaPagaDipendente.objects.create(dipendente=profile, anno=2026, mese=1)),
+            ("Fornitori", Fornitore.objects.create(dipendente_collegato=profile, denominazione="Test")),
+            ("Documenti lavorativi", DocumentoDipendente.objects.create(dipendente=profile, titolo="Test")),
+            ("Spese operative", SpesaOperativa.objects.create(
+                dipendente=profile, descrizione="Test", data_scadenza=date(2026, 1, 31), importo_previsto=10,
+            )),
+        ]
+        for method, query in (("get", {}), ("post", {}), ("post", {"popup": "1"})):
+            with self.subTest(method=method, query=query):
+                response = getattr(self.client, method)(self.url, query)
+                self.assertContains(response, "rimuovi prima i dati collegati")
+                for label, related in relations:
+                    self.assertContains(response, f"{label}: 1")
+                    self.assertTrue(type(related).objects.filter(pk=related.pk).exists())
+                self.assertTrue(Familiare.objects.filter(pk=self.familiare.pk).exists())
+                self.assertTrue(Persona.objects.filter(pk=self.persona.pk).exists())
+                self.assertEqual(Dipendente.objects.filter(pk__in=[empty_profile.pk, profile.pk]).count(), 2)
+
+    def test_scambio_retta_blocks_deletion_with_a_clear_message(self):
+        anno = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027", data_inizio=date(2026, 9, 1), data_fine=date(2027, 8, 31),
+        )
+        prestazione = PrestazioneScambioRetta.objects.create(
+            familiare=self.familiare, anno_scolastico=anno, data=date(2026, 9, 1),
+            descrizione="Test", ore_lavorate=Decimal("1.00"),
+            tariffa_scambio_retta=TariffaScambioRetta.objects.create(valore_orario=10),
+        )
+
+        response = self.client.post(self.url)
+
+        self.assertContains(response, "Prestazioni scambio retta: 1")
+        self.assertTrue(PrestazioneScambioRetta.objects.filter(pk=prestazione.pk).exists())
+        self.assertTrue(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertTrue(Familiare.objects.filter(pk=self.familiare.pk).exists())
+
+    def test_work_profile_deletion_requires_administration_manage_permission(self):
+        profile = Dipendente.objects.create(persona_collegata=self.persona)
+        user = User.objects.create_user(username="anagrafica-manager")
+        SistemaUtentePermessi.objects.create(
+            user=user, permesso_anagrafica=LivelloPermesso.GESTIONE,
+            permesso_gestione_amministrativa=LivelloPermesso.VISUALIZZAZIONE,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(self.url)
+
+        self.assertContains(response, "servono anche i permessi di gestione dei profili lavorativi")
+        self.assertTrue(Familiare.objects.filter(pk=self.familiare.pk).exists())
+        self.assertTrue(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=profile.pk).exists())
+
+    def test_anagrafica_manager_can_delete_person_without_work_profiles(self):
+        user = User.objects.create_user(username="family-manager")
+        SistemaUtentePermessi.objects.create(user=user, permesso_anagrafica=LivelloPermesso.GESTIONE)
+        self.client.force_login(user)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(response, reverse("lista_familiari"))
+        self.assertFalse(Persona.objects.filter(pk=self.persona.pk).exists())
+
+    def test_protected_deletion_rolls_back_work_profiles_and_contacts(self):
+        profile = Dipendente.objects.create(persona_collegata=self.persona)
+        contact = AnagraficaEmail.objects.create(
+            content_object=profile, label=LabelEmail.objects.get_or_create(nome="Lavoro")[0],
+            email="test@example.com",
+        )
+        with patch.object(Persona, "delete", side_effect=ProtectedError("Test", {self.familiare})):
+            response = self.client.post(self.url)
+
+        self.assertContains(response, "Nessun dato è stato eliminato")
+        self.assertTrue(Familiare.objects.filter(pk=self.familiare.pk).exists())
+        self.assertTrue(Persona.objects.filter(pk=self.persona.pk).exists())
+        self.assertTrue(Dipendente.objects.filter(pk=profile.pk).exists())
+        self.assertTrue(AnagraficaEmail.objects.filter(pk=contact.pk).exists())
+
+    def test_deletion_removes_document_file_and_preserves_shared_address_and_student(self):
+        indirizzo = Indirizzo.objects.create(via="Via Test", numero_civico="1")
+        self.familiare.indirizzo = indirizzo
+        self.familiare.save()
+        other = Familiare.objects.create(nome="Altra", cognome="Persona", indirizzo=indirizzo)
+        studente = Studente.objects.create(nome="Studente", cognome="Test", indirizzo=indirizzo)
+        StudenteFamiliare.objects.create(studente=studente, familiare=self.familiare)
+        other_relation = StudenteFamiliare.objects.create(studente=studente, familiare=other)
+        with TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root,
+            STORAGES={
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+            },
+        ):
+            documento = Documento.objects.create(
+                familiare=self.familiare,
+                tipo_documento=TipoDocumento.objects.create(tipo_documento="Test"),
+                file=SimpleUploadedFile("test-delete.txt", b"test"),
+            )
+            file_path = Path(documento.file.path)
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.post(self.url)
+
+            self.assertRedirects(response, reverse("lista_familiari"))
+            self.assertFalse(file_path.exists())
+            self.assertFalse(Documento.objects.filter(pk=documento.pk).exists())
+        self.assertTrue(Indirizzo.objects.filter(pk=indirizzo.pk).exists())
+        self.assertTrue(Familiare.objects.filter(pk=other.pk).exists())
+        self.assertTrue(Persona.objects.filter(pk=other.persona_id).exists())
+        self.assertTrue(Studente.objects.filter(pk=studente.pk).exists())
+        self.assertTrue(StudenteFamiliare.objects.filter(pk=other_relation.pk).exists())
+        self.assertFalse(StudenteFamiliare.objects.filter(familiare_id=self.familiare.pk).exists())
 
 
 class ImportDatiBaseTests(TestCase):

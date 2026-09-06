@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Elimina familiare - Arboris{% endblock %}
+{% block title %}Elimina anagrafica - Arboris{% endblock %}
 
 {% block breadcrumb %}
     <div class="breadcrumb">
@@ -14,31 +14,20 @@
 
 {% block content %}
     <div class="page-head">
-        <h1 class="page-title">Elimina familiare</h1>
+        <h1 class="page-title">Elimina anagrafica</h1>
     </div>
 
     <div class="panel">
         <div class="panel-body" style="padding: 20px;">
-            <p>Sei sicuro di voler eliminare questo familiare?</p>
+            <p>Sei sicuro di voler eliminare completamente questa anagrafica?</p>
             <p><strong>{{ familiare.cognome }} {{ familiare.nome }}</strong></p>
 
-            {% if impact.totale_documenti %}
-                <div class="message message-warning">
-                    L'eliminazione del familiare rimuoverà anche i suoi documenti collegati.
-                </div>
-
-                <p><strong>Documenti collegati:</strong></p>
-                <p>
-                    {% for doc in impact.documenti %}
-                        {{ doc.tipo_documento }}{% if doc.descrizione %} - {{ doc.descrizione }}{% endif %}{% if not forloop.last %}, {% endif %}
-                    {% endfor %}
-                </p>
-            {% endif %}
+            {% include "anagrafica/familiari/includes/delete_impact.html" %}
 
             <form method="post">
                 {% csrf_token %}
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Si, elimina</button>
+                    <button type="submit" class="btn btn-danger" {% if deletion_error %}disabled{% endif %}>Elimina anagrafica</button>
                     <a href="{% url 'lista_familiari' %}" class="btn btn-secondary">Annulla</a>
                 </div>
             </form>

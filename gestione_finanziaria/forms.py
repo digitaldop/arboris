@@ -11,6 +11,7 @@ from django.db.models import Q
 from arboris.form_widgets import apply_eur_currency_widget
 from gestione_amministrativa.models import Dipendente
 from .security import cifra_testo
+from .fic_periods import IMPORT_PERIOD_CHOICES, import_start_date
 
 from .models import (
     CategoriaFinanziaria,
@@ -961,12 +962,33 @@ class FattureInCloudConnessioneForm(forms.ModelForm):
 
 
 class FattureInCloudSyncForm(forms.Form):
+    periodo = forms.ChoiceField(label="Periodo da importare", choices=IMPORT_PERIOD_CHOICES, initial="tutte")
     data_inizio = forms.DateField(
         label="Dal",
         required=False,
         input_formats=["%Y-%m-%d"],
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
     )
+
+    def __init__(self, data=None, *args, **kwargs):
+        if data is not None:
+            data = data.copy()
+            # Keep older date-only submissions compatible with the new selector.
+            if "periodo" not in data:
+                data["periodo"] = "manuale" if data.get("data_inizio") else "tutte"
+            if data.get("periodo") != "manuale":
+                data["data_inizio"] = ""
+        super().__init__(data, *args, **kwargs)
+
+    def clean(self):
+        cleaned = super().clean()
+        period = cleaned.get("periodo")
+        if period and "data_inizio" not in self.errors:
+            try:
+                cleaned["data_inizio"] = import_start_date(period, cleaned.get("data_inizio"))
+            except forms.ValidationError as exc:
+                self.add_error("data_inizio", exc)
+        return cleaned
 
 
 # =========================================================================

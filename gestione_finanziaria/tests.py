@@ -5312,7 +5312,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("modifica_fatture_in_cloud", kwargs={"pk": connessione.pk}))
-        mock_sync.assert_called_once_with(connessione, utente=self.user, data_inizio=date(2026, 1, 1))
+        mock_sync.assert_called_once_with(connessione, utente=self.user, data_inizio=date(2026, 1, 1), periodo_import="manuale")
 
     @patch("gestione_finanziaria.fatture_in_cloud.FattureInCloudClient")
     def test_sincronizza_fatture_in_cloud_arricchisce_fornitore_da_entity_supplier(self, mock_client_class):

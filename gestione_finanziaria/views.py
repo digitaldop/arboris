@@ -33,6 +33,7 @@ from .background_scheduler import background_scheduler_status
 from .fatture_in_cloud import (
     FIC_SOURCE,
     FattureInCloudError,
+    FattureInCloudSyncInProgress,
     FattureInCloudClient,
     assorbi_alias_import_documento_fornitore,
     authorization_url,
@@ -3078,7 +3079,10 @@ def modifica_fatture_in_cloud(request, pk):
             "oauth_render_configurato": oauth_env_configured(),
             "oauth_confermato": request.GET.get("oauth") == "ok",
             "webhook_url": webhook_url,
-            "sync_form": FattureInCloudSyncForm(),
+            "sync_form": FattureInCloudSyncForm(initial={
+                "periodo": connessione.periodo_import,
+                "data_inizio": connessione.data_inizio_import,
+            }),
             "logs": connessione.log_sincronizzazioni.order_by("-data_operazione", "-id")[:10],
         },
     )
@@ -3176,15 +3180,24 @@ def sincronizza_fatture_in_cloud_view(request, pk):
     if request.method != "POST":
         return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
     sync_form = FattureInCloudSyncForm(request.POST)
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if not sync_form.is_valid():
-        messages.error(request, "Data di sincronizzazione non valida.")
+        error = " ".join(str(message) for errors in sync_form.errors.values() for message in errors)
+        if ajax:
+            return JsonResponse({"error": error}, status=400)
+        messages.error(request, error)
         return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
 
     try:
         data_inizio = sync_form.cleaned_data.get("data_inizio")
-        stats = sincronizza_fatture_in_cloud(connessione, utente=request.user, data_inizio=data_inizio)
+        stats = sincronizza_fatture_in_cloud(
+            connessione, utente=request.user, data_inizio=data_inizio,
+            periodo_import=sync_form.cleaned_data["periodo"],
+        )
+        if ajax:
+            return JsonResponse(stats)
         message = (
-            f"Sincronizzazione completata: {stats['creati']} documenti nuovi, "
+            f"Sincronizzazione: {stats['creati']} documenti nuovi, "
             f"{stats['aggiornati']} documenti aggiornati. "
             f"{stats.get('ignorati', 0)} documenti gia gestiti ignorati. "
             f"Fornitori: {stats.get('fornitori_creati', 0)} nuovi, "
@@ -3196,6 +3209,8 @@ def sincronizza_fatture_in_cloud_view(request, pk):
         else:
             messages.success(request, message)
     except FattureInCloudError as exc:
+        if ajax:
+            return JsonResponse({"error": str(exc)}, status=409 if isinstance(exc, FattureInCloudSyncInProgress) else 502)
         messages.error(request, f"Sincronizzazione fallita: {exc}")
     return redirect("modifica_fatture_in_cloud", pk=connessione.pk)
 

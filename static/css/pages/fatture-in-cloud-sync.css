@@ -1,0 +1,14 @@
+.fic-sync-panel { margin-bottom: 24px; }
+.fic-sync-form { padding: 20px; }
+.fic-sync-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.fic-sync-fields .finance-form-field { flex: 1 1 220px; max-width: 340px; }
+.fic-sync-fields label { display: block; margin-bottom: 8px; font-weight: 700; }
+.fic-sync-fields select, .fic-sync-fields input { width: 100%; min-height: 44px; }
+.fic-sync-form .help-text { margin: 14px 0 0; }
+.fic-sync-form [hidden] { display: none !important; }
+#fic-sync-status:not(:empty) { margin: 16px 0 0; }
+#fic-sync-status.is-error { color: #a12b2b; }
+@media (max-width: 600px) {
+    .fic-sync-fields .finance-form-field { max-width: none; flex-basis: 100%; }
+    .fic-sync-fields .btn { flex: 1 1 auto; }
+}

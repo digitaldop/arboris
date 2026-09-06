@@ -43,15 +43,6 @@
                 <span class="btn-label">Elenco</span>
             </a>
             {% if connessione %}
-                <form method="post" action="{% url 'sincronizza_fatture_in_cloud' connessione.pk %}" class="page-head-inline-form">
-                    {% csrf_token %}
-                    <label class="sr-only" for="{{ sync_form.data_inizio.id_for_label }}">{{ sync_form.data_inizio.label }}</label>
-                    {{ sync_form.data_inizio }}
-                    <button type="submit" class="btn btn-primary btn-icon-text">
-                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
-                        <span class="btn-label">Sincronizza ora</span>
-                    </button>
-                </form>
                 <a href="{% url 'avvia_oauth_fatture_in_cloud' connessione.pk %}" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg></span>
                     <span class="btn-label">Collega OAuth</span>
@@ -67,6 +58,39 @@
             {% endif %}
         </div>
     </div>
+
+    {% if connessione %}
+        <link rel="stylesheet" href="{% static 'css/pages/fatture-in-cloud-sync.css' %}">
+        <section class="panel finance-modern-panel fic-sync-panel" aria-labelledby="fic-sync-title">
+            <div class="finance-section-head">
+                <div>
+                    <h2 class="section-title" id="fic-sync-title">Importa fatture</h2>
+                    <p class="finance-section-subtitle">Scegli quanto indietro cercare, in base alla data della fattura.</p>
+                </div>
+            </div>
+            <form method="post" action="{% url 'sincronizza_fatture_in_cloud' connessione.pk %}" id="fic-sync-form" class="fic-sync-form">
+                {% csrf_token %}
+                <div class="fic-sync-fields">
+                    <div class="finance-form-field">
+                        <label for="{{ sync_form.periodo.id_for_label }}">{{ sync_form.periodo.label }}</label>
+                        {{ sync_form.periodo }}
+                    </div>
+                    <div class="finance-form-field" id="fic-manual-date">
+                        <label for="{{ sync_form.data_inizio.id_for_label }}">Data iniziale inclusa</label>
+                        {{ sync_form.data_inizio }}
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-icon-text" id="fic-sync-submit">
+                        <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
+                        <span class="btn-label">{% if connessione.sync_progress %}Continua importazione{% else %}Sincronizza ora{% endif %}</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="fic-sync-pause" hidden>Metti in pausa</button>
+                </div>
+                <p class="help-text">I mesi si contano a ritroso da oggi. La scelta viene salvata quando avvii l'import e vale anche per le sincronizzazioni automatiche. Le fatture già presenti restano in Arboris.</p>
+                <p id="fic-sync-status" role="status" aria-live="polite">{% if connessione.sync_progress %}Un'importazione è da completare. Con lo stesso periodo riprenderà dal punto raggiunto.{% endif %}</p>
+            </form>
+        </section>
+        <script src="{% static 'js/pages/fatture-in-cloud-sync.js' %}" defer></script>
+    {% endif %}
 
     {% if oauth_confermato %}
         <div class="finance-guide-panel finance-success-panel">
