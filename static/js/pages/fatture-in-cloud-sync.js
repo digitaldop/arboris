@@ -12,6 +12,24 @@
     const status = document.getElementById("fic-sync-status");
     let running = false;
     let pauseRequested = false;
+    let wakeWait = null;
+
+    const waitForRetry = async (seconds, summary) => {
+        const deadline = Date.now() + Math.max(1, Number(seconds) || 60) * 1000;
+        while (!pauseRequested) {
+            const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+            if (!remaining) return true;
+            const hours = Math.floor(remaining / 3600);
+            const minutes = Math.floor((remaining % 3600) / 60);
+            const wait = `${hours ? `${hours} h ` : ""}${minutes ? `${minutes} min ` : ""}${remaining % 60} s`;
+            status.textContent = `Fatture in Cloud richiede una pausa. Ripresa automatica tra ${wait}. ${summary}`;
+            await new Promise((resolve) => {
+                const timer = setTimeout(() => { wakeWait = null; resolve(); }, 1000);
+                wakeWait = () => { clearTimeout(timer); wakeWait = null; resolve(); };
+            });
+        }
+        return false;
+    };
 
     const updatePeriod = () => {
         const custom = period.value === "manuale";
@@ -29,7 +47,8 @@
     pause.addEventListener("click", () => {
         pauseRequested = true;
         pause.disabled = true;
-        status.textContent = "Pausa richiesta: completo le fatture in elaborazione…";
+        if (wakeWait) wakeWait();
+        else status.textContent = "Pausa richiesta: completo le fatture in elaborazione…";
     });
 
     form.addEventListener("submit", async (event) => {
@@ -62,6 +81,12 @@
                 created += result.creati || 0;
                 updated += result.aggiornati || 0;
                 const summary = `${created} fatture nuove, ${updated} aggiornate.`;
+                if (result.in_attesa_limite) {
+                    if (await waitForRetry(result.riprova_tra_secondi, summary)) continue;
+                    status.textContent = `Importazione in pausa: ${summary} Premi Continua importazione per riprendere.`;
+                    submit.querySelector(".btn-label").textContent = "Continua importazione";
+                    break;
+                }
                 if (!result.interrotta_per_tempo) {
                     const partial = result.esito === "parziale";
                     status.classList.toggle("is-error", partial);

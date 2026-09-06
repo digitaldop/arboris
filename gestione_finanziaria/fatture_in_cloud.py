@@ -8,6 +8,7 @@ from copy import deepcopy
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from json import JSONDecodeError
+from math import ceil
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urlencode, urlparse
 
@@ -38,6 +39,7 @@ from .models import (
 )
 from .security import cifra_testo, decifra_testo_safe
 from .fic_periods import import_start_date, validate_import_date_range
+from .fic_rate_limits import retry_after_seconds, sync_retry_at
 from .services import (
     aggiorna_stato_documento_da_scadenze,
     crea_notifica_finanziaria,
@@ -73,6 +75,7 @@ DEFAULT_SCOPES = "received_documents:r entity.suppliers:r"
 DEFAULT_API_CONNECT_TIMEOUT_SECONDS = 3.0
 DEFAULT_API_READ_TIMEOUT_SECONDS = 6.0
 DEFAULT_SYNC_MAX_SECONDS = 18.0
+DEFAULT_SYNC_REQUEST_INTERVAL_SECONDS = 1.2
 USE_CONNECTION_IMPORT_PERIOD = object()
 DEFAULT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 SUPPLIER_DETAILS_SCOPE_WARNING = (
@@ -134,6 +137,27 @@ class FattureInCloudSyncBudgetExceeded(FattureInCloudError):
 
 class FattureInCloudSyncInProgress(FattureInCloudError):
     pass
+
+
+class FattureInCloudRateLimited(FattureInCloudError):
+    def __init__(self, retry_after=None):
+        self.retry_after = retry_after
+        super().__init__("Fatture in Cloud ha raggiunto il limite di richieste. L'importazione riprenderà dopo l'attesa.")
+
+
+def _check_api_rate_limit(response):
+    retry_after = response.headers.get("Retry-After")
+    if response.status_code == 429 or (response.status_code == 403 and retry_after):
+        raise FattureInCloudRateLimited(retry_after_seconds(retry_after))
+
+
+def _empty_sync_stats():
+    return {
+        "creati": 0, "aggiornati": 0, "ignorati": 0, "scadenze": 0,
+        "notifiche": 0, "pagamenti_auto": 0, "fornitori_creati": 0, "fornitori_aggiornati": 0,
+        "messaggi": [], "interrotta_per_tempo": False,
+        "in_attesa_limite": False, "riprova_tra_secondi": 0,
+    }
 
 
 def _positive_float_setting(name, default):
@@ -1272,6 +1296,8 @@ def _document_with_supplier_detail(client, document_data, supplier_context):
     if supplier_id not in cache:
         try:
             cache[supplier_id] = client.get_supplier(supplier_id)
+        except (FattureInCloudRateLimited, FattureInCloudSyncBudgetExceeded):
+            raise
         except FattureInCloudError as exc:
             cache[supplier_id] = None
             if " 401" in str(exc) or " 403" in str(exc) or "NO_PERMISSION" in str(exc).upper():
@@ -2299,6 +2325,12 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
             fornitore_updated = _update_supplier_missing_fields(fornitore, entity)
     else:
         fornitore, fornitore_created, fornitore_updated = _find_or_create_supplier(entity, document_data)
+    Fornitore.objects.select_for_update().get(pk=fornitore.pk)
+    # Anche le fatture già registrate possono contenere il riferimento alla
+    # pro-forma solo nell'XML allegato. Non scaricarlo per fornitori senza attese.
+    from .proforme import proforme_aperte
+    if not pending and proforme_aperte(fornitore.pk).exists():
+        document_data = _document_with_attachment_invoice_detail(document_data, {})
     if documento is None:
         documento = (
             DocumentoFornitore.objects.select_for_update()
@@ -2319,9 +2351,15 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
         documento = DocumentoFornitore()
         created = True
 
+    from .proforme import gestisci_proforma_importata, preserva_importo_collegato
+
+    if documento.pk:
+        documento = DocumentoFornitore.objects.select_for_update().get(pk=documento.pk)
     previous_external_source = documento.external_source if documento.pk else ""
     previous_external_id = documento.external_id if documento.pk else ""
+    originali_proforma = preserva_importo_collegato(documento)
     _update_document_fields(documento, document_data, fornitore, pending, source_doc_type=source_doc_type)
+    preserva_importo_collegato(documento, originali_proforma)
     documento.save()
     registra_alias_import_documento_fornitore(documento, motivo="import_fatture_in_cloud")
     for signature_alias_id in signature_alias_ids:
@@ -2343,9 +2381,10 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
 
     is_credit_note = documento.tipo_documento == TipoDocumentoFornitore.NOTA_CREDITO
     is_compensated = documento.stato == StatoDocumentoFornitore.COMPENSATO
-    if is_compensated:
+    if is_compensated or gestisci_proforma_importata(documento, utente=utente):
         scadenze_create = 0
         pagamenti_auto = 0
+        aggiorna_stato_documento_da_scadenze(documento)
     else:
         scadenze_create = _sync_document_deadlines(
             documento,
@@ -2383,6 +2422,9 @@ class FattureInCloudClient:
     def __init__(self, connessione: FattureInCloudConnessione):
         self.connessione = connessione
         self.base_url = (connessione.base_url or DEFAULT_BASE_URL).rstrip("/")
+        self.request_interval_seconds = 0
+        self.before_request = None
+        self._last_request_at = None
 
     @property
     def access_token(self):
@@ -2411,6 +2453,16 @@ class FattureInCloudClient:
 
     def request(self, method, path, *, params=None, json=None, retry_refresh=True):
         url = f"{self.base_url}{path}"
+        if self.before_request:
+            self.before_request()
+        if self.request_interval_seconds:
+            elapsed = time.monotonic() - self._last_request_at if self._last_request_at is not None else 0
+            delay = max(0, self.request_interval_seconds - elapsed)
+            if delay:
+                time.sleep(delay)
+        if self.before_request:
+            self.before_request()
+        self._last_request_at = time.monotonic()
         try:
             response = requests.request(
                 method,
@@ -2422,6 +2474,7 @@ class FattureInCloudClient:
             )
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Connessione API Fatture in Cloud fallita: {exc}") from exc
+        _check_api_rate_limit(response)
         if response.status_code == 401 and retry_refresh and self.refresh_token:
             self.refresh_access_token()
             return self.request(method, path, params=params, json=json, retry_refresh=False)
@@ -2445,6 +2498,7 @@ class FattureInCloudClient:
             response = requests.post(TOKEN_URL, json=payload, timeout=_api_timeout())
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Refresh token fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
+        _check_api_rate_limit(response)
         if response.status_code >= 400:
             raise FattureInCloudError(f"Refresh token fallito: {response.text[:500]}")
         self._store_tokens(_response_json(response, "Refresh token fallito"))
@@ -2463,6 +2517,7 @@ class FattureInCloudClient:
             response = requests.post(TOKEN_URL, json=payload, timeout=_api_timeout())
         except requests.RequestException as exc:
             raise FattureInCloudError(f"Scambio code fallito: impossibile contattare Fatture in Cloud ({exc}).") from exc
+        _check_api_rate_limit(response)
         if response.status_code >= 400:
             raise FattureInCloudError(f"Scambio code fallito: {response.text[:500]}")
         self._store_tokens(_response_json(response, "Scambio code fallito"))
@@ -2648,6 +2703,7 @@ def sincronizza_fatture_in_cloud(
     data_fine=None, periodo_import=None, lock_acquired=False,
 ):
     start = time.monotonic()
+    stats = _empty_sync_stats()
     if max_seconds is None:
         max_seconds = _sync_max_seconds()
     with transaction.atomic():
@@ -2657,6 +2713,17 @@ def sincronizza_fatture_in_cloud(
             not connessione.avviato_at or connessione.avviato_at >= now - timedelta(minutes=5)
         ):
             raise FattureInCloudSyncInProgress("Una sincronizzazione è già in corso. Attendi che termini e riprova.")
+        retry_at = sync_retry_at(connessione.sync_progress)
+        if retry_at and retry_at > now:
+            if lock_acquired:
+                connessione.in_corso = False
+                connessione.save(update_fields=["in_corso"])
+            stats.update(
+                esito=EsitoSincronizzazione.PARZIALE, avanzato=False, in_attesa_limite=True,
+                riprova_tra_secondi=ceil((retry_at - now).total_seconds()),
+                messaggi=[str(FattureInCloudRateLimited())],
+            )
+            return stats
         if periodo_import is not None:
             import_start_date(periodo_import, data_inizio if periodo_import == "manuale" else None)
             connessione.periodo_import = periodo_import
@@ -2689,6 +2756,14 @@ def sincronizza_fatture_in_cloud(
             # Keep the cutoff fixed while a rolling-period import is resumed.
             data_inizio = parse_date(progress["data_inizio"]) if progress.get("data_inizio") else None
             data_fine = parse_date(progress["data_fine"]) if progress.get("data_fine") else None
+        progress.pop("retry_at", None)
+        # Older versions marked documents that hit 429 as processed. Replay
+        # that interrupted import once so those invoices can be recovered.
+        previous_errors = progress.get("errors") or []
+        recoverable_errors = [message for message in previous_errors
+                              if "Errore API Fatture in Cloud 429" in message or "TOO_MANY_REQUESTS" in message]
+        if recoverable_errors:
+            progress.update(stream=0, cursor={}, errors=[message for message in previous_errors if message not in recoverable_errors])
         connessione.sync_progress = progress
         connessione.in_corso = True
         connessione.avviato_at = now
@@ -2696,21 +2771,12 @@ def sincronizza_fatture_in_cloud(
             "periodo_import", "data_inizio_import", "data_fine_import", "sync_progress",
             "in_corso", "avviato_at", "data_aggiornamento",
         ])
-    stats = {
-        "creati": 0,
-        "aggiornati": 0,
-        "ignorati": 0,
-        "scadenze": 0,
-        "notifiche": 0,
-        "pagamenti_auto": 0,
-        "fornitori_creati": 0,
-        "fornitori_aggiornati": 0,
-        "messaggi": list(progress.get("errors") or []),
-        "interrotta_per_tempo": False,
-    }
+    stats["messaggi"] = list(progress.get("errors") or [])
     initial_progress = deepcopy(progress)
     esito = EsitoSincronizzazione.PARZIALE if stats["messaggi"] else EsitoSincronizzazione.OK
     client = FattureInCloudClient(connessione)
+    client.request_interval_seconds = DEFAULT_SYNC_REQUEST_INTERVAL_SECONDS
+    client.before_request = lambda: _check_sync_budget(start, max_seconds)
     supplier_context = {"cache": {}, "warnings": set()}
 
     try:
@@ -2760,14 +2826,15 @@ def sincronizza_fatture_in_cloud(
                             connessione, document, pending=pending, utente=utente, **kwargs,
                         )
                         _add_import_result_to_stats(stats, result)
-                    except FattureInCloudSyncBudgetExceeded:
+                        progress.pop("rate_limit_attempts", None)
+                    except (FattureInCloudSyncBudgetExceeded, FattureInCloudRateLimited):
                         raise
                     except (FattureInCloudError, ValidationError) as exc:
                         esito = EsitoSincronizzazione.PARZIALE
                         message = f"{label}: documento {summary.get('id') or '-'}: {exc}"
                         stats["messaggi"].append(message)
                         progress["errors"] = stats["messaggi"][-20:]
-            except FattureInCloudSyncBudgetExceeded:
+            except (FattureInCloudSyncBudgetExceeded, FattureInCloudRateLimited):
                 raise
             except FattureInCloudError as exc:
                 esito = EsitoSincronizzazione.PARZIALE
@@ -2790,6 +2857,17 @@ def sincronizza_fatture_in_cloud(
                 f"{stats['fornitori_aggiornati']} aggiornati. "
                 f"Pagamenti riconosciuti: {stats['pagamenti_auto']}."
             )
+    except FattureInCloudRateLimited as exc:
+        esito = EsitoSincronizzazione.PARZIALE
+        attempts = progress.get("rate_limit_attempts", 0)
+        base_delay = exc.retry_after if exc.retry_after is not None else 60
+        delay = max(base_delay, min(max(1, base_delay) * 2 ** min(attempts, 9), 300))
+        progress.update(
+            retry_at=(timezone.now() + timedelta(seconds=delay)).isoformat(),
+            rate_limit_attempts=attempts + 1,
+        )
+        stats.update(in_attesa_limite=True, riprova_tra_secondi=delay)
+        stats["messaggi"].append(str(exc))
     except FattureInCloudSyncBudgetExceeded as exc:
         esito = EsitoSincronizzazione.PARZIALE
         stats["interrotta_per_tempo"] = True

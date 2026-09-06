@@ -9,11 +9,12 @@ from django.utils import timezone
 from .fatture_in_cloud import (
     FattureInCloudClient, FattureInCloudError, FattureInCloudSyncBudgetExceeded,
     FattureInCloudSyncInProgress, _iter_paginated, sincronizza_fatture_in_cloud,
+    FattureInCloudRateLimited,
 )
 from .fic_periods import import_start_date
 from .forms import FattureInCloudSyncForm
 from .models import DocumentoFornitore, FattureInCloudConnessione
-from .scheduler import is_fatture_in_cloud_sync_due
+from .scheduler import is_fatture_in_cloud_sync_due, prossima_esecuzione_fatture_in_cloud
 
 
 class FicImportPeriodTests(SimpleTestCase):
@@ -363,3 +364,97 @@ class FicSyncContinuationTests(TestCase):
         self.connessione.refresh_from_db()
         self.assertEqual(self.connessione.periodo_import, "tutte")
         self.assertEqual(self.connessione.sync_progress, {})
+
+    def test_rate_limited_document_is_retried_without_skipping_following_documents(self):
+        def detail(client, summary, **kwargs):
+            if summary["id"] == 2:
+                raise FattureInCloudRateLimited(120)
+            return summary
+        with patch("gestione_finanziaria.fatture_in_cloud._document_detail_from_summary", side_effect=detail) as get_detail:
+            stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertTrue(stats["in_attesa_limite"])
+        self.assertEqual(stats["riprova_tra_secondi"], 120)
+        self.assertEqual(stats["creati"], 1)
+        self.assertEqual([call.args[1]["id"] for call in get_detail.call_args_list], [1, 2])
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.sync_progress["cursor"]["processed_ids"], ["1"])
+        self.assertEqual(self.connessione.sync_progress["errors"], [])
+        self.assertFalse(self.connessione.in_corso)
+        retry_at = timezone.datetime.fromisoformat(self.connessione.sync_progress["retry_at"])
+        with patch("gestione_finanziaria.fatture_in_cloud.timezone.now", return_value=retry_at + timedelta(seconds=1)):
+            resumed = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertEqual(resumed["creati"], 3)
+        self.assertEqual(resumed["aggiornati"], 0)
+        self.assertEqual(resumed["esito"], "ok")
+        self.assertFalse(resumed["in_attesa_limite"])
+        self.assertEqual(DocumentoFornitore.objects.count(), 4)
+
+    def test_pending_list_rate_limit_keeps_cursor_and_resumes(self):
+        self.connessione.sincronizza_documenti_registrati = False
+        self.connessione.sincronizza_documenti_da_registrare = True
+        self.connessione.save()
+        self.api.list_pending_received_documents.side_effect = FattureInCloudRateLimited(60)
+        stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertTrue(stats["in_attesa_limite"])
+        self.api.list_pending_received_documents.assert_called_once()
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.sync_progress["stream"], 0)
+        retry_at = timezone.datetime.fromisoformat(self.connessione.sync_progress["retry_at"])
+        self.api.list_pending_received_documents.side_effect = lambda doc_type, **kwargs: self.fetch("expense" if doc_type == "agyo" else doc_type, **kwargs)
+        with patch("gestione_finanziaria.fatture_in_cloud.timezone.now", return_value=retry_at + timedelta(seconds=1)):
+            stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertEqual(stats["creati"], 4)
+
+    def test_cooldown_survives_repeat_posts_and_period_changes_without_api_calls(self):
+        self.interrupt_after_first_document()
+        deadline = timezone.now() + timedelta(hours=1)
+        self.connessione.sync_progress["retry_at"] = deadline.isoformat()
+        self.connessione.save(update_fields=["sync_progress"])
+        saved = dict(self.connessione.sync_progress)
+        self.api.reset_mock()
+        response = self.client.post(
+            reverse("sincronizza_fatture_in_cloud", args=[self.connessione.pk]),
+            {"periodo": "1"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["in_attesa_limite"])
+        self.assertGreater(response.json()["riprova_tra_secondi"], 3500)
+        self.api.list_received_documents.assert_not_called()
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.sync_progress, saved)
+        self.assertEqual(self.connessione.periodo_import, "tutte")
+
+    def test_scheduler_observes_api_cooldown_even_when_regular_interval_is_due(self):
+        now = timezone.now()
+        self.connessione.sync_automatico = True
+        self.connessione.ultimo_sync_at = now - timedelta(days=1)
+        self.connessione.sync_progress = {"retry_at": (now + timedelta(hours=1)).isoformat()}
+        self.assertFalse(is_fatture_in_cloud_sync_due(self.connessione, now=now))
+        self.assertEqual(prossima_esecuzione_fatture_in_cloud(self.connessione), now + timedelta(hours=1))
+        self.assertTrue(is_fatture_in_cloud_sync_due(self.connessione, now=now + timedelta(hours=1)))
+
+    def test_repeated_rate_limits_increase_backoff_when_retry_after_is_missing(self):
+        self.api.list_received_documents.side_effect = FattureInCloudRateLimited()
+        now = timezone.now()
+        delays = []
+        for _ in range(8):
+            with patch("gestione_finanziaria.fatture_in_cloud.timezone.now", return_value=now):
+                stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+            delays.append(stats["riprova_tra_secondi"])
+            now += timedelta(seconds=stats["riprova_tra_secondi"] + 1)
+        self.assertEqual(delays, [60, 120, 240, 300, 300, 300, 300, 300])
+        self.connessione.refresh_from_db()
+        self.assertEqual(self.connessione.sync_progress["rate_limit_attempts"], 8)
+
+    def test_legacy_429_errors_are_recovered_by_replaying_the_interrupted_import(self):
+        self.interrupt_after_first_document()
+        self.connessione.sync_progress.update(
+            cursor={"page": 2, "processed_ids": ["3"]},
+            errors=["Da registrare agyo: documento 2: Errore API Fatture in Cloud 429: TOO_MANY_REQUESTS"],
+        )
+        self.connessione.save(update_fields=["sync_progress"])
+        stats = sincronizza_fatture_in_cloud(self.connessione, max_seconds=0)
+        self.assertEqual(stats["creati"], 3)
+        self.assertEqual(stats["aggiornati"], 1)
+        self.assertEqual(stats["esito"], "ok")
+        self.assertEqual(DocumentoFornitore.objects.count(), 4)

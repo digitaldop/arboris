@@ -25,6 +25,7 @@ from django.core.cache import cache
 from django.db import OperationalError, ProgrammingError, transaction
 from django.utils import timezone
 
+from .fic_rate_limits import sync_retry_at
 from .models import (
     ContoBancario,
     EsitoSincronizzazione,
@@ -235,6 +236,9 @@ def is_fatture_in_cloud_sync_due(connessione: FattureInCloudConnessione, *, now=
     if not connessione.attiva or not connessione.sync_automatico or connessione.intervallo_sync_ore <= 0:
         return False
     now = now or timezone.now()
+    retry_at = sync_retry_at(connessione.sync_progress)
+    if retry_at:
+        return retry_at <= now
     if connessione.ultimo_sync_at is None:
         return True
     if connessione.sync_progress:
@@ -245,6 +249,9 @@ def is_fatture_in_cloud_sync_due(connessione: FattureInCloudConnessione, *, now=
 def prossima_esecuzione_fatture_in_cloud(connessione: FattureInCloudConnessione):
     if not connessione.attiva or not connessione.sync_automatico or connessione.intervallo_sync_ore <= 0:
         return None
+    retry_at = sync_retry_at(connessione.sync_progress)
+    if retry_at:
+        return retry_at
     base = connessione.ultimo_sync_at or timezone.now()
     if connessione.sync_progress:
         return base + timedelta(minutes=5)

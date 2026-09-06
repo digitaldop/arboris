@@ -30,6 +30,12 @@ from sistema.models import LivelloPermesso
 from sistema.permissions import user_has_module_permission, user_is_operational_admin
 
 from .background_scheduler import background_scheduler_status
+from .models import VerificaProforma
+from .proforme import (
+    annulla_collegamento_proforma, candidati_proforma, collega_proforma,
+    conferma_fattura_distinta, conferma_variazione_importi, documento_bloccato_per_proforma,
+    documento_con_storico_proforma, netto_documento, proforme_aperte,
+)
 from .fatture_in_cloud import (
     FIC_SOURCE,
     FattureInCloudError,
@@ -529,6 +535,7 @@ def _aggiorna_stato_documento_da_scadenze(documento):
 def _scadenze_fornitori_con_impatto_spese(queryset):
     return (
         queryset.exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
     )
 
@@ -935,6 +942,8 @@ def lista_documenti_fornitori(request):
     for documento in documenti:
         if documento.stato not in stati_non_saldati:
             continue
+        if documento.verifica_proforma in {VerificaProforma.DA_VERIFICARE, VerificaProforma.SOSTITUITA}:
+            continue
         numero_documenti_non_saldati += 1
         importo_pagato = sum(
             (scadenza.importo_pagato or Decimal("0.00") for scadenza in documento.scadenze.all()),
@@ -973,6 +982,12 @@ def _scadenza_documento_da_collegare(documento):
 
 
 def _documento_form_context(form, formset, documento, popup=False):
+    if documento and documento_bloccato_per_proforma(documento):
+        for field in form.fields.values():
+            field.disabled = True
+        for child_form in formset.forms:
+            for field in child_form.fields.values():
+                field.disabled = True
     compensazione_form = None
     puo_compensare = False
     if documento and documento.pk:
@@ -980,6 +995,7 @@ def _documento_form_context(form, formset, documento, popup=False):
         puo_compensare = (
             documento.tipo_documento != TipoDocumentoFornitore.NOTA_CREDITO
             and documento.stato != StatoDocumentoFornitore.COMPENSATO
+            and not documento_bloccato_per_proforma(documento)
             and compensazione_form.fields["nota_credito"].queryset.exists()
         )
     return {
@@ -987,6 +1003,8 @@ def _documento_form_context(form, formset, documento, popup=False):
         "formset": formset,
         "documento": documento,
         "popup": popup,
+        "nuova_proforma": not documento and form["tipo_documento"].value() == TipoDocumentoFornitore.PROFORMA,
+        "blocco_proforma": bool(documento and documento_bloccato_per_proforma(documento)),
         "scadenza_collegamento_movimento": _scadenza_documento_da_collegare(documento),
         "compensazione_form": compensazione_form,
         "puo_compensare_documento": puo_compensare,
@@ -1085,6 +1103,7 @@ def _documento_fornitore_post_con_scadenze_normalizzate(post_data):
     return normalized or post_data
 
 
+@transaction.atomic
 def crea_documento_fornitore(request):
     popup = is_popup_request(request)
     if request.method == "POST":
@@ -1099,6 +1118,11 @@ def crea_documento_fornitore(request):
             documento = form.save()
             formset.instance = documento
             formset.save()
+            if documento.tipo_documento == TipoDocumentoFornitore.PROFORMA and not documento.scadenze.exists():
+                ScadenzaPagamentoFornitore.objects.create(
+                    documento=documento, data_scadenza=documento.data_documento,
+                    importo_previsto=netto_documento(documento),
+                )
             _aggiorna_stato_documento_da_scadenze(documento)
             messages.success(request, "Fattura fornitore creata correttamente.")
             if popup:
@@ -1114,6 +1138,8 @@ def crea_documento_fornitore(request):
             "data_ricezione": timezone.localdate(),
             "aliquota_iva": Decimal("22.00"),
         }
+        if request.GET.get("tipo") == TipoDocumentoFornitore.PROFORMA:
+            initial["tipo_documento"] = TipoDocumentoFornitore.PROFORMA
         fornitore_id = request.GET.get("fornitore")
         if fornitore_id and fornitore_id.isdigit():
             fornitore = Fornitore.objects.filter(pk=int(fornitore_id)).first()
@@ -1133,10 +1159,16 @@ def crea_documento_fornitore(request):
     )
 
 
+@transaction.atomic
 def modifica_documento_fornitore(request, pk):
     popup = is_popup_request(request)
     documento = get_object_or_404(_documento_fornitore_detail_queryset(), pk=pk)
     if request.method == "POST":
+        Fornitore.objects.select_for_update().get(pk=documento.fornitore_id)
+        documento = DocumentoFornitore.objects.select_for_update().get(pk=pk)
+        if documento_bloccato_per_proforma(documento):
+            messages.error(request, "Gestisci prima la verifica o correggi il collegamento alla pro-forma. I pagamenti si aggiungono con Aggiungi pagamento.")
+            return redirect("gestisci_proforma_documento", pk=pk)
         post_data = _documento_fornitore_post_con_scadenze_normalizzate(request.POST)
         form = DocumentoFornitoreForm(post_data, request.FILES, instance=documento)
         formset = _documento_fornitore_formset_class(documento)(
@@ -1168,6 +1200,67 @@ def modifica_documento_fornitore(request, pk):
         "gestione_finanziaria/documento_fornitore_form.html",
         _documento_form_context(form, formset, documento, popup=popup),
     )
+
+
+def gestisci_proforma_documento(request, pk):
+    documento = get_object_or_404(_documento_fornitore_detail_queryset(), pk=pk)
+    popup = is_popup_request(request)
+    if documento.tipo_documento not in {TipoDocumentoFornitore.FATTURA, TipoDocumentoFornitore.PARCELLA, TipoDocumentoFornitore.PROFORMA}:
+        raise Http404
+    errore = ""
+    if request.method == "POST":
+        try:
+            azione = request.POST.get("azione")
+            if azione == "collega":
+                proforma_id = request.POST.get("proforma", "")
+                if not proforma_id.isdigit():
+                    raise ValidationError("Seleziona una pro-forma.")
+                proforma = get_object_or_404(DocumentoFornitore, pk=int(proforma_id))
+                collega_proforma(documento, proforma, utente=request.user, conferma_differenza=request.POST.get("conferma_differenza") == "1")
+                messaggio = "Pro-forma collegata. Scadenze e pagamenti conservati nella fattura definitiva."
+            elif azione == "distinta":
+                conferma_fattura_distinta(documento, utente=request.user)
+                messaggio = "Fattura confermata come distinta e inserita nello scadenziario."
+            elif azione == "annulla" and request.POST.get("conferma") == "1":
+                annulla_collegamento_proforma(documento, utente=request.user)
+                messaggio = "Collegamento annullato. Pagamenti restituiti alla pro-forma; fattura in verifica."
+            elif azione == "importi" and request.POST.get("conferma") == "1":
+                conferma_variazione_importi(documento)
+                messaggio = "Importi aggiornati e residuo ricalcolato. Pagamenti conservati."
+            else:
+                raise ValidationError("Seleziona un'azione e conferma l'operazione.")
+        except ValidationError as exc:
+            errore = " ".join(exc.messages)
+            documento.refresh_from_db()
+        else:
+            messages.success(request, messaggio)
+            if popup:
+                return render(request, "popup/popup_close.html", {"message": messaggio})
+            return redirect("gestisci_proforma_documento", pk=pk)
+
+    proforma_documento = documento.tipo_documento == TipoDocumentoFornitore.PROFORMA
+    suggerimenti = {item["proforma"].pk: item["motivo"] for item in candidati_proforma(documento)} if not proforma_documento else {}
+    candidati = []
+    if not proforma_documento and not documento.proforma_origine_id:
+        for proforma in proforme_aperte(documento.fornitore_id):
+            pagato = proforma.importo_pagato
+            candidati.append({
+                "proforma": proforma, "netto": netto_documento(proforma), "pagato": pagato,
+                "residuo": max(netto_documento(documento) - pagato, Decimal("0.00")),
+                "differenza": netto_documento(documento) != netto_documento(proforma) or documento.totale != proforma.totale,
+                "eccedenza": pagato > netto_documento(documento), "motivo": suggerimenti.get(proforma.pk, "Collegamento manuale"),
+            })
+        candidati.sort(key=lambda item: item["proforma"].pk not in suggerimenti)
+    variazione = documento.external_payload.get("_arboris_proforma_variazione") or {}
+    netto_importato = Decimal(variazione["totale"]) - Decimal(variazione["ritenuta_acconto"]) if variazione else None
+    return render(request, "gestione_finanziaria/proforma_verifica.html", {
+        "documento": documento, "popup": popup, "errore": errore, "candidati": candidati,
+        "proforma_documento": proforma_documento, "netto_fattura": netto_documento(documento),
+        "netto_importato": netto_importato,
+        "residuo_importato": max(netto_importato - documento.importo_pagato, Decimal("0.00")) if variazione else None,
+        "fatture_disponibili": DocumentoFornitore.objects.filter(fornitore=documento.fornitore, tipo_documento__in=[TipoDocumentoFornitore.FATTURA, TipoDocumentoFornitore.PARCELLA], proforma_origine__isnull=True).exclude(stato__in=[StatoDocumentoFornitore.ANNULLATO, StatoDocumentoFornitore.COMPENSATO]) if proforma_documento else [],
+        "storico": (documento.storico_fatture_definitive if proforma_documento else documento.storico_proforma).select_related("proforma", "fattura", "creato_da", "annullato_da"),
+    })
 
 
 @require_POST
@@ -1221,6 +1314,10 @@ def elimina_documento_fornitore(request, pk):
     popup = is_popup_request(request)
     if request.method == "POST":
         with transaction.atomic():
+            Fornitore.objects.select_for_update().get(pk=documento.fornitore_id)
+            if documento_con_storico_proforma(documento):
+                messages.error(request, "Il documento fa parte dello storico pro-forma e pagamenti e deve essere conservato.")
+                return redirect("gestisci_proforma_documento", pk=pk)
             ignora_alias_import_documento_fornitore(documento, motivo="eliminazione_manuale")
             documento.delete()
         message = "Fattura fornitore eliminata correttamente."
@@ -1300,6 +1397,9 @@ def elimina_documenti_fornitori_multipla(request):
         .order_by("-data_documento", "-id")
     )
     documenti = list(queryset)
+    if any(documento_con_storico_proforma(doc) for doc in documenti):
+        messages.error(request, "La selezione comprende documenti dello storico pro-forma: escludili dall'eliminazione.")
+        return redirect(next_url)
     if not documenti:
         messages.error(request, "Le fatture selezionate non sono piu disponibili.")
         return redirect(next_url)
@@ -1310,6 +1410,9 @@ def elimina_documenti_fornitori_multipla(request):
             locked_documenti = list(
                 DocumentoFornitore.objects.select_for_update().filter(pk__in=[documento.pk for documento in documenti])
             )
+            if any(documento_con_storico_proforma(doc) for doc in locked_documenti):
+                messages.error(request, "Un documento è stato collegato a una pro-forma: aggiorna la selezione.")
+                return redirect(next_url)
             for documento in locked_documenti:
                 ignora_alias_import_documento_fornitore(documento, motivo="eliminazione_multipla")
             DocumentoFornitore.objects.filter(pk__in=[documento.pk for documento in locked_documenti]).delete()
@@ -1404,6 +1507,9 @@ def _canonical_duplicate_documento_key(documento):
 def _documenti_fornitori_duplicate_groups():
     documenti = list(
         DocumentoFornitore.objects.select_related("fornitore", "categoria_spesa")
+        .filter(storico_proforma__isnull=True, storico_fatture_definitive__isnull=True)
+        .exclude(tipo_documento=TipoDocumentoFornitore.PROFORMA)
+        .exclude(verifica_proforma=VerificaProforma.DA_VERIFICARE)
         .annotate(
             dedup_scadenze_count=Count("scadenze", distinct=True),
             dedup_pagamenti_count=Count("scadenze__pagamenti", distinct=True),
@@ -1616,6 +1722,8 @@ def _scadenze_fornitori_duplicate_groups():
             "conto_bancario",
             "movimento_finanziario",
         )
+        .filter(documento__storico_proforma__isnull=True, documento__storico_fatture_definitive__isnull=True)
+        .exclude(documento__tipo_documento=TipoDocumentoFornitore.PROFORMA)
         .annotate(dedup_pagamenti_count=Count("pagamenti", distinct=True))
         .order_by("data_scadenza", "id")
     )
@@ -1769,6 +1877,8 @@ def _esegui_pulizia_duplicati_documenti_fornitori(duplicate_pairs):
             documento_keep = documenti.get(keep_id)
             if not documento_duplicato or not documento_keep or documento_duplicato.pk == documento_keep.pk:
                 continue
+            if any(doc.tipo_documento == TipoDocumentoFornitore.PROFORMA or documento_con_storico_proforma(doc) for doc in (documento_duplicato, documento_keep)):
+                continue
             assorbi_alias_import_documento_fornitore(
                 documento_duplicato,
                 documento_keep,
@@ -1802,6 +1912,8 @@ def _esegui_pulizia_duplicati_scadenze_fornitori(duplicate_pairs):
             scadenza_duplicata = scadenze.get(duplicato_id)
             scadenza_keep = scadenze.get(keep_id)
             if not scadenza_duplicata or not scadenza_keep or scadenza_duplicata.pk == scadenza_keep.pk:
+                continue
+            if any(s.documento.tipo_documento == TipoDocumentoFornitore.PROFORMA or documento_con_storico_proforma(s.documento) for s in (scadenza_duplicata, scadenza_keep)):
                 continue
             eliminati_ids.append(scadenza_duplicata.pk)
             documenti_da_aggiornare_ids.add(scadenza_duplicata.documento_id)
@@ -2194,13 +2306,25 @@ def fatture_scadenze_fornitori(request):
     q = (request.GET.get("q") or "").strip()
     stato = request.GET.get("stato") or ""
     vista = (request.GET.get("vista") or "tutte").strip()
-    if vista not in {"tutte", "insolute"}:
+    if vista not in {"tutte", "insolute", "proforme", "verifica"}:
         vista = "tutte"
     categoria_id = request.GET.get("categoria") or ""
     fornitore_id = request.GET.get("fornitore") or ""
     oggi = timezone.localdate()
 
     scadenze = _fatture_scadenze_fornitori_queryset(q=q, categoria_id=categoria_id, fornitore_id=fornitore_id)
+    verifiche = DocumentoFornitore.objects.select_related("fornitore").filter(
+        Q(verifica_proforma=VerificaProforma.DA_VERIFICARE)
+        | Q(proforma_origine__isnull=False, external_payload__has_key="_arboris_proforma_variazione")
+    )
+    if q:
+        verifiche = verifiche.filter(Q(numero_documento__icontains=q) | Q(fornitore__denominazione__icontains=q) | Q(descrizione__icontains=q))
+    if fornitore_id.isdigit():
+        verifiche = verifiche.filter(fornitore_id=int(fornitore_id))
+    if categoria_id.isdigit():
+        verifiche = verifiche.filter(Q(categoria_spesa_id=int(categoria_id)) | Q(categoria_spesa__isnull=True, fornitore__categoria_spesa_id=int(categoria_id)))
+    if vista == "proforme":
+        scadenze = scadenze.filter(documento__tipo_documento=TipoDocumentoFornitore.PROFORMA, documento__fattura_definitiva__isnull=True)
     if stato == "pagata":
         scadenze = scadenze.filter(stato=StatoScadenzaFornitore.PAGATA)
     elif stato == "da_pagare":
@@ -2224,6 +2348,8 @@ def fatture_scadenze_fornitori(request):
     scadenze = scadenze_tutte
     if vista == "insolute":
         scadenze = [scadenza for scadenza in scadenze if scadenza.importo_residuo > Decimal("0.00")]
+    elif vista == "verifica":
+        scadenze = []
 
     switch_params = _fatture_scadenze_fornitori_switch_params(
         q=q,
@@ -2253,6 +2379,9 @@ def fatture_scadenze_fornitori(request):
             "vista": vista,
             "vista_tutte_url": switch_url("tutte"),
             "vista_insolute_url": switch_url("insolute"),
+            "vista_proforme_url": switch_url("proforme"),
+            "vista_verifica_url": switch_url("verifica"),
+            "documenti_da_verificare": verifiche,
             "export_insolute_excel_url": export_insolute_excel_url,
             "categorie": _categorie_spesa_queryset(attive_solo=True),
             "fornitori": Fornitore.objects.filter(attivo=True).order_by("denominazione"),
@@ -2909,6 +3038,8 @@ def aggiorna_categoria_spesa_operativa(request, pk):
 @require_POST
 def aggiorna_categoria_documento_fornitore(request, pk):
     documento = get_object_or_404(DocumentoFornitore.objects.select_related("fornitore"), pk=pk)
+    if documento.verifica_proforma == VerificaProforma.SOSTITUITA:
+        return JsonResponse({"error": "La categoria si modifica nella fattura definitiva."}, status=400)
     categoria = _categoria_spesa_da_request(request)
     if documento.categoria_spesa_id != (categoria.pk if categoria else None):
         documento.categoria_spesa = categoria

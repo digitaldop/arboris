@@ -165,6 +165,16 @@ def document_data_from_e_invoice_xml(xml_text):
         if general_data:
             e_invoice_body["DatiGenerali"] = {"DatiGeneraliDocumento": general_data}
 
+    general = _find_first(body, "DatiGenerali")
+    for kind in ("DatiFattureCollegate", "DatiOrdineAcquisto"):
+        references = []
+        for node in _find_all(general, kind):
+            reference = {field: _text_for(node, field) for field in ("IdDocumento", "Data")}
+            if reference["IdDocumento"]:
+                references.append(reference)
+        if references:
+            e_invoice_body.setdefault("DatiGenerali", {})[kind] = references
+
     line_descriptions = []
     for goods_services in _find_all(body, "DatiBeniServizi"):
         for line in _find_all(goods_services, "DettaglioLinee"):

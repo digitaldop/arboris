@@ -387,6 +387,7 @@ class DocumentoFornitoreForm(forms.ModelForm):
             "categoria_spesa",
             "tipo_documento",
             "numero_documento",
+            "riferimento_ordine",
             "data_documento",
             "data_ricezione",
             "anno_competenza",
@@ -407,9 +408,10 @@ class DocumentoFornitoreForm(forms.ModelForm):
         labels = {
             "fornitore": "Fornitore",
             "categoria_spesa": "Categoria di spesa",
-            "tipo_documento": "Tipo fattura",
-            "numero_documento": "Numero fattura",
-            "data_documento": "Data fattura",
+            "tipo_documento": "Tipo documento",
+            "numero_documento": "Numero documento",
+            "riferimento_ordine": "Riferimento ordine",
+            "data_documento": "Data emissione",
             "data_ricezione": "Data ricezione",
             "anno_competenza": "Anno competenza",
             "mese_competenza": "Mese competenza",
@@ -548,6 +550,8 @@ class DocumentoFornitoreForm(forms.ModelForm):
         cleaned["ritenuta_acconto"] = ritenuta.quantize(Decimal("0.01"))
 
         totale = totale or Decimal("0.00")
+        if cleaned.get("tipo_documento") == TipoDocumentoFornitore.PROFORMA and totale <= Decimal("0.00"):
+            self.add_error("totale", "Il totale della pro-forma deve essere maggiore di zero.")
         if totale > Decimal("0.00") and cleaned["ritenuta_acconto"] > totale:
             self.add_error("ritenuta_acconto", "La ritenuta non puo superare il totale fattura.")
         return cleaned

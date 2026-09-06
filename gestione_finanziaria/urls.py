@@ -149,6 +149,11 @@ urlpatterns = [
         name="compensa_documento_fornitore",
     ),
     path(
+        "gestione-finanziaria/documenti-fornitori/<int:pk>/proforma/",
+        gf_edit(views.gestisci_proforma_documento),
+        name="gestisci_proforma_documento",
+    ),
+    path(
         "gestione-finanziaria/documenti-fornitori/<int:pk>/elimina/",
         gf_manage(views.elimina_documento_fornitore),
         name="elimina_documento_fornitore",

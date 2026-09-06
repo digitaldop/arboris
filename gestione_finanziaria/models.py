@@ -2,6 +2,7 @@ from decimal import Decimal
 import uuid
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -288,6 +289,13 @@ class OrigineDocumentoFornitore(models.TextChoices):
     FATTURE_IN_CLOUD = "fatture_in_cloud", "Fatture in Cloud"
 
 
+class VerificaProforma(models.TextChoices):
+    DA_VERIFICARE = "da_verificare", "Da verificare"
+    DISTINTA = "distinta", "Fattura distinta"
+    COLLEGATA = "collegata", "Collegata a pro-forma"
+    SOSTITUITA = "sostituita", "Fattura definitiva ricevuta"
+
+
 def documento_fornitore_upload_to(instance, filename):
     if getattr(instance, "external_source", "") == "fatture_in_cloud":
         return f"fatture_fornitori/{timezone.localdate():%Y/%m}/{filename}"
@@ -313,6 +321,11 @@ class DocumentoFornitore(models.Model):
         default=TipoDocumentoFornitore.FATTURA,
     )
     numero_documento = models.CharField(max_length=80)
+    riferimento_ordine = models.CharField(max_length=120, blank=True)
+    proforma_origine = models.OneToOneField(
+        "self", on_delete=models.PROTECT, related_name="fattura_definitiva", blank=True, null=True,
+    )
+    verifica_proforma = models.CharField(max_length=20, choices=VerificaProforma.choices, blank=True, default="", db_index=True)
     data_documento = models.DateField(db_index=True)
     data_ricezione = models.DateField(blank=True, null=True)
     anno_competenza = models.PositiveIntegerField(blank=True, null=True)
@@ -455,6 +468,8 @@ class DocumentoFornitore(models.Model):
 
     @property
     def totale_da_pagare(self):
+        if self.verifica_proforma in {VerificaProforma.DA_VERIFICARE, VerificaProforma.SOSTITUITA}:
+            return Decimal("0.00")
         if self.stato == StatoDocumentoFornitore.COMPENSATO:
             return Decimal("0.00")
         totale = (self.totale or Decimal("0.00")) - (self.ritenuta_acconto or Decimal("0.00"))
@@ -464,6 +479,23 @@ class DocumentoFornitore(models.Model):
     def residuo_da_pagare(self):
         residuo = self.totale_da_pagare - self.importo_pagato
         return max(residuo, Decimal("0.00"))
+
+
+class CollegamentoProforma(models.Model):
+    """Registro dei collegamenti, conservato anche dopo una correzione."""
+
+    fattura = models.ForeignKey(DocumentoFornitore, on_delete=models.PROTECT, related_name="storico_proforma")
+    proforma = models.ForeignKey(DocumentoFornitore, on_delete=models.PROTECT, related_name="storico_fatture_definitive")
+    automatico = models.BooleanField(default=False)
+    creato_da = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    creato_at = models.DateTimeField(auto_now_add=True)
+    annullato_at = models.DateTimeField(null=True, blank=True)
+    annullato_da = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dati_originali = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ["-creato_at", "-id"]
+        constraints = [models.UniqueConstraint(fields=["fattura"], condition=models.Q(annullato_at__isnull=True), name="gf_proforma_link_attivo")]
 
 
 class DocumentoFornitoreImportAlias(models.Model):

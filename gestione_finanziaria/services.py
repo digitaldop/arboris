@@ -211,6 +211,7 @@ def build_current_month_supplier_due_data(monthly_start, monthly_end, *, include
         ScadenzaPagamentoFornitore.objects.select_related("documento", "documento__fornitore")
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .filter(data_scadenza__lte=monthly_end)
         .order_by("data_scadenza", "documento__fornitore__denominazione", "id")
@@ -667,6 +668,7 @@ def build_budgeting_dashboard_data(period_type=None, today=None):
             stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
         )
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .filter(data_scadenza__gte=period["start"], data_scadenza__lte=period["end"])
     )
@@ -2714,7 +2716,10 @@ def annulla_riconciliazione_rata(rata):
 
 
 def aggiorna_stato_documento_da_scadenze(documento):
-    from .models import StatoDocumentoFornitore, StatoScadenzaFornitore
+    from .models import StatoDocumentoFornitore, StatoScadenzaFornitore, VerificaProforma
+
+    if documento.verifica_proforma in {VerificaProforma.DA_VERIFICARE, VerificaProforma.SOSTITUITA}:
+        return documento
 
     if documento.stato in {StatoDocumentoFornitore.ANNULLATO, StatoDocumentoFornitore.COMPENSATO}:
         return documento
@@ -2740,6 +2745,10 @@ def aggiorna_stato_documento_da_scadenze(documento):
 
 def compensa_documento_fornitore_con_nota_credito(documento, nota_credito):
     from .models import DocumentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
+    from .proforme import documento_bloccato_per_proforma
+
+    if documento and documento_bloccato_per_proforma(documento):
+        raise ValidationError("Gestisci prima il collegamento alla pro-forma.")
 
     if not documento or not getattr(documento, "pk", None):
         raise ValidationError("Fattura fornitore non valida.")
@@ -2759,6 +2768,8 @@ def compensa_documento_fornitore_con_nota_credito(documento, nota_credito):
     with transaction.atomic():
         documento = DocumentoFornitore.objects.select_for_update().get(pk=documento.pk)
         nota_credito = DocumentoFornitore.objects.select_for_update().get(pk=nota_credito.pk)
+        if documento_bloccato_per_proforma(documento):
+            raise ValidationError("Gestisci prima il collegamento alla pro-forma.")
         if nota_credito.fatture_compensate.exclude(pk=documento.pk).exists():
             raise ValidationError("La nota di credito selezionata e gia collegata a un'altra fattura compensata.")
         documento.stato = StatoDocumentoFornitore.COMPENSATO
@@ -3008,7 +3019,12 @@ def registra_pagamento_fornitore(
     note="",
     utente=None,
 ):
-    from .models import PagamentoFornitore, StatoRiconciliazione
+    from .models import Fornitore, PagamentoFornitore, ScadenzaPagamentoFornitore, StatoRiconciliazione, VerificaProforma
+
+    Fornitore.objects.select_for_update().get(pk=scadenza.documento.fornitore_id)
+    scadenza = ScadenzaPagamentoFornitore.objects.select_related("documento").select_for_update(of=("self",)).get(pk=scadenza.pk)
+    if scadenza.documento.verifica_proforma in {VerificaProforma.DA_VERIFICARE, VerificaProforma.SOSTITUITA}:
+        raise ValidationError("Completa prima la verifica del collegamento alla pro-forma.")
 
     _clear_importo_movimento_disponibile_cache(movimento)
     importo = Decimal(importo or Decimal("0.00"))
@@ -3045,7 +3061,11 @@ def registra_pagamento_fornitore(
 
 @transaction.atomic
 def annulla_pagamento_fornitore(pagamento):
-    scadenza = pagamento.scadenza
+    from .models import Fornitore, PagamentoFornitore, ScadenzaPagamentoFornitore
+
+    Fornitore.objects.select_for_update().get(pk=pagamento.scadenza.documento.fornitore_id)
+    pagamento = PagamentoFornitore.objects.select_for_update().get(pk=pagamento.pk)
+    scadenza = ScadenzaPagamentoFornitore.objects.select_for_update().get(pk=pagamento.scadenza_id)
     movimento = pagamento.movimento_finanziario
     pagamento.delete()
     aggiorna_scadenza_da_pagamenti(scadenza)
@@ -3101,6 +3121,7 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
         )
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .order_by("data_scadenza", "id")[:300]
     )
@@ -3270,6 +3291,7 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
         )
         .exclude(stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA])
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
+        .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
         .order_by("documento__fornitore_id", "data_scadenza", "id")[:600]
     )

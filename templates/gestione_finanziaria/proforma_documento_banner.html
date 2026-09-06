@@ -1,0 +1,21 @@
+{% if documento %}
+{% if documento.tipo_documento == 'proforma' or documento.tipo_documento == 'fattura' or documento.tipo_documento == 'parcella' %}
+<section class="panel panel-standalone" aria-label="Stato pro-forma">
+    <div class="panel-body">
+        {% if documento.verifica_proforma == 'sostituita' %}
+            <strong>Fattura definitiva ricevuta.</strong> Numero, data e allegato della pro-forma sono conservati qui. Pagamenti e scadenze sono nella <a href="{% url 'modifica_documento_fornitore' documento.fattura_definitiva.pk %}{% if popup %}?popup=1{% endif %}">fattura {{ documento.fattura_definitiva.numero_documento }}</a>.
+        {% elif documento.tipo_documento == 'proforma' %}
+            <strong>Pro-forma · In attesa di fattura definitiva.</strong> Puoi registrare e riconciliare i pagamenti anche prima dell'arrivo della fattura.
+        {% elif documento.proforma_origine_id %}
+            <strong>Collegata alla pro-forma {{ documento.proforma_origine.numero_documento }}.</strong> I pagamenti precedenti sono conservati in questa fattura.
+        {% elif documento.verifica_proforma == 'da_verificare' %}
+            <strong>Da verificare.</strong> Scegli una pro-forma oppure conferma che questa fattura è distinta per inserirla nello scadenziario.
+        {% endif %}
+        <a class="btn btn-secondary" href="{% url 'gestisci_proforma_documento' documento.pk %}{% if popup %}?popup=1{% endif %}">Gestisci collegamento pro-forma</a>
+        {% if blocco_proforma %}<p>Per modificare i dati del documento, completa prima la verifica o annulla il collegamento. I pagamenti della fattura definitiva si aggiungono con «Aggiungi pagamento».</p>{% endif %}
+    </div>
+</section>
+{% endif %}
+{% elif nuova_proforma %}
+<p>Se non inserisci una scadenza, verrà usata la data di emissione per l'intero netto da corrispondere.</p>
+{% endif %}

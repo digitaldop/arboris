@@ -1,0 +1,75 @@
+{% extends popup|yesno:"popup_base.html,base.html" %}
+{% load static currency %}
+{% block title %}Collegamento pro-forma - {{ documento.numero_documento }}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/proforme.css' %}">
+<div class="proforma-workspace">
+    <h1>Collegamento pro-forma</h1>
+    <p>{{ documento.fornitore }} · {{ documento.get_tipo_documento_display }} {{ documento.numero_documento }} del {{ documento.data_documento|date:"d/m/Y" }}</p>
+    <p><a href="{% url 'modifica_documento_fornitore' documento.pk %}{% if popup %}?popup=1{% endif %}">Apri documento e allegato</a> · <a href="{% url 'fatture_scadenze_fornitori' %}">Fatture e scadenze</a></p>
+    {% if errore %}<div class="alert alert-danger" role="alert">{{ errore }}</div>{% endif %}
+    <section class="proforma-card">
+        <h2>Importi del documento</h2>
+        <dl class="proforma-amounts"><div><dt>Totale</dt><dd>{{ documento.totale|euro }} &euro;</dd></div><div><dt>Netto da corrispondere</dt><dd>{{ netto_fattura|euro }} &euro;</dd></div><div><dt>Già pagato</dt><dd>{{ documento.importo_pagato|euro }} &euro;</dd></div></dl>
+    </section>
+    {% if documento.proforma_origine_id %}
+        <section class="proforma-card">
+            <h2>Pro-forma collegata</h2>
+            <p><a href="{% url 'modifica_documento_fornitore' documento.proforma_origine_id %}{% if popup %}?popup=1{% endif %}">{{ documento.proforma_origine }}</a>. Scadenze e pagamenti sono ora associati a questa fattura.</p>
+            {% if netto_importato != None %}
+            <form method="post" class="proforma-action">
+                {% csrf_token %}<input type="hidden" name="azione" value="importi">
+                <h3>Variazione ricevuta da Fatture in Cloud</h3>
+                <p>Nuovo netto: <strong>{{ netto_importato|euro }} &euro;</strong>. Residuo dopo i pagamenti: <strong>{{ residuo_importato|euro }} &euro;</strong>.</p>
+                <label><input type="checkbox" name="conferma" value="1" required> Confermo gli importi aggiornati e il nuovo residuo.</label>
+                <button class="btn btn-primary" type="submit">Aggiorna importi</button>
+            </form>
+            {% endif %}
+            <form method="post" class="proforma-action">
+                {% csrf_token %}<input type="hidden" name="azione" value="annulla">
+                <p>Per correggere il collegamento, scadenze e pagamenti verranno restituiti alla pro-forma. La fattura tornerà in verifica.</p>
+                <label><input type="checkbox" name="conferma" value="1" required> Confermo l'annullamento del collegamento.</label>
+                <button class="btn btn-secondary" type="submit">Annulla collegamento</button>
+            </form>
+        </section>
+    {% elif proforma_documento %}
+        <section class="proforma-card">
+            {% if documento.fattura_definitiva %}
+                <h2>Fattura definitiva ricevuta</h2>
+                <p>Pagamenti e scadenze sono consultabili nella <a href="{% url 'gestisci_proforma_documento' documento.fattura_definitiva.pk %}{% if popup %}?popup=1{% endif %}">fattura {{ documento.fattura_definitiva.numero_documento }}</a>.</p>
+            {% else %}
+                <h2>In attesa di fattura definitiva</h2>
+                <p>La pro-forma resta nello scadenziario anche dopo il pagamento. Se la fattura è già presente, aprila per collegarla.</p>
+                <ul>{% for fattura in fatture_disponibili %}<li><a href="{% url 'gestisci_proforma_documento' fattura.pk %}{% if popup %}?popup=1{% endif %}">{{ fattura.numero_documento }} del {{ fattura.data_documento|date:"d/m/Y" }} · {{ fattura.totale|euro }} &euro;</a></li>{% empty %}<li>Nessuna fattura disponibile per questo fornitore.</li>{% endfor %}</ul>
+            {% endif %}
+        </section>
+    {% else %}
+        {% if documento.verifica_proforma == 'da_verificare' %}<p class="alert alert-warning">Fattura in verifica: non genera ulteriori scadenze finché non scegli un collegamento o confermi che è distinta.</p>{% endif %}
+        <h2>Pro-forma dello stesso fornitore</h2>
+        {% for candidato in candidati %}
+        <section class="proforma-card">
+            <h3><a href="{% url 'modifica_documento_fornitore' candidato.proforma.pk %}{% if popup %}?popup=1{% endif %}">Pro-forma {{ candidato.proforma.numero_documento }}</a> del {{ candidato.proforma.data_documento|date:"d/m/Y" }}</h3>
+            <p>{{ candidato.motivo }}{% if candidato.proforma.riferimento_ordine %} · Ordine {{ candidato.proforma.riferimento_ordine }}{% endif %}</p>
+            <dl class="proforma-amounts"><div><dt>Netto pro-forma</dt><dd>{{ candidato.netto|euro }} &euro;</dd></div><div><dt>Pagamento da conservare</dt><dd>{{ candidato.pagato|euro }} &euro;</dd></div><div><dt>Residuo della fattura dopo il collegamento</dt><dd>{{ candidato.residuo|euro }} &euro;</dd></div></dl>
+            {% if candidato.eccedenza %}<p class="alert alert-warning">Il pagato supera il netto della fattura. Verifica l'eccedenza prima di collegare.</p>{% else %}
+            <form method="post" class="proforma-action">
+                {% csrf_token %}<input type="hidden" name="azione" value="collega"><input type="hidden" name="proforma" value="{{ candidato.proforma.pk }}">
+                {% if candidato.differenza %}<label><input type="checkbox" name="conferma_differenza" value="1" required> Gli importi differiscono: confermo il residuo di {{ candidato.residuo|euro }} &euro;. L'adeguamento parte dall'ultima scadenza e conserva i pagamenti.</label>{% endif %}
+                <button class="btn btn-primary" type="submit">Collega alla pro-forma {{ candidato.proforma.numero_documento }}</button>
+            </form>{% endif %}
+        </section>
+        {% empty %}<p>Nessuna pro-forma disponibile per questo fornitore.</p>{% endfor %}
+        {% if documento.verifica_proforma == 'da_verificare' %}
+        <form method="post" class="proforma-card">
+            {% csrf_token %}<input type="hidden" name="azione" value="distinta">
+            <p>Se è una spesa diversa, crea le sue scadenze lasciando aperte le pro-forma.</p>
+            <button class="btn btn-secondary" type="submit">È una fattura distinta</button>
+        </form>{% endif %}
+    {% endif %}
+    {% if storico %}
+    <section class="proforma-card">
+        <h2>Storico dei collegamenti</h2>
+        <ul>{% for evento in storico %}<li>{{ evento.creato_at|date:"d/m/Y H:i" }} · Pro-forma {{ evento.proforma.numero_documento }} → fattura {{ evento.fattura.numero_documento }} · {% if evento.automatico %}Import automatico{% else %}{{ evento.creato_da|default:"Utente" }}{% endif %}{% if evento.annullato_at %} · Annullato il {{ evento.annullato_at|date:"d/m/Y H:i" }} da {{ evento.annullato_da|default:"Utente" }}{% endif %}</li>{% endfor %}</ul>
+    </section>{% endif %}
+</div>
+{% endblock %}

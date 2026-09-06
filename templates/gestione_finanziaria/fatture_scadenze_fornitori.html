@@ -42,6 +42,7 @@
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                     <span class="btn-label">Pulisci duplicati</span>
                 </a>
+                <a href="{% url 'crea_documento_fornitore' %}?popup=1&amp;tipo=proforma" class="btn btn-secondary" data-window-popup="1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">Nuova pro-forma</a>
                 <a href="{% url 'crea_documento_fornitore' %}?popup=1" class="btn btn-primary btn-icon-text btn-add-action" data-window-popup="1" data-popup-url="{% url 'crea_documento_fornitore' %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">
                     <span class="btn-icon btn-plus-mark" aria-hidden="true">+</span>
                     <span class="btn-label">Nuova fattura</span>
@@ -85,6 +86,8 @@
                 <span class="supplier-fusion-view-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#alert"></use></svg></span>
                 <span>Solo fatture insolute</span>
             </a>
+            <a href="{{ vista_proforme_url }}" class="{% if vista == 'proforme' %}is-active{% endif %}" aria-pressed="{% if vista == 'proforme' %}true{% else %}false{% endif %}">In attesa di fattura definitiva</a>
+            <a href="{{ vista_verifica_url }}" class="{% if vista == 'verifica' %}is-active{% endif %}" aria-pressed="{% if vista == 'verifica' %}true{% else %}false{% endif %}">Da verificare ({{ documenti_da_verificare|length }})</a>
         </div>
         <form method="get" class="search-form anagrafica-search-form">
             <input type="hidden" name="vista" value="{{ vista }}">
@@ -121,11 +124,27 @@
         </form>
     </div>
 
+    {% if documenti_da_verificare %}
+    <section class="panel panel-standalone finance-modern-panel" aria-label="Documenti da verificare">
+        <div class="panel-body">
+            <h2>Da verificare</h2>
+            <p>Le fatture con una possibile pro-forma restano sospese nello scadenziario fino alla verifica. Per le fatture già collegate, gli importi precedenti restano validi fino alla conferma della variazione.</p>
+            <table class="list-table finance-modern-table">
+                <thead><tr><th>Data emissione</th><th>Fornitore</th><th>Fattura</th><th>Totale</th><th>Azioni</th></tr></thead>
+                <tbody>{% for fattura in documenti_da_verificare %}
+                <tr><td>{{ fattura.data_documento|date:"d/m/Y" }}</td><td>{{ fattura.fornitore }}</td><td>{{ fattura.numero_documento }}</td><td>{{ fattura.totale|euro }} &euro;</td>
+                    <td><a class="btn btn-secondary" href="{% url 'gestisci_proforma_documento' fattura.pk %}?popup=1" data-window-popup="1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes">Verifica pro-forma</a></td></tr>
+                {% endfor %}</tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
     <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
         <div class="panel-body">
             {% if scadenze %}
                 <table class="list-table anagrafica-list-table finance-modern-table supplier-fusion-table">
                     <colgroup>
+                        <col class="supplier-fusion-col-date">
                         <col class="supplier-fusion-col-date">
                         <col class="supplier-fusion-col-supplier">
                         <col class="supplier-fusion-col-category">
@@ -137,6 +156,7 @@
                     </colgroup>
                     <thead>
                         <tr>
+                            <th>Data fattura</th>
                             <th>Scadenza</th>
                             <th>Fornitore</th>
                             <th>Categoria</th>
@@ -151,6 +171,9 @@
                         {% for scadenza in scadenze %}
                             <tr class="list-row-link {% if scadenza.pagamento_parziale %}supplier-invoice-row-partial{% elif scadenza.importo_residuo %}supplier-invoice-row-unpaid{% else %}supplier-invoice-row-paid{% endif %}" data-row-href="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}" data-row-popup-url="{% url 'modifica_documento_fornitore' scadenza.documento.pk %}?popup=1" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" data-popup-title="Fattura {{ scadenza.documento.numero_documento }}">
                                 <td>
+                                    {{ scadenza.documento.data_documento|date:"d/m/Y" }}
+                                </td>
+                                <td>
                                     <strong>{{ scadenza.data_scadenza|date:"d/m/Y" }}</strong>
                                 </td>
                                 <td class="anagrafica-record-cell">
@@ -160,6 +183,7 @@
                                         </span>
                                         <span class="anagrafica-record-main">
                                             <span class="table-main-text">{{ scadenza.documento.fornitore.denominazione }}</span>
+                                            {% if scadenza.documento.tipo_documento == 'proforma' %}<span class="anagrafica-status-chip is-amber">Pro-forma {{ scadenza.documento.numero_documento }}</span>{% elif scadenza.documento.proforma_origine_id %}<span class="table-subtext">Da pro-forma · Fattura {{ scadenza.documento.numero_documento }}</span>{% endif %}
                                             <span class="table-subtext">
                                                 {{ scadenza.documento.descrizione|default:"Fattura fornitore"|truncatechars:70 }}
                                                 {% if scadenza.documento.ritenuta_acconto %}
