@@ -5151,6 +5151,20 @@ body.sidebar-is-collapsed .sidebar-collapse-icon {
     background: #fdebea;
 }
 
+.module-gestione_finanziaria .finance-movements-table tr.finance-movement-row-unreconciled > td:first-child {
+    box-shadow: inset 3px 0 #c5ad79;
+}
+
+.finance-movement-status.is-unreconciled {
+    display: inline-block;
+    padding: 3px 7px;
+    border-radius: 5px;
+    background: #f4eddc;
+    color: #735c31;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
 .finance-movement-filters,
 .finance-report-filters {
     display: flex;

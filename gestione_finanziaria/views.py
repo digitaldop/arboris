@@ -5049,6 +5049,10 @@ def lista_movimenti_finanziari(request):
             movimento.stato_riconciliazione = StatoRiconciliazione.RICONCILIATO
             movimento.save(update_fields=["stato_riconciliazione", "data_aggiornamento"])
         movimento.stato_riconciliazione_display_effettivo = stato_display
+        movimento.riconciliazione_da_completare = stato_display not in (
+            StatoRiconciliazione.RICONCILIATO.label,
+            StatoRiconciliazione.IGNORATO.label,
+        )
 
     conti_disponibili = list(ContoBancario.objects.filter(attivo=True).order_by("nome_conto"))
     saldo_totale_conti = Decimal("0")

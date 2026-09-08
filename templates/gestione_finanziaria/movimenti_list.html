@@ -199,7 +199,7 @@
                     <tbody>
                         {% for movimento in movimenti %}
                             <tr
-                                class="list-row-link {% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}"
+                                class="list-row-link {% if movimento.importo > 0 %}finance-movement-row-incoming{% elif movimento.importo < 0 %}finance-movement-row-outgoing{% endif %}{% if movimento.riconciliazione_da_completare %} finance-movement-row-unreconciled{% endif %}"
                                 data-row-href="{% url 'dettaglio_movimento_finanziario' movimento.pk %}"
                                 data-row-popup-url="{% url 'dettaglio_movimento_finanziario' movimento.pk %}?popup=1"
                                 data-popup-window-features="width=1080,height=780,resizable=yes,scrollbars=yes"
@@ -253,7 +253,7 @@
                                     </span>
                                 </td>
                                 <td class="column-right">{{ movimento.importo|euro }} &euro;</td>
-                                <td>{{ movimento.stato_riconciliazione_display_effettivo|default:movimento.get_stato_riconciliazione_display }}</td>
+                                <td><span class="finance-movement-status{% if movimento.riconciliazione_da_completare %} is-unreconciled{% endif %}">{{ movimento.stato_riconciliazione_display_effettivo|default:movimento.get_stato_riconciliazione_display }}</span></td>
                                 {% if can_manage_gestione_finanziaria %}
                                     <td class="actions-cell finance-movements-actions-cell">
                                         <span class="table-icon-actions finance-movement-icon-actions">
