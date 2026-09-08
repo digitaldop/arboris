@@ -17,12 +17,14 @@ from django.db import transaction
 from django.db.models import Count, Min, Prefetch, Q, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_POST
 
 from anagrafica.views import is_popup_request, popup_delete_response, popup_select_response
 from scuola.models import AnnoScolastico
@@ -3448,63 +3450,79 @@ def webhook_fatture_in_cloud(request, webhook_key):
     return JsonResponse({"success": True, "imported": imported, "errors": errors[:3]}, status=status)
 
 
+@never_cache
 def lista_notifiche_finanziarie(request):
-    notifiche = NotificaFinanziaria.objects.select_related("documento", "scadenza", "movimento_finanziario")
-    can_manage_gestione_finanziaria = user_has_module_permission(
-        request.user,
-        "gestione_finanziaria",
-        LivelloPermesso.GESTIONE,
-    )
-    if not can_manage_gestione_finanziaria:
-        notifiche = notifiche.filter(richiede_gestione=False)
-    lette_ids = set(
-        NotificaFinanziariaLettura.objects.filter(user=request.user).values_list("notifica_id", flat=True)
-    )
-    only_unread = request.GET.get("stato") == "non_lette"
-    if only_unread:
-        notifiche = notifiche.exclude(letture__user=request.user)
+    from .notifiche import notifiche_per_utente
+
+    notifiche = notifiche_per_utente(request.user)
+    stato = request.GET.get("stato") or "non_lette"
+    if stato != "tutte":
+        stato = "non_lette"
+        notifiche = notifiche.filter(letta=False)
 
     return render(
         request,
         "gestione_finanziaria/notifiche_finanziarie_list.html",
         {
             "notifiche": notifiche.order_by("-data_creazione", "-id"),
-            "lette_ids": lette_ids,
-            "stato": request.GET.get("stato") or "",
+            "stato": stato,
         },
     )
 
 
+def _risposta_notifiche(request, *, lette_ids=()):
+    from .notifiche import riepilogo_notifiche
+
+    riepilogo = riepilogo_notifiche(request.user)
+    next_url = request.POST.get("next") or request.GET.get("next") or reverse("lista_notifiche_finanziarie")
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        next_url = reverse("lista_notifiche_finanziarie")
+    # Non esegue nuovamente tutti i context processor per un piccolo aggiornamento.
+    from django.middleware.csrf import get_token
+    html = render_to_string("gestione_finanziaria/notifiche_header.html", {
+        **riepilogo, "notifiche_next_url": next_url, "csrf_token": get_token(request),
+    })
+    return JsonResponse({"success": True, "non_lette": riepilogo["notifiche_finanziarie_non_lette"], "html": html, "lette_ids": list(lette_ids)})
+
+
+@never_cache
+@require_GET
+def stato_notifiche_finanziarie(request):
+    return _risposta_notifiche(request)
+
+
+@never_cache
+@require_POST
 def segna_notifica_finanziaria_letta(request, pk):
-    notifica = get_object_or_404(NotificaFinanziaria, pk=pk)
-    if request.method == "POST":
-        NotificaFinanziariaLettura.objects.get_or_create(notifica=notifica, user=request.user)
-        if next_url := request.POST.get("next"):
-            if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                return redirect(next_url)
+    from .notifiche import notifiche_per_utente
+
+    notifica = get_object_or_404(notifiche_per_utente(request.user), pk=pk)
+    NotificaFinanziariaLettura.objects.get_or_create(notifica=notifica, user=request.user)
+    if request.headers.get("Accept") == "application/json":
+        return _risposta_notifiche(request, lette_ids=[pk])
+    if next_url := request.POST.get("next"):
+        if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+            return redirect(next_url)
     return redirect("lista_notifiche_finanziarie")
 
 
+@never_cache
+@require_POST
 def segna_tutte_notifiche_finanziarie_lette(request):
-    if request.method == "POST":
-        qs = NotificaFinanziaria.objects.all()
-        if not user_has_module_permission(request.user, "gestione_finanziaria", LivelloPermesso.GESTIONE):
-            qs = qs.filter(richiede_gestione=False)
-        existing = set(
-            NotificaFinanziariaLettura.objects.filter(user=request.user).values_list("notifica_id", flat=True)
-        )
+    from .notifiche import notifiche_per_utente
+
+    with transaction.atomic():
+        ids = list(notifiche_per_utente(request.user).filter(letta=False).values_list("pk", flat=True))
         NotificaFinanziariaLettura.objects.bulk_create(
-            [
-                NotificaFinanziariaLettura(notifica=notifica, user=request.user)
-                for notifica in qs
-                if notifica.pk not in existing
-            ],
-            ignore_conflicts=True,
+            [NotificaFinanziariaLettura(notifica_id=pk, user=request.user) for pk in ids],
+            ignore_conflicts=True, batch_size=500,
         )
-        messages.success(request, "Notifiche segnate come lette.")
-        if next_url := request.POST.get("next"):
-            if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                return redirect(next_url)
+    if request.headers.get("Accept") == "application/json":
+        return _risposta_notifiche(request, lette_ids=ids)
+    messages.success(request, "Notifiche segnate come lette.")
+    if next_url := request.POST.get("next"):
+        if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+            return redirect(next_url)
     return redirect("lista_notifiche_finanziarie")
 
 

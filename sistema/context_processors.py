@@ -444,13 +444,11 @@ def sistema_permissions_context(request):
 
     if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
         try:
-            from gestione_finanziaria.models import NotificaFinanziaria
+            from gestione_finanziaria.notifiche import riepilogo_notifiche
 
-            notifiche_qs = NotificaFinanziaria.objects.select_related("documento").exclude(letture__user=user)
-            if not can_manage_gestione_finanziaria:
-                notifiche_qs = notifiche_qs.filter(richiede_gestione=False)
-            notifiche_finanziarie_non_lette = notifiche_qs.count()
-            notifiche_finanziarie_recenti = list(notifiche_qs.order_by("-data_creazione", "-id")[:5])
+            riepilogo = riepilogo_notifiche(user)
+            notifiche_finanziarie_non_lette = riepilogo["notifiche_finanziarie_non_lette"]
+            notifiche_finanziarie_recenti = riepilogo["notifiche_finanziarie_recenti"]
         except (OperationalError, ProgrammingError):
             notifiche_finanziarie_non_lette = 0
             notifiche_finanziarie_recenti = []

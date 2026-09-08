@@ -1,0 +1,37 @@
+.header-notification-menu {
+    max-height: min(75vh, 640px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.header-notification-count[hidden] { display: none; }
+.header-notification-read-form { align-items: flex-start; padding-top: 10px; }
+.notification-preview { transition: background-color 150ms ease; }
+.notification-preview .notification-message {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+}
+.notification-preview:hover .notification-message,
+.notification-preview:focus-within .notification-message {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+}
+.notification-message:focus-visible { outline: 2px solid #417690; outline-offset: 3px; }
+.notification-save-error { padding: 10px; color: #a02222; background: #fff3f3; font-size: 13px; }
+[data-notification-list] tr[hidden],
+[data-notification-list] form[hidden] { display: none; }
+[data-notification-list] .anagrafica-record-main { min-width: 0; }
+@media (hover: none) {
+    .notification-preview .notification-message { display: block; -webkit-line-clamp: unset; line-clamp: unset; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .notification-preview { transition: none; }
+}

@@ -229,6 +229,11 @@ urlpatterns = [
         name="segna_notifica_finanziaria_letta",
     ),
     path(
+        "gestione-finanziaria/notifiche/stato/",
+        gf_view(views.stato_notifiche_finanziarie),
+        name="stato_notifiche_finanziarie",
+    ),
+    path(
         "gestione-finanziaria/notifiche/segna-tutte-lette/",
         gf_view(views.segna_tutte_notifiche_finanziarie_lette),
         name="segna_tutte_notifiche_finanziarie_lette",

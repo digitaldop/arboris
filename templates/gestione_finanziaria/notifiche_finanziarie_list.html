@@ -20,7 +20,7 @@
                 <h1 class="page-title">Notifiche finanziarie</h1>
                 <span class="family-status-pill is-muted">
                     <span class="family-status-dot" aria-hidden="true"></span>
-                    {{ notifiche|length }} notifiche
+                    <span data-notification-list-count>{{ notifiche|length }}</span> notifiche
                 </span>
             </div>
             <div class="family-page-address">
@@ -33,7 +33,7 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Dashboard</span>
             </a>
-            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="page-head-inline-form">
+            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="page-head-inline-form" data-notification-mark-all>
                 {% csrf_token %}
                 <button type="submit" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
@@ -48,7 +48,7 @@
             <label class="anagrafica-filter-field">
                 <span class="anagrafica-filter-label">Stato</span>
                 <select name="stato">
-                    <option value="">Tutte</option>
+                    <option value="tutte" {% if stato == "tutte" %}selected{% endif %}>Tutte, comprese le lette</option>
                     <option value="non_lette" {% if stato == "non_lette" %}selected{% endif %}>Non lette</option>
                 </select>
             </label>
@@ -63,7 +63,7 @@
         </form>
     </div>
 
-    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel" data-notification-list data-unread-only="{% if stato == 'non_lette' %}1{% else %}0{% endif %}">
         <div class="panel-body">
             {% if notifiche %}
                 <table class="list-table anagrafica-list-table finance-modern-table">
@@ -78,7 +78,7 @@
                     </thead>
                     <tbody>
                         {% for notifica in notifiche %}
-                            <tr class="{% if notifica.pk not in lette_ids %}finance-row-unread{% endif %}">
+                            <tr class="notification-preview {% if not notifica.letta %}finance-row-unread{% endif %}" data-notification-id="{{ notifica.pk }}">
                                 <td>{{ notifica.data_creazione|date:"d/m/Y H:i" }}</td>
                                 <td>{{ notifica.get_tipo_display }}</td>
                                 <td class="anagrafica-record-cell">
@@ -88,15 +88,15 @@
                                         </span>
                                         <span class="anagrafica-record-main">
                                             <span class="table-main-text">{{ notifica.titolo }}</span>
-                                            <span class="table-subtext">{{ notifica.messaggio }}</span>
+                                            <span class="table-subtext notification-message" tabindex="0">{{ notifica.messaggio }}</span>
                                         </span>
                                     </div>
                                 </td>
                                 <td>
-                                    {% if notifica.pk in lette_ids %}
+                                    {% if notifica.letta %}
                                         <span class="anagrafica-status-chip is-muted">Letta</span>
                                     {% else %}
-                                        <span class="anagrafica-status-chip is-success">Nuova</span>
+                                        <span class="anagrafica-status-chip is-success" data-notification-state>Non letta</span>
                                     {% endif %}
                                 </td>
                                 <td class="actions-cell">
@@ -107,7 +107,7 @@
                                                     class="table-icon-link anagrafica-action-btn anagrafica-action-open"
                                                     href="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
                                                     title="Apri"
-                                                    aria-label="Apri notifica {{ notifica.titolo }}"
+                                                    aria-label="Apri notifica {{ notifica.titolo }}" data-notification-read-url="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}"
                                                     data-window-popup="1"
                                                     data-popup-url="{% url 'modifica_documento_fornitore' notifica.documento_id %}?popup=1"
                                                     data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes"
@@ -117,11 +117,11 @@
                                                 class="table-icon-link anagrafica-action-btn anagrafica-action-open"
                                                 href="{{ notifica.url }}"
                                                 title="Apri"
-                                                aria-label="Apri notifica {{ notifica.titolo }}"
+                                                aria-label="Apri notifica {{ notifica.titolo }}" data-notification-read-url="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}"
                                             ><svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg></a>
                                             {% endif %}
                                         {% endif %}
-                                        {% if notifica.pk not in lette_ids %}
+                                        {% if not notifica.letta %}
                                             <form method="post" action="{% url 'segna_notifica_finanziaria_letta' notifica.pk %}" class="inline-form">
                                                 {% csrf_token %}
                                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -140,7 +140,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <div class="empty-state">Nessuna notifica finanziaria.</div>
+                <div class="empty-state">{% if stato == "non_lette" %}Nessuna notifica da leggere. Le precedenti restano disponibili nel filtro Tutte.{% else %}Nessuna notifica finanziaria.{% endif %}</div>
             {% endif %}
         </div>
     </div>

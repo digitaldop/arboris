@@ -259,6 +259,86 @@ class ProformeFornitoriTests(TestCase):
         movimento.refresh_from_db()
         self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("400"))
 
+    def test_pagina_movimento_propone_proforma_e_riconcilia_acconto(self):
+        proforma = self.documento()
+        scadenza = self.scadenza(proforma)
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 2, 1), importo=Decimal("-400"),
+            descrizione="Acconto PF-1 Fornitore Proforme", controparte=self.fornitore.denominazione,
+        )
+        url = reverse("riconcilia_movimento", args=[movimento.pk])
+        response = self.client.get(url, {"next": reverse("lista_movimenti_finanziari")})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, proforma.numero_documento)
+        self.assertEqual([p.allocazioni[0].target.pk for p in response.context["proposte_fornitori"]], [scadenza.pk])
+
+        response = self.client.post(url, {"scadenza": scadenza.pk, "importo": "400", "next": reverse("lista_movimenti_finanziari")})
+        self.assertRedirects(response, reverse("lista_movimenti_finanziari"), fetch_redirect_response=False)
+        pagamento = PagamentoFornitore.objects.get(movimento_finanziario=movimento)
+        self.assertEqual(pagamento.scadenza_id, scadenza.pk)
+        self.assertEqual(pagamento.importo, Decimal("400"))
+        proforma.refresh_from_db()
+        self.assertEqual(proforma.residuo_da_pagare, Decimal("600"))
+        self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0"))
+
+        fattura = self.importa("PF-1")
+        pagamento.refresh_from_db()
+        self.assertEqual(pagamento.scadenza.documento_id, fattura.pk)
+        self.assertEqual(pagamento.movimento_finanziario_id, movimento.pk)
+        self.assertEqual(fattura.residuo_da_pagare, Decimal("600"))
+
+    def test_pagina_movimento_riconcilia_cumulativa_proforma_e_fattura(self):
+        proforma = self.documento(totale="400")
+        prima = self.scadenza(proforma, importo="400")
+        fattura = self.documento("F-2", totale="600", tipo="fattura")
+        seconda = self.scadenza(fattura, importo="600")
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 2, 1), importo=Decimal("-1000"),
+            descrizione="Pagamento Fornitore Proforme", controparte=self.fornitore.denominazione,
+        )
+        url = reverse("riconcilia_movimento", args=[movimento.pk])
+        response = self.client.get(url)
+        proposte = response.context["proposte_fornitori_cumulative"]
+        self.assertEqual(len(proposte), 1)
+        self.assertEqual({a.target.pk for a in proposte[0].allocazioni}, {prima.pk, seconda.pk})
+        response = self.client.post(url, {
+            "azione": "collega_fornitori_cumulativa", "scadenza_ids": [prima.pk, seconda.pk],
+            f"importo_scadenza_{prima.pk}": "400", f"importo_scadenza_{seconda.pk}": "600",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PagamentoFornitore.objects.filter(movimento_finanziario=movimento).count(), 2)
+        for documento in (proforma, fattura):
+            documento.refresh_from_db()
+            self.assertEqual(documento.residuo_da_pagare, Decimal("0"))
+        self.assertEqual(importo_movimento_disponibile_fornitori(movimento), Decimal("0"))
+
+    def test_pagina_movimento_dopo_collegamento_propone_solo_residuo_fattura(self):
+        proforma = self.documento()
+        scadenza = self.scadenza(proforma, pagato="400")
+        fattura = self.importa("PF-1")
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 2, 1), importo=Decimal("-600"),
+            descrizione="Saldo Fornitore Proforme", controparte=self.fornitore.denominazione,
+        )
+        response = self.client.get(reverse("riconcilia_movimento", args=[movimento.pk]))
+        proposte = response.context["proposte_fornitori"]
+        self.assertEqual(len(proposte), 1)
+        allocazione = proposte[0].allocazioni[0]
+        self.assertEqual(allocazione.target.pk, scadenza.pk)
+        self.assertEqual(allocazione.target.documento_id, fattura.pk)
+        self.assertEqual(allocazione.importo, Decimal("600"))
+        self.assertFalse(response.context["proposte_fornitori_cumulative"])
+
+    def test_pagina_movimento_non_propone_proforma_saldata(self):
+        self.scadenza(self.documento(), pagato="1000")
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=date(2026, 2, 1), importo=Decimal("-1000"),
+            descrizione="Pagamento Fornitore Proforme", controparte=self.fornitore.denominazione,
+        )
+        response = self.client.get(reverse("riconcilia_movimento", args=[movimento.pk]))
+        self.assertEqual(response.context["proposte_fornitori"], [])
+        self.assertEqual(response.context["proposte_fornitori_cumulative"], [])
+
     def test_due_scadenze_non_pagata_non_rigenerate_da_reimport(self):
         proforma = self.documento()
         prima = self.scadenza(proforma, importo="400")

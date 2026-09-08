@@ -2935,6 +2935,10 @@ def crea_notifica_finanziaria(
         "richiede_gestione": richiede_gestione,
         "payload": payload or {},
     }
+    if documento is not None and tipo == "fattura_ricevuta" and (chiave_deduplica or "").startswith(("fic-document-", "fic-documento-")):
+        from .notifiche import notifica_documento_importato
+
+        return notifica_documento_importato(documento, defaults)
     if chiave_deduplica:
         notifica, created = NotificaFinanziaria.objects.get_or_create(
             chiave_deduplica=chiave_deduplica,
@@ -3074,15 +3078,27 @@ def annulla_pagamento_fornitore(pagamento):
     return scadenza
 
 
+_SIGLE_SOCIETARIE_MATCH = ("srls", "srl", "spa", "sas", "snc")
+
+
+def _normalizza_testo_fornitore_match(value):
+    testo = _normalizza_testo_match(value)
+    # Banche e fatture scrivono la stessa sigla con o senza punti/spazi.
+    for sigla in _SIGLE_SOCIETARIE_MATCH:
+        testo = re.sub(r"\b" + r"\s*".join(sigla) + r"\b", sigla, testo)
+    return testo
+
+
 def _supplier_match_score(fornitore, testo_movimento):
     score = 0
     motivazioni = []
-    denominazione = _normalizza_testo_match(getattr(fornitore, "denominazione", "") or "")
+    denominazione = _normalizza_testo_fornitore_match(getattr(fornitore, "denominazione", "") or "")
+    testo_movimento = _normalizza_testo_fornitore_match(testo_movimento)
     if denominazione and _testo_contiene_frase(testo_movimento, denominazione):
         score += 38
         motivazioni.append("Denominazione fornitore presente nella causale")
     else:
-        parole = [p for p in denominazione.split() if len(p) >= 4]
+        parole = [p for p in denominazione.split() if len(p) >= 4 and p not in _SIGLE_SOCIETARIE_MATCH]
         match = [p for p in parole if _testo_contiene_parola(testo_movimento, p)]
         if match:
             score += min(26, 8 * len(match))
