@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import log_notifiche, views
 from anagrafica import views as anagrafica_views
 from .permissions import database_backup_access_required, module_edit_permission_required, module_permission_required
 
@@ -81,6 +81,9 @@ urlpatterns = [
         views.cronologia_operazioni_sistema,
         name="cronologia_operazioni_sistema",
     ),
+    path("sistema/log/stato/", log_notifiche.stato_log_operazioni, name="stato_log_operazioni"),
+    path("sistema/log/<int:pk>/letta/", log_notifiche.segna_log_operazione_letta, name="segna_log_operazione_letta"),
+    path("sistema/log/segna-tutti-letti/", log_notifiche.segna_tutti_log_operazioni_letti, name="segna_tutti_log_operazioni_letti"),
     path(
         "sistema/feedback/",
         views.lista_feedback_segnalazioni,

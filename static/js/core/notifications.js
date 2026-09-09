@@ -1,19 +1,20 @@
 (function () {
     "use strict";
 
-    function init() {
-        const dropdown = document.querySelector("[data-notification-status-url]");
-        if (!dropdown) return;
+    function setupDropdown(dropdown) {
+        const feed = dropdown.dataset.notificationFeed;
+        const list = document.querySelector('[data-notification-list="' + feed + '"]');
+        const scope = list || dropdown;
         let refreshVersion = 0;
         let pendingWrites = 0;
 
         function showError() {
-            let error = document.querySelector(".notification-save-error");
+            let error = scope.querySelector(".notification-save-error");
             if (!error) {
                 error = document.createElement("div");
                 error.className = "notification-save-error";
                 error.setAttribute("role", "alert");
-                (document.querySelector("[data-notification-list]") || dropdown.querySelector(".header-notification-menu")).prepend(error);
+                (list || dropdown.querySelector(".header-notification-menu")).prepend(error);
             }
             error.textContent = "Lettura non salvata. Riprova; se la sessione è scaduta, accedi nuovamente.";
         }
@@ -46,7 +47,6 @@
         }
 
         function updateList(ids) {
-            const list = document.querySelector("[data-notification-list]");
             if (!list) return;
             const readIds = new Set(ids.map(String));
             list.querySelectorAll("[data-notification-id]").forEach(row => {
@@ -85,7 +85,7 @@
                     headers: {Accept: "application/json"},
                 }));
                 updateList(data.lette_ids);
-                document.querySelectorAll(".notification-save-error").forEach(error => error.remove());
+                scope.querySelectorAll(".notification-save-error").forEach(error => error.remove());
             } catch (_) {
                 showError();
             } finally {
@@ -99,17 +99,28 @@
         // keepalive ne permette il completamento anche cambiando pagina.
         document.addEventListener("click", function (event) {
             const link = event.target.closest("a[data-notification-read-url]");
-            if (link) save(link.dataset.notificationReadUrl);
+            if (link && (dropdown.contains(link) || (list && list.contains(link)))) save(link.dataset.notificationReadUrl);
         }, true);
         document.addEventListener("submit", function (event) {
             const form = event.target;
-            if (!form.matches(".header-notification-read-form, .header-notification-mark-all-form, [data-notification-list] form, [data-notification-mark-all]")) return;
+            const belongsToFeed = dropdown.contains(form) || (list && list.contains(form)) || form.dataset.notificationMarkAll === feed;
+            if (!belongsToFeed) return;
             event.preventDefault();
             save(form.action, form);
         }, true);
-        dropdown.addEventListener("toggle", function () { if (dropdown.open) refresh(); });
+        dropdown.addEventListener("toggle", function () {
+            if (!dropdown.open) return;
+            document.querySelectorAll("[data-notification-status-url]").forEach(other => {
+                if (other !== dropdown) other.open = false;
+            });
+            refresh();
+        });
         window.addEventListener("pageshow", refresh);
         document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
+    }
+
+    function init() {
+        document.querySelectorAll("[data-notification-status-url]").forEach(setupDropdown);
     }
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

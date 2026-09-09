@@ -58,8 +58,8 @@
         })();
     </script>
     <link rel="stylesheet" href="{% static 'css/style.css' %}?v=303">
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}?v=1">
-    <script defer src="{% static 'js/core/notifications.js' %}?v=1"></script>
+    <link rel="stylesheet" href="{% static 'css/notifications.css' %}?v=3">
+    <script defer src="{% static 'js/core/notifications.js' %}?v=2"></script>
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/streamline-icons.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
@@ -156,12 +156,22 @@
                     {% endif %}
 
                     {% if can_view_gestione_finanziaria %}
-                        <details class="header-notification-dropdown" data-notification-status-url="{% url 'stato_notifiche_finanziarie' %}">
+                        <details class="header-notification-dropdown" data-notification-feed="financial" data-notification-status-url="{% url 'stato_notifiche_finanziarie' %}">
                             <summary class="header-icon-btn" aria-label="Apri notifiche finanziarie">
                                 <span class="header-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bell"></use></svg></span>
                                 <span class="header-notification-count" {% if not notifiche_finanziarie_non_lette %}hidden{% endif %}>{{ notifiche_finanziarie_non_lette }}</span>
                             </summary>
                             {% include "gestione_finanziaria/notifiche_header.html" with notifiche_next_url=request.get_full_path %}
+                        </details>
+                    {% endif %}
+
+                    {% if can_view_operation_history %}
+                        <details class="header-notification-dropdown header-log-dropdown" data-notification-feed="activity" data-notification-status-url="{% url 'stato_log_operazioni' %}">
+                            <summary class="header-icon-btn header-log-trigger" aria-label="Apri LOG operazioni utenti" title="LOG operazioni utenti">
+                                <span class="header-log-label" aria-hidden="true">LOG</span>
+                                <span class="header-notification-count" {% if not log_operazioni_non_lette %}hidden{% endif %}>{{ log_operazioni_non_lette }}</span>
+                            </summary>
+                            {% include "sistema/log_header.html" with log_next_url=request.get_full_path %}
                         </details>
                     {% endif %}
 

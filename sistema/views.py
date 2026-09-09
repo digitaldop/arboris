@@ -1336,6 +1336,9 @@ def cronologia_operazioni_sistema(request):
     q = (request.GET.get("q") or "").strip()
     azione = (request.GET.get("azione") or "").strip()
     modulo = (request.GET.get("modulo") or "").strip()
+    operazione_id = (request.GET.get("operazione") or "").strip()
+    if not operazione_id.isdigit():
+        operazione_id = ""
 
     action_values = {value for value, _label in AzioneOperazioneCronologia.choices}
     module_values = {value for value, _label in ModuloOperazioneCronologia.choices}
@@ -1347,6 +1350,8 @@ def cronologia_operazioni_sistema(request):
         modulo = ""
 
     operazioni_qs = SistemaOperazioneCronologia.objects.select_related("utente").order_by("-data_operazione", "-id")
+    if operazione_id:
+        operazioni_qs = operazioni_qs.filter(pk=int(operazione_id))
 
     if q:
         operazioni_qs = operazioni_qs.filter(
@@ -1379,6 +1384,7 @@ def cronologia_operazioni_sistema(request):
             "azione": azione,
             "modulo": modulo,
             "q": q,
+            "operazione_id": operazione_id,
             "azioni_disponibili": AzioneOperazioneCronologia.choices,
             "moduli_disponibili": ModuloOperazioneCronologia.choices,
             "count_creazioni": riepilogo["count_creazioni"] or 0,

@@ -985,6 +985,24 @@ class SistemaOperazioneCronologia(models.Model):
         return mapping.get(self.azione, "audit-action-badge-update")
 
 
+class SistemaLogStatoLettura(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="stato_lettura_log")
+    storico_fino_id = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Stato lettura LOG"
+
+
+class SistemaLogLettura(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="letture_log")
+    operazione = models.ForeignKey(SistemaOperazioneCronologia, on_delete=models.CASCADE, related_name="letture_log")
+    letta_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "operazione"], name="sistema_log_lettura_unica")]
+        verbose_name = "Lettura LOG"
+
+
 class LivelloPermesso(models.TextChoices):
     NESSUNO = "none", "Nessun accesso"
     VISUALIZZAZIONE = "view", "Sola visualizzazione"

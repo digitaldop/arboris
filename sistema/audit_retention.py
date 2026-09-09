@@ -71,8 +71,8 @@ def cleanup_cronologia_operazioni(*, impostazioni=None, force=False):
             ids = list(base_qs.values_list("id", flat=True)[:AUDIT_RETENTION_BATCH_SIZE])
             if not ids:
                 break
-            deleted_count, _details = SistemaOperazioneCronologia.objects.filter(id__in=ids).delete()
-            deleted_total += deleted_count
+            _deleted_count, details = SistemaOperazioneCronologia.objects.filter(id__in=ids).delete()
+            deleted_total += details.get(SistemaOperazioneCronologia._meta.label, 0)
             if len(ids) < AUDIT_RETENTION_BATCH_SIZE:
                 break
             truncated = batch_index == max_batches - 1

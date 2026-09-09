@@ -453,7 +453,17 @@ def sistema_permissions_context(request):
             notifiche_finanziarie_non_lette = 0
             notifiche_finanziarie_recenti = []
 
+    log_riepilogo = {"log_operazioni_non_lette": 0, "log_operazioni_recenti": []}
+    if can_view_system_tables:
+        try:
+            from .log_notifiche import riepilogo_log
+
+            log_riepilogo = riepilogo_log(user)
+        except (OperationalError, ProgrammingError):
+            pass
+
     return {
+        **log_riepilogo,
         "user_permission_profile": profilo,
         "role_theme": role_theme,
         "current_permission_module": current_module,

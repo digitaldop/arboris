@@ -124,7 +124,7 @@
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                         <span class="btn-label">Filtra</span>
                     </button>
-                    {% if q or azione or modulo %}
+                    {% if q or azione or modulo or operazione_id %}
                         <a href="{% url 'cronologia_operazioni_sistema' %}" class="btn btn-secondary btn-icon-text">
                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                             <span class="btn-label">Pulisci</span>
@@ -140,7 +140,7 @@
                     <div class="audit-log-card-head">
                         <div>
                             <h2 id="audit-log-table-title">Registro operazioni</h2>
-                            <p>Ultime operazioni corrispondenti ai filtri impostati.</p>
+                            <p>{% if operazione_id %}Operazione selezionata dal menu LOG.{% else %}Ultime operazioni corrispondenti ai filtri impostati.{% endif %}</p>
                         </div>
                     </div>
 

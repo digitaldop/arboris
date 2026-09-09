@@ -4,6 +4,8 @@ from contextvars import ContextVar
 from datetime import date, datetime, time
 from decimal import Decimal
 
+from django.apps import apps
+
 
 _current_audit_user = ContextVar("current_audit_user", default=None)
 _audit_disabled_depth = ContextVar("audit_disabled_depth", default=0)
@@ -95,7 +97,19 @@ def format_audit_user_label(user):
 def should_track_model(model):
     opts = model._meta
 
+    # Le migrazioni usano modelli storici e uno schema ancora in aggiornamento.
+    # I segnali non devono leggere o scrivere tramite i modelli correnti.
+    if opts.apps is not apps:
+        return False
+
     if opts.abstract or opts.proxy or opts.auto_created:
+        return False
+
+    if (opts.app_label, opts.model_name) in {
+        ("sistema", "sistemalogstatolettura"),
+        ("sistema", "sistemaloglettura"),
+        ("gestione_finanziaria", "notificafinanziarialettura"),
+    }:
         return False
 
     if opts.app_label in TRACKED_APP_LABELS:

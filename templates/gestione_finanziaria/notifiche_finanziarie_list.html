@@ -33,7 +33,7 @@
                 <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg></span>
                 <span class="btn-label">Dashboard</span>
             </a>
-            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="page-head-inline-form" data-notification-mark-all>
+            <form method="post" action="{% url 'segna_tutte_notifiche_finanziarie_lette' %}" class="page-head-inline-form" data-notification-mark-all="financial">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-secondary btn-icon-text">
                     <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg></span>
@@ -63,7 +63,7 @@
         </form>
     </div>
 
-    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel" data-notification-list data-unread-only="{% if stato == 'non_lette' %}1{% else %}0{% endif %}">
+    <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel" data-notification-list="financial" data-unread-only="{% if stato == 'non_lette' %}1{% else %}0{% endif %}">
         <div class="panel-body">
             {% if notifiche %}
                 <table class="list-table anagrafica-list-table finance-modern-table">

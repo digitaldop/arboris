@@ -1,10 +1,13 @@
 .header-notification-menu {
     max-height: min(75vh, 640px);
     overflow-y: auto;
+    scrollbar-gutter: stable;
     overscroll-behavior: contain;
 }
 
 .header-notification-count[hidden] { display: none; }
+.header-log-label { font-size: 11px; font-weight: 800; letter-spacing: 0.3px; }
+.header-log-meta { color: #64748b; font-size: 11px; line-height: 1.4; }
 .header-notification-read-form { align-items: flex-start; padding-top: 10px; }
 .notification-preview { transition: background-color 150ms ease; }
 .notification-preview .notification-message {
