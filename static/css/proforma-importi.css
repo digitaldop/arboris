@@ -1,0 +1,39 @@
+.supplier-custom-amounts {
+    padding: 16px 0;
+    min-width: 0;
+}
+.supplier-custom-amounts[hidden],
+.supplier-custom-amount-row[hidden] {
+    display: none;
+}
+.supplier-custom-amounts h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+}
+.supplier-custom-amounts-scroll {
+    overflow-x: auto;
+    margin: 12px 0;
+}
+.supplier-custom-amounts .list-table {
+    width: 100%;
+    min-width: 680px;
+}
+.supplier-custom-amount-row input:not([type="checkbox"]),
+.supplier-custom-amount-row select {
+    width: 100%;
+    box-sizing: border-box;
+}
+.supplier-custom-amount-row td:first-child {
+    min-width: 170px;
+}
+.supplier-custom-amount-row td:nth-child(3) {
+    min-width: 85px;
+    max-width: 120px;
+}
+.supplier-custom-amount-row output {
+    white-space: nowrap;
+}
+.supplier-document-form-grid > .is-full {
+    grid-column: 1 / -1;
+    min-width: 0;
+}

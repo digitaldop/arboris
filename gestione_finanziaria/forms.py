@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import formset_factory, inlineformset_factory
 from django.db.models import Q
 
-from arboris.form_widgets import apply_eur_currency_widget
+from arboris.form_widgets import apply_eur_currency_widget, italian_decimal_to_python
 from gestione_amministrativa.models import Dipendente
 from .security import cifra_testo
 from .fic_periods import IMPORT_PERIOD_CHOICES, import_start_date, validate_import_date_range
@@ -379,6 +379,39 @@ class FornitoreForm(forms.ModelForm):
         make_searchable_select(self.fields["dipendente_collegato"], "Cerca un dipendente o educatore...")
 
 
+class RigaImportoProformaForm(forms.Form):
+    descrizione = forms.CharField(max_length=120, label="Descrizione", widget=forms.TextInput(
+        attrs={"placeholder": "Es. Cassa ENPACL", "aria-label": "Descrizione riga"},
+    ))
+    tipo = forms.ChoiceField(
+        choices=[("fisso", "Importo in €"), ("percentuale", "Percentuale %")],
+        initial="fisso", label="Calcolo", widget=forms.Select(attrs={"aria-label": "Calcolo riga"}),
+    )
+    valore = forms.DecimalField(max_digits=12, decimal_places=2, label="Valore", widget=forms.TextInput(
+        attrs={"inputmode": "decimal", "placeholder": "0,00", "aria-label": "Valore riga"},
+    ))
+    soggetta_iva = forms.BooleanField(
+        required=False, initial=True, label="Applica IVA",
+        widget=forms.CheckboxInput(attrs={"aria-label": "Applica IVA alla riga"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["valore"]
+        field.to_python = lambda value: italian_decimal_to_python(field, value)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("tipo") == "percentuale" and abs(cleaned.get("valore") or 0) > 100:
+            self.add_error("valore", "La percentuale deve essere compresa tra -100 e 100.")
+        return cleaned
+
+
+RigheImportoProformaFormSet = formset_factory(
+    RigaImportoProformaForm, extra=0, can_delete=True, max_num=50, validate_max=True, absolute_max=50,
+)
+
+
 class DocumentoFornitoreForm(forms.ModelForm):
     class Meta:
         model = DocumentoFornitore
@@ -439,6 +472,21 @@ class DocumentoFornitoreForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        righe = self.instance.righe_importo_personalizzate
+        righe_data = self.data if self.is_bound else None
+        # I client precedenti possono omettere il formset solo se non ci sono righe salvate.
+        if self.is_bound and not righe and not any(key.startswith("righe_importo-") for key in self.data):
+            righe_data = {"righe_importo-TOTAL_FORMS": "0", "righe_importo-INITIAL_FORMS": "0"}
+        self.righe_importo_formset = RigheImportoProformaFormSet(
+            righe_data, initial=righe, prefix="righe_importo",
+        )
+        if righe and not self.is_bound:
+            self.initial["imponibile"] = self.instance.importo_base
+        if righe or self.initial.get("tipo_documento") == TipoDocumentoFornitore.PROFORMA or (
+            self.is_bound and self.data.get("tipo_documento") == TipoDocumentoFornitore.PROFORMA
+        ):
+            self.fields["imponibile"].label = "Importo prodotti e servizi"
+            self.fields["totale"].label = "Totale documento"
         optional_fields = [
             "categoria_spesa",
             "data_ricezione",
@@ -475,7 +523,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
         for field_name in ("data_documento", "data_ricezione"):
             self.fields[field_name].input_formats = ["%Y-%m-%d"]
         for field_name in ("imponibile", "iva", "totale", "imponibile_ritenuta_acconto", "ritenuta_acconto"):
-            apply_eur_currency_widget(self.fields[field_name], compact=False)
+            apply_eur_currency_widget(
+                self.fields[field_name], compact=False, zero_as_placeholder=not (righe and field_name == "imponibile"),
+            )
         if not self.is_bound and not getattr(self.instance, "pk", None):
             self.initial.setdefault("aliquota_ritenuta_acconto", Decimal("20.00"))
         stato_choices = list(self.fields["stato"].choices)
@@ -495,6 +545,15 @@ class DocumentoFornitoreForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if not self.righe_importo_formset.is_valid():
+            self.add_error(None, "Controlla le righe personalizzate degli importi.")
+            return cleaned
+        righe = [
+            row.cleaned_data for row in self.righe_importo_formset
+            if row.cleaned_data and not row.cleaned_data.get("DELETE")
+        ]
+        if righe and cleaned.get("tipo_documento") != TipoDocumentoFornitore.PROFORMA:
+            self.add_error("tipo_documento", "Le righe personalizzate sono disponibili per le pro-forma.")
         imponibile = cleaned.get("imponibile")
         aliquota_iva = cleaned.get("aliquota_iva") or Decimal("0.00")
         iva = cleaned.get("iva")
@@ -514,7 +573,36 @@ class DocumentoFornitoreForm(forms.ModelForm):
             imponibile in (None, "") or (imponibile == Decimal("0.00") and totale != Decimal("0.00"))
         )
 
-        if total_is_source:
+        if righe:
+            if imponibile is None:
+                self.add_error("imponibile", "Con le righe personalizzate inserisci l'importo prodotti e servizi.")
+                return cleaned
+            centesimi = Decimal("0.01")
+            righe_salvate = []
+            extra_iva = Decimal("0.00")
+            extra_non_iva = Decimal("0.00")
+            for riga in righe:
+                importo = riga["valore"]
+                if riga["tipo"] == "percentuale":
+                    importo = imponibile * importo / Decimal("100")
+                importo = importo.quantize(centesimi, rounding=ROUND_HALF_UP)
+                righe_salvate.append({
+                    "descrizione": riga["descrizione"], "tipo": riga["tipo"],
+                    "valore": str(riga["valore"].quantize(centesimi)),
+                    "soggetta_iva": riga["soggetta_iva"], "importo": str(importo),
+                })
+                if riga["soggetta_iva"]:
+                    extra_iva += importo
+                else:
+                    extra_non_iva += importo
+            base_iva = imponibile + extra_iva
+            if imponibile < 0 or base_iva < 0:
+                self.add_error("imponibile", "L'importo base e il totale imponibile non possono essere negativi.")
+            iva = (base_iva * aliquota_iva / Decimal("100")).quantize(centesimi, rounding=ROUND_HALF_UP)
+            totale = base_iva + iva + extra_non_iva
+            cleaned.update(imponibile=base_iva, iva=iva, totale=totale)
+            self.instance.righe_importo_personalizzate = righe_salvate
+        elif total_is_source:
             if moltiplicatore_iva == Decimal("0.00"):
                 imponibile = totale
             else:
@@ -531,6 +619,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
             cleaned["totale"] = (imponibile + iva).quantize(Decimal("0.01"))
             totale = cleaned["totale"]
 
+        if not righe:
+            self.instance.righe_importo_personalizzate = []
+
         if aliquota_ritenuta in (None, ""):
             aliquota_ritenuta = Decimal("20.00")
         if aliquota_ritenuta < Decimal("0.00"):
@@ -539,7 +630,9 @@ class DocumentoFornitoreForm(forms.ModelForm):
             self.add_error("imponibile_ritenuta_acconto", "L'imponibile ritenuta non puo essere negativo.")
 
         if imponibile_ritenuta > Decimal("0.00"):
-            ritenuta = (imponibile_ritenuta * aliquota_ritenuta / Decimal("100")).quantize(Decimal("0.01"))
+            ritenuta = (imponibile_ritenuta * aliquota_ritenuta / Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP if righe else None,
+            )
         else:
             ritenuta = ritenuta or Decimal("0.00")
         if ritenuta < Decimal("0.00"):

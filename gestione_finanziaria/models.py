@@ -332,6 +332,7 @@ class DocumentoFornitore(models.Model):
     mese_competenza = models.PositiveSmallIntegerField(blank=True, null=True)
     descrizione = models.CharField(max_length=255, blank=True)
     descrizione_righe_fattura = models.TextField(blank=True)
+    righe_importo_personalizzate = models.JSONField(default=list, blank=True)
     imponibile = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     aliquota_iva = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("22.00"))
     iva = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
@@ -397,6 +398,14 @@ class DocumentoFornitore(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_documento_display()} {self.numero_documento} - {self.fornitore}"
+
+    @property
+    def importo_base(self):
+        """Compenso prima delle righe aggiuntive; imponibile resta il totale IVA."""
+        return (self.imponibile or Decimal("0.00")) - sum(
+            (Decimal(riga["importo"]) for riga in self.righe_importo_personalizzate if riga["soggetta_iva"]),
+            Decimal("0.00"),
+        )
 
     @property
     def categoria_spesa_effettiva(self):

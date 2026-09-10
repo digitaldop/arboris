@@ -2,6 +2,16 @@
 
 La prima versione gestisce una pro-forma per fattura definitiva, con una o più scadenze e pagamenti. Si accede da **Fatture e scadenze → Nuova pro-forma**. La vista **In attesa di fattura definitiva** comprende anche le pro-forma interamente pagate. Senza scadenze inserite, la creazione propone l'intero netto alla data di emissione.
 
+## Righe personalizzate degli importi
+
+Nella sezione **Importi**, il pulsante **Aggiungi riga** permette di inserire una descrizione libera e un importo fisso oppure una percentuale sull'**Importo prodotti e servizi**. Ogni percentuale usa la stessa base, senza includere le altre righe. Sono ammessi valori negativi per gli sconti e fino a 50 righe per documento. **Applica IVA** include la riga nell'imponibile e usa l'aliquota IVA del documento; le righe senza IVA vengono aggiunte al totale dopo il calcolo dell'imposta.
+
+Le righe non modificano automaticamente l'imponibile della ritenuta, da indicare nel campo dedicato. Con righe presenti occorre inserire l'importo prodotti e servizi; IVA e totale sono calcolati automaticamente. I calcoli vengono verificati anche al salvataggio, arrotondando righe e imposte al centesimo. Le righe si possono modificare e rimuovere e restano visibili nello storico della pro-forma collegata alla fattura definitiva.
+
+Esempio: prodotti e servizi **81,00 €**, riga **Cassa ENPACL**, percentuale **4%**, **Applica IVA** selezionato, aliquota IVA **22%**, imponibile ritenuta **81,00 €** e aliquota ritenuta **20%**. Si ottengono cassa **3,24 €**, imponibile IVA **84,24 €**, IVA **18,53 €**, totale **102,77 €**, ritenuta **16,20 €** e netto **86,57 €**.
+
+Le righe personalizzate sono disponibili sulle pro-forma. I documenti senza righe mantengono il calcolo precedente, compreso lo scorporo dell'IVA dal totale. Applicare la migrazione `gestione_finanziaria.0015_documentofornitore_righe_importo_personalizzate` con il codice; i documenti esistenti partono senza righe e conservano gli importi. I test specifici sono in `gestione_finanziaria.test_righe_importo_proforma`.
+
 ## Import e verifica
 
 L'import cerca le pro-forma disponibili dello stesso fornitore, senza limite di anzianità. Collega automaticamente soltanto una candidata univoca con totale e netto coincidenti e un riferimento strutturato alla pro-forma (`DatiFattureCollegate`, con data coerente se presente) o all'ordine (`DatiOrdineAcquisto`, confrontato con **Riferimento ordine**). L'XML allegato viene considerato anche per fatture già registrate quando il fornitore ha pro-forma aperte.
@@ -22,6 +32,6 @@ Gli import successivi non ricreano le scadenze collegate e non cambiano i pagame
 
 ## Installazione e collaudo
 
-Applicare la migrazione `gestione_finanziaria.0013_documentofornitore_proforma_origine_and_more` insieme al codice. Non serve modificare i documenti esistenti: le pro-forma già registrate sono utilizzabili.
+Applicare le migrazioni fino a `gestione_finanziaria.0015_documentofornitore_righe_importo_personalizzate` insieme al codice. Non serve modificare i documenti esistenti: le pro-forma già registrate sono utilizzabili.
 
 I test sono in `gestione_finanziaria.test_proforme`; coprono collegamenti, import ripetuti, XML, ritenute, pagamenti parziali e bancari, correzioni, protezione dello storico, permessi e schermate. Le chiamate esterne sono simulate. Le migrazioni e i percorsi del browser sono stati verificati in database temporanei, senza import reali.

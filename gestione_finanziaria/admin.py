@@ -93,6 +93,7 @@ class DocumentoFornitoreAdmin(admin.ModelAdmin):
     date_hierarchy = "data_documento"
     autocomplete_fields = ("fornitore", "categoria_spesa", "nota_credito_compensazione")
     readonly_fields = (
+        "righe_importo_personalizzate",
         "external_payload",
         "external_source",
         "external_id",

@@ -1,0 +1,8 @@
+<tr class="supplier-custom-amount-row" {% if riga.DELETE.value %}hidden{% endif %}>
+    <td>{{ riga.descrizione }}{{ riga.descrizione.errors }}{{ riga.non_field_errors }}</td>
+    <td>{{ riga.tipo }}{{ riga.tipo.errors }}</td>
+    <td>{{ riga.valore }}{{ riga.valore.errors }}</td>
+    <td>{{ riga.soggetta_iva }}{{ riga.soggetta_iva.errors }}</td>
+    <td><output data-custom-amount-preview>—</output></td>
+    <td><span hidden>{{ riga.DELETE }}</span><button type="button" class="btn btn-secondary btn-sm" data-remove-custom-amount aria-label="Rimuovi riga personalizzata">Rimuovi</button></td>
+</tr>

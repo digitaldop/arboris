@@ -1,0 +1,27 @@
+{% load currency %}
+<div class="supplier-custom-amounts" data-custom-amounts {% if form.tipo_documento.value != 'proforma' and not documento.righe_importo_personalizzate %}hidden{% endif %}>
+    <h3>Righe personalizzate</h3>
+    {% if popup %}
+        <div class="mode-view-only">
+            {% for riga in documento.righe_importo_personalizzate %}
+                <p><strong>{{ riga.descrizione }}</strong>: EUR {{ riga.importo|euro }}{% if riga.tipo == 'percentuale' %} ({{ riga.valore|euro }}% su prodotti e servizi){% endif %} · {% if riga.soggetta_iva %}con IVA{% else %}senza IVA{% endif %}</p>
+            {% empty %}<p>Nessuna riga aggiuntiva.</p>{% endfor %}
+            <p><strong>Totale imponibile IVA:</strong> EUR {{ documento.imponibile|euro }}</p>
+        </div>
+    {% endif %}
+    <div{% if popup %} class="mode-edit-field"{% endif %}>
+        <p class="help-text">Aggiungi casse previdenziali, spese o sconti. Le percentuali si calcolano sull'importo prodotti e servizi, senza sommare le altre righe. Usa valori negativi per gli sconti.</p>
+        <p class="help-text">“Applica IVA” usa l'aliquota del documento. Indica separatamente l'imponibile della ritenuta d'acconto.</p>
+        {{ form.righe_importo_formset.management_form }}
+        {{ form.righe_importo_formset.non_form_errors }}
+        <div class="supplier-custom-amounts-scroll">
+            <table class="list-table" id="righe-importo-table">
+                <thead><tr><th scope="col">Descrizione</th><th scope="col">Calcolo</th><th scope="col">Valore</th><th scope="col">Applica IVA</th><th scope="col">Importo</th><th scope="col">Azioni</th></tr></thead>
+                <tbody>{% for riga in form.righe_importo_formset %}{% include "gestione_finanziaria/proforma_riga_importo.html" %}{% endfor %}</tbody>
+            </table>
+        </div>
+        <template id="righe-importo-empty-form-template">{% include "gestione_finanziaria/proforma_riga_importo.html" with riga=form.righe_importo_formset.empty_form %}</template>
+        <button type="button" class="btn btn-secondary btn-sm" id="add-riga-importo">+ Aggiungi riga</button>
+        <p><strong>Totale imponibile IVA:</strong> <output data-custom-taxable-preview>EUR {{ documento.imponibile|euro }}</output></p>
+    </div>
+</div>

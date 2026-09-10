@@ -50,6 +50,35 @@ window.ArborisDocumentoFornitoreForm = (function () {
         field.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
+    function roundMoney(value) {
+        return Math.sign(value) * Math.round((Math.abs(value) + 1e-9) * 100) / 100;
+    }
+
+    function customAmountRows() {
+        return Array.from(document.querySelectorAll("#righe-importo-table tbody .supplier-custom-amount-row"))
+            .filter(row => !row.querySelector('[name$="-DELETE"]')?.checked);
+    }
+
+    function customAmounts(base) {
+        let taxable = 0;
+        let untaxed = 0;
+        customAmountRows().forEach(function (row) {
+            const value = parseNumber(row.querySelector('[name$="-valore"]')?.value) || 0;
+            const percentage = row.querySelector('[name$="-tipo"]')?.value === "percentuale";
+            const amount = roundMoney(percentage ? base * value / 100 : value);
+            row.querySelector("[data-custom-amount-preview]").textContent = `EUR ${formatMoney(amount)}`;
+            if (row.querySelector('[name$="-soggetta_iva"]')?.checked) {
+                taxable += amount;
+            } else {
+                untaxed += amount;
+            }
+        });
+        document.querySelectorAll("[data-custom-taxable-preview]").forEach(function (node) {
+            node.textContent = `EUR ${formatMoney(roundMoney(base + taxable))}`;
+        });
+        return { taxable: roundMoney(taxable), untaxed: roundMoney(untaxed) };
+    }
+
     function computeNetPayable() {
         const totale = document.getElementById(MONEY_FIELDS.totale);
         const ritenuta = document.getElementById(MONEY_FIELDS.ritenuta);
@@ -94,7 +123,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
             return;
         }
         const netPayable = computeNetPayable();
-        if (netPayable <= 0) {
+        if (netPayable <= 0 && field.dataset.autoNetPayable !== "1") {
             return;
         }
         syncDeadlineDate(row);
@@ -128,16 +157,27 @@ window.ArborisDocumentoFornitoreForm = (function () {
 
         function calculateFromNet() {
             const net = parseNumber(imponibile.value);
+            const extra = customAmounts(net || 0);
             if (net === null) {
+                if (customAmountRows().length) {
+                    iva.value = "";
+                    totale.value = "";
+                    refreshNetPayable();
+                }
                 return;
             }
-            const tax = net * getAliquota() / 100;
+            const taxable = roundMoney(net + extra.taxable);
+            const tax = roundMoney(taxable * getAliquota() / 100);
             setValue(iva, tax);
-            setValue(totale, net + tax);
+            setValue(totale, roundMoney(taxable + tax + extra.untaxed));
             refreshNetPayable();
         }
 
         function calculateFromGross() {
+            if (customAmountRows().length) {
+                calculateFromNet();
+                return;
+            }
             const gross = parseNumber(totale.value);
             if (gross === null) {
                 return;
@@ -147,6 +187,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
             const tax = gross - net;
             setValue(imponibile, net);
             setValue(iva, tax);
+            customAmounts(net);
             refreshNetPayable();
         }
 
@@ -161,7 +202,7 @@ window.ArborisDocumentoFornitoreForm = (function () {
                 return;
             }
             const withholdingRate = parseNumber(aliquotaRitenuta.value) || 0;
-            setValue(ritenuta, withholdingBase * withholdingRate / 100);
+            setValue(ritenuta, roundMoney(withholdingBase * withholdingRate / 100));
             refreshNetPayable();
         }
 
@@ -192,7 +233,77 @@ window.ArborisDocumentoFornitoreForm = (function () {
             dataRicezione.addEventListener("input", refreshNetPayable);
             dataRicezione.addEventListener("change", refreshNetPayable);
         }
+        initCustomAmounts(calculateFromNet);
+        customAmounts(parseNumber(imponibile.value) || 0);
         refreshNetPayable();
+    }
+
+    function initCustomAmounts(recalculate) {
+        const section = document.querySelector("[data-custom-amounts]");
+        const addButton = document.getElementById("add-riga-importo");
+        const totalForms = document.getElementById("id_righe_importo-TOTAL_FORMS");
+        const documentType = document.getElementById("id_tipo_documento");
+        if (!section || !addButton || !totalForms || !documentType) {
+            return;
+        }
+        function updateControls() {
+            const hasRows = customAmountRows().length > 0;
+            const isProforma = documentType.value === "proforma";
+            section.hidden = !isProforma && !hasRows;
+            addButton.disabled = !isProforma || customAmountRows().length >= 50;
+            const baseLabel = document.querySelector('label[for="id_imponibile"]');
+            if (baseLabel) {
+                baseLabel.textContent = isProforma || hasRows ? "Importo prodotti e servizi:" : "Imponibile:";
+            }
+            if (!section.closest("form")?.classList.contains("is-view-mode")) {
+                document.getElementById(MONEY_FIELDS.totale).readOnly = hasRows;
+                document.getElementById(MONEY_FIELDS.iva).readOnly = hasRows;
+            }
+        }
+        addButton.addEventListener("click", function () {
+            const index = Number(totalForms.value);
+            const template = document.getElementById("righe-importo-empty-form-template");
+            const tbody = document.querySelector("#righe-importo-table tbody");
+            const removedRow = Array.from(tbody.querySelectorAll(".supplier-custom-amount-row"))
+                .find(row => row.querySelector('[name$="-DELETE"]').checked);
+            let addedRow;
+            if (removedRow) {
+                removedRow.querySelector('[name$="-DELETE"]').checked = false;
+                removedRow.querySelector('[name$="-descrizione"]').value = "";
+                removedRow.querySelector('[name$="-valore"]').value = "";
+                removedRow.querySelector('[name$="-tipo"]').value = "fisso";
+                removedRow.querySelector('[name$="-soggetta_iva"]').checked = true;
+                removedRow.querySelectorAll(".errorlist").forEach(node => node.remove());
+                removedRow.hidden = false;
+                addedRow = removedRow;
+            } else {
+                if (index >= 50) {
+                    return;
+                }
+                tbody.insertAdjacentHTML("beforeend", template.innerHTML.replace(/__prefix__/g, index));
+                totalForms.value = index + 1;
+                addedRow = tbody.lastElementChild;
+            }
+            updateControls();
+            recalculate();
+            addedRow.querySelector('[name$="-descrizione"]').focus();
+        });
+        section.addEventListener("click", function (event) {
+            const button = event.target.closest("[data-remove-custom-amount]");
+            if (!button) {
+                return;
+            }
+            const row = button.closest(".supplier-custom-amount-row");
+            row.querySelector('[name$="-DELETE"]').checked = true;
+            row.hidden = true;
+            updateControls();
+            recalculate();
+        });
+        section.addEventListener("input", recalculate);
+        section.addEventListener("change", recalculate);
+        documentType.addEventListener("change", updateControls);
+        section.closest("form")?.addEventListener("arboris:view-mode-change", updateControls);
+        updateControls();
     }
 
     function isoToday() {
