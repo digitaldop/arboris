@@ -2187,7 +2187,7 @@ def _auto_reconcile_imported_supplier_deadlines(documento, *, utente=None):
     for scadenza in scadenze:
         if scadenza.importo_residuo <= Decimal("0.00"):
             continue
-        candidati = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=3)
+        candidati = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=3, allow_fuzzy=False)
         if not candidati:
             continue
 

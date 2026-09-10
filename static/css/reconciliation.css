@@ -1,0 +1,42 @@
+.reconciliation-confidence {
+    --match-hue: calc(var(--match-confidence, 0) * 1.2);
+    --match-background: hsl(var(--match-hue) 65% 94%);
+    --match-border: hsl(var(--match-hue) 42% 58%);
+}
+
+body .reconciliation-confidence,
+body .reconciliation-confidence > td {
+    background-color: var(--match-background) !important;
+    border-color: var(--match-border);
+}
+
+body .reconciliation-confidence:hover,
+body .reconciliation-confidence:hover > td {
+    background-color: hsl(var(--match-hue) 65% 90%) !important;
+}
+
+.reconciliation-confidence:focus-within {
+    outline: 2px solid hsl(var(--match-hue) 42% 32%);
+    outline-offset: -2px;
+}
+
+body .reconciliation-confidence .reconciliation-confidence-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border: 1px solid var(--match-border);
+    border-radius: 6px;
+    background: hsl(var(--match-hue) 65% 86%);
+    color: hsl(var(--match-hue) 50% 22%);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.reconciliation-confidence-note {
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 8px 0 12px;
+}

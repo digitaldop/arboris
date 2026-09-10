@@ -26,6 +26,8 @@ from django.db.models import Count, Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 
+from .name_matching import person_similarity, supplier_similarity
+
 
 MONTH_SHORT_LABELS = {
     1: "Gen",
@@ -1457,6 +1459,7 @@ class CandidatoRiconciliazione:
     rata: object
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1471,6 +1474,7 @@ class CandidatoRiconciliazioneCumulativa:
     allocazioni: list
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1487,6 +1491,7 @@ class CandidatoMovimentoRiconciliazione:
     importo_disponibile: Decimal
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1501,6 +1506,7 @@ class CandidatoMovimentiRiconciliazioneCumulativa:
     allocazioni: list
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1517,6 +1523,7 @@ class CandidatoScadenzaFornitoreRiconciliazione:
     importo_residuo: Decimal
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1531,6 +1538,7 @@ class CandidatoScadenzeFornitoriCumulativa:
     allocazioni: list
     score: int
     motivazioni: list
+    richiede_conferma: bool = False
 
     @property
     def score_percentuale(self) -> int:
@@ -1808,6 +1816,45 @@ def _testo_movimento_per_identita(movimento) -> str:
     return _normalizza_testo_match(f"{getattr(movimento, 'descrizione', '') or ''} {getattr(movimento, 'controparte', '') or ''}")
 
 
+def _identita_famiglia_per_suggerimento(studenti, testo, *, allow_fuzzy=True):
+    studenti = [studente for studente in studenti if studente is not None]
+    match, score, motivazioni = _valuta_identita_famiglia_studenti_in_causale(None, studenti, testo)
+    if match or not allow_fuzzy:
+        return match, score, motivazioni, False
+    migliori = []
+    for persona in [*studenti, *_familiari_collegati_studenti(studenti)]:
+        nome, cognome = getattr(persona, "nome", ""), getattr(persona, "cognome", "")
+        similarita, motivo = person_similarity(nome, cognome, testo)
+        if similarita:
+            migliori.append((similarita, f"{motivo}: {_label_persona(nome, cognome)} (da verificare)"))
+    if not migliori:
+        return False, 0, [], False
+    similarita, motivo = max(migliori)
+    return True, round(30 * similarita), [motivo], True
+
+
+def _limita_score_suggerimento(score, score_identita, approssimato):
+    # Sommare importo e data non rende certa un'identità solo probabile.
+    return min(round(score * 0.7), 50 + score_identita, 84) if approssimato else score
+
+
+def _movimenti_per_matching(queryset):
+    """Esamina tutti i candidati a blocchi, senza query per ogni residuo."""
+    queryset = queryset.prefetch_related(
+        "riconciliazioni_rate", "pagamenti_fornitori", "pagamenti_buste_paga",
+        "buste_paga_dipendenti__pagamenti",
+    )
+    for movimento in queryset.iterator(chunk_size=200):
+        totale = sum((r.importo for relation in (
+            movimento.riconciliazioni_rate, movimento.pagamenti_fornitori, movimento.pagamenti_buste_paga,
+        ) for r in relation.all()), Decimal("0.00"))
+        for busta in movimento.buste_paga_dipendenti.all():
+            if not busta.pagamenti.all():
+                totale += abs(busta.netto_effettivo or busta.netto_previsto or Decimal("0.00"))
+        movimento._arboris_importo_disponibile_cache = max(abs(movimento.importo) - totale, Decimal("0.00"))
+        yield movimento
+
+
 def _famiglia_label_sicurezza(famiglia) -> str:
     return getattr(famiglia, "cognome_famiglia", "") or "selezionata"
 
@@ -1826,8 +1873,7 @@ def _valida_identita_movimento_rate(movimento, rate):
         visti.add(chiave)
         studenti.append(studente)
 
-    ha_match_identita, _score_identita, _motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
-        None,
+    ha_match_identita, _score_identita, _motivazioni_identita, _approssimato = _identita_famiglia_per_suggerimento(
         studenti,
         testo_movimento,
     )
@@ -2093,7 +2139,7 @@ def _rata_disponibile_per_auto(rata, include_rata=None, *, controlla_collegament
     return importo_rata_residuo(rata) > Decimal("0.00")
 
 
-def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False, rate_pool=None):
+def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False, rate_pool=None, allow_fuzzy=True):
     """
     Ritorna una lista ordinata di :class:`CandidatoRiconciliazione`
     per il movimento dato. Il matching e' pensato per entrate in conto
@@ -2142,7 +2188,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
                 movimenti_finanziari__isnull=True,
                 riconciliazioni_movimenti__isnull=True,
             ).distinct()
-        qs = qs[:200]
+        qs = qs.iterator(chunk_size=200)
     else:
         limite_importo_min = importo_cerca - _TOLLERANZA_IMPORTO_APPROX
         limite_importo_max = importo_cerca + _TOLLERANZA_IMPORTO_APPROX
@@ -2194,10 +2240,8 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
             motivazioni.append("Rata non ancora marcata come pagata")
 
         studente = getattr(getattr(rata, "iscrizione", None), "studente", None)
-        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_in_causale(
-            None,
-            studente,
-            testo_movimento,
+        ha_match_identita, score_identita, motivazioni_identita, approssimato = _identita_famiglia_per_suggerimento(
+            [studente], testo_movimento, allow_fuzzy=allow_fuzzy,
         )
         if not ha_match_identita:
             continue
@@ -2205,14 +2249,15 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         motivazioni.extend(motivazioni_identita)
 
         candidati.append(
-            CandidatoRiconciliazione(rata=rata, score=score, motivazioni=motivazioni)
+            CandidatoRiconciliazione(rata=rata, score=_limita_score_suggerimento(score, score_identita, approssimato),
+                                    motivazioni=motivazioni, richiede_conferma=approssimato)
         )
 
     candidati.sort(key=lambda c: c.score, reverse=True)
     return candidati[:limite]
 
 
-def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=None, rate_pool=None):
+def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=None, rate_pool=None, allow_fuzzy=True):
     """
     Ritorna gruppi di rate della stessa famiglia compatibili con un unico
     movimento bancario. E' usata dalla riconciliazione automatica per i
@@ -2248,7 +2293,7 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
                 riconciliazioni_movimenti__isnull=True,
             )
             .distinct()
-            .order_by("iscrizione__studente__cognome", "iscrizione__studente__nome", "anno_riferimento", "mese_riferimento", "numero_rata")[:600]
+            .order_by("iscrizione__studente__cognome", "iscrizione__studente__nome", "anno_riferimento", "mese_riferimento", "numero_rata").iterator(chunk_size=200)
         )
         controlla_collegamenti = False
     else:
@@ -2291,10 +2336,8 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
 
         famiglia = gruppo["famiglia"]
         studenti = _studenti_unici_da_rate(sottoinsieme)
-        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
-            famiglia,
-            studenti,
-            testo_movimento,
+        ha_match_identita, score_identita, motivazioni_identita, approssimato = _identita_famiglia_per_suggerimento(
+            studenti, testo_movimento, allow_fuzzy=allow_fuzzy,
         )
         if not ha_match_identita:
             continue
@@ -2335,8 +2378,9 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
             CandidatoRiconciliazioneCumulativa(
                 rate=sottoinsieme,
                 allocazioni=allocazioni,
-                score=score,
+                score=_limita_score_suggerimento(score, score_identita, approssimato),
                 motivazioni=motivazioni,
+                richiede_conferma=approssimato,
             )
         )
 
@@ -2368,11 +2412,11 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
         MovimentoFinanziario.objects.select_related("conto", "categoria")
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
         .filter(importo__gt=0)
-        .order_by("-data_contabile", "-id")[:300]
+        .order_by("-data_contabile", "-id")
     )
 
     candidati = []
-    for movimento in queryset:
+    for movimento in _movimenti_per_matching(queryset):
         if movimento.rata_iscrizione_id and not movimento.riconciliazioni_rate.exists():
             continue
 
@@ -2381,10 +2425,8 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
             continue
 
         testo_movimento = _normalizza_testo_match(f"{movimento.descrizione or ''} {movimento.controparte or ''}")
-        ha_match_identita, score_identita, motivazioni_identita = _valuta_identita_famiglia_studenti_in_causale(
-            famiglia,
-            studenti_rate_aperte,
-            testo_movimento,
+        ha_match_identita, score_identita, motivazioni_identita, approssimato = _identita_famiglia_per_suggerimento(
+            studenti_rate_aperte, testo_movimento,
         )
         if not ha_match_identita:
             continue
@@ -2427,8 +2469,9 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
             CandidatoMovimentoRiconciliazione(
                 movimento=movimento,
                 importo_disponibile=disponibile,
-                score=score,
+                score=_limita_score_suggerimento(score, score_identita, approssimato),
                 motivazioni=motivazioni,
+                richiede_conferma=approssimato,
             )
         )
 
@@ -2459,6 +2502,9 @@ def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, 
         for candidato in sottoinsieme
     ]
     score = min(100, int(sum(candidato.score for candidato in sottoinsieme) / len(sottoinsieme)) + 18)
+    approssimato = any(c.richiede_conferma for c in sottoinsieme)
+    if approssimato:
+        score = min(score, min(c.score_percentuale for c in sottoinsieme if c.richiede_conferma))
     motivazioni = ["Somma di piu movimenti identica al residuo della rata selezionata"]
     motivazioni.extend(
         motivo
@@ -2471,6 +2517,7 @@ def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, 
             allocazioni=allocazioni,
             score=score,
             motivazioni=motivazioni,
+            richiede_conferma=approssimato,
         )
     ][:limite]
 
@@ -2488,11 +2535,11 @@ def riconcilia_movimento_automaticamente(
         return None
 
     opzioni = []
-    for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True):
+    for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True, allow_fuzzy=False):
         if _rata_disponibile_per_auto(candidato.rata, include_rata, controlla_collegamenti=False):
             opzioni.append(("singola", candidato.score, candidato))
 
-    for candidato in trova_rate_cumulative_candidate(movimento, limite=5, include_rata=include_rata):
+    for candidato in trova_rate_cumulative_candidate(movimento, limite=5, include_rata=include_rata, allow_fuzzy=False):
         opzioni.append(("cumulativa", candidato.score, candidato))
 
     if not opzioni:
@@ -3115,7 +3162,19 @@ def _supplier_match_score(fornitore, testo_movimento):
     return score, motivazioni
 
 
-def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
+def _identita_fornitore_per_suggerimento(fornitore, testo, *, allow_fuzzy=True):
+    score, motivazioni = _supplier_match_score(fornitore, testo)
+    if score >= 30 or not allow_fuzzy:
+        return score, motivazioni, False
+    similarita = supplier_similarity(getattr(fornitore, "denominazione", ""), testo)
+    if not similarita:
+        return score, motivazioni, False
+    return max(score, round(similarita * 30)), [
+        "Denominazione fornitore parziale o simile nella causale/controparte (da verificare)",
+    ], True
+
+
+def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10, allow_fuzzy=True):
     from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     if movimento is None or movimento.importo is None or movimento.importo >= 0:
@@ -3139,7 +3198,7 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
         .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
-        .order_by("data_scadenza", "id")[:300]
+        .order_by("data_scadenza", "id").iterator(chunk_size=200)
     )
     candidati = []
     for scadenza in scadenze:
@@ -3171,7 +3230,9 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
                 score += 8
                 motivazioni.append(f"Data entro 30 giorni dalla scadenza ({delta_giorni} gg)")
 
-        supplier_score, supplier_motivazioni = _supplier_match_score(scadenza.documento.fornitore, testo_movimento)
+        supplier_score, supplier_motivazioni, approssimato = _identita_fornitore_per_suggerimento(
+            scadenza.documento.fornitore, testo_movimento, allow_fuzzy=allow_fuzzy,
+        )
         score += supplier_score
         motivazioni.extend(supplier_motivazioni)
 
@@ -3187,8 +3248,9 @@ def trova_scadenze_fornitori_candidate(movimento, *, limite: int = 10):
             CandidatoScadenzaFornitoreRiconciliazione(
                 scadenza=scadenza,
                 importo_residuo=residuo,
-                score=score,
+                score=_limita_score_suggerimento(score, supplier_score, approssimato),
                 motivazioni=motivazioni or ["Scadenza compatibile"],
+                richiede_conferma=approssimato,
             )
         )
 
@@ -3286,7 +3348,7 @@ def _trova_sottoinsieme_scadenze_fornitori_per_importo(scadenze, importo_target,
     return [item["scadenza"] for item in migliore]
 
 
-def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5):
+def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5, allow_fuzzy=True):
     from .models import ScadenzaPagamentoFornitore, StatoDocumentoFornitore, StatoScadenzaFornitore, TipoDocumentoFornitore
 
     if movimento is None or movimento.importo is None or movimento.importo >= 0:
@@ -3309,7 +3371,7 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
         .exclude(documento__stato=StatoDocumentoFornitore.COMPENSATO)
         .exclude(documento__verifica_proforma__in=["da_verificare", "sostituita"])
         .exclude(documento__tipo_documento=TipoDocumentoFornitore.NOTA_CREDITO)
-        .order_by("documento__fornitore_id", "data_scadenza", "id")[:600]
+        .order_by("documento__fornitore_id", "data_scadenza", "id").iterator(chunk_size=200)
     )
 
     gruppi = {}
@@ -3328,7 +3390,9 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
             continue
 
         fornitore = gruppo["fornitore"]
-        supplier_score, supplier_motivazioni = _supplier_match_score(fornitore, testo_movimento)
+        supplier_score, supplier_motivazioni, approssimato = _identita_fornitore_per_suggerimento(
+            fornitore, testo_movimento, allow_fuzzy=allow_fuzzy,
+        )
         iban_fornitore = _normalizza_testo_match(getattr(fornitore, "iban", "") or "")
         iban_movimento = _normalizza_testo_match(getattr(movimento, "iban_controparte", "") or "")
         iban_match = bool(iban_fornitore and iban_movimento and iban_fornitore == iban_movimento)
@@ -3370,8 +3434,9 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
             CandidatoScadenzeFornitoriCumulativa(
                 scadenze=sottoinsieme,
                 allocazioni=allocazioni,
-                score=score,
+                score=_limita_score_suggerimento(score, supplier_score, approssimato),
                 motivazioni=motivazioni,
+                richiede_conferma=approssimato,
             )
         )
 
@@ -3385,7 +3450,7 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5)
     return candidati[:limite]
 
 
-def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8):
+def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8, allow_fuzzy=True):
     from .models import MovimentoFinanziario, StatoRiconciliazione
 
     if scadenza is None:
@@ -3399,12 +3464,12 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
         MovimentoFinanziario.objects.select_related("conto", "categoria")
         .exclude(stato_riconciliazione=StatoRiconciliazione.IGNORATO)
         .filter(importo__lt=0)
-        .order_by("-data_contabile", "-id")[:300]
+        .order_by("-data_contabile", "-id")
     )
 
     fornitore = getattr(getattr(scadenza, "documento", None), "fornitore", None)
     candidati = []
-    for movimento in queryset:
+    for movimento in _movimenti_per_matching(queryset):
         disponibile = importo_movimento_disponibile_fornitori(movimento)
         if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
             continue
@@ -3433,11 +3498,14 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
                 score += 8
                 motivazioni.append(f"Data entro 30 giorni dalla scadenza ({delta_giorni} gg)")
 
+        supplier_score, approssimato = 0, False
         if fornitore is not None:
             testo_movimento = _normalizza_testo_match(
                 f"{movimento.descrizione or ''} {movimento.controparte or ''} {movimento.iban_controparte or ''}"
             )
-            supplier_score, supplier_motivazioni = _supplier_match_score(fornitore, testo_movimento)
+            supplier_score, supplier_motivazioni, approssimato = _identita_fornitore_per_suggerimento(
+                fornitore, testo_movimento, allow_fuzzy=allow_fuzzy,
+            )
             score += supplier_score
             motivazioni.extend(supplier_motivazioni)
 
@@ -3453,8 +3521,9 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
             CandidatoMovimentoRiconciliazione(
                 movimento=movimento,
                 importo_disponibile=disponibile,
-                score=score,
+                score=_limita_score_suggerimento(score, supplier_score, approssimato),
                 motivazioni=motivazioni or ["Movimento disponibile per riconciliazione"],
+                richiede_conferma=approssimato,
             )
         )
 
@@ -3481,6 +3550,9 @@ def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, lim
         for candidato in sottoinsieme
     ]
     score = min(100, int(sum(candidato.score for candidato in sottoinsieme) / len(sottoinsieme)) + 18)
+    approssimato = any(c.richiede_conferma for c in sottoinsieme)
+    if approssimato:
+        score = min(score, min(c.score_percentuale for c in sottoinsieme if c.richiede_conferma))
     motivazioni = ["Somma di piu movimenti identica al residuo della scadenza"]
     motivazioni.extend(
         motivo
@@ -3493,6 +3565,7 @@ def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, lim
             allocazioni=allocazioni,
             score=score,
             motivazioni=motivazioni,
+            richiede_conferma=approssimato,
         )
     ][:limite]
 
@@ -3945,8 +4018,8 @@ def anteprima_riconcilia_fornitori_automaticamente(*, punteggio_minimo: int = 85
         if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
             stats["gia_coperti"] += 1
             continue
-        candidati_singoli = trova_scadenze_fornitori_candidate(movimento, limite=3)
-        candidati_cumulativi = trova_scadenze_fornitori_cumulative_candidate(movimento, limite=3)
+        candidati_singoli = trova_scadenze_fornitori_candidate(movimento, limite=3, allow_fuzzy=False)
+        candidati_cumulativi = trova_scadenze_fornitori_cumulative_candidate(movimento, limite=3, allow_fuzzy=False)
         opzioni = [("singola", candidato.score, candidato) for candidato in candidati_singoli]
         opzioni.extend(("cumulativa", candidato.score, candidato) for candidato in candidati_cumulativi)
         if not opzioni:

@@ -106,6 +106,7 @@
                 </section>
             {% endif %}
 
+            {% include "gestione_finanziaria/_compatibilita_note.html" %}
             {% if proposte_movimento %}
                 <section class="calendar-event-form-card supplier-payment-reconcile-card">
                     <div class="calendar-event-form-title">
@@ -118,7 +119,7 @@
                     <div class="supplier-payment-candidate-list">
                         {% for proposta in proposte_movimento %}
                             {% with allocazione=proposta.allocazioni.0 %}
-                            <article class="supplier-payment-candidate{% if forloop.first %} is-best{% endif %}">
+                            <article class="supplier-payment-candidate{% if forloop.first %} is-best{% endif %} reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                 <div class="supplier-payment-candidate-main">
                                     <span class="supplier-payment-candidate-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
                                     <div>
@@ -135,7 +136,7 @@
                                     </div>
                                 </div>
                                 <div class="supplier-payment-candidate-actions">
-                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                    <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                         {{ proposta.score_percentuale }}%
                                     </span>
                                     <button
@@ -167,7 +168,7 @@
                     <div class="supplier-payment-candidate-list">
                         {% for proposta in proposte_movimenti_cumulativi %}
                             {% with idx=forloop.counter0 %}
-                                <article class="supplier-payment-candidate is-best">
+                                <article class="supplier-payment-candidate is-best reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                     <div class="supplier-payment-candidate-main">
                                         <span class="supplier-payment-candidate-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg></span>
                                         <div>
@@ -189,7 +190,7 @@
                                         </div>
                                     </div>
                                     <div class="supplier-payment-candidate-actions">
-                                        <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                        <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                             {{ proposta.score_percentuale }}%
                                         </span>
                                         <button

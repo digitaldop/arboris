@@ -420,6 +420,7 @@ def _preview_riconcilia_movimenti_con_rate(
                 limite=10,
                 solo_disponibili=True,
                 rate_pool=rate_pool_disponibili,
+                allow_fuzzy=False,
             )
             if include_rata(candidato.rata)
             and not candidato.rata.pagata
@@ -430,6 +431,7 @@ def _preview_riconcilia_movimenti_con_rate(
             limite=5,
             include_rata=include_rata,
             rate_pool=rate_pool_disponibili,
+            allow_fuzzy=False,
         )
 
         opzioni = [("singola", candidato.score, candidato) for candidato in candidati]

@@ -137,10 +137,11 @@
                             aria-label="Aiuto movimenti candidati"
                         >?</button>
                     </div>
+                    {% include "gestione_finanziaria/_compatibilita_note.html" %}
                     <div class="rate-reconcile-movement-list">
                         {% for proposta in proposte_movimento %}
                             {% with allocazione=proposta.allocazioni.0 %}
-                            <label class="rate-reconcile-movement{% if forloop.first %} is-best{% endif %}">
+                            <label class="rate-reconcile-movement{% if forloop.first %} is-best{% endif %} reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                 <input
                                     type="radio"
                                     name="movimento_pk"
@@ -151,7 +152,7 @@
                                 <span class="rate-reconcile-movement-body">
                                     <span class="rate-reconcile-movement-head">
                                         <strong>EUR {{ allocazione.importo|euro }}</strong>
-                                        <span>{{ proposta.score_percentuale }}%</span>
+                                        <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">{{ proposta.score_percentuale }}%</span>
                                     </span>
                                     <span>
                                         {{ allocazione.movimento.data_contabile|it_date }} -
@@ -188,11 +189,11 @@
                             </div>
                             {% for proposta in proposte_movimenti_cumulativi %}
                                 {% with idx=forloop.counter0 %}
-                                    <article class="rate-reconcile-movement is-best">
+                                    <article class="rate-reconcile-movement is-best reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                         <span class="rate-reconcile-movement-body">
                                             <span class="rate-reconcile-movement-head">
                                                 <strong>EUR {{ proposta.importo_totale|euro }}</strong>
-                                                <span>{{ proposta.score_percentuale }}%</span>
+                                                <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">{{ proposta.score_percentuale }}%</span>
                                             </span>
                                             {% for allocazione in proposta.allocazioni %}
                                                 <span>

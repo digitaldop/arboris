@@ -134,6 +134,7 @@
                 <span class="anagrafica-status-chip is-muted">{{ proposte_rate|length }} risultati</span>
             </div>
             <div class="panel-body">
+                {% include "gestione_finanziaria/_compatibilita_note.html" %}
                 {% if proposte_rate %}
                     <table class="list-table anagrafica-list-table finance-modern-table finance-reconciliation-candidates-table">
                         <thead>
@@ -143,14 +144,14 @@
                                 <th>Scadenza</th>
                                 <th class="column-right">Importo finale</th>
                                 <th>Stato</th>
-                                <th class="column-right">Match</th>
+                                <th class="column-right">Compatibilità</th>
                                 <th>Motivazioni</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for proposta in proposte_rate %}
                                 {% with rata=proposta.allocazioni.0.target %}
-                                <tr>
+                                <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                     <td class="anagrafica-record-cell">
                                         <label class="anagrafica-record-link anagrafica-record-link-compact finance-reconciliation-choice">
                                             <input type="radio" name="rata_pk" value="{{ rata.pk }}" required>
@@ -176,7 +177,7 @@
                                         </span>
                                     </td>
                                     <td class="column-right">
-                                        <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% elif proposta.score_percentuale >= 60 %}is-amber{% else %}is-muted{% endif %}">
+                                        <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                             {{ proposta.score_percentuale }}%
                                         </span>
                                     </td>
@@ -252,14 +253,14 @@
                         <tr>
                             <th>Rate incluse</th>
                             <th class="column-right">Importo</th>
-                            <th class="column-right">Match</th>
+                            <th class="column-right">Compatibilità</th>
                             <th>Motivazioni</th>
                             <th>Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for proposta in proposte_rate_cumulative %}
-                            <tr>
+                            <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                 <td>
                                     {% for allocazione in proposta.allocazioni %}
                                         <div>
@@ -270,7 +271,7 @@
                                 </td>
                                 <td class="column-right finance-money-cell">{{ proposta.importo_totale|euro }} &euro;</td>
                                 <td class="column-right">
-                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% elif proposta.score_percentuale >= 60 %}is-amber{% else %}is-muted{% endif %}">
+                                    <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                         {{ proposta.score_percentuale }}%
                                     </span>
                                 </td>
@@ -317,13 +318,14 @@
                 <span class="anagrafica-status-chip is-muted">{{ proposte_fornitori|length }} risultati</span>
             </div>
             <div class="panel-body">
+                {% include "gestione_finanziaria/_compatibilita_note.html" %}
                 {% if proposte_fornitori %}
                     <table class="list-table anagrafica-list-table finance-modern-table">
                         <thead>
                             <tr>
                                 <th>Scadenza candidata</th>
                                 <th class="column-right">Residuo</th>
-                                <th class="column-right">Match</th>
+                                <th class="column-right">Compatibilità</th>
                                 <th>Motivazioni</th>
                                 <th>Riconcilia</th>
                             </tr>
@@ -331,7 +333,7 @@
                         <tbody>
                             {% for proposta in proposte_fornitori %}
                                 {% with allocazione=proposta.allocazioni.0 scadenza=proposta.allocazioni.0.target %}
-                                <tr>
+                                <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                     <td class="anagrafica-record-cell">
                                         <div class="anagrafica-record-link anagrafica-record-link-compact">
                                             <span class="finance-record-icon finance-record-icon-supplier" aria-hidden="true">
@@ -345,7 +347,7 @@
                                     </td>
                                     <td class="column-right finance-money-cell">{{ allocazione.importo|euro }} &euro;</td>
                                     <td class="column-right">
-                                        <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% elif proposta.score_percentuale >= 60 %}is-amber{% else %}is-muted{% endif %}">
+                                        <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                             {{ proposta.score_percentuale }}%
                                         </span>
                                     </td>
@@ -400,14 +402,14 @@
                             <tr>
                                 <th>Scadenze incluse</th>
                                 <th class="column-right">Importo</th>
-                                <th class="column-right">Match</th>
+                                <th class="column-right">Compatibilità</th>
                                 <th>Motivazioni</th>
                                 <th>Azioni</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for proposta in proposte_fornitori_cumulative %}
-                                <tr>
+                                <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                     <td>
                                         {% for allocazione in proposta.allocazioni %}
                                             <div>
@@ -418,7 +420,7 @@
                                     </td>
                                     <td class="column-right finance-money-cell">{{ proposta.importo_totale|euro }} &euro;</td>
                                     <td class="column-right">
-                                        <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% elif proposta.score_percentuale >= 60 %}is-amber{% else %}is-muted{% endif %}">
+                                        <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                             {{ proposta.score_percentuale }}%
                                         </span>
                                     </td>

@@ -55,13 +55,14 @@
 
     <div class="panel panel-standalone anagrafica-list-panel finance-modern-panel">
         <div class="panel-body">
+            {% include "gestione_finanziaria/_compatibilita_note.html" %}
             {% if proposte_fornitore %}
                 <table class="list-table anagrafica-list-table finance-modern-table">
                     <thead>
                         <tr>
                             <th>Scadenza candidata</th>
                             <th>Residuo</th>
-                            <th>Punteggio</th>
+                            <th>Compatibilità</th>
                             <th>Motivazioni</th>
                             <th>Riconcilia</th>
                         </tr>
@@ -69,7 +70,7 @@
                     <tbody>
                         {% for proposta in proposte_fornitore %}
                             {% with allocazione=proposta.allocazioni.0 scadenza=proposta.allocazioni.0.target %}
-                            <tr>
+                            <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                 <td class="anagrafica-record-cell">
                                     <div class="anagrafica-record-link anagrafica-record-link-compact">
                                         <span class="finance-record-icon finance-record-icon-supplier" aria-hidden="true">
@@ -83,7 +84,7 @@
                                 </td>
                                 <td class="finance-money-cell">{{ allocazione.importo|euro }} &euro;</td>
                                 <td>
-                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                    <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                         {{ proposta.score_percentuale }}%
                                     </span>
                                 </td>
@@ -135,14 +136,14 @@
                         <tr>
                             <th>Scadenze incluse</th>
                             <th>Importo</th>
-                            <th>Punteggio</th>
+                            <th>Compatibilità</th>
                             <th>Motivazioni</th>
                             <th>Riconcilia</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for proposta in proposte_fornitore_cumulative %}
-                            <tr>
+                            <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                 <td>
                                     {% for allocazione in proposta.allocazioni %}
                                         <div>
@@ -153,7 +154,7 @@
                                 </td>
                                 <td class="finance-money-cell">{{ proposta.importo_totale|euro }} &euro;</td>
                                 <td>
-                                    <span class="anagrafica-status-chip {% if proposta.score_percentuale >= 80 %}is-success{% else %}is-muted{% endif %}">
+                                    <span class="reconciliation-confidence-badge" aria-label="Compatibilità {{ proposta.score_percentuale }}%">
                                         {{ proposta.score_percentuale }}%
                                     </span>
                                 </td>
