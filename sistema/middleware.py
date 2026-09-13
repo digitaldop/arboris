@@ -1,4 +1,5 @@
 from .audit import reset_current_audit_user, set_current_audit_user
+from .audit_accessi import log_page_view
 from .database_backups import maybe_run_scheduled_backup
 
 
@@ -10,6 +11,7 @@ class AuditUserMiddleware:
         token = set_current_audit_user(getattr(request, "user", None))
         try:
             response = self.get_response(request)
+            log_page_view(request, response)
         finally:
             if token is not None:
                 reset_current_audit_user(token)

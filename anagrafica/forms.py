@@ -1112,6 +1112,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         "telefono",
         "email",
         "codice_fiscale",
+        "professione",
         "sesso",
         "data_nascita",
         "luogo_nascita",
@@ -1128,6 +1129,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
     telefono = forms.CharField(max_length=40, required=False)
     email = forms.EmailField(required=False)
     codice_fiscale = forms.CharField(max_length=16, required=False)
+    professione = forms.CharField(label="Professione", max_length=255, required=False)
     sesso = forms.ChoiceField(choices=[("", "---------")] + SESSO_CHOICES, required=False)
     data_nascita = forms.DateField(
         required=False,
@@ -1158,6 +1160,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
             "telefono",
             "email",
             "codice_fiscale",
+            "professione",
             "sesso",
             "data_nascita",
             "luogo_nascita",
@@ -1417,6 +1420,7 @@ class FamiliareInlineForm(FamiliareForm):
             self.data.get(self.add_prefix("telefono"), ""),
             self.data.get(self.add_prefix("email"), ""),
             self.data.get(self.add_prefix("codice_fiscale"), ""),
+            self.data.get(self.add_prefix("professione"), ""),
             self.data.get(self.add_prefix("data_nascita"), ""),
             self.data.get(self.add_prefix("luogo_nascita_search"), ""),
         ]
@@ -1493,6 +1497,7 @@ class FamiliareInlineBaseFormSet(IgnoreBlankExtraModelFormSet):
         "telefono",
         "email",
         "codice_fiscale",
+        "professione",
         "data_nascita",
         "luogo_nascita_search",
     )

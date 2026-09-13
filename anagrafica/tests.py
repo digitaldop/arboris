@@ -102,6 +102,7 @@ class FamiliarePersonaProxySaveTests(TestCase):
             cognome="Rossi",
             email="ada.rossi@example.com",
             telefono="3331234567",
+            professione="Architetta",
         )
 
         familiare.email = "nuova.ada@example.com"
@@ -117,7 +118,8 @@ class FamiliarePersonaProxySaveTests(TestCase):
 
         familiare.email = "contatti.ada@example.com"
         familiare.telefono = "3330000000"
-        familiare.save(update_fields=["email", "telefono"])
+        familiare.professione = "Insegnante"
+        familiare.save(update_fields=["email", "telefono", "professione"])
 
         familiare.refresh_from_db()
         familiare.persona.refresh_from_db()
@@ -125,6 +127,8 @@ class FamiliarePersonaProxySaveTests(TestCase):
         self.assertEqual(familiare.persona.email, "contatti.ada@example.com")
         self.assertEqual(familiare.telefono, "3330000000")
         self.assertEqual(familiare.persona.telefono, "3330000000")
+        self.assertEqual(familiare.professione, "Insegnante")
+        self.assertEqual(familiare.persona.professione, "Insegnante")
 
     def test_contact_link_sync_persists_email_on_linked_persona(self):
         relazione = RelazioneFamiliare.objects.create(relazione="Tutore", ordine=1)
@@ -142,6 +146,65 @@ class FamiliarePersonaProxySaveTests(TestCase):
         familiare.persona.refresh_from_db()
         self.assertEqual(familiare.email, "contatti.lia@example.com")
         self.assertEqual(familiare.persona.email, "contatti.lia@example.com")
+
+
+class FamiliareProfessioneTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser(username="professione-test")
+        cls.relazione = RelazioneFamiliare.objects.create(relazione="Genitore", ordine=1)
+        cls.studente = Studente.objects.create(nome="Luca", cognome="Rossi")
+
+    def test_professione_can_be_created_updated_and_cleared_from_main_card(self):
+        self.client.force_login(self.user)
+        url = reverse("crea_familiare")
+        response = self.client.get(url)
+        self.assertContains(response, 'name="professione"')
+        payload = {
+            "nome": "Ada",
+            "cognome": "Rossi",
+            "relazione_familiare": str(self.relazione.pk),
+            "studenti_collegati": [str(self.studente.pk)],
+            "_edit_scope": "full",
+            "_relative_main_submit": "1",
+        }
+        for prefix in ("studenti", "parenti", "documenti", "contatti_indirizzi", "contatti_telefoni", "contatti_email"):
+            payload[f"{prefix}-TOTAL_FORMS"] = "0"
+            payload[f"{prefix}-INITIAL_FORMS"] = "0"
+
+        for professione in ("Architetta", "Consulente d'impresa & formatrice", ""):
+            with self.subTest(professione=professione):
+                response = self.client.post(url, {**payload, "professione": professione})
+                self.assertEqual(response.status_code, 302)
+                familiare = Familiare.objects.get(nome="Ada", cognome="Rossi")
+                self.assertEqual(familiare.professione, professione)
+                self.assertEqual(familiare.persona.professione, professione)
+                self.assertTrue(StudenteFamiliare.objects.filter(studente=self.studente, familiare=familiare).exists())
+                url = reverse("modifica_familiare", kwargs={"pk": familiare.pk})
+                response = self.client.get(url)
+                self.assertContains(response, 'name="professione"')
+                self.assertEqual(response.context["form"]["professione"].value(), professione)
+                if professione:
+                    self.assertContains(response, f"<span>Professione: {professione}</span>", html=True)
+                else:
+                    self.assertContains(response, 'Professione: <span class="family-muted-value">Non indicata</span>')
+
+    def test_inline_form_preserves_professione_when_editing_another_field(self):
+        familiare = Familiare.objects.create(
+            nome="Ada", cognome="Rossi", relazione_familiare=self.relazione, professione="Architetta"
+        )
+        form = FamiliareInlineForm(instance=familiare, prefix="parenti-0")
+        payload = {
+            field.html_name: field.value() if field.value() is not None else ""
+            for field in form
+        }
+        payload["parenti-0-email"] = "ada@example.com"
+        form = FamiliareInlineForm(data=payload, instance=familiare, prefix="parenti-0")
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        familiare.refresh_from_db()
+        self.assertEqual(familiare.email, "ada@example.com")
+        self.assertEqual(familiare.professione, "Architetta")
 
 
 class FamiliareDeletionTests(TestCase):

@@ -892,6 +892,8 @@ class AzioneOperazioneCronologia(models.TextChoices):
     CREAZIONE = "create", "Creazione"
     MODIFICA = "update", "Modifica"
     ELIMINAZIONE = "delete", "Eliminazione"
+    LOGIN = "login", "Login"
+    VISUALIZZAZIONE = "view", "Visualizzazione pagina"
 
 
 class ModuloOperazioneCronologia(models.TextChoices):
@@ -981,6 +983,8 @@ class SistemaOperazioneCronologia(models.Model):
             AzioneOperazioneCronologia.CREAZIONE: "audit-action-badge-create",
             AzioneOperazioneCronologia.MODIFICA: "audit-action-badge-update",
             AzioneOperazioneCronologia.ELIMINAZIONE: "audit-action-badge-delete",
+            AzioneOperazioneCronologia.LOGIN: "audit-action-badge-login",
+            AzioneOperazioneCronologia.VISUALIZZAZIONE: "audit-action-badge-view",
         }
         return mapping.get(self.azione, "audit-action-badge-update")
 

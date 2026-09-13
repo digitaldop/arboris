@@ -1359,6 +1359,7 @@ def cronologia_operazioni_sistema(request):
             | Q(oggetto_label__icontains=q)
             | Q(model_verbose_name__icontains=q)
             | Q(utente_label__icontains=q)
+            | Q(utente__username__icontains=q)
         )
 
     if azione:
@@ -1373,6 +1374,8 @@ def cronologia_operazioni_sistema(request):
         count_creazioni=Count("id", filter=Q(azione=AzioneOperazioneCronologia.CREAZIONE)),
         count_modifiche=Count("id", filter=Q(azione=AzioneOperazioneCronologia.MODIFICA)),
         count_eliminazioni=Count("id", filter=Q(azione=AzioneOperazioneCronologia.ELIMINAZIONE)),
+        count_login=Count("id", filter=Q(azione=AzioneOperazioneCronologia.LOGIN)),
+        count_visualizzazioni=Count("id", filter=Q(azione=AzioneOperazioneCronologia.VISUALIZZAZIONE)),
     )
 
     return render(
@@ -1390,6 +1393,8 @@ def cronologia_operazioni_sistema(request):
             "count_creazioni": riepilogo["count_creazioni"] or 0,
             "count_modifiche": riepilogo["count_modifiche"] or 0,
             "count_eliminazioni": riepilogo["count_eliminazioni"] or 0,
+            "count_login": riepilogo["count_login"] or 0,
+            "count_visualizzazioni": riepilogo["count_visualizzazioni"] or 0,
             "is_truncated": totale_operazioni > len(operazioni),
             "result_limit": CRONOLOGIA_RESULT_LIMIT,
         },

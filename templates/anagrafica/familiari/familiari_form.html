@@ -223,6 +223,7 @@
                                             <div class="family-detail-label">Dati anagrafici</div>
                                             <div class="family-detail-value relative-overview-value">
                                                 <span>{% if familiare.sesso %}{{ familiare.get_sesso_display }}{% else %}Sesso non indicato{% endif %}</span>
+                                                <span>Professione: {% if familiare.professione %}{{ familiare.professione }}{% else %}<span class="family-muted-value">Non indicata</span>{% endif %}</span>
                                                 {% if familiare.codice_fiscale %}
                                                     <span class="readonly-action-group">
                                                         <span>CF {{ familiare.codice_fiscale }}</span>
@@ -655,6 +656,11 @@
                                         {{ form.codice_fiscale }}
                                         <div class="help-text">Calcolato automaticamente quando i dati anagrafici sono completi.</div>
                                         {{ form.codice_fiscale.errors }}
+                                    </div>
+                                    <div class="family-student-editor-field family-student-editor-field-wide">
+                                        <label for="{{ form.professione.id_for_label }}">Professione</label>
+                                        {{ form.professione }}
+                                        {{ form.professione.errors }}
                                     </div>
 
                                     <div class="family-student-editor-field family-student-editor-field-wide">
@@ -1207,6 +1213,16 @@
                                         </div>
                                         <div class="mode-edit-field">{{ form.nazionalita }}</div>
                                         {{ form.nazionalita.errors }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ form.professione.label_tag }}</th>
+                                    <td>
+                                        <div class="mode-view-only readonly-display readonly-display-plain">
+                                            {% if familiare.professione %}{{ familiare.professione }}{% else %}<span class="table-muted">Non indicata</span>{% endif %}
+                                        </div>
+                                        <div class="mode-edit-field">{{ form.professione }}</div>
+                                        {{ form.professione.errors }}
                                     </td>
                                 </tr>
 
@@ -1897,6 +1913,7 @@
                                                     </div>
                                                     <div class="inline-subform-field"><label>Nazionalita</label>{{ f.nazionalita }}{{ f.nazionalita.errors }}</div>
                                                     <div class="inline-subform-field"><label>Codice fiscale</label>{{ f.codice_fiscale }}{{ f.codice_fiscale.errors }}</div>
+                                                    <div class="inline-subform-field">{{ f.professione.label_tag }}{{ f.professione }}{{ f.professione.errors }}</div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2526,6 +2543,7 @@
                         </div>
                         <div class="inline-subform-field"><label>Nazionalita</label>{{ parenti_formset.empty_form.nazionalita }}{{ parenti_formset.empty_form.nazionalita.errors }}</div>
                         <div class="inline-subform-field"><label>Codice fiscale</label>{{ parenti_formset.empty_form.codice_fiscale }}{{ parenti_formset.empty_form.codice_fiscale.errors }}</div>
+                        <div class="inline-subform-field">{{ parenti_formset.empty_form.professione.label_tag }}{{ parenti_formset.empty_form.professione }}{{ parenti_formset.empty_form.professione.errors }}</div>
                     </div>
                 </td>
             </tr>
@@ -2623,7 +2641,7 @@
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/familiare-form.js' %}?v=39"></script>
+    <script src="{% static 'js/pages/familiare-form.js' %}?v=40"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

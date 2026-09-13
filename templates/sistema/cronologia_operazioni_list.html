@@ -30,7 +30,7 @@
                         <span class="family-meta-icon" aria-hidden="true">
                             <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#shield"></use></svg>
                         </span>
-                        Registro consultabile delle modifiche effettuate nel software
+                        Registro di modifiche, login e pagine visualizzate dagli utenti
                     </div>
                 </div>
             </div>
@@ -77,6 +77,26 @@
                     <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg>
                 </span>
             </article>
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Login</span>
+                    <strong class="audit-log-kpi-value">{{ count_login }}</strong>
+                    <span class="audit-log-kpi-note">Accessi riusciti</span>
+                </div>
+                <span class="audit-log-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#user"></use></svg>
+                </span>
+            </article>
+            <article class="audit-log-kpi-card">
+                <div class="audit-log-kpi-copy">
+                    <span class="audit-log-kpi-label">Pagine visualizzate</span>
+                    <strong class="audit-log-kpi-value">{{ count_visualizzazioni }}</strong>
+                    <span class="audit-log-kpi-note">Consultazioni degli utenti</span>
+                </div>
+                <span class="audit-log-kpi-icon is-blue" aria-hidden="true">
+                    <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
+                </span>
+            </article>
         </section>
 
         <section class="audit-log-filter-card" aria-labelledby="audit-log-filter-title">
@@ -115,7 +135,7 @@
                             type="text"
                             name="q"
                             value="{{ q|default:'' }}"
-                            placeholder="Cerca per utente, oggetto o descrizione..."
+                            placeholder="Cerca per utente, pagina, oggetto o descrizione..."
                         >
                     </span>
                 </label>

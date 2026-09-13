@@ -99,8 +99,9 @@ class LogNotificheTests(TestCase):
         self.assertEqual(SistemaLogLettura.objects.get(pk=lettura.pk).letta_il, lettura.letta_il)
         self.client.get(reverse("logout"))
         self.client.post(reverse("login"), {"username": self.admin.username, "password": "Log-tests-2026"})
-        self.assertEqual(self.non_lette(), 0)
-        self.assertEqual(riepilogo_log(self.operativo)["log_operazioni_non_lette"], 1)
+        self.assertTrue(SistemaLogLettura.objects.filter(pk=lettura.pk).exists())
+        self.assertEqual(self.non_lette(), 1)  # Il nuovo login resta da leggere.
+        self.assertEqual(riepilogo_log(self.operativo)["log_operazioni_non_lette"], 2)
 
     def test_segna_tutte_centinaia_di_operazioni_e_nuovi_eventi_successivi(self):
         SistemaOperazioneCronologia.objects.bulk_create([

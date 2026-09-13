@@ -16316,6 +16316,16 @@ textarea.is-conditional-disabled,
     color: #9b3845;
 }
 
+.audit-action-badge-login {
+    background: #e4f0fc;
+    color: #245e94;
+}
+
+.audit-action-badge-view {
+    background: #efebfa;
+    color: #634497;
+}
+
 .audit-operation-text {
     margin-top: 6px;
 }
@@ -38395,7 +38405,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .audit-log-kpi-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
 }
 
@@ -38512,7 +38522,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .audit-log-filter-form {
     display: grid;
-    grid-template-columns: minmax(180px, 240px) minmax(180px, 240px) minmax(260px, 1fr) auto;
+    grid-template-columns: minmax(180px, 240px) minmax(220px, 240px) minmax(220px, 1fr) auto;
     gap: 14px;
     align-items: end;
     padding: 18px 22px 22px;

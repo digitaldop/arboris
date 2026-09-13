@@ -696,6 +696,11 @@
                                                     {{ f.codice_fiscale }}
                                                     {{ f.codice_fiscale.errors }}
                                                 </div>
+                                                <div class="inline-subform-field">
+                                                    {{ f.professione.label_tag }}
+                                                    {{ f.professione }}
+                                                    {{ f.professione.errors }}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -815,6 +820,11 @@
                                                     <label>Codice fiscale</label>
                                                     {{ f.codice_fiscale }}
                                                     {{ f.codice_fiscale.errors }}
+                                                </div>
+                                                <div class="inline-subform-field">
+                                                    {{ f.professione.label_tag }}
+                                                    {{ f.professione }}
+                                                    {{ f.professione.errors }}
                                                 </div>
                                             </div>
                                         </td>
@@ -1242,6 +1252,11 @@
                         {{ familiari_formset.empty_form.codice_fiscale }}
                         {{ familiari_formset.empty_form.codice_fiscale.errors }}
                     </div>
+                    <div class="inline-subform-field">
+                        {{ familiari_formset.empty_form.professione.label_tag }}
+                        {{ familiari_formset.empty_form.professione }}
+                        {{ familiari_formset.empty_form.professione.errors }}
+                    </div>
                 </div>
             </td>
         </tr>
@@ -1384,7 +1399,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=12"></script>
 
-    <script src="{% static 'js/pages/famiglia-form.js' %}?v=57"></script>
+    <script src="{% static 'js/pages/famiglia-form.js' %}?v=58"></script>
 
     <script>
     document.addEventListener("DOMContentLoaded", function () {

@@ -560,6 +560,7 @@ class Persona(models.Model):
         null=True,
     )
     codice_fiscale = models.CharField(max_length=16, blank=True)
+    professione = models.CharField("Professione", max_length=255, blank=True)
     email = models.EmailField(blank=True)
     telefono = models.CharField(max_length=40, blank=True)
     note = models.TextField(blank=True)
@@ -657,6 +658,7 @@ class FamiliareQuerySet(models.QuerySet):
         "telefono",
         "email",
         "codice_fiscale",
+        "professione",
         "sesso",
         "data_nascita",
         "luogo_nascita",
@@ -752,6 +754,7 @@ class Familiare(models.Model):
         "telefono",
         "email",
         "codice_fiscale",
+        "professione",
         "sesso",
         "data_nascita",
         "luogo_nascita",
@@ -884,6 +887,14 @@ class Familiare(models.Model):
         self._set_persona_value("codice_fiscale", value)
 
     @property
+    def professione(self):
+        return self._get_persona_value("professione") or ""
+
+    @professione.setter
+    def professione(self, value):
+        self._set_persona_value("professione", value or "")
+
+    @property
     def sesso(self):
         return self._get_persona_value("sesso") or ""
 
@@ -959,7 +970,7 @@ class Familiare(models.Model):
         payload = {}
         for field_name in self.PERSONA_PROXY_FIELDS:
             value = source.get(field_name)
-            if field_name in {"nome", "cognome", "telefono", "email", "codice_fiscale", "sesso", "luogo_nascita_custom", "note"}:
+            if field_name in {"nome", "cognome", "telefono", "email", "codice_fiscale", "professione", "sesso", "luogo_nascita_custom", "note"}:
                 value = value or ""
             payload[field_name] = value
         payload["codice_fiscale"] = (payload.get("codice_fiscale") or "").upper().strip()

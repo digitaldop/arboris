@@ -1,3 +1,4 @@
+from django.contrib.auth.signals import user_logged_in
 from django.db import connection
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.db.utils import OperationalError, ProgrammingError
@@ -44,6 +45,18 @@ def build_operation_description(action, model_verbose_name, object_label):
     return f"Modificato {model_verbose_name}: {object_label}."
 
 
+def save_audit_entry(**fields):
+    if is_audit_disabled() or not audit_table_exists():
+        return
+
+    try:
+        with audit_logging_disabled():
+            SistemaOperazioneCronologia.objects.create(**fields)
+            cleanup_cronologia_operazioni()
+    except (OperationalError, ProgrammingError):
+        return
+
+
 def create_audit_entry(instance, action, changed_field_names=None):
     if is_audit_disabled():
         return
@@ -59,24 +72,38 @@ def create_audit_entry(instance, action, changed_field_names=None):
         overflow_count = len(changed_field_labels) - 8
         changed_field_labels = changed_field_labels[:8] + [f"+{overflow_count} altri campi"]
 
-    try:
-        with audit_logging_disabled():
-            SistemaOperazioneCronologia.objects.create(
-                azione=action,
-                modulo=get_audit_module_for_model(model),
-                utente=current_user,
-                utente_label=format_audit_user_label(current_user),
-                app_label=model._meta.app_label,
-                model_name=model._meta.model_name,
-                model_verbose_name=model_verbose_name[:120],
-                oggetto_id="" if getattr(instance, "pk", None) is None else str(instance.pk),
-                oggetto_label=object_label,
-                descrizione=build_operation_description(action, model_verbose_name, object_label),
-                campi_coinvolti=changed_field_labels,
-            )
-            cleanup_cronologia_operazioni()
-    except (OperationalError, ProgrammingError):
+    save_audit_entry(
+        azione=action,
+        modulo=get_audit_module_for_model(model),
+        utente=current_user,
+        utente_label=format_audit_user_label(current_user),
+        app_label=model._meta.app_label,
+        model_name=model._meta.model_name,
+        model_verbose_name=model_verbose_name[:120],
+        oggetto_id="" if getattr(instance, "pk", None) is None else str(instance.pk),
+        oggetto_label=object_label,
+        descrizione=build_operation_description(action, model_verbose_name, object_label),
+        campi_coinvolti=changed_field_labels,
+    )
+
+
+@receiver(user_logged_in, dispatch_uid="sistema_audit_log_login")
+def log_user_login(sender, request, user, **kwargs):
+    if request is None:
         return
+    user_label = format_audit_user_label(user)
+    save_audit_entry(
+        azione=AzioneOperazioneCronologia.LOGIN,
+        modulo="sistema",
+        utente=user,
+        utente_label=user_label,
+        app_label=user._meta.app_label,
+        model_name=user._meta.model_name,
+        model_verbose_name="Utente",
+        oggetto_id=str(user.pk),
+        oggetto_label=user_label[:255],
+        descrizione=f"Login eseguito: {user_label}.",
+    )
 
 
 @receiver(pre_save, dispatch_uid="sistema_audit_capture_previous_state")

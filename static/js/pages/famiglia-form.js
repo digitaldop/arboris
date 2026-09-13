@@ -3282,6 +3282,7 @@ window.ArborisFamigliaForm = (function () {
             appendStudentSubformField(grid, subformRow, 'input[name$="-luogo_nascita_search"]', "family-student-editor-field-wide", editor);
             appendStudentSubformField(grid, subformRow, 'select[name$="-nazionalita"]', "family-student-editor-field-third", editor);
             appendStudentSubformField(grid, subformRow, 'input[name$="-codice_fiscale"]', "family-student-editor-field-third", editor);
+            appendStudentSubformField(grid, subformRow, 'input[name$="-professione"]', "family-student-editor-field-wide", editor);
             appendRelativeAddressField(grid, row, editor);
             appendCardCheckboxField(grid, row, 'input[type="checkbox"][name$="-convivente"]', "Convivente", "", editor);
             appendCardCheckboxField(grid, row, 'input[type="checkbox"][name$="-referente_principale"]', "Referente principale", "", editor);

@@ -2401,6 +2401,7 @@
                                                     </div>
                                                     <div class="inline-subform-field"><label>Nazionalit&agrave;</label>{{ f.nazionalita }}{{ f.nazionalita.errors }}</div>
                                                     <div class="inline-subform-field"><label>Codice fiscale</label>{{ f.codice_fiscale }}{{ f.codice_fiscale.errors }}</div>
+                                                    <div class="inline-subform-field">{{ f.professione.label_tag }}{{ f.professione }}{{ f.professione.errors }}</div>
                                                 </div>
                                             </td>
                                         </tr>
@@ -2672,6 +2673,7 @@
                         </div>
                         <div class="inline-subform-field"><label>Nazionalit&agrave;</label>{{ parenti_formset.empty_form.nazionalita }}{{ parenti_formset.empty_form.nazionalita.errors }}</div>
                         <div class="inline-subform-field"><label>Codice fiscale</label>{{ parenti_formset.empty_form.codice_fiscale }}{{ parenti_formset.empty_form.codice_fiscale.errors }}</div>
+                        <div class="inline-subform-field">{{ parenti_formset.empty_form.professione.label_tag }}{{ parenti_formset.empty_form.professione }}{{ parenti_formset.empty_form.professione.errors }}</div>
                     </div>
                 </td>
             </tr>
@@ -3050,7 +3052,7 @@
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>
     <script src="{% static 'js/core/copy-actions.js' %}?v=1"></script>
     <script src="{% static 'js/core/view-mode.js' %}?v=11"></script>
-    <script src="{% static 'js/pages/studente-form.js' %}?v=59"></script>
+    <script src="{% static 'js/pages/studente-form.js' %}?v=60"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

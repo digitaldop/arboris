@@ -1228,6 +1228,7 @@ window.ArborisFamiliareForm = (function () {
             appendInputField(grid, formRoot, "#id_luogo_nascita_search", "Luogo nascita", "family-student-editor-field-wide", editor);
             appendInputField(grid, formRoot, "#id_nazionalita", "Nazionalita", "family-student-editor-field-third", editor);
             appendInputField(grid, formRoot, "#id_codice_fiscale", "Codice fiscale", "family-student-editor-field-third", editor);
+            appendInputField(grid, formRoot, "#id_professione", "Professione", "family-student-editor-field-wide", editor);
             appendRelatedField(grid, formRoot, "#id_indirizzo", "Indirizzo", "family-student-editor-field-wide family-student-editor-address-field", editor, "indirizzo", {
                 helpSelector: "#familiare-address-help",
                 addressControl: true,
@@ -1713,6 +1714,7 @@ window.ArborisFamiliareForm = (function () {
             appendSubformField(grid, subformRow, 'input[name$="-luogo_nascita_search"]', "family-student-editor-field-wide", editor);
             appendSubformField(grid, subformRow, 'select[name$="-nazionalita"]', "family-student-editor-field-third", editor);
             appendSubformField(grid, subformRow, 'input[name$="-codice_fiscale"]', "family-student-editor-field-third", editor);
+            appendSubformField(grid, subformRow, 'input[name$="-professione"]', "family-student-editor-field-wide", editor);
             appendCardAddressField(grid, row, editor, ".inline-family-address-cell");
             appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-convivente"]', "Convivente", "", editor);
             appendCheckboxField(grid, row, 'input[type="checkbox"][name$="-referente_principale"]', "Referente principale", "", editor);
