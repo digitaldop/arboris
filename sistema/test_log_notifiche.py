@@ -100,8 +100,48 @@ class LogNotificheTests(TestCase):
         self.client.get(reverse("logout"))
         self.client.post(reverse("login"), {"username": self.admin.username, "password": "Log-tests-2026"})
         self.assertTrue(SistemaLogLettura.objects.filter(pk=lettura.pk).exists())
-        self.assertEqual(self.non_lette(), 1)  # Il nuovo login resta da leggere.
+        self.assertEqual(self.non_lette(), 0)  # Il proprio login non compare nelle notifiche.
         self.assertEqual(riepilogo_log(self.operativo)["log_operazioni_non_lette"], 2)
+
+    def test_notifiche_escludono_proprie_operazioni_ma_cronologia_le_conserva(self):
+        proprie = [
+            self.operazione(f"Evento proprio {azione}", utente=self.admin, utente_label=self.admin.username, azione=azione)
+            for azione in ("create", "update", "delete", "login", "view")
+        ]
+        altrui = self.operazione("Evento di un altro utente")
+        altro_admin = self.operazione("Evento di un altro amministratore", utente=self.operativo)
+        response = self.client.get(reverse("stato_log_operazioni"))
+        self.assertEqual(response.json()["non_lette"], 2)
+        self.assertNotIn("Evento proprio", response.json()["html"])
+        self.assertIn(altrui.descrizione, response.json()["html"])
+        self.assertIn(altro_admin.descrizione, response.json()["html"])
+
+        response = self.client.get(reverse("cronologia_operazioni_sistema"))
+        ids = {entry.pk for entry in response.context["operazioni"]}
+        self.assertTrue({entry.pk for entry in proprie}.issubset(ids))
+        self.assertIn(altrui.pk, ids)
+        self.assertIn(altro_admin.pk, ids)
+        self.assertEqual(self.non_lette(), 2)
+
+        response = self.client.post(reverse("segna_tutti_log_operazioni_letti"), HTTP_ACCEPT="application/json")
+        self.assertEqual(set(response.json()["lette_ids"]), {altrui.pk, altro_admin.pk})
+        self.assertEqual(response.json()["non_lette"], 0)
+        self.assertFalse(SistemaLogLettura.objects.filter(user=self.admin, operazione__utente=self.admin).exists())
+        self.assertEqual(SistemaOperazioneCronologia.objects.filter(pk__in=[entry.pk for entry in proprie]).count(), 5)
+
+    def test_ogni_amministratore_esclude_solo_il_proprio_account(self):
+        mia = self.operazione("Attività superuser", utente=self.admin)
+        sua = self.operazione("Attività amministratore operativo", utente=self.operativo)
+        self.assertEqual([op.pk for op in riepilogo_log(self.admin)["log_operazioni_recenti"]], [sua.pk])
+        self.assertEqual([op.pk for op in riepilogo_log(self.operativo)["log_operazioni_recenti"]], [mia.pk])
+
+    def test_esclusione_per_account_e_non_per_nome_visualizzato(self):
+        altra = self.operazione("Account diverso con stesso nome", utente_label=self.admin.username)
+        propria = self.operazione("Account corrente", utente=self.admin, utente_label=self.admin.username)
+        self.assertEqual([op.pk for op in riepilogo_log(self.admin)["log_operazioni_recenti"]], [altra.pk])
+        response = self.client.post(reverse("segna_log_operazione_letta", args=[propria.pk]), HTTP_ACCEPT="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(SistemaLogLettura.objects.filter(operazione=propria).exists())
 
     def test_segna_tutte_centinaia_di_operazioni_e_nuovi_eventi_successivi(self):
         SistemaOperazioneCronologia.objects.bulk_create([

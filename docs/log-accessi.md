@@ -6,6 +6,11 @@ separa i tipi di evento; **Ricerca** permette di cercare il nome dell'utente,
 il suo username oppure il percorso della pagina. Restano disponibili il filtro
 per modulo e la lettura delle singole voci dal menu LOG.
 
+Le notifiche rapide e il loro contatore mostrano solo le attività degli altri
+account, inclusi gli altri amministratori. Le proprie attività restano nella
+cronologia generale e non richiedono di essere segnate come lette. Questa regola
+si applica anche ai login e alle pagine visualizzate.
+
 Una visualizzazione corrisponde a una richiesta GET autenticata per cui il server
 ha restituito una pagina HTML completa con esito positivo. Sono comprese le schede
 aperte nei popup tramite iframe. Ogni caricamento o ricaricamento genera un evento;

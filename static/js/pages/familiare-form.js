@@ -223,7 +223,6 @@ window.ArborisFamiliareForm = (function () {
         }
 
         function updateMainButtons() {
-            refreshFamigliaNavigation();
             refreshRelazioneButtons();
             refreshIndirizzoButtons();
         }
@@ -1678,6 +1677,7 @@ window.ArborisFamiliareForm = (function () {
             card.classList.add("is-card-editing");
             initEditorEnhancements(editor);
             studentiInlineAddressDefaults.bindTracking(editor);
+            personRules.bindAvatarToSex({ root: card, kind: "student" });
             studentiInlineAddressDefaults.refreshCollectionHelp(editor);
             wireStudentCardActions(editor);
             refreshRelativePageActionLocks();
@@ -1726,6 +1726,7 @@ window.ArborisFamiliareForm = (function () {
             card.appendChild(editor);
             card.classList.add("is-card-editing");
             initEditorEnhancements(editor);
+            personRules.bindAvatarToSex({ root: card, kind: "relative" });
             personRules.bindSexFromRelation({
                 relationSelect: row.querySelector('select[name$="-relazione_familiare"]'),
                 sexSelect: subformRow ? subformRow.querySelector('select[name$="-sesso"]') : null,
@@ -2905,6 +2906,11 @@ window.ArborisFamiliareForm = (function () {
         }
         bindStandaloneSexFromRelazioneFamiliare();
         bindScambioRettaNavigation();
+        personRules.bindAvatarToSex({
+            sexSelect: document.getElementById("id_sesso"),
+            avatar: ".relative-overview-avatar",
+            kind: "relative",
+        });
         syncEducatorClassField(document);
         initRelativeNoteDialog();
         bindRelativeWorkInlineTabs();

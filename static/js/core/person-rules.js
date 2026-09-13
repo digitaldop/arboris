@@ -1,4 +1,42 @@
 window.ArborisPersonRules = (function () {
+    const avatarBindings = new WeakMap();
+
+    function bindAvatarToSex(options) {
+        options = options || {};
+        const root = options.root || document;
+        const sexSelect = resolveElement(options.sexSelect || 'select[name="sesso"], select[name$="-sesso"]', root);
+        const avatar = resolveElement(options.avatar || ".family-person-avatar, .family-avatar-illustration", root);
+        const use = avatar ? avatar.querySelector("use") : null;
+
+        function sync() {
+            if (!sexSelect || !use) {
+                return;
+            }
+
+            const symbols = options.kind === "student"
+                ? { F: "avatar-girl", M: "avatar-boy" }
+                : { F: "avatar-woman", M: "avatar-man" };
+            const symbol = symbols[sexSelect.value] || "avatar-child";
+            const sprite = (use.getAttribute("href") || "").split("#")[0];
+            use.setAttribute("href", `${sprite}#${symbol}`);
+        }
+
+        if (sexSelect && use) {
+            // Fields are moved between the table and card when an editor is reopened.
+            const previousSync = avatarBindings.get(sexSelect);
+            if (previousSync) {
+                sexSelect.removeEventListener("input", previousSync);
+                sexSelect.removeEventListener("change", previousSync);
+            }
+            sexSelect.addEventListener("input", sync);
+            sexSelect.addEventListener("change", sync);
+            avatarBindings.set(sexSelect, sync);
+        }
+
+        sync();
+        return { sync: sync };
+    }
+
     function normalizeText(value) {
         return (value || "")
             .toString()
@@ -256,6 +294,7 @@ window.ArborisPersonRules = (function () {
     }
 
     return {
+        bindAvatarToSex: bindAvatarToSex,
         applyInferredSex: applyInferredSex,
         bindSexFromFirstName: bindSexFromFirstName,
         bindTrackedSexFromFirstName: bindTrackedSexFromFirstName,

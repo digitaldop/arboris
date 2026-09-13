@@ -2821,6 +2821,7 @@ window.ArborisFamigliaForm = (function () {
             card.classList.add("is-card-editing");
             card.dataset.studentCardEditing = "1";
             refreshStudentCardInteractionLocks();
+            personRules.bindAvatarToSex({ root: card, kind: "student" });
 
             formTools.initSearchableSelects(editor);
             formTools.initCodiceFiscale(editor);
@@ -3320,6 +3321,7 @@ window.ArborisFamigliaForm = (function () {
             card.appendChild(editor);
             card.classList.add("is-card-editing");
             card.dataset.relativeCardEditing = "1";
+            personRules.bindAvatarToSex({ root: card, kind: "relative" });
 
             formTools.initSearchableSelects(editor);
             formTools.initCodiceFiscale(editor);

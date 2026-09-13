@@ -3226,6 +3226,9 @@ window.ArborisStudenteForm = (function () {
             card.appendChild(editor);
             card.classList.add("is-card-editing");
             initEditorEnhancements(editor);
+            if (personRules) {
+                personRules.bindAvatarToSex({ root: card, kind: "relative" });
+            }
             if (personRules && typeof personRules.bindSexFromRelation === "function") {
                 personRules.bindSexFromRelation({
                     relationSelect: relationSelect,
@@ -4298,6 +4301,13 @@ window.ArborisStudenteForm = (function () {
         refreshStudentPageActionLocks();
         bindRateRecalcForms();
         bindStandaloneSexFromNome();
+        if (personRules) {
+            personRules.bindAvatarToSex({
+                sexSelect: document.getElementById("id_sesso"),
+                avatar: ".student-overview-avatar",
+                kind: "student",
+            });
+        }
         bindParentSuggestionsBySurname();
         bindStudentAddressSuggestion();
         bindStudentLazySectionLoading();

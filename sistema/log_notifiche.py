@@ -31,7 +31,8 @@ def nuove_operazioni(user):
         ultimo_id = SistemaOperazioneCronologia.objects.aggregate(ultimo=Max("pk"))["ultimo"] or 0
         stato, _ = SistemaLogStatoLettura.objects.get_or_create(user=user, defaults={"storico_fino_id": ultimo_id})
     letture = SistemaLogLettura.objects.filter(user=user, operazione_id=OuterRef("pk"))
-    return operazioni_utente().filter(pk__gt=stato.storico_fino_id).annotate(letta=Exists(letture))
+    # Il menu rapido riguarda gli altri account; la cronologia resta completa.
+    return operazioni_utente().exclude(utente=user).filter(pk__gt=stato.storico_fino_id).annotate(letta=Exists(letture))
 
 
 def riepilogo_log(user):
