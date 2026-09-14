@@ -7,7 +7,8 @@
     <title>Accedi - Arboris School Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet"></noscript>
     <style>
         :root {
             --font-body: {{ site_fonts.body_css_stack|safe }};
@@ -16,7 +17,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=48">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=304">
     <link rel="stylesheet" href="{% static 'css/site-fonts.css' %}?v=1">
 </head>
 <body class="login-page">

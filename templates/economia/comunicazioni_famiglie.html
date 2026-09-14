@@ -7,13 +7,15 @@
     <div class="breadcrumb">
         <a href="{% url 'home' %}">Home</a>
         <span class="breadcrumb-sep">&gt;</span>
-        <span>Gestione Economica</span>
+        <span>Anagrafiche</span>
         <span class="breadcrumb-sep">&gt;</span>
         <span>Comunicazioni alle famiglie</span>
     </div>
 {% endblock %}
 
 {% block content %}
+    <link rel="stylesheet" href="{% static 'css/family-communication-filters.css' %}?v=1">
+    <script defer src="{% static 'js/core/family-communications.js' %}?v=2"></script>
     <div class="family-communication-shell">
         <div class="page-head settings-page-head">
             <div class="page-head-title-block">
@@ -71,6 +73,8 @@
 
         <form method="post" id="family-communication-form" class="family-communication-form">
             {% csrf_token %}
+            <input type="hidden" name="selezione_presentata" value="1">
+            {% for anno in anni_selezionati %}<input type="hidden" name="anni_destinatari" value="{{ anno.pk }}">{% endfor %}
             {{ form.non_field_errors }}
 
             <section class="settings-card">
@@ -94,6 +98,7 @@
                     {% endfor %}
                 </div>
                 {{ form.anni_scolastici.errors }}
+                <p class="family-communication-filter-notice" data-years-changed hidden>Gli anni scolastici sono cambiati. Aggiorna i destinatari prima di inviare.</p>
                 <div class="family-communication-actions-row">
                     <button type="submit" name="action" value="preview" class="btn btn-secondary btn-icon-text">
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#refresh"></use></svg></span>
@@ -102,11 +107,26 @@
                 </div>
             </section>
 
-            <section class="family-communication-kpi-grid" aria-label="Riepilogo destinatari">
+            <section class="settings-card family-communication-class-filters" aria-labelledby="class-filter-title">
+                <div class="settings-card-head">
+                    <span class="settings-card-icon is-green" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#student"></use></svg></span>
+                    <div><h2 id="class-filter-title">Seleziona per classe</h2>
+                    <p>Scegli una o più classi per selezionare i relativi destinatari. Puoi poi escludere singole persone.</p></div>
+                </div>
+                <fieldset class="family-communication-filter-mode"><legend>{{ form.ambito_destinatari.label }}</legend>{{ form.ambito_destinatari }}{{ form.ambito_destinatari.errors }}</fieldset>
+                <fieldset class="family-communication-class-options"><legend>{{ form.classi.label }}</legend>
+                    {% for checkbox in form.classi %}<label class="family-communication-class-option">{{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span></label>
+                    {% empty %}<p class="table-muted">Nessuna classe disponibile per gli anni e le iscrizioni selezionati.</p>{% endfor %}
+                </fieldset>
+                {{ form.classi.errors }}
+                <div class="family-communication-actions-row"><button type="submit" name="action" value="preview" class="btn btn-secondary">Applica filtri</button></div>
+            </section>
+
+            <section class="family-communication-kpi-grid" aria-label="Riepilogo destinatari nel filtro">
                 <article class="system-user-kpi-card">
                     <div class="system-user-kpi-copy">
                         <span class="system-user-kpi-label">Studenti</span>
-                        <strong class="system-user-kpi-value">{{ statistiche.studenti }}</strong>
+                        <strong class="system-user-kpi-value" data-recipient-stat="studenti">{{ statistiche.studenti }}</strong>
                         <span class="system-user-kpi-note">Iscrizioni considerate</span>
                     </div>
                     <span class="system-user-kpi-icon is-blue" aria-hidden="true">
@@ -116,7 +136,7 @@
                 <article class="system-user-kpi-card">
                     <div class="system-user-kpi-copy">
                         <span class="system-user-kpi-label">Destinatari</span>
-                        <strong class="system-user-kpi-value is-green">{{ statistiche.destinatari }}</strong>
+                        <strong class="system-user-kpi-value is-green" data-recipient-stat="destinatari">{{ statistiche.destinatari }}</strong>
                         <span class="system-user-kpi-note">Checkbox disponibili</span>
                     </div>
                     <span class="system-user-kpi-icon is-green" aria-hidden="true">
@@ -126,8 +146,8 @@
                 <article class="system-user-kpi-card">
                     <div class="system-user-kpi-copy">
                         <span class="system-user-kpi-label">Email uniche</span>
-                        <strong class="system-user-kpi-value is-amber">{{ statistiche.email_uniche }}</strong>
-                        <span class="system-user-kpi-note">Invii singoli reali</span>
+                        <strong class="system-user-kpi-value is-amber" data-recipient-stat="email_uniche">{{ statistiche.email_uniche }}</strong>
+                        <span class="system-user-kpi-note">Nel filtro corrente</span>
                     </div>
                     <span class="system-user-kpi-icon is-amber" aria-hidden="true">
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#check"></use></svg>
@@ -136,8 +156,8 @@
                 <article class="system-user-kpi-card">
                     <div class="system-user-kpi-copy">
                         <span class="system-user-kpi-label">Duplicati</span>
-                        <strong class="system-user-kpi-value is-purple">{{ statistiche.duplicati }}</strong>
-                        <span class="system-user-kpi-note">Saltati in invio</span>
+                        <strong class="system-user-kpi-value is-purple" data-recipient-stat="duplicati">{{ statistiche.duplicati }}</strong>
+                        <span class="system-user-kpi-note">Nel filtro corrente</span>
                     </div>
                     <span class="system-user-kpi-icon is-purple" aria-hidden="true">
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
@@ -155,7 +175,7 @@
                         <p>Se la stessa email compare piu volte, Arboris la mostra dove serve ma invia una sola email a quell'indirizzo.</p>
                     </div>
                     <div class="family-communication-selection-actions">
-                        <button type="button" class="btn btn-secondary" data-recipient-action="select-all">Seleziona tutti</button>
+                        <button type="button" class="btn btn-secondary" data-recipient-action="select-all">Seleziona tutti nel filtro</button>
                         <button type="button" class="btn btn-secondary" data-recipient-action="clear-all">Deseleziona tutti</button>
                     </div>
                 </div>
@@ -163,10 +183,12 @@
                 <div class="family-communication-alert">
                     <strong>Nota sui duplicati.</strong> L'invio e singolo per indirizzo email: un genitore collegato a piu studenti ricevera una sola copia della comunicazione.
                 </div>
+                <p class="family-communication-selection-summary" role="status" data-selection-summary>Destinatari selezionati: {{ selected_keys|length }}.</p>
+                <p class="family-communication-empty" data-no-recipients {% if statistiche.studenti %}hidden{% endif %}>Nessuna iscrizione nel filtro. Seleziona una classe oppure scegli Tutte le classi.</p>
 
                 <div class="family-communication-recipient-list" data-recipient-list>
                     {% for gruppo in gruppi_destinatari %}
-                        <article class="family-communication-student-card">
+                        <article class="family-communication-student-card" data-recipient-classes="{{ gruppo.classi_tokens }}" {% if not gruppo.visibile %}hidden{% endif %}>
                             <header>
                                 <div>
                                     <strong>{{ gruppo.studente_label }}</strong>
@@ -183,6 +205,7 @@
                                                 name="destinatari"
                                                 value="{{ destinatario.key }}"
                                                 data-recipient-email="{{ destinatario.email }}"
+                                                {% if not gruppo.visibile %}disabled{% endif %}
                                                 {% if destinatario.key in selected_keys %}checked{% endif %}
                                             >
                                             <span class="family-communication-recipient-main">
@@ -190,11 +213,7 @@
                                                 <span>{{ destinatario.relazione_label }}{% if destinatario.referente_principale %} - referente principale{% endif %}</span>
                                             </span>
                                             <span class="family-communication-recipient-email">{{ destinatario.email }}</span>
-                                            {% if destinatario.duplicato %}
-                                                <span class="family-communication-chip">Invio singolo</span>
-                                            {% else %}
-                                                <span class="family-communication-chip family-communication-chip-placeholder" aria-hidden="true">Invio singolo</span>
-                                            {% endif %}
+                                            <span data-duplicate-chip class="family-communication-chip{% if not destinatario.duplicato %} family-communication-chip-placeholder{% endif %}" {% if not destinatario.duplicato %}aria-hidden="true"{% endif %}>Invio singolo</span>
                                         </label>
                                     {% endfor %}
                                 </div>
@@ -254,76 +273,4 @@
         </form>
     </div>
 
-    <script>
-        (function () {
-            var MAX_MAILTO_LENGTH = 1800;
-
-            function getSelectedEmails() {
-                var emails = [];
-                var seen = new Set();
-                document.querySelectorAll('input[name="destinatari"]:checked').forEach(function (checkbox) {
-                    var email = (checkbox.getAttribute("data-recipient-email") || "").trim();
-                    var key = email.toLowerCase();
-                    if (!email || seen.has(key)) {
-                        return;
-                    }
-                    seen.add(key);
-                    emails.push(email);
-                });
-                return emails;
-            }
-
-            function buildMailto(emails, subject, body, includeBody) {
-                var params = ["bcc=" + encodeURIComponent(emails.join(","))];
-                if (subject) {
-                    params.push("subject=" + encodeURIComponent(subject));
-                }
-                if (includeBody && body) {
-                    params.push("body=" + encodeURIComponent(body));
-                }
-                return "mailto:?" + params.join("&");
-            }
-
-            document.addEventListener("click", function (event) {
-                var button = event.target.closest("[data-recipient-action]");
-                if (!button) {
-                    return;
-                }
-                var list = document.querySelector("[data-recipient-list]");
-                if (!list) {
-                    return;
-                }
-                var checked = button.getAttribute("data-recipient-action") === "select-all";
-                list.querySelectorAll('input[name="destinatari"]').forEach(function (checkbox) {
-                    checkbox.checked = checked;
-                });
-            });
-
-            document.addEventListener("click", function (event) {
-                var button = event.target.closest("[data-open-mail-client]");
-                if (!button) {
-                    return;
-                }
-                var emails = getSelectedEmails();
-                if (!emails.length) {
-                    window.alert("Seleziona almeno un destinatario.");
-                    return;
-                }
-
-                var subjectField = document.querySelector('[name="{{ form.oggetto.html_name }}"]');
-                var messageField = document.querySelector('[name="{{ form.messaggio.html_name }}"]');
-                var subject = subjectField ? subjectField.value.trim() : "";
-                var body = messageField ? messageField.value.trim() : "";
-                var mailtoUrl = buildMailto(emails, subject, body, true);
-                if (mailtoUrl.length > MAX_MAILTO_LENGTH && body) {
-                    mailtoUrl = buildMailto(emails, subject, "", false);
-                }
-                if (mailtoUrl.length > MAX_MAILTO_LENGTH) {
-                    window.alert("Troppi indirizzi per aprire il client email tramite link. Riduci la selezione oppure usa l'invio da Arboris.");
-                    return;
-                }
-                window.location.href = mailtoUrl;
-            });
-        })();
-    </script>
 {% endblock %}

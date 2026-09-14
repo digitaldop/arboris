@@ -180,7 +180,10 @@
                                         {% if ruolo.accesso_backup_database %}
                                             <span class="system-role-chip is-amber">Backup</span>
                                         {% endif %}
-                                        {% if not ruolo.controllo_completo and not ruolo.amministratore_operativo and not ruolo.accesso_backup_database %}
+                                        {% if ruolo.accesso_comunicazioni_famiglie %}
+                                            <span class="system-role-chip is-green">Comunicazioni alle famiglie</span>
+                                        {% endif %}
+                                        {% if not ruolo.controllo_completo and not ruolo.amministratore_operativo and not ruolo.accesso_backup_database and not ruolo.accesso_comunicazioni_famiglie %}
                                             <span class="table-muted">-</span>
                                         {% endif %}
                                     </div>

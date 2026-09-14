@@ -109,6 +109,9 @@ def should_track_model(model):
         ("sistema", "sistemalogstatolettura"),
         ("sistema", "sistemaloglettura"),
         ("gestione_finanziaria", "notificafinanziarialettura"),
+        ("gestione_finanziaria", "richiestaanalisiriconciliazione"),
+        ("gestione_finanziaria", "statoanalisiriconciliazione"),
+        ("gestione_finanziaria", "propostariconciliazione"),
     }:
         return False
 

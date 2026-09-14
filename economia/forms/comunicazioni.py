@@ -4,6 +4,15 @@ from scuola.models import AnnoScolastico
 
 
 class ComunicazioneFamiglieForm(forms.Form):
+    ambito_destinatari = forms.ChoiceField(
+        label="Destinatari per classe",
+        choices=(("tutti", "Tutte le classi"), ("classi", "Classi selezionate")),
+        initial="tutti", required=False, widget=forms.RadioSelect,
+    )
+    classi = forms.MultipleChoiceField(
+        label="Classi e pluriclassi", choices=(), required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
     anni_scolastici = forms.ModelMultipleChoiceField(
         label="Anni scolastici",
         queryset=AnnoScolastico.objects.none(),
@@ -28,3 +37,10 @@ class ComunicazioneFamiglieForm(forms.Form):
             "-data_inizio",
             "-id",
         )
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned["ambito_destinatari"] = cleaned.get("ambito_destinatari") or "tutti"
+        if cleaned["ambito_destinatari"] == "classi" and not cleaned.get("classi"):
+            self.add_error("classi", "Seleziona almeno una classe oppure scegli Tutte le classi.")
+        return cleaned

@@ -3,6 +3,7 @@ from django.urls import path
 from sistema.permissions import module_edit_permission_required, module_permission_required
 
 from . import views
+from . import reconciliation_views
 
 
 gf_view = module_permission_required("gestione_finanziaria")
@@ -11,6 +12,9 @@ gf_edit = module_edit_permission_required("gestione_finanziaria")
 
 
 urlpatterns = [
+    path("gestione-finanziaria/proposte/", reconciliation_views.review, name="proposte_riconciliazione"),
+    path("gestione-finanziaria/proposte/stato/", reconciliation_views.status, name="stato_proposte_riconciliazione"),
+    path("gestione-finanziaria/proposte/decidi/", reconciliation_views.decide, name="decidi_proposte_riconciliazione"),
     path(
         "gestione-finanziaria/",
         gf_view(views.dashboard_gestione_finanziaria),

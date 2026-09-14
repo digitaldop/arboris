@@ -1,6 +1,6 @@
 from .audit import reset_current_audit_user, set_current_audit_user
 from .audit_accessi import log_page_view
-from .database_backups import maybe_run_scheduled_backup
+from .backup_scheduler import trigger_due_backup_check_async
 
 
 class AuditUserMiddleware:
@@ -29,6 +29,6 @@ class DatabaseBackupScheduleMiddleware:
         if request.method in {"GET", "HEAD", "OPTIONS"} and response.status_code < 500:
             path = request.path or ""
             if not path.startswith("/admin/") and not path.startswith("/media/") and not path.startswith("/static/"):
-                maybe_run_scheduled_backup(getattr(request, "user", None))
+                trigger_due_backup_check_async(getattr(request, "user", None))
 
         return response

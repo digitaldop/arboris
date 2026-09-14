@@ -125,7 +125,10 @@ window.ArborisRichNotes = (function () {
 
         const hasContent = Boolean((textarea.value || "").trim());
         const isOpen = wrapper.classList.contains("is-open");
-        status.textContent = hasContent ? "Note presenti" : (isOpen ? "Nessuna nota" : "Clicca per espandere");
+        const label = hasContent ? "Note presenti" : (isOpen ? "Nessuna nota" : "Clicca per espandere");
+        if (status.textContent !== label) {
+            status.textContent = label;
+        }
     }
 
     function setPopupNoteCollapsedState(wrapper, isOpen) {
@@ -286,7 +289,9 @@ window.ArborisRichNotes = (function () {
 
     function setEditorHtml(editor, value) {
         const html = renderRichNotesHtml(value);
-        editor.innerHTML = html || "";
+        if (editor.innerHTML !== html) {
+            editor.innerHTML = html;
+        }
     }
 
     function syncTextareaFromEditor(textarea) {
@@ -519,8 +524,7 @@ window.ArborisRichNotes = (function () {
         });
 
         textarea.addEventListener("input", function () {
-            syncEditorFromTextarea(textarea, false);
-            updatePopupNoteStatus(wrapper, textarea);
+            refreshTextarea(textarea);
         });
 
         textarea.classList.add("rich-note-source");
@@ -571,7 +575,11 @@ window.ArborisRichNotes = (function () {
         preview.hidden = !readonly;
 
         if (readonly) {
-            preview.innerHTML = renderRichNotesHtml(textarea.value || "");
+            const value = textarea.value || "";
+            if (preview._richNotesValue !== value) {
+                preview.innerHTML = renderRichNotesHtml(value);
+                preview._richNotesValue = value;
+            }
         }
     }
 
@@ -603,15 +611,28 @@ window.ArborisRichNotes = (function () {
             return;
         }
 
-        observer = new MutationObserver(function () {
-            queueRefresh();
+        observer = new MutationObserver(function (mutations) {
+            // Ignore editor/preview rendering and unrelated page changes. Only
+            // new fields and changes to readonly state need another refresh.
+            const needsRefresh = mutations.some(function (mutation) {
+                if (mutation.type === "attributes") {
+                    return mutation.target.matches("textarea, fieldset");
+                }
+                return Array.from(mutation.addedNodes).some(function (node) {
+                    return node.nodeType === Node.ELEMENT_NODE &&
+                        (node.matches("textarea") || node.querySelector("textarea"));
+                });
+            });
+            if (needsRefresh) {
+                queueRefresh();
+            }
         });
 
         observer.observe(document.body, {
             subtree: true,
             childList: true,
             attributes: true,
-            attributeFilter: ["disabled", "readonly", "class"],
+            attributeFilter: ["disabled", "readonly"],
         });
     }
 

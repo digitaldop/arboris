@@ -625,6 +625,7 @@ class AjaxCercaCittaTests(TestCase):
         francia, _ = Nazione.objects.update_or_create(
             nome="Francia",
             defaults={
+                "nome_nazionalita": "Francese",
                 "codice_iso2": "FR",
                 "codice_iso3": "FRA",
                 "codice_belfiore": "Z110",
@@ -644,6 +645,17 @@ class AjaxCercaCittaTests(TestCase):
         self.assertEqual(result["codice_catastale"], "Z110")
         self.assertEqual(result["nazionalita_id"], francia.pk)
         self.assertEqual(result["nazionalita_label"], "Francese")
+
+    def test_ajax_cerca_citta_leaves_missing_nationality_empty(self):
+        nazione = Nazione.objects.create(nome="Zanzibar", nome_nazionalita="", attiva=True)
+
+        response = self.client.get(reverse("ajax_cerca_citta"), {"q": "Zanzibar", "include_nazioni": "1"})
+
+        self.assertEqual(response.status_code, 200)
+        result = next(result for result in response.json()["results"] if result["type"] == "nazione")
+        self.assertEqual(result["id"], nazione.pk)
+        self.assertEqual(result["nazionalita_id"], "")
+        self.assertEqual(result["nazionalita_label"], "")
 
     def test_crea_indirizzo_page_renders(self):
         response = self.client.get(reverse("crea_indirizzo"))
@@ -2320,17 +2332,23 @@ class IscrizioneInlineDefaultsTests(TestCase):
             numero_mensilita_default=10,
             attiva=True,
         )
-        CondizioneIscrizione.objects.create(
+        condizione_futura = CondizioneIscrizione.objects.create(
             anno_scolastico=anno_futuro,
             nome_condizione_iscrizione="A - Retta futura",
             numero_mensilita_default=10,
             attiva=True,
         )
 
-        form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
+        for today, anno, condizione in (
+            (date(2026, 2, 15), anno_corrente, prima_condizione),
+            (date(2026, 8, 31), anno_corrente, prima_condizione),
+            (date(2026, 9, 1), anno_futuro, condizione_futura),
+        ):
+            with self.subTest(today=today), patch("scuola.utils.timezone.localdate", return_value=today):
+                form = IscrizioneStudenteInlineForm(prefix="iscrizioni-0")
 
-        self.assertEqual(form.initial["anno_scolastico"], anno_corrente.pk)
-        self.assertEqual(form.initial["condizione_iscrizione"], prima_condizione.pk)
+                self.assertEqual(form.initial["anno_scolastico"], anno.pk)
+                self.assertEqual(form.initial["condizione_iscrizione"], condizione.pk)
 
     def test_iscrizione_inline_empty_extra_row_ignores_default_condition(self):
         anno = AnnoScolastico.objects.create(

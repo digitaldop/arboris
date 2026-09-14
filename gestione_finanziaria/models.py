@@ -1645,6 +1645,61 @@ class SincronizzazioneLog(models.Model):
 # =========================================================================
 
 
+class RichiestaAnalisiRiconciliazione(models.Model):
+    """Durable, coalesced work; deleted only when its transaction succeeds."""
+
+    tipo = models.CharField(max_length=20)
+    oggetto_id = models.PositiveBigIntegerField()
+    richiesta_il = models.DateTimeField(default=timezone.now)
+    riprova_il = models.DateTimeField(default=timezone.now, db_index=True)
+    tentativi = models.PositiveIntegerField(default=0)
+    errore = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tipo", "oggetto_id"], name="gf_analisi_oggetto_unique")]
+
+
+class StatoAnalisiRiconciliazione(models.Model):
+    """The singleton row serializes workers and proposal decisions across processes."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+
+
+class PropostaRiconciliazione(models.Model):
+    class Stato(models.TextChoices):
+        APERTA = "aperta", "Da verificare"
+        CONFERMATA = "confermata", "Confermata"
+        RIFIUTATA = "rifiutata", "Rifiutata"
+        SUPERATA = "superata", "Da aggiornare"
+
+    chiave = models.CharField(max_length=64, unique=True)
+    abbinamento = models.CharField(max_length=64, db_index=True)
+    caso = models.CharField(max_length=80, db_index=True)
+    ambito = models.CharField(max_length=16, choices=[("rate", "Rette"), ("fornitore", "Fornitori")])
+    stato = models.CharField(max_length=16, choices=Stato.choices, default=Stato.APERTA, db_index=True)
+    compatibilita = models.PositiveSmallIntegerField(default=0)
+    motivazioni = models.JSONField(default=list)
+    allocazioni = models.JSONField(default=list)
+    dati_verifica = models.JSONField(default=dict)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+    data_aggiornamento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-compatibilita", "-id"]
+        indexes = [models.Index(fields=["stato", "ambito", "caso"], name="gf_proposta_casi_idx")]
+
+
+class DecisionePropostaRiconciliazione(models.Model):
+    proposta = models.ForeignKey(PropostaRiconciliazione, on_delete=models.CASCADE, related_name="decisioni")
+    azione = models.CharField(max_length=16)
+    utente = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    data = models.DateTimeField(default=timezone.now)
+    dettaglio = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-data", "-id"]
+
+
 class TipoNotificaFinanziaria(models.TextChoices):
     FATTURA_RICEVUTA = "fattura_ricevuta", "Fattura ricevuta"
     MOVIMENTO_BANCARIO = "movimento_bancario", "Movimento bancario"

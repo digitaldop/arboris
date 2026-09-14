@@ -43,8 +43,6 @@ from .fic_rate_limits import retry_after_seconds, sync_retry_at
 from .services import (
     aggiorna_stato_documento_da_scadenze,
     crea_notifica_finanziaria,
-    riconcilia_movimento_con_scadenza_fornitore,
-    trova_movimenti_candidati_per_scadenza_fornitore,
 )
 from .fatture_in_cloud_xml import (
     content_kind,
@@ -2182,37 +2180,11 @@ def _sync_document_deadlines(documento, deadlines, *, clear_existing=False):
 
 
 def _auto_reconcile_imported_supplier_deadlines(documento, *, utente=None):
-    pagamenti_creati = 0
-    scadenze = documento.scadenze.select_related("documento", "documento__fornitore").order_by("data_scadenza", "id")
-    for scadenza in scadenze:
-        if scadenza.importo_residuo <= Decimal("0.00"):
-            continue
-        candidati = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=3, allow_fuzzy=False)
-        if not candidati:
-            continue
+    """Legacy callers now queue suggestions requiring a human decision."""
+    from .reconciliation_queue import enqueue_analysis
 
-        top_score = candidati[0].score
-        migliori = [candidato for candidato in candidati if candidato.score == top_score]
-        if top_score < FIC_AUTO_MATCH_MIN_SCORE or len(migliori) != 1:
-            continue
-
-        candidato = migliori[0]
-        importo = min(candidato.importo_disponibile, scadenza.importo_residuo)
-        if abs(importo - scadenza.importo_residuo) > Decimal("0.01"):
-            continue
-
-        try:
-            riconcilia_movimento_con_scadenza_fornitore(
-                candidato.movimento,
-                scadenza,
-                importo=importo,
-                utente=utente,
-                note="Riconciliazione automatica da import Fatture in Cloud",
-            )
-        except ValidationError:
-            continue
-        pagamenti_creati += 1
-    return pagamenti_creati
+    enqueue_analysis("documento", documento.pk)
+    return 0
 
 
 def _update_document_fields(documento, document_data, fornitore, pending, *, source_doc_type=None):
@@ -2391,7 +2363,8 @@ def importa_documento_fatture_in_cloud(connessione, document_data, *, pending=Fa
             _payment_deadlines(document_data, source_doc_type),
             clear_existing=is_credit_note,
         )
-        pagamenti_auto = 0 if is_credit_note else _auto_reconcile_imported_supplier_deadlines(documento, utente=utente)
+        # Deadline signals queue analysis; importing must never infer a payment.
+        pagamenti_auto = 0
         aggiorna_stato_documento_da_scadenze(documento)
     _notifica, notifica_created = crea_notifica_finanziaria(
         titolo="Nuova nota di credito ricevuta" if is_credit_note and created else (

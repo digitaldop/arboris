@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
 
-from anagrafica.family_logic import iter_logical_family_snapshots, logical_family_summary_for_person
+from anagrafica.family_logic import iter_logical_family_snapshots
 from anagrafica.models import Documento, Familiare, Studente, StudenteFamiliare
 from archivio_storico.models import ArchivioAnnoScolastico, ArchivioSnapshot, TipoSnapshotStorico
 from economia.models import Iscrizione, RataIscrizione, TariffaCondizioneIscrizione
@@ -168,6 +168,35 @@ def build_archivio_snapshots(archivio):
     for iscrizione in iscrizioni:
         studenti_by_id[iscrizione.studente_id] = iscrizione.studente
 
+    family_labels_by_student = {}
+    family_labels_by_relative = {}
+    for famiglia in iter_logical_family_snapshots():
+        if not famiglia.student_ids.intersection(studenti_by_id):
+            continue
+        label = f"Famiglia {famiglia.cognome_famiglia}" if famiglia.cognome_famiglia else "Famiglia logica"
+        family_labels_by_student.update(dict.fromkeys(famiglia.student_ids, label))
+        family_labels_by_relative.update(dict.fromkeys(famiglia.familiare_ids, label))
+        ordine += 1
+        # Logical families are connected groups, with no database model of their own.
+        # Freeze their membership so later relationship edits cannot alter the archive.
+        snapshots.append(
+            ArchivioSnapshot(
+                archivio=archivio,
+                tipo=TipoSnapshotStorico.FAMIGLIA,
+                source_app_label="anagrafica",
+                source_model="famiglia_logica",
+                source_pk=famiglia.logical_key,
+                titolo=label,
+                dati={
+                    "cognome_famiglia": famiglia.cognome_famiglia,
+                    "studenti": "; ".join(str(studente) for studente in famiglia.studenti),
+                    "familiari": "; ".join(str(familiare) for familiare in famiglia.familiari),
+                    "indirizzo": address_label(famiglia.indirizzo_principale),
+                },
+                ordine=ordine,
+            )
+        )
+
     studenti = sorted(studenti_by_id.values(), key=lambda item: ((item.cognome or "").lower(), (item.nome or "").lower(), item.pk))
     familiari_ids = set(
         StudenteFamiliare.objects.filter(studente_id__in=studenti_by_id.keys(), attivo=True)
@@ -189,12 +218,12 @@ def build_archivio_snapshots(archivio):
                 TipoSnapshotStorico.FAMILIARE,
                 str(familiare),
                 {
-                    "famiglia": logical_family_summary_for_person(familiare)["label"],
+                    "famiglia": family_labels_by_relative.get(familiare.pk, ""),
                     "nome": familiare.nome,
                     "cognome": familiare.cognome,
                     "relazione": str(familiare.relazione_familiare) if familiare.relazione_familiare_id else "",
                     "data_nascita": familiare.data_nascita,
-                    "luogo_nascita": str(familiare.luogo_nascita) if familiare.luogo_nascita_id else "",
+                    "luogo_nascita": str(familiare.luogo_nascita) if familiare.luogo_nascita else "",
                     "codice_fiscale": familiare.codice_fiscale,
                     "telefono": familiare.telefono,
                     "email": familiare.email,
@@ -216,7 +245,7 @@ def build_archivio_snapshots(archivio):
                 TipoSnapshotStorico.STUDENTE,
                 str(studente),
                 {
-                    "famiglia": logical_family_summary_for_person(studente)["label"],
+                    "famiglia": family_labels_by_student.get(studente.pk, ""),
                     "nome": studente.nome,
                     "cognome": studente.cognome,
                     "data_nascita": studente.data_nascita,
@@ -241,7 +270,7 @@ def build_archivio_snapshots(archivio):
                 str(iscrizione),
                 {
                     "studente": str(iscrizione.studente),
-                    "famiglia": logical_family_summary_for_person(iscrizione.studente)["label"],
+                    "famiglia": family_labels_by_student.get(iscrizione.studente_id, ""),
                     "classe": str(iscrizione.classe) if iscrizione.classe_id else "",
                     "pluriclasse": (
                         iscrizione.gruppo_classe.nome_gruppo_classe if iscrizione.gruppo_classe_id else ""
@@ -273,7 +302,7 @@ def build_archivio_snapshots(archivio):
                     f"{rata.display_label} - {iscrizione.studente}",
                     {
                         "studente": str(iscrizione.studente),
-                        "famiglia": logical_family_summary_for_person(iscrizione.studente)["label"],
+                        "famiglia": family_labels_by_student.get(iscrizione.studente_id, ""),
                         "iscrizione": str(iscrizione),
                         "tipo_rata": rata.get_tipo_rata_display(),
                         "numero_rata": rata.numero_rata,

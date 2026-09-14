@@ -46,7 +46,7 @@
                 <h2>{{ log.oggetto }}</h2>
                 <p>
                     Operatore:
-                    {{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username|default:"Sistema" }}
+                    {% if log.utente %}{{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username }}{% else %}Sistema{% endif %}
                     - Stato: {{ log.get_stato_display }}
                 </p>
             </div>

@@ -7,9 +7,9 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from anagrafica.models import Famiglia, StatoRelazioneFamiglia, Studente
+from anagrafica.models import Citta, Familiare, Provincia, Studente, StudenteFamiliare
 from archivio_storico.models import ArchivioAnnoScolastico, ArchivioSnapshot, TipoSnapshotStorico
-from archivio_storico.services import anno_scolastico_archiviabile, archivia_anno_scolastico
+from archivio_storico.services import anno_scolastico_archiviabile, archivia_anno_scolastico, get_archiviazione_preview
 from economia.models import CondizioneIscrizione, Iscrizione, StatoIscrizione, TariffaCondizioneIscrizione
 from osservazioni.models import OsservazioneStudente
 from scuola.models import AnnoScolastico, Classe
@@ -50,15 +50,18 @@ class ArchivioStoricoTests(TestCase):
             attivo=True,
         )
 
-        stato_famiglia = StatoRelazioneFamiglia.objects.create(stato="Iscritta", ordine=1, attivo=True)
-        self.famiglia = Famiglia.objects.create(cognome_famiglia="Bianchi", stato_relazione_famiglia=stato_famiglia)
         self.studente = Studente.objects.create(
-            famiglia=self.famiglia,
             nome="Luca",
             cognome="Bianchi",
             data_nascita=date(today.year - 7, 1, 15),
             codice_fiscale="BNCLCU19A01A944X",
             note="Note studente da congelare.",
+        )
+        self.familiare = Familiare.objects.create(nome="Anna", cognome="Bianchi")
+        self.relazione = StudenteFamiliare.objects.create(
+            studente=self.studente,
+            familiare=self.familiare,
+            referente_principale=True,
         )
         self.classe = Classe.objects.create(
             nome_classe="Primavera",
@@ -126,6 +129,72 @@ class ArchivioStoricoTests(TestCase):
                 dati__codice_fiscale="BNCLCU19A01A944X",
             ).exists()
         )
+        famiglia = archivio.snapshot.get(tipo=TipoSnapshotStorico.FAMIGLIA)
+        self.assertEqual(famiglia.titolo, "Famiglia Bianchi")
+        self.assertEqual(famiglia.source_pk, f"s-{self.studente.pk}")
+        self.assertEqual(famiglia.dati["studenti"], str(self.studente))
+        self.assertEqual(famiglia.dati["familiari"], str(self.familiare))
+        dati_congelati = famiglia.dati.copy()
+
+        self.studente.cognome = "Rossi"
+        self.studente.save()
+        self.familiare.cognome = "Verdi"
+        self.familiare.save()
+        self.relazione.delete()
+
+        famiglia.refresh_from_db()
+        self.assertEqual(famiglia.titolo, "Famiglia Bianchi")
+        self.assertEqual(famiglia.dati, dati_congelati)
+        self.assertEqual(
+            set(archivio.snapshot.filter(tipo__in=[
+                TipoSnapshotStorico.STUDENTE,
+                TipoSnapshotStorico.FAMILIARE,
+                TipoSnapshotStorico.ISCRIZIONE,
+                TipoSnapshotStorico.RATA,
+            ]).values_list("dati__famiglia", flat=True)),
+            {"Famiglia Bianchi"},
+        )
+
+    def test_archive_family_counts_match_preview_with_siblings_and_inactive_links(self):
+        fratello = Studente.objects.create(nome="Marco", cognome="Bianchi")
+        isolato = Studente.objects.create(nome="Giulia", cognome="Verdi")
+        estraneo = Studente.objects.create(nome="Paolo", cognome="Rossi")
+        StudenteFamiliare.objects.create(studente=fratello, familiare=self.familiare)
+        StudenteFamiliare.objects.create(studente=isolato, familiare=self.familiare, attivo=False)
+        for studente in (fratello, isolato):
+            Iscrizione.objects.create(
+                studente=studente,
+                anno_scolastico=self.anno_passato,
+                classe=self.classe,
+                stato_iscrizione=self.stato_iscrizione,
+                condizione_iscrizione=self.condizione,
+            )
+
+        preview = get_archiviazione_preview(self.anno_passato)
+        archivio = archivia_anno_scolastico(self.anno_passato, user=self.user)
+
+        self.assertEqual(preview["famiglie"], 2)
+        self.assertEqual(archivio.totale_famiglie, preview["famiglie"])
+        self.assertEqual(archivio.totale_studenti, 3)
+        self.assertEqual(archivio.totale_studenti, preview["studenti"])
+        self.assertEqual(archivio.snapshot.filter(tipo=TipoSnapshotStorico.FAMILIARE).count(), preview["familiari"])
+        famiglia = archivio.snapshot.get(tipo=TipoSnapshotStorico.FAMIGLIA, source_pk=f"s-{self.studente.pk}")
+        self.assertIn(str(self.studente), famiglia.dati["studenti"])
+        self.assertIn(str(fratello), famiglia.dati["studenti"])
+        self.assertNotIn(str(isolato), famiglia.dati["studenti"])
+        self.assertNotIn(str(estraneo), famiglia.dati["studenti"])
+        self.assertFalse(archivio.snapshot.filter(tipo=TipoSnapshotStorico.STUDENTE, source_pk=str(estraneo.pk)).exists())
+
+    def test_archive_preserves_birthplace_from_relative_person(self):
+        provincia = Provincia.objects.create(nome="Bologna", sigla="BO")
+        citta = Citta.objects.create(nome="Bologna", provincia=provincia)
+        self.familiare.luogo_nascita = citta
+        self.familiare.save()
+
+        archivio = archivia_anno_scolastico(self.anno_passato, user=self.user)
+
+        familiare = archivio.snapshot.get(tipo=TipoSnapshotStorico.FAMILIARE)
+        self.assertEqual(familiare.dati["luogo_nascita"], "Bologna (BO)")
 
     def test_archive_cannot_be_repeated_for_same_school_year(self):
         archivia_anno_scolastico(self.anno_passato, user=self.user)
@@ -157,5 +226,6 @@ class ArchivioStoricoTests(TestCase):
         self.assertRedirects(post_response, reverse("dettaglio_archivio_storico", kwargs={"pk": archivio.pk}))
 
         detail_response = self.client.get(reverse("dettaglio_archivio_storico", kwargs={"pk": archivio.pk}))
+        self.assertContains(detail_response, "Famiglia Bianchi")
         self.assertContains(detail_response, "Osservazione anno passato")
         self.assertContains(detail_response, "BNCLCU19A01A944X")

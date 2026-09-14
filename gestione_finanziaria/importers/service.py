@@ -43,7 +43,6 @@ from ..services import (
     chiavi_deduplica_movimento,
     crea_notifica_movimento_bancario,
     ricalcola_saldo_corrente_conto,
-    riconcilia_movimento_automaticamente,
     transazione_gia_importata,
     _regola_matcha_movimento,
 )
@@ -58,7 +57,7 @@ def importa_movimenti_da_file(
     conto: ContoBancario,
     provider: Optional[ProviderBancario] = None,
     nome_file: str = "",
-    riconcilia_automaticamente: bool = True,
+    riconcilia_automaticamente: bool = False,
 ) -> RisultatoImport:
     risultato = RisultatoImport()
     start = time.monotonic()
@@ -125,10 +124,8 @@ def importa_movimenti_da_file(
             regole_applicate[regola_applicata.pk] = regole_applicate.get(regola_applicata.pk, 0) + 1
         movimento.save()
         crea_notifica_movimento_bancario(movimento, origine_label="import estratto conto")
-        if riconcilia_automaticamente:
-            candidato_riconciliazione = riconcilia_movimento_automaticamente(movimento)
-            if candidato_riconciliazione is not None:
-                risultato.riconciliati += 1
+        # Saving the movement queues suggestions. Even legacy callers requesting
+        # automatic reconciliation must wait for explicit user confirmation.
 
         risultato.inseriti += 1
         risultato.movimenti_ids.append(movimento.id)
@@ -154,11 +151,11 @@ def importa_movimenti_da_file(
         esito=esito,
         messaggio_extra=(
             f"File: {nome_file}; parser: {parser.nome_formato}; "
-            f"riconciliazione automatica: {'attiva' if riconcilia_automaticamente else 'disattivata'}"
+            "analisi riconciliazioni accodata; conferma utente richiesta"
             if nome_file
             else (
                 f"Parser: {parser.nome_formato}; "
-                f"riconciliazione automatica: {'attiva' if riconcilia_automaticamente else 'disattivata'}"
+                "analisi riconciliazioni accodata; conferma utente richiesta"
             )
         ),
     )

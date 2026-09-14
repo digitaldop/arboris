@@ -91,11 +91,31 @@ def chiave_destinatario(iscrizione_id, familiare_id, email):
 
 
 def classe_iscrizione_label(iscrizione):
-    if iscrizione.gruppo_classe_id:
-        return str(iscrizione.gruppo_classe)
-    if iscrizione.classe_id:
-        return str(iscrizione.classe)
-    return ""
+    return " · ".join(str(item) for item in (iscrizione.classe, iscrizione.gruppo_classe) if item)
+
+
+def classi_comunicazione_disponibili(gruppi):
+    options = {}
+    for gruppo in gruppi:
+        options.update(gruppo.get("classi_opzioni", {}))
+    return sorted(options.items(), key=lambda item: (item[0] == "senza_classe", item[1].casefold()))
+
+
+def filtra_destinatari_famiglie(gruppi, destinatari, classi=None):
+    if classi is not None:
+        selected = set(classi)
+        gruppi = [item for item in gruppi if selected.intersection(item.get("classi_keys", []))]
+        destinatari = [item for item in destinatari if selected.intersection(item.get("classi_keys", []))]
+    emails = Counter(item.get("email_norm") or normalizza_email(item["email"]) for item in destinatari)
+    for item in destinatari:
+        item["duplicato"] = emails[item.get("email_norm") or normalizza_email(item["email"])] > 1
+    return gruppi, destinatari, {
+        "studenti": len(gruppi),
+        "studenti_senza_email": sum(not item["destinatari"] for item in gruppi),
+        "destinatari": len(destinatari),
+        "email_uniche": len(emails),
+        "duplicati": len(destinatari) - len(emails),
+    }
 
 
 def relazione_familiare_label(relazione):
@@ -111,6 +131,7 @@ def iscrizioni_attive_per_anni(anni_scolastici):
     relazioni_qs = (
         StudenteFamiliare.objects.filter(attivo=True)
         .select_related("familiare__persona", "familiare__relazione_familiare", "relazione_familiare")
+        .prefetch_related("familiare__persona__email_anagrafiche", "familiare__email_anagrafiche")
         .order_by("-referente_principale", "familiare__persona__cognome", "familiare__persona__nome", "id")
     )
     return (
@@ -121,7 +142,7 @@ def iscrizioni_attive_per_anni(anni_scolastici):
             studente__attivo=True,
         )
         .exclude(stato_iscrizione__stato_iscrizione__icontains="annull")
-        .select_related("anno_scolastico", "studente", "classe", "gruppo_classe", "stato_iscrizione")
+        .select_related("anno_scolastico", "studente", "classe", "gruppo_classe__anno_scolastico", "stato_iscrizione")
         .prefetch_related(Prefetch("studente__relazioni_familiari", queryset=relazioni_qs, to_attr="relazioni_email"))
         .order_by("anno_scolastico__data_inizio", "studente__cognome", "studente__nome", "id")
     )
@@ -134,6 +155,11 @@ def costruisci_destinatari_famiglie(anni_scolastici):
 
     for iscrizione in iscrizioni_attive_per_anni(anni_scolastici):
         gruppo_destinatari = []
+        classi_opzioni = {
+            f"classe:{iscrizione.classe_id}": f"Classe {iscrizione.classe}"
+        } if iscrizione.classe_id else {"senza_classe": "Classe non assegnata"}
+        if iscrizione.gruppo_classe_id:
+            classi_opzioni[f"gruppo:{iscrizione.gruppo_classe_id}"] = f"Pluriclasse {iscrizione.gruppo_classe}"
         relazioni = getattr(iscrizione.studente, "relazioni_email", [])
         for relazione in relazioni:
             familiare = relazione.familiare
@@ -149,6 +175,7 @@ def costruisci_destinatari_famiglie(anni_scolastici):
                 "studente_id": iscrizione.studente_id,
                 "studente_label": str(iscrizione.studente),
                 "classe_label": classe_iscrizione_label(iscrizione),
+                "classi_keys": list(classi_opzioni),
                 "familiare_id": familiare.pk,
                 "familiare_label": str(familiare),
                 "relazione_label": relazione_familiare_label(relazione),
@@ -170,6 +197,8 @@ def costruisci_destinatari_famiglie(anni_scolastici):
                 "studente_label": str(iscrizione.studente),
                 "classe_label": classe_iscrizione_label(iscrizione),
                 "stato_label": str(iscrizione.stato_iscrizione),
+                "classi_opzioni": classi_opzioni,
+                "classi_keys": list(classi_opzioni),
                 "destinatari": gruppo_destinatari,
             }
         )

@@ -2338,6 +2338,11 @@ class RiconciliazioneRateMatchingTests(TestCase):
 
 class BudgetingGestioneFinanziariaTests(TestCase):
     def setUp(self):
+        # Keep requests and service calls inside the school year in these fixtures.
+        self.today = date(2026, 2, 15)
+        localdate_patch = patch("django.utils.timezone.localdate", return_value=self.today)
+        localdate_patch.start()
+        self.addCleanup(localdate_patch.stop)
         self.user = User.objects.create_user(
             username="budget@example.com",
             email="budget@example.com",
@@ -2348,12 +2353,28 @@ class BudgetingGestioneFinanziariaTests(TestCase):
             permesso_gestione_finanziaria=LivelloPermesso.GESTIONE,
         )
         self.client.force_login(self.user)
-        self.today = timezone.localdate()
-        AnnoScolastico.objects.create(
+        self.anno = AnnoScolastico.objects.create(
             nome_anno_scolastico="2025/2026",
             data_inizio=date(2025, 9, 1),
             data_fine=date(2026, 6, 30),
         )
+
+    def test_budgeting_uses_reference_date_to_select_school_year(self):
+        anno_successivo = AnnoScolastico.objects.create(
+            nome_anno_scolastico="2026/2027",
+            data_inizio=date(2026, 9, 1),
+            data_fine=date(2027, 6, 30),
+        )
+        for today, anno in (
+            (date(2026, 6, 30), self.anno),
+            (date(2026, 9, 1), anno_successivo),
+        ):
+            with self.subTest(today=today):
+                data = build_budgeting_dashboard_data(today=today)
+
+                self.assertEqual(data["period"]["anno_scolastico"], anno)
+                self.assertEqual(data["period"]["start"], anno.data_inizio)
+                self.assertEqual(data["period"]["end"], anno.data_fine)
 
     def test_budgeting_dashboard_renders_recurring_forecast(self):
         categoria = CategoriaFinanziaria.objects.create(
@@ -3909,7 +3930,23 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'href="{popup_url}"', count=2)
         self.assertContains(response, f'data-popup-url="{popup_url}"', count=2)
-        self.assertContains(response, 'data-window-popup="1"', count=2)
+        # Other global actions may also open popups: check the invoice links.
+        from html.parser import HTMLParser
+
+        class InvoiceLinks(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.matches = []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "a" and attrs.get("data-popup-url") == popup_url:
+                    self.matches.append(attrs)
+
+        links = InvoiceLinks()
+        links.feed(response.content.decode())
+        self.assertEqual(len(links.matches), 2)
+        self.assertTrue(all(link.get("data-window-popup") == "1" for link in links.matches))
         self.assertNotContains(response, f'href="{documento_url}"')
 
     def test_campanella_header_permette_di_segnare_notifiche_lette(self):
@@ -4937,7 +4974,7 @@ class FornitoriGestioneFinanziariaTests(TestCase):
         self.assertEqual(scadenza.data_pagamento, date(2026, 5, 18))
         self.assertEqual(scadenza.stato, StatoScadenzaFornitore.PAGATA)
 
-    def test_importa_documento_fatture_in_cloud_riconosce_movimento_bancario_pagato(self):
+    def test_importa_documento_fatture_in_cloud_propone_movimento_e_attende_conferma(self):
         connessione = FattureInCloudConnessione.objects.create(nome="FIC", company_id=123)
         conto = ContoBancario.objects.create(nome_conto="Conto operativo")
         movimento = MovimentoFinanziario.objects.create(
@@ -4963,7 +5000,15 @@ class FornitoriGestioneFinanziariaTests(TestCase):
 
         result = importa_documento_fatture_in_cloud(connessione, payload, pending=False, utente=self.user)
 
-        self.assertEqual(result["pagamenti_auto"], 1)
+        self.assertEqual(result["pagamenti_auto"], 0)
+        self.assertFalse(PagamentoFornitore.objects.filter(movimento_finanziario=movimento).exists())
+        from .models import PropostaRiconciliazione
+        from .reconciliation import decide_proposal
+        from .reconciliation_worker import process_pending_analysis
+
+        process_pending_analysis(limit=100, max_seconds=60)
+        proposta = PropostaRiconciliazione.objects.get(ambito="fornitore", stato="aperta")
+        self.assertTrue(decide_proposal(proposta.pk, "conferma", user=self.user)[0])
         documento = DocumentoFornitore.objects.get(external_id="998")
         self.assertEqual(documento.stato, StatoDocumentoFornitore.PAGATO)
         scadenza = documento.scadenze.get()

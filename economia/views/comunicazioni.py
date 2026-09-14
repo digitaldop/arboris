@@ -1,12 +1,15 @@
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from economia.comunicazioni_famiglie import (
     ComunicazioneFamiglieError,
+    classi_comunicazione_disponibili,
     costruisci_destinatari_famiglie,
     destinatari_da_chiavi,
+    filtra_destinatari_famiglie,
     invia_comunicazione_famiglie,
 )
 from economia.forms import ComunicazioneFamiglieForm
@@ -19,75 +22,70 @@ COMUNICAZIONI_STORICO_PER_PAGE = 20
 
 
 def comunicazioni_famiglie(request):
-    gruppi_destinatari = []
-    destinatari = []
-    statistiche = {
-        "studenti": 0,
-        "studenti_senza_email": 0,
-        "destinatari": 0,
-        "email_uniche": 0,
-        "duplicati": 0,
-    }
     riepilogo_invio = None
-    selected_keys = set()
-    anni_selezionati = []
-
-    if request.method == "POST":
-        form = ComunicazioneFamiglieForm(request.POST)
-        action = request.POST.get("action") or "preview"
-        if form.is_valid():
-            anni_selezionati = list(form.cleaned_data["anni_scolastici"])
-            gruppi_destinatari, destinatari, statistiche = costruisci_destinatari_famiglie(anni_selezionati)
-            posted_keys = request.POST.getlist("destinatari")
-            selected_keys = set(posted_keys) if posted_keys else {destinatario["key"] for destinatario in destinatari}
-
-            if action == "send":
-                oggetto = (form.cleaned_data.get("oggetto") or "").strip()
-                messaggio = (form.cleaned_data.get("messaggio") or "").strip()
-                if not oggetto:
-                    form.add_error("oggetto", "Inserisci l'oggetto dell'email.")
-                if not messaggio:
-                    form.add_error("messaggio", "Inserisci il testo della comunicazione.")
-
-                destinatari_selezionati = destinatari_da_chiavi(destinatari, posted_keys)
-                if not destinatari_selezionati:
-                    form.add_error(None, "Seleziona almeno un destinatario.")
-
-                if not form.errors:
-                    configurazione = ConfigurazioneEmailSMTP.get_solo()
-                    try:
-                        riepilogo_invio = invia_comunicazione_famiglie(
-                            configurazione=configurazione,
-                            destinatari=destinatari_selezionati,
-                            oggetto=oggetto,
-                            messaggio=messaggio,
-                            anni_scolastici=anni_selezionati,
-                            utente=request.user,
-                        )
-                    except ComunicazioneFamiglieError as exc:
-                        messages.error(request, str(exc))
-                    else:
-                        if riepilogo_invio["fallite"]:
-                            messages.warning(
-                                request,
-                                "Invio completato con errori. Controlla il riepilogo e il log interno.",
-                            )
-                        else:
-                            messages.success(request, "Comunicazione inviata correttamente alle famiglie selezionate.")
-        else:
-            action = "preview"
+    is_post = request.method == "POST"
+    action = request.POST.get("action", "preview") if is_post else "preview"
+    if is_post:
+        year_ids = request.POST.getlist("anni_scolastici")
     else:
-        anni_attivi = AnnoScolastico.objects.filter(attivo=True)
-        anno_default = resolve_default_anno_scolastico(anni_attivi)
-        initial = {"anni_scolastici": [anno_default.pk]} if anno_default else {}
-        form = ComunicazioneFamiglieForm(initial=initial)
-        if anno_default:
-            anni_selezionati = [anno_default]
-            gruppi_destinatari, destinatari, statistiche = costruisci_destinatari_famiglie(anni_selezionati)
-            selected_keys = {destinatario["key"] for destinatario in destinatari}
+        anno_default = resolve_default_anno_scolastico(AnnoScolastico.objects.filter(attivo=True))
+        year_ids = [anno_default.pk] if anno_default else []
+    form = ComunicazioneFamiglieForm(request.POST if is_post else None, initial={"anni_scolastici": year_ids})
+    # Class choices come from the same active enrollments as the recipients.
+    try:
+        anni_selezionati = list(form.fields["anni_scolastici"].clean(year_ids))
+    except ValidationError:
+        anni_selezionati = []
+    gruppi_destinatari, tutti_destinatari, _ = costruisci_destinatari_famiglie(anni_selezionati)
+    form.fields["classi"].choices = classi_comunicazione_disponibili(gruppi_destinatari)
+    valid = form.is_valid() if is_post else True
+    class_filter = None
+    if is_post and form.cleaned_data.get("ambito_destinatari") == "classi":
+        class_filter = form.cleaned_data.get("classi", [])
+    if is_post and ("classi" in form.errors or "ambito_destinatari" in form.errors):
+        class_filter = []
+    gruppi_visibili, destinatari, statistiche = filtra_destinatari_famiglie(
+        gruppi_destinatari, tutti_destinatari, class_filter,
+    )
+    allowed_keys = {item["key"] for item in destinatari}
+    posted_keys = set(request.POST.getlist("destinatari")) if is_post else set()
+    years_changed = set(request.POST.getlist("anni_destinatari")) != {str(anno.pk) for anno in anni_selezionati}
+    first_preview = request.POST.get("selezione_presentata") != "1"
+    selected_keys = (
+        allowed_keys if not is_post or (action != "send" and (first_preview or years_changed))
+        else posted_keys & allowed_keys
+    )
 
-    if request.method == "POST" and not selected_keys:
-        selected_keys = {destinatario["key"] for destinatario in destinatari}
+    if is_post and valid and action == "send":
+        oggetto = (form.cleaned_data.get("oggetto") or "").strip()
+        messaggio = (form.cleaned_data.get("messaggio") or "").strip()
+        if not oggetto:
+            form.add_error("oggetto", "Inserisci l'oggetto dell'email.")
+        if not messaggio:
+            form.add_error("messaggio", "Inserisci il testo della comunicazione.")
+        destinatari_selezionati = destinatari_da_chiavi(destinatari, posted_keys)
+        if posted_keys - allowed_keys:
+            form.add_error(None, "I destinatari o le classi sono cambiati. Aggiorna i destinatari e verifica la selezione prima di inviare.")
+        if not destinatari_selezionati:
+            form.add_error(None, "Seleziona almeno un destinatario.")
+        if not form.errors:
+            try:
+                riepilogo_invio = invia_comunicazione_famiglie(
+                    configurazione=ConfigurazioneEmailSMTP.get_solo(),
+                    destinatari=destinatari_selezionati, oggetto=oggetto, messaggio=messaggio,
+                    anni_scolastici=anni_selezionati, utente=request.user,
+                )
+            except ComunicazioneFamiglieError as exc:
+                messages.error(request, str(exc))
+            else:
+                if riepilogo_invio["fallite"]:
+                    messages.warning(request, "Invio completato con errori. Controlla il riepilogo e il log interno.")
+                else:
+                    messages.success(request, "Comunicazione inviata correttamente alle famiglie selezionate.")
+    visible_ids = {id(gruppo) for gruppo in gruppi_visibili}
+    for gruppo in gruppi_destinatari:
+        gruppo["visibile"] = id(gruppo) in visible_ids
+        gruppo["classi_tokens"] = " ".join(gruppo.get("classi_keys", []))
 
     return render(
         request,

@@ -115,7 +115,9 @@
             });
             refresh();
         });
-        window.addEventListener("pageshow", refresh);
+        // A normal navigation already contains a fresh server-rendered summary.
+        // Refresh on history restoration, where the browser reuses old markup.
+        window.addEventListener("pageshow", function (event) { if (event.persisted) refresh(); });
         document.addEventListener("visibilitychange", function () { if (!document.hidden) refresh(); });
     }
 

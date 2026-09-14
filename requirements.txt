@@ -19,6 +19,7 @@ psycopg-binary==3.3.3
 psycopg2-binary==2.9.12
 pycparser==3.0
 redis==5.2.0
+rcssmin==1.2.2
 xlrd==2.0.1
 PySide6==6.11.0
 PySide6_Addons==6.11.0

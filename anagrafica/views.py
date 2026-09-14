@@ -77,6 +77,7 @@ from .family_logic import (
     build_logical_family_snapshot_from_ids,
     family_document_queryset,
     iter_logical_family_snapshots,
+    count_logical_families_for_students,
     logical_family_detail_url,
     logical_family_matches,
     logical_family_summary_for_person,
@@ -1782,6 +1783,8 @@ def build_famiglia_rette_mensili_summary(famiglia, today=None):
 
 
 def build_economia_dashboard_data(anno_corrente):
+    from economia.read_optimizations import prepare_iscrizioni_for_display
+
     default_data = {
         "configured_year": bool(anno_corrente),
         "count_studenti_iscritti": 0,
@@ -1821,11 +1824,14 @@ def build_economia_dashboard_data(anno_corrente):
         .select_related(
             "studente",
             "agevolazione",
+            "anno_scolastico",
             "condizione_iscrizione",
+            "condizione_iscrizione__anno_scolastico",
         )
         .prefetch_related("rate")
         .order_by("studente__cognome", "studente__nome", "id")
     )
+    prepare_iscrizioni_for_display(iscrizioni_anno_corrente)
 
     monthly_total_map = defaultdict(lambda: Decimal("0.00"))
     monthly_paid_map = defaultdict(lambda: Decimal("0.00"))
@@ -2279,11 +2285,7 @@ def build_dashboard_school_year_statistics(anno_scolastico):
 
     studenti_iscritti_ids = {iscrizione.studente_id for iscrizione in iscrizioni_anno_list}
     data["count_studenti_iscritti"] = len(studenti_iscritti_ids)
-    data["count_famiglie_iscritte"] = sum(
-        1
-        for snapshot in iter_logical_family_snapshots()
-        if studenti_iscritti_ids.intersection(snapshot.student_ids)
-    )
+    data["count_famiglie_iscritte"] = count_logical_families_for_students(studenti_iscritti_ids)
 
     studenti_per_classe = defaultdict(dict)
     studenti_per_gruppo = defaultdict(dict)

@@ -334,7 +334,7 @@ def resolve_budgeting_period(period_type=None, today=None):
 
     today = today or timezone.localdate()
     period_type = period_type or PERIODO_BUDGET_ANNO_SCOLASTICO
-    anno_scolastico = resolve_default_anno_scolastico()
+    anno_scolastico = resolve_default_anno_scolastico(today=today)
 
     if period_type == PERIODO_BUDGET_ANNO_SCOLASTICO and anno_scolastico:
         start_date = anno_scolastico.data_inizio or date(today.year, 9, 1)
@@ -1653,8 +1653,18 @@ def importo_movimento_disponibile(movimento):
 
 
 def _clear_importo_movimento_disponibile_cache(movimento):
-    if movimento is not None and hasattr(movimento, "_arboris_importo_disponibile_cache"):
+    if movimento is None:
+        return
+    if hasattr(movimento, "_arboris_importo_disponibile_cache"):
         delattr(movimento, "_arboris_importo_disponibile_cache")
+    # Matching prefetches these relations. A payment may have been written using
+    # a freshly locked instance, leaving the caller's relation caches outdated.
+    prefetched = getattr(movimento, "_prefetched_objects_cache", {})
+    for relation in (
+        "riconciliazioni_rate", "pagamenti_fornitori", "pagamenti_buste_paga",
+        "buste_paga_dipendenti",
+    ):
+        prefetched.pop(relation, None)
 
 
 def importo_rata_residuo(rata):
@@ -1838,8 +1848,10 @@ def _limita_score_suggerimento(score, score_identita, approssimato):
     return min(round(score * 0.7), 50 + score_identita, 84) if approssimato else score
 
 
-def _movimenti_per_matching(queryset):
+def _movimenti_per_matching(queryset, *, bank_only=False):
     """Esamina tutti i candidati a blocchi, senza query per ogni residuo."""
+    if bank_only:
+        queryset = queryset.filter(canale="banca", sostenuta_da_terzi=False, valuta__iexact="EUR")
     queryset = queryset.prefetch_related(
         "riconciliazioni_rate", "pagamenti_fornitori", "pagamenti_buste_paga",
         "buste_paga_dipendenti__pagamenti",
@@ -2388,7 +2400,7 @@ def trova_rate_cumulative_candidate(movimento, *, limite: int = 5, include_rata=
     return candidati[:limite]
 
 
-def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 12):
+def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 12, bank_only=False):
     from .models import MovimentoFinanziario, StatoRiconciliazione
 
     if rata_principale is None:
@@ -2416,7 +2428,7 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
     )
 
     candidati = []
-    for movimento in _movimenti_per_matching(queryset):
+    for movimento in _movimenti_per_matching(queryset, bank_only=bank_only):
         if movimento.rata_iscrizione_id and not movimento.riconciliazioni_rate.exists():
             continue
 
@@ -2479,7 +2491,7 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
     return candidati[:limite]
 
 
-def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 5):
+def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, *, limite: int = 5, bank_only=False):
     if rata_principale is None:
         return []
 
@@ -2491,6 +2503,7 @@ def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, 
         rata_principale,
         rate_aperte,
         limite=30,
+        bank_only=bank_only,
     )
     sottoinsieme = _trova_sottoinsieme_movimenti_per_importo(candidati_singoli, residuo_principale)
     if len(sottoinsieme) < 2:
@@ -2523,40 +2536,21 @@ def trova_movimenti_cumulativi_candidati_per_rate(rata_principale, rate_aperte, 
 
 
 def riconcilia_movimento_automaticamente(
-    movimento,
-    *,
-    utente=None,
-    punteggio_minimo: int = 85,
-    include_rata=None,
+    movimento, *, utente=None, punteggio_minimo=85, include_rata=None,
 ):
-    if movimento is None or movimento.importo is None or movimento.importo <= 0:
-        return None
-    if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate.exists():
-        return None
+    """Compatibility entry point: schedule review, never register a payment."""
+    from .reconciliation_queue import enqueue_analysis
 
-    opzioni = []
-    for candidato in trova_rate_candidate(movimento, limite=10, solo_disponibili=True, allow_fuzzy=False):
-        if _rata_disponibile_per_auto(candidato.rata, include_rata, controlla_collegamenti=False):
-            opzioni.append(("singola", candidato.score, candidato))
+    if movimento is not None and movimento.pk:
+        enqueue_analysis("movimento", movimento.pk)
+    return None
 
-    for candidato in trova_rate_cumulative_candidate(movimento, limite=5, include_rata=include_rata, allow_fuzzy=False):
-        opzioni.append(("cumulativa", candidato.score, candidato))
 
-    if not opzioni:
-        return None
+def _serialize_reconciliation_writes():
+    from .models import StatoAnalisiRiconciliazione
 
-    top_score = max(score for _tipo, score, _candidato in opzioni)
-    migliori = [(tipo, candidato) for tipo, score, candidato in opzioni if score == top_score]
-    if top_score < punteggio_minimo or len(migliori) != 1:
-        return None
-
-    tipo, candidato = migliori[0]
-    if tipo == "cumulativa":
-        riconcilia_movimento_con_rate(movimento, candidato.allocazioni, utente=utente)
-        return candidato
-
-    riconcilia_movimento_con_rata(movimento, candidato.rata, utente=utente, marca_rata_pagata=True)
-    return candidato
+    StatoAnalisiRiconciliazione.objects.get_or_create(pk=1)
+    StatoAnalisiRiconciliazione.objects.select_for_update().get(pk=1)
 
 
 @transaction.atomic
@@ -2566,7 +2560,16 @@ def riconcilia_movimento_con_rate(
     *,
     utente=None,
 ):
+    _serialize_reconciliation_writes()
     from .models import RiconciliazioneRataMovimento, StatoRiconciliazione
+
+    movimento = movimento.__class__.objects.select_for_update().get(pk=movimento.pk)
+    allocazioni = list(allocazioni)
+    rate_ids = [rata.pk for rata, _ in allocazioni if rata is not None]
+    from economia.models import RataIscrizione
+
+    rate_correnti = RataIscrizione.objects.select_for_update().filter(pk__in=rate_ids).in_bulk()
+    allocazioni = [(rate_correnti[rata.pk], importo) for rata, importo in allocazioni if rata is not None]
 
     _clear_importo_movimento_disponibile_cache(movimento)
 
@@ -2664,6 +2667,7 @@ def riconcilia_movimento_con_rata(
 
 @transaction.atomic
 def annulla_riconciliazione(movimento):
+    _serialize_reconciliation_writes()
     from .models import StatoRiconciliazione
 
     links = list(movimento.riconciliazioni_rate.select_related("rata"))
@@ -2693,6 +2697,7 @@ def annulla_riconciliazione(movimento):
 
 @transaction.atomic
 def annulla_riconciliazione_rata(rata):
+    _serialize_reconciliation_writes()
     if rata is None or not getattr(rata, "pk", None):
         raise ValidationError("Rata non valida.")
 
@@ -3070,9 +3075,12 @@ def registra_pagamento_fornitore(
     note="",
     utente=None,
 ):
+    _serialize_reconciliation_writes()
     from .models import Fornitore, PagamentoFornitore, ScadenzaPagamentoFornitore, StatoRiconciliazione, VerificaProforma
 
     Fornitore.objects.select_for_update().get(pk=scadenza.documento.fornitore_id)
+    if movimento is not None:
+        movimento = movimento.__class__.objects.select_for_update().get(pk=movimento.pk)
     scadenza = ScadenzaPagamentoFornitore.objects.select_related("documento").select_for_update(of=("self",)).get(pk=scadenza.pk)
     if scadenza.documento.verifica_proforma in {VerificaProforma.DA_VERIFICARE, VerificaProforma.SOSTITUITA}:
         raise ValidationError("Completa prima la verifica del collegamento alla pro-forma.")
@@ -3112,6 +3120,7 @@ def registra_pagamento_fornitore(
 
 @transaction.atomic
 def annulla_pagamento_fornitore(pagamento):
+    _serialize_reconciliation_writes()
     from .models import Fornitore, PagamentoFornitore, ScadenzaPagamentoFornitore
 
     Fornitore.objects.select_for_update().get(pk=pagamento.scadenza.documento.fornitore_id)
@@ -3450,7 +3459,7 @@ def trova_scadenze_fornitori_cumulative_candidate(movimento, *, limite: int = 5,
     return candidati[:limite]
 
 
-def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8, allow_fuzzy=True):
+def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 8, allow_fuzzy=True, bank_only=False):
     from .models import MovimentoFinanziario, StatoRiconciliazione
 
     if scadenza is None:
@@ -3469,7 +3478,7 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
 
     fornitore = getattr(getattr(scadenza, "documento", None), "fornitore", None)
     candidati = []
-    for movimento in _movimenti_per_matching(queryset):
+    for movimento in _movimenti_per_matching(queryset, bank_only=bank_only):
         disponibile = importo_movimento_disponibile_fornitori(movimento)
         if disponibile <= _TOLLERANZA_IMPORTO_ESATTO:
             continue
@@ -3531,7 +3540,7 @@ def trova_movimenti_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 
     return candidati[:limite]
 
 
-def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 5):
+def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, limite: int = 5, bank_only=False):
     if scadenza is None:
         return []
 
@@ -3539,7 +3548,7 @@ def trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, *, lim
     if residuo_scadenza <= _TOLLERANZA_IMPORTO_ESATTO:
         return []
 
-    candidati_singoli = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=30)
+    candidati_singoli = trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=30, bank_only=bank_only)
     sottoinsieme = _trova_sottoinsieme_movimenti_per_importo(candidati_singoli, residuo_scadenza)
     if len(sottoinsieme) < 2:
         return []
@@ -3780,27 +3789,27 @@ def proposte_riconciliazione_da_movimento(movimento, *, limite_singole=12, limit
     return proposte
 
 
-def proposte_riconciliazione_da_rata(rata, rate_aperte, *, limite_singole=12, limite_cumulative=5):
+def proposte_riconciliazione_da_rata(rata, rate_aperte, *, limite_singole=12, limite_cumulative=5, bank_only=False):
     proposte = [
         _proposal_for_movimento_candidate(rata, "rata", "rate", candidato)
-        for candidato in trova_movimenti_candidati_per_rate(rata, rate_aperte, limite=limite_singole)
+        for candidato in trova_movimenti_candidati_per_rate(rata, rate_aperte, limite=limite_singole, bank_only=bank_only)
     ]
     proposte.extend(
         _proposal_for_movimenti_cumulative_candidate(rata, "rata", "rate", candidato)
-        for candidato in trova_movimenti_cumulativi_candidati_per_rate(rata, rate_aperte, limite=limite_cumulative)
+        for candidato in trova_movimenti_cumulativi_candidati_per_rate(rata, rate_aperte, limite=limite_cumulative, bank_only=bank_only)
     )
     proposte.sort(key=lambda proposta: (proposta.score, proposta.importo_totale), reverse=True)
     return proposte
 
 
-def proposte_riconciliazione_da_scadenza_fornitore(scadenza, *, limite_singole=8, limite_cumulative=5):
+def proposte_riconciliazione_da_scadenza_fornitore(scadenza, *, limite_singole=8, limite_cumulative=5, bank_only=False):
     proposte = [
         _proposal_for_movimento_candidate(scadenza, "scadenza_fornitore", "fornitore", candidato)
-        for candidato in trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=limite_singole)
+        for candidato in trova_movimenti_candidati_per_scadenza_fornitore(scadenza, limite=limite_singole, bank_only=bank_only)
     ]
     proposte.extend(
         _proposal_for_movimenti_cumulative_candidate(scadenza, "scadenza_fornitore", "fornitore", candidato)
-        for candidato in trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, limite=limite_cumulative)
+        for candidato in trova_movimenti_cumulativi_candidati_per_scadenza_fornitore(scadenza, limite=limite_cumulative, bank_only=bank_only)
     )
     proposte.sort(key=lambda proposta: (proposta.score, proposta.importo_totale), reverse=True)
     return proposte
@@ -3855,6 +3864,7 @@ def _group_proposal_allocazioni_per_movimento(proposta, target_tipo):
 
 @transaction.atomic
 def applica_proposta_riconciliazione(proposta, *, utente=None, note=""):
+    _serialize_reconciliation_writes()
     if not isinstance(proposta, ReconciliationProposal):
         raise ValidationError("Proposta di riconciliazione non valida.")
 
@@ -3902,6 +3912,7 @@ def riconcilia_movimento_con_scadenza_fornitore(
     utente=None,
     note="",
 ):
+    _serialize_reconciliation_writes()
     from .models import MetodoPagamentoFornitore, StatoRiconciliazione
 
     if movimento.importo is None or movimento.importo >= 0:
@@ -3950,6 +3961,7 @@ def riconcilia_movimento_con_scadenze_fornitore(
     utente=None,
     note="",
 ):
+    _serialize_reconciliation_writes()
     if movimento.importo is None or movimento.importo >= 0:
         raise ValidationError("La riconciliazione fornitori richiede un movimento in uscita.")
 
@@ -3988,17 +4000,12 @@ def riconcilia_movimento_con_scadenze_fornitore(
     return pagamenti
 
 
-def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo: int = 85, limite_movimenti: int = 100):
-    anteprima = anteprima_riconcilia_fornitori_automaticamente(
-        punteggio_minimo=punteggio_minimo,
-        limite_movimenti=limite_movimenti,
-    )
-    risultato = applica_anteprima_riconciliazione_fornitori(
-        anteprima["dettagli"],
-        [item["key"] for item in anteprima["dettagli"]],
-        utente=utente,
-    )
-    return risultato["pagamenti"]
+def riconcilia_fornitori_automaticamente(*, utente=None, punteggio_minimo=85, limite_movimenti=100):
+    """Compatibility entry point; explicit confirmation is always required."""
+    from .reconciliation_queue import enqueue_existing_movements
+
+    enqueue_existing_movements()
+    return []
 
 
 def anteprima_riconcilia_fornitori_automaticamente(*, punteggio_minimo: int = 85, limite_movimenti: int = 100):

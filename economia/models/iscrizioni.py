@@ -568,7 +568,10 @@ class Iscrizione(models.Model):
         if mese_iscrizione < mese_partenza_standard:
             return mese_partenza_standard, False
 
-        regola, giorno_soglia = get_mid_year_enrollment_settings()
+        mid_year_settings = getattr(self, "_mid_year_settings_cache", None)
+        regola, giorno_soglia = (
+            mid_year_settings if mid_year_settings is not None else get_mid_year_enrollment_settings()
+        )
         if regola == MID_YEAR_RULE_NEXT_MONTH_AFTER_THRESHOLD and self.data_iscrizione.day > giorno_soglia:
             return add_months_safe(mese_iscrizione, 1, target_day=1).replace(day=1), False
 
@@ -864,6 +867,17 @@ class Iscrizione(models.Model):
         sincronizza_sconti_fondo_da_iscrizione(self)
 
     def sync_rate_schedule(self):
+        from django.db import transaction
+        from gestione_finanziaria.reconciliation_queue import enqueue_analysis
+
+        with transaction.atomic():
+            result = self._sync_rate_schedule()
+            # bulk_create does not emit the signals used for individual edits.
+            if self.pk and result in {"created", "precreated", "extended", "regenerated"}:
+                enqueue_analysis("iscrizione", self.pk)
+            return result
+
+    def _sync_rate_schedule(self):
         if not self.pk:
             return "missing"
 

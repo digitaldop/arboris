@@ -59,8 +59,9 @@ class SistemaRuoloPermessiAdmin(admin.ModelAdmin):
         "controllo_completo",
         "amministratore_operativo",
         "accesso_backup_database",
+        "accesso_comunicazioni_famiglie",
     )
-    list_filter = ("attivo", "controllo_completo", "amministratore_operativo", "accesso_backup_database")
+    list_filter = ("attivo", "controllo_completo", "amministratore_operativo", "accesso_backup_database", "accesso_comunicazioni_famiglie")
     search_fields = ("nome", "descrizione")
 
 
@@ -71,6 +72,7 @@ class SistemaUtentePermessiAdmin(admin.ModelAdmin):
         "ruolo_permessi",
         "ruolo",
         "controllo_completo",
+        "accesso_comunicazioni_famiglie",
         "permesso_anagrafica",
         "permesso_famiglie_interessate",
         "permesso_economia",

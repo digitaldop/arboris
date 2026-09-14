@@ -46,7 +46,7 @@
                         <td>{{ iscrizione.stato_iscrizione }}</td>
                         <td>{{ iscrizione.condizione_iscrizione.nome_condizione_iscrizione }}</td>
                         <td>{{ iscrizione.agevolazione|default:"-" }}</td>
-                        <td>{{ iscrizione.rate.count }}</td>
+                        <td>{{ iscrizione.count_rate }}</td>
                         <td>{% if iscrizione.non_pagante %}Si{% else %}No{% endif %}</td>
                         <td>{% active_toggle iscrizione %}</td>
                         <td class="actions-cell">

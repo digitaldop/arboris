@@ -1199,6 +1199,11 @@ class SistemaRuoloPermessi(models.Model):
         default=False,
         help_text="Consente l'accesso alla pagina Backup Database.",
     )
+    accesso_comunicazioni_famiglie = models.BooleanField(
+        "Comunicazioni alle famiglie",
+        default=False,
+        help_text="Consente di preparare e inviare comunicazioni e consultare lo storico, indipendentemente dai permessi dei moduli Anagrafica ed Economia.",
+    )
     controllo_completo = models.BooleanField(
         default=False,
         help_text="Permette agli utenti con questo ruolo di accedere e gestire tutte le sezioni del software.",
@@ -1329,6 +1334,9 @@ class SistemaUtentePermessi(models.Model):
         default=False,
         help_text="Permette all'utente di accedere e gestire tutte le sezioni del software senza essere superuser Django.",
     )
+    accesso_comunicazioni_famiglie = models.BooleanField(
+        "Comunicazioni alle famiglie", default=False,
+    )
     permesso_anagrafica = models.CharField(
         max_length=10,
         choices=LivelloPermesso.choices,
@@ -1444,6 +1452,13 @@ class SistemaUtentePermessi(models.Model):
         if self.ruolo_permessi_id:
             return False
         return self.ruolo == RuoloUtente.AMMINISTRATORE
+
+    @property
+    def accesso_comunicazioni_famiglie_effettivo(self):
+        if self.ruolo_permessi_id:
+            role = self.ruolo_permessi
+            return role.attivo and (role.controllo_completo or role.accesso_comunicazioni_famiglie)
+        return self.controllo_completo or self.accesso_comunicazioni_famiglie
 
     def get_module_level_display_value(self, module_name):
         return LivelloPermesso(self.get_module_level(module_name)).label

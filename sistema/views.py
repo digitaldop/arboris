@@ -554,6 +554,7 @@ def sync_user_profiles_for_role(ruolo):
     SistemaUtentePermessi.objects.filter(ruolo_permessi=ruolo).update(
         ruolo=ruolo.chiave_legacy or "",
         controllo_completo=ruolo.controllo_completo,
+        accesso_comunicazioni_famiglie=ruolo.accesso_comunicazioni_famiglie,
         permesso_anagrafica=ruolo.permesso_anagrafica,
         permesso_famiglie_interessate=ruolo.permesso_famiglie_interessate,
         permesso_economia=ruolo.permesso_economia,
@@ -1576,6 +1577,7 @@ def sistema_ruolo_form_context(request, form, ruolo_obj=None, is_new=False):
         {"field": form["permesso_servizi_extra"], "icon": "list", "tone": "purple"},
     ]
     special_permission_fields = [
+        {"field": form["accesso_comunicazioni_famiglie"], "icon": "message", "tone": "green"},
         {"field": form["controllo_completo"], "icon": "shield", "tone": "red"},
         {"field": form["amministratore_operativo"], "icon": "settings", "tone": "blue"},
         {"field": form["accesso_backup_database"], "icon": "archive", "tone": "amber"},
@@ -1602,6 +1604,7 @@ def sistema_utente_form_context(request, form, utente_obj=None, is_new=False):
             ("Ruolo", profilo.ruolo_display),
             ("Controllo completo", "Si" if profilo.controllo_completo_effettivo else "No"),
             ("Anagrafica", profilo.permesso_anagrafica_effettivo_display),
+            ("Comunicazioni alle famiglie", "Si" if profilo.accesso_comunicazioni_famiglie_effettivo else "No"),
             ("Famiglie interessate", profilo.permesso_famiglie_interessate_effettivo_display),
             ("Rette scolastiche", profilo.permesso_economia_effettivo_display),
             ("Gestione finanziaria", profilo.permesso_gestione_finanziaria_effettivo_display),

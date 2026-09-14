@@ -27,7 +27,7 @@ SIDEBAR_MENU_SECTIONS = (
             {
                 "key": "anagrafica_comunicazioni_famiglie",
                 "label": "Comunicazioni alle famiglie",
-                "requires": ("can_manage_economia",),
+                "requires": ("can_communicate_with_families",),
             },
             {
                 "key": "anagrafica_rette_iscrizioni",

@@ -1,10 +1,10 @@
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.urls import reverse
 
-from .models import Documento, Familiare, Studente, StudenteFamiliare
+from .models import AnagraficaIndirizzo, Documento, Familiare, Studente, StudenteFamiliare
 
 
 def _person_label(person):
@@ -182,30 +182,52 @@ def _build_note_entries(students, relatives):
     return entries
 
 
+def _address_links():
+    return AnagraficaIndirizzo.objects.select_related(
+        "indirizzo__citta__provincia", "indirizzo__provincia",
+        "indirizzo__regione", "indirizzo__cap_scelto",
+    )
+
+
 def _load_students(student_ids):
+    students = Studente.objects.all()
+    if student_ids is not None:
+        students = students.filter(pk__in=student_ids)
     return list(
-        Studente.objects.filter(pk__in=student_ids)
+        students
         .select_related(
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
+            "indirizzo__regione",
+            "indirizzo__cap_scelto",
             "luogo_nascita__provincia",
             "nazione_nascita",
             "nazionalita",
         )
+        .prefetch_related(Prefetch("indirizzi_anagrafici", queryset=_address_links()))
         .order_by("cognome", "nome", "id")
     )
 
 
 def _load_relatives(familiare_ids):
+    relatives = Familiare.objects.all()
+    if familiare_ids is not None:
+        relatives = relatives.filter(pk__in=familiare_ids)
     return list(
-        Familiare.objects.filter(pk__in=familiare_ids)
+        relatives
         .select_related(
             "relazione_familiare",
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
+            "indirizzo__regione",
+            "indirizzo__cap_scelto",
             "luogo_nascita__provincia",
             "nazione_nascita",
             "nazionalita",
+        )
+        .prefetch_related(
+            Prefetch("persona__indirizzi_anagrafici", queryset=_address_links()),
+            Prefetch("indirizzi_anagrafici", queryset=_address_links()),
         )
         .order_by("cognome", "nome", "id")
     )
@@ -216,11 +238,13 @@ def build_logical_family_snapshot_from_ids(
     familiare_ids=None,
     *,
     legacy_family=None,
+    students=None,
+    relatives=None,
 ):
     student_ids = set(student_ids or [])
     familiare_ids = set(familiare_ids or [])
-    students = _load_students(student_ids)
-    relatives = _load_relatives(familiare_ids)
+    students = _load_students(student_ids) if students is None else students
+    relatives = _load_relatives(familiare_ids) if relatives is None else relatives
     fallback_name = getattr(legacy_family, "cognome_famiglia", "")
     fallback_address = getattr(legacy_family, "indirizzo_principale", None)
 
@@ -260,6 +284,12 @@ def apply_logical_family_snapshot(famiglia):
 
 
 def iter_logical_family_snapshots():
+    # Load each person and their effective addresses once for the entire graph.
+    # Keep database ordering (including its collation) inside each family.
+    students = {person.pk: person for person in _load_students(None)}
+    relatives = {person.pk: person for person in _load_relatives(None)}
+    student_order = {pk: index for index, pk in enumerate(students)}
+    relative_order = {pk: index for index, pk in enumerate(relatives)}
     nodes = set()
     adjacency = defaultdict(set)
 
@@ -273,17 +303,19 @@ def iter_logical_family_snapshots():
         adjacency[left].add(right)
         adjacency[right].add(left)
 
-    for studente_id in Studente.objects.values_list("pk", flat=True):
+    for studente_id in students:
         add_node(("s", studente_id))
 
-    for familiare_id in Familiare.objects.values_list("pk", flat=True):
+    for familiare_id in relatives:
         add_node(("f", familiare_id))
 
     for studente_id, familiare_id in StudenteFamiliare.objects.filter(attivo=True).values_list(
         "studente_id",
         "familiare_id",
     ):
-        if studente_id and familiare_id:
+        # A person inserted concurrently after the bulk reads belongs to the
+        # next request's snapshot, not to these already-loaded maps.
+        if studente_id in students and familiare_id in relatives:
             link(("s", studente_id), ("f", familiare_id))
 
     seen = set()
@@ -304,7 +336,12 @@ def iter_logical_family_snapshots():
 
         student_ids = {pk for kind, pk in component if kind == "s"}
         familiare_ids = {pk for kind, pk in component if kind == "f"}
-        snapshots.append(build_logical_family_snapshot_from_ids(student_ids, familiare_ids))
+        snapshots.append(build_logical_family_snapshot_from_ids(
+            student_ids,
+            familiare_ids,
+            students=[students[pk] for pk in sorted(student_ids, key=student_order.__getitem__)],
+            relatives=[relatives[pk] for pk in sorted(familiare_ids, key=relative_order.__getitem__)],
+        ))
 
     return sorted(
         snapshots,
@@ -313,6 +350,26 @@ def iter_logical_family_snapshots():
             snapshot.logical_key or "",
         ),
     )
+
+
+def count_logical_families_for_students(student_ids):
+    """Count connected families using IDs only, without loading personal records."""
+    if not student_ids:
+        return 0
+    parents = {}
+
+    def root(node):
+        parents.setdefault(node, node)
+        while parents[node] != node:
+            parents[node] = parents[parents[node]]
+            node = parents[node]
+        return node
+
+    for student_id, relative_id in StudenteFamiliare.objects.filter(attivo=True).values_list(
+        "studente_id", "familiare_id",
+    ).iterator(chunk_size=2000):
+        parents[root(("s", student_id))] = root(("f", relative_id))
+    return len({root(("s", pk)) for pk in student_ids})
 
 
 def resolve_logical_family_snapshot(logical_key):

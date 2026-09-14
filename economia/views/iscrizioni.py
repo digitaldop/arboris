@@ -549,7 +549,7 @@ def lista_iscrizioni(request):
         "stato_iscrizione",
         "condizione_iscrizione",
         "agevolazione",
-    ).all()
+    ).annotate(count_rate=Count("rate"))
     return render(request, "economia/iscrizioni/iscrizione_list.html", {"iscrizioni": iscrizioni})
 
 

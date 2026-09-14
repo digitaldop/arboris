@@ -14,8 +14,10 @@ from .models import (
     get_site_font_settings,
 )
 from .permissions import (
+    FAMILY_COMMUNICATIONS_VIEW_MODULE,
     get_user_permission_profile,
     user_can_access_database_backups,
+    user_can_communicate_with_families,
     user_has_module_permission,
     user_is_operational_admin,
 )
@@ -24,6 +26,8 @@ from .terminology import get_educator_terminology, get_family_member_terminology
 
 
 def permission_module_from_view(view_module, path=""):
+    if view_module == FAMILY_COMMUNICATIONS_VIEW_MODULE:
+        return "anagrafica"
     if view_module.startswith("anagrafica."):
         return "anagrafica"
     if view_module.startswith("osservazioni."):
@@ -320,6 +324,7 @@ def sistema_permissions_context(request):
     user = getattr(request, "user", None)
     profilo = get_user_permission_profile(user)
     current_module = get_current_permission_module(request)
+    can_communicate_with_families = user_can_communicate_with_families(user)
     can_view_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.GESTIONE)
     can_view_famiglie_interessate = user_has_module_permission(
@@ -379,6 +384,10 @@ def sistema_permissions_context(request):
     elif current_module == "gestione_amministrativa":
         can_manage_current_module = can_manage_gestione_amministrativa
 
+    current_view = getattr(getattr(request, "resolver_match", None), "func", None)
+    if getattr(current_view, "__module__", "") == FAMILY_COMMUNICATIONS_VIEW_MODULE:
+        can_manage_current_module = can_communicate_with_families
+
     servizi_extra_sidebar_items = []
     current_servizio_extra_id = None
 
@@ -415,6 +424,7 @@ def sistema_permissions_context(request):
     sidebar_menu_state = build_sidebar_menu_state(
         sidebar_menu_disabled_keys,
         {
+            "can_communicate_with_families": can_communicate_with_families,
             "can_view_anagrafica": can_view_anagrafica,
             "can_manage_anagrafica": can_manage_anagrafica,
             "can_view_famiglie_interessate": can_view_famiglie_interessate,
@@ -454,6 +464,12 @@ def sistema_permissions_context(request):
             notifiche_finanziarie_recenti = []
 
     log_riepilogo = {"log_operazioni_non_lette": 0, "log_operazioni_recenti": []}
+    reconciliation_pending_count = 0
+    can_review_reconciliations = can_manage_economia or can_manage_gestione_finanziaria
+    if can_review_reconciliations:
+        from gestione_finanziaria.reconciliation import pending_count, proposals_for_user
+
+        reconciliation_pending_count = pending_count(proposals_for_user(user))
     if can_view_system_tables:
         try:
             from .log_notifiche import riepilogo_log
@@ -464,10 +480,13 @@ def sistema_permissions_context(request):
 
     return {
         **log_riepilogo,
+        "can_review_reconciliations": can_review_reconciliations,
+        "reconciliation_pending_count": reconciliation_pending_count,
         "user_permission_profile": profilo,
         "role_theme": role_theme,
         "current_permission_module": current_module,
         "can_manage_current_module": can_manage_current_module,
+        "can_communicate_with_families": can_communicate_with_families,
         "current_module_view_only": bool(current_module) and not can_manage_current_module,
         "can_view_anagrafica": can_view_anagrafica,
         "can_manage_anagrafica": can_manage_anagrafica,

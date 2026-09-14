@@ -7,7 +7,8 @@
     <title>{% block title %}Popup - Arboris School Management{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet">
+    <link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="{{ site_fonts.google_fonts_url }}" rel="stylesheet"></noscript>
     <style>
         :root {
             --font-body: {{ site_fonts.body_css_stack|safe }};
@@ -16,7 +17,7 @@
     </style>
     <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}?v=1">
     <link rel="apple-touch-icon" href="{% static 'images/favicon.png' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=302">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=304">
     <script defer src="{% static 'js/core/icon-viewbox.js' %}?v=1"></script>
     <script defer src="{% static 'js/core/active-toggle.js' %}?v=1"></script>
     {% if role_theme %}
@@ -144,7 +145,7 @@
         })();
     </script>
     <script src="{% static 'js/core/popup-window-triggers.js' %}?v=2"></script>
-    <script src="{% static 'js/core/rich-notes.js' %}?v=7"></script>
+    <script src="{% static 'js/core/rich-notes.js' %}?v=8"></script>
     <script src="{% static 'js/core/button-intents.js' %}?v=2"></script>
     <script src="{% static 'js/core/floating-tooltips.js' %}?v=1"></script>
     <script>

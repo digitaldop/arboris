@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from django.db import close_old_connections
+from django.db import close_old_connections, connections
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ _runner_lock = threading.Lock()
 _runner_thread: threading.Thread | None = None
 _kick_lock = threading.Lock()
 _kick_thread: threading.Thread | None = None
+_last_kick_at: float | None = None
 
 
 def _env_bool(name: str) -> bool | None:
@@ -83,10 +84,10 @@ def _is_runserver_parent(argv: list[str]) -> bool:
     return os.environ.get("RUN_MAIN") not in {"true", "1"}
 
 
-def should_start_background_scheduler() -> tuple[bool, str]:
-    forced = _env_bool(ENABLE_ENV_VAR)
+def should_start_background_scheduler(*, enabled_env_var=ENABLE_ENV_VAR) -> tuple[bool, str]:
+    forced = _env_bool(enabled_env_var)
     if forced is False:
-        return False, f"{ENABLE_ENV_VAR}=0"
+        return False, f"{enabled_env_var}=0"
 
     argv = list(sys.argv)
     if _is_management_command_process(argv) and "runserver" not in argv:
@@ -97,7 +98,7 @@ def should_start_background_scheduler() -> tuple[bool, str]:
         return False, "processo autoreload in attesa"
 
     if forced is True:
-        return True, f"{ENABLE_ENV_VAR}=1"
+        return True, f"{enabled_env_var}=1"
     return True, "processo web"
 
 
@@ -125,7 +126,7 @@ def _run_due_syncs() -> None:
         maybe_run_scheduled_sync()
         maybe_run_scheduled_fatture_in_cloud_sync()
     finally:
-        close_old_connections()
+        connections.close_all()
 
 
 def _run_due_syncs_safely() -> None:
@@ -177,7 +178,7 @@ def trigger_due_sync_check_async() -> bool:
     risposta HTTP e quindi non rischia di far scattare il timeout del worker.
     """
 
-    global _kick_thread
+    global _kick_thread, _last_kick_at
 
     enabled, reason = should_start_background_scheduler()
     if not enabled:
@@ -187,6 +188,9 @@ def trigger_due_sync_check_async() -> bool:
     with _kick_lock:
         if _kick_thread and _kick_thread.is_alive():
             return False
+        now = time.monotonic()
+        if _last_kick_at is not None and now - _last_kick_at < MIN_INTERVAL_SECONDS:
+            return False
 
         _kick_thread = threading.Thread(
             target=_run_due_syncs_safely,
@@ -194,4 +198,5 @@ def trigger_due_sync_check_async() -> bool:
             daemon=True,
         )
         _kick_thread.start()
+        _last_kick_at = now
         return True

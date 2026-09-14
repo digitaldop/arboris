@@ -76,6 +76,7 @@ if USE_S3_MEDIA:
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -194,7 +195,7 @@ STORAGES = {
         "BACKEND": (
             "django.contrib.staticfiles.storage.StaticFilesStorage"
             if DEBUG or "test" in sys.argv
-            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            else "sistema.static_storage.OptimizedStaticFilesStorage"
         ),
     },
 }

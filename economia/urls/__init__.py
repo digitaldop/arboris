@@ -4,7 +4,7 @@ from economia.views import iscrizioni as iscrizioni_views
 from economia.views import impostazioni as impostazioni_views
 from economia.views import comunicazioni as comunicazioni_views
 from economia.views import scambio_retta as scambio_retta_views
-from sistema.permissions import module_edit_permission_required, module_permission_required
+from sistema.permissions import family_communications_required, module_edit_permission_required, module_permission_required
 
 
 economia_view = module_permission_required("economia")
@@ -49,17 +49,17 @@ urlpatterns = [
     path("economia/verifica-situazione-rette/", economia_view(iscrizioni_views.verifica_situazione_rette), name="verifica_situazione_rette"),
     path(
         "economia/comunicazioni-famiglie/",
-        economia_manage(comunicazioni_views.comunicazioni_famiglie),
+        family_communications_required(comunicazioni_views.comunicazioni_famiglie),
         name="comunicazioni_famiglie",
     ),
     path(
         "economia/comunicazioni-famiglie/storico/",
-        economia_manage(comunicazioni_views.storico_comunicazioni_famiglie),
+        family_communications_required(comunicazioni_views.storico_comunicazioni_famiglie),
         name="storico_comunicazioni_famiglie",
     ),
     path(
         "economia/comunicazioni-famiglie/storico/<int:pk>/",
-        economia_manage(comunicazioni_views.dettaglio_comunicazione_famiglia),
+        family_communications_required(comunicazioni_views.dettaglio_comunicazione_famiglia),
         name="dettaglio_comunicazione_famiglia",
     ),
     path("economia/scambio-retta/", economia_view(scambio_retta_views.lista_scambi_retta), name="lista_scambi_retta"),

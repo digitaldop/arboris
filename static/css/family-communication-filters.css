@@ -1,0 +1,11 @@
+.family-communication-filter-mode, .family-communication-class-options { border:0; padding:0; margin:0 0 1rem; min-width:0; }
+.family-communication-filter-mode legend, .family-communication-class-options legend { font-weight:700; margin-bottom:.65rem; }
+.family-communication-filter-mode > div { display:flex; flex-wrap:wrap; gap:.6rem 1.5rem; }
+.family-communication-filter-mode label, .family-communication-class-option { display:flex; align-items:center; gap:.65rem; cursor:pointer; }
+.family-communication-class-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:.65rem; }
+.family-communication-class-option { padding:.8rem; border:1px solid #ceddd5; background:#f7faf8; border-radius:10px; }
+.family-communication-class-option:has(input:checked) { border-color:#34785c; background:#e9f5ee; }
+.family-communication-class-option input { width:18px; height:18px; accent-color:#28734e; flex-shrink:0; }
+.family-communication-selection-summary { padding:.8rem 1rem; background:#edf5f0; border-radius:8px; font-weight:600; }
+.family-communication-filter-notice { padding:.75rem; border-radius:8px; background:#fff3d4; color:#684e17; }
+.family-communication-shell [hidden] { display:none !important; }

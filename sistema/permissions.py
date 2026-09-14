@@ -17,6 +17,7 @@ from .models import (
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+FAMILY_COMMUNICATIONS_VIEW_MODULE = "economia.views.comunicazioni"
 EDIT_MODE_QUERY_VALUES = {"1", "true", "on", "yes", "si"}
 
 
@@ -118,6 +119,30 @@ def user_can_access_database_backups(user):
         return False
 
     return profilo.accesso_backup_database_effettivo
+
+
+def user_can_communicate_with_families(user):
+    if not user or not user.is_authenticated or not user.is_active:
+        return False
+    if not module_is_enabled("anagrafica"):
+        return False
+    if user.is_superuser:
+        return True
+    profile = get_user_permission_profile(user)
+    return bool(profile and profile.accesso_comunicazioni_famiglie_effettivo)
+
+
+def family_communications_required(view_func):
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        if not getattr(request.user, "is_authenticated", False):
+            return redirect_unauthenticated_user(request)
+        if not user_can_communicate_with_families(request.user):
+            messages.error(request, "Non hai l'abilitazione alle comunicazioni alle famiglie.")
+            return redirect("home")
+        return view_func(request, *args, **kwargs)
+
+    return wrapped
 
 
 def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZIONE):

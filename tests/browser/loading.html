@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="it">
+<meta charset="utf-8">
+<title>Arboris - verifica caricamento note</title>
+<link rel="stylesheet" href="/style.css">
+<body class="popup-page">
+<main style="max-width:900px;margin:30px auto;padding:20px">
+    <h1>Verifica caricamento note</h1>
+    <p id="status">Verifiche in corso...</p>
+    <ol id="results"></ol>
+    <div id="fields">
+        <fieldset id="readonly" disabled><textarea name="note_readonly">**Nota** di prova</textarea></fieldset>
+        <textarea name="note_empty" data-popup-note-collapse="false"></textarea>
+    </div>
+</main>
+<script>
+(async function () {
+    const results = document.querySelector("#results");
+    const fields = document.querySelector("#fields");
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    let failed = 0;
+    function check(condition, label) {
+        const item = document.createElement("li");
+        item.textContent = (condition ? "PASS: " : "FAIL: ") + label;
+        results.append(item);
+        if (!condition) failed += 1;
+    }
+    const script = document.createElement("script");
+    script.src = "/rich-notes.js" + location.search;
+    await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.append(script); });
+    ArborisRichNotes.init();
+    await delay(200);
+    let mutations = 0;
+    const observer = new MutationObserver(records => { mutations += records.length; });
+    observer.observe(fields, {subtree:true, childList:true, attributes:true});
+    await delay(200);
+    observer.disconnect();
+    check(mutations === 0, "Nessun aggiornamento DOM a riposo (mutazioni: " + mutations + ")");
+    check(document.querySelector("#readonly .rich-note-preview strong")?.textContent === "Nota", "Formattazione in sola lettura");
+    const fieldset = document.querySelector("#readonly");
+    fieldset.disabled = false;
+    await delay(100);
+    check(!fieldset.querySelector(".rich-note-editor").hidden, "Passaggio alla modifica");
+    const source = fieldset.querySelector("textarea");
+    source.value = "**Nota aggiornata**";
+    source.dispatchEvent(new Event("input", {bubbles:true}));
+    fieldset.disabled = true;
+    await delay(100);
+    check(fieldset.querySelector(".rich-note-preview strong")?.textContent === "Nota aggiornata", "Anteprima aggiornata dopo modifica");
+    source.value = "**Aggiornamento esterno**";
+    source.dispatchEvent(new Event("input", {bubbles:true}));
+    check(fieldset.querySelector(".rich-note-preview strong")?.textContent === "Aggiornamento esterno", "Anteprima aggiornata dagli eventi input in sola lettura");
+    const added = document.createElement("section");
+    added.innerHTML = '<label>Note dinamiche<textarea name="note_dynamic"></textarea></label>';
+    fields.append(added);
+    await delay(100);
+    check(added.querySelector("textarea").dataset.richNotesBound === "1", "Inizializzazione automatica dei campi aggiunti");
+    const toggle = added.querySelector(".popup-note-toggle");
+    toggle.click();
+    const editor = added.querySelector(".rich-note-editor");
+    editor.innerHTML = "Testo <strong>in grassetto</strong>";
+    editor.dispatchEvent(new Event("input", {bubbles:true}));
+    check(added.querySelector("textarea").value === "Testo **in grassetto**", "Sincronizzazione del testo da salvare");
+    await delay(100);
+    mutations = 0;
+    observer.observe(fields, {subtree:true, childList:true, attributes:true});
+    await delay(200);
+    observer.disconnect();
+    check(mutations === 0, "Il popup torna inattivo dopo la modifica (mutazioni: " + mutations + ")");
+    document.querySelector("#status").textContent = failed ? failed + " verifiche fallite" : "Tutte le 8 verifiche superate";
+})().catch(error => { document.querySelector("#status").textContent = error.stack; });
+</script>
+</body>
+</html>

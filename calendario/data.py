@@ -10,7 +10,7 @@ from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivi
 from gestione_amministrativa.models import Dipendente, RuoloAziendaleDipendente, StatoDipendente
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 from sistema.models import LivelloPermesso
-from sistema.permissions import module_is_enabled, user_has_module_permission
+from sistema.permissions import user_has_module_permission
 
 from .models import (
     CategoriaCalendario,
@@ -234,18 +234,10 @@ def build_birthday_occurrence(birth_date, target_year):
 
 
 def can_include_birthday_records(user):
-    if not module_is_enabled("anagrafica"):
-        return False
-    if user is None:
-        return True
     return user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
 
 
 def can_include_staff_birthday_records(user):
-    if not module_is_enabled("gestione_amministrativa"):
-        return False
-    if user is None:
-        return True
     return user_has_module_permission(user, "gestione_amministrativa", LivelloPermesso.VISUALIZZAZIONE)
 
 
@@ -549,8 +541,6 @@ def get_document_owner_metadata(documento):
 
 
 def can_include_interested_family_records(user):
-    if user is None:
-        return True
     return user_has_module_permission(user, "famiglie_interessate", LivelloPermesso.VISUALIZZAZIONE)
 
 
@@ -611,7 +601,7 @@ def build_interested_family_activity_records(system_categories=None, user=None):
     return records
 
 
-def build_calendar_deadline_records(system_categories=None):
+def build_calendar_deadline_records(system_categories=None, user=None):
     system_categories = system_categories or ensure_system_calendar_categories()
     records = []
 
@@ -619,7 +609,7 @@ def build_calendar_deadline_records(system_categories=None):
     categoria_documenti = system_categories.get(SYSTEM_CATEGORY_DOCUMENTS)
     categoria_fornitori = system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE)
 
-    if categoria_rate and module_is_enabled("economia"):
+    if categoria_rate and user_has_module_permission(user, "economia", LivelloPermesso.VISUALIZZAZIONE):
         rate = (
             RataIscrizione.objects.filter(data_scadenza__isnull=False)
             .select_related(
@@ -655,7 +645,7 @@ def build_calendar_deadline_records(system_categories=None):
                 )
             )
 
-    if categoria_documenti and module_is_enabled("anagrafica"):
+    if categoria_documenti and user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE):
         today = timezone.localdate()
         current_year_start = date(today.year, 1, 1)
         current_year_end = date(today.year, 12, 31)
@@ -688,7 +678,7 @@ def build_calendar_deadline_records(system_categories=None):
                 )
             )
 
-    if categoria_fornitori and module_is_enabled("gestione_finanziaria"):
+    if categoria_fornitori and user_has_module_permission(user, "gestione_finanziaria", LivelloPermesso.VISUALIZZAZIONE):
         scadenze = (
             ScadenzaPagamentoFornitore.objects.exclude(
                 stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]
@@ -741,7 +731,7 @@ def build_calendar_agenda_bundle(user=None):
         for occurrence in evento.iter_occurrence_ranges():
             records.append(build_local_calendar_occurrence_record(evento, occurrence))
 
-    records.extend(build_calendar_deadline_records(system_categories))
+    records.extend(build_calendar_deadline_records(system_categories, user=user))
     records.extend(build_interested_family_activity_records(system_categories, user=user))
     records.sort(key=get_calendar_record_sort_key)
 
@@ -784,7 +774,7 @@ def build_calendar_list_bundle(categoria_filter="", query="", user=None):
     )
 
     all_records = [build_local_calendar_list_record(evento) for evento in eventi_locali]
-    all_records.extend(build_calendar_deadline_records(system_categories))
+    all_records.extend(build_calendar_deadline_records(system_categories, user=user))
     all_records.extend(build_interested_family_activity_records(system_categories, user=user))
     all_records.sort(key=get_calendar_record_sort_key)
 

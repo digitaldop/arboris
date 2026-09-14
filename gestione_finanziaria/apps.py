@@ -8,6 +8,9 @@ class GestioneFinanziariaConfig(AppConfig):
 
     def ready(self) -> None:
         from . import signals  # noqa: F401 - registra post_migrate
+        from . import reconciliation_signals  # noqa: F401
+        from .reconciliation_worker import start_analysis_worker
         from .background_scheduler import start_background_scheduler_once
 
         start_background_scheduler_once()
+        start_analysis_worker()

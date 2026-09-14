@@ -6699,7 +6699,7 @@ def import_estratto_conto(request):
                     request,
                     f"Import completato: {risultato.inseriti} movimenti inseriti "
                     f"(duplicati scartati: {risultato.duplicati}). "
-                    "La riconciliazione delle rette può essere avviata dalla pagina dedicata.",
+                    "Analisi degli abbinamenti in corso: le proposte saranno disponibili nel pulsante Riconciliazioni da verificare.",
                 )
             elif risultato.errori:
                 messages.error(

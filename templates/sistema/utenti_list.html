@@ -171,6 +171,7 @@
                                 <td>
                                     <div class="system-user-permission-stack">
                                         <span><strong>Anagrafica</strong> {{ utente.profilo_permessi_safe.permesso_anagrafica_effettivo_display }}</span>
+                                        <span><strong>Comunicazioni alle famiglie</strong> {{ utente.profilo_permessi_safe.accesso_comunicazioni_famiglie_effettivo|yesno:'Si,No' }}</span>
                                         <span><strong>Famiglie interessate</strong> {{ utente.profilo_permessi_safe.permesso_famiglie_interessate_effettivo_display }}</span>
                                         <span><strong>Rette scolastiche</strong> {{ utente.profilo_permessi_safe.permesso_economia_effettivo_display }}</span>
                                         <span><strong>Gestione finanziaria</strong> {{ utente.profilo_permessi_safe.permesso_gestione_finanziaria_effettivo_display }}</span>

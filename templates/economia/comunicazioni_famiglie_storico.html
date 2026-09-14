@@ -87,7 +87,7 @@
                                         {% if log.duplicati_saltati %}<span>{{ log.duplicati_saltati }} duplicati</span>{% endif %}
                                     </div>
                                 </td>
-                                <td>{{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username|default:"Sistema" }}</td>
+                                <td>{% if log.utente %}{{ log.utente.get_full_name|default:log.utente.email|default:log.utente.username }}{% else %}Sistema{% endif %}</td>
                                 <td class="actions-cell">
                                     <a href="{% url 'dettaglio_comunicazione_famiglia' log.pk %}" class="table-icon-link" aria-label="Apri dettaglio comunicazione" data-floating-text="Dettaglio">
                                         <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#eye"></use></svg>
