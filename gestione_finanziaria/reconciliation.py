@@ -201,7 +201,7 @@ def invalidate_changed(queryset):
         except ValidationError:
             valid = False
         if not valid:
-            PropostaRiconciliazione.objects.filter(pk=record.pk).update(stato=S.SUPERATA, data_aggiornamento=timezone.now())
+            PropostaRiconciliazione.objects.filter(pk=record.pk, stato=S.APERTA).update(stato=S.SUPERATA, data_aggiornamento=timezone.now())
 
 
 def analyse_request(tipo, pk):
@@ -310,11 +310,16 @@ def analyse_request(tipo, pk):
 def decide_proposal(pk, action, *, user):
     if action not in {"conferma", "rifiuta", "riapri"}:
         raise ValidationError("Azione non valida.")
-    StatoAnalisiRiconciliazione.objects.get_or_create(pk=1)
-    StatoAnalisiRiconciliazione.objects.select_for_update().get(pk=1)
+    # Rejecting a suggestion does not touch bank balances or run analysis. Only
+    # confirmations/reopening need to wait for the matching worker's global lock.
+    if action != "rifiuta":
+        StatoAnalisiRiconciliazione.objects.get_or_create(pk=1)
+        StatoAnalisiRiconciliazione.objects.select_for_update().get(pk=1)
     record = PropostaRiconciliazione.objects.select_for_update().get(pk=pk)
     if record.ambito not in allowed_scopes(user):
         raise PermissionDenied
+    if action == "rifiuta" and record.stato == S.RIFIUTATA:
+        return True, "Proposta già rifiutata."
     if action == "riapri" and record.stato != S.RIFIUTATA:
         raise ValidationError("La proposta non è rifiutata.")
     if action != "riapri" and record.stato != S.APERTA:
@@ -348,5 +353,6 @@ def decide_proposal(pk, action, *, user):
             query |= _affected_query("movimento", row["movimento_id"])
             query |= _affected_query("rata" if row["target_tipo"] == "rata" else "scadenza", row["target_id"])
         invalidate_changed(PropostaRiconciliazione.objects.filter(query))
-    regroup_cases()
+    if action != "rifiuta":
+        regroup_cases()
     return True, {"conferma": "Riconciliazione registrata.", "rifiuta": "Proposta rifiutata.", "riapri": "Proposta riaperta."}[action]

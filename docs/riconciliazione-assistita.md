@@ -8,15 +8,17 @@ Gli import di movimenti bancari, fatture e scadenze accodano una ricerca di poss
 
 Il pulsante **Riconciliazioni da verificare**, nell'intestazione, mostra il numero dei casi aperti e viene evidenziato quando il numero è positivo. Il popup si apre soltanto al clic. Il contatore si aggiorna ogni 30 secondi quando la pagina è visibile e dopo le decisioni nel popup.
 
-Il popup separa rette e fornitori. Ogni proposta espone movimento, destinatario, scadenza, importo assegnato, residui successivi e motivi della compatibilità. Sono gestiti abbinamenti singoli, parziali e cumulativi, anche con più movimenti. Il punteggio è un indice di compatibilità delle regole esistenti, non una probabilità statistica.
+Il popup separa rette e fornitori. Ogni riga mostra a sinistra la retta o la scadenza/fattura e a destra il movimento bancario. Le alternative per le stesse destinazioni sono raccolte in un menu a tendina, ordinate per compatibilità. Cambiare candidato aggiorna dettagli, importi, residui, selezione e colore della riga. Sono gestiti abbinamenti singoli, parziali e cumulativi, anche con più movimenti: una proposta cumulativa mantiene insieme tutte le proprie allocazioni.
+
+La scala continua va dal rosso (0) al verde (100). Al colore si affiancano il punteggio e un'indicazione testuale: bassa sotto 50, media da 50, alta da 75, molto alta da 90. I motivi sono consultabili in un dettaglio espandibile. Il punteggio è un indice di compatibilità delle regole esistenti, non una probabilità statistica.
 
 - **Conferma abbinamento** registra il pagamento usando i servizi contabili esistenti.
-- **Rifiuta** conserva la decisione senza registrare pagamenti. La stessa proposta non riappare a ogni import.
+- **Rifiuta** scarta tutte le alternative della riga, conservando le decisioni senza registrare pagamenti. La riga sparisce subito e il salvataggio avviene in background, senza ricaricare la pagina o mostrare il caricamento generale. In caso di errore le opzioni non salvate vengono ripristinate con un avviso; quelle salvate rimangono escluse. Ripetere un rifiuto già registrato non duplica lo storico. La stessa proposta non riappare a ogni import.
 - **Riapri proposta**, nella vista delle rifiutate, consente una nuova valutazione.
 - La selezione multipla mostra numero e totale delle proposte. Alternative che usano gli stessi movimenti o le stesse scadenze non possono essere confermate insieme.
 - **Più tardi**, o la chiusura della finestra, conserva le proposte aperte.
 
-Il contatore raggruppa le alternative collegate nello stesso caso. Le viste sono paginate a 20 proposte. Le proposte rifiutate, confermate e superate restano consultabili con lo storico delle decisioni.
+Il contatore raggruppa le alternative collegate nello stesso caso. Le viste sono paginate a 20 righe di destinazioni, mantenendo tutti i candidati della stessa riga nella medesima pagina. Dopo i rifiuti, «Carica altre proposte» recupera gli elementi spostati nella pagina corrente, senza saltarli per effetto della nuova paginazione. Le proposte rifiutate, confermate e superate restano consultabili con lo storico delle decisioni.
 
 ## Correttezza e autorizzazioni
 
@@ -34,7 +36,9 @@ La ricerca assistita riguarda movimenti bancari in EUR, non ignorati e non soste
 
 Le richieste sono persistenti e deduplicate per oggetto. Vengono scritte nella stessa transazione dei dati importati; il worker viene risvegliato dopo il commit. Un rollback dell'import non lascia richieste di analisi.
 
-Il worker elabora fino a 40 richieste per passaggio e controlla il limite di 20 secondi tra le richieste. Una singola analisi può superare tale limite. La ricerca e le decisioni sono serializzate tramite un lock nel database per evitare corse fra processi. Gli oggetti necessari alle proposte vengono caricati a gruppi, mentre contatore e popup leggono proposte già preparate: non eseguono il matching durante il caricamento della pagina.
+Il worker elabora fino a 40 richieste per passaggio e controlla il limite di 20 secondi tra le richieste. Una singola analisi può superare tale limite. La ricerca, le conferme e le riaperture sono serializzate tramite un lock nel database per evitare corse fra processi. Il rifiuto blocca solo la propria proposta, senza attendere il lock generale o ricalcolare tutti i casi; i raggruppamenti vengono riallineati dalle analisi o dalle decisioni successive. L'invalidazione dell'analisi non sovrascrive i rifiuti arrivati nel frattempo.
+
+Gli oggetti necessari alle proposte vengono caricati a gruppi, mentre contatore e popup leggono proposte già preparate: non eseguono il matching durante il caricamento della pagina. La paginazione legge le identità delle allocazioni, caricando dettagli e storico solo per le righe visualizzate. Le richieste di rifiuto e del contatore non attivano l'indicatore globale di attesa; le operazioni che richiedono una navigazione conservano il comportamento precedente.
 
 Senza broker Celery il lavoro viene eseguito in un thread del processo web. Con `CELERY_BROKER_URL` configurato viene inviato al task `gestione_finanziaria.tasks.analyse_reconciliation_task`: serve quindi un worker Celery attivo. Un controllo ogni 30 secondi riprende le richieste rimaste in coda, anche dopo un riavvio. Gli errori di analisi prevedono un nuovo tentativo dopo due minuti e un avviso nel popup; i dettagli tecnici restano nei log.
 
@@ -75,3 +79,10 @@ Per ripetere i test della funzionalità:
 ```powershell
 .venv\Scripts\python.exe -B manage.py test gestione_finanziaria.test_reconciliation_review
 ```
+
+## Revisione interfaccia e rifiuto del 14 settembre 2026
+
+- 36 test mirati superati, inclusi 11 nuovi test in `gestione_finanziaria/test_reconciliation_interface.py`: alternative, paginazione, cumulativi, rifiuti JSON, invio senza JavaScript, candidato confermato, permessi, idempotenza e concorrenza con il worker.
+- Suite completa: **886 test, 767 superati, 119 già esclusi, nessun errore o fallimento**.
+- Browser su dati fittizi isolati: cambio candidato e colore, conservazione della selezione, rifiuto individuale e multiplo, storico, conferma del candidato selezionato e assenza di errori JavaScript. Con risposta ritardata di quattro secondi, la riga risulta già nascosta al primo controllo (circa 300 ms, comprensivi dell'automazione). Le altre righe rimangono utilizzabili e non compare il caricamento globale. Verificati ripristino dopo errore HTTP 503 simulato e salvataggio durante il cambio di scheda Rette/Fornitori.
+- Controlli Django, migrazioni, sintassi JavaScript e Git superati. Nessuna nuova migrazione. Aggiornate le versioni degli asset statici; pubblicazione su Render da eseguire.

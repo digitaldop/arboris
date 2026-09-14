@@ -2,12 +2,12 @@
 {% load static currency %}
 {% block title %}Riconciliazioni da verificare - Arboris{% endblock %}
 {% block content %}
-{% if popup %}<link rel="stylesheet" href="{% static 'css/reconciliation-review.css' %}?v=1">
-<script defer src="{% static 'js/core/reconciliation-review.js' %}?v=1"></script>{% endif %}
+{% if popup %}<link rel="stylesheet" href="{% static 'css/reconciliation-review.css' %}?v=2">
+<script defer src="{% static 'js/core/reconciliation-review.js' %}?v=2"></script>{% endif %}
 <div class="reconciliation-review{% if popup %} reconciliation-review-popup{% endif %}" data-reconciliation-review data-initial-count="{{ totale_casi }}" data-status-url="{% url 'stato_proposte_riconciliazione' %}?ambito={{ ambito }}">
     <div class="review-heading">
         <div><p class="review-eyebrow">CONTROLLO DEI PAGAMENTI</p><h1>Riconciliazioni da verificare</h1>
-        <p>Controlla gli abbinamenti suggeriti. I pagamenti vengono registrati soltanto alla conferma.</p></div>
+        <p>Scegli il movimento da collegare a ogni {% if ambito == 'rate' %}retta{% else %}scadenza{% endif %}. Il pagamento si registra solo alla conferma.</p></div>
         {% if popup %}<button type="button" class="btn btn-secondary" data-review-close>Più tardi</button>{% endif %}
     </div>
     <div class="review-toolbar">
@@ -22,50 +22,80 @@
             </select><button class="btn btn-secondary" type="submit">Filtra</button>
         </form>
     </div>
+    <div class="review-legend">
+        <div><strong>Compatibilità dell'abbinamento</strong><p>Confronto di nominativo, importo e data. Il colore aiuta a valutare, ma la scelta resta tua.</p></div>
+        <div class="review-scale" aria-label="Scala di compatibilità: da 0, bassa in rosso, a 100, alta in verde">
+            <div class="review-scale-gradient"></div><div class="review-scale-labels"><span>0 · Bassa</span><span>50 · Media</span><span>100 · Alta</span></div>
+        </div>
+    </div>
     <p class="review-analysis" role="status" data-analysis-state>{% if analysis_error %}Analisi rinviata: il sistema riproverà automaticamente.{% elif analysis_pending %}Analisi in corso. Gli abbinamenti saranno disponibili al completamento.{% else %}{{ totale_casi }} casi da verificare.{% endif %}</p>
     <p class="review-refresh" data-review-refresh hidden>Sono disponibili aggiornamenti. <a href="">Aggiorna le proposte</a></p>
+    <p class="review-error" role="alert" data-review-error hidden></p>
+    {% if stato == 'aperta' %}<p class="review-help">Le alternative sono ordinate per compatibilità. <strong>Rifiuta</strong> scarta tutti gli abbinamenti proposti nella riga, conservandoli nello storico.</p>{% endif %}
     <form method="post" action="{% url 'decidi_proposte_riconciliazione' %}" data-review-form>
         {% csrf_token %}<input type="hidden" name="ambito" value="{{ ambito }}"><input type="hidden" name="popup" value="{% if popup %}1{% else %}0{% endif %}">
         {% for gruppo in gruppi %}
-        <section class="review-case" aria-label="Caso da verificare">
-            {% if gruppo|length > 1 %}<p class="review-alternatives">Alternative dello stesso caso: confronta gli abbinamenti prima di scegliere.</p>{% endif %}
-            {% for proposta in gruppo %}
-            <article class="review-card">
-                <div class="review-card-head">
-                    <label class="review-select">
-                        {% if stato == 'aperta' %}<input type="checkbox" name="proposte" value="{{ proposta.pk }}" data-proposal-total-cents="{{ proposta.totale_centesimi }}" data-proposal-nodes="{{ proposta.conflict_nodes }}" aria-label="Seleziona proposta {{ proposta.pk }}">{% endif %}
-                        <strong>EUR {{ proposta.totale|euro }}</strong>
-                        {% if proposta.allocazioni|length > 1 %}<span class="review-chip">Pagamento cumulativo</span>{% endif %}
-                    </label>
-                    <span class="review-confidence">Compatibilità {{ proposta.compatibilita }}/100</span>
+        <article class="review-card" data-review-row data-reject-ids="{{ gruppo.ids }}" style="--match-confidence: {{ gruppo.proposte.0.compatibilita }}">
+            <div class="review-row-heading">
+                <strong>{% if ambito == 'rate' %}Retta{% else %}Scadenza / fattura{% endif %}{% if gruppo.proposte.0.destinazioni|length > 1 %} · Pagamento cumulativo{% endif %}</strong>
+                {% if gruppo.proposte|length > 1 %}
+                <div class="review-option-picker">
+                    <label for="review-choice-{{ gruppo.id }}">Movimenti proposti <span data-option-count>({{ gruppo.proposte|length }})</span></label>
+                    <select id="review-choice-{{ gruppo.id }}" data-proposal-choice aria-label="Movimento proposto per {{ gruppo.proposte.0.destinazioni.0.intestatario }} · {{ gruppo.proposte.0.destinazioni.0.riferimento }}">
+                        {% for proposta in gruppo.proposte %}<option value="{{ proposta.pk }}">{{ proposta.option_label }}</option>{% endfor %}
+                    </select>
                 </div>
-                {% for riga in proposta.righe %}
+                {% else %}<span class="review-single-label">Movimento bancario proposto</span>{% endif %}
+            </div>
+            {% for proposta in gruppo.proposte %}
+            <section data-proposal-panel="{{ proposta.pk }}" data-confidence="{{ proposta.compatibilita }}">
                 <div class="review-allocation">
-                    <div><span class="review-label">Movimento bancario</span><strong>{{ riga.movimento.controparte|default:riga.movimento.conto }}</strong>
-                        <p>{{ riga.data_movimento|date:'d/m/Y' }} · {{ riga.movimento.conto }}</p><p>{{ riga.movimento.causale }}</p>
-                        <p>Disponibile: <strong>EUR {{ riga.movimento.disponibile|euro }}</strong> · Residuo successivo: EUR {{ riga.residuo_movimento|euro }}</p></div>
-                    <div class="review-arrow" aria-hidden="true">→</div>
-                    <div><span class="review-label">{% if ambito == 'rate' %}Retta{% else %}Scadenza fornitore{% endif %}</span><strong>{{ riga.destinazione.intestatario }}</strong>
-                        <p>{{ riga.destinazione.riferimento }}{% if riga.destinazione.anno %} · {{ riga.destinazione.anno }}{% endif %}</p>
-                        <p>Scadenza: {{ riga.data_scadenza|date:'d/m/Y'|default:'Non indicata' }} · Residuo: EUR {{ riga.destinazione.residuo|euro }}</p>
-                        <p>Da abbinare: <strong>EUR {{ riga.importo|euro }}</strong> · Residuo successivo: EUR {{ riga.residuo|euro }}</p></div>
+                    <div class="review-targets">
+                        {% for destinazione in proposta.destinazioni %}
+                        <div class="review-item">
+                            <strong class="review-party">{{ destinazione.intestatario }}</strong>
+                            <p>{{ destinazione.riferimento }}{% if destinazione.anno %} · {{ destinazione.anno }}{% endif %}</p>
+                            <p>Scadenza: <strong>{{ destinazione.data_scadenza|date:'d/m/Y'|default:'Non indicata' }}</strong></p>
+                            <p>Da saldare: <strong>EUR {{ destinazione.residuo|euro }}</strong></p>
+                            <p>Da abbinare: <strong>EUR {{ destinazione.importo_abbinato|euro }}</strong> · Residuo successivo: EUR {{ destinazione.residuo_successivo|euro }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="review-movements">
+                        <div class="review-match-summary"><span class="review-confidence">{{ proposta.compatibilita_label }} · {{ proposta.compatibilita }}/100</span>{% if proposta.movimenti|length > 1 %}<span class="review-chip">{{ proposta.movimenti|length }} movimenti insieme</span>{% endif %}</div>
+                        {% for movimento in proposta.movimenti %}
+                        <div class="review-item">
+                            <strong class="review-party">{{ movimento.controparte|default:movimento.conto }}</strong>
+                            <p>{{ movimento.data_movimento|date:'d/m/Y' }} · {{ movimento.conto }} · #{{ movimento.id }}</p>
+                            <p class="review-causale">{{ movimento.causale }}</p>
+                            <p>Movimento: <strong>EUR {{ movimento.importo|euro }}</strong> · Disponibile: EUR {{ movimento.disponibile|euro }}</p>
+                            <p>Da abbinare: <strong>EUR {{ movimento.importo_abbinato|euro }}</strong> · Residuo successivo: EUR {{ movimento.residuo_successivo|euro }}</p>
+                        </div>
+                        {% endfor %}
+                        <details class="review-reasons"><summary>Perché questo abbinamento</summary><ul>{% for motivo in proposta.motivazioni %}<li>{{ motivo }}</li>{% endfor %}</ul></details>
+                    </div>
                 </div>
-                {% endfor %}
-                <div class="review-reasons"><span class="review-label">Motivi della proposta</span><ul>{% for motivo in proposta.motivazioni %}<li>{{ motivo }}</li>{% endfor %}</ul></div>
-                <div class="review-actions">
-                    {% if stato == 'aperta' %}
-                        <button type="submit" class="btn btn-secondary" name="proposta" value="{{ proposta.pk }}" data-review-action="rifiuta">Rifiuta</button>
-                        <button type="submit" class="btn btn-primary" name="proposta" value="{{ proposta.pk }}" data-review-action="conferma">Conferma abbinamento</button>
-                    {% elif stato == 'rifiutata' %}
-                        <button type="submit" class="btn btn-secondary" name="proposta" value="{{ proposta.pk }}" data-review-action="riapri">Riapri proposta</button>
-                    {% endif %}
+                <div class="review-card-foot">
+                    <label class="review-select">
+                        {% if stato == 'aperta' %}<input type="checkbox" name="proposte" value="{{ proposta.pk }}" data-proposal-total-cents="{{ proposta.totale_centesimi }}" data-proposal-nodes="{{ proposta.conflict_nodes }}" aria-label="Seleziona {{ proposta.destinazioni.0.intestatario }} · {{ proposta.destinazioni.0.riferimento }}">{% endif %}
+                        <span>Totale da abbinare <strong>EUR {{ proposta.totale|euro }}</strong></span>
+                    </label>
+                    <div class="review-actions">
+                        {% if stato == 'aperta' %}
+                            <button type="submit" class="btn btn-secondary" name="decisione" value="rifiuta:{{ gruppo.ids }}" data-review-action="rifiuta">Rifiuta</button>
+                            <button type="submit" class="btn btn-primary" name="decisione" value="conferma:{{ proposta.pk }}" data-review-action="conferma">Conferma abbinamento</button>
+                        {% elif stato == 'rifiutata' %}
+                            <button type="submit" class="btn btn-secondary" name="decisione" value="riapri:{{ proposta.pk }}" data-review-action="riapri">Riapri proposta</button>
+                        {% endif %}
+                    </div>
                 </div>
-                {% if stato != 'aperta' or proposta.decisioni.all %}<details><summary>Storico decisioni</summary><ul>{% for decisione in proposta.decisioni.all %}<li>{{ decisione.data|date:'d/m/Y H:i' }} · {{ decisione.utente|default:'Operatore non più disponibile' }} · {{ decisione.azione }}</li>{% empty %}<li>I dati della proposta sono cambiati.</li>{% endfor %}</ul></details>{% endif %}
-            </article>
+                {% if stato != 'aperta' or proposta.decisioni.all %}<details class="review-history"><summary>Storico decisioni</summary><ul>{% for decisione in proposta.decisioni.all %}<li>{{ decisione.data|date:'d/m/Y H:i' }} · {{ decisione.utente|default:'Operatore non più disponibile' }} · {{ decisione.azione }}</li>{% empty %}<li>I dati della proposta sono cambiati.</li>{% endfor %}</ul></details>{% endif %}
+            </section>
             {% endfor %}
-        </section>
-        {% empty %}<div class="review-empty"><strong>Nessuna proposta in questa vista.</strong><p>Gli abbinamenti trovati dopo gli import compariranno qui. Chiudere questa finestra conserva le proposte ancora da verificare.</p></div>{% endfor %}
-        {% if stato == 'aperta' and gruppi %}<div class="review-bulk">
+        </article>
+        {% endfor %}
+        <div class="review-empty" data-review-empty {% if gruppi %}hidden{% endif %}><strong>Nessuna proposta in questa pagina.</strong><p>Le nuove proposte saranno disponibili dopo l'analisi. Puoi consultare le altre pagine o chiudere la finestra.</p>{% if pagina.has_next %}<a href="" class="btn btn-secondary">Carica altre proposte</a>{% endif %}</div>
+        {% if stato == 'aperta' and gruppi %}<div class="review-bulk" data-review-bulk>
             <span data-selection-summary>Nessuna proposta selezionata</span>
             <button type="submit" class="btn btn-secondary" name="azione" value="rifiuta" data-bulk-decision disabled>Rifiuta selezionate</button>
             <button type="submit" class="btn btn-primary" name="azione" value="conferma" data-bulk-decision disabled>Conferma selezionate</button>
@@ -74,7 +104,7 @@
     {% if pagina.has_other_pages %}<nav class="review-pagination" aria-label="Pagine delle proposte">
         {% if pagina.has_previous %}<a href="?ambito={{ ambito }}&amp;stato={{ stato }}&amp;pagina={{ pagina.previous_page_number }}{% if popup %}&amp;popup=1{% endif %}">Precedente</a>{% endif %}
         <span>Pagina {{ pagina.number }} di {{ pagina.paginator.num_pages }}</span>
-        {% if pagina.has_next %}<a href="?ambito={{ ambito }}&amp;stato={{ stato }}&amp;pagina={{ pagina.next_page_number }}{% if popup %}&amp;popup=1{% endif %}">Successiva</a>{% endif %}
+        {% if pagina.has_next %}<a data-review-next href="?ambito={{ ambito }}&amp;stato={{ stato }}&amp;pagina={{ pagina.next_page_number }}{% if popup %}&amp;popup=1{% endif %}">Successiva</a>{% endif %}
     </nav>{% endif %}
 </div>
 {% endblock %}

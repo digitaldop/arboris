@@ -57,6 +57,7 @@ from .models import (
     TipoContrattoDipendente,
 )
 from .services import compensi_lavorativi_dipendente, contratto_applicabile, crea_o_aggiorna_previsione_busta_paga
+from .payroll_matrix import PAYMENT_FILTERS, build_payroll_matrix
 
 
 ZERO = Decimal("0.00")
@@ -1254,16 +1255,59 @@ def genera_previsione_busta_paga(request, dipendente_pk):
 
 
 def lista_buste_paga_dipendenti(request):
-    buste = BustaPagaDipendente.objects.select_related("dipendente", "contratto", "contratto__tipo_contratto")
+    buste = BustaPagaDipendente.objects.select_related("dipendente__persona_collegata", "contratto", "contratto__tipo_contratto")
+    vista = "matrice" if request.GET.get("vista") == "matrice" else "elenco"
     anno = (request.GET.get("anno") or "").strip()
     mese = (request.GET.get("mese") or "").strip()
     dipendente_id = (request.GET.get("dipendente") or "").strip()
-    if anno.isdigit():
+    if not (anno.isascii() and anno.isdecimal() and len(anno) == 4 and 2000 <= int(anno) <= 2100):
+        anno = str(timezone.localdate().year) if vista == "matrice" else ""
+    if mese not in {str(value) for value, _ in BUSTA_PAGA_MONTH_CHOICES}:
+        mese = ""
+    if not (dipendente_id.isascii() and dipendente_id.isdecimal() and len(dipendente_id) <= 18):
+        dipendente_id = ""
+    if anno:
         buste = buste.filter(anno=int(anno))
-    if mese.isdigit():
+    if mese:
         buste = buste.filter(mese=int(mese))
-    if dipendente_id.isdigit():
+    if dipendente_id:
         buste = buste.filter(dipendente_id=int(dipendente_id))
+
+    tab_params = request.GET.copy()
+    for key, value in (("anno", anno), ("mese", mese), ("dipendente", dipendente_id)):
+        tab_params[key] = value
+    tab_params["vista"] = "elenco"
+    elenco_url = f"{reverse('lista_buste_paga_dipendenti')}?{tab_params.urlencode()}"
+    tab_params["vista"] = "matrice"
+    matrice_url = f"{reverse('lista_buste_paga_dipendenti')}?{tab_params.urlencode()}"
+    context = {
+        "vista": vista, "anno": anno, "mese": mese, "dipendente_id": dipendente_id,
+        "elenco_url": elenco_url, "matrice_url": matrice_url,
+        "dipendenti": Dipendente.objects.select_related("persona_collegata").order_by(
+            "persona_collegata__cognome", "persona_collegata__nome"
+        ),
+        "mesi_busta_paga": BUSTA_PAGA_MONTH_CHOICES,
+    }
+    if vista == "matrice":
+        ricerca = (request.GET.get("q") or "").strip()
+        for parola in ricerca.split():
+            buste = buste.filter(
+                Q(dipendente__persona_collegata__nome__icontains=parola)
+                | Q(dipendente__persona_collegata__cognome__icontains=parola)
+            )
+        stato_pagamento = request.GET.get("stato_pagamento", "")
+        if stato_pagamento not in dict(PAYMENT_FILTERS):
+            stato_pagamento = ""
+        mesi = [(value, label) for value, label in BUSTA_PAGA_MONTH_CHOICES if not mese or str(value) == mese]
+        matrice = build_payroll_matrix(
+            buste.select_related("movimento_pagamento").prefetch_related("pagamenti"),
+            mesi, stato_pagamento,
+        )
+        context.update({
+            "matrice": matrice, "buste_stats": matrice["totali"], "ricerca": ricerca,
+            "stato_pagamento": stato_pagamento, "stati_pagamento": PAYMENT_FILTERS,
+        })
+        return render(request, "gestione_amministrativa/dipendenti/busta_paga_list.html", context)
 
     buste_aggregate = buste.aggregate(
         netto_previsto=Sum("netto_previsto"),
@@ -1282,19 +1326,8 @@ def lista_buste_paga_dipendenti(request):
         "costo_effettivo": buste_aggregate["costo_effettivo"] or ZERO,
     }
 
-    return render(
-        request,
-        "gestione_amministrativa/dipendenti/busta_paga_list.html",
-        {
-            "buste": buste,
-            "buste_stats": buste_stats,
-            "anno": anno,
-            "mese": mese,
-            "dipendente_id": dipendente_id,
-            "dipendenti": Dipendente.objects.order_by("persona_collegata__cognome", "persona_collegata__nome"),
-            "mesi_busta_paga": BUSTA_PAGA_MONTH_CHOICES,
-        },
-    )
+    context.update({"buste": buste, "buste_stats": buste_stats})
+    return render(request, "gestione_amministrativa/dipendenti/busta_paga_list.html", context)
 
 
 def crea_busta_paga_dipendente(request):

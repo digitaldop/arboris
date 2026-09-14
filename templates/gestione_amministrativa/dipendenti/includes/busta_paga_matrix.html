@@ -1,0 +1,122 @@
+{% load static currency %}
+<section class="scambio-list-filter-card" aria-label="Filtri matrice pagamenti">
+    <form method="get" class="scambio-list-filter-form ga-payroll-filters">
+        <input type="hidden" name="vista" value="matrice">
+        <label class="scambio-list-search ga-buste-search">
+            <span class="scambio-list-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
+            <input type="search" name="q" value="{{ ricerca }}" placeholder="Cerca dipendente..." aria-label="Cerca dipendente nella matrice">
+        </label>
+        <label class="scambio-list-filter-field ga-buste-filter-short">
+            <span>Anno</span><input type="number" name="anno" value="{{ anno }}" min="2000" max="2100" required>
+        </label>
+        <label class="scambio-list-filter-field">
+            <span>Mese</span>
+            <select name="mese">
+                <option value="">Tutti</option>
+                {% for value, label in mesi_busta_paga %}<option value="{{ value }}" {% if mese == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="scambio-list-filter-field">
+            <span>Dipendente</span>
+            <select name="dipendente">
+                <option value="">Tutti</option>
+                {% for dipendente in dipendenti %}<option value="{{ dipendente.pk }}" {% if dipendente_id == dipendente.pk|stringformat:'s' %}selected{% endif %}>{{ dipendente }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="scambio-list-filter-field">
+            <span>Stato pagamento</span>
+            <select name="stato_pagamento">
+                {% for value, label in stati_pagamento %}<option value="{{ value }}" {% if stato_pagamento == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="btn btn-secondary">Filtra</button>
+        <a href="{% url 'lista_buste_paga_dipendenti' %}?vista=matrice" class="btn btn-secondary">Pulisci</a>
+    </form>
+</section>
+
+<section class="scambio-list-kpi-grid" aria-label="Riepilogo pagamenti filtrati">
+    <article class="scambio-list-kpi-card"><div class="scambio-list-kpi-copy">
+        <span class="scambio-list-kpi-label">Netto dovuto</span>
+        <strong class="scambio-list-kpi-value">{{ matrice.totali.dovuto|euro }} &euro;</strong>
+        <span class="scambio-list-kpi-note">{{ matrice.totali.totale }} bust{{ matrice.totali.totale|pluralize:"a,e" }} nei filtri selezionati</span>
+    </div></article>
+    <article class="scambio-list-kpi-card"><div class="scambio-list-kpi-copy">
+        <span class="scambio-list-kpi-label">Pagato</span>
+        <strong class="scambio-list-kpi-value is-green">{{ matrice.totali.pagato|euro }} &euro;</strong>
+        <span class="scambio-list-kpi-note">Buste saldate: {{ matrice.totali.pagate }}</span>
+    </div></article>
+    <article class="scambio-list-kpi-card"><div class="scambio-list-kpi-copy">
+        <span class="scambio-list-kpi-label">Da pagare</span>
+        <strong class="scambio-list-kpi-value ga-payroll-unpaid-value">{{ matrice.totali.residuo|euro }} &euro;</strong>
+        <span class="scambio-list-kpi-note">Buste con residuo: {{ matrice.totali.da_pagare }}, parziali: {{ matrice.totali.parziali }}</span>
+    </div></article>
+    <article class="scambio-list-kpi-card"><div class="scambio-list-kpi-copy">
+        <span class="scambio-list-kpi-label">Di cui da previsione</span>
+        <strong class="scambio-list-kpi-value is-amber">{{ matrice.totali.residuo_previsto|euro }} &euro;</strong>
+        <span class="scambio-list-kpi-note">Buste con netto previsto: {{ matrice.totali.previste }}</span>
+    </div></article>
+</section>
+
+<section class="scambio-list-card ga-payroll-card" aria-labelledby="ga-payroll-title">
+    <div class="scambio-list-card-head ga-payroll-head">
+        <div>
+            <h2 id="ga-payroll-title">Matrice pagamenti &middot; {{ anno }}</h2>
+            <p class="ga-payroll-note" id="ga-payroll-help">Dipendenti in ordine alfabetico. Clicca su una busta per aprirla; scorri in orizzontale per vedere tutti i mesi.</p>
+        </div>
+        <span class="scambio-list-status-chip is-muted">{{ matrice.righe|length }} dipendent{{ matrice.righe|length|pluralize:"e,i" }}</span>
+    </div>
+    <div class="ga-payroll-legend" aria-label="Legenda pagamenti">
+        <span><i class="is-pagata" aria-hidden="true"></i>Pagata</span>
+        <span><i class="is-parziale" aria-hidden="true"></i>Parziale</span>
+        <span><i class="is-non_pagata" aria-hidden="true"></i>Da pagare</span>
+        <span><i class="is-da_definire" aria-hidden="true"></i>Importo da definire</span>
+        <span><i class="is-assente" aria-hidden="true"></i>Nessuna busta</span>
+    </div>
+    <p class="ga-payroll-note ga-payroll-explanation">Il dovuto usa il netto effettivo, oppure il netto previsto se assente. I pagamenti comprendono le quote collegate e le buste segnate come pagate. Le celle tratteggiate non entrano nei totali.</p>
+    {% if matrice.totali.da_definire %}<p class="ga-payroll-note ga-payroll-explanation">Buste con importo da definire: {{ matrice.totali.da_definire }}. Non aumentano il residuo.</p>{% endif %}
+    {% if matrice.totali.eccedenza %}<p class="ga-payroll-note ga-payroll-explanation">Pagamenti eccedenti il netto: &euro; {{ matrice.totali.eccedenza|euro }}. Le eccedenze non compensano i residui delle altre buste.</p>{% endif %}
+    <div class="ga-payroll-scroll" role="region" aria-label="Matrice pagamenti per dipendente e mese" aria-describedby="ga-payroll-help" tabindex="0">
+        <table class="ga-payroll-table">
+            <caption class="sr-only">Buste paga {{ anno }}: dovuto, pagato e residuo per dipendente e mese, secondo i filtri selezionati.</caption>
+            <thead><tr>
+                <th scope="col" class="ga-payroll-sticky">Dipendente</th>
+                {% for colonna in matrice.colonne %}<th scope="col">{{ colonna.label }}</th>{% endfor %}
+                <th scope="col">Totale periodo</th>
+            </tr></thead>
+            <tbody>
+                {% for riga in matrice.righe %}
+                    <tr>
+                        <th scope="row" class="ga-payroll-sticky"><a class="ga-payroll-person" href="{% url 'modifica_dipendente' riga.dipendente.pk %}">{{ riga.dipendente }}<small>{{ riga.totale }} bust{{ riga.totale|pluralize:"a,e" }}</small></a></th>
+                        {% for cella in riga.celle %}
+                            {% if cella.busta %}
+                                <td class="is-{{ cella.stato }}">
+                                    <a class="ga-payroll-cell" href="{% url 'modifica_busta_paga_dipendente' cella.busta.pk %}" data-window-popup="1" data-popup-url="{% url 'modifica_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-popup-window-name="arboris-busta-paga-popup" data-popup-window-features="width=1180,height=860,resizable=yes,scrollbars=yes" aria-label="{{ riga.dipendente }} - {{ cella.busta.periodo_label }} - {{ cella.stato_label }}">
+                                        <span class="ga-payroll-status">{{ cella.stato_label }}</span>
+                                        {% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=cella only %}
+                                        {% if cella.data_pagamento %}<span class="ga-payroll-date">Ultimo pagamento {{ cella.data_pagamento|date:'d/m/Y' }}</span>{% endif %}
+                                        {% if cella.prevista %}<span class="ga-payroll-badge">Netto previsto</span>{% elif cella.bozza %}<span class="ga-payroll-badge">Bozza</span>{% endif %}
+                                    </a>
+                                    {% if can_manage_gestione_amministrativa and cella.residuo %}
+                                        <a class="ga-payroll-reconcile" href="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-window-popup="1" data-popup-url="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-popup-window-name="arboris-busta-paga-reconcile-popup" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" aria-label="Collega pagamento {{ riga.dipendente }} - {{ cella.busta.periodo_label }}">Collega pagamento</a>
+                                    {% endif %}
+                                </td>
+                            {% elif cella.esclusa %}
+                                <td class="ga-payroll-empty is-da_definire"><span>Fuori filtro</span></td>
+                            {% else %}
+                                <td class="ga-payroll-empty is-assente"><span aria-label="Nessuna busta paga">&mdash;</span></td>
+                            {% endif %}
+                        {% endfor %}
+                        <td class="ga-payroll-totals">{% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=riga only %}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{{ matrice.num_colonne }}"><div class="empty-state">Nessuna busta paga trovata per i filtri selezionati.</div></td></tr>
+                {% endfor %}
+            </tbody>
+            {% if matrice.righe %}<tfoot><tr>
+                <th scope="row" class="ga-payroll-sticky">Totali</th>
+                {% for colonna in matrice.colonne %}<td class="ga-payroll-totals">{% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=colonna only %}</td>{% endfor %}
+                <td class="ga-payroll-totals">{% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=matrice.totali only %}</td>
+            </tr></tfoot>{% endif %}
+        </table>
+    </div>
+</section>

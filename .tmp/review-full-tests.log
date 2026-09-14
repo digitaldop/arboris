@@ -1,0 +1,30 @@
+Creating test database for alias 'default'...
+
+.....C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+........s.s..s....ssss.....sssssssssssssssssssssssss......................ssssssss....sss.......C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+.....ssssssss....ssssssssssss...sssss............................s...s...........................sssssssssssssss..............................ssssssssss..............................s..............................................................................................................................................................Analisi riconciliazioni non completata (richiesta 1329).
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\gestione_finanziaria\reconciliation_worker.py", line 41, in process_pending_analysis
+    analyse_request(job.tipo, job.oggetto_id)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1241, in _execute_mock_call
+    raise effect
+RuntimeError: test interruption
+............................................................................................ss.......................................................s...............................................................................sssssssssssssss...........ssss..........................................................................................s..............................................................................................
+----------------------------------------------------------------------
+Ran 886 tests in 82.246s
+
+OK (skipped=119)
+Destroying test database for alias 'default'...
+
+Found 886 test(s).
+System check identified no issues (0 silenced).
+Catalogo fonti aggiornato: 0 nuove, 6 aggiornate.

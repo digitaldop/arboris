@@ -583,6 +583,10 @@
         window.__arborisLongWaitFetchPatched = true;
         const nativeFetch = window.fetch.bind(window);
         window.fetch = function () {
+            if (arguments[1] && arguments[1].arborisBackground === true) {
+                const {arborisBackground, ...options} = arguments[1];
+                return nativeFetch(arguments[0], options);
+            }
             scheduleFetchWaitArmed();
             return nativeFetch.apply(this, arguments).finally(function () {
                 releaseFetchWait();

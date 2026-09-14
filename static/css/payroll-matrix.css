@@ -1,0 +1,125 @@
+/* Payslip overview: same palette and sticky grid as the tuition matrix. */
+.ga-payroll-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-bottom: 1px solid #dbe7ef;
+}
+.ga-payroll-tabs a {
+    padding: 12px 18px;
+    border-bottom: 3px solid transparent;
+    color: #60738d;
+    font-weight: 700;
+    text-decoration: none;
+}
+.ga-payroll-tabs a[aria-current="page"] {
+    border-color: #427c93;
+    color: #27465c;
+    background: #f3f9fc;
+    border-radius: 8px 8px 0 0;
+}
+.ga-payroll-tabs a:hover { color: #27465c; background: #f3f9fc; }
+.ga-buste-list-shell, .ga-payroll-card { min-width: 0; max-width: 100%; }
+.ga-payroll-filters { flex-wrap: wrap; }
+.ga-payroll-filters .scambio-list-filter-field { min-width: 135px; }
+.ga-payroll-filters .ga-buste-filter-short { min-width: 100px; }
+.ga-payroll-head { align-items: flex-start; gap: 12px; }
+.ga-payroll-note { margin: 6px 0 0; color: #60738d; font-size: 12px; line-height: 1.5; }
+.ga-payroll-explanation { margin: 0; padding: 0 18px 14px; }
+.ga-payroll-unpaid-value { color: #a33333; }
+.ga-payroll-legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 18px; }
+.ga-payroll-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border: 1px solid #dbe7ef;
+    border-radius: 999px;
+    color: #344a63;
+    font-size: 12px;
+    font-weight: 700;
+}
+.ga-payroll-legend i { width: 20px; height: 16px; border: 1px solid #0002; border-radius: 5px; }
+.ga-payroll-scroll {
+    position: relative;
+    overflow: auto;
+    max-width: 100%;
+    max-height: 70vh;
+    margin: 0 18px 18px;
+    border: 1px solid #dfe8ef;
+    border-radius: 8px;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+.ga-payroll-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.ga-payroll-table th, .ga-payroll-table td {
+    padding: 0;
+    min-width: 150px;
+    border-right: 1px solid #e2ebf2;
+    border-bottom: 1px solid #e2ebf2;
+    background: #fff;
+    vertical-align: top;
+}
+.ga-payroll-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 10px 12px;
+    background: #f3f9fc;
+    color: #344a63;
+    font-weight: 800;
+    text-align: center;
+    box-shadow: 0 2px 0 #b9c8d2, 0 8px 14px #132a3f14;
+}
+.ga-payroll-table .ga-payroll-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 210px;
+    max-width: 210px;
+    width: 210px;
+    background: #fff;
+    text-align: left;
+    box-shadow: 9px 0 18px #132a3f1f;
+}
+.ga-payroll-table thead .ga-payroll-sticky { z-index: 4; background: #f3f9fc; }
+.ga-payroll-person { display: block; padding: 12px; color: #1f2937; text-decoration: none; }
+.ga-payroll-person:hover { background: #f1f5f9; }
+.ga-payroll-person small { display: block; margin-top: 5px; color: #60738d; font-weight: 500; }
+.ga-payroll-cell { display: block; padding: 8px 10px; color: inherit; text-decoration: none; line-height: 1.4; }
+.ga-payroll-cell:hover { color: inherit; background: #ffffff38; }
+.ga-payroll-cell:focus-visible, .ga-payroll-reconcile:focus-visible, .ga-payroll-scroll:focus-visible {
+    outline: 2px solid #2f7c9b;
+    outline-offset: -2px;
+}
+.ga-payroll-status { display: block; margin-bottom: 5px; font-size: 11px; font-weight: 800; }
+.ga-payroll-amount { display: flex; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.ga-payroll-amount > span { font-size: 10px; text-transform: uppercase; color: #0009; }
+.ga-payroll-amount > strong { font-weight: 700; }
+.ga-payroll-date { display: block; margin-top: 6px; text-align: right; font-size: 10px; color: #0009; }
+.ga-payroll-badge { display: inline-block; margin-top: 6px; padding: 1px 5px; border: 1px solid currentColor; border-radius: 4px; font-size: 10px; }
+.ga-payroll-reconcile { display: block; padding: 0 10px 8px; color: inherit; font-size: 10px; text-underline-offset: 2px; }
+.ga-payroll-table .ga-payroll-totals { padding: 10px; background: #f7fbfd; color: #223846; box-shadow: inset 3px 0 0 #c8dfea; }
+.ga-payroll-table tfoot th, .ga-payroll-table tfoot td { border-top: 2px solid #b9c8d2; background: #edf4f7; }
+.ga-payroll-table tfoot th { padding: 12px; color: #223846; text-transform: uppercase; }
+.ga-payroll-table .ga-payroll-empty { text-align: center; color: #718096; vertical-align: middle; font-size: 11px; }
+.ga-payroll-table .is-pagata, .ga-payroll-legend .is-pagata { background: #d6f5dc; color: #14532d; }
+.ga-payroll-table .is-parziale, .ga-payroll-legend .is-parziale { background: #fde9a6; color: #6b4906; }
+.ga-payroll-table .is-non_pagata, .ga-payroll-legend .is-non_pagata { background: #f8c9c9; color: #7f1d1d; }
+.ga-payroll-table .is-da_definire, .ga-payroll-legend .is-da_definire { background: #eef2f6; color: #475569; }
+.ga-payroll-table .is-assente, .ga-payroll-legend .is-assente {
+    background: repeating-linear-gradient(135deg, #fafafa 0, #fafafa 6px, #eceff2 6px, #eceff2 12px);
+}
+@media (max-width: 700px) {
+    .ga-payroll-table .ga-payroll-sticky { min-width: 135px; max-width: 135px; width: 135px; }
+    .ga-payroll-scroll { margin: 0 8px 12px; }
+    .ga-payroll-head { flex-wrap: wrap; }
+    .ga-payroll-filters .scambio-list-search { flex-basis: 100%; }
+}

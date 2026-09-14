@@ -14,6 +14,7 @@
 {% endblock %}
 
 {% block content %}
+    <link rel="stylesheet" href="{% static 'css/payroll-matrix.css' %}?v=1">
     <div class="scambio-list-shell ga-buste-list-shell">
         <div class="page-head scambio-list-head">
             <div class="page-head-title-block">
@@ -55,6 +56,14 @@
             </div>
         </div>
 
+        <nav class="ga-payroll-tabs" aria-label="Viste buste paga">
+            <a href="{{ elenco_url }}" {% if vista == 'elenco' %}aria-current="page"{% endif %}>Elenco buste paga</a>
+            <a href="{{ matrice_url }}" {% if vista == 'matrice' %}aria-current="page"{% endif %}>Matrice pagamenti</a>
+        </nav>
+
+        {% if vista == 'matrice' %}
+            {% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix.html" %}
+        {% else %}
         <section class="scambio-list-kpi-grid" aria-label="Riepilogo buste paga">
             <article class="scambio-list-kpi-card">
                 <div class="scambio-list-kpi-copy">
@@ -279,6 +288,7 @@
                 </table>
             </div>
         </section>
+        {% endif %}
     </div>
 
     <script src="{% static 'js/core/list-row-links.js' %}?v=4"></script>

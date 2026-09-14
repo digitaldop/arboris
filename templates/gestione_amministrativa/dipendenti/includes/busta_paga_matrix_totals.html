@@ -1,0 +1,5 @@
+{% load currency %}
+<div class="ga-payroll-amount"><span>Dovuto</span><strong>&euro; {{ totale.dovuto|euro }}</strong></div>
+<div class="ga-payroll-amount"><span>Pagato</span><strong>&euro; {{ totale.pagato|euro }}</strong></div>
+<div class="ga-payroll-amount"><span>Residuo</span><strong>&euro; {{ totale.residuo|euro }}</strong></div>
+{% if totale.eccedenza %}<div class="ga-payroll-amount"><span>Eccedenza</span><strong>&euro; {{ totale.eccedenza|euro }}</strong></div>{% endif %}

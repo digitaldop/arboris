@@ -1,11 +1,6 @@
-from datetime import date
-from decimal import Decimal
-from itertools import groupby
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.paginator import Paginator
 from django.db.models import Max
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -15,6 +10,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .models import PropostaRiconciliazione, RichiestaAnalisiRiconciliazione
 from .reconciliation import allowed_scopes, decide_proposal, pending_count, proposals_for_user, _nodes
+from .reconciliation_presentation import review_page
 
 
 def _scope(request):
@@ -50,29 +46,8 @@ def review(request):
     state = request.GET.get("stato", PropostaRiconciliazione.Stato.APERTA)
     if state not in PropostaRiconciliazione.Stato.values:
         state = PropostaRiconciliazione.Stato.APERTA
-    records = proposals_for_user(request.user).filter(ambito=scope, stato=state).prefetch_related("decisioni__utente").order_by("caso", "-compatibilita", "-pk")
-    page = Paginator(records, 20).get_page(request.GET.get("pagina"))
-    for record in page.object_list:
-        record.righe = []
-        record.totale = sum((Decimal(row["importo"]) for row in record.allocazioni), Decimal("0"))
-        record.totale_centesimi = int(record.totale * 100)
-        for row in record.allocazioni:
-            movement = record.dati_verifica["movimenti"][str(row["movimento_id"])]
-            target = record.dati_verifica["destinazioni"][f"{row['target_tipo']}:{row['target_id']}"]
-            record.righe.append({
-                **row, "movimento": movement, "destinazione": target,
-                "data_movimento": date.fromisoformat(movement["data"]) if movement["data"] else None,
-                "data_scadenza": date.fromisoformat(target["data"]) if target["data"] else None,
-                "residuo_movimento": Decimal(movement["disponibile"]) - sum(
-                    Decimal(other["importo"]) for other in record.allocazioni if other["movimento_id"] == row["movimento_id"]
-                ),
-                "residuo": Decimal(target["residuo"]) - sum(
-                    Decimal(other["importo"]) for other in record.allocazioni
-                    if other["target_tipo"] == row["target_tipo"] and other["target_id"] == row["target_id"]
-                ),
-            })
-        record.conflict_nodes = ",".join(sorted(_nodes(record.allocazioni)))
-    groups = [list(items) for _, items in groupby(page.object_list, key=lambda p: p.caso)]
+    records = proposals_for_user(request.user).filter(ambito=scope, stato=state)
+    page, groups = review_page(records, request.GET.get("pagina"))
     popup = request.GET.get("popup") == "1"
     return render(request, "gestione_finanziaria/proposte_riconciliazione.html", {
         "base_template": "popup_base.html" if popup else "base.html",
@@ -91,13 +66,19 @@ def review(request):
 def decide(request):
     _, scope = _scope(request)
     action = request.POST.get("azione")
+    json_request = "application/json" in request.headers.get("Accept", "")
     raw_ids = request.POST.getlist("proposte")
     single = request.POST.get("proposta")
     if single:
         raw_ids = [single]
+    decision = request.POST.get("decisione", "")
+    if decision:
+        action, _, selection = decision.partition(":")
+        raw_ids = selection.split(",")
+    results = []
     try:
         ids = list(dict.fromkeys(int(pk) for pk in raw_ids))
-        if not ids or len(ids) > 40 or action not in {"conferma", "rifiuta", "riapri"}:
+        if not ids or len(ids) > (400 if action == "rifiuta" else 40) or action not in {"conferma", "rifiuta", "riapri"}:
             raise ValidationError("Seleziona le proposte da gestire.")
         records = list(proposals_for_user(request.user).filter(pk__in=ids, ambito=scope))
         if len(records) != len(ids):
@@ -113,18 +94,25 @@ def decide(request):
         for record in records:
             try:
                 success, message = decide_proposal(record.pk, action, user=request.user)
+                results.append({"id": record.pk, "success": success, "message": message})
                 successes += int(success)
                 if not success:
                     errors.append(message)
             except ValidationError as exc:
                 errors.extend(exc.messages)
+                results.append({"id": record.pk, "success": False, "message": " ".join(exc.messages)})
+        if json_request:
+            return JsonResponse({"results": results, "errors": list(dict.fromkeys(errors))})
         if successes:
             verb = {"conferma": "confermate", "rifiuta": "rifiutate", "riapri": "riaperte"}[action]
             messages.success(request, f"1 proposta {verb[:-1]}a." if successes == 1 else f"{successes} proposte {verb}.")
         for error in dict.fromkeys(errors):
             messages.warning(request, error)
     except (ValueError, ValidationError) as exc:
-        messages.error(request, " ".join(exc.messages) if isinstance(exc, ValidationError) else "Selezione non valida.")
+        error = " ".join(exc.messages) if isinstance(exc, ValidationError) else "Selezione non valida."
+        if json_request:
+            return JsonResponse({"results": [], "errors": [error]}, status=400)
+        messages.error(request, error)
     url = reverse("proposte_riconciliazione") + f"?ambito={scope}"
     if request.POST.get("popup") == "1":
         url += "&popup=1"
