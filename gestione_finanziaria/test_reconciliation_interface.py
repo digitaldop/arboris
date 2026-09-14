@@ -17,6 +17,12 @@ from .test_reconciliation_review import ReviewFixtures
 
 
 class InterfaceFixtures(ReviewFixtures):
+    def next_rate(self, rate, number=2, month=10, year=2026, amount=100):
+        return RataIscrizione.objects.create(
+            iscrizione=rate.iscrizione, numero_rata=number, mese_riferimento=month, anno_riferimento=year,
+            data_scadenza=date(year, month, 10), importo_dovuto=amount, importo_finale=amount,
+        )
+
     def proposal(self, rate, movement, *, score=90, extra_rows=()):
         rows = [{"movimento_id": movement.pk, "target_tipo": "rata", "target_id": rate.pk, "importo": "100.00"}, *extra_rows]
         snapshot, _ = _describe(rows)
@@ -28,10 +34,11 @@ class InterfaceFixtures(ReviewFixtures):
 
 
 class ReconciliationInterfaceTests(InterfaceFixtures, TestCase):
-    def test_alternatives_are_grouped_by_target_and_sorted_by_score(self):
+    def test_tuition_alternatives_are_grouped_by_movement_and_sorted_by_score(self):
         rate = self.rate()
-        low = self.proposal(rate, self.movement(description="Acconto"), score=45)
-        high = self.proposal(rate, self.movement(description="Retta settembre"), score=96)
+        movement = self.movement(description="Retta settembre")
+        low = self.proposal(self.next_rate(rate), movement, score=45)
+        high = self.proposal(rate, movement, score=96)
         response = self.client.get(reverse("proposte_riconciliazione"), {"popup": "1"})
         self.assertEqual(response.status_code, 200)
         groups = response.context["gruppi"]
@@ -42,12 +49,16 @@ class ReconciliationInterfaceTests(InterfaceFixtures, TestCase):
         self.assertContains(response, "Bassa · 45/100")
         self.assertContains(response, "review-scale-gradient")
         html = response.content.decode()
-        self.assertLess(html.index('class="review-targets"'), html.index('class="review-movements"'))
+        self.assertLess(html.index('class="review-movements"'), html.index('class="review-targets"'))
+        self.assertContains(response, "Rata da riconciliare")
+        self.assertContains(response, "Settembre 2026")
 
     def test_pagination_keeps_all_twenty_one_candidates_in_one_row(self):
         rate = self.rate()
+        movement = self.movement()
         for index in range(21):
-            self.proposal(rate, self.movement(description=f"Movimento {index}"), score=100 - index)
+            alternative = self.next_rate(rate, number=index + 2, month=index % 12 + 1, year=2026 + index // 12)
+            self.proposal(alternative, movement, score=100 - index)
         page, groups = review_page(self.pending(), 1)
         self.assertEqual(page.paginator.num_pages, 1)
         self.assertEqual(page.paginator.count, 1)
@@ -139,13 +150,74 @@ class ReconciliationInterfaceTests(InterfaceFixtures, TestCase):
 
     def test_dropdown_selected_confirmation_records_only_that_candidate(self):
         rate = self.rate()
-        first = self.proposal(rate, self.movement())
-        second = self.proposal(rate, self.movement())
+        other = self.next_rate(rate)
+        movement = self.movement()
+        first = self.proposal(rate, movement)
+        second = self.proposal(other, movement)
         response = self.client.post(reverse("decidi_proposte_riconciliazione"), {
             "ambito": "rate", "decisione": f"conferma:{second.pk}", "proposte": [first.pk],
         })
         self.assertEqual(response.status_code, 302)
         self.assertEqual(RiconciliazioneRataMovimento.objects.get().movimento_id, second.allocazioni[0]["movimento_id"])
+        self.assertEqual(RiconciliazioneRataMovimento.objects.get().rata_id, other.pk)
+        rate.refresh_from_db()
+        self.assertFalse(rate.pagata)
+
+    def test_old_full_score_proposals_preselect_september_before_november(self):
+        rate = self.rate()
+        movement = self.movement(description="Settembre 26 Luca Bianchi")
+        september = self.proposal(rate, movement, score=100)
+        november = self.proposal(self.next_rate(rate, 3, 11), movement, score=100)
+        response = self.client.get(reverse("proposte_riconciliazione"))
+        options = response.context["gruppi"][0]["proposte"]
+        self.assertEqual([p.pk for p in options], [september.pk, november.pk])
+        self.assertLess(options[1].compatibilita, options[0].compatibilita)
+        self.assertEqual(len(response.context["gruppi"]), 1)
+        # Presentation must not alter confirmation snapshots or stored history.
+        november.refresh_from_db()
+        self.assertEqual(november.compatibilita, 100)
+        self.assertTrue(decide_proposal(september.pk, "conferma", user=self.user)[0])
+
+    def test_different_movements_have_separate_rows_and_paginate(self):
+        rate = self.rate()
+        for _ in range(21):
+            self.proposal(rate, self.movement())
+        page, groups = review_page(self.pending(), 1)
+        self.assertEqual(page.paginator.count, 21)
+        self.assertEqual(page.paginator.num_pages, 2)
+        self.assertEqual(len(groups), 20)
+
+    def test_same_movement_cumulative_option_preserves_all_allocations(self):
+        rate = self.rate()
+        other = self.next_rate(rate)
+        movement = self.movement("200")
+        self.proposal(rate, movement)
+        cumulative = self.proposal(rate, movement, extra_rows=[{
+            "movimento_id": movement.pk, "target_tipo": "rata", "target_id": other.pk, "importo": "100.00",
+        }])
+        _, groups = review_page(self.pending(), 1)
+        self.assertEqual(len(groups), 1)
+        prepared = next(p for p in groups[0]["proposte"] if p.pk == cumulative.pk)
+        self.assertEqual(len(prepared.destinazioni), 2)
+        self.assertEqual(prepared.totale_centesimi, 20000)
+        self.assertTrue(decide_proposal(cumulative.pk, "conferma", user=self.user)[0])
+        self.assertEqual(RiconciliazioneRataMovimento.objects.count(), 2)
+
+    def test_supplier_alternatives_still_group_by_deadline(self):
+        deadline = self.deadline()
+        for score in (96, 45):
+            movement = self.movement("-100", "Aurora Servizi SRL")
+            rows = [{"movimento_id": movement.pk, "target_tipo": "scadenza_fornitore", "target_id": deadline.pk, "importo": "100.00"}]
+            snapshot, _ = _describe(rows)
+            PropostaRiconciliazione.objects.create(
+                chiave=_hash([rows, snapshot]), abbinamento=_hash(rows), caso="supplier",
+                ambito="fornitore", compatibilita=score, allocazioni=rows, dati_verifica=snapshot,
+            )
+        response = self.client.get(reverse("proposte_riconciliazione"), {"ambito": "fornitore"})
+        self.assertEqual(len(response.context["gruppi"]), 1)
+        self.assertEqual([p.compatibilita for p in response.context["gruppi"][0]["proposte"]], [96, 45])
+        html = response.content.decode()
+        self.assertLess(html.index('class="review-targets"'), html.index('class="review-movements"'))
 
 
 class ReconciliationRejectionConcurrencyTests(InterfaceFixtures, TransactionTestCase):

@@ -8,7 +8,9 @@ Gli import di movimenti bancari, fatture e scadenze accodano una ricerca di poss
 
 Il pulsante **Riconciliazioni da verificare**, nell'intestazione, mostra il numero dei casi aperti e viene evidenziato quando il numero è positivo. Il popup si apre soltanto al clic. Il contatore si aggiorna ogni 30 secondi quando la pagina è visibile e dopo le decisioni nel popup.
 
-Il popup separa rette e fornitori. Ogni riga mostra a sinistra la retta o la scadenza/fattura e a destra il movimento bancario. Le alternative per le stesse destinazioni sono raccolte in un menu a tendina, ordinate per compatibilità. Cambiare candidato aggiorna dettagli, importi, residui, selezione e colore della riga. Sono gestiti abbinamenti singoli, parziali e cumulativi, anche con più movimenti: una proposta cumulativa mantiene insieme tutte le proprie allocazioni.
+Il popup separa rette e fornitori. Per le rette ogni movimento bancario occupa una riga: il movimento è a sinistra e il menu delle rate a destra. Il menu mostra alunno, numero rata, mese di riferimento, scadenza e residuo; la rata più compatibile è selezionata inizialmente. L'analisi include tutte le rate ancora da saldare degli alunni riconosciuti, anche oltre il precedente limite di dodici alternative e con residui inferiori al movimento. Per i fornitori rimangono la scadenza/fattura a sinistra e i movimenti alternativi a destra. Cambiare candidato aggiorna dettagli, importi, residui, selezione e colore della riga. Sono gestiti abbinamenti singoli, parziali e cumulativi, anche con più movimenti: una proposta cumulativa mantiene insieme tutte le proprie allocazioni. Le combinazioni di più movimenti costituiscono un gruppo distinto e non vengono spezzate nelle singole righe.
+
+Il mese nella causale (per esempio «Settembre 26» o «settembre 2026») viene confrontato con mese e anno di riferimento della rata, anche se la scadenza è stata spostata. Senza un anno esplicito si considera l'occorrenza del mese più vicina alla data del bonifico; senza un mese nella causale si usano il mese del movimento e la distanza dalla scadenza. Il limite al punteggio distingue i mesi coerenti da quelli non confermati o in contrasto con la causale: nome e importo da soli non rendono tutte le rate equivalenti a 100. A parità di compatibilità, periodo e distanza dalla scadenza precedono l'identificativo. La ricerca inversa non somma il bonus per un gruppo di rate quando sta esaminando una sola rata.
 
 La scala continua va dal rosso (0) al verde (100). Al colore si affiancano il punteggio e un'indicazione testuale: bassa sotto 50, media da 50, alta da 75, molto alta da 90. I motivi sono consultabili in un dettaglio espandibile. Il punteggio è un indice di compatibilità delle regole esistenti, non una probabilità statistica.
 
@@ -18,7 +20,7 @@ La scala continua va dal rosso (0) al verde (100). Al colore si affiancano il pu
 - La selezione multipla mostra numero e totale delle proposte. Alternative che usano gli stessi movimenti o le stesse scadenze non possono essere confermate insieme.
 - **Più tardi**, o la chiusura della finestra, conserva le proposte aperte.
 
-Il contatore raggruppa le alternative collegate nello stesso caso. Le viste sono paginate a 20 righe di destinazioni, mantenendo tutti i candidati della stessa riga nella medesima pagina. Dopo i rifiuti, «Carica altre proposte» recupera gli elementi spostati nella pagina corrente, senza saltarli per effetto della nuova paginazione. Le proposte rifiutate, confermate e superate restano consultabili con lo storico delle decisioni.
+Il contatore raggruppa le alternative collegate nello stesso caso. Le viste sono paginate a 20 gruppi (movimenti per le rette, destinazioni per i fornitori), mantenendo tutti i candidati della stessa riga nella medesima pagina. Dopo i rifiuti, «Carica altre proposte» recupera gli elementi spostati nella pagina corrente, senza saltarli per effetto della nuova paginazione. Le proposte rifiutate, confermate e superate restano consultabili con lo storico delle decisioni.
 
 ## Correttezza e autorizzazioni
 
@@ -51,6 +53,8 @@ Applicare le migrazioni prima di avviare i processi web con questa versione:
 ```powershell
 .venv\Scripts\python.exe -B manage.py migrate
 ```
+
+La migrazione `0017_refresh_tuition_proposals` accoda nuovamente gli incassi bancari in EUR per completare le alternative delle rette con le nuove regole. Non registra pagamenti. L'analisi aggiorna punteggi e motivazioni delle proposte aperte senza modificare le decisioni rifiutate. Il popup riordina anche le proposte preparate prima dell'aggiornamento, mentre il worker completa il ricalcolo. Per questa revisione occorre pubblicare codice e statici e applicare la migrazione.
 
 La migrazione `gestione_finanziaria.0016_proposte_riconciliazione` crea le tabelle e accoda i movimenti esistenti non ignorati. Non registra pagamenti e non modifica le riconciliazioni esistenti. In produzione rigenerare gli statici con la configurazione prevista dal progetto e riavviare processi web ed eventuali worker Celery.
 
@@ -86,3 +90,11 @@ Per ripetere i test della funzionalità:
 - Suite completa: **886 test, 767 superati, 119 già esclusi, nessun errore o fallimento**.
 - Browser su dati fittizi isolati: cambio candidato e colore, conservazione della selezione, rifiuto individuale e multiplo, storico, conferma del candidato selezionato e assenza di errori JavaScript. Con risposta ritardata di quattro secondi, la riga risulta già nascosta al primo controllo (circa 300 ms, comprensivi dell'automazione). Le altre righe rimangono utilizzabili e non compare il caricamento globale. Verificati ripristino dopo errore HTTP 503 simulato e salvataggio durante il cambio di scheda Rette/Fornitori.
 - Controlli Django, migrazioni, sintassi JavaScript e Git superati. Nessuna nuova migrazione. Aggiornate le versioni degli asset statici; pubblicazione su Render da eseguire.
+
+## Revisione delle rate per movimento del 14 settembre 2026
+
+- 65 test mirati superati: mese nella causale, anno esplicito e arretrati a cavallo d'anno, parità dei vecchi punteggi, oltre dodici alternative, rate parzialmente saldate, esclusione delle saldate, aggiornamento delle proposte aperte e conservazione dei rifiuti.
+- Suite completa su PostgreSQL dedicato nuovo: **907 test, 788 superati, 119 esclusi, nessun fallimento o errore** (131 secondi). La prima esecuzione sul database di test riutilizzato è stata interrotta dopo un rallentamento; la verifica completa sul database nuovo è terminata regolarmente.
+- Verifica browser su dati fittizi isolati: settembre preselezionato con vecchie proposte tutte a 100; movimento a sinistra e menu rate a destra; cambio a novembre; selezione conservata e totale aggiornato a 60 EUR con 40 EUR residui sul movimento; esclusione delle selezioni incompatibili; rifiuto di tutte le alternative, storico, riapertura e conferma della sola rata scelta. Nessun errore JavaScript.
+- `manage.py check`, `makemigrations --check --dry-run` e `git diff --check` superati. Migrazione `0017` applicata anche al database locale. Gli asset sono alla versione 3. Nessun pagamento reale registrato e nessun deployment esterno eseguito.
+- Il database locale non contiene l'alunna e il movimento dello screenshot: il difetto di ordinamento è stato riprodotto con dati fittizi; non è stato possibile accertare lo stato originario della rata di settembre nell'ambiente esterno.

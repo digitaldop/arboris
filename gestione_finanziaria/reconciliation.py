@@ -251,7 +251,7 @@ def analyse_request(tipo, pk):
         if movement.importo > 0:
             candidate.importo = available
         candidate._arboris_importo_disponibile_cache = available
-        return services.proposte_riconciliazione_da_movimento(candidate)
+        return services.proposte_riconciliazione_da_movimento(candidate, tutte_rate_aperte=True)
 
     if tipo == "movimento":
         movement = MovimentoFinanziario.objects.filter(pk=pk).first()
@@ -303,6 +303,12 @@ def analyse_request(tipo, pk):
             # An annulled payment may make the original allocation available again.
             record.stato = S.APERTA
             record.save(update_fields=["stato", "data_aggiornamento"])
+        if not created:
+            # Refresh ranking rules without changing the material version or
+            # resurrecting a rejected alternative, including concurrent rejects.
+            PropostaRiconciliazione.objects.filter(pk=record.pk, stato=S.APERTA).exclude(
+                compatibilita=proposal.score_percentuale, motivazioni=list(dict.fromkeys(reasons)),
+            ).update(compatibilita=proposal.score_percentuale, motivazioni=list(dict.fromkeys(reasons)), data_aggiornamento=timezone.now())
     regroup_cases()
 
 

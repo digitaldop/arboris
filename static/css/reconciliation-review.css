@@ -45,6 +45,8 @@
 .review-option-picker select:focus-visible { outline:2px solid #246049; outline-offset:2px; }
 .review-targets,.review-movements { min-width:0; }
 .review-movements { padding:1rem; border-radius:8px; background:hsl(var(--match-hue) 65% 96%); }
+.review-card-rate .review-movements { padding:0; background:transparent; }
+.review-card-rate .review-targets { padding:1rem; border-radius:8px; background:hsl(var(--match-hue) 65% 96%); }
 .review-match-summary { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.7rem; }
 .review-party { font-size:1rem; }
 .review-item + .review-item { border-top:1px solid #dce5df; margin-top:.8rem; padding-top:.8rem; }

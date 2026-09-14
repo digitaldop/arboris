@@ -1,0 +1,14 @@
+{% load currency %}
+<div class="review-movements">
+    {% if ambito != 'rate' %}{% include 'gestione_finanziaria/includes/review_confidence.html' %}{% endif %}
+    {% for movimento in proposta.movimenti %}
+    <div class="review-item">
+        <strong class="review-party">{{ movimento.controparte|default:movimento.conto }}</strong>
+        <p>{{ movimento.data_movimento|date:'d/m/Y' }} · {{ movimento.conto }} · #{{ movimento.id }}</p>
+        <p class="review-causale">{{ movimento.causale }}</p>
+        <p>Movimento: <strong>EUR {{ movimento.importo|euro }}</strong> · Disponibile: EUR {{ movimento.disponibile|euro }}</p>
+        <p>Da abbinare: <strong>EUR {{ movimento.importo_abbinato|euro }}</strong> · Residuo successivo: EUR {{ movimento.residuo_successivo|euro }}</p>
+    </div>
+    {% endfor %}
+    {% if ambito != 'rate' %}{% include 'gestione_finanziaria/includes/review_reasons.html' %}{% endif %}
+</div>

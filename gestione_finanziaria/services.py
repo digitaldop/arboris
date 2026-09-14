@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .name_matching import person_similarity, supplier_similarity
+from .reconciliation_periods import rate_movement_evidence
 
 
 MONTH_SHORT_LABELS = {
@@ -2151,7 +2152,7 @@ def _rata_disponibile_per_auto(rata, include_rata=None, *, controlla_collegament
     return importo_rata_residuo(rata) > Decimal("0.00")
 
 
-def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool = False, rate_pool=None, allow_fuzzy=True):
+def trova_rate_candidate(movimento, *, limite: int | None = 10, solo_disponibili: bool = False, rate_pool=None, allow_fuzzy=True, tutte_rate_aperte=False):
     """
     Ritorna una lista ordinata di :class:`CandidatoRiconciliazione`
     per il movimento dato. Il matching e' pensato per entrate in conto
@@ -2164,6 +2165,11 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
     - IBAN controparte corrisponde all'IBAN della famiglia (+15)
       quando disponibile (facoltativo, soft match);
     - controparte contiene parte del nome famiglia (+10).
+
+    Il periodo indicato nella causale e la distanza dalla scadenza limitano
+    il punteggio, evitando parità a 100 fra mensilità diverse. L'analisi
+    assistita usa tutte_rate_aperte=True e limite=None per includere anche
+    le rate con residuo inferiore al bonifico e i pagamenti parziali.
     """
 
     from decimal import Decimal as _D
@@ -2189,11 +2195,12 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
                 "iscrizione__studente__relazioni_familiari__familiare",
                 "iscrizione__studente__relazioni_familiari__relazione_familiare",
             )
-            .filter(
-                importo_finale__gte=max(importo_cerca - _TOLLERANZA_IMPORTO_APPROX, Decimal("0.00")),
-            )
             .order_by("-anno_riferimento", "-mese_riferimento")
         )
+        if tutte_rate_aperte:
+            qs = qs.filter(pagata=False)
+        else:
+            qs = qs.filter(importo_finale__gte=max(importo_cerca - _TOLLERANZA_IMPORTO_APPROX, Decimal("0.00")))
         if solo_disponibili:
             qs = qs.filter(
                 pagata=False,
@@ -2207,7 +2214,7 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         qs = [
             rata
             for rata in rate_pool
-            if limite_importo_min <= importo_rata_residuo(rata) <= limite_importo_max
+            if (tutte_rate_aperte or limite_importo_min <= importo_rata_residuo(rata) <= limite_importo_max)
             and (
                 not solo_disponibili
                 or _rata_disponibile_per_auto(rata, controlla_collegamenti=False)
@@ -2224,6 +2231,8 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         motivazioni = []
 
         importo_rata_cerca = importo_rata_residuo(rata)
+        if tutte_rate_aperte and (rata.pagata or importo_rata_cerca <= 0):
+            continue
         diff_importo = (importo_rata_cerca - importo_cerca).copy_abs()
         if diff_importo <= _TOLLERANZA_IMPORTO_ESATTO:
             score += 50
@@ -2234,6 +2243,9 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         elif importo_cerca < importo_rata_cerca:
             score += 18
             motivazioni.append("Movimento utilizzabile come pagamento parziale della rata")
+        elif tutte_rate_aperte:
+            score += 18
+            motivazioni.append("Parte del movimento utilizzabile per saldare la rata")
         else:
             continue
 
@@ -2260,12 +2272,14 @@ def trova_rate_candidate(movimento, *, limite: int = 10, solo_disponibili: bool 
         score += score_identita
         motivazioni.extend(motivazioni_identita)
 
+        ceiling, _, reason = rate_movement_evidence(rata, movimento)
+        motivazioni.append(reason)
         candidati.append(
-            CandidatoRiconciliazione(rata=rata, score=_limita_score_suggerimento(score, score_identita, approssimato),
+            CandidatoRiconciliazione(rata=rata, score=min(ceiling, _limita_score_suggerimento(score, score_identita, approssimato)),
                                     motivazioni=motivazioni, richiede_conferma=approssimato)
         )
 
-    candidati.sort(key=lambda c: c.score, reverse=True)
+    candidati.sort(key=lambda c: (-c.score, rate_movement_evidence(c.rata, movimento)[1], c.rata.pk or 0))
     return candidati[:limite]
 
 
@@ -2453,10 +2467,10 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
             score += 32
             motivazioni.append("Importo simile al residuo della rata selezionata")
 
-        if totale_residui > 0 and _decimal_close(disponibile, totale_residui, _TOLLERANZA_IMPORTO_ESATTO):
+        if len(rate_aperte) > 1 and totale_residui > 0 and _decimal_close(disponibile, totale_residui, _TOLLERANZA_IMPORTO_ESATTO):
             score += 35
             motivazioni.append("Copre tutte le rate aperte della famiglia per l'anno")
-        elif _esiste_somma_compatibile(disponibile, residui_rate):
+        elif len(rate_aperte) > 1 and _esiste_somma_compatibile(disponibile, residui_rate):
             score += 30
             motivazioni.append("Compatibile con una combinazione di rate aperte della famiglia")
         elif totale_residui > 0 and disponibile < totale_residui:
@@ -2477,11 +2491,13 @@ def trova_movimenti_candidati_per_rate(rata_principale, rate_aperte, *, limite: 
             score += 1
             motivazioni.append("Movimento disponibile per riconciliazione manuale")
 
+        ceiling, _, reason = rate_movement_evidence(rata_principale, movimento)
+        motivazioni.append(reason)
         candidati.append(
             CandidatoMovimentoRiconciliazione(
                 movimento=movimento,
                 importo_disponibile=disponibile,
-                score=_limita_score_suggerimento(score, score_identita, approssimato),
+                score=min(ceiling, _limita_score_suggerimento(score, score_identita, approssimato)),
                 motivazioni=motivazioni,
                 richiede_conferma=approssimato,
             )
@@ -3762,7 +3778,7 @@ def _target_residuo_for_proposal(target, target_tipo):
     return Decimal("0.00")
 
 
-def proposte_riconciliazione_da_movimento(movimento, *, limite_singole=12, limite_cumulative=5):
+def proposte_riconciliazione_da_movimento(movimento, *, limite_singole=12, limite_cumulative=5, tutte_rate_aperte=False):
     if movimento is None or movimento.importo is None:
         return []
 
@@ -3779,7 +3795,7 @@ def proposte_riconciliazione_da_movimento(movimento, *, limite_singole=12, limit
     else:
         proposte.extend(
             _proposal_for_rate_candidate(movimento, candidato)
-            for candidato in trova_rate_candidate(movimento, limite=limite_singole)
+            for candidato in trova_rate_candidate(movimento, limite=None if tutte_rate_aperte else limite_singole, tutte_rate_aperte=tutte_rate_aperte)
         )
         proposte.extend(
             _proposal_for_rate_cumulative_candidate(movimento, candidato)

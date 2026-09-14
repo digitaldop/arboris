@@ -1,0 +1,14 @@
+{% load currency %}
+<div class="review-targets">
+    {% if ambito == 'rate' %}{% include 'gestione_finanziaria/includes/review_confidence.html' %}{% endif %}
+    {% for destinazione in proposta.destinazioni %}
+    <div class="review-item">
+        <strong class="review-party">{{ destinazione.intestatario }}</strong>
+        <p>{{ destinazione.riferimento }}{% if destinazione.periodo %} · {{ destinazione.periodo }}{% endif %}{% if destinazione.anno %} · {{ destinazione.anno }}{% endif %}</p>
+        <p>Scadenza: <strong>{{ destinazione.data_scadenza|date:'d/m/Y'|default:'Non indicata' }}</strong></p>
+        <p>Da saldare: <strong>EUR {{ destinazione.residuo|euro }}</strong></p>
+        <p>Da abbinare: <strong>EUR {{ destinazione.importo_abbinato|euro }}</strong> · Residuo successivo: EUR {{ destinazione.residuo_successivo|euro }}</p>
+    </div>
+    {% endfor %}
+    {% if ambito == 'rate' %}{% include 'gestione_finanziaria/includes/review_reasons.html' %}{% endif %}
+</div>

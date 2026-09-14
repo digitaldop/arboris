@@ -2,14 +2,24 @@
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.core.paginator import Paginator
+from economia.models import RataIscrizione
 
 from .reconciliation import _nodes
+from .reconciliation_periods import MONTHS, rate_movement_evidence
 
 
 def target_key(rows):
     return tuple(sorted({(row["target_tipo"], row["target_id"]) for row in rows}))
+
+
+def review_group_key(scope, rows):
+    if scope == "rate":
+        # Keep cumulative proposals atomic, including those with several credits.
+        return scope, tuple(sorted({row["movimento_id"] for row in rows}))
+    return scope, target_key(rows)
 
 
 def confidence_label(score):
@@ -22,7 +32,22 @@ def confidence_label(score):
     return "Bassa"
 
 
-def prepare_proposal(record):
+def prepare_proposal(record, rates=None):
+    rates = rates or {}
+    record.period_rank = (4, 99999)
+    if record.ambito == "rate" and len(record.allocazioni) == 1:
+        row = record.allocazioni[0]
+        rate = rates.get(row["target_id"])
+        movement = record.dati_verifica["movimenti"][str(row["movimento_id"])]
+        if rate:
+            ceiling, record.period_rank, reason = rate_movement_evidence(rate, SimpleNamespace(
+                data_contabile=date.fromisoformat(movement["data"]) if movement["data"] else None,
+                descrizione=movement["causale"],
+            ))
+            # Old snapshots remain valid for confirmation; only display ranking
+            # is refreshed while the background analysis catches up.
+            record.compatibilita = min(record.compatibilita, ceiling)
+            record.motivazioni = list(dict.fromkeys([*record.motivazioni, reason]))
     target_totals, movement_totals = defaultdict(Decimal), defaultdict(Decimal)
     for row in record.allocazioni:
         target_totals[f"{row['target_tipo']}:{row['target_id']}"] += Decimal(row["importo"])
@@ -34,8 +59,12 @@ def prepare_proposal(record):
     record.destinazioni, record.movimenti = [], []
     for key, amount in target_totals.items():
         target = record.dati_verifica["destinazioni"][key]
+        rate = rates.get(int(key.split(":")[1])) if key.startswith("rata:") else None
+        period = ""
+        if rate and rate.tipo_rata == "mensile" and 1 <= rate.mese_riferimento <= 12:
+            period = f"{MONTHS[rate.mese_riferimento - 1]} {rate.anno_riferimento}"
         record.destinazioni.append({
-            **target, "importo_abbinato": amount,
+            **target, "importo_abbinato": amount, "periodo": period,
             "data_scadenza": date.fromisoformat(target["data"]) if target["data"] else None,
             "residuo_successivo": Decimal(target["residuo"]) - amount,
         })
@@ -54,27 +83,37 @@ def prepare_proposal(record):
             f"€ {formatted_amount}", f"#{key}",
         ]))
         option_labels.append(label)
+    if record.ambito == "rate":
+        option_labels = [" · ".join(filter(None, [
+            target["intestatario"], target["riferimento"], target["periodo"] or target.get("anno"),
+            "scad. " + target["data_scadenza"].strftime("%d/%m/%Y") if target["data_scadenza"] else "",
+            "da saldare € " + f"{Decimal(target['residuo']):.2f}".replace(".", ","),
+        ])) for target in record.destinazioni]
     record.option_label = f"{record.compatibilita}/100 · " + " + ".join(option_labels)
     return record
 
 
 def review_page(records, page_number, per_page=20):
     # Read only allocation identities across the view; fetch snapshots and audit
-    # history for the displayed groups. A target's alternatives stay on one page.
+    # history for the displayed groups. Alternatives stay on the same page.
     grouped_ids = {}
-    for pk, rows in records.order_by("-compatibilita", "-pk").values_list("pk", "allocazioni").iterator(chunk_size=500):
-        grouped_ids.setdefault(target_key(rows), []).append(pk)
+    for pk, scope, rows in records.order_by("-compatibilita", "-pk").values_list("pk", "ambito", "allocazioni").iterator(chunk_size=500):
+        grouped_ids.setdefault(review_group_key(scope, rows), []).append(pk)
     page = Paginator(list(grouped_ids.values()), per_page).get_page(page_number)
     ids = [pk for group in page.object_list for pk in group]
-    proposals = {
-        record.pk: prepare_proposal(record)
-        for record in records.filter(pk__in=ids).prefetch_related("decisioni__utente")
-    }
+    page_records = list(records.filter(pk__in=ids).prefetch_related("decisioni__utente"))
+    rate_ids = {row["target_id"] for record in page_records for row in record.allocazioni if row["target_tipo"] == "rata"}
+    rates = RataIscrizione.objects.filter(pk__in=rate_ids).only(
+        "pk", "tipo_rata", "anno_riferimento", "mese_riferimento", "data_scadenza",
+    ).in_bulk()
+    proposals = {record.pk: prepare_proposal(record, rates) for record in page_records}
     groups = []
     for group_ids in page.object_list:
         options = [proposals[pk] for pk in group_ids if pk in proposals]
         if not options:
             continue
+        if options[0].ambito == "rate":
+            options.sort(key=lambda option: (-option.compatibilita, option.period_rank, option.pk))
         groups.append({
             "id": options[0].pk, "proposte": options,
             "ids": ",".join(str(option.pk) for option in options),
