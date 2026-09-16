@@ -7800,7 +7800,8 @@ def riconcilia_movimento(request, pk):
 
     proposte_riconciliazione = proposte_riconciliazione_da_movimento(
         movimento,
-        limite_singole=12,
+        # A full monthly plan must not hide its enrollment fee (often 13th).
+        limite_singole=None if tipo_riconciliazione == "rate" else 12,
         limite_cumulative=5,
     )
     if tipo_riconciliazione == "fornitori":

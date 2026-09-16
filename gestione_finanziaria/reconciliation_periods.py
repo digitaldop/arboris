@@ -1,4 +1,4 @@
-"""Calendar evidence shared by tuition matching and stored proposal display."""
+"""Payment purpose and calendar evidence shared by tuition suggestions."""
 import re
 from datetime import date
 
@@ -11,6 +11,8 @@ _MONTH_PATTERN = re.compile(
     r"\b(" + "|".join(MONTHS) + r")\b(?:\s+(?:del\s+)?(20\d{2}|\d{2})(?!\d))?",
     re.IGNORECASE,
 )
+_ENROLLMENT_PATTERN = re.compile(r"\b(?:pre[\s-]*)?iscrizion[ei]\b", re.IGNORECASE)
+_TUITION_PATTERN = re.compile(r"\b(?:rett[ae]|rat[ae]|mensilit[aà])\b", re.IGNORECASE)
 
 
 def rate_period_evidence(*, year, month, due_date, movement_date, description):
@@ -44,11 +46,21 @@ def rate_period_evidence(*, year, month, due_date, movement_date, description):
 
 
 def rate_movement_evidence(rate, movement):
-    monthly = getattr(rate, "tipo_rata", "mensile") == "mensile"
+    rate_type = getattr(rate, "tipo_rata", "mensile")
+    monthly = rate_type == "mensile"
     due = rate.data_scadenza
+    description = movement.descrizione or ""
+    if _ENROLLMENT_PATTERN.search(description):
+        # Enrollment fees deliberately have no due date. Their placeholder
+        # reference month must not compete with the actual monthly installments.
+        if rate_type == "preiscrizione":
+            return 100, (0, 0), "Quota di iscrizione/preiscrizione indicata nella causale"
+        # Keep both kinds available for combined enrollment and tuition payments.
+        if not _TUITION_PATTERN.search(description):
+            return 50, (3, 99999), "La causale indica una quota di iscrizione/preiscrizione, non una retta"
     return rate_period_evidence(
         year=rate.anno_riferimento if monthly else (due.year if due else None),
         month=rate.mese_riferimento if monthly else (due.month if due else None),
         due_date=due, movement_date=movement.data_contabile,
-        description=movement.descrizione if monthly else "",
+        description=description if monthly else "",
     )

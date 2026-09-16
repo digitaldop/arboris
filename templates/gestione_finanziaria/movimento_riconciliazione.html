@@ -126,9 +126,9 @@
         <section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-reconciliation-candidates-panel">
             <div class="finance-section-head">
                 <div>
-                    <h2 class="section-title">Rate candidate</h2>
+                    <h2 class="section-title">Rate e quote di preiscrizione candidate</h2>
                     <p class="finance-section-subtitle">
-                        Le rate sono ordinate per compatibilita' su importo, data e dati anagrafici.
+                        Le proposte sono ordinate per compatibilità con causale, importo, data e dati anagrafici.
                     </p>
                 </div>
                 <span class="anagrafica-status-chip is-muted">{{ proposte_rate|length }} risultati</span>
@@ -139,7 +139,7 @@
                     <table class="list-table anagrafica-list-table finance-modern-table finance-reconciliation-candidates-table">
                         <thead>
                             <tr>
-                                <th>Rata candidata</th>
+                                <th>Rata / quota candidata</th>
                                 <th>Famiglia / studente</th>
                                 <th>Scadenza</th>
                                 <th class="column-right">Importo finale</th>
@@ -225,7 +225,7 @@
                     </div>
                 {% else %}
                     <div class="empty-state">
-                        Nessuna rata candidata trovata. Verifica importo e data oppure marca il movimento come da ignorare.
+                        Nessuna rata o quota di preiscrizione candidata trovata. Verifica causale, importo e data oppure marca il movimento come da ignorare.
                     </div>
                     <div class="finance-reconciliation-action-bar finance-reconciliation-action-bar-empty">
                         <button type="submit" name="azione" value="ignora" class="btn btn-secondary btn-icon-text" formnovalidate>
