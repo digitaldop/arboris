@@ -103,10 +103,19 @@
             <div class="audit-log-filter-head">
                 <div>
                     <h2 id="audit-log-filter-title">Filtri ricerca</h2>
-                    <p>Restringi la cronologia per modulo, operazione o testo libero.</p>
+                    <p>Restringi la cronologia per utente, modulo, operazione o testo libero.</p>
                 </div>
             </div>
             <form method="get" class="audit-log-filter-form">
+                <label class="audit-log-filter-field">
+                    <span class="audit-log-filter-label">Utente</span>
+                    <select name="utente">
+                        <option value="">Tutti gli utenti</option>
+                        {% for value, label in utenti_disponibili %}
+                            <option value="{{ value }}" {% if utente_id == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
                 <label class="audit-log-filter-field">
                     <span class="audit-log-filter-label">Modulo</span>
                     <select name="modulo">
@@ -144,7 +153,7 @@
                         <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
                         <span class="btn-label">Filtra</span>
                     </button>
-                    {% if q or azione or modulo or operazione_id %}
+                    {% if q or azione or modulo or utente_id or operazione_id %}
                         <a href="{% url 'cronologia_operazioni_sistema' %}" class="btn btn-secondary btn-icon-text">
                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#trash"></use></svg></span>
                             <span class="btn-label">Pulisci</span>
@@ -265,6 +274,10 @@
                         <article>
                             <span>Operazioni mostrate</span>
                             <strong>{{ operazioni|length }}</strong>
+                        </article>
+                        <article>
+                            <span>Utente filtrato</span>
+                            <strong>{{ utente_label|default:"Tutti" }}</strong>
                         </article>
                         <article>
                             <span>Modulo filtrato</span>

@@ -1337,6 +1337,18 @@ def cronologia_operazioni_sistema(request):
     q = (request.GET.get("q") or "").strip()
     azione = (request.GET.get("azione") or "").strip()
     modulo = (request.GET.get("modulo") or "").strip()
+    utente_id = (request.GET.get("utente") or "").strip()
+    utenti_disponibili = []
+    for utente in User.objects.only("pk", "username", "first_name", "last_name", "email").order_by(
+        "last_name", "first_name", "username",
+    ):
+        label = utente.get_full_name().strip() or utente.email or utente.username
+        if label != utente.username:
+            label = f"{label} ({utente.username})"
+        utenti_disponibili.append((str(utente.pk), label))
+    utenti_labels = dict(utenti_disponibili)
+    if utente_id not in utenti_labels:
+        utente_id = ""
     operazione_id = (request.GET.get("operazione") or "").strip()
     if not operazione_id.isdigit():
         operazione_id = ""
@@ -1369,6 +1381,9 @@ def cronologia_operazioni_sistema(request):
     if modulo:
         operazioni_qs = operazioni_qs.filter(modulo=modulo)
 
+    if utente_id:
+        operazioni_qs = operazioni_qs.filter(utente_id=utente_id)
+
     totale_operazioni = operazioni_qs.count()
     operazioni = list(operazioni_qs[:CRONOLOGIA_RESULT_LIMIT])
     riepilogo = operazioni_qs.aggregate(
@@ -1387,6 +1402,9 @@ def cronologia_operazioni_sistema(request):
             "totale_operazioni": totale_operazioni,
             "azione": azione,
             "modulo": modulo,
+            "utente_id": utente_id,
+            "utente_label": utenti_labels.get(utente_id, ""),
+            "utenti_disponibili": utenti_disponibili,
             "q": q,
             "operazione_id": operazione_id,
             "azioni_disponibili": AzioneOperazioneCronologia.choices,

@@ -205,6 +205,51 @@ class LogNotificheTests(TestCase):
         self.assertNotIn(altra, response.context["operazioni"])
         self.assertContains(response, "Pulisci")
 
+    def test_cronologia_filtra_per_account_e_aggiorna_riepilogo(self):
+        proprie = [self.operazione(azione=azione) for azione in ("create", "update")]
+        self.operazione(utente=self.admin, utente_label=self.utente.get_full_name())
+        self.operazione(utente=None, utente_label="")
+        response = self.client.get(reverse("cronologia_operazioni_sistema"), {"utente": self.utente.pk})
+        self.assertEqual({entry.pk for entry in response.context["operazioni"]}, {entry.pk for entry in proprie})
+        self.assertEqual(response.context["totale_operazioni"], 2)
+        self.assertEqual(response.context["count_creazioni"], 1)
+        self.assertEqual(response.context["count_modifiche"], 1)
+        self.assertEqual(response.context["utente_id"], str(self.utente.pk))
+        self.assertContains(response, f'<option value="{self.utente.pk}" selected>Operatore Prova (log-utente)</option>', html=True)
+        self.assertContains(response, "Utente filtrato")
+        self.assertContains(response, "Pulisci")
+
+    def test_cronologia_combina_utente_con_gli_altri_filtri(self):
+        scelta = self.operazione("Pagamento verificato", modulo="economia")
+        self.operazione("Pagamento verificato", modulo="anagrafica")
+        self.operazione("Pagamento verificato", modulo="economia", azione="create")
+        self.operazione("Iscrizione verificata", modulo="economia")
+        self.operazione("Pagamento verificato", modulo="economia", utente=self.admin)
+        response = self.client.get(reverse("cronologia_operazioni_sistema"), {
+            "utente": self.utente.pk, "modulo": "economia", "azione": "update", "q": "Pagamento",
+        })
+        self.assertEqual([entry.pk for entry in response.context["operazioni"]], [scelta.pk])
+        self.assertEqual(response.context["totale_operazioni"], 1)
+        self.assertEqual(response.context["count_modifiche"], 1)
+        self.assertEqual(response.context["count_creazioni"], 0)
+        self.assertEqual(response.context["modulo"], "economia")
+        self.assertEqual(response.context["azione"], "update")
+        self.assertEqual(response.context["q"], "Pagamento")
+        self.assertIn(str(self.admin.pk), dict(response.context["utenti_disponibili"]))
+
+    def test_cronologia_include_utenti_disattivati_e_gestisce_filtro_non_valido(self):
+        User.objects.filter(pk=self.utente.pk).update(is_active=False)
+        scelta = self.operazione()
+        url = reverse("cronologia_operazioni_sistema")
+        response = self.client.get(url, {"utente": self.utente.pk})
+        self.assertEqual([entry.pk for entry in response.context["operazioni"]], [scelta.pk])
+        for value in ("", "inesistente", "9" * 30):
+            with self.subTest(value=value):
+                response = self.client.get(url, {"utente": value})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["utente_id"], "")
+                self.assertIn(scelta, response.context["operazioni"])
+
     def test_get_e_csrf_non_possono_segnare_lette(self):
         op = self.operazione()
         url = reverse("segna_log_operazione_letta", args=[op.pk])

@@ -38522,7 +38522,7 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
 .audit-log-filter-form {
     display: grid;
-    grid-template-columns: minmax(180px, 240px) minmax(220px, 240px) minmax(220px, 1fr) auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
     align-items: end;
     padding: 18px 22px 22px;
@@ -38532,6 +38532,10 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
     display: grid;
     gap: 8px;
     min-width: 0;
+}
+
+.audit-log-filter-field.is-search {
+    grid-column: span 2;
 }
 
 .audit-log-filter-label {
@@ -38753,6 +38757,14 @@ body.sidebar-is-collapsed .sidebar-section:not(.sidebar-home-section) {
 
     .audit-log-filter-form {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .audit-log-filter-field.is-search {
+        grid-column: auto;
+    }
+
+    .audit-log-filter-actions {
+        grid-column: 1 / -1;
     }
 
     .audit-log-layout {
