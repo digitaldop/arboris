@@ -6,9 +6,7 @@
             <span class="scambio-list-search-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#search"></use></svg></span>
             <input type="search" name="q" value="{{ ricerca }}" placeholder="Cerca dipendente..." aria-label="Cerca dipendente nella matrice">
         </label>
-        <label class="scambio-list-filter-field ga-buste-filter-short">
-            <span>Anno</span><input type="number" name="anno" value="{{ anno }}" min="2000" max="2100" required>
-        </label>
+        {% include "gestione_amministrativa/dipendenti/includes/busta_paga_period_filter.html" %}
         <label class="scambio-list-filter-field">
             <span>Mese</span>
             <select name="mese">
@@ -27,6 +25,13 @@
             <span>Stato pagamento</span>
             <select name="stato_pagamento">
                 {% for value, label in stati_pagamento %}<option value="{{ value }}" {% if stato_pagamento == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="scambio-list-filter-field">
+            <span>Ordina per</span>
+            <select name="ordine" data-payroll-auto-submit>
+                <option value="alfabetico" {% if ordine == 'alfabetico' %}selected{% endif %}>Dipendente (A–Z)</option>
+                <option value="anzianita" {% if ordine == 'anzianita' %}selected{% endif %}>Anzianità (più mesi prima)</option>
             </select>
         </label>
         <button type="submit" class="btn btn-secondary">Filtra</button>
@@ -60,8 +65,9 @@
 <section class="scambio-list-card ga-payroll-card" aria-labelledby="ga-payroll-title">
     <div class="scambio-list-card-head ga-payroll-head">
         <div>
-            <h2 id="ga-payroll-title">Matrice pagamenti &middot; {{ anno }}</h2>
-            <p class="ga-payroll-note" id="ga-payroll-help">Dipendenti in ordine alfabetico. Clicca su una busta per aprirla; scorri in orizzontale per vedere tutti i mesi.</p>
+            <h2 id="ga-payroll-title">Matrice pagamenti &middot; {{ periodo_label }}</h2>
+            <p class="ga-payroll-note" id="ga-payroll-help">{% if ordine == 'anzianita' %}Dipendenti in ordine di anzianità, dal maggior numero di mesi.{% else %}Dipendenti in ordine alfabetico.{% endif %} Clicca su una busta per aprirla; scorri in orizzontale per vedere tutti i mesi.</p>
+            {% if periodo_tipo == 'scolastico' and periodo_inizio %}<p class="ga-payroll-note">Competenze da {{ periodo_inizio|date:'d/m/Y' }} a {{ periodo_fine|date:'d/m/Y' }}.</p>{% endif %}
         </div>
         <span class="scambio-list-status-chip is-muted">{{ matrice.righe|length }} dipendent{{ matrice.righe|length|pluralize:"e,i" }}</span>
     </div>
@@ -73,20 +79,26 @@
         <span><i class="is-assente" aria-hidden="true"></i>Nessuna busta</span>
     </div>
     <p class="ga-payroll-note ga-payroll-explanation">Il dovuto usa il netto effettivo, oppure il netto previsto se assente. I pagamenti comprendono le quote collegate e le buste segnate come pagate. Le celle tratteggiate non entrano nei totali.</p>
+    {% if ordine == 'anzianita' %}<p class="ga-payroll-note ga-payroll-explanation">Anzianità al {{ data_anzianita|date:'d/m/Y' }}: mesi con almeno un giorno coperto da contratto, anche precedente al periodo visualizzato. Interruzioni escluse e sovrapposizioni contate una sola volta. A parità di mesi, ordine alfabetico; senza contratto, in fondo.</p>{% endif %}
     {% if matrice.totali.da_definire %}<p class="ga-payroll-note ga-payroll-explanation">Buste con importo da definire: {{ matrice.totali.da_definire }}. Non aumentano il residuo.</p>{% endif %}
     {% if matrice.totali.eccedenza %}<p class="ga-payroll-note ga-payroll-explanation">Pagamenti eccedenti il netto: &euro; {{ matrice.totali.eccedenza|euro }}. Le eccedenze non compensano i residui delle altre buste.</p>{% endif %}
     <div class="ga-payroll-scroll" role="region" aria-label="Matrice pagamenti per dipendente e mese" aria-describedby="ga-payroll-help" tabindex="0">
         <table class="ga-payroll-table">
-            <caption class="sr-only">Buste paga {{ anno }}: dovuto, pagato e residuo per dipendente e mese, secondo i filtri selezionati.</caption>
+            <caption class="sr-only">Buste paga {{ periodo_label }}: dovuto, pagato e residuo per dipendente e mese, secondo i filtri selezionati.</caption>
             <thead><tr>
                 <th scope="col" class="ga-payroll-sticky">Dipendente</th>
-                {% for colonna in matrice.colonne %}<th scope="col">{{ colonna.label }}</th>{% endfor %}
+                {% for colonna in matrice.colonne %}<th scope="col">{{ colonna.label }} {% if periodo_tipo == 'scolastico' %}<small class="ga-payroll-column-year">{{ colonna.anno }}</small>{% endif %}</th>{% endfor %}
                 <th scope="col">Totale periodo</th>
             </tr></thead>
             <tbody>
                 {% for riga in matrice.righe %}
                     <tr>
-                        <th scope="row" class="ga-payroll-sticky"><a class="ga-payroll-person" href="{% url 'modifica_dipendente' riga.dipendente.pk %}">{{ riga.dipendente }}<small>{{ riga.totale }} bust{{ riga.totale|pluralize:"a,e" }}</small></a></th>
+                        <th scope="row" class="ga-payroll-sticky">
+                            <a class="ga-payroll-person" href="{% url 'modifica_dipendente' riga.dipendente.pk %}">
+                                {{ riga.dipendente }}<small>{{ riga.totale }} bust{{ riga.totale|pluralize:"a,e" }}</small>
+                                {% if ordine == 'anzianita' %}<small>{% if riga.anzianita %}{{ riga.anzianita.mesi }} mes{{ riga.anzianita.mesi|pluralize:"e,i" }} di anzianità{% else %}Contratto non disponibile{% endif %}</small>{% endif %}
+                            </a>
+                        </th>
                         {% for cella in riga.celle %}
                             {% if cella.busta %}
                                 <td class="is-{{ cella.stato }}">
@@ -94,7 +106,8 @@
                                         <span class="ga-payroll-status">{{ cella.stato_label }}</span>
                                         {% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=cella only %}
                                         {% if cella.data_pagamento %}<span class="ga-payroll-date">Ultimo pagamento {{ cella.data_pagamento|date:'d/m/Y' }}</span>{% endif %}
-                                        {% if cella.prevista %}<span class="ga-payroll-badge">Netto previsto</span>{% elif cella.bozza %}<span class="ga-payroll-badge">Bozza</span>{% endif %}
+                                        {% if cella.prevista %}<span class="ga-payroll-badge">Netto previsto</span>{% endif %}
+                                        {% if cella.bozza %}<span class="ga-payroll-badge" title="Cedolino salvato con stato Bozza. Il pagamento è indicato separatamente dal colore e dagli importi." data-floating-text="Cedolino salvato con stato Bozza. Il pagamento è indicato separatamente dal colore e dagli importi.">Bozza cedolino</span>{% endif %}
                                     </a>
                                     {% if can_manage_gestione_amministrativa and cella.residuo %}
                                         <a class="ga-payroll-reconcile" href="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-window-popup="1" data-popup-url="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-popup-window-name="arboris-busta-paga-reconcile-popup" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" aria-label="Collega pagamento {{ riga.dipendente }} - {{ cella.busta.periodo_label }}">Collega pagamento</a>
@@ -109,7 +122,7 @@
                         <td class="ga-payroll-totals">{% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=riga only %}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{{ matrice.num_colonne }}"><div class="empty-state">Nessuna busta paga trovata per i filtri selezionati.</div></td></tr>
+                    <tr><td colspan="{{ matrice.num_colonne }}"><div class="empty-state">{% if periodo_tipo == 'scolastico' and not anni_scolastici %}Nessun anno scolastico configurato. Aggiungilo nelle impostazioni della scuola oppure passa all'anno solare.{% else %}Nessuna busta paga trovata per i filtri selezionati.{% endif %}</div></td></tr>
                 {% endfor %}
             </tbody>
             {% if matrice.righe %}<tfoot><tr>

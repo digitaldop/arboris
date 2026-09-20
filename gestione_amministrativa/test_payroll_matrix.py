@@ -7,9 +7,10 @@ from django.test import TestCase
 from django.urls import reverse
 
 from gestione_finanziaria.models import MovimentoFinanziario
+from scuola.models import AnnoScolastico
 from sistema.models import LivelloPermesso, SistemaUtentePermessi
 
-from .models import BustaPagaDipendente, Dipendente, PagamentoBustaPagaDipendente, StatoBustaPaga
+from .models import BustaPagaDipendente, ContrattoDipendente, Dipendente, PagamentoBustaPagaDipendente, StatoBustaPaga
 from .payroll_matrix import build_payroll_matrix
 
 
@@ -156,5 +157,118 @@ class PayrollMatrixTests(TestCase):
             self.pagamento(self.busta(mese=mese), "500")
         buste = BustaPagaDipendente.objects.select_related("dipendente__persona_collegata", "movimento_pagamento").prefetch_related("pagamenti")
         with self.assertNumQueries(2):
-            matrix = build_payroll_matrix(buste, [(mese, str(mese)) for mese in range(1, 14)])
+            matrix = build_payroll_matrix(buste, [(2026, mese, str(mese)) for mese in range(1, 14)])
         self.assertEqual(matrix["totali"]["residuo"], Decimal("6500"))
+
+    def school_year(self, start=date(2025, 9, 1), end=date(2026, 8, 31), **kwargs):
+        return AnnoScolastico.objects.create(
+            nome_anno_scolastico=f"{start.year}/{end.year}", data_inizio=start, data_fine=end, **kwargs,
+        )
+
+    def contratto(self, dipendente, start, end=None, **kwargs):
+        return ContrattoDipendente.objects.create(
+            dipendente=dipendente, data_inizio=start, data_fine=end, **kwargs,
+        )
+
+    def test_school_year_includes_correct_calendar_years_and_thirteenth_salary(self):
+        school_year = self.school_year()
+        included = [(2025, 9), (2025, 12), (2025, 13), (2026, 1), (2026, 8)]
+        for year, month in included + [(2025, 8), (2026, 9), (2026, 13)]:
+            self.busta(anno=year, mese=month)
+        response = self.overview(periodo="scolastico", anno_scolastico=str(school_year.pk))
+        matrix = response.context["matrice"]
+        self.assertEqual(matrix["totali"]["dovuto"], Decimal("5000"))
+        self.assertEqual([(c["anno"], c["mese"]) for c in matrix["colonne"]],
+                         [(2025, m) for m in [9, 10, 11, 12, 13]] + [(2026, m) for m in range(1, 9)])
+        cells = matrix["righe"][0]["celle"]
+        self.assertEqual([(c["busta"].anno, c["busta"].mese) for c in cells if c], included)
+        self.assertContains(response, "2025/2026")
+        thirteenth = self.overview(periodo="scolastico", anno_scolastico=str(school_year.pk), mese="13")
+        self.assertEqual(thirteenth.context["matrice"]["totali"]["dovuto"], Decimal("1000"))
+
+    def test_historical_inactive_school_year_and_current_default(self):
+        historical = self.school_year(attivo=False)
+        current = self.school_year(start=date(2026, 9, 1), end=date(2027, 8, 31))
+        self.busta(anno=2025, mese=9)
+        self.busta(anno=2026, mese=9, netto_effettivo=2000)
+        with patch("gestione_amministrativa.views.timezone.localdate", return_value=date(2026, 9, 20)):
+            default = self.overview(periodo="scolastico", anno_scolastico="invalid")
+        self.assertEqual(default.context["anno_scolastico_id"], str(current.pk))
+        self.assertEqual(default.context["matrice"]["totali"]["dovuto"], Decimal("2000"))
+        historical_response = self.overview(periodo="scolastico", anno_scolastico=str(historical.pk))
+        self.assertEqual(historical_response.context["matrice"]["totali"]["dovuto"], Decimal("1000"))
+        self.assertIn(historical, historical_response.context["anni_scolastici"])
+
+    def test_configured_school_dates_keep_same_month_in_different_years_separate(self):
+        school_year = self.school_year(start=date(2025, 1, 15), end=date(2026, 1, 20))
+        self.busta(anno=2025, mese=1, netto_effettivo=100)
+        self.busta(anno=2026, mese=1, netto_effettivo=200)
+        self.busta(anno=2026, mese=2)
+        matrix = self.overview(periodo="scolastico", anno_scolastico=str(school_year.pk), mese="1").context["matrice"]
+        self.assertEqual([c["anno"] for c in matrix["colonne"]], [2025, 2026])
+        self.assertEqual([c["dovuto"] for c in matrix["righe"][0]["celle"]], [Decimal("100"), Decimal("200")])
+        self.assertEqual(matrix["totali"]["dovuto"], Decimal("300"))
+
+    def test_school_mode_without_configured_year_has_explicit_empty_state(self):
+        self.busta()
+        response = self.overview(periodo="scolastico")
+        self.assertContains(response, "Nessun anno scolastico configurato")
+        self.assertEqual(response.context["matrice"]["totali"]["totale"], 0)
+        self.assertEqual(response.context["matrice"]["colonne"], [])
+
+    def test_selected_school_year_and_sort_are_preserved_when_opening_list(self):
+        school_year = self.school_year()
+        self.busta(anno=2025, mese=12)
+        self.busta(anno=2026, mese=1)
+        response = self.overview(periodo="scolastico", anno_scolastico=str(school_year.pk), ordine="anzianita")
+        listing = self.client.get(response.context["elenco_url"])
+        self.assertEqual(listing.context["buste_stats"]["totale"], 2)
+        self.assertEqual(listing.context["periodo_tipo"], "scolastico")
+        self.assertEqual(listing.context["anno_scolastico_id"], str(school_year.pk))
+        self.assertEqual(listing.context["ordine"], "anzianita")
+
+    def test_seniority_counts_contract_months_excluding_gaps_and_not_payslip_count(self):
+        self.contratto(self.rossi, date(2019, 1, 1), date(2019, 3, 31), attivo=False)
+        self.contratto(self.rossi, date(2020, 1, 1), date(2020, 3, 31), attivo=False)
+        self.contratto(self.bianchi, date(2024, 1, 1))
+        self.busta()
+        self.busta(mese=2)
+        self.busta(dipendente=self.bianchi)
+        with patch("gestione_amministrativa.views.timezone.localdate", return_value=date(2026, 9, 20)):
+            rows = self.overview(ordine="anzianita").context["matrice"]["righe"]
+        self.assertEqual([r["dipendente"].pk for r in rows], [self.bianchi.pk, self.rossi.pk])
+        self.assertEqual([r["anzianita"]["mesi"] for r in rows], [33, 6])
+
+    def test_seniority_deduplicates_overlaps_ignores_future_and_sorts_missing_last(self):
+        self.contratto(self.rossi, date(2026, 1, 31), date(2026, 6, 30), attivo=False)
+        self.contratto(self.rossi, date(2026, 6, 1), date(2026, 8, 1))
+        self.contratto(self.bianchi, date(2026, 1, 1), date(2026, 7, 31))
+        self.contratto(self.bianchi, date(2027, 1, 1))
+        missing = Dipendente.objects.create(nome="Anna", cognome="Alberti")
+        for employee in (self.rossi, self.bianchi, missing):
+            self.busta(dipendente=employee)
+        with patch("gestione_amministrativa.views.timezone.localdate", return_value=date(2026, 9, 20)):
+            rows = self.overview(ordine="anzianita").context["matrice"]["righe"]
+        self.assertEqual([r["dipendente"].pk for r in rows], [self.rossi.pk, self.bianchi.pk, missing.pk])
+        self.assertEqual([r["anzianita"]["mesi"] for r in rows[:2]], [8, 7])
+        alphabetical = self.overview(ordine="alfabetico").context["matrice"]["righe"]
+        self.assertEqual([r["dipendente"].pk for r in alphabetical], [missing.pk, self.bianchi.pk, self.rossi.pk])
+
+    def test_seniority_for_historical_year_stops_at_period_end_and_breaks_ties_alphabetically(self):
+        school_year = self.school_year(start=date(2024, 9, 1), end=date(2025, 8, 31))
+        for employee in (self.rossi, self.bianchi):
+            self.contratto(employee, date(2025, 1, 1))
+            self.busta(dipendente=employee, anno=2025, mese=8)
+        response = self.overview(periodo="scolastico", anno_scolastico=str(school_year.pk), ordine="anzianita")
+        self.assertEqual(response.context["data_anzianita"], date(2025, 8, 31))
+        rows = response.context["matrice"]["righe"]
+        self.assertEqual([r["anzianita"]["mesi"] for r in rows], [8, 8])
+        self.assertEqual([r["dipendente"].pk for r in rows], [self.bianchi.pk, self.rossi.pk])
+
+    def test_draft_badge_does_not_change_payment_status(self):
+        self.pagamento(self.busta(stato=StatoBustaPaga.BOZZA), "1000")
+        response = self.overview()
+        cell = response.context["matrice"]["righe"][0]["celle"][0]
+        self.assertEqual(cell["stato"], "pagata")
+        self.assertTrue(cell["bozza"])
+        self.assertContains(response, "Bozza cedolino")

@@ -1,0 +1,25 @@
+<div class="scambio-list-filter-field ga-payroll-period-control">
+    <span>Periodo</span>
+    <label class="ga-payroll-period-switch">
+        <span>Anno solare</span>
+        <input type="checkbox" name="periodo" value="scolastico" role="switch" aria-label="Anno scolastico" data-payroll-period-toggle {% if periodo_tipo == 'scolastico' %}checked{% endif %}>
+        <span class="ga-payroll-switch-track" aria-hidden="true"></span>
+        <span>Anno scolastico</span>
+    </label>
+</div>
+<input type="hidden" name="anno" value="{{ anno }}" data-payroll-solar-memory {% if periodo_tipo != 'scolastico' %}disabled{% endif %}>
+<input type="hidden" name="anno_scolastico" value="{{ anno_scolastico_id }}" data-payroll-school-memory {% if periodo_tipo == 'scolastico' %}disabled{% endif %}>
+<label class="scambio-list-filter-field ga-buste-filter-short" data-payroll-solar-year {% if periodo_tipo == 'scolastico' %}hidden{% endif %}>
+    <span>Anno solare</span>
+    <input type="number" name="anno" value="{{ anno }}" min="2000" max="2100" {% if vista == 'matrice' %}required{% endif %} {% if periodo_tipo == 'scolastico' %}disabled{% endif %}>
+</label>
+<label class="scambio-list-filter-field" data-payroll-school-year {% if periodo_tipo != 'scolastico' %}hidden{% endif %}>
+    <span>Anno scolastico</span>
+    <select name="anno_scolastico" data-payroll-auto-submit {% if periodo_tipo != 'scolastico' %}disabled{% endif %}>
+        {% for anno_storico in anni_scolastici %}
+            <option value="{{ anno_storico.pk }}" {% if anno_scolastico_id == anno_storico.pk|stringformat:'s' %}selected{% endif %}>{{ anno_storico }}{% if anno_storico.is_corrente %} (corrente){% endif %}</option>
+        {% empty %}
+            <option value="">Nessun anno scolastico configurato</option>
+        {% endfor %}
+    </select>
+</label>

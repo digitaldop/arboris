@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from .models import StatoBustaPaga
+from .models import BUSTA_PAGA_MONTH_CHOICES, StatoBustaPaga
 
 
 ZERO = Decimal("0.00")
@@ -14,6 +14,52 @@ PAYMENT_FILTERS = (
     ("da_definire", "Importo da definire"),
 )
 AMOUNT_KEYS = ("dovuto", "pagato", "residuo", "eccedenza")
+
+
+def payroll_periods(data_inizio, data_fine, mese=""):
+    """Monthly payroll competences overlapping the selected date range.
+
+    The thirteenth salary belongs to December of its own calendar year.
+    """
+    labels = dict(BUSTA_PAGA_MONTH_CHOICES)
+    periodi = []
+    start = data_inizio.year * 12 + data_inizio.month - 1
+    end = data_fine.year * 12 + data_fine.month - 1
+    for month_index in range(start, end + 1):
+        year, month_zero = divmod(month_index, 12)
+        month = month_zero + 1
+        periodi.append((year, month, labels[month]))
+        if month == 12:
+            periodi.append((year, 13, labels[13]))
+    return [periodo for periodo in periodi if not mese or str(periodo[1]) == mese]
+
+
+def contract_seniority(contratti, data_riferimento):
+    """Count distinct calendar months covered by contracts up to the cutoff."""
+    per_dipendente = {}
+    for contratto in contratti:
+        inizio = contratto["data_inizio"]
+        fine = min(contratto["data_fine"] or data_riferimento, data_riferimento)
+        if inizio > fine:
+            continue
+        dato = per_dipendente.setdefault(contratto["dipendente_id"], {
+            "data_inizio": inizio, "intervalli": [],
+        })
+        dato["data_inizio"] = min(dato["data_inizio"], inizio)
+        dato["intervalli"].append((inizio.year * 12 + inizio.month, fine.year * 12 + fine.month))
+
+    for dato in per_dipendente.values():
+        intervalli = sorted(dato.pop("intervalli"))
+        inizio, fine = intervalli[0]
+        mesi = 0
+        for prossimo_inizio, prossima_fine in intervalli[1:]:
+            if prossimo_inizio <= fine + 1:
+                fine = max(fine, prossima_fine)
+            else:
+                mesi += fine - inizio + 1
+                inizio, fine = prossimo_inizio, prossima_fine
+        dato["mesi"] = mesi + fine - inizio + 1
+    return per_dipendente
 
 
 def _totals():
@@ -60,17 +106,19 @@ def _payment_cell(busta):
     }
 
 
-def build_payroll_matrix(buste, mesi, stato_pagamento=""):
-    """The caller supplies one year, related employees and prefetched payments."""
-    colonne = [{"mese": mese, "label": label, **_totals()} for mese, label in mesi]
-    colonne_per_mese = {colonna["mese"]: colonna for colonna in colonne}
+def build_payroll_matrix(buste, periodi, stato_pagamento="", *, ordine="alfabetico", anzianita=None):
+    """The caller supplies year/month columns and prefetched payment data."""
+    colonne = [{"anno": anno, "mese": mese, "label": label, **_totals()} for anno, mese, label in periodi]
+    colonne_per_periodo = {(colonna["anno"], colonna["mese"]): colonna for colonna in colonne}
+    anzianita = anzianita or {}
     righe = {}
     totali = {
         **_totals(), "totale": 0, "pagate": 0, "parziali": 0,
         "da_pagare": 0, "da_definire": 0, "previste": 0, "residuo_previsto": ZERO,
     }
     for busta in buste:
-        if busta.mese not in colonne_per_mese:
+        periodo = (busta.anno, busta.mese)
+        if periodo not in colonne_per_periodo:
             continue
         cella = _payment_cell(busta)
         corrisponde = (
@@ -79,10 +127,11 @@ def build_payroll_matrix(buste, mesi, stato_pagamento=""):
             or (stato_pagamento == "da_pagare" and cella["residuo"] > ZERO)
         )
         riga = righe.setdefault(busta.dipendente_id, {
-            "dipendente": busta.dipendente, "celle_per_mese": {},
+            "dipendente": busta.dipendente, "celle_per_periodo": {},
+            "anzianita": anzianita.get(busta.dipendente_id),
             "totale": 0, **_totals(),
         })
-        riga["celle_per_mese"][busta.mese] = cella if corrisponde else {"esclusa": True}
+        riga["celle_per_periodo"][periodo] = cella if corrisponde else {"esclusa": True}
         if not corrisponde:
             continue
         riga["totale"] += 1
@@ -96,18 +145,23 @@ def build_payroll_matrix(buste, mesi, stato_pagamento=""):
             totali["residuo_previsto"] += cella["residuo"]
         for key in AMOUNT_KEYS:
             riga[key] += cella[key]
-            colonne_per_mese[busta.mese][key] += cella[key]
+            colonne_per_periodo[periodo][key] += cella[key]
             totali[key] += cella[key]
 
     righe_visibili = []
-    for riga in sorted(righe.values(), key=lambda item: (
-        item["dipendente"].cognome.casefold(), item["dipendente"].nome.casefold(),
-        item["dipendente"].pk,
-    )):
+
+    def ordine_riga(item):
+        alfabetico = (item["dipendente"].cognome.casefold(), item["dipendente"].nome.casefold(), item["dipendente"].pk)
+        if ordine == "anzianita":
+            dato = item["anzianita"]
+            return (dato is None, -(dato["mesi"] if dato else 0), *alfabetico)
+        return alfabetico
+
+    for riga in sorted(righe.values(), key=ordine_riga):
         if not riga["totale"]:
             continue
-        celle_per_mese = riga.pop("celle_per_mese")
-        riga["celle"] = [celle_per_mese.get(colonna["mese"]) for colonna in colonne]
+        celle_per_periodo = riga.pop("celle_per_periodo")
+        riga["celle"] = [celle_per_periodo.get((colonna["anno"], colonna["mese"])) for colonna in colonne]
         righe_visibili.append(riga)
     return {"righe": righe_visibili, "colonne": colonne, "totali": totali,
             "num_colonne": len(colonne) + 2}

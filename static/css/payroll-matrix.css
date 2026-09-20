@@ -23,6 +23,48 @@
 .ga-payroll-filters { flex-wrap: wrap; }
 .ga-payroll-filters .scambio-list-filter-field { min-width: 135px; }
 .ga-payroll-filters .ga-buste-filter-short { min-width: 100px; }
+.ga-buste-list-shell [data-payroll-solar-year][hidden],
+.ga-buste-list-shell [data-payroll-school-year][hidden] { display: none; }
+.ga-payroll-period-switch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    color: #344a63;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: none;
+    cursor: pointer;
+}
+.ga-payroll-period-switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.ga-payroll-switch-track {
+    width: 40px;
+    height: 24px;
+    flex-shrink: 0;
+    padding: 3px;
+    border-radius: 14px;
+    background: #bacbd5;
+    box-sizing: border-box;
+}
+.ga-payroll-switch-track::before {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px #132a3f30;
+}
+.ga-payroll-period-switch input:checked + .ga-payroll-switch-track { background: #427c93; }
+.ga-payroll-period-switch input:checked + .ga-payroll-switch-track::before { transform: translateX(16px); }
+.ga-payroll-period-switch input:focus-visible + .ga-payroll-switch-track { outline: 2px solid #2f7c9b; outline-offset: 3px; }
+.ga-payroll-column-year { display: block; margin-top: 3px; color: #60738d; font-size: 10px; font-weight: 500; }
 .ga-payroll-head { align-items: flex-start; gap: 12px; }
 .ga-payroll-note { margin: 6px 0 0; color: #60738d; font-size: 12px; line-height: 1.5; }
 .ga-payroll-explanation { margin: 0; padding: 0 18px 14px; }
@@ -62,8 +104,8 @@
 .ga-payroll-table th, .ga-payroll-table td {
     padding: 0;
     min-width: 150px;
-    border-right: 1px solid #e2ebf2;
-    border-bottom: 1px solid #e2ebf2;
+    border-right: 1px solid #b9c6cc;
+    border-bottom: 1px solid #b9c6cc;
     background: #fff;
     vertical-align: top;
 }

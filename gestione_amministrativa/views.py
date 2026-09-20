@@ -1,7 +1,7 @@
 import mimetypes
 import re
 import unicodedata
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode
@@ -31,6 +31,7 @@ from economia.models import Iscrizione
 from gestione_finanziaria.models import MovimentoFinanziario, OrigineMovimento, StatoRiconciliazione
 from gestione_finanziaria.services import aggiorna_stato_riconciliazione_movimento, importo_movimento_disponibile_fornitori
 from sistema.models import SistemaImpostazioniGenerali
+from scuola.models import AnnoScolastico
 from scuola.utils import resolve_default_anno_scolastico
 
 from .forms import (
@@ -57,7 +58,7 @@ from .models import (
     TipoContrattoDipendente,
 )
 from .services import compensi_lavorativi_dipendente, contratto_applicabile, crea_o_aggiorna_previsione_busta_paga
-from .payroll_matrix import PAYMENT_FILTERS, build_payroll_matrix
+from .payroll_matrix import PAYMENT_FILTERS, build_payroll_matrix, contract_seniority, payroll_periods
 
 
 ZERO = Decimal("0.00")
@@ -1257,24 +1258,53 @@ def genera_previsione_busta_paga(request, dipendente_pk):
 def lista_buste_paga_dipendenti(request):
     buste = BustaPagaDipendente.objects.select_related("dipendente__persona_collegata", "contratto", "contratto__tipo_contratto")
     vista = "elenco" if request.GET.get("vista") == "elenco" else "matrice"
+    oggi = timezone.localdate()
+    periodo_tipo = "scolastico" if request.GET.get("periodo") == "scolastico" else "solare"
+    ordine = "anzianita" if request.GET.get("ordine") == "anzianita" else "alfabetico"
     anno = (request.GET.get("anno") or "").strip()
     mese = (request.GET.get("mese") or "").strip()
     dipendente_id = (request.GET.get("dipendente") or "").strip()
     if not (anno.isascii() and anno.isdecimal() and len(anno) == 4 and 2000 <= int(anno) <= 2100):
-        anno = str(timezone.localdate().year) if vista == "matrice" else ""
+        anno = str(oggi.year) if vista == "matrice" else ""
     if mese not in {str(value) for value, _ in BUSTA_PAGA_MONTH_CHOICES}:
         mese = ""
     if not (dipendente_id.isascii() and dipendente_id.isdecimal() and len(dipendente_id) <= 18):
         dipendente_id = ""
-    if anno:
-        buste = buste.filter(anno=int(anno))
+    anni_scolastici = AnnoScolastico.objects.all()
+    anno_scolastico_id = request.GET.get("anno_scolastico", "")
+    anno_scolastico = next((item for item in anni_scolastici if str(item.pk) == anno_scolastico_id), None)
+    if anno_scolastico is None:
+        anno_scolastico = resolve_default_anno_scolastico(today=oggi)
+    anno_scolastico_id = str(anno_scolastico.pk) if anno_scolastico else ""
+    if periodo_tipo == "scolastico":
+        periodo_inizio = anno_scolastico.data_inizio if anno_scolastico else None
+        periodo_fine = anno_scolastico.data_fine if anno_scolastico else None
+        periodo_label = str(anno_scolastico) if anno_scolastico else "Anno scolastico"
+        periodi = payroll_periods(periodo_inizio, periodo_fine, mese) if anno_scolastico else []
+        mesi_per_anno = {}
+        for year, month, _ in periodi:
+            mesi_per_anno.setdefault(year, []).append(month)
+        periodo_filter = Q(pk__in=[])
+        for year, months in mesi_per_anno.items():
+            periodo_filter |= Q(anno=year, mese__in=months)
+        buste = buste.filter(periodo_filter)
+    else:
+        periodo_inizio = date(int(anno or oggi.year), 1, 1)
+        periodo_fine = date(int(anno or oggi.year), 12, 31)
+        periodo_label = anno
+        periodi = payroll_periods(periodo_inizio, periodo_fine, mese)
+        if anno:
+            buste = buste.filter(anno=int(anno))
     if mese:
         buste = buste.filter(mese=int(mese))
     if dipendente_id:
         buste = buste.filter(dipendente_id=int(dipendente_id))
 
     tab_params = request.GET.copy()
-    for key, value in (("anno", anno), ("mese", mese), ("dipendente", dipendente_id)):
+    for key, value in (
+        ("anno", anno), ("mese", mese), ("dipendente", dipendente_id),
+        ("periodo", periodo_tipo), ("anno_scolastico", anno_scolastico_id), ("ordine", ordine),
+    ):
         tab_params[key] = value
     tab_params["vista"] = "elenco"
     elenco_url = f"{reverse('lista_buste_paga_dipendenti')}?{tab_params.urlencode()}"
@@ -1282,6 +1312,10 @@ def lista_buste_paga_dipendenti(request):
     matrice_url = f"{reverse('lista_buste_paga_dipendenti')}?{tab_params.urlencode()}"
     context = {
         "vista": vista, "anno": anno, "mese": mese, "dipendente_id": dipendente_id,
+        "periodo_tipo": periodo_tipo, "periodo_label": periodo_label,
+        "periodo_inizio": periodo_inizio, "periodo_fine": periodo_fine,
+        "anni_scolastici": anni_scolastici, "anno_scolastico_id": anno_scolastico_id,
+        "ordine": ordine,
         "elenco_url": elenco_url, "matrice_url": matrice_url,
         "dipendenti": Dipendente.objects.select_related("persona_collegata").order_by(
             "persona_collegata__cognome", "persona_collegata__nome"
@@ -1298,14 +1332,22 @@ def lista_buste_paga_dipendenti(request):
         stato_pagamento = request.GET.get("stato_pagamento", "")
         if stato_pagamento not in dict(PAYMENT_FILTERS):
             stato_pagamento = ""
-        mesi = [(value, label) for value, label in BUSTA_PAGA_MONTH_CHOICES if not mese or str(value) == mese]
+        data_anzianita = min(oggi, periodo_fine) if periodo_fine else oggi
+        anzianita = {}
+        if ordine == "anzianita":
+            contratti = ContrattoDipendente.objects.filter(
+                dipendente_id__in=buste.order_by().values("dipendente_id"),
+                data_inizio__lte=data_anzianita,
+            ).values("dipendente_id", "data_inizio", "data_fine")
+            anzianita = contract_seniority(contratti, data_anzianita)
         matrice = build_payroll_matrix(
             buste.select_related("movimento_pagamento").prefetch_related("pagamenti"),
-            mesi, stato_pagamento,
+            periodi, stato_pagamento, ordine=ordine, anzianita=anzianita,
         )
         context.update({
             "matrice": matrice, "buste_stats": matrice["totali"], "ricerca": ricerca,
             "stato_pagamento": stato_pagamento, "stati_pagamento": PAYMENT_FILTERS,
+            "data_anzianita": data_anzianita,
         })
         return render(request, "gestione_amministrativa/dipendenti/busta_paga_list.html", context)
 
