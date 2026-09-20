@@ -692,7 +692,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
     def test_lista_buste_paga_renderizza_nuovo_layout_e_popup(self):
         self.client.force_login(self.user)
 
-        response = self.client.get(reverse("lista_buste_paga_dipendenti"))
+        response = self.client.get(reverse("lista_buste_paga_dipendenti"), {"vista": "elenco"})
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ga-buste-list-shell")
@@ -772,7 +772,7 @@ class SimulazioneCostoDipendenteTests(TestCase):
 
         response = self.client.get(
             reverse("lista_buste_paga_dipendenti"),
-            {"mese": str(BUSTA_PAGA_MESE_TREDICESIMA)},
+            {"vista": "elenco", "mese": str(BUSTA_PAGA_MESE_TREDICESIMA)},
         )
 
         self.assertEqual(response.status_code, 200)

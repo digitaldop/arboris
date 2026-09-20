@@ -1256,7 +1256,7 @@ def genera_previsione_busta_paga(request, dipendente_pk):
 
 def lista_buste_paga_dipendenti(request):
     buste = BustaPagaDipendente.objects.select_related("dipendente__persona_collegata", "contratto", "contratto__tipo_contratto")
-    vista = "matrice" if request.GET.get("vista") == "matrice" else "elenco"
+    vista = "elenco" if request.GET.get("vista") == "elenco" else "matrice"
     anno = (request.GET.get("anno") or "").strip()
     mese = (request.GET.get("mese") or "").strip()
     dipendente_id = (request.GET.get("dipendente") or "").strip()
