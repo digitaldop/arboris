@@ -369,9 +369,12 @@ def normalize_sidebar_menu_disabled_keys(value):
 def get_role_sidebar_menu_disabled_keys(role):
     if not role:
         return []
-    return normalize_sidebar_menu_disabled_keys(
+    from .permission_catalog import SIDEBAR_PAGE_ALIASES
+    disabled = normalize_sidebar_menu_disabled_keys(
         getattr(role, "voci_menu_disabilitate", [])
     )
+    overrides = role.permessi_pagine or {}
+    return [key for key in disabled if overrides.get(SIDEBAR_PAGE_ALIASES.get(key, key)) not in {"view", "manage"}]
 
 
 def _node_is_visible(node, flags, disabled_keys):
@@ -383,7 +386,7 @@ def _node_is_visible(node, flags, disabled_keys):
     return all(bool(flags.get(flag_name)) for flag_name in node.get("requires", ()))
 
 
-def build_sidebar_menu_state(disabled_keys, flags):
+def build_sidebar_menu_state(disabled_keys, flags, user=None):
     disabled_key_set = set(normalize_sidebar_menu_disabled_keys(disabled_keys))
     items = {}
     groups = {}
@@ -397,6 +400,14 @@ def build_sidebar_menu_state(disabled_keys, flags):
             return visible
 
         visible = _node_is_visible(node, flags, disabled_key_set)
+        if user is not None:
+            from .permission_catalog import PAGES_BY_KEY, SIDEBAR_PAGE_ALIASES
+            from .permissions import user_has_page_permission
+            page_key = SIDEBAR_PAGE_ALIASES.get(node["key"], node["key"])
+            if page_key in PAGES_BY_KEY:
+                visible = node["key"] not in disabled_key_set and user_has_page_permission(user, page_key)
+                if "gestione_dipendenti_dettagliata_attiva" in node.get("requires", ()):
+                    visible = visible and bool(flags.get("gestione_dipendenti_dettagliata_attiva"))
         items[node["key"]] = visible
         return visible
 

@@ -11,7 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from economia.models import RataIscrizione
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_page_permission
 from . import services
 from .models import (
     DecisionePropostaRiconciliazione, Fornitore, MovimentoFinanziario,
@@ -22,8 +22,8 @@ S = PropostaRiconciliazione.Stato
 
 
 def allowed_scopes(user):
-    finance = user_has_module_permission(user, "gestione_finanziaria", "manage")
-    economics = user_has_module_permission(user, "economia", "manage")
+    finance = user_has_page_permission(user, "gestione_finanziaria_riconciliazione", "manage")
+    economics = user_has_page_permission(user, "economia_rate_iscrizione", "manage")
     return (["rate"] if finance or economics else []) + (["fornitore"] if finance else [])
 
 

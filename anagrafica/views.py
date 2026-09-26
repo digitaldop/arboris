@@ -68,7 +68,7 @@ from sistema.models import (
     Scuola,
     SistemaOperazioneCronologia,
 )
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_module_permission, user_has_page_permission
 from sistema.terminology import get_educator_terminology, get_student_terminology
 
 from .contact_services import address_duplicate_candidates, set_familiare_studenti, set_studente_familiari
@@ -2366,14 +2366,14 @@ def home(request):
         anno_scolastico_corrente = anno_corrente.nome_anno_scolastico
     else:
         _, anno_scolastico_corrente = resolve_current_school_year()
-    can_view_gestione_finanziaria = user_has_module_permission(
+    can_view_gestione_finanziaria = user_has_page_permission(
         request.user,
-        "gestione_finanziaria",
+        "gestione_finanziaria_dashboard",
         LivelloPermesso.VISUALIZZAZIONE,
     )
-    can_manage_gestione_finanziaria = user_has_module_permission(
+    can_manage_gestione_finanziaria = user_has_page_permission(
         request.user,
-        "gestione_finanziaria",
+        "gestione_finanziaria_dashboard",
         LivelloPermesso.GESTIONE,
     )
 
@@ -2396,6 +2396,10 @@ def home(request):
 
     context = {
         "dashboard_anni_scolastici": dashboard_school_year["anni_scolastici"],
+        "can_view_home_anagrafica": user_has_page_permission(request.user, "anagrafica_studenti"),
+        "can_view_home_economia": user_has_page_permission(request.user, "economia_panoramica_rette"),
+        "can_view_home_finanza": can_view_gestione_finanziaria,
+        "can_view_home_calendario": user_has_page_permission(request.user, "calendario_agenda"),
         "dashboard_anno_scolastico_selezionato": dashboard_school_year["anno_scolastico_id"],
         "dashboard_has_year_switch": dashboard_school_year["has_year_switch"],
         "anno_scolastico_corrente": anno_scolastico_corrente,

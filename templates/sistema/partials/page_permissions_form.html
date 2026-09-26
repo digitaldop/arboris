@@ -1,0 +1,43 @@
+<section class="system-role-card role-permissions" aria-labelledby="role-modules-title" data-role-permissions>
+    <input type="hidden" name="page_permissions_form_present" value="1">
+    <div class="system-role-card-head">
+        <div>
+            <h2 id="role-modules-title">Accesso ai moduli e alle pagine</h2>
+            <p>Imposta il livello del modulo, poi personalizza le singole pagine. Le eccezioni possono concedere o limitare l'accesso rispetto al modulo.</p>
+        </div>
+    </div>
+    <p class="system-role-help">Per esempio: lascia Economia e Gestione finanziaria su «Divieto di accesso» e abilita solo Matrice rette e Movimenti bancari in visualizzazione.</p>
+    <div class="role-permissions-warning" data-full-control-warning hidden>Il controllo completo concede visualizzazione e azione su tutte le pagine. Disattivalo per applicare i livelli qui sotto.</div>
+    <div class="role-permissions-toolbar" aria-label="Selezione di tutte le pagine">
+        <strong>Tutte le pagine</strong>
+        <button type="button" class="btn btn-secondary" data-bulk-level="view">Seleziona tutto · visualizzazione</button>
+        <button type="button" class="btn btn-secondary" data-bulk-level="manage">Seleziona tutto · azione</button>
+        <button type="button" class="btn btn-secondary" data-bulk-level="none">Deseleziona tutto</button>
+        <button type="button" class="btn btn-secondary" data-bulk-level="">Ripristina ereditarietà</button>
+    </div>
+    {% for section in permission_sections %}
+        <details class="role-permissions-module" data-permission-module="{{ section.key }}" open>
+            <summary>{{ section.field.label }} <span>{{ section.pages|length }} pagin{{ section.pages|length|pluralize:"a,e" }}</span></summary>
+            <div class="role-permissions-module-body">
+                <label class="role-permissions-default" for="{{ section.field.id_for_label }}">
+                    <strong>Livello predefinito del modulo</strong>
+                    {{ section.field }}
+                </label>
+                {{ section.field.errors }}
+                <div class="role-permissions-toolbar" aria-label="Selezione pagine del {{ section.field.label }}">
+                    <button type="button" class="btn btn-secondary" data-bulk-level="view">Seleziona tutto · visualizzazione</button>
+                    <button type="button" class="btn btn-secondary" data-bulk-level="manage">Seleziona tutto · azione</button>
+                    <button type="button" class="btn btn-secondary" data-bulk-level="none">Deseleziona tutto</button>
+                    <button type="button" class="btn btn-secondary" data-bulk-level="">Eredita dal modulo</button>
+                </div>
+                {% for page in section.pages %}
+                    <div class="role-permissions-page">
+                        <label for="{{ page.field.id_for_label }}">{{ page.field.label }}</label>
+                        <div>{{ page.field }}{{ page.field.errors }}<small data-effective-permission aria-live="polite"></small></div>
+                    </div>
+                {% endfor %}
+            </div>
+        </details>
+    {% endfor %}
+    <p class="system-role-help">«Visualizzazione e azione» permette di creare, modificare ed eliminare. «Solo visualizzazione» blocca le modifiche anche tramite URL diretti. Le abilitazioni speciali sottostanti restano il valore ereditato per Comunicazioni, Backup e Cronologia.</p>
+</section>

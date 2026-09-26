@@ -107,10 +107,12 @@
                                         {% include "gestione_amministrativa/dipendenti/includes/busta_paga_matrix_totals.html" with totale=cella only %}
                                         {% if cella.data_pagamento %}<span class="ga-payroll-date">Ultimo pagamento {{ cella.data_pagamento|date:'d/m/Y' }}</span>{% endif %}
                                         {% if cella.prevista %}<span class="ga-payroll-badge">Netto previsto</span>{% endif %}
-                                        {% if cella.bozza %}<span class="ga-payroll-badge" title="Cedolino salvato con stato Bozza. Il pagamento è indicato separatamente dal colore e dagli importi." data-floating-text="Cedolino salvato con stato Bozza. Il pagamento è indicato separatamente dal colore e dagli importi.">Bozza cedolino</span>{% endif %}
                                     </a>
                                     {% if can_manage_gestione_amministrativa and cella.residuo %}
-                                        <a class="ga-payroll-reconcile" href="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-window-popup="1" data-popup-url="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-popup-window-name="arboris-busta-paga-reconcile-popup" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" aria-label="Collega pagamento {{ riga.dipendente }} - {{ cella.busta.periodo_label }}">Collega pagamento</a>
+                                        <a class="ga-payroll-reconcile" href="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-window-popup="1" data-popup-url="{% url 'riconcilia_busta_paga_dipendente' cella.busta.pk %}?popup=1" data-popup-window-name="arboris-busta-paga-reconcile-popup" data-popup-window-features="width=1180,height=820,resizable=yes,scrollbars=yes" aria-label="Collega movimento bancario {{ riga.dipendente }} - {{ cella.busta.periodo_label }}">
+                                            <svg aria-hidden="true"><use href="{% static 'images/arboris-ui-icons.svg' %}#bank"></use></svg>
+                                            <span>Collega movimento</span>
+                                        </a>
                                     {% endif %}
                                 </td>
                             {% elif cella.esclusa %}

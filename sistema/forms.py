@@ -18,7 +18,10 @@ from .models import (
     SistemaBackupDatabaseConfigurazione,
     SistemaRuoloPermessi,
     SistemaUtentePermessi,
+    LivelloPermesso,
+    PERMISSION_MODULE_FIELDS,
 )
+from .permission_catalog import PERMISSION_PAGES
 from .sidebar_menu import (
     SIDEBAR_MENU_ITEM_CHOICES,
     SIDEBAR_MENU_ITEM_KEYS,
@@ -486,6 +489,27 @@ class SistemaRuoloPermessiForm(forms.ModelForm):
             key for key in SIDEBAR_MENU_ITEM_KEYS if key not in set(disabled_keys)
         ]
         self.fields["voci_menu_attive"].initial = active_keys
+        overrides = self.instance.permessi_pagine or {}
+        choices = [("", "Eredita dal modulo"), ("none", "Divieto di accesso"),
+                   ("view", "Solo visualizzazione"), ("manage", "Visualizzazione e azione")]
+        for page in PERMISSION_PAGES:
+            initial = overrides.get(page.key, "none" if page.key in disabled_keys else "")
+            self.fields[f"pagina_{page.key}"] = forms.ChoiceField(
+                label=page.label, choices=choices, required=False, initial=initial,
+                widget=forms.Select(attrs={"data-page-permission": page.key}),
+            )
+        for field_name in PERMISSION_MODULE_FIELDS.values():
+            self.fields[field_name].choices = choices[1:]
+            self.fields[field_name].widget.attrs["data-module-permission"] = "1"
+
+    def get_permission_sections(self):
+        return [
+            {"key": module, "field": self[field_name], "pages": [
+                {"key": page.key, "field": self[f"pagina_{page.key}"]}
+                for page in PERMISSION_PAGES if page.module == module
+            ]}
+            for module, field_name in PERMISSION_MODULE_FIELDS.items()
+        ]
 
     def clean_voci_menu_attive(self):
         active_keys = self.cleaned_data.get("voci_menu_attive") or []
@@ -499,10 +523,15 @@ class SistemaRuoloPermessiForm(forms.ModelForm):
 
     def save(self, commit=True):
         role = super().save(commit=False)
-        active_keys = set(self.cleaned_data.get("voci_menu_attive") or [])
-        role.voci_menu_disabilitate = [
-            key for key in SIDEBAR_MENU_ITEM_KEYS if key not in active_keys
-        ]
+        if "page_permissions_form_present" in self.data:
+            role.permessi_pagine = {
+                page.key: self.cleaned_data[f"pagina_{page.key}"]
+                for page in PERMISSION_PAGES if self.cleaned_data.get(f"pagina_{page.key}")
+            }
+            role.voci_menu_disabilitate = []
+        elif "sidebar_menu_form_present" in self.data:
+            active_keys = set(self.cleaned_data.get("voci_menu_attive") or [])
+            role.voci_menu_disabilitate = [key for key in SIDEBAR_MENU_ITEM_KEYS if key not in active_keys]
         if commit:
             role.save()
             self.save_m2m()

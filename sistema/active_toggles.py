@@ -20,6 +20,52 @@ class ActiveToggleConfig:
     def model_label_lower(self):
         return self.model_label.lower()
 
+    @property
+    def permission_page(self):
+        return ACTIVE_TOGGLE_PAGES.get(self.model_label_lower)
+
+
+ACTIVE_TOGGLE_PAGES = {
+    "anagrafica.regione": "anagrafica_indirizzi",
+    "anagrafica.provincia": "anagrafica_indirizzi",
+    "anagrafica.citta": "anagrafica_indirizzi",
+    "anagrafica.nazione": "anagrafica_indirizzi",
+    "anagrafica.cap": "anagrafica_indirizzi",
+    "anagrafica.familiare": "anagrafica_familiari",
+    "anagrafica.studente": "anagrafica_studenti",
+    "anagrafica.tipodocumento": "anagrafica_documenti",
+    "scuola.annoscolastico": "sistema_anni_scolastici",
+    "scuola.classe": "sistema_classi",
+    "scuola.gruppoclasse": "sistema_pluriclassi",
+    "calendario.categoriacalendario": "calendario_categorie",
+    "calendario.eventocalendario": "calendario_agenda",
+    "economia.metodopagamento": "economia_metodi_pagamento",
+    "economia.tipomovimentocredito": "economia_fondi_accantonamento",
+    "economia.statoiscrizione": "economia_stati_iscrizione",
+    "economia.condizioneiscrizione": "economia_condizioni",
+    "economia.tariffacondizioneiscrizione": "economia_tariffe",
+    "economia.agevolazione": "economia_agevolazioni",
+    "economia.iscrizione": "economia_iscrizioni",
+    "fondo_accantonamento.pianoaccantonamento": "economia_fondi_accantonamento",
+    "fondo_accantonamento.regolascontoagevolazione": "economia_fondi_accantonamento",
+    "servizi_extra.servizioextra": "servizi_extra_servizi",
+    "servizi_extra.tariffaservizioextra": "servizi_extra_tariffe",
+    "servizi_extra.iscrizioneservizioextra": "servizi_extra_iscrizioni",
+    "gestione_finanziaria.categoriafinanziaria": "gestione_finanziaria_categorie_movimenti",
+    "gestione_finanziaria.fornitore": "anagrafica_fornitori",
+    "gestione_finanziaria.vocebudgetricorrente": "gestione_finanziaria_budgeting",
+    "gestione_finanziaria.providerbancario": "gestione_finanziaria_provider_bancari",
+    "gestione_finanziaria.contobancario": "gestione_finanziaria_conti_bancari",
+    "gestione_finanziaria.regolacategorizzazione": "gestione_finanziaria_regole_categorizzazione",
+    "gestione_finanziaria.pianificazionesincronizzazione": "gestione_finanziaria_pianificazione_sync",
+    "gestione_finanziaria.fattureincloudconnessione": "gestione_finanziaria_fatture_in_cloud",
+    "gestione_amministrativa.tipocontrattodipendente": "gestione_amministrativa_contratti",
+    "gestione_amministrativa.contrattodipendente": "gestione_amministrativa_contratti",
+    "gestione_amministrativa.simulazionecostodipendente": "gestione_amministrativa_simulazioni_costo",
+    "gestione_amministrativa.parametrocalcolostipendio": "gestione_amministrativa_parametri_calcolo",
+    "sistema.sistemaruolopermessi": "sistema_ruoli",
+}
+
 
 ACTIVE_TOGGLE_REGISTRY = {
     # Anagrafica

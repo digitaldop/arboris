@@ -43,7 +43,7 @@ urlpatterns = [
     ),
     path(
         "sistema/email-smtp/",
-        sistema_manage(views.configurazione_email_smtp),
+        sistema_edit(views.configurazione_email_smtp),
         name="configurazione_email_smtp",
     ),
     path(
@@ -100,5 +100,5 @@ urlpatterns = [
     path("sistema/utenti/ruoli/<int:pk>/", sistema_edit(views.modifica_ruolo_utente), name="modifica_ruolo_utente"),
     path("sistema/utenti/nuovo/", sistema_manage(views.crea_utente), name="crea_utente"),
     path("sistema/utenti/<int:pk>/elimina/", sistema_manage(views.elimina_utente), name="elimina_utente"),
-    path("sistema/utenti/<int:pk>/", sistema_manage(views.modifica_utente), name="modifica_utente"),
+    path("sistema/utenti/<int:pk>/", sistema_edit(views.modifica_utente), name="modifica_utente"),
 ]

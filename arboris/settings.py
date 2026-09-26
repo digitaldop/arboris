@@ -83,6 +83,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'sistema.middleware.AuditUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'sistema.middleware.PagePermissionMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'sistema.middleware.DatabaseBackupScheduleMiddleware',
     'gestione_finanziaria.middleware.SincronizzazionePsd2ScheduleMiddleware',

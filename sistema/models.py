@@ -1249,6 +1249,7 @@ class SistemaRuoloPermessi(models.Model):
         default=LivelloPermesso.NESSUNO,
     )
     voci_menu_disabilitate = models.JSONField(default=list, blank=True)
+    permessi_pagine = models.JSONField(default=dict, blank=True)
     data_creazione = models.DateTimeField(auto_now_add=True)
     data_aggiornamento = models.DateTimeField(auto_now=True)
 
@@ -1278,6 +1279,31 @@ class SistemaRuoloPermessi(models.Model):
             return LivelloPermesso.NESSUNO
         return getattr(self, field_name, LivelloPermesso.NESSUNO)
 
+    def get_page_level(self, page_key):
+        from .permission_catalog import PAGES_BY_KEY, SIDEBAR_PAGE_ALIASES
+
+        page = PAGES_BY_KEY.get(page_key)
+        if not self.attivo or not page:
+            return LivelloPermesso.NESSUNO
+        if self.controllo_completo:
+            return LivelloPermesso.GESTIONE
+        overrides = self.permessi_pagine if isinstance(self.permessi_pagine, dict) else {}
+        if page_key in overrides:
+            value = overrides[page_key]
+            return value if value in LivelloPermesso.values else LivelloPermesso.NESSUNO
+        disabled = {SIDEBAR_PAGE_ALIASES.get(key, key) for key in self.voci_menu_disabilitate}
+        if page_key in disabled:
+            return LivelloPermesso.NESSUNO
+        special = {
+            "anagrafica_comunicazioni_famiglie": self.accesso_comunicazioni_famiglie,
+            "sistema_backup_database": self.accesso_backup_database,
+            "sistema_cronologia_operazioni": self.amministratore_operativo,
+            "sistema_feedback_beta": self.amministratore_operativo,
+        }
+        if page_key in special:
+            return LivelloPermesso.GESTIONE if special[page_key] else LivelloPermesso.NESSUNO
+        return self.get_module_level(page.module)
+
     def has_module_permission(self, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
         if not self.attivo:
             return False
@@ -1293,7 +1319,10 @@ class SistemaRuoloPermessi(models.Model):
         return current_level == LivelloPermesso.GESTIONE
 
     def get_module_level_display_value(self, module_name):
-        return LivelloPermesso(self.get_module_level(module_name)).label
+        from .permission_catalog import PERMISSION_PAGES
+        label = LivelloPermesso(self.get_module_level(module_name)).label
+        count = sum(page.key in (self.permessi_pagine or {}) for page in PERMISSION_PAGES if page.module == module_name)
+        return f"{label} · {count} pagine personalizzate" if count else label
 
     @property
     def theme_variables(self):
@@ -1461,6 +1490,8 @@ class SistemaUtentePermessi(models.Model):
         return self.controllo_completo or self.accesso_comunicazioni_famiglie
 
     def get_module_level_display_value(self, module_name):
+        if self.ruolo_permessi_id:
+            return self.ruolo_permessi.get_module_level_display_value(module_name)
         return LivelloPermesso(self.get_module_level(module_name)).label
 
     @property

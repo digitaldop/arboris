@@ -10,7 +10,7 @@ from famiglie_interessate.models import AttivitaFamigliaInteressata, StatoAttivi
 from gestione_amministrativa.models import Dipendente, RuoloAziendaleDipendente, StatoDipendente
 from gestione_finanziaria.models import ScadenzaPagamentoFornitore, StatoScadenzaFornitore
 from sistema.models import LivelloPermesso
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_page_permission
 
 from .models import (
     CategoriaCalendario,
@@ -234,11 +234,11 @@ def build_birthday_occurrence(birth_date, target_year):
 
 
 def can_include_birthday_records(user):
-    return user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
+    return any(user_has_page_permission(user, page) for page in ("anagrafica_studenti", "anagrafica_familiari"))
 
 
 def can_include_staff_birthday_records(user):
-    return user_has_module_permission(user, "gestione_amministrativa", LivelloPermesso.VISUALIZZAZIONE)
+    return any(user_has_page_permission(user, page) for page in ("gestione_amministrativa_dipendenti", "gestione_amministrativa_educatori"))
 
 
 def dashboard_active_student_ids(anno_scolastico):
@@ -397,6 +397,10 @@ def build_dashboard_birthdays_data(today=None, user=None, anno_scolastico=None, 
                 data_nascita__month__in=target_months,
             ).distinct()
 
+        if not user_has_page_permission(user, "anagrafica_studenti"):
+            studenti = studenti.none()
+        if not user_has_page_permission(user, "anagrafica_familiari"):
+            adulti = adulti.none()
         studenti = studenti.order_by("data_nascita", "cognome", "nome", "pk")
         for studente in studenti:
             record = build_dashboard_birthday_record(studente, "student", target_year_by_month)
@@ -426,6 +430,9 @@ def build_dashboard_birthdays_data(today=None, user=None, anno_scolastico=None, 
         )
         for dipendente in dipendenti:
             person_type = dipendente_birthday_person_type(dipendente)
+            page = "gestione_amministrativa_educatori" if person_type == "educator" else "gestione_amministrativa_dipendenti"
+            if not user_has_page_permission(user, page):
+                continue
             record = build_dashboard_birthday_record(dipendente, person_type, target_year_by_month)
             if not record:
                 continue
@@ -436,6 +443,9 @@ def build_dashboard_birthdays_data(today=None, user=None, anno_scolastico=None, 
             records.append(record)
             records_by_identity[record["identity_key"]] = record
 
+    if not user_has_page_permission(user, "anagrafica_famiglie"):
+        for record in records:
+            record["family_label"] = record["family_url"] = ""
     records.sort(
         key=lambda record: (
             record["date"],
@@ -541,7 +551,7 @@ def get_document_owner_metadata(documento):
 
 
 def can_include_interested_family_records(user):
-    return user_has_module_permission(user, "famiglie_interessate", LivelloPermesso.VISUALIZZAZIONE)
+    return user_has_page_permission(user, "famiglie_interessate_contatti")
 
 
 def build_interested_family_activity_records(system_categories=None, user=None):
@@ -609,7 +619,7 @@ def build_calendar_deadline_records(system_categories=None, user=None):
     categoria_documenti = system_categories.get(SYSTEM_CATEGORY_DOCUMENTS)
     categoria_fornitori = system_categories.get(SYSTEM_CATEGORY_SUPPLIER_DUE)
 
-    if categoria_rate and user_has_module_permission(user, "economia", LivelloPermesso.VISUALIZZAZIONE):
+    if categoria_rate and user_has_page_permission(user, "economia_rate_iscrizione"):
         rate = (
             RataIscrizione.objects.filter(data_scadenza__isnull=False)
             .select_related(
@@ -645,7 +655,7 @@ def build_calendar_deadline_records(system_categories=None, user=None):
                 )
             )
 
-    if categoria_documenti and user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE):
+    if categoria_documenti and user_has_page_permission(user, "anagrafica_documenti"):
         today = timezone.localdate()
         current_year_start = date(today.year, 1, 1)
         current_year_end = date(today.year, 12, 31)
@@ -678,7 +688,7 @@ def build_calendar_deadline_records(system_categories=None, user=None):
                 )
             )
 
-    if categoria_fornitori and user_has_module_permission(user, "gestione_finanziaria", LivelloPermesso.VISUALIZZAZIONE):
+    if categoria_fornitori and user_has_page_permission(user, "gestione_finanziaria_scadenziario_fornitori"):
         scadenze = (
             ScadenzaPagamentoFornitore.objects.exclude(
                 stato__in=[StatoScadenzaFornitore.PAGATA, StatoScadenzaFornitore.ANNULLATA]

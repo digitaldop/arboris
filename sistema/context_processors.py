@@ -19,9 +19,13 @@ from .permissions import (
     user_can_access_database_backups,
     user_can_communicate_with_families,
     user_has_module_permission,
+    user_has_any_module_page_permission,
+    user_has_page_permission,
+    request_has_permission,
     user_is_operational_admin,
 )
 from .sidebar_menu import build_sidebar_menu_state, get_role_sidebar_menu_disabled_keys
+from .permission_catalog import page_for_match
 from .terminology import get_educator_terminology, get_family_member_terminology, get_student_terminology
 
 
@@ -59,6 +63,9 @@ def permission_module_from_view(view_module, path=""):
 
 def get_current_permission_module(request):
     resolver_match = getattr(request, "resolver_match", None)
+    page = page_for_match(resolver_match)
+    if page:
+        return page.module
     if not resolver_match or not getattr(resolver_match, "func", None):
         return ""
 
@@ -234,6 +241,10 @@ def user_can_access_sidebar_url(user, url):
     if getattr(resolver_match, "url_name", "") == "home":
         return True
 
+    page = page_for_match(resolver_match)
+    if page:
+        return user_has_page_permission(user, page.key)
+
     module_name = permission_module_from_view(
         getattr(resolver_match.func, "__module__", ""),
         parsed.path,
@@ -325,9 +336,9 @@ def sistema_permissions_context(request):
     profilo = get_user_permission_profile(user)
     current_module = get_current_permission_module(request)
     can_communicate_with_families = user_can_communicate_with_families(user)
-    can_view_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
+    can_view_anagrafica = user_has_any_module_page_permission(user, "anagrafica", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_anagrafica = user_has_module_permission(user, "anagrafica", LivelloPermesso.GESTIONE)
-    can_view_famiglie_interessate = user_has_module_permission(
+    can_view_famiglie_interessate = user_has_any_module_page_permission(
         user,
         "famiglie_interessate",
         LivelloPermesso.VISUALIZZAZIONE,
@@ -337,15 +348,15 @@ def sistema_permissions_context(request):
         "famiglie_interessate",
         LivelloPermesso.GESTIONE,
     )
-    can_view_economia = user_has_module_permission(user, "economia", LivelloPermesso.VISUALIZZAZIONE)
+    can_view_economia = user_has_any_module_page_permission(user, "economia", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_economia = user_has_module_permission(user, "economia", LivelloPermesso.GESTIONE)
-    can_view_sistema = user_has_module_permission(user, "sistema", LivelloPermesso.VISUALIZZAZIONE)
+    can_view_sistema = user_has_any_module_page_permission(user, "sistema", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_sistema = user_has_module_permission(user, "sistema", LivelloPermesso.GESTIONE)
-    can_view_calendario = user_has_module_permission(user, "calendario", LivelloPermesso.VISUALIZZAZIONE)
+    can_view_calendario = user_has_any_module_page_permission(user, "calendario", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_calendario = user_has_module_permission(user, "calendario", LivelloPermesso.GESTIONE)
-    can_view_servizi_extra = user_has_module_permission(user, "servizi_extra", LivelloPermesso.VISUALIZZAZIONE)
+    can_view_servizi_extra = user_has_any_module_page_permission(user, "servizi_extra", LivelloPermesso.VISUALIZZAZIONE)
     can_manage_servizi_extra = user_has_module_permission(user, "servizi_extra", LivelloPermesso.GESTIONE)
-    can_view_gestione_finanziaria = user_has_module_permission(
+    can_view_gestione_finanziaria = user_has_any_module_page_permission(
         user,
         "gestione_finanziaria",
         LivelloPermesso.VISUALIZZAZIONE,
@@ -355,7 +366,7 @@ def sistema_permissions_context(request):
         "gestione_finanziaria",
         LivelloPermesso.GESTIONE,
     )
-    can_view_gestione_amministrativa = user_has_module_permission(
+    can_view_gestione_amministrativa = user_has_any_module_page_permission(
         user,
         "gestione_amministrativa",
         LivelloPermesso.VISUALIZZAZIONE,
@@ -446,13 +457,14 @@ def sistema_permissions_context(request):
             "can_access_database_backups": can_access_database_backups,
             "gestione_dipendenti_dettagliata_attiva": gestione_dipendenti_dettagliata_attiva,
         },
+        user=user,
     )
     notifiche_finanziarie_non_lette = 0
     notifiche_finanziarie_recenti = []
     sidebar_can_reorder_menu = can_view_system_tables
     sidebar_personalizzazione_config = get_effective_sidebar_order_config(user)
 
-    if can_view_gestione_finanziaria and getattr(user, "is_authenticated", False):
+    if user_has_page_permission(user, "gestione_finanziaria_notifiche"):
         try:
             from gestione_finanziaria.notifiche import riepilogo_notifiche
 
@@ -465,18 +477,26 @@ def sistema_permissions_context(request):
 
     log_riepilogo = {"log_operazioni_non_lette": 0, "log_operazioni_recenti": []}
     reconciliation_pending_count = 0
-    can_review_reconciliations = can_manage_economia or can_manage_gestione_finanziaria
+    from gestione_finanziaria.reconciliation import allowed_scopes
+    can_review_reconciliations = bool(allowed_scopes(user))
     if can_review_reconciliations:
         from gestione_finanziaria.reconciliation import pending_count, proposals_for_user
 
         reconciliation_pending_count = pending_count(proposals_for_user(user))
-    if can_view_system_tables:
+    if user_has_page_permission(user, "sistema_cronologia_operazioni"):
         try:
             from .log_notifiche import riepilogo_log
 
             log_riepilogo = riepilogo_log(user)
         except (OperationalError, ProgrammingError):
             pass
+
+    page_flags = {}
+    current_page = page_for_match(getattr(request, "resolver_match", None))
+    if current_page:
+        can_manage_current_module = request_has_permission(request, current_page.module, LivelloPermesso.GESTIONE)
+        if current_page.key != "anagrafica_comunicazioni_famiglie":
+            page_flags[f"can_manage_{current_page.module}"] = can_manage_current_module
 
     return {
         **log_riepilogo,
@@ -516,6 +536,7 @@ def sistema_permissions_context(request):
         "sidebar_menu_items": sidebar_menu_state["items"],
         "sidebar_menu_groups": sidebar_menu_state["groups"],
         "sidebar_menu_disabled_keys": sidebar_menu_disabled_keys,
+        **page_flags,
     }
 
 

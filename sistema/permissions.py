@@ -14,11 +14,17 @@ from .models import (
     SistemaUtentePermessi,
     get_module_enabled_map,
 )
+from .permission_catalog import PERMISSION_PAGES, PAGES_BY_KEY, SHARED_PAGE_VIEWS, page_for_match
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 FAMILY_COMMUNICATIONS_VIEW_MODULE = "economia.views.comunicazioni"
 EDIT_MODE_QUERY_VALUES = {"1", "true", "on", "yes", "si"}
+# These POSTs only record the current user's reading progress, not business data.
+READ_RECEIPT_VIEWS = {
+    "segna_notifica_finanziaria_letta", "segna_tutte_notifiche_finanziarie_lette",
+    "segna_log_operazione_letta", "segna_tutti_log_operazioni_letti",
+}
 
 
 def redirect_unauthenticated_user(request):
@@ -56,7 +62,7 @@ def get_user_permission_profile(user):
 
 
 def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
-    if not user or not user.is_authenticated:
+    if not user or not user.is_authenticated or not user.is_active:
         return False
 
     if not module_is_enabled(module_name):
@@ -73,6 +79,55 @@ def user_has_module_permission(user, module_name, level=LivelloPermesso.VISUALIZ
         return True
 
     return profilo.has_module_permission(module_name, level=level)
+
+
+def user_has_page_permission(user, page_key, level=LivelloPermesso.VISUALIZZAZIONE):
+    page = PAGES_BY_KEY.get(page_key)
+    if not page or not user or not user.is_authenticated or not user.is_active:
+        return False
+    if not module_is_enabled(page.module):
+        return False
+    if user.is_superuser:
+        return True
+    profile = get_user_permission_profile(user)
+    if profile.ruolo_permessi_id:
+        current = profile.ruolo_permessi.get_page_level(page_key)
+    elif profile.controllo_completo_effettivo:
+        current = LivelloPermesso.GESTIONE
+    else:
+        special = {
+            "anagrafica_comunicazioni_famiglie": profile.accesso_comunicazioni_famiglie_effettivo,
+            "sistema_backup_database": profile.accesso_backup_database_effettivo,
+            "sistema_cronologia_operazioni": profile.amministratore_operativo_effettivo,
+            "sistema_feedback_beta": profile.amministratore_operativo_effettivo,
+        }
+        current = (
+            (LivelloPermesso.GESTIONE if special[page_key] else LivelloPermesso.NESSUNO)
+            if page_key in special else profile.get_module_level(page.module)
+        )
+    return current == LivelloPermesso.GESTIONE or (
+        level == LivelloPermesso.VISUALIZZAZIONE and current == LivelloPermesso.VISUALIZZAZIONE
+    )
+
+
+def user_has_any_module_page_permission(user, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
+    return any(user_has_page_permission(user, page.key, level) for page in PERMISSION_PAGES if page.module == module_name)
+
+
+def request_has_permission(request, module_name, level=LivelloPermesso.VISUALIZZAZIONE):
+    page = page_for_match(getattr(request, "resolver_match", None))
+    if page:
+        keys = (page.key, *SHARED_PAGE_VIEWS.get(request.resolver_match.url_name, ()))
+        return any(user_has_page_permission(request.user, key, level) for key in keys)
+    return user_has_module_permission(request.user, module_name, level)
+
+
+def request_permission_level(request, minimum=LivelloPermesso.VISUALIZZAZIONE):
+    editing = str(request.GET.get("edit") or "").strip().lower() in EDIT_MODE_QUERY_VALUES
+    reading = getattr(getattr(request, "resolver_match", None), "url_name", None) in READ_RECEIPT_VIEWS
+    if minimum == LivelloPermesso.GESTIONE or (request.method not in SAFE_METHODS and not reading) or editing:
+        return LivelloPermesso.GESTIONE
+    return LivelloPermesso.VISUALIZZAZIONE
 
 
 def module_is_enabled(module_name):
@@ -108,28 +163,11 @@ def user_is_operational_admin(user):
 
 
 def user_can_access_database_backups(user):
-    if not user or not user.is_authenticated:
-        return False
-
-    if user.is_superuser:
-        return True
-
-    profilo = get_user_permission_profile(user)
-    if not profilo:
-        return False
-
-    return profilo.accesso_backup_database_effettivo
+    return user_has_page_permission(user, "sistema_backup_database")
 
 
 def user_can_communicate_with_families(user):
-    if not user or not user.is_authenticated or not user.is_active:
-        return False
-    if not module_is_enabled("anagrafica"):
-        return False
-    if user.is_superuser:
-        return True
-    profile = get_user_permission_profile(user)
-    return bool(profile and profile.accesso_comunicazioni_famiglie_effettivo)
+    return user_has_page_permission(user, "anagrafica_comunicazioni_famiglie")
 
 
 def family_communications_required(view_func):
@@ -137,7 +175,7 @@ def family_communications_required(view_func):
     def wrapped(request, *args, **kwargs):
         if not getattr(request.user, "is_authenticated", False):
             return redirect_unauthenticated_user(request)
-        if not user_can_communicate_with_families(request.user):
+        if not user_has_page_permission(request.user, "anagrafica_comunicazioni_famiglie", request_permission_level(request)):
             messages.error(request, "Non hai l'abilitazione alle comunicazioni alle famiglie.")
             return redirect("home")
         return view_func(request, *args, **kwargs)
@@ -156,12 +194,14 @@ def module_permission_required(module_name, level=LivelloPermesso.VISUALIZZAZION
                 messages.warning(request, "Questo modulo e temporaneamente disattivato nelle impostazioni generali.")
                 return redirect("home")
 
-            if not user_has_module_permission(request.user, module_name, level=level):
+            if not request_has_permission(request, module_name, level=request_permission_level(request, level)):
                 messages.error(request, "Non hai i permessi necessari per accedere a questa sezione.")
                 return redirect("home")
 
             return view_func(request, *args, **kwargs)
 
+        wrapped.permission_module = module_name
+        wrapped.permission_level = level
         return wrapped
 
     return decorator
@@ -188,12 +228,14 @@ def module_edit_permission_required(module_name):
                 messages.warning(request, "Questo modulo e temporaneamente disattivato nelle impostazioni generali.")
                 return redirect("home")
 
-            if not user_has_module_permission(request.user, module_name, level=required_level):
+            if not request_has_permission(request, module_name, level=required_level):
                 messages.error(request, "Non hai i permessi necessari per eseguire questa operazione.")
                 return redirect("home")
 
             return view_func(request, *args, **kwargs)
 
+        wrapped.permission_module = module_name
+        wrapped.permission_level = LivelloPermesso.VISUALIZZAZIONE
         return wrapped
 
     return decorator
@@ -205,7 +247,10 @@ def operational_admin_required(view_func):
         if not getattr(request.user, "is_authenticated", False):
             return redirect_unauthenticated_user(request)
 
-        if not user_is_operational_admin(request.user):
+        page = page_for_match(getattr(request, "resolver_match", None))
+        permitted = (user_has_page_permission(request.user, page.key, request_permission_level(request))
+                     if page else user_is_operational_admin(request.user))
+        if not permitted:
             messages.error(request, "Questa sezione e riservata all'Amministratore.")
             return redirect("home")
 
@@ -220,7 +265,7 @@ def database_backup_access_required(view_func):
         if not getattr(request.user, "is_authenticated", False):
             return redirect_unauthenticated_user(request)
 
-        if not user_can_access_database_backups(request.user):
+        if not user_has_page_permission(request.user, "sistema_backup_database", request_permission_level(request)):
             messages.error(request, "La sezione Backup Database e riservata ad amministratori e superuser.")
             return redirect("home")
 

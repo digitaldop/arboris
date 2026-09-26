@@ -480,7 +480,7 @@ class HomeDashboardSchoolYearTests(TestCase):
             email="dashboard@example.com",
             password="Password123!",
         )
-        SistemaUtentePermessi.objects.create(user=self.user)
+        SistemaUtentePermessi.objects.create(user=self.user, permesso_anagrafica=LivelloPermesso.VISUALIZZAZIONE)
         self.client.force_login(self.user)
 
     def test_home_uses_school_year_dates_for_current_status(self):
@@ -731,7 +731,7 @@ class SidebarEconomiaTests(TestCase):
         self.assertNotContains(response, 'data-sidebar-section-key="sistema"', html=False)
         self.assertNotContains(response, 'data-sidebar-section-key="parcheggio"', html=False)
 
-    def test_home_hides_parcheggio_accounting_links_for_view_only_roles(self):
+    def test_home_shows_readable_accounting_pages_for_view_only_roles(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("home"))
@@ -759,12 +759,12 @@ class SidebarEconomiaTests(TestCase):
 
         self.assertIn('data-sidebar-menu-group="anagrafica_rette_iscrizioni"', content)
         self.assertIn('data-sidebar-menu-key="economia_iscrizioni"', content)
-        self.assertNotIn('data-sidebar-section-key="parcheggio"', content)
-        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_budgeting"', content)
-        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_documenti_fornitori"', content)
-        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_scadenziario_fornitori"', content)
-        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_pagamenti_fornitori"', content)
-        self.assertNotIn('data-sidebar-menu-key="gestione_finanziaria_notifiche"', content)
+        self.assertIn('data-sidebar-section-key="parcheggio"', content)
+        self.assertIn('data-sidebar-menu-key="gestione_finanziaria_budgeting"', content)
+        self.assertIn('data-sidebar-menu-key="gestione_finanziaria_documenti_fornitori"', content)
+        self.assertIn('data-sidebar-menu-key="gestione_finanziaria_scadenziario_fornitori"', content)
+        self.assertIn('data-sidebar-menu-key="gestione_finanziaria_pagamenti_fornitori"', content)
+        self.assertIn('data-sidebar-menu-key="gestione_finanziaria_notifiche"', content)
 
     def test_home_renders_parcheggio_accounting_links_for_manage_roles(self):
         admin_user = User.objects.create_user(
@@ -893,7 +893,7 @@ class SidebarGestioneFinanziariaTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
         start = content.index('id="sidebar-gestione-economica-panel"')
-        end = content.index('data-sidebar-section-key="sistema"', start)
+        end = content.index('data-sidebar-section-key="parcheggio"', start)
         gestione_economica_section = content[start:end]
 
         labels_in_order = [
@@ -1748,16 +1748,16 @@ class RuoliUtenteTests(TestCase):
         self.assertContains(response, "--primary: #f2c94c")
         self.assertContains(response, reverse("crea_ruolo_utente"))
 
-    def test_role_form_renders_sidebar_menu_items(self):
+    def test_role_form_renders_page_permission_levels(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("modifica_ruolo_utente", args=[self.admin_role.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Voci menu")
-        self.assertContains(response, 'name="voci_menu_attive"', html=False)
-        self.assertContains(response, 'value="anagrafica_studenti"', html=False)
-        self.assertContains(response, 'value="gestione_finanziaria_dashboard"', html=False)
+        self.assertContains(response, "Accesso ai moduli e alle pagine")
+        self.assertContains(response, 'name="pagina_anagrafica_studenti"', html=False)
+        self.assertContains(response, 'name="pagina_gestione_finanziaria_dashboard"', html=False)
+        self.assertContains(response, "Deseleziona tutto")
 
     def test_role_form_saves_disabled_sidebar_menu_items(self):
         self.client.force_login(self.user)

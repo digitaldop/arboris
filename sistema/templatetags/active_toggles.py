@@ -7,7 +7,7 @@ from sistema.active_toggles import (
     validate_active_toggle_config,
 )
 from sistema.models import LivelloPermesso
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_page_permission
 
 
 register = template.Library()
@@ -29,9 +29,9 @@ def active_toggle(context, obj, field=None, reload=False, compact=False):
     can_toggle = bool(
         request
         and getattr(request, "user", None)
-        and user_has_module_permission(
+        and user_has_page_permission(
             request.user,
-            config.module_name,
+            config.permission_page,
             level=LivelloPermesso.GESTIONE,
         )
     )

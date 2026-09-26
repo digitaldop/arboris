@@ -87,6 +87,8 @@ from .permissions import (
     get_user_permission_profile,
     operational_admin_required,
     user_has_module_permission,
+    user_has_page_permission,
+    user_has_any_module_page_permission,
     user_is_operational_admin,
 )
 
@@ -267,9 +269,9 @@ def toggle_active_state(request):
     if not config:
         return HttpResponseBadRequest("Toggle non configurato.")
 
-    if not user_has_module_permission(
+    if not user_has_page_permission(
         request.user,
-        config.module_name,
+        config.permission_page,
         level=LivelloPermesso.GESTIONE,
     ):
         raise PermissionDenied("Non hai i permessi necessari per modificare questo stato.")
@@ -528,9 +530,11 @@ def build_global_search_results(user, query, limit=GLOBAL_SEARCH_MAX_RESULTS):
         remaining = limit - len(results)
         if remaining <= 0:
             break
-        if not user_has_module_permission(user, module_name, LivelloPermesso.VISUALIZZAZIONE):
+        if not user_has_any_module_page_permission(user, module_name, LivelloPermesso.VISUALIZZAZIONE):
             continue
-        append_limited_results(results, builder(query, remaining), remaining)
+        from .context_processors import user_can_access_sidebar_url
+        permitted = [item for item in builder(query, limit) if user_can_access_sidebar_url(user, item["url"])]
+        append_limited_results(results, permitted, remaining)
 
     return results[:limit]
 
@@ -1606,6 +1610,7 @@ def sistema_ruolo_form_context(request, form, ruolo_obj=None, is_new=False):
         "is_new": is_new,
         "popup": sistema_is_popup_request(request),
         "module_permission_fields": module_permission_fields,
+        "permission_sections": form.get_permission_sections(),
         "special_permission_fields": special_permission_fields,
         "sidebar_menu_form_sections": form.get_sidebar_menu_sections(),
     }

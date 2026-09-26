@@ -167,6 +167,7 @@
                                         <span><strong>Gestione finanziaria</strong> {{ ruolo.get_permesso_gestione_finanziaria_display }}</span>
                                         <span><strong>Sistema</strong> {{ ruolo.get_permesso_sistema_display }}</span>
                                         <span><strong>Calendario</strong> {{ ruolo.get_permesso_calendario_display }}</span>
+                                        {% if ruolo.permessi_pagine %}<span><strong>{{ ruolo.permessi_pagine|length }} pagine personalizzate</strong> Apri il ruolo per i livelli effettivi.</span>{% endif %}
                                     </div>
                                 </td>
                                 <td>

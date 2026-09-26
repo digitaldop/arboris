@@ -288,7 +288,7 @@ urlpatterns = [
     ),
     path(
         "gestione-finanziaria/conti/fondi/",
-        gf_manage(views.fondi_conti_bancari),
+        gf_edit(views.fondi_conti_bancari),
         name="fondi_conti_bancari",
     ),
     path(
@@ -424,7 +424,7 @@ urlpatterns = [
     # Import estratto conto (CAMT.053 / CSV)
     path(
         "gestione-finanziaria/import-estratto-conto/",
-        gf_manage(views.import_estratto_conto),
+        gf_edit(views.import_estratto_conto),
         name="import_estratto_conto",
     ),
 
@@ -476,7 +476,7 @@ urlpatterns = [
     # Pianificazione sincronizzazione PSD2
     path(
         "gestione-finanziaria/pianificazione-sincronizzazione/",
-        gf_manage(views.pianificazione_sincronizzazione),
+        gf_edit(views.pianificazione_sincronizzazione),
         name="pianificazione_sincronizzazione",
     ),
 

@@ -4,17 +4,17 @@ from django.db import transaction
 from django.db.models import Exists, OuterRef, Q
 
 from sistema.models import LivelloPermesso
-from sistema.permissions import user_has_module_permission
+from sistema.permissions import user_has_page_permission
 
 from .models import DocumentoFornitore, NotificaFinanziaria, NotificaFinanziariaLettura
 
 
 def notifiche_per_utente(user):
-    if not getattr(user, "is_authenticated", False):
-        return NotificaFinanziaria.objects.none()
     letture = NotificaFinanziariaLettura.objects.filter(user=user, notifica_id=OuterRef("pk"))
     notifiche = NotificaFinanziaria.objects.annotate(letta=Exists(letture))
-    if not user_has_module_permission(user, "gestione_finanziaria", LivelloPermesso.GESTIONE):
+    if not user_has_page_permission(user, "gestione_finanziaria_notifiche"):
+        return notifiche.none()
+    if not user_has_page_permission(user, "gestione_finanziaria_notifiche", LivelloPermesso.GESTIONE):
         notifiche = notifiche.filter(richiede_gestione=False)
     return notifiche
 

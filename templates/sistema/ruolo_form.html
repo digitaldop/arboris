@@ -18,6 +18,8 @@
 {% endblock %}
 
 {% block content %}
+    <link rel="stylesheet" href="{% static 'css/role-permissions.css' %}">
+    <script src="{% static 'js/role-permissions.js' %}" defer></script>
     <div class="system-role-form-shell{% if popup %} is-popup{% endif %}">
         <div class="system-role-form-head">
             <span class="system-role-head-icon" aria-hidden="true">
@@ -114,53 +116,7 @@
                 </div>
             </section>
 
-            <section class="system-role-card" aria-labelledby="role-modules-title">
-                <div class="system-role-card-head">
-                    <span class="system-role-card-icon is-green" aria-hidden="true">
-                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#list"></use></svg>
-                    </span>
-                    <div>
-                        <h2 id="role-modules-title">Permessi moduli</h2>
-                        <p>Scegli il livello di accesso per ogni area applicativa.</p>
-                    </div>
-                </div>
-                <div class="system-role-permissions-grid">
-                    {% for item in module_permission_fields %}
-                        <label class="system-role-field">
-                            <span class="system-role-field-icon is-{{ item.tone }}" aria-hidden="true">
-                                <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#{{ item.icon }}"></use></svg>
-                            </span>
-                            <span class="system-role-field-body">
-                                <span class="system-role-label">{{ item.field.label }}</span>
-                                {{ item.field }}
-                                {{ item.field.errors }}
-                            </span>
-                        </label>
-                    {% endfor %}
-                </div>
-            </section>
-
-            <section class="system-role-card" aria-labelledby="role-menu-title">
-                <div class="system-role-card-head">
-                    <span class="system-role-card-icon is-blue" aria-hidden="true">
-                        <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#menu"></use></svg>
-                    </span>
-                    <div>
-                        <h2 id="role-menu-title">Voci menu</h2>
-                        <p>Attiva o disattiva le voci della sidebar per gli utenti collegati a questo ruolo.</p>
-                    </div>
-                </div>
-                <div class="system-role-menu-tree">
-                    <input type="hidden" name="sidebar_menu_form_present" value="1">
-                    {% include "sistema/partials/sidebar_menu_form_nodes.html" with nodes=sidebar_menu_form_sections depth=0 field_name=form.voci_menu_attive.html_name only %}
-                </div>
-                <div class="system-role-menu-errors">
-                    {{ form.voci_menu_attive.errors }}
-                    {% if form.voci_menu_attive.help_text %}
-                        <span class="system-role-help">{{ form.voci_menu_attive.help_text }}</span>
-                    {% endif %}
-                </div>
-            </section>
+            {% include "sistema/partials/page_permissions_form.html" %}
 
             <section class="system-role-card" aria-labelledby="role-special-title">
                 <div class="system-role-card-head">

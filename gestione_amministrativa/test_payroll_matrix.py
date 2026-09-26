@@ -51,8 +51,15 @@ class PayrollMatrixTests(TestCase):
         self.pagamento(paid, "600", 5)
         partial = self.busta(mese=2, data_pagamento_effettiva=date(2026, 2, 1))
         self.pagamento(partial, "250")
-        self.busta(mese=3)
-        matrix = self.overview().context["matrice"]
+        unpaid = self.busta(mese=3)
+        response = self.overview()
+        matrix = response.context["matrice"]
+        self.assertContains(response, 'class="ga-payroll-reconcile"', count=2)
+        for payslip in (partial, unpaid):
+            url = reverse("riconcilia_busta_paga_dipendente", args=[payslip.pk])
+            self.assertContains(response, f'href="{url}?popup=1"')
+        paid_url = reverse("riconcilia_busta_paga_dipendente", args=[paid.pk])
+        self.assertNotContains(response, f'href="{paid_url}?popup=1"')
         cells = matrix["righe"][0]["celle"]
         self.assertEqual([cell["stato"] for cell in cells[:3]], ["pagata", "parziale", "non_pagata"])
         self.assertEqual(cells[0]["data_pagamento"], date(2026, 2, 5))
@@ -265,10 +272,10 @@ class PayrollMatrixTests(TestCase):
         self.assertEqual([r["anzianita"]["mesi"] for r in rows], [8, 8])
         self.assertEqual([r["dipendente"].pk for r in rows], [self.bianchi.pk, self.rossi.pk])
 
-    def test_draft_badge_does_not_change_payment_status(self):
+    def test_draft_status_is_not_shown_in_matrix(self):
         self.pagamento(self.busta(stato=StatoBustaPaga.BOZZA), "1000")
         response = self.overview()
         cell = response.context["matrice"]["righe"][0]["celle"][0]
         self.assertEqual(cell["stato"], "pagata")
         self.assertTrue(cell["bozza"])
-        self.assertContains(response, "Bozza cedolino")
+        self.assertNotContains(response, "Bozza")

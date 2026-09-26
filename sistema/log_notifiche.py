@@ -13,7 +13,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import SistemaLogLettura, SistemaLogStatoLettura, SistemaOperazioneCronologia
-from .permissions import operational_admin_required, user_is_operational_admin
+from .permissions import operational_admin_required, user_has_page_permission
 
 
 def operazioni_utente():
@@ -23,7 +23,7 @@ def operazioni_utente():
 
 
 def nuove_operazioni(user):
-    if not user_is_operational_admin(user):
+    if not user_has_page_permission(user, "sistema_cronologia_operazioni"):
         raise PermissionDenied
     stato = SistemaLogStatoLettura.objects.filter(user=user).first()
     if stato is None:
