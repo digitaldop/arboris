@@ -29,6 +29,8 @@ def queue_changed_financial_data(sender, instance, using="default", raw=False, *
     elif label == "gestione_finanziaria.riconciliazioneratamovimento":
         enqueue_analysis("movimento", instance.movimento_id, using=using)
         enqueue_analysis("rata", instance.rata_id, using=using)
+    elif label == "gestione_finanziaria.riconciliazioneservizioextramovimento":
+        enqueue_analysis("movimento", instance.movimento_id, using=using)
     elif label == "gestione_finanziaria.pagamentofornitore":
         enqueue_analysis("movimento", instance.movimento_finanziario_id, using=using)
         enqueue_analysis("scadenza", instance.scadenza_id, using=using)

@@ -1,0 +1,67 @@
+{% load currency %}
+<section class="panel panel-standalone anagrafica-list-panel finance-modern-panel finance-reconciliation-candidates-panel">
+    <div class="finance-section-head">
+        <div>
+            <h2 class="section-title">Quote dei servizi extra</h2>
+            <p class="finance-section-subtitle">Seleziona le quote da collegare, anche insieme alla retta scelta sopra. Indica per ogni servizio la parte del bonifico da assegnare.</p>
+        </div>
+        <span class="anagrafica-status-chip is-muted">{{ candidati_servizi_extra|length }} {% if candidati_servizi_extra|length == 1 %}risultato{% else %}risultati{% endif %}</span>
+    </div>
+    <div class="panel-body">
+        <table class="list-table anagrafica-list-table finance-modern-table finance-reconciliation-candidates-table finance-extra-quotes-table">
+            <thead>
+                <tr>
+                    <th>Servizio / quota</th>
+                    <th>Studente</th>
+                    <th>Scadenza</th>
+                    <th class="column-right">Residuo quota</th>
+                    <th>Da assegnare</th>
+                    <th>Compatibilità</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for candidato in candidati_servizi_extra %}
+                    {% with rata=candidato.rata %}
+                    <tr class="reconciliation-confidence" style="--match-confidence: {{ candidato.score_percentuale }}">
+                        <td>
+                            <label class="finance-reconciliation-choice">
+                                <input type="checkbox" name="servizio_extra_ids" value="{{ rata.pk }}">
+                                <span>
+                                    <strong>{{ rata.iscrizione.servizio.nome_servizio }}</strong>
+                                    <span class="table-subtext">{{ rata.display_label }} · {{ rata.iscrizione.servizio.anno_scolastico }}</span>
+                                </span>
+                            </label>
+                        </td>
+                        <td>{{ rata.iscrizione.studente }}</td>
+                        <td>{{ rata.data_scadenza|date:"d/m/Y" }}</td>
+                        <td class="column-right finance-money-cell">{{ candidato.residuo|euro }} &euro;</td>
+                        <td>
+                            <input type="text" inputmode="decimal" name="importo_servizio_extra_{{ rata.pk }}"
+                                   value="{{ candidato.importo_proposto|floatformat:2 }}"
+                                   aria-label="Importo per {{ rata.iscrizione.servizio.nome_servizio }} - {{ rata.display_label }}">
+                        </td>
+                        <td>
+                            <span class="reconciliation-confidence-badge">{{ candidato.score_percentuale }}%</span>
+                            <div class="finance-reasons">
+                                {% for motivo in candidato.motivazioni %}<span>{{ motivo }}</span>{% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="help-text">La somma della retta e dei servizi selezionati può arrivare fino a {{ residuo_movimento|euro }} &euro;. La parte non assegnata resterà disponibile per altre quote.</p>
+        <input type="hidden" name="marca_rata_pagata" value="1">
+        <input type="hidden" name="residuo_movimento_atteso" value="{{ residuo_movimento|floatformat:2 }}">
+        <div class="finance-reconciliation-action-bar">
+            <button type="submit" name="azione" value="collega" class="btn btn-primary"
+                    onclick="return confirm('Confermi la riconciliazione con le quote selezionate? Gli importi pagati e il residuo del movimento verranno aggiornati.');">
+                Collega quote selezionate
+            </button>
+            <button type="submit" name="azione" value="ignora" class="btn btn-secondary" formnovalidate>
+                Ignora movimento
+            </button>
+        </div>
+    </div>
+</section>

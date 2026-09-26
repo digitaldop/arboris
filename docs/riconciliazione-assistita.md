@@ -106,3 +106,13 @@ Per ripetere i test della funzionalità:
 - La pagina di riconciliazione del movimento mostra tutte le rate e quote candidate senza il precedente limite di dodici. Le regole condivise si applicano anche alla ricerca dalla rata e all'ordinamento delle alternative nel popup.
 - 13 nuovi test, inclusi il caso con dodici mensilità, causali generiche e miste, acconti, identità approssimata, quote saldate, vecchie proposte e conferma della sola preiscrizione. Verifica mirata su PostgreSQL isolato: **92 test, 88 superati e 4 esclusi, nessun fallimento o errore**. `manage.py check` e `git diff --check` superati.
 - Nessuna nuova migrazione. La correzione è locale e richiede la pubblicazione del codice su Render. Nessun pagamento reale registrato.
+
+## Bonifici per rette e servizi extra, 26 settembre 2026
+
+- La pagina del movimento usa tutte le rate aperte degli studenti riconosciuti, anche quando il bonifico supera la singola retta. Il confronto usa il residuo disponibile del movimento e non propone allocazioni a saldo zero.
+- Nella stessa pagina sono selezionabili una retta e una o più quote dei servizi extra registrati, oppure soltanto i servizi. Ogni quota extra ha un importo modificabile; il salvataggio è atomico, verifica l'identità per ciascun servizio e rispetta i residui delle quote e del bonifico. La parte non assegnata rimane disponibile anche se il servizio non è ancora stato inserito.
+- I collegamenti extra partecipano al calcolo del residuo, allo stato del movimento e ai controlli sui duplicati. L'annullamento ripristina rette e servizi, conservando eventuali pagamenti manuali precedenti. Il form della quota extra protegge i dati di pagamento collegati alla banca.
+- Il residuo mostrato nella pagina viene verificato sotto blocco al salvataggio, per impedire la doppia registrazione di un invio parziale ripetuto. Test dedicati coprono anche richieste simultanee, quote di altri studenti, importi non validi e permessi.
+- Due verifiche estese su PostgreSQL: 121 test (113 superati, 8 esclusi) e 187 test (184 superati, 3 esclusi), senza errori o fallimenti. Il nuovo modulo `test_reconciliation_mixed_payments.py` comprende 20 test. Il secondo giro include fornitori, budget e lista movimenti.
+- Browser con dati fittizi isolati: bonifico di 425 EUR, retta di 350 EUR e doposcuola di 75 EUR; verificate selezione congiunta, registrazione di entrambi i collegamenti con residuo zero e annullamento con ripristino di 425 EUR. Nessun errore JavaScript rilevato.
+- Migrazione `0018_riconciliazione_servizi_extra` creata e applicata al database locale. Il movimento 2196 non è presente in locale e la pagina Render richiede autenticazione: il caso è stato riprodotto con dati fittizi. Pubblicazione su Render ancora da eseguire.

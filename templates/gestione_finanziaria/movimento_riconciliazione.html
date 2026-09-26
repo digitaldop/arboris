@@ -23,11 +23,11 @@
                 <span class="family-status-pill {% if not gia_riconciliato %}is-muted{% endif %}">
                     <span class="family-status-dot" aria-hidden="true"></span>
                     {% if gia_riconciliato %}
-                        Riconciliato
+                        {{ stato_riconciliazione_label }}
                     {% elif tipo_riconciliazione == "fornitori" %}
                         {{ proposte_fornitori|length }} candidati
                     {% else %}
-                        {{ proposte_rate|length }} candidati
+                        {{ numero_candidati }} candidati
                     {% endif %}
                 </span>
             </div>
@@ -62,7 +62,7 @@
             <div class="summary-label">Conto</div>
         </div>
         <div class="summary-item">
-            <div class="summary-value">{{ movimento.get_stato_riconciliazione_display }}</div>
+            <div class="summary-value">{{ stato_riconciliazione_label }}</div>
             <div class="summary-label">Stato</div>
         </div>
     </div>
@@ -95,6 +95,10 @@
         </div>
         <div class="finance-reconciliation-detail-grid">
             <div class="finance-reconciliation-detail-item">
+                <span>Importo ancora disponibile</span>
+                <strong>{{ residuo_movimento|euro }} &euro;</strong>
+            </div>
+            <div class="finance-reconciliation-detail-item">
                 <span>Controparte</span>
                 <strong>{{ movimento.controparte|default:"-" }}</strong>
             </div>
@@ -110,12 +114,24 @@
                 <span>Descrizione</span>
                 <strong>{{ movimento.descrizione|default:"-" }}</strong>
             </div>
-            {% if movimento.rata_iscrizione %}
+            {% if movimento.rata_iscrizione and not movimento.riconciliazioni_rate.all %}
                 <div class="finance-reconciliation-detail-item is-full">
                     <span>Rata collegata</span>
                     <strong>{{ movimento.rata_iscrizione }}</strong>
                 </div>
             {% endif %}
+            {% for link in movimento.riconciliazioni_rate.all %}
+                <div class="finance-reconciliation-detail-item is-full">
+                    <span>Retta riconciliata</span>
+                    <strong>{{ link.rata }} · {{ link.importo|euro }} &euro;</strong>
+                </div>
+            {% endfor %}
+            {% for link in movimento.riconciliazioni_servizi_extra.all %}
+                <div class="finance-reconciliation-detail-item is-full">
+                    <span>Servizio extra riconciliato</span>
+                    <strong>{{ link.rata }} · {{ link.importo|euro }} &euro;</strong>
+                </div>
+            {% endfor %}
         </div>
     </section>
 
@@ -129,6 +145,7 @@
                     <h2 class="section-title">Rate e quote di preiscrizione candidate</h2>
                     <p class="finance-section-subtitle">
                         Le proposte sono ordinate per compatibilità con causale, importo, data e dati anagrafici.
+                        Puoi collegare una retta anche se il bonifico comprende altri importi: l'eccedenza resta disponibile.
                     </p>
                 </div>
                 <span class="anagrafica-status-chip is-muted">{{ proposte_rate|length }} risultati</span>
@@ -136,13 +153,19 @@
             <div class="panel-body">
                 {% include "gestione_finanziaria/_compatibilita_note.html" %}
                 {% if proposte_rate %}
+                    {% if candidati_servizi_extra %}
+                        <label class="calendar-event-check-field">
+                            <input type="radio" name="rata_pk" value="" checked>
+                            <span>Solo servizi extra, nessuna retta da collegare</span>
+                        </label>
+                    {% endif %}
                     <table class="list-table anagrafica-list-table finance-modern-table finance-reconciliation-candidates-table">
                         <thead>
                             <tr>
                                 <th>Rata / quota candidata</th>
                                 <th>Famiglia / studente</th>
                                 <th>Scadenza</th>
-                                <th class="column-right">Importo finale</th>
+                                <th class="column-right">Da assegnare</th>
                                 <th>Stato</th>
                                 <th class="column-right">Compatibilità</th>
                                 <th>Motivazioni</th>
@@ -154,7 +177,7 @@
                                 <tr class="reconciliation-confidence" style="--match-confidence: {{ proposta.score_percentuale }}">
                                     <td class="anagrafica-record-cell">
                                         <label class="anagrafica-record-link anagrafica-record-link-compact finance-reconciliation-choice">
-                                            <input type="radio" name="rata_pk" value="{{ rata.pk }}" required>
+                                            <input type="radio" name="rata_pk" value="{{ rata.pk }}" {% if not candidati_servizi_extra %}required{% endif %}>
                                             <span class="finance-record-icon finance-record-icon-bank" aria-hidden="true">
                                                 <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#coins"></use></svg>
                                             </span>
@@ -170,7 +193,10 @@
                                         {% endwith %}
                                     </td>
                                     <td>{% if rata.data_scadenza %}{{ rata.data_scadenza|date:"d/m/Y" }}{% else %}<span class="table-muted">-</span>{% endif %}</td>
-                                    <td class="column-right finance-money-cell">{{ rata.importo_finale|euro }} &euro;</td>
+                                    <td class="column-right finance-money-cell">
+                                        {{ proposta.importo_totale|euro }} &euro;
+                                        <span class="table-subtext">Importo rata: {{ rata.importo_finale|euro }} &euro;</span>
+                                    </td>
                                     <td>
                                         <span class="anagrafica-status-chip {% if rata.pagata %}is-success{% else %}is-muted{% endif %}">
                                             {% if rata.pagata %}Pagata{% else %}Da pagare{% endif %}
@@ -194,10 +220,11 @@
                         </tbody>
                     </table>
 
+                    {% if not candidati_servizi_extra %}
                     <div class="finance-reconciliation-action-bar">
                         <label class="calendar-event-check-field finance-reconciliation-paid-toggle">
                             <input type="checkbox" name="marca_rata_pagata" value="1" checked>
-                            <span>Marca la rata come pagata alla data contabile del movimento</span>
+                            <span>Registra l'importo sulla rata alla data contabile del movimento</span>
                         </label>
                         <div class="form-actions">
                             <button
@@ -223,19 +250,25 @@
                             </button>
                         </div>
                     </div>
+                    {% endif %}
                 {% else %}
                     <div class="empty-state">
-                        Nessuna rata o quota di preiscrizione candidata trovata. Verifica causale, importo e data oppure marca il movimento come da ignorare.
+                        Nessuna rata o quota di preiscrizione aperta compatibile con questo movimento.
                     </div>
+                    {% if not candidati_servizi_extra %}
                     <div class="finance-reconciliation-action-bar finance-reconciliation-action-bar-empty">
                         <button type="submit" name="azione" value="ignora" class="btn btn-secondary btn-icon-text" formnovalidate>
                             <span class="btn-icon" aria-hidden="true"><svg><use href="{% static 'images/arboris-ui-icons.svg' %}#archive"></use></svg></span>
                             <span class="btn-label">Ignora movimento</span>
                         </button>
                     </div>
+                    {% endif %}
                 {% endif %}
             </div>
         </section>
+        {% if candidati_servizi_extra %}
+            {% include "gestione_finanziaria/_riconciliazione_servizi_extra.html" %}
+        {% endif %}
     </form>
 
     {% if proposte_rate_cumulative %}

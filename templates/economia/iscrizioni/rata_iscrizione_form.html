@@ -41,6 +41,7 @@
                         <span class="btn-label">Torna alle rate</span>
                     </a>
                 {% endif %}
+                {% if can_manage_economia %}
                 <a
                     href="{% url 'riconcilia_rata_iscrizione' rata.pk %}?popup=1"
                     class="btn btn-secondary btn-icon-text"
@@ -66,6 +67,7 @@
                     <span class="btn-label">Modifica</span>
                 </button>
                 <button type="button" class="btn btn-secondary is-hidden" id="cancel-edit-rata-btn">Annulla modifiche</button>
+                {% endif %}
             </div>
         </div>
 

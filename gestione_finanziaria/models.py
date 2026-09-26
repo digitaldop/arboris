@@ -1431,6 +1431,30 @@ class RiconciliazioneRataMovimento(models.Model):
         return f"{self.movimento_id} -> {self.rata_id}: {self.importo}"
 
 
+class RiconciliazioneServizioExtraMovimento(models.Model):
+    movimento = models.ForeignKey(
+        MovimentoFinanziario, on_delete=models.CASCADE, related_name="riconciliazioni_servizi_extra",
+    )
+    rata = models.ForeignKey(
+        "servizi_extra.RataServizioExtra", on_delete=models.PROTECT, related_name="riconciliazioni_movimenti",
+    )
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    creato_da = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True)
+    data_creazione = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_creazione", "-id"]
+        verbose_name = "Riconciliazione servizio extra movimento"
+        verbose_name_plural = "Riconciliazioni servizi extra movimenti"
+        constraints = [
+            models.UniqueConstraint(fields=["movimento", "rata"], name="gf_ric_extra_mov_unique"),
+            models.CheckConstraint(condition=models.Q(importo__gt=0), name="gf_ric_extra_importo_pos"),
+        ]
+
+    def __str__(self):
+        return f"{self.movimento_id} -> servizio {self.rata_id}: {self.importo}"
+
+
 # =========================================================================
 #  Log delle sincronizzazioni
 # =========================================================================

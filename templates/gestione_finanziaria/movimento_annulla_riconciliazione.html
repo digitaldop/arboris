@@ -92,6 +92,13 @@
                             <td>{{ pagamento.importo|euro }} &euro;</td>
                         </tr>
                     {% endfor %}
+                    {% for link in riconciliazioni_servizi_extra %}
+                        <tr>
+                            <td>Servizio extra</td>
+                            <td>{{ link.rata }}</td>
+                            <td>{{ link.importo|euro }} &euro;</td>
+                        </tr>
+                    {% endfor %}
                 </tbody>
             </table>
             <form method="post" class="form-actions">

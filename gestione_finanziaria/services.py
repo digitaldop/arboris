@@ -1641,9 +1641,16 @@ def _importo_movimento_riconciliato(movimento):
 def _importo_movimento_riconciliato_totale(movimento):
     return (
         _importo_movimento_riconciliato(movimento)
+        + _importo_movimento_servizi_extra_riconciliato(movimento)
         + _importo_movimento_fornitori_riconciliato(movimento)
         + _importo_movimento_buste_paga_riconciliato(movimento)
     )
+
+
+def _importo_movimento_servizi_extra_riconciliato(movimento):
+    if movimento is None or not getattr(movimento, "pk", None):
+        return Decimal("0.00")
+    return movimento.riconciliazioni_servizi_extra.aggregate(totale=Sum("importo"))["totale"] or Decimal("0.00")
 
 
 def importo_movimento_disponibile(movimento):
@@ -1663,7 +1670,7 @@ def _clear_importo_movimento_disponibile_cache(movimento):
     prefetched = getattr(movimento, "_prefetched_objects_cache", {})
     for relation in (
         "riconciliazioni_rate", "pagamenti_fornitori", "pagamenti_buste_paga",
-        "buste_paga_dipendenti",
+        "buste_paga_dipendenti", "riconciliazioni_servizi_extra",
     ):
         prefetched.pop(relation, None)
 
@@ -1855,11 +1862,12 @@ def _movimenti_per_matching(queryset, *, bank_only=False):
         queryset = queryset.filter(canale="banca", sostenuta_da_terzi=False, valuta__iexact="EUR")
     queryset = queryset.prefetch_related(
         "riconciliazioni_rate", "pagamenti_fornitori", "pagamenti_buste_paga",
-        "buste_paga_dipendenti__pagamenti",
+        "buste_paga_dipendenti__pagamenti", "riconciliazioni_servizi_extra",
     )
     for movimento in queryset.iterator(chunk_size=200):
         totale = sum((r.importo for relation in (
             movimento.riconciliazioni_rate, movimento.pagamenti_fornitori, movimento.pagamenti_buste_paga,
+            movimento.riconciliazioni_servizi_extra,
         ) for r in relation.all()), Decimal("0.00"))
         for busta in movimento.buste_paga_dipendenti.all():
             if not busta.pagamenti.all():
@@ -2184,6 +2192,11 @@ def trova_rate_candidate(movimento, *, limite: int | None = 10, solo_disponibili
     # confrontiamo il valore assoluto, cosi' si puo' riconciliare anche
     # rimborsi/storni manuali.
     importo_cerca = abs(importo_mov)
+
+    if tutte_rate_aperte:
+        importo_cerca = importo_movimento_disponibile(movimento)
+        if importo_cerca <= _TOLLERANZA_IMPORTO_ESATTO:
+            return []
 
     if rate_pool is None:
         qs = (
@@ -2575,9 +2588,13 @@ def riconcilia_movimento_con_rate(
     allocazioni,
     *,
     utente=None,
+    allocazioni_servizi_extra=None,
+    residuo_movimento_atteso=None,
 ):
+    """Register tuition and optional extra-service shares in one transaction."""
     _serialize_reconciliation_writes()
-    from .models import RiconciliazioneRataMovimento, StatoRiconciliazione
+    from .models import RiconciliazioneRataMovimento, RiconciliazioneServizioExtraMovimento, StatoRiconciliazione
+    from servizi_extra.models import RataServizioExtra
 
     movimento = movimento.__class__.objects.select_for_update().get(pk=movimento.pk)
     allocazioni = list(allocazioni)
@@ -2586,6 +2603,12 @@ def riconcilia_movimento_con_rate(
 
     rate_correnti = RataIscrizione.objects.select_for_update().filter(pk__in=rate_ids).in_bulk()
     allocazioni = [(rate_correnti[rata.pk], importo) for rata, importo in allocazioni if rata is not None]
+    allocazioni_servizi_extra = list(allocazioni_servizi_extra or [])
+    extra_ids = [rata.pk for rata, _ in allocazioni_servizi_extra]
+    extra_correnti = RataServizioExtra.objects.select_for_update().filter(pk__in=extra_ids).in_bulk()
+    if len(set(extra_ids)) != len(extra_ids) or set(extra_correnti) != set(extra_ids):
+        raise ValidationError("Quote dei servizi extra non valide o duplicate.")
+    allocazioni_servizi_extra = [(extra_correnti[rata.pk], importo) for rata, importo in allocazioni_servizi_extra]
 
     _clear_importo_movimento_disponibile_cache(movimento)
 
@@ -2594,23 +2617,37 @@ def riconcilia_movimento_con_rate(
         for rata, importo in (allocazioni or [])
         if rata is not None and importo and importo > 0
     ]
-    if not allocazioni:
+    if not allocazioni and not allocazioni_servizi_extra:
         raise ValidationError("Seleziona almeno una rata e indica l'importo da riconciliare.")
 
-    _valida_identita_movimento_rate(movimento, [rata for rata, _importo in allocazioni])
+    if allocazioni:
+        _valida_identita_movimento_rate(movimento, [rata for rata, _importo in allocazioni])
+    for rata, importo in allocazioni_servizi_extra:
+        _valida_identita_movimento_rate(movimento, [rata])
+        if movimento.importo <= 0 or rata.pagata or not importo.is_finite() or importo <= 0:
+            raise ValidationError("Seleziona una quota extra da pagare e un importo positivo.")
+
+    registrazioni = [
+        (rata, importo, RiconciliazioneRataMovimento) for rata, importo in allocazioni
+    ] + [
+        (rata, importo, RiconciliazioneServizioExtraMovimento) for rata, importo in allocazioni_servizi_extra
+    ]
 
     disponibile = importo_movimento_disponibile(movimento)
-    totale_allocato = sum((importo for _rata, importo in allocazioni), Decimal("0.00"))
-    if totale_allocato > disponibile + _TOLLERANZA_IMPORTO_ESATTO:
+    if residuo_movimento_atteso is not None and disponibile != residuo_movimento_atteso:
+        raise ValidationError("Il residuo del movimento è cambiato. Verifica le quote prima di confermare nuovamente.")
+    totale_allocato = sum((importo for _rata, importo, _model in registrazioni), Decimal("0.00"))
+    tolleranza = Decimal("0.00") if allocazioni_servizi_extra else _TOLLERANZA_IMPORTO_ESATTO
+    if totale_allocato > disponibile + tolleranza:
         raise ValidationError("L'importo assegnato supera il residuo disponibile del movimento bancario.")
 
-    for rata, importo in allocazioni:
+    for rata, importo, _model in registrazioni:
         residuo_rata = importo_rata_residuo(rata)
-        if importo > residuo_rata + _TOLLERANZA_IMPORTO_ESATTO:
+        if importo > residuo_rata + tolleranza:
             raise ValidationError(f"L'importo assegnato a {rata.display_label} supera il residuo della rata.")
 
-    for rata, importo in allocazioni:
-        link, created = RiconciliazioneRataMovimento.objects.get_or_create(
+    for rata, importo, link_model in registrazioni:
+        link, created = link_model.objects.get_or_create(
             movimento=movimento,
             rata=rata,
             defaults={
@@ -2632,7 +2669,10 @@ def riconcilia_movimento_con_rate(
 
     residuo_movimento = importo_movimento_disponibile(movimento)
     links = list(movimento.riconciliazioni_rate.select_related("rata"))
-    movimento.rata_iscrizione = links[0].rata if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO and len(links) == 1 else None
+    movimento.rata_iscrizione = (
+        links[0].rata if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO and len(links) == 1
+        and not movimento.riconciliazioni_servizi_extra.exists() else None
+    )
     movimento.stato_riconciliazione = (
         StatoRiconciliazione.RICONCILIATO
         if residuo_movimento <= _TOLLERANZA_IMPORTO_ESATTO
@@ -2686,9 +2726,12 @@ def annulla_riconciliazione(movimento):
     _serialize_reconciliation_writes()
     from .models import StatoRiconciliazione
 
+    movimento = movimento.__class__.objects.select_for_update().get(pk=movimento.pk)
     links = list(movimento.riconciliazioni_rate.select_related("rata"))
+    extra_links = list(movimento.riconciliazioni_servizi_extra.select_related("rata"))
+    links.extend(extra_links)
     for link in links:
-        rata = link.rata
+        rata = link.rata.__class__.objects.select_for_update().get(pk=link.rata_id)
         rata.importo_pagato = max((rata.importo_pagato or Decimal("0.00")) - link.importo, Decimal("0.00"))
         importo_finale = rata.importo_finale or Decimal("0.00")
         rata.pagata = importo_finale <= 0 or rata.importo_pagato >= importo_finale - _TOLLERANZA_IMPORTO_ESATTO
@@ -2698,6 +2741,8 @@ def annulla_riconciliazione(movimento):
 
     if links:
         movimento.riconciliazioni_rate.all().delete()
+    if extra_links:
+        movimento.riconciliazioni_servizi_extra.all().delete()
 
     movimento.rata_iscrizione = None
     movimento.stato_riconciliazione = StatoRiconciliazione.NON_RICONCILIATO
@@ -2762,6 +2807,7 @@ def annulla_riconciliazione_rata(rata):
         nuova_rata_diretta = (
             links_rimasti[0].rata
             if len(links_rimasti) == 1 and residuo <= _TOLLERANZA_IMPORTO_ESATTO
+            and not movimento.riconciliazioni_servizi_extra.exists()
             else None
         )
         nuova_rata_diretta_id = nuova_rata_diretta.pk if nuova_rata_diretta else None
@@ -2924,7 +2970,8 @@ def aggiorna_stato_riconciliazione_movimento(movimento):
     ha_collegamenti_rate = bool(movimento.rata_iscrizione_id) or movimento.riconciliazioni_rate.exists()
     ha_collegamenti_fornitori = movimento.pagamenti_fornitori.exists()
     ha_collegamenti_buste = movimento.buste_paga_dipendenti.exists() or movimento.pagamenti_buste_paga.exists()
-    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
+    ha_collegamenti = (ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
+                       or movimento.riconciliazioni_servizi_extra.exists())
 
     if movimento.importo is not None and movimento.importo < 0:
         residuo = importo_movimento_disponibile_fornitori(movimento)
@@ -2963,7 +3010,9 @@ def stato_riconciliazione_movimento_display(movimento):
         if buste_count is not None
         else movimento.buste_paga_dipendenti.exists() or movimento.pagamenti_buste_paga.exists()
     )
-    ha_collegamenti = ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
+    extra_count = getattr(movimento, "riconciliazioni_servizi_extra_count", None)
+    ha_collegamenti = (ha_collegamenti_rate or ha_collegamenti_fornitori or ha_collegamenti_buste
+                       or (extra_count if extra_count is not None else movimento.riconciliazioni_servizi_extra.exists()))
 
     if not ha_collegamenti:
         return movimento.get_stato_riconciliazione_display()

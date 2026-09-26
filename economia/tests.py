@@ -60,6 +60,8 @@ from sistema.models import (
     ConfigurazioneEmailSMTP,
     GestioneIscrizioneCorsoAnno,
     SistemaImpostazioniGenerali,
+    SistemaRuoloPermessi,
+    SistemaUtentePermessi,
 )
 
 
@@ -1249,6 +1251,47 @@ class RateCustomizationAndRemodulationTests(TestCase):
         self.assertContains(response, f'href="{reconciliation_url}"')
         self.assertContains(response, f'data-popup-url="{reconciliation_url}"')
         self.assertNotContains(response, "Annulla riconciliazione")
+
+    def test_read_only_rate_detail_omits_reconciliation_actions(self):
+        user = User.objects.create_user(username="lettore-rate")
+        role = SistemaRuoloPermessi.objects.create(nome="Lettore rate")
+        SistemaUtentePermessi.objects.create(user=user, ruolo_permessi=role)
+        self.client.force_login(user)
+        self.iscrizione.sync_rate_schedule()
+        rata = self.iscrizione.rate.filter(tipo_rata=RataIscrizione.TIPO_MENSILE).first()
+        movimento = MovimentoFinanziario.objects.create(
+            data_contabile=rata.data_scadenza,
+            importo=rata.importo_finale,
+            descrizione="Pagamento retta Luca Bianchi",
+            stato_riconciliazione=StatoRiconciliazione.NON_RICONCILIATO,
+        )
+        riconcilia_movimento_con_rate(movimento, [(rata, rata.importo_finale)])
+        detail_url = reverse("modifica_rata_iscrizione", args=[rata.pk])
+        reconciliation_url = reverse("riconcilia_rata_iscrizione", args=[rata.pk])
+        cancel_url = reverse("annulla_riconciliazione_rata_iscrizione", args=[rata.pk])
+        configurations = (
+            ("view", {}),
+            ("none", {"economia_panoramica_rette": "view"}),
+            ("manage", {"economia_rate_iscrizione": "view", "economia_panoramica_rette": "view"}),
+        )
+        for module_level, page_levels in configurations:
+            role.permesso_economia = module_level
+            role.permessi_pagine = page_levels
+            role.save()
+            for query in ({}, {"popup": "1"}):
+                with self.subTest(module=module_level, pages=page_levels, query=query):
+                    response = self.client.get(detail_url, query)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertFalse(response.context["can_manage_economia"])
+                    self.assertNotContains(response, "Collega un pagamento")
+                    self.assertNotContains(response, "Annulla riconciliazione")
+                    self.assertNotContains(response, reconciliation_url)
+                    self.assertNotContains(response, cancel_url)
+                    self.assertNotContains(response, 'id="enable-edit-rata-btn"')
+            for url in (reconciliation_url, cancel_url):
+                with self.subTest(module=module_level, url=url):
+                    self.assertRedirects(self.client.get(url), reverse("home"), fetch_redirect_response=False)
+                    self.assertRedirects(self.client.post(url), reverse("home"), fetch_redirect_response=False)
 
     def test_rate_detail_has_cancel_reconciliation_button_when_linked(self):
         User.objects.create_superuser(username="admin", password="admin")

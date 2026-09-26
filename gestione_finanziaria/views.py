@@ -32,6 +32,7 @@ from sistema.models import LivelloPermesso
 from sistema.permissions import user_has_module_permission, user_is_operational_admin
 
 from .background_scheduler import background_scheduler_status
+from .reconciliation_extras import trova_quote_servizi_extra_candidate
 from .models import VerificaProforma
 from .proforme import (
     annulla_collegamento_proforma, candidati_proforma, collega_proforma,
@@ -5004,6 +5005,7 @@ def lista_movimenti_finanziari(request):
         MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
         .annotate(
             riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            riconciliazioni_servizi_extra_count=Count("riconciliazioni_servizi_extra", distinct=True),
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
             buste_paga_count=Count("pagamenti_buste_paga", distinct=True) + Count("buste_paga_dipendenti", distinct=True),
         )
@@ -5091,6 +5093,7 @@ def dettaglio_movimento_finanziario(request, pk):
             "rata_iscrizione",
         ).annotate(
             riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            riconciliazioni_servizi_extra_count=Count("riconciliazioni_servizi_extra", distinct=True),
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
             scadenze_fornitori_count=Count("scadenze_fornitori", distinct=True),
             spese_operative_count=Count("spese_operative", distinct=True),
@@ -5138,6 +5141,7 @@ def _link_count_movimento(movimento):
     return (
         (1 if movimento.rata_iscrizione_id else 0)
         + (getattr(movimento, "riconciliazioni_rate_count", 0) or 0)
+        + (getattr(movimento, "riconciliazioni_servizi_extra_count", 0) or 0)
         + (getattr(movimento, "pagamenti_fornitori_count", 0) or 0)
         + (getattr(movimento, "scadenze_fornitori_count", 0) or 0)
         + (getattr(movimento, "spese_operative_count", 0) or 0)
@@ -5147,6 +5151,8 @@ def _link_count_movimento(movimento):
 
 def _links_label_movimento(movimento):
     labels = []
+    if getattr(movimento, "riconciliazioni_servizi_extra_count", 0):
+        labels.append("servizi extra")
     if movimento.rata_iscrizione_id or (getattr(movimento, "riconciliazioni_rate_count", 0) or 0):
         labels.append("rate")
     if getattr(movimento, "pagamenti_fornitori_count", 0) or getattr(movimento, "scadenze_fornitori_count", 0):
@@ -5294,6 +5300,7 @@ def _movimenti_finanziari_duplicate_groups():
         MovimentoFinanziario.objects.select_related("conto", "categoria", "categoria__parent")
         .annotate(
             riconciliazioni_rate_count=Count("riconciliazioni_rate", distinct=True),
+            riconciliazioni_servizi_extra_count=Count("riconciliazioni_servizi_extra", distinct=True),
             pagamenti_fornitori_count=Count("pagamenti_fornitori", distinct=True),
             scadenze_fornitori_count=Count("scadenze_fornitori", distinct=True),
             spese_operative_count=Count("spese_operative", distinct=True),
@@ -5874,14 +5881,17 @@ def annulla_riconciliazione_movimento(request, pk):
     movimento = get_object_or_404(
         MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione").prefetch_related(
             "riconciliazioni_rate__rata",
+            "riconciliazioni_servizi_extra__rata__iscrizione__servizio",
+            "riconciliazioni_servizi_extra__rata__iscrizione__studente",
             "pagamenti_fornitori__scadenza__documento__fornitore",
         ),
         pk=pk,
     )
     next_url = _safe_next_url(request, "lista_movimenti_finanziari")
     riconciliazioni_rate = list(movimento.riconciliazioni_rate.all())
+    riconciliazioni_servizi_extra = list(movimento.riconciliazioni_servizi_extra.all())
     pagamenti_fornitori = list(movimento.pagamenti_fornitori.all())
-    ha_riconciliazioni = bool(movimento.rata_iscrizione_id or riconciliazioni_rate or pagamenti_fornitori)
+    ha_riconciliazioni = bool(movimento.rata_iscrizione_id or riconciliazioni_rate or riconciliazioni_servizi_extra or pagamenti_fornitori)
 
     if request.method == "POST":
         if not ha_riconciliazioni:
@@ -5890,7 +5900,7 @@ def annulla_riconciliazione_movimento(request, pk):
 
         rate_count = len(riconciliazioni_rate) or (1 if movimento.rata_iscrizione_id else 0)
         fornitori_count = len(pagamenti_fornitori)
-        if movimento.rata_iscrizione_id or riconciliazioni_rate:
+        if movimento.rata_iscrizione_id or riconciliazioni_rate or riconciliazioni_servizi_extra:
             annulla_riconciliazione(movimento)
         for pagamento in pagamenti_fornitori:
             annulla_pagamento_fornitore(pagamento)
@@ -5898,6 +5908,8 @@ def annulla_riconciliazione_movimento(request, pk):
         dettagli = []
         if rate_count:
             dettagli.append(f"{rate_count} collegamento/i rata")
+        if riconciliazioni_servizi_extra:
+            dettagli.append(f"{len(riconciliazioni_servizi_extra)} collegamento/i servizi extra")
         if fornitori_count:
             dettagli.append(f"{fornitori_count} pagamento/i fornitore")
         messages.success(request, "Riconciliazione annullata: " + ", ".join(dettagli) + ".")
@@ -5909,6 +5921,7 @@ def annulla_riconciliazione_movimento(request, pk):
         {
             "movimento": movimento,
             "riconciliazioni_rate": riconciliazioni_rate,
+            "riconciliazioni_servizi_extra": riconciliazioni_servizi_extra,
             "pagamenti_fornitori": pagamenti_fornitori,
             "ha_riconciliazioni": ha_riconciliazioni,
             "next_url": next_url,
@@ -7608,6 +7621,8 @@ def riconcilia_movimento(request, pk):
     movimento = get_object_or_404(
         MovimentoFinanziario.objects.select_related("conto", "categoria", "rata_iscrizione").prefetch_related(
             "riconciliazioni_rate__rata",
+            "riconciliazioni_servizi_extra__rata__iscrizione__servizio",
+            "riconciliazioni_servizi_extra__rata__iscrizione__studente",
             "pagamenti_fornitori__scadenza__documento__fornitore",
         ),
         pk=pk,
@@ -7622,7 +7637,7 @@ def riconcilia_movimento(request, pk):
         azione = request.POST.get("azione", "")
 
         if azione == "annulla":
-            if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate.exists():
+            if movimento.rata_iscrizione_id or movimento.riconciliazioni_rate.exists() or movimento.riconciliazioni_servizi_extra.exists():
                 annulla_riconciliazione(movimento)
             for pagamento in list(movimento.pagamenti_fornitori.all()):
                 annulla_pagamento_fornitore(pagamento)
@@ -7720,6 +7735,48 @@ def riconcilia_movimento(request, pk):
                         else:
                             messages.success(request, "Movimento riconciliato con la scadenza fornitore.")
                             return redirect(return_url)
+        elif azione == "collega" and request.POST.getlist("servizio_extra_ids"):
+            from economia.models import RataIscrizione
+            from servizi_extra.models import RataServizioExtra
+            from .services import riconcilia_movimento_con_rate
+
+            try:
+                if request.POST.get("marca_rata_pagata") != "1":
+                    raise ValidationError("Per collegare i servizi extra occorre registrare gli importi pagati.")
+                extra_ids = request.POST.getlist("servizio_extra_ids")
+                if any(not value.isdigit() for value in extra_ids) or len(set(extra_ids)) != len(extra_ids):
+                    raise ValidationError("Selezione dei servizi extra non valida.")
+                extras = RataServizioExtra.objects.in_bulk([int(value) for value in extra_ids])
+                if len(extras) != len(extra_ids):
+                    raise ValidationError("Una quota dei servizi extra non è più disponibile.")
+                allocazioni_extra = []
+                residuo_atteso = _parse_decimal_locale(request.POST.get("residuo_movimento_atteso", ""))
+                if not residuo_atteso.is_finite() or residuo_atteso <= 0:
+                    raise ValidationError("Il residuo del movimento non è valido. Ricarica la pagina.")
+                for extra_id in extra_ids:
+                    amount = _parse_decimal_locale(request.POST.get(f"importo_servizio_extra_{extra_id}", ""))
+                    if not amount.is_finite() or amount <= 0 or amount != amount.quantize(Decimal("0.01")):
+                        raise ValidationError("Indica un importo positivo con al massimo due decimali per ogni servizio selezionato.")
+                    allocazioni_extra.append((extras[int(extra_id)], amount))
+                allocazioni_rate = []
+                rata_id = request.POST.get("rata_pk")
+                if rata_id:
+                    if not rata_id.isdigit():
+                        raise ValidationError("Rata selezionata non valida.")
+                    rata = RataIscrizione.objects.filter(pk=int(rata_id), pagata=False).first()
+                    if rata is None or importo_rata_residuo(rata) <= 0:
+                        raise ValidationError("La rata selezionata non è più disponibile.")
+                    allocazioni_rate.append((rata, min(importo_movimento_disponibile(movimento), importo_rata_residuo(rata))))
+                riconcilia_movimento_con_rate(
+                    movimento, allocazioni_rate, allocazioni_servizi_extra=allocazioni_extra, utente=request.user,
+                    residuo_movimento_atteso=residuo_atteso,
+                )
+            except (ValidationError, InvalidOperation, ValueError) as exc:
+                for message in exc.messages if isinstance(exc, ValidationError) else ["Importo non valido."]:
+                    messages.error(request, message)
+            else:
+                messages.success(request, "Movimento riconciliato con le quote selezionate. L'eventuale eccedenza resta disponibile.")
+                return redirect(return_url)
         elif azione == "collega_rate_cumulativa":
             rata_ids = [item for item in request.POST.getlist("rata_ids") if item.isdigit()]
             if not rata_ids:
@@ -7803,7 +7860,12 @@ def riconcilia_movimento(request, pk):
         # A full monthly plan must not hide its enrollment fee (often 13th).
         limite_singole=None if tipo_riconciliazione == "rate" else 12,
         limite_cumulative=5,
+        tutte_rate_aperte=tipo_riconciliazione == "rate",
     )
+    candidati_servizi_extra = trova_quote_servizi_extra_candidate(movimento) if tipo_riconciliazione == "rate" else []
+    for candidato in candidati_servizi_extra:
+        candidato.residuo = importo_rata_residuo(candidato.rata)
+        candidato.importo_proposto = min(importo_movimento_disponibile(movimento), candidato.residuo)
     if tipo_riconciliazione == "fornitori":
         proposte_fornitori = [
             proposta
@@ -7842,12 +7904,16 @@ def riconcilia_movimento(request, pk):
             "proposte_riconciliazione": proposte_riconciliazione,
             "proposte_rate": proposte_rate,
             "proposte_rate_cumulative": proposte_rate_cumulative,
+            "candidati_servizi_extra": candidati_servizi_extra,
+            "numero_candidati": len(proposte_rate) + len(candidati_servizi_extra),
+            "stato_riconciliazione_label": stato_riconciliazione_movimento_display(movimento),
             "proposte_fornitori": proposte_fornitori,
             "proposte_fornitori_cumulative": proposte_fornitori_cumulative,
             "residuo_movimento": residuo_movimento,
             "gia_riconciliato": (
                 movimento.rata_iscrizione_id is not None
                 or movimento.riconciliazioni_rate.exists()
+                or movimento.riconciliazioni_servizi_extra.exists()
                 or movimento.pagamenti_fornitori.exists()
             ),
             "return_url": return_url,

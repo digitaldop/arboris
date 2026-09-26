@@ -210,6 +210,10 @@ class RataServizioExtraPagamentoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.riconciliazioni_movimenti.exists():
+            for name in ("pagata", "importo_pagato", "data_pagamento", "metodo_pagamento"):
+                self.fields[name].disabled = True
+                self.fields[name].help_text = "Pagamento collegato a un movimento bancario. Annulla la riconciliazione per modificarlo."
         apply_eur_currency_widget(self.fields["importo_pagato"])
         self.fields["metodo_pagamento"].required = False
         self.fields["metodo_pagamento"].widget.attrs.update({"placeholder": "Contanti, bonifico, POS..."})

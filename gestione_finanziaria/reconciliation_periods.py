@@ -59,8 +59,8 @@ def rate_movement_evidence(rate, movement):
         if not _TUITION_PATTERN.search(description):
             return 50, (3, 99999), "La causale indica una quota di iscrizione/preiscrizione, non una retta"
     return rate_period_evidence(
-        year=rate.anno_riferimento if monthly else (due.year if due else None),
-        month=rate.mese_riferimento if monthly else (due.month if due else None),
+        year=getattr(rate, "anno_riferimento", due.year if due else None) if monthly else (due.year if due else None),
+        month=getattr(rate, "mese_riferimento", due.month if due else None) if monthly else (due.month if due else None),
         due_date=due, movement_date=movement.data_contabile,
         description=description if monthly else "",
     )
