@@ -36,6 +36,7 @@ PERMISSION_PAGES = (
         'lista_famiglie',
         'crea_famiglia',
         'modifica_famiglia_logica',
+        'famiglia_indirizzo',
         'stampa_famiglia_logica',
     )),
     PermissionPage('anagrafica_ricerche', 'anagrafica', 'Ricerche', (
@@ -51,6 +52,7 @@ PERMISSION_PAGES = (
         'elimina_label_contatto',
         'ajax_cerca_citta',
         'ajax_indirizzi_duplicati',
+        'address_autocomplete',
     )),
     PermissionPage('anagrafica_documenti', 'anagrafica', 'Documenti', (
         'crea_tipo_documento',

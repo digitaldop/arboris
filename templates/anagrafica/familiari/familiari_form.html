@@ -667,7 +667,7 @@
                                         <label for="{{ form.indirizzo.id_for_label }}">Indirizzo</label>
                                         <div class="inline-related-field mode-edit-field family-card-editor-related-control family-student-editor-address-control">
                                             <div class="autocomplete-wrapper indirizzo-autocomplete">
-                                                {{ form.indirizzo }}
+                                                {% include "anagrafica/partials/family_address_choice.html" with address_form=form %}{{ form.indirizzo }}
                                             </div>
                                             <div class="related-actions inline-related-actions">
                                                 <button type="button" class="related-btn related-btn-add inline-related-add" id="add-indirizzo-btn" data-related-type="indirizzo" aria-label="Nuovo indirizzo" title="Nuovo indirizzo" data-floating-text="Nuovo indirizzo">
@@ -1239,7 +1239,7 @@
                                         <div class="related-field-row mode-edit-field">
                                             <div class="related-field-stack">
                                                 <div class="autocomplete-wrapper indirizzo-autocomplete">
-                                                    {{ form.indirizzo }}
+                                                    {% include "anagrafica/partials/family_address_choice.html" with address_form=form %}{{ form.indirizzo }}
                                                 </div>
                                             </div>
                                             <div class="related-actions">
@@ -1861,7 +1861,7 @@
                                             <td class="inline-address-cell inline-family-address-cell">
                                                 <div class="mode-view-only readonly-display readonly-display-inline readonly-display-plain">{% if f.instance.pk and f.instance.indirizzo_effettivo %}{{ f.instance.indirizzo_effettivo.label_full }}{% else %}<span class="table-muted">Nessun indirizzo</span>{% endif %}</div>
                                                 <div class="inline-related-field mode-edit-field">
-                                                    <div class="autocomplete-wrapper indirizzo-autocomplete">{{ f.indirizzo }}</div>
+                                                    <div class="autocomplete-wrapper indirizzo-autocomplete">{% include "anagrafica/partials/family_address_choice.html" with address_form=f %}{{ f.indirizzo }}</div>
                                                     <div class="related-actions inline-related-actions">
                                                         <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
                                                         <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">&#9998;</button>
@@ -2495,7 +2495,7 @@
                 </td>
                 <td class="inline-address-cell inline-family-address-cell">
                     <div class="inline-related-field mode-edit-field">
-                        <div class="autocomplete-wrapper indirizzo-autocomplete">{{ parenti_formset.empty_form.indirizzo }}</div>
+                        <div class="autocomplete-wrapper indirizzo-autocomplete">{% include "anagrafica/partials/family_address_choice.html" with address_form=parenti_formset.empty_form %}{{ parenti_formset.empty_form.indirizzo }}</div>
                         <div class="related-actions inline-related-actions">
                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>
                             <button type="button" class="related-btn related-btn-edit inline-related-edit" data-related-type="indirizzo">&#9998;</button>

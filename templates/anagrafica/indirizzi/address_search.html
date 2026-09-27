@@ -1,0 +1,15 @@
+{% load static %}
+<div class="address-search" data-address-autocomplete="{% url 'address_autocomplete' %}" data-city-url="{% url 'ajax_cerca_citta' %}">
+    {{ form.non_field_errors }}
+    <label for="address-query">Cerca indirizzo</label>
+    <input id="address-query" type="search" autocomplete="off" placeholder="Via Stelloni Levante 37" aria-controls="address-results" aria-expanded="false">
+    <div id="address-results" class="address-search-results" aria-label="Indirizzi suggeriti" hidden></div>
+    <p data-address-status role="status">Cerca in Arboris e con Geoapify, oppure compila manualmente i campi qui sotto.</p>
+    <p data-address-preview></p>
+    <p class="help-text">Ricerca indirizzi: <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer">Geoapify</a> / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>.</p>
+    {{ form.geoapify_token }}
+    <label for="{{ form.cap.id_for_label }}">CAP manuale (se manca nell'elenco)</label>
+    {{ form.cap }} {{ form.cap.errors }}
+    {% if indirizzo %}<p>Il salvataggio seleziona un nuovo indirizzo. Le altre persone mantengono l'indirizzo precedente.</p>{% endif %}
+</div>
+<script src="{% static 'js/core/address-autocomplete.js' %}" defer></script>

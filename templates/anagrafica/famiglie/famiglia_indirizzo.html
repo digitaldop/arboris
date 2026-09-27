@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Indirizzo principale della famiglia{% endblock %}
+{% block content %}
+<div class="content-card">
+    <h1>Indirizzo principale · {{ famiglia.cognome_famiglia }}</h1>
+    <p>I componenti che usano l'indirizzo della famiglia seguiranno questa scelta. Gli indirizzi personali restano disponibili.</p>
+    {% if famiglia.indirizzi_principali_in_conflitto %}<p>Questo gruppo comprende residenze principali diverse. La scelta qui sotto imposta un unico indirizzo principale per il gruppo.</p>{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        {% include "anagrafica/indirizzi/address_search.html" %}
+        <p>{{ form.via.label_tag }} {{ form.via }} {{ form.via.errors }}</p>
+        <p>{{ form.numero_civico.label_tag }} {{ form.numero_civico }} {{ form.numero_civico.errors }}</p>
+        <p>{{ form.citta_search.label_tag }} <span class="autocomplete-wrapper citta-autocomplete">{{ form.citta_search }}{{ form.citta }}</span>{{ form.citta.errors }}{{ form.citta_search.errors }}</p>
+        <p>{{ form.cap_scelto.label_tag }} {{ form.cap_scelto }} {{ form.cap_scelto.errors }}</p>
+        <button type="submit" class="btn btn-primary">Salva indirizzo principale</button>
+        <a class="btn btn-secondary" href="{% url 'modifica_famiglia_logica' famiglia.logical_key %}">Annulla</a>
+    </form>
+</div>
+<script src="{% static 'js/core/address-city-caps.js' %}" defer></script>
+{% endblock %}

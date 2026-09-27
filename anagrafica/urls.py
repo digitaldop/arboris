@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .address_autocomplete import address_autocomplete
 from sistema.permissions import authenticated_user_required, module_edit_permission_required, module_permission_required
 
 
@@ -9,6 +10,7 @@ anagrafica_manage = module_permission_required("anagrafica", level="manage")
 anagrafica_edit = module_edit_permission_required("anagrafica")
 
 urlpatterns = [
+    path("api/address-autocomplete/", anagrafica_view(address_autocomplete), name="address_autocomplete"),
     path("", app_auth(views.home), name="home"),
     path("ricerche-anagrafica/", anagrafica_view(views.ricerche_anagrafica), name="ricerche_anagrafica"),
     #URLS DEGLI INDIRIZZI
@@ -19,6 +21,8 @@ urlpatterns = [
     path("etichette-contatti/<str:kind>/nuova/", anagrafica_manage(views.crea_label_contatto), name="crea_label_contatto"),
     path("etichette-contatti/<str:kind>/<int:pk>/modifica/", anagrafica_edit(views.modifica_label_contatto), name="modifica_label_contatto"),
     path("etichette-contatti/<str:kind>/<int:pk>/elimina/", anagrafica_manage(views.elimina_label_contatto), name="elimina_label_contatto"),
+
+    path("famiglie/logica/<str:key>/indirizzo/", anagrafica_manage(views.famiglia_indirizzo), name="famiglia_indirizzo"),
 
     #URLS DELLE FAMIGLIE
     path("famiglie/", anagrafica_view(views.lista_famiglie), name="lista_famiglie"),

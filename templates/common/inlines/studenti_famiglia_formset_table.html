@@ -49,7 +49,7 @@
                     </div>
                     <div class="inline-related-field mode-edit-field">
                         <div class="autocomplete-wrapper indirizzo-autocomplete">
-                            {{ f.indirizzo }}
+                            {% include "anagrafica/partials/family_address_choice.html" with address_form=f %}{{ f.indirizzo }}
                         </div>
                         <div class="related-actions inline-related-actions">
                             <button type="button" class="related-btn related-btn-add inline-related-add" data-related-type="indirizzo">+</button>

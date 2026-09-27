@@ -116,6 +116,33 @@ class IndirizzoAdmin(admin.ModelAdmin):
     search_fields = ("via", "numero_civico", "cap", "citta__nome")
     ordering = ("via", "numero_civico")
 
+    def get_form(self, request, obj=None, **kwargs):
+        from django import forms
+        from .address_services import prepare_address
+
+        class AddressAdminForm(forms.ModelForm):
+            def clean(self):
+                data = super().clean()
+                candidate = Indirizzo(**{f.name: data[f.name] for f in Indirizzo._meta.fields if f.name in data})
+                prepare_address(candidate)
+                return data
+
+        kwargs["form"] = AddressAdminForm
+        return super().get_form(request, obj, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        from .address_services import get_or_create_normalized_address
+        values = {field.attname: getattr(obj, field.attname) for field in obj._meta.concrete_fields if not field.primary_key and field.editable}
+        selected, _ = get_or_create_normalized_address(**values)
+        obj.pk, obj._state = selected.pk, selected._state
+
+    def has_change_permission(self, request, obj=None):
+        return obj is None and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 
 @admin.register(LabelIndirizzo)
 class LabelIndirizzoAdmin(admin.ModelAdmin):

@@ -1,0 +1,41 @@
+Using existing test database for alias 'default' ('test_arboris_address_revision')...
+
+test_ambiguous_or_conflicting_city_is_not_created_or_guessed (anagrafica.test_addresses.AutocompleteTests.test_ambiguous_or_conflicting_city_is_not_created_or_guessed) ... ok
+test_auth_input_and_short_queries (anagrafica.test_addresses.AutocompleteTests.test_auth_input_and_short_queries) ... C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+ok
+test_delete_rejects_secondary_contact_and_family_references (anagrafica.test_addresses.AutocompleteTests.test_delete_rejects_secondary_contact_and_family_references) ... ok
+test_edit_view_changes_only_selected_association_and_ignores_force_duplicate (anagrafica.test_addresses.AutocompleteTests.test_edit_view_changes_only_selected_association_and_ignores_force_duplicate) ... ok
+test_family_address_page_saves_new_association (anagrafica.test_addresses.AutocompleteTests.test_family_address_page_saves_new_association) ... ok
+test_unavailable_keeps_local_results_and_manual_form (anagrafica.test_addresses.AutocompleteTests.test_unavailable_keeps_local_results_and_manual_form) ... ok
+test_valid_response_reconciles_existing_territories_and_caches (anagrafica.test_addresses.AutocompleteTests.test_valid_response_reconciles_existing_territories_and_caches) ... ok
+test_consolidation_preserves_all_relations_and_is_idempotent (anagrafica.test_addresses.MigrationAddressTests.test_consolidation_preserves_all_relations_and_is_idempotent) ... ok
+test_constraint_and_bulk_creation_cannot_duplicate (anagrafica.test_addresses.SharedAddressTests.test_constraint_and_bulk_creation_cannot_duplicate) ... ok
+test_create_and_reuse_case_punctuation_and_combined_address (anagrafica.test_addresses.SharedAddressTests.test_create_and_reuse_case_punctuation_and_combined_address) ... ok
+test_distinct_civics_and_suffix_spacing (anagrafica.test_addresses.SharedAddressTests.test_distinct_civics_and_suffix_spacing) ... ok
+test_family_principal_fallback_and_personal_override (anagrafica.test_addresses.SharedAddressTests.test_family_principal_fallback_and_personal_override) ... ok
+test_foreign_cap_rejected (anagrafica.test_addresses.SharedAddressTests.test_foreign_cap_rejected) ... ok
+test_incompatible_households_are_not_merged (anagrafica.test_addresses.SharedAddressTests.test_incompatible_households_are_not_merged) ... ok
+test_manual_cap_not_in_catalog_and_no_new_territories (anagrafica.test_addresses.SharedAddressTests.test_manual_cap_not_in_catalog_and_no_new_territories) ... ok
+test_manual_form_reuses_without_provider (anagrafica.test_addresses.SharedAddressTests.test_manual_form_reuses_without_provider) ... ok
+test_new_relation_inherits_settings_and_split_change_isolated (anagrafica.test_addresses.SharedAddressTests.test_new_relation_inherits_settings_and_split_change_isolated) ... ok
+test_secondary_contact_is_preserved_when_using_family (anagrafica.test_addresses.SharedAddressTests.test_secondary_contact_is_preserved_when_using_family) ... ok
+test_shared_address_is_immutable_and_change_reassociates (anagrafica.test_addresses.SharedAddressTests.test_shared_address_is_immutable_and_change_reassociates) ... ok
+test_two_connections_create_one_address (anagrafica.test_addresses.AddressConcurrencyTests.test_two_connections_create_one_address) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 8.303s
+
+OK
+Preserving test database for alias 'default' ('test_arboris_address_revision')...
+
+Found 20 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: messages, staticfiles
+  Apply all migrations: admin, anagrafica, archivio_storico, auth, calendario, contenttypes, economia, famiglie_interessate, fondo_accantonamento, gestione_amministrativa, gestione_finanziaria, osservazioni, scuola, servizi_extra, sessions, sistema
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  No migrations to apply.
+System check identified no issues (0 silenced).

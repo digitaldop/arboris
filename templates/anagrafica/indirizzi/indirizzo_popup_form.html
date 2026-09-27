@@ -11,6 +11,7 @@
 
         <form method="post" class="related-config-popup-form related-address-popup-form">
             {% csrf_token %}
+            {% include "anagrafica/indirizzi/address_search.html" %}
             <input type="hidden" name="popup" value="1">
             <input type="hidden" name="target_input_name" value="{{ request.GET.target_input_name|default:'' }}">
 
@@ -21,7 +22,7 @@
                 <div class="related-address-popup-title-block">
                     <div class="related-config-kicker">Anagrafica</div>
                     <h1 class="page-title">{% if indirizzo %}Modifica indirizzo{% else %}Nuovo indirizzo{% endif %}</h1>
-                    <p>{% if indirizzo %}Aggiorna i dati dell'indirizzo selezionato.{% else %}Aggiungi un nuovo indirizzo di residenza o domicilio.{% endif %}</p>
+                    <p>{% if indirizzo %}Seleziona l'indirizzo aggiornato per questa scheda.{% else %}Aggiungi un nuovo indirizzo di residenza o domicilio.{% endif %}</p>
                 </div>
             </div>
 
@@ -35,35 +36,7 @@
                 </div>
             </div>
 
-            {% if duplicate_candidates %}
-                <div class="related-address-popup-info related-address-duplicate-warning">
-                    <span class="related-address-popup-info-icon" aria-hidden="true">!</span>
-                    <div>
-                        <p><strong>Possibile indirizzo gia presente.</strong></p>
-                        <p>Controlla le corrispondenze: puoi usare un indirizzo esistente oppure confermare la creazione di uno nuovo.</p>
-                        <div class="related-address-duplicate-list">
-                            {% for candidate in duplicate_candidates %}
-                                <div class="related-address-duplicate-item">
-                                    <div>
-                                        <strong>{{ candidate.label }}</strong>
-                                        {% if candidate.owners %}
-                                            <div class="help-text">
-                                                Usato da:
-                                                {% for owner in candidate.owners %}
-                                                    {{ owner.tipo }} {{ owner.nome }}{% if not forloop.last %}, {% endif %}
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                    <button type="submit" name="use_existing_address" value="{{ candidate.id }}" class="btn btn-secondary btn-sm">
-                                        Usa questo
-                                    </button>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+
 
             <div class="related-config-popup-editor related-address-popup-editor">
                 <div class="related-address-popup-grid">
@@ -174,14 +147,7 @@
                     </span>
                     <span class="btn-label">Salva</span>
                 </button>
-                {% if duplicate_candidates %}
-                    <button type="submit" name="force_new_address" value="1" class="btn btn-warning-soft btn-icon-text">
-                        <span class="btn-icon" aria-hidden="true">
-                            <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#plus"></use></svg>
-                        </span>
-                        <span class="btn-label">Crea comunque nuovo</span>
-                    </button>
-                {% endif %}
+
                 <button type="button" class="btn btn-secondary btn-icon-text" onclick="window.close()">
                     <span class="btn-icon" aria-hidden="true">
                         <svg><use href="{% static 'images/arboris-ui-icons.svg' %}#chevron-left"></use></svg>
@@ -269,6 +235,7 @@
                 fetch(url.toString())
                     .then(response => response.json())
                     .then(data => {
+                        if (String(cittaInput.value) !== selectedCityId) return;
                         const match = (data.results || []).find(item => String(item.id) === selectedCityId)
                             || null;
 
@@ -284,6 +251,7 @@
                         loadCaps(match.caps || [], currentCapValue);
                     })
                     .catch(() => {
+                        if (String(cittaInput.value) !== selectedCityId) return;
                         provinciaDisplay.value = "";
                         regioneDisplay.value = "";
                         resetCapSelect();

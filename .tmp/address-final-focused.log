@@ -1,0 +1,13 @@
+Using existing test database for alias 'default'...
+
+C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+...............................
+----------------------------------------------------------------------
+Ran 31 tests in 13.002s
+
+OK
+Preserving test database for alias 'default'...
+
+Found 31 test(s).
+System check identified no issues (0 silenced).

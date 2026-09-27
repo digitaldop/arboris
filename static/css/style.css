@@ -41911,3 +41911,17 @@ body.ui-professional-interface .sidebar-reorder-list > .sidebar-section > .sideb
     padding: 7px 0 10px;
     background: transparent !important;
 }
+
+/* Shared address search and family inheritance */
+.address-search { padding: 18px; margin-bottom: 18px; border: 1px solid #dce4e2; border-radius: 12px; background: #f7faf9; }
+.address-search > input[type="search"] { width: 100%; min-height: 42px; padding: 10px 12px; margin: 8px 0; border: 1px solid #cbd8d4; border-radius: 8px; font: inherit; background: white; box-sizing: border-box; }
+.address-search-results { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.address-search-results[hidden] { display: none; }
+.address-search-results button { text-align: left; white-space: normal; }
+.family-address-choice { margin-bottom: 8px; font-size: 13px; }
+.family-address-choice label { display: flex; align-items: center; gap: 6px; }
+.family-address-choice small { display: block; color: #536761; }
+.uses-family-address .searchable-select,
+.uses-family-address .searchable-select-container,
+.uses-family-address .related-actions,
+.uses-family-address select[name$="indirizzo"] { display: none !important; }

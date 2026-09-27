@@ -1,0 +1,12 @@
+{% if address_form.usa_indirizzo_famiglia %}
+<div class="family-address-choice">
+    <input type="hidden" name="{% if address_form.prefix %}{{ address_form.prefix }}-{% endif %}family_address_present" value="1">
+    <label>{{ address_form.usa_indirizzo_famiglia }} Usa l'indirizzo principale della famiglia</label>
+    {{ address_form.usa_indirizzo_famiglia.errors }}
+    {% if address_form.instance.residenza_famiglia.indirizzo_principale %}
+        <small>{{ address_form.instance.residenza_famiglia.indirizzo_principale.label_full }}</small>
+    {% else %}
+        <small>L'indirizzo principale si imposta nella scheda della famiglia.</small>
+    {% endif %}
+</div>
+{% endif %}

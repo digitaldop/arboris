@@ -229,9 +229,31 @@ class CAP(models.Model):
         super().save(*args, **kwargs)
     
 
+class IndirizzoQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Gli indirizzi sono condivisi: crea o seleziona un altro indirizzo.")
+
+    def bulk_update(self, objs, fields, **kwargs):
+        raise ValidationError("Gli indirizzi condivisi non si modificano in blocco.")
+
+    def bulk_create(self, objs, **kwargs):
+        from .address_services import prepare_address
+        if kwargs.get("update_conflicts"):
+            raise ValidationError("Non è consentito sovrascrivere indirizzi condivisi.")
+        objs = [prepare_address(obj) for obj in objs]
+        return super().bulk_create(objs, **kwargs)
+
+
 class Indirizzo(models.Model):
+    objects = IndirizzoQuerySet.as_manager()
     via = models.CharField(max_length=200)
     numero_civico = models.CharField(max_length=20, blank=True)
+    via_normalizzata = models.CharField(max_length=200, editable=False, blank=True)
+    civico_normalizzato = models.CharField(max_length=40, editable=False, blank=True)
+    chiave_normalizzata = models.CharField(max_length=64, editable=False, null=True, blank=True)
+    latitudine = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitudine = models.DecimalField(max_digits=11, decimal_places=7, null=True, blank=True)
+    geoapify_place_id = models.CharField(max_length=512, blank=True)
 
     regione = models.ForeignKey(
         Regione,
@@ -267,15 +289,17 @@ class Indirizzo(models.Model):
     class Meta:
         verbose_name = "Indirizzo"
         verbose_name_plural = "Indirizzi"
+        constraints = [models.UniqueConstraint(fields=["chiave_normalizzata"], name="unique_indirizzo_normalizzato")]
+        indexes = [models.Index(fields=["citta", "via_normalizzata", "civico_normalizzato"], name="indirizzo_lookup_idx")]
 
     def save(self, *args, **kwargs):
-        if self.citta:
-            self.provincia = self.citta.provincia
-            self.regione = self.citta.provincia.regione
-
-        if self.cap_scelto:
-            self.cap = self.cap_scelto.codice
-
+        from .address_services import prepare_address
+        if self.pk and not self._state.adding:
+            current = type(self).objects.using(kwargs.get("using") or self._state.db).get(pk=self.pk)
+            if any(getattr(current, f.attname) != getattr(self, f.attname) for f in self._meta.concrete_fields):
+                raise ValidationError("Indirizzo condiviso: cerca o crea un nuovo record e cambia il collegamento.")
+            return
+        prepare_address(self)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -315,6 +339,22 @@ class Indirizzo(models.Model):
         if dettagli:
             return f"{base} - {' - '.join(dettagli)}"
         return base
+
+
+class IndirizzoArchivioMigrazione(models.Model):
+    """Lossless audit of rows/relationships consolidated by the data migration."""
+    originale_id = models.PositiveBigIntegerField(unique=True)
+    canonico_id = models.PositiveBigIntegerField()
+    dati = models.JSONField()
+    relazioni = models.JSONField(default=list)
+
+
+class ResidenzaFamiglia(models.Model):
+    """Shared address settings, independent of the existing logical-family graph."""
+    indirizzo_principale = models.ForeignKey(Indirizzo, on_delete=models.PROTECT, null=True, blank=True, related_name="residenze_famiglie")
+
+    def __str__(self):
+        return str(self.indirizzo_principale or "Indirizzo principale da impostare")
 
 
 class LabelIndirizzo(models.Model):
@@ -747,6 +787,8 @@ class FamiliareQuerySet(models.QuerySet):
 
 
 class Familiare(models.Model):
+    residenza_famiglia = models.ForeignKey(ResidenzaFamiglia, on_delete=models.PROTECT, null=True, blank=True, related_name="familiari")
+    usa_indirizzo_famiglia = models.BooleanField(default=False, verbose_name="Usa l'indirizzo principale della famiglia")
     PERSONA_PROXY_FIELDS = {
         "indirizzo",
         "nome",
@@ -1018,12 +1060,14 @@ class Familiare(models.Model):
 
     @property
     def indirizzo_effettivo(self):
+        if self.usa_indirizzo_famiglia:
+            return self.residenza_famiglia.indirizzo_principale if self.residenza_famiglia_id else None
         link = _first_principal_link(self.persona.indirizzi_anagrafici) if self.persona_id else None
         if not link:
             link = _first_principal_link(self.indirizzi_anagrafici)
         if link and link.indirizzo_id:
             return link.indirizzo
-        return self.indirizzo
+        return self.indirizzo or (self.residenza_famiglia.indirizzo_principale if self.residenza_famiglia_id else None)
 
     @property
     def telefono_principale(self):
@@ -1070,6 +1114,8 @@ class Familiare(models.Model):
 # INIZIO MODELLI PER GLI STUDENTI
 
 class Studente(models.Model):
+    residenza_famiglia = models.ForeignKey(ResidenzaFamiglia, on_delete=models.PROTECT, null=True, blank=True, related_name="studenti")
+    usa_indirizzo_famiglia = models.BooleanField(default=False, verbose_name="Usa l'indirizzo principale della famiglia")
     indirizzi_anagrafici = GenericRelation(
         AnagraficaIndirizzo,
         related_query_name="studenti",
@@ -1135,10 +1181,12 @@ class Studente(models.Model):
 
     @property
     def indirizzo_effettivo(self):
+        if self.usa_indirizzo_famiglia:
+            return self.residenza_famiglia.indirizzo_principale if self.residenza_famiglia_id else None
         link = _first_principal_link(self.indirizzi_anagrafici)
         if link and link.indirizzo_id:
             return link.indirizzo
-        return self.indirizzo
+        return self.indirizzo or (self.residenza_famiglia.indirizzo_principale if self.residenza_famiglia_id else None)
 
     @property
     def telefono_principale(self):

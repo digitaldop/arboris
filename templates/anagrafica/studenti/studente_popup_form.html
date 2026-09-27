@@ -53,7 +53,7 @@
                         <div class="related-field-row popup-related-field">
                             <div class="related-field-stack">
                                 <div class="autocomplete-wrapper indirizzo-autocomplete">
-                                    {{ form.indirizzo }}
+                                    {% include "anagrafica/partials/family_address_choice.html" with address_form=form %}{{ form.indirizzo }}
                                 </div>
                             </div>
                             <div class="related-actions">

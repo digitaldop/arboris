@@ -1,0 +1,274 @@
+Using existing test database for alias 'default'...
+
+.C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+................E..............s.s..s....ssss.....sssssssssssssssssssssssss......................ssssssss....sss.......C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\core\handlers\base.py:61: UserWarning: No directory at: C:\sviluppo_software\arboris\staticfiles\
+  mw_instance = middleware(adapted_handler)
+.....ssssssss....ssssssssssss...sssss............................s...s...........................sssssssssssssss...............................ssssssssss.................................................s.................................................................................................................................................................................................Analisi riconciliazioni non completata (richiesta 2019).
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\gestione_finanziaria\reconciliation_worker.py", line 41, in process_pending_analysis
+    analyse_request(job.tipo, job.oggetto_id)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\mirco\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\mock.py", line 1241, in _execute_mock_call
+    raise effect
+RuntimeError: test interruption
+............................................................................................ss.......................................................s...............................................................................sssssssssssssss...........ssss.....F.F.FEFFFFFFFFFFFFFFFFFEFF.............................................................................................s.........................................................................................................
+======================================================================
+ERROR: test_secondary_contact_is_preserved_when_using_family (anagrafica.test_addresses.SharedAddressTests.test_secondary_contact_is_preserved_when_using_family)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\anagrafica\test_addresses.py", line 123, in test_secondary_contact_is_preserved_when_using_family
+    AnagraficaIndirizzo.objects.create(content_type=ContentType.objects.get_for_model(student), object_id=student.pk, indirizzo=other, principale=True, label=LabelIndirizzo.objects.get(nome="Principale"))
+                                                                                                                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\query.py", line 635, in get
+    raise self.model.DoesNotExist(
+        "%s matching query does not exist." % self.model._meta.object_name
+    )
+anagrafica.models.LabelIndirizzo.DoesNotExist: LabelIndirizzo matching query does not exist.
+
+======================================================================
+ERROR: test_login_riuscito_registra_una_sola_voce_con_utente_e_orario (sistema.test_audit_accessi.AuditAccessiTests.test_login_riuscito_registra_una_sola_voce_con_utente_e_orario)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 48, in test_login_riuscito_registra_una_sola_voce_con_utente_e_orario
+    entry = SistemaOperazioneCronologia.objects.get()
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\query.py", line 638, in get
+    raise self.model.MultipleObjectsReturned(
+    ...<5 lines>...
+    )
+sistema.models.SistemaOperazioneCronologia.MultipleObjectsReturned: get() returned more than one SistemaOperazioneCronologia -- it returned 2!
+
+======================================================================
+ERROR: test_scheda_identificata_dal_percorso_senza_parametri_o_contenuti (sistema.test_audit_accessi.AuditAccessiTests.test_scheda_identificata_dal_percorso_senza_parametri_o_contenuti)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 79, in test_scheda_identificata_dal_percorso_senza_parametri_o_contenuti
+    entry = SistemaOperazioneCronologia.objects.get()
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\sviluppo_software\arboris\.venv\Lib\site-packages\django\db\models\query.py", line 638, in get
+    raise self.model.MultipleObjectsReturned(
+    ...<5 lines>...
+    )
+sistema.models.SistemaOperazioneCronologia.MultipleObjectsReturned: get() returned more than one SistemaOperazioneCronologia -- it returned 2!
+
+======================================================================
+FAIL: test_accesso_negato_non_registrato_come_visita (sistema.test_audit_accessi.AuditAccessiTests.test_accesso_negato_non_registrato_come_visita)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 171, in test_accesso_negato_non_registrato_come_visita
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_eccezioni_ripristinano_il_contesto_utente (sistema.test_audit_accessi.AuditAccessiTests.test_eccezioni_ripristinano_il_contesto_utente)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 187, in test_eccezioni_ripristinano_il_contesto_utente
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_login_fallito_e_pagine_anonime_non_generano_eventi (sistema.test_audit_accessi.AuditAccessiTests.test_login_fallito_e_pagine_anonime_non_generano_eventi)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 65, in test_login_fallito_e_pagine_anonime_non_generano_eventi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_polling_log_non_genera_visite (sistema.test_audit_accessi.AuditAccessiTests.test_polling_log_non_genera_visite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 167, in test_polling_log_non_genera_visite
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='HEAD', headers={}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='POST', headers={}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={'HTTP_SEC_FETCH_DEST': 'empty'}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={'HTTP_HX_REQUEST': 'true'}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={'HTTP_PURPOSE': 'prefetch'}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={'HTTP_SEC_PURPOSE': 'prefetch;prerender'}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=200, content_type='application/json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=302, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=403, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=404, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=500, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=200, content_type='application/pdf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_richieste_automatiche_file_frammenti_ed_errori_esclusi (sistema.test_audit_accessi.AuditAccessiTests.test_richieste_automatiche_file_frammenti_ed_errori_esclusi) (method='GET', headers={}, status=200, content_type='text/html; charset=utf-8')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 112, in test_richieste_automatiche_file_frammenti_ed_errori_esclusi
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_schema_non_disponibile_non_interrompe_la_pagina (sistema.test_audit_accessi.AuditAccessiTests.test_schema_non_disponibile_non_interrompe_la_pagina)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 178, in test_schema_non_disponibile_non_interrompe_la_pagina
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_utenti_anonimi_e_audit_disabilitato_non_registrati (sistema.test_audit_accessi.AuditAccessiTests.test_utenti_anonimi_e_audit_disabilitato_non_registrati)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\sviluppo_software\arboris\sistema\test_audit_accessi.py", line 123, in test_utenti_anonimi_e_audit_disabilitato_non_registrati
+    self.assertFalse(SistemaOperazioneCronologia.objects.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 990 tests in 627.837s
+
+FAILED (failures=22, errors=3, skipped=119)
+Preserving test database for alias 'default'...
+
+Found 990 test(s).
+System check identified no issues (0 silenced).
+Catalogo fonti aggiornato: 6 nuove, 0 aggiornate.

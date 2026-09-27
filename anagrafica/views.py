@@ -2455,6 +2455,7 @@ def popup_response(request, message="Operazione completata."):
 
 
 def get_indirizzo_usage(indirizzo):
+    from .address_services import address_references
     studenti = [
         f"{cognome} {nome}".strip()
         for cognome, nome in indirizzo.studenti.order_by("cognome", "nome").values_list("cognome", "nome")
@@ -2478,7 +2479,7 @@ def get_indirizzo_usage(indirizzo):
         "studenti": studenti,
         "familiari": familiari,
         "scuole": scuole,
-        "totale": len(studenti) + len(familiari) + len(scuole),
+        "totale": sum(query.count() for _, query in address_references(indirizzo)),
     }
 
 
@@ -2588,23 +2589,6 @@ def crea_indirizzo(request):
 
         form = IndirizzoForm(request.POST)
         if form.is_valid():
-            if request.POST.get("force_new_address") != "1":
-                duplicate_candidates = _indirizzo_duplicate_candidates_from_form(form)
-                if duplicate_candidates:
-                    template_name = (
-                        "anagrafica/indirizzi/indirizzo_popup_form.html"
-                        if popup
-                        else "anagrafica/indirizzi/indirizzo_form.html"
-                    )
-                    return render(
-                        request,
-                        template_name,
-                        {
-                            "form": form,
-                            "popup": popup,
-                            "duplicate_candidates": duplicate_candidates,
-                        },
-                    )
             indirizzo = form.save()
 
             if popup:
@@ -2615,7 +2599,7 @@ def crea_indirizzo(request):
                     object_label=indirizzo.label_select(),
                 )
 
-            messages.success(request, "Indirizzo creato correttamente.")
+            messages.success(request, "Indirizzo creato correttamente." if form.address_created else "Indirizzo già presente: selezionato il record esistente.")
             return redirect(f"{reverse('lista_indirizzi')}?highlight={indirizzo.pk}")
     else:
         form = IndirizzoForm()
@@ -2646,24 +2630,6 @@ def modifica_indirizzo(request, pk):
 
         form = IndirizzoForm(request.POST, instance=indirizzo)
         if form.is_valid():
-            if request.POST.get("force_new_address") != "1":
-                duplicate_candidates = _indirizzo_duplicate_candidates_from_form(form, exclude_id=indirizzo.pk)
-                if duplicate_candidates:
-                    template_name = (
-                        "anagrafica/indirizzi/indirizzo_popup_form.html"
-                        if popup
-                        else "anagrafica/indirizzi/indirizzo_form.html"
-                    )
-                    return render(
-                        request,
-                        template_name,
-                        {
-                            "form": form,
-                            "indirizzo": indirizzo,
-                            "popup": popup,
-                            "duplicate_candidates": duplicate_candidates,
-                        },
-                    )
             indirizzo = form.save()
 
             if popup:
@@ -2701,7 +2667,13 @@ def elimina_indirizzo(request, pk):
     usage = get_indirizzo_usage(indirizzo)
 
     if request.method == "POST":
-        indirizzo.delete()
+        from .address_services import address_references
+        with transaction.atomic():
+            indirizzo = Indirizzo.objects.select_for_update().get(pk=indirizzo.pk)
+            if any(query.exists() for _, query in address_references(indirizzo)):
+                messages.error(request, "Indirizzo ancora utilizzato: cambia il collegamento nella scheda della persona o famiglia.")
+                return redirect("lista_indirizzi")
+            indirizzo.delete()
 
         if popup:
             return popup_delete_response(
@@ -5241,3 +5213,18 @@ def elimina_studente(request, pk):
     )
 
 #FINE VIEWS PER GLI STUDENTI
+
+
+def famiglia_indirizzo(request, key):
+    from .family_address_services import set_family_address
+    snapshot = resolve_logical_family_snapshot(key)
+    if snapshot is None:
+        raise Http404("Famiglia non trovata.")
+    form = IndirizzoForm(request.POST or None, instance=snapshot.indirizzo_principale)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            address = form.save()
+            set_family_address(snapshot, address)
+        messages.success(request, "Indirizzo principale aggiornato.")
+        return redirect("modifica_famiglia_logica", key=snapshot.logical_key)
+    return render(request, "anagrafica/famiglie/famiglia_indirizzo.html", {"form": form, "famiglia": snapshot})

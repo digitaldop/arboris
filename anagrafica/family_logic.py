@@ -45,6 +45,7 @@ class LogicalFamilySnapshot:
     familiari: list[Familiare] = field(default_factory=list)
     cognome_famiglia: str = ""
     indirizzo_principale: object | None = None
+    indirizzi_principali_in_conflitto: bool = False
     note_entries: list[LogicalFamilyNote] = field(default_factory=list)
 
     @property
@@ -196,6 +197,8 @@ def _load_students(student_ids):
     return list(
         students
         .select_related(
+            "residenza_famiglia__indirizzo_principale__citta__provincia",
+            "residenza_famiglia__indirizzo_principale__provincia",
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
             "indirizzo__regione",
@@ -216,6 +219,8 @@ def _load_relatives(familiare_ids):
     return list(
         relatives
         .select_related(
+            "residenza_famiglia__indirizzo_principale__citta__provincia",
+            "residenza_famiglia__indirizzo_principale__provincia",
             "relazione_familiare",
             "indirizzo__citta__provincia",
             "indirizzo__provincia",
@@ -247,6 +252,11 @@ def build_logical_family_snapshot_from_ids(
     relatives = _load_relatives(familiare_ids) if relatives is None else relatives
     fallback_name = getattr(legacy_family, "cognome_famiglia", "")
     fallback_address = getattr(legacy_family, "indirizzo_principale", None)
+    principal_addresses = {
+        person.residenza_famiglia.indirizzo_principale_id: person.residenza_famiglia.indirizzo_principale
+        for person in list(students) + list(relatives)
+        if person.residenza_famiglia_id and person.residenza_famiglia.indirizzo_principale_id
+    }
 
     return LogicalFamilySnapshot(
         legacy_family=legacy_family,
@@ -260,11 +270,9 @@ def build_logical_family_snapshot_from_ids(
         studenti=students,
         familiari=relatives,
         cognome_famiglia=_derive_family_name(students, relatives, fallback_name),
-        indirizzo_principale=_derive_family_address(
-            students,
-            relatives,
-            fallback_address,
-        ),
+        indirizzo_principale=(next(iter(principal_addresses.values())) if len(principal_addresses) == 1 else
+                             None if len(principal_addresses) > 1 else _derive_family_address(students, relatives, fallback_address)),
+        indirizzi_principali_in_conflitto=len(principal_addresses) > 1,
         note_entries=_build_note_entries(students, relatives),
     )
 

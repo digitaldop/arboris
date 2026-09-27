@@ -622,6 +622,15 @@ class FamiliareRelationSelectMultiple(forms.SelectMultiple):
 
 
 class IndirizzoSearchMixin:
+    def clean(self):
+        data = super().clean()
+        flag_name = "usa_indirizzo_famiglia"
+        if flag_name in self.fields and self.add_prefix(flag_name) not in self.data and self.add_prefix("family_address_present") not in self.data:
+            data[flag_name] = getattr(self.instance, flag_name, False)
+        if data.get("usa_indirizzo_famiglia"):
+            data["indirizzo"] = None
+        return data
+
     indirizzo_search = forms.CharField(
         required=False,
         label="Indirizzo",
@@ -676,7 +685,7 @@ class IndirizzoSearchMixin:
                     selected_label = selected.label_select()
         else:
             selected = self.initial.get(field_name) or getattr(self.instance, field_name, None)
-            if not selected:
+            if not selected and not hasattr(self.instance, "residenza_famiglia_id"):
                 selected = getattr(self.instance, "indirizzo_effettivo", None)
             if selected:
                 if hasattr(selected, "pk"):
@@ -991,6 +1000,7 @@ class LuogoNascitaCittaFkMixin:
 
 #FORMS PER GLI INDIRIZZI
 class IndirizzoForm(forms.ModelForm):
+    geoapify_token = forms.CharField(required=False, widget=forms.HiddenInput())
     citta_search = forms.CharField(
         required=False,
         label="Città",
@@ -1009,6 +1019,7 @@ class IndirizzoForm(forms.ModelForm):
             "numero_civico",
             "citta",
             "cap_scelto",
+            "cap",
         ]
         widgets = {
             "citta": forms.Select(attrs={"data-citta-hidden": "1"}),
@@ -1018,6 +1029,7 @@ class IndirizzoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["via"].label = "Via / Strada / Piazza"
+        self.fields["citta"].required = True
         self.fields["via"].widget.attrs["placeholder"] = "Via Roma, Piazza Maggiore, Viale dei Mille, etc."
         self.fields["numero_civico"].widget.attrs["placeholder"] = "Es. 15, 3/B, interno 2, etc."
         self.fields["citta"].widget = forms.HiddenInput(attrs={"data-citta-hidden": "1"})
@@ -1071,6 +1083,9 @@ class IndirizzoForm(forms.ModelForm):
         citta = cleaned_data.get("citta")
         citta_search = cleaned_data.get("citta_search")
         cap_scelto = cleaned_data.get("cap_scelto")
+        cap_manual = (cleaned_data.get("cap") or "").strip()
+        if cap_manual and not re.fullmatch(r"\d{5}", cap_manual):
+            self.add_error("cap", "Inserisci un CAP italiano di 5 cifre.")
 
         if citta_search and not citta:
             self.add_error("citta_search", "Seleziona una città valida dall'elenco.")
@@ -1078,16 +1093,42 @@ class IndirizzoForm(forms.ModelForm):
         if citta:
             caps = CAP.objects.filter(citta=citta, attivo=True).order_by("codice")
             num_caps = caps.count()
+            if cap_manual and not cap_scelto:
+                cap_scelto = caps.filter(codice=cap_manual).first()
+                cleaned_data["cap_scelto"] = cap_scelto
 
-            if num_caps == 1 and not cap_scelto:
+            if num_caps == 1 and not cap_scelto and not cap_manual:
                 cleaned_data["cap_scelto"] = caps.first()
-            elif num_caps > 1 and not cap_scelto:
+            elif num_caps > 1 and not cap_scelto and not cap_manual:
                 self.add_error("cap_scelto", "Seleziona un CAP per questa città.")
 
             if cap_scelto and cap_scelto.citta_id != citta.id:
                 self.add_error("cap_scelto", "Il CAP selezionato non appartiene alla città scelta.")
+            if cap_scelto and cap_manual and cap_scelto.codice != cap_manual:
+                self.add_error("cap", "Il CAP manuale non coincide con quello selezionato.")
 
         return cleaned_data
+
+    def save(self, commit=True):
+        from django.core import signing
+        from .address_autocomplete import TOKEN_SALT
+        from .address_services import get_or_create_normalized_address
+
+        if self.errors:
+            raise ValueError("Impossibile salvare un indirizzo non valido.")
+        values = {key: self.cleaned_data.get(key) for key in ("via", "numero_civico", "citta", "cap_scelto", "cap")}
+        try:
+            signed = signing.loads(self.cleaned_data.get("geoapify_token", ""), salt=TOKEN_SALT, max_age=3600)
+            expected = {"via": values["via"], "numero_civico": values["numero_civico"], "citta_id": getattr(values["citta"], "pk", None), "cap_id": getattr(values["cap_scelto"], "pk", None)}
+            if signed["address"] == expected:
+                values.update(signed["metadata"])
+        except (signing.BadSignature, KeyError, TypeError):
+            pass  # Manual edits and expired selections remain fully usable.
+        if not commit:
+            return Indirizzo(**values)
+        # Deliberately never save the bound instance: it may have other owners.
+        self.instance, self.address_created = get_or_create_normalized_address(**values)
+        return self.instance
     
 #FINE FORMS PER GLI INDIRIZZI
 
@@ -1155,6 +1196,7 @@ class FamiliareForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelF
         fields = [
             "relazione_familiare",
             "indirizzo",
+            "usa_indirizzo_famiglia",
             "nome",
             "cognome",
             "telefono",
@@ -1649,6 +1691,7 @@ class StudenteForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, forms.ModelFo
             "nazionalita",
             "codice_fiscale",
             "indirizzo",
+            "usa_indirizzo_famiglia",
             "attivo",
         ]
         widgets = {
@@ -1757,6 +1800,7 @@ class StudenteStandaloneForm(IndirizzoSearchMixin, LuogoNascitaCittaFkMixin, for
             "nazionalita",
             "codice_fiscale",
             "indirizzo",
+            "usa_indirizzo_famiglia",
             "attivo",
             "note",
         ]

@@ -1,7 +1,7 @@
 import logging
 
 from django.db import transaction
-from django.db.models.signals import post_delete, pre_save
+from django.db.models.signals import post_delete, pre_save, post_save
 from django.dispatch import receiver
 
 from .models import Documento
@@ -9,6 +9,21 @@ from .storage_utils import DOCUMENT_STORAGE_ERROR_TYPES
 
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender="anagrafica.StudenteFamiliare")
+def connect_address_settings(sender, instance, raw=False, **kwargs):
+    if not raw and instance.attivo:
+        from .family_address_services import connect_family_addresses
+        connect_family_addresses(instance)
+
+
+@receiver(post_save, sender="anagrafica.Studente")
+@receiver(post_save, sender="anagrafica.Familiare")
+def initialize_address_settings(sender, instance, raw=False, **kwargs):
+    if not raw:
+        from .family_address_services import initialize_family_address
+        initialize_family_address(instance)
 
 
 def _delete_document_file_if_unused(file_name, *, exclude_pk=None):

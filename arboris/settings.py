@@ -295,3 +295,6 @@ FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI = (
     os.environ.get("FATTURE_IN_CLOUD_OAUTH_REDIRECT_URI")
     or os.environ.get("FATTURE_IN_CLOUD_REDIRECT_URI", "")
 ).strip()
+
+# Address search is optional; manual entry and local reuse always work.
+GEOAPIFY_API_KEY = os.environ.get("GEOAPIFY_API_KEY", "").strip()

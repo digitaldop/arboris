@@ -4,6 +4,8 @@ from collections import defaultdict
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
+from .address_normalization import normalize_text as normalize_address_part, normalize_address
+
 from .models import (
     AnagraficaEmail,
     AnagraficaIndirizzo,
@@ -23,20 +25,6 @@ DEFAULT_PHONE_LABELS = ["Principale", "Cellulare", "Casa", "Lavoro", "Emergenza"
 DEFAULT_EMAIL_LABELS = ["Principale", "Personale", "Lavoro", "PEC", "Altro"]
 
 
-def normalize_address_part(value):
-    value = (value or "").strip().lower()
-    value = re.sub(r"[^\w\s]", " ", value)
-    value = re.sub(r"\s+", " ", value).strip()
-    replacements = {
-        "v ": "via ",
-        "v. ": "via ",
-        "p zza ": "piazza ",
-        "p.zza ": "piazza ",
-        "str ": "strada ",
-    }
-    for old, new in replacements.items():
-        value = value.replace(old, new)
-    return value
 
 
 def ensure_default_contact_labels():
@@ -77,6 +65,10 @@ def sync_principal_contacts(instance, *, indirizzo=None, telefono=None, email=No
                 "ordine": 1,
             },
         )
+        if isinstance(instance, Familiare) and instance.persona_id:
+            # The family profile reads Persona's primary contact first. Keep
+            # that association aligned too, without editing either address.
+            sync_principal_contacts(instance.persona, indirizzo=indirizzo)
 
     if telefono is not None:
         telefono = (telefono or "").strip()
@@ -185,6 +177,9 @@ def sync_legacy_contact_fields_from_links(instance):
 
     if update_fields:
         instance.save(update_fields=update_fields)
+
+    if isinstance(instance, Familiare) and instance.persona_id and address_link:
+        sync_principal_contacts(instance.persona, indirizzo=address_link.indirizzo)
 
     return instance
 
@@ -351,8 +346,7 @@ def _address_owner_payload(indirizzo):
 
 
 def address_duplicate_candidates(*, via, numero_civico="", cap="", citta_id=None, exclude_id=None, limit=8):
-    via_norm = normalize_address_part(via)
-    numero_norm = normalize_address_part(numero_civico)
+    via_norm, numero_norm = normalize_address(via, numero_civico)
     cap = (cap or "").strip()
     try:
         citta_id = int(citta_id) if citta_id else None
@@ -377,8 +371,7 @@ def address_duplicate_candidates(*, via, numero_civico="", cap="", citta_id=None
 
     candidates = []
     for indirizzo in queryset[:80]:
-        existing_via = normalize_address_part(indirizzo.via)
-        existing_numero = normalize_address_part(indirizzo.numero_civico)
+        existing_via, existing_numero = normalize_address(indirizzo.via, indirizzo.numero_civico)
         score = 0
         if existing_via == via_norm:
             score += 70
